@@ -18,10 +18,18 @@
 //	NOTE: Portions of this source adapted from MrBayes source code (Huelsenbeck and Ronquist)
 //	I believe that they originaly appeared in PAUP* source code
 
-#include <stdio.h>
-#include <math.h>
-#include <float.h>
-#include <assert.h>
+#if defined(_MSC_VER)
+//POL 23-Feb-2006 VC requires these headers instead if using the std namespace
+#	include <cstdio>
+#	include <cmath>
+#	include <cfloat>
+#	include <cassert>
+#else
+#	include <stdio.h>
+#	include <math.h>
+#	include <float.h>
+#	include <assert.h>
+#endif
 
 using namespace std;
 

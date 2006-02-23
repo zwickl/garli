@@ -19,7 +19,12 @@
 //	Press, W. H., B. P. Flannery, S. A. Teukolsky, and W. T. Vetterling.  1992. 
 //	Numerical Recipes in C : The Art of Scientific Computing.  Cambridge University Press, Cambridge.
 
-#include <unistd.h>
+#if defined(_MSC_VER)
+//POL 23-Feb-2006 VC doesn't have this header, and it was not needed to compile
+//#	include <unistd.h>
+#else
+#	include <unistd.h>
+#endif
 
 #include "funcs.h"
 #include "population.h"

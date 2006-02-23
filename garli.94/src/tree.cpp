@@ -1407,6 +1407,8 @@ int Tree::VariableSPRMutate(int range, double optPrecision){
 	ofstream poo("3branchScores.log", ios::app);
 	poo << endl;
 	poo.close();
+
+	return 0; //POL 23-Feb-2006 VC complained about no return statement for this function
 	}
  
 int Tree::SPRMutate(int range, double optPrecision){
