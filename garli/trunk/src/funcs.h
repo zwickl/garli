@@ -31,6 +31,29 @@
 
 extern rng rnd;
 
+class InternalState{
+	private:
+	char best;
+	double probs[4];
+	
+	public:
+	InternalState(double *tots){
+		char bases[4]={'A', 'C', 'G', 'T'};
+
+		double tot=0.0;
+		tot = tots[0] + tots[1] + tots[2] + tots[3];
+		int max1=(tots[0] > tots[1] ? 0:1);
+		int max2=(tots[2] > tots[3] ? 2:3);	
+		best=bases[(tots[max1] > tots[max2] ? max1 : max2)];
+		for(int i=0;i<4;i++)
+			probs[i]=tots[i]/tot;
+		}
+	void Output(ofstream &out){
+		out << best << "\t" << probs[0] << "\t" << probs[1] <<  "\t" << probs[2] << "\t" <<  probs[3] << "\n";
+		
+		}
+	};
+
 int FileExists(const char* s);
 int ReadData(const Parameters& params, HKYData* data);
 int ReadData(const char* filename, HKYData* data);
@@ -44,6 +67,7 @@ double brent(double ax, double bx, double cx, double (*f)(TreeNode *, Tree*, dou
 double DZbrent(double ax, double bx, double cx, double fa, double fb, double fc, double (*f)(TreeNode *, Tree*, double), double tol, double *xmin, TreeNode *thisnode, Tree *thistree);
 void DirichletRandomVariable (double *alp, double *z, int n);
 void InferStatesFromCla(char *states, double *cla, int nchar);
+vector<InternalState *> *InferStatesFromCla(double *cla, int nchar);
 double CalculatePDistance(const char *str1, const char *str2, int nchar);
 #ifndef GANESH
 double CalculateHammingDistance(const char *str1, const char *str2, int nchar);

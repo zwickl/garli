@@ -57,6 +57,7 @@ ClaManager *Tree::claMan;
 list<TreeNode *> Tree::nodeOptVector;
 HKYData *Tree::data;
 int Tree::rescaleEvery;
+double Tree::treeRejectionThreshold;
 
 void InferStatesFromCla(char *states, double *cla, int nchar);
 double CalculateHammingDistance(const char *str1, const char *str2, int nchar);
@@ -1256,6 +1257,49 @@ void Tree::TaxonSwap(int range, double optPrecision){
 	OptimizeBranchesAroundNode(t2->anc, optPrecision, 0);	
 	}
 
+void Tree::VariableNNIMutate(int node, int branch, double optPrecision, int subtreeNode){
+	//this is just a spoof version of SPRMutate that will perform the same mutation
+	//several times with different levels of optimiation, but will otherwise 
+	//maintain exactly the same program flow because it resets the seed
+	
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	
+	Individual sourceIndiv;
+	sourceIndiv.treeStruct=this;
+	sourceIndiv.mod->CopyModel(this->mod);
+		
+	int savedSeed;
+	
+	ofstream out("variable.log", ios::app);
+	out.precision(9);
+	out << "NNI\t" << lnL << "\t";
+	
+	
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv);
+	
+	double prec[5]={.5, .25, .1, .05, .01};
+	for(int i=0;i<5;i++){
+		savedSeed = rnd.seed();
+		tempIndiv.treeStruct->NNIMutate(node, branch, prec[i], subtreeNode);
+		out << tempIndiv.treeStruct->lnL << "\t";
+		rnd.set_seed(savedSeed);
+		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
+		}
+	out << "\n";
+	
+	tempIndiv.treeStruct->RemoveTreeFromAllClas();
+	delete tempIndiv.treeStruct;
+	tempIndiv.treeStruct=NULL;
+	sourceIndiv.treeStruct=NULL;
+
+	NNIMutate(node, branch, optPrecision, subtreeNode);
+
+	ofstream poo("3branchScores.log", ios::app);
+	poo << endl;
+	poo.close();
+	}
+
 void Tree::NNIMutate(int node, int branch, double optPrecision, int subtreeNode){
 
 	TreeNode* connector=NULL;
@@ -1320,6 +1364,51 @@ void Tree::NNIMutate(int node, int branch, double optPrecision, int subtreeNode)
 #endif
 
 	OptimizeBranchesWithinRadius(connector, optPrecision, subtreeNode);
+	}
+ 
+ 
+int Tree::VariableSPRMutate(int range, double optPrecision){
+	//this is just a spoof version of SPRMutate that will perform the same mutation
+	//several times with different levels of optimiation, but will otherwise 
+	//maintain exactly the same program flow because it resets the seed
+	
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	
+	Individual sourceIndiv;
+	sourceIndiv.treeStruct=this;
+	sourceIndiv.mod->CopyModel(this->mod);
+		
+	int savedSeed;
+	
+	ofstream out("variable.log", ios::app);
+	out.precision(9);
+	out << "SPR" << range << "\t" << lnL << "\t";
+	
+	
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv);
+	
+	double prec[5]={.5, .25, .1, .05, .01};
+	for(int i=0;i<5;i++){
+		savedSeed = rnd.seed();
+		tempIndiv.treeStruct->SPRMutate(range, prec[i]);
+		out << tempIndiv.treeStruct->lnL << "\t";
+		rnd.set_seed(savedSeed);
+		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
+		}
+	out << "\n";
+
+	tempIndiv.treeStruct->RemoveTreeFromAllClas();
+	delete tempIndiv.treeStruct;
+	tempIndiv.treeStruct=NULL;
+	sourceIndiv.treeStruct=NULL;
+
+	SPRMutate(range, optPrecision);
+	ofstream poo("3branchScores.log", ios::app);
+	poo << endl;
+	poo.close();
+
+	return 0; //POL 23-Feb-2006 VC complained about no return statement for this function
 	}
  
 int Tree::SPRMutate(int range, double optPrecision){
@@ -1497,7 +1586,7 @@ int Tree::SPRMutate(int range, double optPrecision){
 
 int Tree::GatherNodesInRadius(int range, TreeNode *sib, TreeNode *subtreeNode){
 	//if we are reconnecting within some particular range of branches, gather all the nodes within that range
-	sprRange.empty();
+	sprRange.clear();
 	sprRange.setseed(sib->nodeNum);//the subset will be centered on cut's sib
     for(int i = 0;i<range;i++){
       int j = sprRange.total;
@@ -2234,12 +2323,16 @@ bool Tree::ConditionalLikelihood(int direction, TreeNode* nd){
 */	return true;
 	}
 
-void Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd){
+int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA /*=false*/){
+	//note that fillFinalCLA just refers to whether we actually want to calc a CLA
+	//representing the contribution of the entire tree vs just calcing the score
+	//The only reason I can think of for doing that is to calc internal state probs
+	//the fuction will then return a pointer to the CLA
 
 	calcCount++;
 	
 	int nsites=data->NChar();
-	CondLikeArray *destCLA;
+	CondLikeArray *destCLA=NULL;
 
 	TreeNode* Lchild, *Rchild;
 	CondLikeArray *LCLA=NULL, *RCLA=NULL, *partialCLA=NULL;
@@ -2381,15 +2474,27 @@ void Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd){
 				mod->CalcPmatRateHet(child->dlen, prmat, false);
 				}
 			}	
+		
+		if(fillFinalCLA==false){
+			if(childCLA!=NULL)//if child is internal
+				lnL = GetScorePartialInternalRateHet(partialCLA, childCLA, prmat);
 			
-		if(childCLA!=NULL){//if child is internal
-			lnL = GetScorePartialInternalRateHet(partialCLA, childCLA, prmat);
-//			CalcFullCLAPartialInternalRateHet(destCLA, childCLA, prmat, partialCLA, nsites);
+			else
+				lnL = GetScorePartialTerminalRateHet(partialCLA, prmat, child->tipData);
 			}
 		
 		else{
-			lnL = GetScorePartialTerminalRateHet(partialCLA, prmat, child->tipData);
-//			CalcFullCLAPartialTerminalRateHet(destCLA, partialCLA, prmat, child->tipData, nsites);
+			//this is only for inferring internal states
+			//careful!  This will have to be returned manually!!
+			int wholeTreeIndex=claMan->AssignClaHolder();
+			claMan->FillHolder(wholeTreeIndex, ROOT);
+			claMan->ReserveCla(wholeTreeIndex);
+			if(childCLA!=NULL)//if child is internal
+				CalcFullCLAPartialInternalRateHet(claMan->GetCla(wholeTreeIndex), childCLA, prmat, partialCLA, nsites);
+			
+			else
+				CalcFullCLAPartialTerminalRateHet(claMan->GetCla(wholeTreeIndex), partialCLA, prmat, child->tipData, nsites);
+			return wholeTreeIndex;
 			}
 		}
 
@@ -2397,6 +2502,7 @@ void Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd){
 		if(destCLA->rescaleRank >= rescaleEvery)
 			RescaleRateHet(destCLA, nsites);
 
+	return -1;
 	}
 
 int Tree::Score(int rootNodeNum /*=0*/){
@@ -3020,7 +3126,7 @@ void Tree::SetDistanceBasedBranchLengthsAroundNode(TreeNode *nd){
 void Tree::FindNearestTerminalUp(TreeNode *start, TreeNode *&term, double &dist){
 	dist=999999.9;
 	int nodeDist=9999;
-	sprRange.empty();
+	sprRange.clear();
 	sprRange.setseed(start->nodeNum);
 	int range=10;
     for(int i = 0;i<range;i++){
@@ -3048,7 +3154,7 @@ void Tree::FindNearestTerminalUp(TreeNode *start, TreeNode *&term, double &dist)
 void Tree::FindNearestTerminalsDown(TreeNode *start, TreeNode *from, TreeNode *&term1, TreeNode *&term2, double &dist1, double &dist2){
 	dist1=dist2=999999.9;
 	int nodeDist1=9999, nodeDist2=9999;
-	sprRange.empty();
+	sprRange.clear();
 	if(from==start->left) sprRange.setseed(start->right->nodeNum, start->right->dlen);
 	else sprRange.setseed(start->left->nodeNum, start->left->dlen);
 	int range=10;
@@ -3073,7 +3179,7 @@ void Tree::FindNearestTerminalsDown(TreeNode *start, TreeNode *from, TreeNode *&
 		    }
 		}
 
-	sprRange.empty();
+	sprRange.clear();
 	if(start->anc != NULL){		
 		sprRange.setseed(start->anc->nodeNum, start->dlen);
 		for(int i = 0;i<range;i++){
@@ -3587,6 +3693,57 @@ void Tree::GetInternalStateString(char *string, int nodeNum){
 //	Score(nodeNum);
 //	InferStatesFromCla(string, claMan->GetTempCla()->arr, data->NChar());	
 	}
+
+void Tree::InferAllInternalStateProbs(char *ofprefix){
+	char filename[80];
+	sprintf(filename, "%s.internalstates.log", ofprefix);
+	ofstream out(filename);
+	out.precision(5);
+	RecursivelyCalculateInternalStateProbs(root, out);
+	out.close();
+	}
+
+void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
+	if(nd->left != NULL) RecursivelyCalculateInternalStateProbs(nd->left, out);
+	if(nd->next != NULL) RecursivelyCalculateInternalStateProbs(nd->next, out);
+	
+	if(nd->left != NULL){
+		int wholeTreeIndex=ConditionalLikelihoodRateHet(ROOT, nd, true);
+		vector<InternalState *> *stateProbs=InferStatesFromCla(claMan->GetCla(wholeTreeIndex)->arr, data->NChar());
+
+		char subtreeString[5000];
+		nd->MakeNewickForSubtree(subtreeString);		
+		out << "node " << nd->nodeNum << "\t" << subtreeString << "\t";
+		char *loc=subtreeString;
+		NxsString temp;
+		
+		while(*loc){
+			if(isdigit(*loc) == false) out << *loc++;
+			else{
+				while(isdigit(*loc))
+					temp += *loc++;
+				out << data->TaxonLabel(atoi(temp.c_str())-1);
+				temp="";
+				}
+			}
+		out << "\n";
+		
+		for(int s=0;s<data->GapsIncludedNChar();s++){
+			out << s+1 << "\t";
+			if(data->Number(s) > -1)
+				(*stateProbs)[data->Number(s)]->Output(out);
+			else out << "Entirely uninformative character (gaps,N's or ?'s)\n";
+			}
+		
+		claMan->ClearTempReservation(wholeTreeIndex);
+		claMan->DecrementCla(wholeTreeIndex);
+		
+		for(vector<InternalState*>::iterator delit=stateProbs->begin();delit!=stateProbs->end();delit++){
+			delete *(delit);
+			}
+		delete stateProbs;
+		}
+	}
 	
 void Tree::ClaReport(ofstream &cla){
 	int totDown=0;
@@ -3632,10 +3789,14 @@ double Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, con
 	double *partial=partialCLA->arr;
 	int *underflow_mult=partialCLA->underflow_mult;
 
+	int nchar=data->NChar();
+#ifdef UNIX
+	madvise(partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+#endif
+
 	double siteL, totallnL=0.0;
 	double La, Lc, Lg, Lt;
 	
-	int nchar=data->NChar();
 	//gamma and invariants
 	const int *countit=data->GetCounts();
 	int lastConst=data->LastConstant();
@@ -3679,7 +3840,7 @@ double Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, con
 				}
 			partial+=16;
 			}
-		if(i<=lastConst){
+		if(mod->NoPinvInModel() == false && i<=lastConst){
 			double btot=0.0;
 			if(conBases[i]&1) btot+=mod->Pi(0);
 			if(conBases[i]&2) btot+=mod->Pi(1);
@@ -3705,11 +3866,17 @@ double Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, con
 	double *partial=partialCLA->arr;
 	int *underflow_mult1=partialCLA->underflow_mult;
 	int *underflow_mult2=childCLA->underflow_mult;
-	
+
+	int nchar=data->NChar();
+
+#ifdef UNIX
+	madvise(partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+	madvise(CL1, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+#endif
+
 	double siteL, totallnL=0.0;
 	double La, Lc, Lg, Lt;
 
-	int nchar=data->NChar();
 	//gamma and invariants
 	const int *countit=data->GetCounts();
 	int lastConst=data->LastConstant();
@@ -3730,7 +3897,7 @@ double Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, con
 			partial+=4;
 			CL1+=4;
 			}
-		if(i<=lastConst){
+		if(mod->NoPinvInModel() == false && i<=lastConst){
 			double btot=0.0;
 			if(conBases[i]&1) btot+=mod->Pi(0);
 			if(conBases[i]&2) btot+=mod->Pi(1);

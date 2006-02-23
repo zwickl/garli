@@ -40,6 +40,8 @@ extern int calcCount;
 
 #define MUTUALLY_EXCLUSIVE_MUTS
 
+#undef VARIABLE_OPTIMIZATION
+
 //
 //
 // Methods for class Individual
@@ -72,7 +74,7 @@ void Individual::CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const 
 	CopyNonTreeFields(sourceOfInformation);
 	treeStruct=sourceOfTreePtr;
 
-	for(int i=params->data->NTax()+1;i<(2*params->data->NTax()-2);i++)
+	for(int i=treeStruct->getNumTipsTotal()+1;i<(2*treeStruct->getNumTipsTotal()-2);i++)
 		treeStruct->allNodes[i]->attached=false;
 		
 	//DZ 10-28 changing this	
@@ -281,6 +283,11 @@ void Individual::SubtreeMutate(int subdomain, double optPrecision, vector<int> c
 	calcCount=0;
 	}
 
+#ifdef VARIABLE_OPTIMIZATION
+
+#define SPRMutate VariableSPRMutate
+#define NNIMutate VariableNNIMutate
+#endif
 
 void Individual::Mutate(double optPrecision, Adaptation *adap){
 	//this is the original version of mutate, and will be called by both 
@@ -364,21 +371,24 @@ void Individual::Mutate(double optPrecision, Adaptation *adap){
 	//DJZ making model mutations mutually exclusive with topo mutations
 	else if( r < adap->modelMutateProb + adap->topoMutateProb){
 	  r = rnd.uniform();
-	  double p=1.0/11.0;
-	  if(r<p){//5% of model mutations will be tree rescalings
+	  double p;
+	  if(mod->NoPinvInModel() == false)
+	  	p=1.0/11.0;
+	  else p=1.0/10.0;
+	  if(r<p){
 		treeStruct->ScaleWholeTree();
 		mutation_type |= muScale;
 		}
 	  
-	  else if(r < p*6){
+	  else if(r < p*6.0){
 	    mod->MutateRates();
 	    mutation_type |= rates;
 	  }
-	  else if(r < p*7){
+	  else if(r < p*7.0){
 	    mod->MutateAlpha();
 	    mutation_type |= alpha;		
 	  }
-	  else if(r < p*10){
+	  else if(r < p*10.0){
 	    mod->MutatePis();
 	    mutation_type |= pi;
 	  }
@@ -437,13 +447,24 @@ void Individual::Randomize(char* fname, int rank){
 	double ebf[4];
 	params->data->CalcEmpiricalFreqs( ebf );
 	mod->SetPis(ebf);
-	mod->SetPinv(0.25 * ((double)params->data->NConstant()/(params->data->NConstant()+params->data->NInformative()+params->data->NAutapomorphic())));
-	mod->SetMaxPinv((double)params->data->NConstant()/(params->data->NConstant()+params->data->NInformative()+params->data->NAutapomorphic()));
+	if(mod->NoPinvInModel()){
+		mod->SetPinv(0.0);
+		mod->SetMaxPinv(0.0);		
+		}
+	else{
+		mod->SetPinv(0.25 * ((double)params->data->NConstant()/(params->data->NConstant()+params->data->NInformative()+params->data->NAutapomorphic())));
+		mod->SetMaxPinv((double)params->data->NConstant()/(params->data->NConstant()+params->data->NInformative()+params->data->NAutapomorphic()));
+		}
 	
 	if(strcmp(fname, "random") == 0) MakeRandomTree();
 
 	else { //using a startfile for the initial conditions
-	  if( params->starting_tree.length() == 0 )	{
+	  //12-28-05 This part used to check whether a tree had
+	  //previously been read in before going into this loop.
+	  //now it goes in regardlesss, since it needs to for
+	  // bootstrapping from a starting tree
+	  if(1){
+	  //if( params->starting_tree.length() == 0 )	{
 			if (!FileExists(fname))	{
 				throw ErrorException("starting model/tree file \"%s\" does not exist!", fname);
 				}
@@ -546,7 +567,9 @@ void Individual::Randomize(char* fname, int rank){
 						}				
 					else if(c == 'P' || c == 'p'){
 						stf >> temp;
-						mod->SetPinv(atof(temp));
+						double p=atof(temp);
+						if(mod->NoPinvInModel() == true && p > 0.0) throw ErrorException("Error: Value for proportion of invariable sites\nspecified in %s, but not allowed in model\n(see dontinferproportioninvariant in conf file).", fname);
+						mod->SetPinv(p);
 						foundModel=true;
 						c=stf.get();
 						}
@@ -587,29 +610,25 @@ void Individual::Randomize(char* fname, int rank){
 	CalcFitness(0);
 	}
 
-void Individual::RefineStartingConditions(bool optModel){
+void Individual::RefineStartingConditions(bool optModel, double branchPrec){
 	if(optModel) cout << "optimizing starting branch lengths and model..." << endl;
 	else cout << "optimizing starting branch lengths..." << endl;
 	double improve=999.9;
 	CalcFitness(0);
-	for(int i=1;improve > 50;i++){
+	for(int i=1;improve > branchPrec;i++){
 		double alphaImprove=0.0, pinvImprove=0.0, optImprove=0.0, scaleImprove=0.0;
-		double prec;
-		if(i==1) prec=.5;
-		else prec=.1;
-		optImprove=treeStruct->OptimizeAllBranches(prec);
+		
+		optImprove=treeStruct->OptimizeAllBranches(branchPrec);
 		scaleImprove=treeStruct->OptimizeTreeScale();
 		if(optModel==true){
 			alphaImprove=treeStruct->OptimizeAlpha();
-	//		if(optImprove < 1000.0) pinvImprove=treeStruct->OptimizePinv();
 			}
 		improve=scaleImprove + optImprove + alphaImprove + pinvImprove;
 		cout << "pass " << i << ": tree scale=" << scaleImprove << "\tbranch opt=" << optImprove;
-		if(optModel==true) cout << "\talpha=" << alphaImprove /*<< "\tpinv=" << pinvImprove*/ << endl;
+		if(optModel==true) cout << "\talpha=" << alphaImprove << endl;
 		else cout << endl;
 		}
-//	treeStruct->MarkUpwardClasToReclaim(0);
-//	treeStruct->MarkDownwardClasToReclaim(0);
+
 	treeStruct->MakeAllNodesDirty();
 	treeStruct->nodeOptVector.clear();
 	treeStruct->calcs=calcCount;

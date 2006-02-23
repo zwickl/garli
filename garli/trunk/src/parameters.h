@@ -61,6 +61,7 @@ class Parameters{
 	double selectionIntensity;
 	double holdoverPenalty;
 	double meanBrlenMuts;//, min_brlen_muts, max_brlen_muts;
+	double treeRejectionThreshold;
 
 	Parameters() : data(0), restart(0), stopnow(0), showProgress(0)
 		{ FactorySettings(); }

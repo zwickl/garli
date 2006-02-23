@@ -142,8 +142,12 @@ class ParallelManager{
 //		recalcThresh = mc->subtreeRecalcThresh;
 		updateThresh = startUpdateThresh = mc->startUpdateThresh;
 		minUpdateThresh = mc->minUpdateThresh;
-		updateReductionFactor = mc->updateReductionFactor;
-
+		//DJZ 2/20/06
+		//making the reduction factor depend on the min and max updateThreshes
+		//and the number of reductions that one wants (for now 38, the number
+		//required to reduce the opt precision from 0.5 to 0.01 by 0.9's
+		//updateReductionFactor = mc->updateReductionFactor;
+		updateReductionFactor=pow(minUpdateThresh/startUpdateThresh, 1.0/38.0);
 
 //		subtreeThresh = mc->subtreeUpdateThresh;
 //		nonSubtreeThresh = mc->nonsubtreeUpdateThresh;
@@ -281,8 +285,12 @@ public:
 	Adaptation *adap;
 	bool refineStart;
 	bool outputTreelog;
+	bool outputMostlyUselessFiles;
+	bool outputPhylipTree;
 	
 	bool bootstrap;
+	int bootstrapReps;
+	bool inferInternalStateProbs;
 	int bestIndiv;
 	int bestAccurateIndiv;
 
@@ -332,7 +340,7 @@ private:
 			//allocated in Setup(), deleted in dest
 		long gen;
 		Parameters* params;
-		Individual allTimeBest;
+		Individual allTimeBest; //this is only used for perturbation or ratcheting
 		Individual bestSinceRestart;
 		Stopwatch stopwatch;
         	double starting_wtime;
@@ -349,7 +357,9 @@ private:
 			 pertMan(NULL),
 #endif
 			 paraMan(NULL), doneWithRep(0),
-			 subtreeDefNumber(0), claMan(NULL)
+			 subtreeDefNumber(0), claMan(NULL), 
+			 inferInternalStateProbs(0), bootstrapReps(0),
+			 outputMostlyUselessFiles(0), outputPhylipTree(0)
 			{
 			allTimeBest.SetFitness(-1e100);
 			bestSinceRestart.SetFitness(-1e100);

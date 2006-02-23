@@ -16,7 +16,7 @@ class subset{
   void setfront(int,int);
   int getfront(int);
   void compact();
-  void empty();
+  void clear();
   void print();
 };
 

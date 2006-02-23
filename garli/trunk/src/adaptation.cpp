@@ -240,15 +240,9 @@ void Adaptation::UpdateProbs(){
 	if(totNumBipartRecom > 0) perBipartRecom=(totBipartRecom/totNumBipartRecom);
 	else perBipartRecom=0.0;
 	
-	//if there have been no beneficial topo mutations recently, decrease the precision
-	//9/12/05 changing this to require no _significant_ topo improvements, rather than any
-	//at all.  ie, istead of perTopo==0.0, perTopo < 0.0001
-#ifndef MPI_VERSION
-	if(perTopo<0.0001 && topoMutateProb > .1) branchOptPrecision *= precReductionFactor;
-#else
-	if(perTopo<0.0001 && topoMutateProb > .1 && perBipartRecom<0.0001) branchOptPrecision *= precReductionFactor;
-#endif
-	if(branchOptPrecision < minOptPrecision) branchOptPrecision=minOptPrecision;
+	//version 0.94 - The reduction of precision that used to appear here has been
+	//moved to Adaptation::ReducePrecision, which is called from Run, MasterMaster and
+	//RemoteSubtreeWorker when lastTopoImprove is > that #int * intLength generations ago
 	
 	perTopo += topoWeight;
 	perModel += modWeight;

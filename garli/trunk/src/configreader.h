@@ -44,13 +44,13 @@ public:
 	int SetOption(const char*, const char*);
 	int RemoveOption(const char*);
 
-	int GetStringOption(const char*, string&);
-	int GetBoolOption(const char*, bool&);
-	int GetIntOption(const char*, int&);
+	int GetStringOption(const char*, string&, bool optional=false);
+	int GetBoolOption(const char*, bool&, bool optional=false);
+	int GetIntOption(const char*, int&, bool optional=false);
 	int GetIntRangeOption(const char*, int&, int&);
 	int GetFloatOption(const char*, float&);
 	int GetFloatRangeOption(const char*, float&, float&);
-	int GetDoubleOption(const char*, double&);
+	int GetDoubleOption(const char*, double&, bool optional=false);
 	int GetDoubleRangeOption(const char*, double&, double&);
 
 	Sections::const_iterator BeginSection() const	{

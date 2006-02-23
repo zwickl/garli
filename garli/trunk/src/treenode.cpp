@@ -82,19 +82,21 @@ TreeNode* TreeNode::AddDes(TreeNode *d){
 	return d;
 
 }
-char *TreeNode::MakeNewick(char *s, bool internalNodes) const{
+char *TreeNode::MakeNewick(char *s, bool internalNodes, bool branchLengths /*=true*/) const{
 	if(left){
 		if(internalNodes==true && nodeNum!=0){
 			sprintf(s, "%d", nodeNum);
 			while(*s)s++;
 			}
 		*s++='(';
-		s=left->MakeNewick(s, internalNodes);
-		if(anc)
-			{*s++=':';
-			sprintf(s, "%.8lf", dlen);
-//			strcpy(s, ".01");
-			while(*s)s++;
+		s=left->MakeNewick(s, internalNodes, branchLengths);
+		if(anc){
+			if(branchLengths==true){
+				*s++=':';
+				sprintf(s, "%.8lf", dlen);
+	//			strcpy(s, ".01");
+				while(*s)s++;
+				}
 			}
 		else
 			{*s='\0';
@@ -104,16 +106,17 @@ char *TreeNode::MakeNewick(char *s, bool internalNodes) const{
 	else {
 		sprintf(s, "%d", nodeNum);
 		while(*s)s++;
-		*s++=':';
-		sprintf(s, "%.8lf", dlen);
-//		strcpy(s, ".01");
-
-		while(*s)s++;
+		if(branchLengths==true){
+			*s++=':';
+			sprintf(s, "%.8lf", dlen);
+	//		strcpy(s, ".01");
+			while(*s)s++;
+			}
 		}
 		
 	if(next){
 		*s++=',';
-		s=next->MakeNewick(s, internalNodes);
+		s=next->MakeNewick(s, internalNodes, branchLengths);
 		}
 	else {
 		if(anc){
@@ -121,6 +124,14 @@ char *TreeNode::MakeNewick(char *s, bool internalNodes) const{
 			}
 		}
 	return s;
+	}
+
+void TreeNode::MakeNewickForSubtree(char *s) const{
+	assert(left);
+	*s++='(';
+	s=left->MakeNewick(s, false, false);
+	*s++=';';
+	*s++='\0';
 	}
 
 //MTH

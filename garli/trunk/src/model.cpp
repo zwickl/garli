@@ -29,6 +29,7 @@ using namespace std;
 extern rng rnd;
 double Model::mutationShape;
 double Model::maxPropInvar;
+bool Model::noPinvInModel;
 
 double PointNormal (double prob);
 double IncompleteGamma (double x, double alpha, double LnGamma_alpha);
@@ -814,7 +815,7 @@ void Model::OutputPaupBlockForModel(ofstream &outf, const char *treefname){
 	else outf << "nst=6 rmat=(" << Rates(0) << " " << Rates(1) << " " << Rates(2) << " " << Rates(3) << " " << Rates(4);
 	outf << ") base=(" << Pi(0) << " " << Pi(1) << " " << Pi(2);
 	if(NRateCats()>1) outf << ") rates=gamma shape= " << Alpha();
-	if(ProportionInvariant()!=0.0) outf << " pinv= " << ProportionInvariant();
+	/*if(ProportionInvariant()!=0.0)*/ outf << " pinv= " << ProportionInvariant();
 	outf << ";\nend;\n";
 	}
 

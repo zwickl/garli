@@ -39,6 +39,9 @@ class GeneralGamlConfig{
 	string streefname;
 	bool refineStart;
 	bool outputTreelog;
+	bool outputMostlyUselessFiles;
+	bool outputPhylipTree;
+	bool dontInferProportionInvariant;
 
 	bool enforceTermConditions;
 	int lastTopoImproveThresh;
@@ -57,6 +60,8 @@ class GeneralGamlConfig{
 	double minOptPrec;
 	double precReductionFactor;
 
+	double treeRejectionThreshold;
+
 	//parameters affecting proportion of mutations
 	double topoWeight;
 		double randNNIweight;
@@ -68,6 +73,9 @@ class GeneralGamlConfig{
 
 	int intervalLength;
 	int intervalsToStore;
+
+	int bootstrapReps;
+	bool inferInternalStateProbs;
 
 	//parameters affecting other details of mutations				
 	double maxBrlenMuts, minBrlenMuts;

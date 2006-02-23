@@ -124,6 +124,15 @@ class Adaptation{
 	void UpdateProbs();
 	void OutputProbs(ofstream &plog, int gen);
 	void BeginProbLog(ofstream &plot);
+	bool ReducePrecision(){
+		if(branchOptPrecision==minOptPrecision) return false;
+		if(topoMutateProb > .1 || topoWeight==0.0){
+			branchOptPrecision*=precReductionFactor;
+			if(branchOptPrecision < minOptPrecision) branchOptPrecision=minOptPrecision;
+			return true;
+			}
+		else return false;
+		}
 
 };
 

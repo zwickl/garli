@@ -115,6 +115,7 @@ int Parameters::SetParams(const GeneralGamlConfig& conf, const HKYData& data_in)
 	gammaShapeModel = conf.gammaShapeBrlen;
 	selectionIntensity=conf.selectionIntensity;
 	holdoverPenalty=conf.holdoverPenalty;
+	treeRejectionThreshold = conf.treeRejectionThreshold;
 
 	// construct other settings from the previous ones
 	sprintf(logfname, "%s.log", ofprefix);

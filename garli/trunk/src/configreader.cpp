@@ -236,7 +236,7 @@ int ConfigReader::RemoveOption(const char* _option)	{
 /****************************************************************************************/
 /*** GetStringOption() ***/
 /****************************************************************************************/
-int ConfigReader::GetStringOption(const char* _option, string& val)	{
+int ConfigReader::GetStringOption(const char* _option, string& val, bool optional /*=false*/)	{
 	int rv;
 	string option;
 	Sections::iterator sit;
@@ -251,7 +251,8 @@ int ConfigReader::GetStringOption(const char* _option, string& val)	{
 		oit = sit->second.find(option);
 		if (oit == sit->second.end())	{	// option doesn't exist, bomb out
 			rv = -1;
-			cout << "error: could not find string configuration entry \"" << option << "\"" << endl;
+			if(!optional)
+				cout << "error: could not find string configuration entry \"" << option << "\"" << endl;
 		}
 		else	{	// option exists, get the value
 			val = oit->second;
@@ -265,10 +266,10 @@ int ConfigReader::GetStringOption(const char* _option, string& val)	{
 /****************************************************************************************/
 /*** GetBoolOption() ***/
 /****************************************************************************************/
-int ConfigReader::GetBoolOption(const char* option, bool& val)	{
+int ConfigReader::GetBoolOption(const char* option, bool& val, bool optional /*=false*/)	{
 	int rv;
 	string str;
-	if (GetStringOption(option, str) == 0)	{  // option exists
+	if (GetStringOption(option, str, optional) == 0)	{  // option exists
 		// lower case it
 		for (int i = 0; i < str.length(); ++i)
 			str[i] = tolower(str[i]);
@@ -286,7 +287,8 @@ int ConfigReader::GetBoolOption(const char* option, bool& val)	{
 	}
 	else{
 		rv = -1;
-		cout << "error: could not find boolean configuration entry \"" << option << "\"" << endl;
+		if(!optional)
+			cout << "error: could not find boolean configuration entry \"" << option << "\"" << endl;
 		}
 		
 	return rv;
@@ -295,16 +297,17 @@ int ConfigReader::GetBoolOption(const char* option, bool& val)	{
 /****************************************************************************************/
 /*** GetIntOption() ***/
 /****************************************************************************************/
-int ConfigReader::GetIntOption(const char* option, int& val)	{
+int ConfigReader::GetIntOption(const char* option, int& val, bool optional /*=false*/)	{
 	int rv;
 	string str;
-	if (GetStringOption(option, str) == 0)	{  // option exists
+	if (GetStringOption(option, str, optional) == 0)	{  // option exists
 		val = atoi(str.c_str());
 		rv = 0;
 	}
 	else{
 		rv = -1;
-		cout << "error: could not find integer configuration entry \"" << option << "\"" << endl;
+		if(!optional)
+			cout << "error: could not find integer configuration entry \"" << option << "\"" << endl;
 		}
 
 	return rv;
@@ -381,16 +384,16 @@ int ConfigReader::GetFloatRangeOption(const char* option, float& val1, float& va
 /****************************************************************************************/
 /*** GetDoubleOption() ***/
 /****************************************************************************************/
-int ConfigReader::GetDoubleOption(const char* option, double& val)	{
+int ConfigReader::GetDoubleOption(const char* option, double& val, bool optional /*=false*/)	{
 	int rv;
 	string str;
-	if (GetStringOption(option, str) == 0)	{  // option exists
+	if (GetStringOption(option, str, optional) == 0)	{  // option exists
 		val = atof(str.c_str());
 		rv = 0;
 	}
 	else{
 		rv = -1;
-		cout << "error: could not float configuration entry \"" << option << "\"" << endl;
+		if(!optional) cout << "error: could not float configuration entry \"" << option << "\"" << endl;
 		}
 
 	return rv;

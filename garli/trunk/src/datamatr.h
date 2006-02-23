@@ -27,6 +27,7 @@
 using namespace std;
 
 #include "stricl.h"
+#include "errorexception.h"
 
 typedef double** DblPtrPtr;
 #define MAX_STATES (8*sizeof(unsigned char))
@@ -45,13 +46,19 @@ class DataMatrix
 {
 	int		nTax;
 	int		nChar;     //after compression
-	int		totalNChar; //columns in matrix
+	int		totalNChar; //columns in matrix, with all missing columns removed
+	int 	gapsIncludedNChar; //the actual number of columns in the data matrix read in
+								//only used when outputting something relative to input alignment
 	int		dense;
 	
 	unsigned char**         matrix;
 	int*		count;
 	int*		origCounts;
-	int*		number;
+	int*		number; //maping of chars to columns
+						//Indeces are original char numbers,
+						//contents are the packed column representing that char
+						//both start at 0, so offset upon output
+						//This used to represent something else (I think)
 	char**          taxonLabel;
 	char**          taxonColor;	//POL-2/19/98
 	int		nConstant;
@@ -133,7 +140,7 @@ class DataMatrix
 		int AmbiguousStates() { return (dmFlags & ambigstates); }
 
 		// functions for getting the data in and out
-		int GetToken( istream& in, char* tokenbuf, int maxlen );
+		int GetToken( istream& in, char* tokenbuf, int maxlen, bool acceptComments=true );
 		int Read( const char* filename, char* left_margin = 0 );
 		int Save( const char* filename, char* newfname = 0, char* nxsfname = 0 );
 
@@ -144,13 +151,15 @@ class DataMatrix
 		void SetNTax(int ntax) { nTax = ntax; }
 
 		int NChar() const { return nChar; }
+		int TotalNChar() const { return totalNChar; }
+		int GapsIncludedNChar() const { return gapsIncludedNChar; }
 		void SetNChar(int nchar) { nChar = nchar; }
 
 		void Flush() { NewMatrix( 0, 0 ); }
 		int Dense() const { return dense; }
 		
 		int Number(int j) const
-			{ return ( number && (j < nChar) ? number[j] : 0 ); }
+			{ return ( number && (j < totalNChar) ? number[j] : 0 ); }
 
 		int Count(int j) const
 			{ return ( count && (j < nChar) ? count[j] : 0 ); }
@@ -508,7 +517,7 @@ inline unsigned char DNAData::CharToBitwiseRepresentation( char ch )
     	case 'c' : datum=2; break;
        	case 'g' : datum=4; break;
        	case 't' : datum=8; break;
-	case 'u' : datum=8; break;
+		case 'u' : datum=8; break;
        	case 'm' : datum=3; break;
        	case 'r' : datum=5; break;
        	case 's' : datum=6; break;
@@ -522,7 +531,7 @@ inline unsigned char DNAData::CharToBitwiseRepresentation( char ch )
        	case 'n' : datum=15; break;
        	case '-' : datum=15; break;
   		case '?' : datum=15; break;
-       	default  : assert(0);
+       	default  : throw ErrorException("ERROR: Unknown character!", ch);
 		}
 	return datum;
 }

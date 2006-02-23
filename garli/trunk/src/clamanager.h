@@ -10,6 +10,11 @@ using namespace std;
 
 extern int memLevel;
 
+
+#ifdef UNIX
+	#include <sys/mman.h>
+#endif
+
 #undef CLA_DEBUG
 
 class ClaManager{
@@ -24,11 +29,10 @@ class ClaManager{
 	CondLikeArrayHolder *holders; //there will be enough of these such that every node and direction could
 								  //have a unique one, although many will generally be shared
 								  
-//	CondLikeArray **tempClas;
 	vector<CondLikeArray *> claStack;
 	vector<int> holderStack;
 	
-	public:
+	public:	
 	ClaManager(int nnod, int nClas, int nHolders, int nchar, int nrates) : numNodes(nnod), numClas(nClas), numHolders(nHolders), numRates(nrates){
 		maxUsed=0;
 		allClas=new CondLikeArray*[numClas];
@@ -52,32 +56,50 @@ class ClaManager{
 		delete []holders;
 		}
 	
-	int NumClas(){
-		return numClas;
-		}	
+	int NumClas() {return numClas;}
+	int NumFreeClas() {return claStack.size();}
+	int NumFreeHolders() {return holderStack.size();}
+
+
+	int AssignClaHolder();
+	CondLikeArray* AssignFreeCla();
+	void FillHolder(int index, int dir); //sorry Mark
+
+	int GetReclaimLevel(int index);
+	int GetNumAssigned(int index) {return holders[index].numAssigned;}
+	void ReserveCla(int index, bool temp=true);
+	void ClearTempReservation(int index) {holders[index].tempReserved=false;}
+	void UnreserveCla(int index);
+	bool IsClaReserved(int index) {return holders[index].reserved;}
+	bool IsClaTempReserved(int index) {return holders[index].tempReserved;};
+	void ReclaimSingleCla(int index);
+	void CountClaTotals(int &clean, int &tempres, int &res);
+	void RecycleClas();
+	int GetClaNumber(int index);
+	int CountClasInUse(int recLevel);
+	CondLikeArray *GetCla(int index);	
+	const CondLikeArrayHolder *GetHolder(int index);	
+	bool IsDirty(int index);
+	int SetDirty(int index);
+	void IncrementCla(int index);
+	void DecrementCla(int index);
+	void CheckClaHolders();
+	void MakeAllHoldersDirty();
+	};
 	
-	int NumFreeClas(){
-		return claStack.size();
-		}
-	
-	int NumFreeHolders(){
-		return holderStack.size();
-		}
-	
-	
-	int AssignClaHolder(){
+	inline int ClaManager::AssignClaHolder(){
 		int index=holderStack[holderStack.size()-1];
 		IncrementCla(index);
 		holderStack.pop_back();
 		return index;
 		}
 	
-	void FillHolder(int index, int dir){
+	inline void ClaManager::FillHolder(int index, int dir){
 		holders[index].theArray = AssignFreeCla();
 		holders[index].reclaimLevel=dir;
 		}
 	
-	CondLikeArray* AssignFreeCla(){
+	inline CondLikeArray* ClaManager::AssignFreeCla(){
 		#ifdef CLA_DEBUG
 		ofstream deb("cladebug.log", ios::app);
 		#endif
@@ -85,64 +107,39 @@ class ClaManager{
 		if(claStack.empty() == true) RecycleClas();
 		
 		CondLikeArray *arr=claStack[claStack.size()-1];
+
+//#define PREFETCH_CLA	
+#ifdef PREFETCH_CLA
+
+		madvise(arr->arr, arr->NSites()*16*sizeof(double), MADV_WILLNEED);
+	
+#endif
+		
 		assert(arr != NULL);
 		claStack.pop_back();
 		if(numClas - claStack.size() > maxUsed) maxUsed=numClas - claStack.size();
 		
 		return arr;
 		}
-/*
-	void MarkReclaimable(int index, int val, bool observeCounts=true){
-		assert(0);
-		#ifdef CLA_DEBUG
-		ofstream deb("cladebug.log", ios::app);
-		deb << index << "\tmarked reclaimed\n";
-		#endif
-//		if(holders[index].theArray != NULL && (observeCounts==false || holders[index].nodes.size()==1)){
-//		if(holders[index].theArray != NULL && (observeCounts==false || holders[index].numAssigned==1)){
-//		if(holders[index].theArray != NULL && holders[index].reserved==false){
-//			holders[index].SetReclaimLevel(val);
 
-//		if(holders[index].theArray != NULL){
-//			if(holders[index].reserved==false) holders[index].SetReclaimLevel(val);
-			holders[index].tempReserved = false;
-//			}
-		}
-*/	
-	int GetReclaimLevel(int index){
+	inline int ClaManager::GetReclaimLevel(int index){
 		if(holders[index].theArray == NULL) return -1;
 		return holders[index].GetReclaimLevel();
 		}
 
-	int GetNumAssigned(int index){
-		return holders[index].numAssigned;
-		}
-
-	void ReserveCla(int index, bool temp=true){
+	inline void ClaManager::ReserveCla(int index, bool temp){
 		if(temp==true) holders[index].tempReserved=true;
 		else holders[index].reserved=true;
 		}
 
-	void ClearTempReservation(int index){
-		holders[index].tempReserved=false;
-		}
-
-	void UnreserveCla(int index){
+	inline void ClaManager::UnreserveCla(int index){
 //		holders[index].tempReserved=false;
 		holders[index].reserved=false;
 		if(memLevel>1)
 			holders[index].SetReclaimLevel(1);
 		}
 
-	bool IsClaReserved(int index){
-		return holders[index].reserved;
-		}
-
-	bool IsClaTempReserved(int index){
-		return holders[index].tempReserved;
-		}
-
-	void ReclaimSingleCla(int index){
+	inline void ClaManager::ReclaimSingleCla(int index){
 		//this simply removes the cla from a holder.  It is equivalent to just
 		//dirtying it if only a single tree shares the holder
 		if(holders[index].theArray==NULL) return;
@@ -151,7 +148,7 @@ class ClaManager{
 		holders[index].theArray=NULL;				
 		}
 
-	void CountClaTotals(int &clean, int &tempres, int &res){
+	inline void ClaManager::CountClaTotals(int &clean, int &tempres, int &res){
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL) clean++;
 			if(holders[i].tempReserved ==true) tempres++;
@@ -160,7 +157,7 @@ class ClaManager{
 		}
 
 
-	void RecycleClas(){
+	inline void ClaManager::RecycleClas(){
 		int numReclaimed=0;
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL){
@@ -193,7 +190,7 @@ class ClaManager{
 		assert(numReclaimed > 0);
 		}
 	
-	int GetClaNumber(int index){
+	inline int ClaManager::GetClaNumber(int index){
 		//this is ugly, but should only be called for debugging
 		if(holders[index].theArray == NULL) return -1;
 		for(int i=0;i<numClas;i++)
@@ -202,7 +199,7 @@ class ClaManager{
 		return -1;
 		}
 
-	int CountClasInUse(int recLevel){
+	inline int ClaManager::CountClasInUse(int recLevel){
 		int num=0;
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL)
@@ -211,22 +208,22 @@ class ClaManager{
 		return num;
 		}
 
-	CondLikeArray *GetCla(int index){
+	inline CondLikeArray *ClaManager::GetCla(int index){
 		assert(holders[index].theArray != NULL);
 		return holders[index].theArray;
 		}
 	
-	const CondLikeArrayHolder *GetHolder(int index){
+	inline const CondLikeArrayHolder *ClaManager::GetHolder(int index){
 		return &holders[index];
 		}
 	
-	bool IsDirty(int index){
+	inline bool ClaManager::IsDirty(int index){
 		//dirtyness is now synonymous with a null cla pointer in the holder
 		assert(index > -1);
 		return (holders[index].theArray == NULL);	
 		}
 
-	int SetDirty(int index){
+	inline int ClaManager::SetDirty(int index){
 		//there are only two options here:
 		//1. Cla is being made dirty, and only node node points to it 
 		//	->null the holder's cla pointer and return the same index
@@ -249,11 +246,11 @@ class ClaManager{
 		return index;
 		}
 
-	void IncrementCla(int index){
+	inline void ClaManager::IncrementCla(int index){
 		holders[index].numAssigned++;
 		}
 
-	void DecrementCla(int index){
+	inline void ClaManager::DecrementCla(int index){
 		assert(index != -1);
 		if(holders[index].numAssigned==1){
 			holderStack.push_back(index);
@@ -270,6 +267,47 @@ class ClaManager{
 			holders[index].tempReserved=false;
 			}
 		}
+
+	inline void ClaManager::CheckClaHolders(){
+		int used=0;
+		int reclaim2=0;
+		for(int i=0;i<numHolders;i++){
+			if(holders[i].theArray != NULL){
+				used++;
+				if(holders[i].GetReclaimLevel() == 2) reclaim2++;
+				}
+			}
+		assert(used == numClas - claStack.size());
+		}
+	
+	inline void ClaManager::MakeAllHoldersDirty(){
+		
+		for(int i=0;i<numHolders;i++){
+			if(holders[i].theArray != NULL){
+				claStack.push_back(holders[i].theArray);
+				holders[i].theArray=NULL;
+				}
+			}
+		}
+
+/*
+	void MarkReclaimable(int index, int val, bool observeCounts=true){
+		assert(0);
+		#ifdef CLA_DEBUG
+		ofstream deb("cladebug.log", ios::app);
+		deb << index << "\tmarked reclaimed\n";
+		#endif
+//		if(holders[index].theArray != NULL && (observeCounts==false || holders[index].nodes.size()==1)){
+//		if(holders[index].theArray != NULL && (observeCounts==false || holders[index].numAssigned==1)){
+//		if(holders[index].theArray != NULL && holders[index].reserved==false){
+//			holders[index].SetReclaimLevel(val);
+
+//		if(holders[index].theArray != NULL){
+//			if(holders[index].reserved==false) holders[index].SetReclaimLevel(val);
+			holders[index].tempReserved = false;
+//			}
+		}
+*/	
 
 /*		
 	void CheckClaManager(int checktot){
@@ -325,29 +363,4 @@ class ClaManager{
 		}
 */
 
-	
-	void CheckClaHolders(){
-		int used=0;
-		int reclaim2=0;
-		for(int i=0;i<numHolders;i++){
-			if(holders[i].theArray != NULL){
-				used++;
-				if(holders[i].GetReclaimLevel() == 2) reclaim2++;
-				}
-			}
-		assert(used == numClas - claStack.size());
-		}
-	
-	void MakeAllHoldersDirty(){
-		
-		for(int i=0;i<numHolders;i++){
-			if(holders[i].theArray != NULL){
-				claStack.push_back(holders[i].theArray);
-				holders[i].theArray=NULL;
-				}
-			
-			
-			}
-		}
-	};		
 #endif

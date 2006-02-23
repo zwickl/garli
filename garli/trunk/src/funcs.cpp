@@ -19,7 +19,12 @@
 //	Press, W. H., B. P. Flannery, S. A. Teukolsky, and W. T. Vetterling.  1992. 
 //	Numerical Recipes in C : The Art of Scientific Computing.  Cambridge University Press, Cambridge.
 
-#include <unistd.h>
+#if defined(_MSC_VER)
+//POL 23-Feb-2006 VC doesn't have this header, and it was not needed to compile
+//#	include <unistd.h>
+#else
+#	include <unistd.h>
+#endif
 
 #include "funcs.h"
 #include "population.h"
@@ -907,6 +912,30 @@ void InferStatesFromCla(char *states, double *cla, int nchar){
 		}
 	}
 
+vector<InternalState *> *InferStatesFromCla(double *cla, int nchar){
+	double stateProbs[4];
+	int nrates=4;
+	
+	vector<InternalState *> *stateVec = new vector<InternalState *>;
+	
+	for(int c=0;c<nchar;c++){
+		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=0.0;
+		for(int i=0;i<nrates;i++){	
+			for(int j=0;j<4;j++){
+				stateProbs[j] += *cla++;
+				}
+			}
+		InternalState *site=new InternalState(stateProbs);
+		stateVec->push_back(site);
+						
+			
+	//		out << bases[(stateProbs[max1] > stateProbs[max2] ? max1 : max2)] << "\t";
+	//		out << stateProbs[0]/tot << "\t" << stateProbs[1]/tot << "\t" << stateProbs[2]/tot << "\t" << stateProbs[3]/tot << "\n";
+
+		}
+	return stateVec;
+	}
+
 double CalculatePDistance(const char *str1, const char *str2, int nchar){
 	double count=0.0;
 	int offset1=0, offset2=0;
@@ -1335,7 +1364,103 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 	
 	double L1, L2, L3, L4, R1, R2, R3, R4;
 	for(int i=0;i<nchar;i++){
+
+		L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
+		L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
+		L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
+		L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
+
+		R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
+		R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
+		R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
+		R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
 		
+		dest[0] = L1 * R1;
+		dest[1] = L2 * R2;
+		dest[2] = L3 * R3;
+		dest[3] = L4 * R4;
+
+		assert(dest[0] < 1e50);
+		assert(dest[1] < 1e50);
+		assert(dest[2] < 1e50);
+		assert(dest[3] < 1e50);
+
+		dest+=4;
+		LCL+=4;
+		RCL+=4;
+		
+		L1=( Lpr[16+0]*LCL[0]+Lpr[16+1]*LCL[1]+Lpr[16+2]*LCL[2]+Lpr[16+3]*LCL[3]);
+		L2=( Lpr[16+4]*LCL[0]+Lpr[16+5]*LCL[1]+Lpr[16+6]*LCL[2]+Lpr[16+7]*LCL[3]);
+		L3=( Lpr[16+8]*LCL[0]+Lpr[16+9]*LCL[1]+Lpr[16+10]*LCL[2]+Lpr[16+11]*LCL[3]);
+		L4=( Lpr[16+12]*LCL[0]+Lpr[16+13]*LCL[1]+Lpr[16+14]*LCL[2]+Lpr[16+15]*LCL[3]);
+
+		R1=(Rpr[16+0]*RCL[0]+Rpr[16+1]*RCL[1]+Rpr[16+2]*RCL[2]+Rpr[16+3]*RCL[3]);
+		R2=(Rpr[16+4]*RCL[0]+Rpr[16+5]*RCL[1]+Rpr[16+6]*RCL[2]+Rpr[16+7]*RCL[3]);
+		R3=(Rpr[16+8]*RCL[0]+Rpr[16+9]*RCL[1]+Rpr[16+10]*RCL[2]+Rpr[16+11]*RCL[3]);			
+		R4=(Rpr[16+12]*RCL[0]+Rpr[16+13]*RCL[1]+Rpr[16+14]*RCL[2]+Rpr[16+15]*RCL[3]);
+		
+		dest[0] = L1 * R1;
+		dest[1] = L2 * R2;
+		dest[2] = L3 * R3;
+		dest[3] = L4 * R4;
+
+		assert(dest[0] < 1e50);
+		assert(dest[1] < 1e50);
+		assert(dest[2] < 1e50);
+		assert(dest[3] < 1e50);
+
+		dest+=4;
+		LCL+=4;
+		RCL+=4;		
+
+		L1=( Lpr[32+0]*LCL[0]+Lpr[32+1]*LCL[1]+Lpr[32+2]*LCL[2]+Lpr[32+3]*LCL[3]);
+		L2=( Lpr[32+4]*LCL[0]+Lpr[32+5]*LCL[1]+Lpr[32+6]*LCL[2]+Lpr[32+7]*LCL[3]);
+		L3=( Lpr[32+8]*LCL[0]+Lpr[32+9]*LCL[1]+Lpr[32+10]*LCL[2]+Lpr[32+11]*LCL[3]);
+		L4=( Lpr[32+12]*LCL[0]+Lpr[32+13]*LCL[1]+Lpr[32+14]*LCL[2]+Lpr[32+15]*LCL[3]);
+
+		R1=(Rpr[32+0]*RCL[0]+Rpr[32+1]*RCL[1]+Rpr[32+2]*RCL[2]+Rpr[32+3]*RCL[3]);
+		R2=(Rpr[32+4]*RCL[0]+Rpr[32+5]*RCL[1]+Rpr[32+6]*RCL[2]+Rpr[32+7]*RCL[3]);
+		R3=(Rpr[32+8]*RCL[0]+Rpr[32+9]*RCL[1]+Rpr[32+10]*RCL[2]+Rpr[32+11]*RCL[3]);			
+		R4=(Rpr[32+12]*RCL[0]+Rpr[32+13]*RCL[1]+Rpr[32+14]*RCL[2]+Rpr[32+15]*RCL[3]);
+		
+		dest[0] = L1 * R1;
+		dest[1] = L2 * R2;
+		dest[2] = L3 * R3;
+		dest[3] = L4 * R4;
+
+		assert(dest[0] < 1e50);
+		assert(dest[1] < 1e50);
+		assert(dest[2] < 1e50);
+		assert(dest[3] < 1e50);
+
+		dest+=4;
+		LCL+=4;
+		RCL+=4;
+
+		L1=( Lpr[48+0]*LCL[0]+Lpr[48+1]*LCL[1]+Lpr[48+2]*LCL[2]+Lpr[48+3]*LCL[3]);
+		L2=( Lpr[48+4]*LCL[0]+Lpr[48+5]*LCL[1]+Lpr[48+6]*LCL[2]+Lpr[48+7]*LCL[3]);
+		L3=( Lpr[48+8]*LCL[0]+Lpr[48+9]*LCL[1]+Lpr[48+10]*LCL[2]+Lpr[48+11]*LCL[3]);
+		L4=( Lpr[48+12]*LCL[0]+Lpr[48+13]*LCL[1]+Lpr[48+14]*LCL[2]+Lpr[48+15]*LCL[3]);
+
+		R1=(Rpr[48+0]*RCL[0]+Rpr[48+1]*RCL[1]+Rpr[48+2]*RCL[2]+Rpr[48+3]*RCL[3]);
+		R2=(Rpr[48+4]*RCL[0]+Rpr[48+5]*RCL[1]+Rpr[48+6]*RCL[2]+Rpr[48+7]*RCL[3]);
+		R3=(Rpr[48+8]*RCL[0]+Rpr[48+9]*RCL[1]+Rpr[48+10]*RCL[2]+Rpr[48+11]*RCL[3]);			
+		R4=(Rpr[48+12]*RCL[0]+Rpr[48+13]*RCL[1]+Rpr[48+14]*RCL[2]+Rpr[48+15]*RCL[3]);
+		
+		dest[0] = L1 * R1;
+		dest[1] = L2 * R2;
+		dest[2] = L3 * R3;
+		dest[3] = L4 * R4;
+
+		assert(dest[0] < 1e50);
+		assert(dest[1] < 1e50);
+		assert(dest[2] < 1e50);
+		assert(dest[3] < 1e50);
+
+		dest+=4;
+		LCL+=4;
+		RCL+=4;
+/*		
 		for(int r=0;r<4;r++){
 			L1=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
 			L2=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
@@ -1361,7 +1486,7 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 			LCL+=4;
 			RCL+=4;
 			}
-		}
+*/		}
 
 /*
 	for(int i=0;i<nchar;i++){

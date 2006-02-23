@@ -65,6 +65,7 @@ class CondLikeArray
 			: nsites(0), nrates(0), nstates(0), arr(0), underflow_mult(0), rescaleRank(1){}
 		~CondLikeArray();
 		int NStates() {return nstates;}
+		int NSites() {return nsites;}
 
 		void Allocate( int nk, int ns, int nr = 1 );
 	};

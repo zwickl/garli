@@ -1,3 +1,25 @@
+
+// GARLI version 0.93 source code
+// Copyright  2005 by Derrick J. Zwickl
+// All rights reserved.
+//
+// This code may be used and modified for non-commercial purposes
+// but redistribution in any form requires written permission.
+// Please contact:
+//
+//  Derrick Zwickl
+//	Integrative Biology, UT
+//	1 University Station, C0930
+//	Austin, TX  78712
+//  email: zwickl@mail.utexas.edu
+//
+//	Note: In 2006  moving to NESCENT (The National
+//	Evolutionary Synthesis Center) for a postdoc
+
+// all of the mpi related code appears here or in mpifuncs.cpp
+
+#ifdef MPI_VERSION
+
 #include "threaddcls.h"
 #include "mpifuncs.h"
 #include "defs.h"
@@ -476,3 +498,5 @@ bool valid_results(transferred_data_t r)	{
 		return true;
 	return false;
 }
+
+#endif

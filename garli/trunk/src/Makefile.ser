@@ -1,11 +1,11 @@
 #CC       = icc
 CC	  = g++
 #CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -DUNIX -DGCC295 -DNDEBUG -include defs.h #this must be used for gcc version 2.95!!!
-CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -DUNIX -DNDEBUG -include defs.h #for other gcc versions
-
+CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h #for other gcc versions
+#CC_FLAGS =  -O2 -g -pg -DUNIX -include defs.h #for icc
 #CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -include defs.h #for icc
 #CC_FLAGS = -g -DUNIX 				#for debugging
-EXEC     = Garli.93
+EXEC     = Garli.94
 
 OBJECT_LIST =	pecr.o condlike.o datamatr.o individual.o parameters.o \
 		population.o rng.o set.o\
@@ -14,8 +14,8 @@ OBJECT_LIST =	pecr.o condlike.o datamatr.o individual.o parameters.o \
 		bipartition.o model.o linalg.o adaptation.o subset.o mlhky.o\
 		optimization.o
 
-Garli.93: $(OBJECT_LIST) garlimain.o
-	$(CC)  -v -o $(EXEC) $(OBJECT_LIST) garlimain.o
+Garli.94: $(OBJECT_LIST) garlimain.o
+	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) garlimain.o
 
 garlimain.o:	mlhky.h tree.h population.h \
 		individual.h parameters.h mlhky.h garlimain.cpp adaptation.h \

@@ -84,13 +84,14 @@ class Tree{
 		TreeNode **allNodes;
 		subset sprRange;
 		static double meanBrlenMuts;
-		static double alpha;
+		static double alpha; //alpha shape of blen mutation, not gamma rate het
 		static double min_brlen;
 		static double max_brlen;
 		static double exp_starting_brlen;
 		static ClaManager *claMan;
 		static HKYData *data;
-		
+		static double treeRejectionThreshold;
+
 		int calcs;
 		
 	enum{
@@ -169,10 +170,12 @@ class Tree{
 #endif
 #endif
 		inline void SetBranchLength(TreeNode *nd, double len);
+		int VariableSPRMutate(int range, double optPrecision);
 		int SPRMutate(int range, double optPrecision);
 		void SPRMutate(int cutnum, int broknum, double optPrecision, int subtreeNode, int range);
 		void SPRMutate(int cutnum, int broknum, double optPrecision, const vector<int> &nonSubNodes);
 		void NNIMutate(int node, int branch, double optPrecision, int subtreeNode);
+		void VariableNNIMutate(int node, int branch, double optPrecision, int subtreeNode);
 		void TaxonSwap(int tax1, int tax2, double optPrecision);
 		void TaxonSwap(int range, double optPrecision);
 		void MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned);
@@ -181,7 +184,7 @@ class Tree{
 		void LocalMove();
 		// functions for computing likelihood
 		bool ConditionalLikelihood(int direction, TreeNode* nd);	
-		void ConditionalLikelihoodRateHet(int direction, TreeNode* nd);
+		int ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA=false);
 
 		int Score(int rootNodeNum =0);
 		double SumSiteLikes(const double *cla, const int *underflow_mult);
@@ -263,7 +266,8 @@ class Tree{
 		int GetRandomTerminalNode() const;
 		int GetRandomNonRootNode() const;
 		void GetInternalStateString(char *string, int nodeNum);
-		
+		void RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out);	
+		void InferAllInternalStateProbs(char *ofprefix);
 		void MarkUpwardClasToReclaim(int subtreeNode);
 		void MarkDownwardClasToReclaim(int subtreeNode);
 		void MarkClasNearTipsToReclaim(int subtreeNode);

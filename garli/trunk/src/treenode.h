@@ -59,7 +59,8 @@ class TreeNode
 		TreeNode( const int i = -1 );
 		~TreeNode();
 		
-		char *MakeNewick(char *s, bool internalNodes) const;
+		char *MakeNewick(char *s, bool internalNodes, bool branchLengths=true) const;
+		void MakeNewickForSubtree(char *s) const;
 		TreeNode * AddDes(TreeNode *);//returns argument
 		void SubstituteNodeWithRespectToAnc(TreeNode *subs);
 		int CountBranches(int s);

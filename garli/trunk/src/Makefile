@@ -1,8 +1,8 @@
 s: 
-	make -f Makefile.ser Garli.93
+	make -f Makefile.ser Garli.94
 p:
-	make -f Makefile.par ParGarli.93
+	make -f Makefile.par ParGarli.94
 clean:
-	rm -f *.o Garli.93 ParGarli.93
+	rm -f *.o Garli.94 ParGarli.94
 backup:
-	tar -cvzf Garli.93src.tar.gz *.cpp *.h Makefile* 
+	tar -cvzf Garli.94src.tar.gz *.cpp *.h Makefile* 

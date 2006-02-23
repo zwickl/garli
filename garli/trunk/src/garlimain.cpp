@@ -110,37 +110,39 @@ int main( int argc, char* argv[] )	{
 	if(Tree::random_p==false) Tree::ComputeRealCatalan();
 #endif
 
-		cout << "Running serial GARLI, version 0.93" << endl;
-		MasterGamlConfig conf;
-		cout << "Reading config file " << conf_name << endl;
-		if (conf.Read(conf_name) < 0)	{
-			cout << "Error in config file...aborting." << endl;
-			return 0;
-		}
-
-		// Create the data object
-		HKYData data;
-		int err=ReadData(conf.datafname.c_str(), &data);
-		if(err==-1) return 0;
-		
-		// create the parameters object
-		Parameters params;
-		params.SetParams(conf, data);
-		
-		Tree::meanBrlenMuts	= params.meanBrlenMuts;
-		Tree::alpha			= params.gammaShapeBrlen;
-
-
-		// create the population object
-		Population pop;
 		try{
+
+			cout << "Running serial GARLI, version 0.94 (Feb 06)" << endl;
+			MasterGamlConfig conf;
+			cout << "Reading config file " << conf_name << endl;
+			if (conf.Read(conf_name) < 0)	{
+				cout << "Error in config file...aborting." << endl;
+				return 0;
+			}
+
+			// Create the data object
+			HKYData data;
+			int err=ReadData(conf.datafname.c_str(), &data);
+			if(err==-1) return 0;
+			
+			// create the parameters object
+			Parameters params;
+			params.SetParams(conf, data);
+			
+			Tree::meanBrlenMuts	= params.meanBrlenMuts;
+			Tree::alpha		= params.gammaShapeBrlen;
+
+			// create the population object
+			Population pop;
+		
 			pop.Setup(params, &conf, 1, 0);
 
 			#ifdef PROFILE
 				ProfilerInit(collectDetailed, bestTimeBase, 100000, 1000);
 			#endif
-
+			if(pop.bootstrapReps == 0)
 			pop.Run();
+			else pop.Bootstrap();
 			}catch(ErrorException err){
 				err.Print(cout);
 				return 0;
@@ -150,10 +152,12 @@ int main( int argc, char* argv[] )	{
 				return 0;
 				}
 
+#ifndef UNIX
 	cout << "-Press enter to close program.-" << endl;
 	while( cin && (cin.get() != '\n') );
 	char d=getchar();
-	exit(0);
+#endif
+//	exit(0);
 
 
 #endif
@@ -179,6 +183,7 @@ int main( int argc, char* argv[] )	{
 	ProfilerDump("\phalfnewrescale.prof");
 	ProfilerTerm();
 	#endif
+
 	return 0;
 };
 

@@ -104,7 +104,7 @@ class Individual
 			dirty=false;
 			}
 		void Randomize(char *fname, int rank);
-		void RefineStartingConditions(bool optModel);
+		void RefineStartingConditions(bool optModel, double branchPrec);
 		void CalcFitness(int subtreeNode);
 		void ReadTreeFromFile(istream & inf);
 

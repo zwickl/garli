@@ -90,7 +90,7 @@ void subset::compact(){
 		}
 	total -= offset;
 	} 
-void subset::empty(){
+void subset::clear(){
   total = 0;
   seednumber = -1;
   for(int i = 0;i<1024;i++)

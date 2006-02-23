@@ -28,7 +28,8 @@ using namespace std;
 // GamlConfig::General methods //////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-GeneralGamlConfig::GeneralGamlConfig()	{
+GeneralGamlConfig::GeneralGamlConfig()	:bootstrapReps(0), outputMostlyUselessFiles(0), 
+		outputPhylipTree(0), treeRejectionThreshold(100.0), dontInferProportionInvariant(0){
 	//default values here //TODO
 	logevery = 10;
 	saveevery = 100;
@@ -60,6 +61,11 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetIntOption("genthreshfortopoterm", lastTopoImproveThresh);
 	errors += cr.GetDoubleOption("scorethreshforterm", improveOverStoredIntervalsThresh);
 
+	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
+	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
+	cr.GetBoolOption("dontinferproportioninvariant", dontInferProportionInvariant, true);
+	
+
 	if(isMaster) errors += cr.SetSection("master");
 	else errors += cr.SetSection("remote");
 	
@@ -79,6 +85,15 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetDoubleOption("randnniweight", randNNIweight);
 	errors += cr.GetDoubleOption("randsprweight", randSPRweight);	
 	errors += cr.GetDoubleOption("limsprweight", limSPRweight);
+	
+	cr.GetDoubleOption("treerejectionthreshold", treeRejectionThreshold, true);
+
+	cr.GetIntOption("bootstrapreps", bootstrapReps, true);
+#ifdef MPI_VERSION
+	if(bootstrapReps != 0) throw ErrorException("Sorry, Bootstrap not yet implemented in parallel GARLI!");
+#endif
+
+	cr.GetBoolOption("inferinternalstateprobs", inferInternalStateProbs, true);
 
 #ifdef MPI_VERSION
 	if(isMaster==false) errors += cr.GetDoubleOption("sendinterval", sendInterval);

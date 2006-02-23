@@ -27,6 +27,7 @@ using namespace std;
 #include "rng.h"
 #include "defs.h"
 #include "stricl.h"
+#include "errorexception.h"
 
 #define MAX_TAXON_LABEL		80
 
@@ -300,7 +301,7 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 
 	// create new data matrix, and new count and number arrays
 	// all counts are initially 1, and characters are numbered
-	// sequentially from 1 to nChar
+	// sequentially from 0 to nChar-1
 	if( taxa > 0 && sites > 0 ) {
 		MEM_NEW_ARRAY(matrix,unsigned char*,taxa);
 		MEM_NEW_ARRAY(count,int,sites);
@@ -311,7 +312,7 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 		for( int j = 0; j < sites; j++ ) {
 			count[j] = 1;
 			numStates[j] = 1;
-			number[j] = j+1;
+			number[j] = j;
 		}
 		for( int i = 0; i < taxa; i++ ) {
 			matrix[i]=new unsigned char[sites];
@@ -326,7 +327,7 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 
 	// set dimension variables to new values
 	nTax = taxa;
-	totalNChar = nChar = sites;
+	gapsIncludedNChar = totalNChar = nChar = sites;
 }
 
 DataMatrix& DataMatrix::operator =(const DataMatrix& d)
@@ -371,11 +372,12 @@ void DataMatrix::Pack()
         MEM_NEW_ARRAY(newCount,int,newNChar);
 	int* newNumStates;
         MEM_NEW_ARRAY(newNumStates,int,newNChar);
-	int* newNumber;
-        MEM_NEW_ARRAY(newNumber,int,newNChar);
+//	int* newNumber;
+  //      MEM_NEW_ARRAY(newNumber,int,newNChar);
 
 	for( i = 0; i < nTax; i++ )
 		 MEM_NEW_ARRAY(newMatrix[i],unsigned char,newNChar);
+
 
 	i = 0;
 	for( j = 0; j < nChar; j++ ) {
@@ -384,10 +386,15 @@ void DataMatrix::Pack()
 				newMatrix[k][i] = matrix[k][j];
 			newCount[i] = count[j];
 			newNumStates[i] = numStates[j];
-			newNumber[i] = number[j];
+			//newNumber[i] = number[j];
 			i++;
+			}
+		else{//as we remove columns, shift all the greater numbers over
+			for(int c=0;c<gapsIncludedNChar;c++){
+				if(number[c] >= i) number[c]--;
+				}
+			}
 		}
-	}
 
 	// copy distribution of the number of states
         int max = maxNumStates;
@@ -400,7 +407,7 @@ void DataMatrix::Pack()
 	if( count ) MEM_DELETE_ARRAY(count); // count has length nChar
 	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates has length nChar
 	if( stateDistr ) MEM_DELETE_ARRAY(stateDistr); // stateDistr has length maxNumStates+1
-	if( number ) MEM_DELETE_ARRAY(number); // number has length nChar
+//	if( number ) MEM_DELETE_ARRAY(number); // number has length nChar
 	if( matrix ) {
 		for( i = 0; i < nTax; i++ )
 			MEM_DELETE_ARRAY(matrix[i]); // matrix[i] has length nChar
@@ -411,7 +418,7 @@ void DataMatrix::Pack()
 	count = newCount;
 	numStates = newNumStates;
 	stateDistr = newStateDistr;
-	number = newNumber;
+//	number = newNumber;
 	matrix = newMatrix;
 	nChar = newNChar;
 	
@@ -469,6 +476,12 @@ void DataMatrix::SwapCharacters( int i, int j )
 	int s=numStates[i];
 	numStates[i]=numStates[j];
 	numStates[j]=s;
+
+	//DJZ 2/14/06 and the number array
+	for(int c=0;c<gapsIncludedNChar;c++){
+		if(number[c] == i) number[c]=j;
+		else if(number[c] == j) number[c]=i;
+		}
 }
 
 void DataMatrix::BeginNexusTreesBlock(ofstream &treeout){
@@ -554,11 +567,12 @@ void DataMatrix::Collapse(){
 	//DJZ 10/28/03 get rid of all missing patterns	
 	int q=nChar-1;
 	while(numStates[q]==0){
+		for(i=0;i<gapsIncludedNChar;i++) if(number[i]==q) number[i]=-1;
 		count[q--]=0;
 		//when all missing columns are deleted, remove them from the total number of characters
 		totalNChar--;
 		}
-		
+	
 	Pack();
 	}
 
@@ -652,7 +666,7 @@ void DataMatrix::QSort( int top, int bottom )
 	if( i   <  bottom ) QSort(   i, bottom );
 }
 
-int DataMatrix::GetToken( istream& in, char* tokenbuf, int maxlen )
+int DataMatrix::GetToken( istream& in, char* tokenbuf, int maxlen, bool acceptComments /*=true*/ )
 {
 	int ok = 1;
 
@@ -660,9 +674,10 @@ int DataMatrix::GetToken( istream& in, char* tokenbuf, int maxlen )
 	char ch = ' ';
 
 	// skip leading whitespace
-	while( in && ( isspace(ch) || ch == '[' ) )
+	while( in && ( isspace(ch) || ch == '[' ) ){
 		in.get(ch);
-
+		if(ch == '[' && acceptComments==false) return -1;
+		}
 	if( !in ) return 0;
 
 	tokenbuf[0] = ch;
@@ -763,17 +778,12 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 	// read in the data, including taxon names
 	for( int i = 0; i < num_taxa; i++ ) {
 
-//		// skip over leading whitespace
-//		do {
-//			inf.get(ch);			if( left_margin )
-
-//		} while( isspace(ch) );
-//		inf.putback(ch);
-
 		// get name for taxon i
 		char taxon_name[ MAX_TAXON_LABEL ];
-//		inf.get( taxon_name, MAX_TAXON_LABEL, ' ' );
-		int ok = GetToken( inf, taxon_name, MAX_TAXON_LABEL );
+		int ok = GetToken( inf, taxon_name, MAX_TAXON_LABEL, false);
+		if(ok == -1){
+			throw ErrorException("\nERROR: Confused by comments (i.e. [...]) in datafile.\nPlease remove comments by exporting dataset from PAUP* a similar program.\n");			
+			}
 		if( !ok ) {
 			if( left_margin )
 				debug << left_margin << "Error reading data: label for taxon " << (i+1) << " too long" << endl;
@@ -782,27 +792,7 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 		}
 		SetTaxonLabel( i, taxon_name );
 
-		// skip over leading whitespace
-//		do {
-//			inf.get(ch);
-//		} while( isspace(ch) );
-//		inf.putback(ch);
-/*
-		// get color for taxon i
-		char taxon_color[ MAX_TAXON_LABEL ];
-//		inf.get( taxon_color, MAX_TAXON_LABEL, ' ' );
-		ok = GetToken( inf, taxon_color, MAX_TAXON_LABEL );
-		if( !ok ) {
-			if( left_margin )
-				debug << left_margin << "Error reading data: color for taxon " << (i+1) << " too long" << endl;
-			Flush();
-			return 0;
-		}
-		SetTaxonColor( i, taxon_color );
-*/
 		// get data for taxon i
-		if( left_margin )
-//			debug << left_margin << "Reading data for taxon " << taxon_name << "..." << endl;
 		for( int j = 0; j < num_chars; j++ ) {
 			inf >> ch;
 			if(ch == '['){//if there is a comment here, which is how the "color" used to be represented
@@ -810,39 +800,24 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 				inf >> ch;
 				}
 			unsigned char datum;
-			if( ch == '.' ) {
+			if( ch == '.' ) 
 	    		datum = Matrix( 0, j );
-	 		}
-	 		else {
-#if defined( CPLUSPLUS_EXCEPTIONS )
-				try {
-					datum = CharToDatum(ch);
-				}
-				catch( DataMatrix::XBadState x ) {
-					debug << left_margin << "Error reading data:  state " << x.ch << " is not allowed" << endl;
-					Flush();
-					return 0;
-				}
-#else
-				//datum = CharToDatum(ch);
+		 		
+	 		else 
 				datum = CharToBitwiseRepresentation(ch);
-#endif
-			}
-			//			printf("%c",ch);
-	//		njstart.matrix[i][j] = datum;
+				
 			SetMatrix( i, j, datum );
+			}
 		}
-		//		printf("\n");
-	}
 
 	// read in the line containing the counts
 	//DZ 11-25-02 This left_margin stuff seems to be totally screwed up, and results in the 
 	//counts not being read.  Commenting out.
 	if( inf ) {
-		int i;			//if( left_margin )
+		int i;
 
 		for( i = 0; i < num_chars; i++ ) {
-			int cnt;			//if( left_margin )
+			int cnt;			
 
 			inf >> cnt;
 			if( !inf ) break;

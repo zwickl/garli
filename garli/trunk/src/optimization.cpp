@@ -22,6 +22,8 @@
 
 //a bunch of functions from the Tree class, relating to optimization
 
+extern double globalBest;
+
 extern int optCalcs;
 
 #undef OPT_DEBUG
@@ -318,12 +320,29 @@ double Tree::OptimizeBranchLength(double optPrecision, TreeNode *nd, bool goodGu
 	}
 
 void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, double optPrecision, int subtreeNode, TreeNode *prune/*=NULL*/){
-	nodeOptVector.empty();
+	nodeOptVector.clear();
 	
 	double totalIncrease=0.0, prunePointIncrease=0.0, thisIncr;
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->left, false);
 	totalIncrease += OptimizeBranchLength(optPrecision, nd, false);
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->right, false);	
+
+//DEBUG
+/*	ofstream poo("3branchScores.log", ios::app);
+	Score(nd->nodeNum);
+	poo << globalBest << "\t" << lnL << "\t";
+//	poo.close();
+*/
+	Score(nd->nodeNum);
+	if(lnL < globalBest - treeRejectionThreshold){
+//		poo << "1\t";
+		#ifdef OPT_DEBUG
+		optsum << "3 branch total\t" << totalIncrease << endl;
+		optsum << "bailing early\t" << globalBest-lnL << endl;
+		#endif
+		return;
+		}
+//	else poo << "0\t";
 	
 	nodeOptVector.push_back(nd->left);
 	nodeOptVector.push_back(nd);
@@ -425,6 +444,10 @@ optsum << "radiusopt intial pass total\t" << totalIncrease << endl;
 		Score(finalNode->anc->nodeNum);
 	else Score(0);
 
+	//DEBUG
+/*	poo << lnL << "\n";
+	poo.close();
+*/
 #ifdef OPT_DEBUG
 optsum << "postopt total\t" << postIncr << endl;
 #endif
@@ -443,6 +466,7 @@ double Tree::RecursivelyOptimizeBranches(TreeNode *nd, double optPrecision, int 
 	if(nd->next!=NULL && dontGoNext==false){
 		scoreIncrease += RecursivelyOptimizeBranches(nd->next, optPrecision, subtreeNode, radius, false, 0, ignoreDelta);
 		}
+	if(memLevel > 1) RemoveTempClaReservations();
 	return scoreIncrease;
 	}
 
@@ -471,6 +495,7 @@ double Tree::RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledFrom,
 			else scoreIncrease += RecursivelyOptimizeBranches(nd->next->next, optPrecision, subtreeNode, radius-1, true, 0);
 			}
 		}
+	if(memLevel > 1) RemoveTempClaReservations();
 	return scoreIncrease;
 	}
 
@@ -1264,14 +1289,19 @@ void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, cons
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *partial=partialCLA->arr;
-	
+
+	int nchar=data->NChar();
+
+#ifdef UNIX
+	madvise(partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+#endif
+
 	double siteL, tempD1, D1tot, D2tot;
 	D1tot=D2tot=0.0;
 	double La, Lc, Lg, Lt;
 	double D1a, D1c, D1g, D1t;
 	double D2a, D2c, D2g, D2t;
 	
-	int nchar=data->NChar();
 	//gamma and invariants
 	const int *countit=data->GetCounts();
 	int lastConst=data->LastConstant();
@@ -1335,7 +1365,7 @@ void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, cons
 					}
 				partial+=16;
 				}
-			if(i<=lastConst){
+			if(mod->NoPinvInModel() == false && i<=lastConst){
 				double btot=0.0;
 				if(conBases[i]&1) btot+=mod->Pi(0);
 				if(conBases[i]&2) btot+=mod->Pi(1);
@@ -1346,6 +1376,7 @@ void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, cons
 				}
 			else
 				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp);
+
 			tempD1 = (((D1a*mod->Pi(0)+D1c*mod->Pi(1)+D1g*mod->Pi(2)+D1t*mod->Pi(3)) * scaledGammaProp) / siteL);
 			d1Tot += *countit * tempD1;
 			assert(d1Tot == d1Tot);
@@ -1371,13 +1402,19 @@ void Tree::GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, cons
 	//first rate, followed by 16 for the second, etc.
 	double *CL1=childCLA->arr;
 	double *partial=partialCLA->arr;
-	
+
+	int nchar=data->NChar();
+
+#ifdef UNIX
+	madvise(partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+	madvise(CL1, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+#endif
+
 	double siteL, tempD1;
 	double La, Lc, Lg, Lt;
 	double D1a, D1c, D1g, D1t;
 	double D2a, D2c, D2g, D2t;
 	
-	int nchar=data->NChar();
 	//gamma and invariants
 	const int *countit=data->GetCounts();
 	int lastConst=data->LastConstant();
@@ -1408,7 +1445,7 @@ void Tree::GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, cons
 				partial+=4;
 				CL1+=4;
 				}
-			if(i<=lastConst){
+			if(mod->NoPinvInModel() == false && i<=lastConst){
 				double btot=0.0;
 				if(conBases[i]&1) btot+=mod->Pi(0);
 				if(conBases[i]&2) btot+=mod->Pi(1);

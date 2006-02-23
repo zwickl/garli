@@ -6,7 +6,7 @@
 class ErrorException{
 	
 	public:
-	char message[100];
+	char message[200];
 	ErrorException(const char *fmt, ...){
 		va_list vl;
 		va_start(vl, fmt);

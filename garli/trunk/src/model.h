@@ -27,7 +27,7 @@ class Model{
 	int nst;
 	int nstates;
 	double pi[4];
-	double R, Y;  
+//	double R, Y;  
 	double *rates; //this will be kappa in the case of nst=2 or 5 rel rates in the case of nst=6
 	double dirty;
 	double blen_multiplier;
@@ -53,6 +53,7 @@ class Model{
 	
 	public:
 	static double mutationShape;
+	static bool noPinvInModel;
 	Model(int _nst)
 		:nRateCats(4)
 		{
@@ -83,7 +84,9 @@ class Model{
 			alpha=.5;
 			DiscreteGamma();
 			}
-		propInvar=0.2;
+		if(noPinvInModel==false)
+			propInvar=0.2;
+		else propInvar=0.0;
 		}
 	void SetRmat(double *r){
 		for(int i=0;i<5;i++) rates[i]=r[i];
@@ -97,6 +100,7 @@ class Model{
 		DiscreteGamma();
 		}
 	void SetPinv(double p){
+		if(noPinvInModel == true) assert(p==0);
 		propInvar=p;
 		}
 	void SetMaxPinv(double p){
@@ -131,6 +135,7 @@ class Model{
 	inline int Nst() const {return nst;}
 	inline double Rates(int r) const { return rates[r];}
 	inline double ProportionInvariant() const { return propInvar;}
+	inline double NoPinvInModel() const { return noPinvInModel;}
 	void SetParams(Parameters *p) {params=p;}
 	int NRateCats() const {return nRateCats;}
 #ifdef GANESH

@@ -1,13 +1,13 @@
-CC       = /opt/mpich/gnu/bin/mpiCC
+#CC       = /opt/mpich/gnu/bin/mpiCC
 #CC       = /opt/mpich/intel/bin/mpiCC
-#CC       = mpiCC
+CC       = mpiCC
 
 #CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -DMPI_VERSION -DUNIX -DGCC295 -DNDEBUG -include defs.h #this must be used for gcc version 2.95!!!
 
-CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -DMPI_VERSION -DUNIX -DNDEBUG -include defs.h #for other gcc versions
+CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -fomit-frame-pointer -DMPI_VERSION -DUNIX -DNDEBUG -include defs.h #for other gcc versions
 
 #CC_FLAGS = -O2 -ip -fno-alias -DMPI_VERSION -DUNIX -DNDEBUG -include defs.h #for icc
-EXEC     = ParGarli.93
+EXEC     = ParGarli.94
 
 OBJECT_LIST =	condlike.o datamatr.o individual.o parameters.o population.o \
 		rng.o set.o stricl.o topologylist.o translatetable.o tree.o\
@@ -15,8 +15,8 @@ OBJECT_LIST =	condlike.o datamatr.o individual.o parameters.o population.o \
 		bipartition.o model.o linalg.o threadfunc.o subset.o\
 		optimization.o mlhky.o adaptation.o
 
-ParGarli.93: $(OBJECT_LIST) garlimain.o
-	$(CC)  -v -o $(EXEC) $(OBJECT_LIST) -lpthread garlimain.o
+ParGarli.94: $(OBJECT_LIST) garlimain.o
+	$(CC)  $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) -lpthread garlimain.o
 	
 garlimain.o:	mlhky.h tree.h population.h \
 		individual.h parameters.h mlhky.h garlimain.cpp \

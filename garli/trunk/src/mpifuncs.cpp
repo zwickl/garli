@@ -206,6 +206,27 @@ int MasterMaster(MasterGamlConfig& conf, HKYData& data)	{
 			pop.NextGeneration();
 			if(pop.gen % pop.params->saveEvery == 0) pop.CreateTreeFile( pop.params->treefname );
 			if(pop.gen % pop.adap->intervalLength == 0){
+	            	bool reduced=false;
+	    	        if(pop.gen-pop.lastTopoImprove > pop.adap->intervalsToStore*pop.adap->intervalLength){
+	         	           reduced=pop.adap->ReducePrecision();
+	            	        }
+	    	        if(reduced){
+	            	        pop.lastTopoImprove=pop.gen;
+	                	   pop.indiv[pop.bestIndiv].treeStruct->OptimizeAllBranches(pop.adap->branchOptPrecision);
+	                   	   pop.indiv[pop.bestIndiv].SetDirty();
+	                   	   pop.CalcAverageFitness();
+							//DJZ 2/20/06
+							//reducing parallel remote update thresh based on same criteria as opt precision
+							double prev=pop.paraMan->updateThresh;
+							pop.paraMan->ReduceUpdateThresh();
+							debug_mpi("Remote update threshold reduced from %f to %f", prev, pop.paraMan->updateThresh);	                    	
+							}
+	           		 else if(!(pop.gen%(pop.adap->intervalLength*pop.adap->intervalsToStore))){
+	                            pop.indiv[pop.bestIndiv].treeStruct->OptimizeAllBranches(pop.adap->branchOptPrecision);
+	                            pop.indiv[pop.bestIndiv].SetDirty();
+	                            pop.CalcAverageFitness();
+	                            }
+
 				if(pop.enforceTermConditions == true
 					&& pop.gen-pop.lastTopoImprove > pop.lastTopoImproveThresh 
 					&& pop.adap->improveOverStoredIntervals < pop.improveOverStoredIntervalsThresh
@@ -217,13 +238,7 @@ int MasterMaster(MasterGamlConfig& conf, HKYData& data)	{
 					break;
 					}
 				pop.CheckSubtrees();
-				//6-20-05 Changing this to deterministically reduce the replace thresh
-				//every subtreeInterval generations.  Tying the reduction of this to 
-				//how often the master recieved new bests from the remotes had odd properties,
-				//and didn't scale well with differing numbers of processors.
-				//and it's not clear what a better automated approach would be
-				//pop.CheckRemoteReplaceThresh();
-				if(pop.gen % pop.paraMan->subtreeInterval == 0) pop.paraMan->ReduceUpdateThresh();
+
 #ifdef INCLUDE_PERTURBATION
 				pop.CheckPerturbParallel();
 #endif
@@ -1118,6 +1133,28 @@ int RemoteSubtreeWorker(Population& pop, const GeneralGamlConfig& conf){
 		++pop.gen;
 		pop.NextGeneration();
 
+	           if(pop.gen % pop.adap->intervalLength == 0){
+	               //DEBUG
+	              cout.precision(10);
+	                bool reduced=false;
+	                if(pop.gen-pop.lastTopoImprove > pop.adap->intervalsToStore*pop.adap->intervalLength){
+	                   reduced=pop.adap->ReducePrecision();
+	                        }
+	                if(reduced){
+	                   pop.lastTopoImprove=pop.gen;
+	                   pop.indiv[pop.bestIndiv].treeStruct->OptimizeAllBranches(pop.adap->branchOptPrecision);
+	                   pop.indiv[pop.bestIndiv].SetDirty();
+	                   pop.CalcAverageFitness();
+	                        }
+	                 else if(!(pop.gen%(pop.adap->intervalLength*pop.adap->intervalsToStore))){
+	                        pop.indiv[pop.bestIndiv].treeStruct->OptimizeAllBranches(pop.adap->branchOptPrecision);
+	                        pop.indiv[pop.bestIndiv].SetDirty();
+	                        pop.CalcAverageFitness();
+	                        }
+					}
+			
+
+
 		if(g_sw->SplitTime() - lastSend > conf.sendInterval){
 			debug_mpi("SYNCH COMM (node 0)");
 			//send our best individual to the master
@@ -1227,8 +1264,7 @@ int RemoteSubtreeWorker(Population& pop, const GeneralGamlConfig& conf){
 //			if(pop.subtreeNode != subtreeNode) pop.AssignSubtree(subtreeNode);
 			pop.CalcAverageFitness();
 			debug_mpi("\tbest score= %f", pop.indiv[*which].Fitness());
-			//DEBUG
-			//pop.AppendTreeToTreeLog(rank, -1, *which);
+			pop.AppendTreeToTreeLog(-1, *which);
 			}
 		}
 
