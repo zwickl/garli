@@ -1,0 +1,75 @@
+[general]
+datafname = rana.phy
+streefname = random
+ofprefix = ranaGarli
+randseed = -1
+megsclamemory = 500
+logevery = 10
+saveevery = 100
+refinestart = 1
+outputeachbettertopology = 1
+enforcetermconditions = 1
+genthreshfortopoterm = 20000
+scorethreshforterm = .05
+outputphyliptree = 0
+outputmostlyuselessfiles = 0
+
+
+[master]
+nindivs = 4
+holdover = 1
+selectionintensity = .5
+holdoverpenalty = 0
+stopgen = 5000000
+stoptime = 5000000
+
+startoptprec = .5
+minoptprec = .01
+precreductionfactor = .9
+topoweight = 1.0
+modweight = .05
+brlenweight = .2
+randnniweight = .2
+randsprweight = .3
+limsprweight =  .5
+intervallength = 100
+intervalstostore = 5
+
+limsprrange = 6
+meanbrlenmuts = 5
+gammashapebrlen = 1000
+gammashapemodel = 1000
+
+bootstrapreps = 0
+inferinternalstateprobs = 0
+
+-PARALLEL ONLY-
+startupdatethresh = 5000
+minupdatethresh = 5000
+maxrecomindivs = 1
+
+[remote]
+nindivs = 4 4 
+holdover = 1
+selectionintensity = .5
+holdoverpenalty = 0
+stopgen = 1000000
+stoptime = 1000000
+startoptprec = .5
+minoptprec = .01
+precreductionfactor = .9
+topoweight = 1.0
+modweight = .05
+brlenweight = .2
+randnniweight = .2
+randsprweight = .3
+limsprweight =  .5
+limsprrange = 6
+
+meanbrlenmuts = 5 5
+gammashapebrlen = 1000
+gammashapemodel = 1000
+sendinterval = 30
+
+intervallength = 100
+intervalstostore = 5
