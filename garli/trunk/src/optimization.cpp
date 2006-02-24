@@ -1365,7 +1365,7 @@ void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, cons
 					}
 				partial+=16;
 				}
-			if(mod->NoPinvInModel() == false && i<=lastConst){
+			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 				double btot=0.0;
 				if(conBases[i]&1) btot+=mod->Pi(0);
 				if(conBases[i]&2) btot+=mod->Pi(1);
@@ -1445,7 +1445,7 @@ void Tree::GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, cons
 				partial+=4;
 				CL1+=4;
 				}
-			if(mod->NoPinvInModel() == false && i<=lastConst){
+			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 				double btot=0.0;
 				if(conBases[i]&1) btot+=mod->Pi(0);
 				if(conBases[i]&2) btot+=mod->Pi(1);

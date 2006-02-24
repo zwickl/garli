@@ -57,8 +57,8 @@ class ClaManager{
 		}
 	
 	int NumClas() {return numClas;}
-	int NumFreeClas() {return claStack.size();}
-	int NumFreeHolders() {return holderStack.size();}
+	int NumFreeClas() {return (int) claStack.size();}
+	int NumFreeHolders() {return (int) holderStack.size();}
 
 
 	int AssignClaHolder();
@@ -117,7 +117,7 @@ class ClaManager{
 		
 		assert(arr != NULL);
 		claStack.pop_back();
-		if(numClas - claStack.size() > maxUsed) maxUsed=numClas - claStack.size();
+		if(numClas - (int)claStack.size() > maxUsed) maxUsed=numClas - (int)claStack.size();
 		
 		return arr;
 		}

@@ -145,10 +145,10 @@ int GeneralGamlConfig::Serialize(char** buf_, int* size_) const	{
 	size += sizeof(saveevery);
 	size += sizeof(megsClaMemory);
 	
-	size += datafname.length() + 1;
-	size += method.length() + 1;
-	size += ofprefix.length() + 1;
-	size += streefname.length() + 1;
+	size += (int)datafname.length() + 1;
+	size += (int)method.length() + 1;
+	size += (int)ofprefix.length() + 1;
+	size += (int)streefname.length() + 1;
 	
 	// allocate the buffer
 	buf = new char[size];

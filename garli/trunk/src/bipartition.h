@@ -72,7 +72,7 @@ class Bipartition{
 			if(rep[i]!=~rhs->rep[i]) return false;
 			}
 			
-		if(rep[i]!=(~rhs->rep[i])&partialBlockMask) return false;
+		if(rep[i]!=((~rhs->rep[i])&partialBlockMask)) return false;
 		
 		return true;
 		}
@@ -121,7 +121,7 @@ class Bipartition{
 		for(i=0;i<nBlocks-1;i++){
 			if((~target->rep[i] | rep[i]) != ~target->rep[i]) return true;
 			}
-		if(((~target->rep[i])&partialBlockMask | rep[i]) != (~target->rep[i])&partialBlockMask) return true;
+		if((((~target->rep[i])&partialBlockMask) | rep[i]) != (~target->rep[i])&partialBlockMask) return true;
 		return false;
 		}
 

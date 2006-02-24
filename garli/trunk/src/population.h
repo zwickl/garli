@@ -176,13 +176,13 @@ class ParallelManager{
 		}
 
 	void CheckSubtreeAccuracy(const Tree *tr){
-		for(int i=0;i<subtrees.size();i++){
+		for(int i=0;i<(int)subtrees.size();i++){
 			int countnum= tr->allNodes[subtrees[i]->nodeNum]->CountTerminals(0);
 			assert(countnum== subtrees[i]->taxa);
 			}	
 		}
 	void ClearSubtrees(){
-		for(int i=0;i<subtrees.size();i++){
+		for(int i=0;i<(int)subtrees.size();i++){
 			delete subtrees[i];
 			}
 		subtrees.clear();

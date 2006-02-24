@@ -271,7 +271,7 @@ int ConfigReader::GetBoolOption(const char* option, bool& val, bool optional /*=
 	string str;
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
 		// lower case it
-		for (int i = 0; i < str.length(); ++i)
+		for (int i = 0; i < (int)str.length(); ++i)
 			str[i] = tolower(str[i]);
 
 		if (str == "true")
@@ -322,8 +322,8 @@ int ConfigReader::GetIntRangeOption(const char* option, int& val1, int& val2)	{
 	if (GetStringOption(option, str) == 0)	{  // option exists
 
 		// split up the string
-		int len = str.length();
-		int i = str.find(' ', 0);
+		int len = (int)str.length();
+		int i = (int)str.find(' ', 0);
 		if (i < 0)
 			rv = -1;
 		else	{
@@ -365,8 +365,8 @@ int ConfigReader::GetFloatRangeOption(const char* option, float& val1, float& va
 	if (GetStringOption(option, str) == 0)	{  // option exists
 
 		// split up the string
-		int len = str.length();
-		int i = str.find(' ', 0);
+		int len = (int)str.length();
+		int i = (int)str.find(' ', 0);
 		if (i < 0)
 			rv = -1;
 		else	{
@@ -408,8 +408,8 @@ int ConfigReader::GetDoubleRangeOption(const char* option, double& val1, double&
 	if (GetStringOption(option, str) == 0)	{  // option exists
 
 		// split up the string
-		int len = str.length();
-		int i = str.find(' ', 0);
+		int len = (int)str.length();
+		int i = (int)str.find(' ', 0);
 		if (i < 0)
 			rv = -1;
 		else	{
@@ -475,7 +475,7 @@ int ConfigReader::ReadLine(FILE* file, string& line)	{
 		fread(&ch, sizeof(char), 1, file);
 	}
 
-	return line.length();
+	return (int)line.length();
 }
 
 void ConfigReader::TrimWhiteSpace(string& str)	{
@@ -484,11 +484,11 @@ void ConfigReader::TrimWhiteSpace(string& str)	{
 	if (str.length() == 0)
 		return;
 
-	index = str.find(' ', 0);
-	while (index != -1 && index < str.length())	{
-		while (index < str.length()-1 && str[index+1] == ' ')
+	index = (int)str.find(' ', 0);
+	while (index != -1 && index < (int)str.length())	{
+		while (index < (int)str.length()-1 && str[index+1] == ' ')
 			str.erase(index+1, 1);
-		index = str.find(' ', index+1);
+		index = (int)str.find(' ', index+1);
 	}
 
 	if (str.find(' ', 0) == 0)

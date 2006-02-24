@@ -78,7 +78,7 @@ int main( int argc, char* argv[] )	{
 //	while(poo);
 
 	CREATE_MEMCHK{
-	srand(time(NULL));
+	srand((unsigned)time(NULL));
 	#ifdef MPI_VERSION
 		MPIMain(argc, argv);
 	#else

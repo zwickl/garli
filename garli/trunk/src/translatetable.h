@@ -47,7 +47,7 @@ class TranslateTable
 		char* GetTaxonName( int i )
 			{ assert( Check(i-1) ); return taxonName[i-1]; }
 		int GetNameLength( int i )
-			{ assert( Check(i-1) ); return strlen( taxonName[i-1] ); }
+			{ assert( Check(i-1) ); return (int)strlen( taxonName[i-1] ); }
 		int Find( const char* s );
 
 		friend ostream& operator<<( ostream& out, TranslateTable& tt );

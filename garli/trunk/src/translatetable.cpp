@@ -61,10 +61,10 @@ void TranslateTable::SetName( int i, char* s )
         assert(s);
         int nmlen;
         if( taxonName[i] ) {
-                nmlen = strlen( taxonName[i] );
+                nmlen = (int)strlen( taxonName[i] );
                 MEM_DELETE_ARRAY(taxonName[i]); // taxonName[i] has length nmlen+1
         }
-        nmlen = strlen(s);
+        nmlen = (int)strlen(s);
 	MEM_NEW_ARRAY(taxonName[i],char,nmlen+1);
         assert( taxonName[i] );
         strcpy( taxonName[i], s );

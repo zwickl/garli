@@ -172,7 +172,7 @@ void Tree::ScaleWholeTree(double factor/*=-1.0*/){
 int Tree::BrlenMutateSubset(vector<int> const &subtreeMemberNodes){
 	int numBrlenMuts;
 	do{
-		numBrlenMuts=rnd.random_binomial(subtreeMemberNodes.size(), meanBrlenMuts);
+		numBrlenMuts=rnd.random_binomial((int)subtreeMemberNodes.size(), meanBrlenMuts);
 		}while(numBrlenMuts==0);
 	for(int i=0;i<numBrlenMuts;i++){
 		int branch=subtreeMemberNodes[(int)(rnd.uniform()*subtreeMemberNodes.size())];//can't mutate the root
@@ -703,7 +703,7 @@ bool Tree::IdenticalSubtreeTopology(const TreeNode *other){
 	
 	if(other->anc!=NULL){
 		if(other->left==NULL) return true;
-		identical=ContainsBipartition(other->bipart);
+		identical=(ContainsBipartition(other->bipart) != NULL);
 		if(identical==true){
 			identical=IdenticalSubtreeTopology(other->left);
 			if(identical==true)
@@ -721,7 +721,7 @@ bool Tree::IdenticalTopology(const TreeNode *other){
 	
 	if(other->anc!=NULL){
 		if(other->left==NULL) return true;
-		identical=ContainsBipartitionOrComplement(other->bipart);
+		identical= (ContainsBipartitionOrComplement(other->bipart) != NULL);
 		if(identical==true){
 			identical=IdenticalTopology(other->left);
 			if(identical==true)
@@ -817,6 +817,8 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, double optPrec
 
 
 void Tree::LocalMove(){
+	assert(0);
+	//This is not working
 	//this will all assume that there are no polytomies besides the root
 	TreeNode *a, *b, *c, *d;
 	int cPosition;
@@ -967,7 +969,7 @@ void Tree::LocalMove(){
 	//Calculate the backbone length and the new length
 	double m;
 	double changing_blens[3];
-	double new_blens[3];
+//	double new_blens[3];
 	changing_blens[0]=a->dlen;
 	changing_blens[1]=u->dlen;
 	if(cPosition==3){
@@ -3840,7 +3842,7 @@ double Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, con
 				}
 			partial+=16;
 			}
-		if(mod->NoPinvInModel() == false && i<=lastConst){
+		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 			double btot=0.0;
 			if(conBases[i]&1) btot+=mod->Pi(0);
 			if(conBases[i]&2) btot+=mod->Pi(1);
@@ -3897,7 +3899,7 @@ double Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, con
 			partial+=4;
 			CL1+=4;
 			}
-		if(mod->NoPinvInModel() == false && i<=lastConst){
+		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 			double btot=0.0;
 			if(conBases[i]&1) btot+=mod->Pi(0);
 			if(conBases[i]&2) btot+=mod->Pi(1);

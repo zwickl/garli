@@ -29,7 +29,7 @@ class Model{
 	double pi[4];
 //	double R, Y;  
 	double *rates; //this will be kappa in the case of nst=2 or 5 rel rates in the case of nst=6
-	double dirty;
+	int dirty;
 	double blen_multiplier;
 	
 	//rate het stuff
@@ -135,7 +135,7 @@ class Model{
 	inline int Nst() const {return nst;}
 	inline double Rates(int r) const { return rates[r];}
 	inline double ProportionInvariant() const { return propInvar;}
-	inline double NoPinvInModel() const { return noPinvInModel;}
+	inline bool NoPinvInModel() const { return noPinvInModel;}
 	void SetParams(Parameters *p) {params=p;}
 	int NRateCats() const {return nRateCats;}
 #ifdef GANESH

@@ -25,7 +25,7 @@ class Stopwatch	{
 		}		
 		int SplitTime()	{
 			time(&end_time);
-			return end_time - start_time;		
+			return (int)(end_time - start_time);		
 		}	
 		#else		
 		void Restart()	{

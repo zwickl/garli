@@ -152,7 +152,6 @@ Population::~Population()
 		}
 	}
 	
-	int i;
 	if( indiv!=NULL )
 		MEM_DELETE_ARRAY(indiv); // indiv has length params.nindivs
 
@@ -160,7 +159,7 @@ Population::~Population()
 		MEM_DELETE_ARRAY(newindiv); // newindiv has length params.nindivs
 
 	if( cumfit!=NULL ) {
-		for( i = 0; i < params->nindivs; i++ )
+		for( int i = 0; i < params->nindivs; i++ )
 			MEM_DELETE_ARRAY(cumfit[i]); // cumfit[i] has length 2
 		MEM_DELETE_ARRAY(cumfit); // cumfit has length params.nindivs
 	}
@@ -279,7 +278,7 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 
 	//allocate the treeString
 	//remember that we also encode internal node numbers sometimes
-	float taxsize=log10((double) ((double)params->data->NTax())*params->data->NTax()*2);
+	double taxsize=log10((double) ((double)params->data->NTax())*params->data->NTax()*2);
 	stringSize=(int)((params->data->NTax()*2)*(8+DEF_PRECISION)+taxsize);
 	treeString=new char[stringSize];
 	stringSize--;
@@ -2106,7 +2105,7 @@ int Population::GetSpecifiedTreeStrings(char** tree_strings_, int n, int* indiv_
 	char*& tree_strings = *tree_strings_;
 	int buf_size = 0;
 	for (int i = 0; i < n; ++i)	// calc the buff size
-		buf_size += strlen(MakeNewick(indiv_list[i], true)) + 1;
+		buf_size += (int) strlen(MakeNewick(indiv_list[i], true)) + 1;
 	char* p = tree_strings = new char[buf_size+1];
 	for (int i = 0; i < n; ++i)
 		p += strlen(strcpy(p, MakeNewick(indiv_list[i], true))) + 1;
@@ -3431,7 +3430,7 @@ void Population::StartSubtreeMode(){
 	   	sub2.clear();
 		sub3.clear();
 		
-		if(paraMan->subtrees.size() > paraMan->nremotes){
+		if((int)paraMan->subtrees.size() > paraMan->nremotes){
 			paraMan->targetSubtreeSize = (int) (paraMan->targetSubtreeSize * 1.05);
 			attempt++;
 			pscores << "too many subtrees, increasing target size to paraMan->targetSubtreeSize..." << endl;
@@ -3831,7 +3830,7 @@ void Population::AssignSubtree(int st, int indNum){
 		if(rank!=0){//if we are the master and are going to choose a subtree, don't do this
 			indiv[indNum].treeStruct->SetupClasForSubtreeMode(subtreeNode);	
 
-			int nodesNeedingClas=subtreeMemberNodes.size()/2+2;//the nodes in the subtree, plus the subnode itself and it's anc
+			int nodesNeedingClas=((int)subtreeMemberNodes.size())/2+2;//the nodes in the subtree, plus the subnode itself and it's anc
 			ResetMemLevel(nodesNeedingClas,claMan->NumClas());
 			}
 		}
@@ -3901,7 +3900,7 @@ int poo=1;
 	ofstream subrec("subrec.log", ios::app);
 	subrec.precision(10);
 	
-	subrec << "Subdef " << paraMan->subtreeDefNumber <<  ", " << paraMan->subtrees.size() << " subtrees, defined gen " << paraMan->subtreeDefGeneration << "\n";
+	subrec << "Subdef " << paraMan->subtreeDefNumber <<  ", " << (int)paraMan->subtrees.size() << " subtrees, defined gen " << paraMan->subtreeDefGeneration << "\n";
 	subrec << "Last full recom gen " << paraMan->lastFullRecom <<"\n";
 	subrec << "nodenum\tsize\tpriority\tassigned\tbrlen\n";
 	int totnode=0;
@@ -3989,7 +3988,7 @@ int poo=1;
 
 double ParallelManager::ScorePartitioning(int nodeNum, ofstream &pscores){
 	
-	int size=subtrees.size();
+	int size=(int)subtrees.size();
 	
 	if(size<2 /*|| size>(nremotes-1)*/) return 9999999999.9;
 
@@ -4057,7 +4056,7 @@ int ParallelManager::ChooseSubtree(){
   */
   int totalsize = 0;
   int temp = 0;
-  int size=subtrees.size();
+  int size=(int)subtrees.size();
   if(size<=0) return (0);
 
   //DJZ see if any subtrees have not been assigned
@@ -4117,7 +4116,7 @@ int ParallelManager::ChooseSubtree(){
 
 void ParallelManager::FindNonSubtreeNodes(TreeNode *nd){
 	bool subNode=false;
-	for(int i=0;i<subtrees.size();i++)
+	for(int i=0;i<(int)subtrees.size();i++)
 		if(nd->nodeNum==subtrees[i]->nodeNum) subNode=true;
 	
 	if(nd->nodeNum!=0){

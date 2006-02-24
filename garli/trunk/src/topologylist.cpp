@@ -60,7 +60,7 @@ int TopologyList::Allocate(int s/*=0*/)
 	int i=0;
 	int * temp;
 	if(indNums)
-		{int displace=currentpos-indNums;
+		{int displace=(int)(currentpos-indNums);
 		int * temptw;
 		temptw=temp=new int[sizeOfAllocation];
 		currentpos=indNums;

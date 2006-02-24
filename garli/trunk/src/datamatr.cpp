@@ -889,7 +889,7 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 #endif
    )
 {
-	int i, j, nchar_total;
+	int i, j;//, nchar_total;
 	char newpath[ MAXPATH ];
 
 	strcpy( newpath, path );
@@ -1141,7 +1141,7 @@ int DataMatrix::Serialize(char** buf_, int* size_)	{
 	// calc size of the label and color array (including null terminators)
 	int label_size = 0, color_size = 0;
 	for (int i = 0; i < nTax; ++i)	{
-		label_size += strlen(taxonLabel[i]) + 1;
+		label_size += (int)strlen(taxonLabel[i]) + 1;
 	}
 
 	// calc size of the stateDistr array
@@ -1229,7 +1229,7 @@ int DataMatrix::Serialize(char** buf_, int* size_)	{
 	memcpy(buf+bptr, &label_size, sizeof(label_size));
 	bptr += sizeof(label_size);
 	for (int i = 0; i < nTax; ++i)	{
-		nTemp = strlen(taxonLabel[i]) + 1;
+		nTemp = (int)strlen(taxonLabel[i]) + 1;
 		memcpy(buf+bptr, taxonLabel[i], nTemp);
 		bptr += nTemp;
 	}
@@ -1353,7 +1353,7 @@ int DataMatrix::Deserialize(const char* buf, const int size_in)	{
 	if (size > 0)	{
 		taxonLabel = new char*[nTax];
 		for (int i = 0; i < nTax; ++i)	{
-			int len = strlen(p) + 1;
+			int len = (int)strlen(p) + 1;
 			taxonLabel[i] = new char[len];
 			strcpy(taxonLabel[i], p);
 			p += len;
@@ -1397,7 +1397,7 @@ int DataMatrix::Deserialize(const char* buf, const int size_in)	{
 		p += size;
 	}
 
-	int diff = p - buf;
+	int diff = (int)(p - buf);
 	assert(p-buf == size_in);
 	
 	return 0;

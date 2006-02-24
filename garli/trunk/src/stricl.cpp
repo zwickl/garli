@@ -67,7 +67,7 @@ Stri::Stri(const unsigned size, const unsigned sizeIncrement)
 Stri::Stri(const char* s, const unsigned sizeIncrement)
 {
 	 if (s != NULL && s[0] != '\0') {
-		 len = strlen(s);
+		 len = (int)strlen(s);
 		 maxSize = len+1;
 
 		 //str = new char[maxSize];
@@ -216,7 +216,7 @@ Stri& Stri::operator =(const Stri &s)
 
 Stri& Stri::operator =(const char* s)
 {
-	len = (s ? strlen(s) : 0);
+	len = (s ? (int)strlen(s) : 0);
 	if ((len+1) > maxSize)
 		resize(len+1);
 	*str = '\0';
@@ -434,7 +434,7 @@ Stri operator +(Stri &s1, Stri &s2)
 Stri operator +(Stri &s1, char* s2)
 {
 	 Stri result(s1.len + strlen(s2) + 1);
-	 unsigned length = strlen(s2);
+	 unsigned length = (unsigned) strlen(s2);
 
 	 if( s1.str ) strcpy(result.str, s1.str);
    if( s2 ) strcat(result.str, s2);
@@ -444,8 +444,8 @@ Stri operator +(Stri &s1, char* s2)
 
 Stri operator +(char* s1, Stri &s2)
 {
-   Stri result(strlen(s1) + s2.len + 1);
-   unsigned length = strlen(s1);
+   Stri result((unsigned) strlen(s1) + s2.len + 1);
+   unsigned length = (unsigned) strlen(s1);
 
    if( s1 ) strcpy(result.str, s1) ;
    if( s2.str ) strcat(result.str, s2.str);
@@ -495,7 +495,7 @@ Stri& Stri::operator +=(const char* s)
 	 if ((newlen+1) > maxSize)
 			 resize(newlen+1);
 	 if( s ) strcat(str, s);
-	 len += strlen(s);
+	 len += (unsigned) strlen(s);
 	 return *this;
 }
 
@@ -578,7 +578,7 @@ NxsString& NxsString::operator +=(const int i)
 	sprintf(s, "%d", i);  
 
 	// below modified from Stri::operator +=(const Stri&)
-	int slen = strlen(s);
+	int slen = (int)strlen(s);
 	unsigned newlen = len + slen;
 
 	if( ( newlen + 1 ) > maxSize )
@@ -596,7 +596,7 @@ NxsString& NxsString::operator +=(const double i)
 	sprintf(s, "%lf", i);  
 
 	// below modified from Stri::operator +=(const Stri&)
-	int slen = strlen(s);
+	int slen = (int)strlen(s);
 	unsigned newlen = len + slen;
 
 	if( ( newlen + 1 ) > maxSize )
@@ -626,7 +626,7 @@ NxsString& NxsString::operator +=( const char* s )
 	if( !s || s[0] == '\0' ) return *this;
 
 	// borrowed from Stri::operator +=(const char*)
-	int slen = strlen(s);
+	int slen = (int)strlen(s);
 	unsigned newlen = len + slen;
 
 	if ( ( newlen + 1 ) > maxSize )
