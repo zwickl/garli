@@ -29,7 +29,7 @@ class Model{
 	double pi[4];
 //	double R, Y;  
 	double *rates; //this will be kappa in the case of nst=2 or 5 rel rates in the case of nst=6
-	int dirty;
+	bool dirty;
 	double blen_multiplier;
 	
 	//rate het stuff

@@ -566,7 +566,10 @@ double Tree::BranchLike(TreeNode *optNode){
 			lnL=SumSiteLikes(destination, underflow_mult);
 	*/		return lnL;
 			}
-		catch(bool err){
+		//POL 24-Feb-2006 the line "catch(int err)" below produces this warning from VC 7.1
+		// warning C4101: 'err' : unreferenced local variable
+		// I'm not sure what you are doing here (catching a non-exception?) so I'm leaving this one alone
+		catch(bool){
 			scoreOK=false;
 			MakeAllNodesDirty();
 			rescaleEvery -= 2;

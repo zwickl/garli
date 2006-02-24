@@ -2520,7 +2520,11 @@ int Tree::Score(int rootNodeNum /*=0*/){
 			else
 				ConditionalLikelihoodRateHet( ROOT, rootNode);
 			}
+#if defined(NDEBUG)
+			catch(int){
+#else
 			catch(int err){
+#endif
 				assert(err==1);
 				scoreOK=false;
 				MakeAllNodesDirty();

@@ -121,7 +121,16 @@ class Bipartition{
 		for(i=0;i<nBlocks-1;i++){
 			if((~target->rep[i] | rep[i]) != ~target->rep[i]) return true;
 			}
-		if((((~target->rep[i])&partialBlockMask) | rep[i]) != (~target->rep[i])&partialBlockMask) return true;
+#		if 0
+			//POL 24-Feb-2006 commented out line below garners this warning from VC 7.1
+			// warning C4554: '&' : check operator precedence for possible error; use parentheses to clarify precedence
+			if((((~target->rep[i])&partialBlockMask) | rep[i]) != (~target->rep[i])&partialBlockMask) return true;
+#		else
+			//POL 24-Feb-2006 my fix
+			unsigned first_part = (((~target->rep[i])&partialBlockMask) | rep[i]);
+			unsigned second_part = (~target->rep[i])&partialBlockMask;
+			if(first_part != second_part) return true;
+#		endif
 		return false;
 		}
 

@@ -47,7 +47,13 @@ void TranslateTable::Alloc()
 void TranslateTable::Destroy()
 {
         for( int i = 0; i < nTax; i++ ) {
-                int nmlen = strlen( taxonName[i] );
+#				if 0
+					//POL 24-Feb-2006 VC 7.1 says "warning C4267: 'initializing' : conversion from 'size_t' to 'int', possible loss of data"
+				    int nmlen = strlen( taxonName[i] );
+#				else
+					//POL 24-Feb-2006 my fix
+				    int nmlen = (int)strlen( taxonName[i] );
+#				endif
                 assert(nmlen > 0);
 		MEM_DELETE_ARRAY(taxonName[i]); // taxonName[i] has length nmlen+1
 	}
