@@ -1,4 +1,4 @@
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -807,14 +807,13 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, double optPrec
 		
 		//try branch length optimization of tonode's branch, to make sure it fits in it's new tree background 
 		SweepDirtynessOverTree(tonode);
-		OptimizeBranchLength(optPrecision, tonode, true);
+		//OptimizeBranchLength(optPrecision, tonode, true);
+		OptimizeBranchesWithinRadius(tonode, optPrecision, 0);
 		Score(tonode->nodeNum);
 		}
 	else return -1;
 	return 1;
 	}
-
-
 
 void Tree::LocalMove(){
 	assert(0);
@@ -1410,7 +1409,7 @@ int Tree::VariableSPRMutate(int range, double optPrecision){
 	poo << endl;
 	poo.close();
 
-	return 0; //POL 23-Feb-2006 VC complained about no return statement for this function
+	return 0; 
 	}
  
 int Tree::SPRMutate(int range, double optPrecision){

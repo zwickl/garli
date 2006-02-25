@@ -1,4 +1,4 @@
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -316,33 +316,27 @@ double Tree::OptimizeBranchLength(double optPrecision, TreeNode *nd, bool goodGu
 #ifdef OPT_DEBUG
 	optsum << nd->dlen << "\t" << improve << endl;
 #endif
+
 	return improve;
 	}
 
 void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, double optPrecision, int subtreeNode, TreeNode *prune/*=NULL*/){
 	nodeOptVector.clear();
 	
+	
 	double totalIncrease=0.0, prunePointIncrease=0.0, thisIncr;
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->left, false);
 	totalIncrease += OptimizeBranchLength(optPrecision, nd, false);
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->right, false);	
 
-//DEBUG
-/*	ofstream poo("3branchScores.log", ios::app);
-	Score(nd->nodeNum);
-	poo << globalBest << "\t" << lnL << "\t";
-//	poo.close();
-*/
 	Score(nd->nodeNum);
 	if(lnL < globalBest - treeRejectionThreshold){
-//		poo << "1\t";
 		#ifdef OPT_DEBUG
 		optsum << "3 branch total\t" << totalIncrease << endl;
 		optsum << "bailing early\t" << globalBest-lnL << endl;
 		#endif
 		return;
 		}
-//	else poo << "0\t";
 	
 	nodeOptVector.push_back(nd->left);
 	nodeOptVector.push_back(nd);
@@ -444,10 +438,7 @@ optsum << "radiusopt intial pass total\t" << totalIncrease << endl;
 		Score(finalNode->anc->nodeNum);
 	else Score(0);
 
-	//DEBUG
-/*	poo << lnL << "\n";
-	poo.close();
-*/
+
 #ifdef OPT_DEBUG
 optsum << "postopt total\t" << postIncr << endl;
 #endif

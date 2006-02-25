@@ -1,4 +1,4 @@
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -27,6 +27,7 @@ using namespace std;
 #include "clamanager.h"
 #include "bipartition.h"
 #include "subset.h"
+#include "errorexception.h"
 
 #undef DEBUG_RECOMBINEWITH
 
@@ -464,6 +465,9 @@ void TreeNode::CheckforPolytomies(){
 	if(anc!=NULL){
 		if(left!=NULL){
 			if(left->next!=right){
+				//we don't ever allow polytomous trees to be used,
+				//so crap out here is we detect one
+				throw ErrorException("Error: Input tree has polytomies!!  See FAQ for suggestions on avoiding this.");
 				assert(0);
 				}
 			}

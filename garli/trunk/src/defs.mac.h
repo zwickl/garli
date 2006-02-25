@@ -2,7 +2,8 @@
 #define DEFS
 
 //unix is defined in the Makefile, so don't define
-//another system type here
+//another system type here.  If compiling with gcc or
+//xcode on OS X, don't define as MAC !!
 #ifndef UNIX
 #undef WINDOWS
 #define MAC

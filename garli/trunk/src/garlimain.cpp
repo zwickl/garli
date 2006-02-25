@@ -1,4 +1,4 @@
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -66,11 +66,11 @@ int main( int argc, char* argv[] )	{
 
 	#ifdef MAC
 	SIOUXSettings.columns = 90;
-	SIOUXSettings.rows = 40;
+	SIOUXSettings.rows = 45;
 	SIOUXSettings.asktosaveonclose = false;
 	SIOUXSettings.autocloseonquit = true;
 	SIOUXSettings.showstatusline = true;
-	SIOUXSetTitle("\pGARLI 0.93");
+	SIOUXSetTitle("\pGARLI 0.94");
 	#endif
 
 
@@ -154,10 +154,10 @@ int main( int argc, char* argv[] )	{
 
 #ifndef UNIX
 	cout << "-Press enter to close program.-" << endl;
-	while( cin && (cin.get() != '\n') );
+//	while( cin && (cin.get() != '\n') );
 	char d=getchar();
 #endif
-//	exit(0);
+	exit(0);
 
 
 #endif

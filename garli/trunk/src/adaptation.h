@@ -82,6 +82,7 @@ class Adaptation{
 	double branchOptPrecision;
 	double minOptPrecision;
 	double precReductionFactor;
+	int numPrecReductions;
 	
 	double topoWeight;
 	double modWeight;

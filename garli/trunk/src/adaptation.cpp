@@ -1,6 +1,6 @@
 
 
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -35,7 +35,12 @@ Adaptation::Adaptation(const GeneralGamlConfig *gc){
 
 	startOptPrecision = branchOptPrecision = gc->startOptPrec;
 	minOptPrecision = gc->minOptPrec;
-	precReductionFactor = gc->precReductionFactor;
+
+	numPrecReductions=gc->numPrecReductions;
+	if(gc->numPrecReductions > 0)
+		precReductionFactor = pow((minOptPrecision/startOptPrecision), 1.0/numPrecReductions);
+	else
+		precReductionFactor = gc->precReductionFactor;
 
 	reset=false;
 

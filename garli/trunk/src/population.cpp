@@ -1,4 +1,4 @@
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -328,14 +328,24 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 	pertMan = new PerturbManager();
 #endif
 
-	//instanitate the clamanager
+	//instantiate the clamanager and figure out how much memory to snatch
+	double memToUse;
+	if(conf->availableMemory > 0){
+		cout << "\nTotal system memory specified as " << conf->availableMemory << " megs" << endl;
+		memToUse=0.75*conf->availableMemory;
+		}
+	else{
+		cout << "\nUsable system memory specified as " << conf->megsClaMemory << " megs" << endl;
+		memToUse=conf->megsClaMemory;
+		}
+		
 	const int KB = 1024;
 	const int MB = KB*KB;
 	int claSizePerNode = (4 * indiv[0].mod->NRateCats() * params->data->NChar() * sizeof(double)) + (params->data->NChar() * sizeof(int));
 	int numNodesPerIndiv = params->data->NTax()-2;
 	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
-	int maxClas = (int)((conf->megsClaMemory*MB)/ claSizePerNode);
+	int maxClas = (int)((memToUse*MB)/ claSizePerNode);
 	int numClas;
 
 	int L0=(int) (numNodesPerIndiv * total_size * 2);//a downward and one upward set for each tree
@@ -356,7 +366,7 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 		}
 
 	cout.precision(4);
-	cout << "\nallocating memory...\n" << conf->megsClaMemory << " megs specified available for conditional likelihood arrays\tMemlevel=" << memLevel << endl;
+	cout << "allocating memory...\nusing " << (double)numClas*(double)claSizePerNode/(double)MB << " megs for conditional likelihood arrays.  Memlevel=" << memLevel << endl;
 	cout << "For this dataset:\n";
 	cout << "level 0: >= " << ceil(L0 * (claSizePerNode/(double)MB)) << " megs\n";
 	cout << "level 1: " << ceil(L0 * ((double)claSizePerNode/MB))-1 << " to " << ceil(L1 * ((double)claSizePerNode/MB)) << " megs\n";
@@ -478,6 +488,7 @@ void Population::SeedPopulationWithStartingTree(){
 	//if starting from a treefile, use the treestring
 	//to create the first indiv, and then copy the tree and clas
 	indiv[0].Randomize(params->startfname, rank);
+	indiv[0].treeStruct->root->CheckforPolytomies();
 	indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->mod=indiv[0].mod;
 
@@ -608,11 +619,13 @@ void Population::Run(){
 	#ifndef NO_OUTPUT
 	cout.setf(ios::left);
 	cout.precision(6);
-	cout << "\t" << setw(10) <<  "gen" << setw(15) << "current lnL" << setw(10) << "precision" << setw(10) << "lastTopoImprove"<< endl;			
+	cout << "\t" << setw(10) <<  "gen" << setw(15) << "current lnL" << setw(10) << "precision" << setw(10) << "lastChange"<< endl;			
 	#endif
 
 	gen=0;
 	OutputLog();
+
+	CatchInterrupt();
 
 	for (gen = 1; gen < params->stopgen+1; ++gen){
 		
@@ -628,12 +641,15 @@ void Population::Run(){
 			#endif
 			}
 		if(askQuitNow == 1){
-			cout << "Terminate Program Now? (y/n)" << endl;
+			cout << "Perform final branch-length optimization and terminate now? (y/n)" << endl;
 			char c=getchar();
+			cin.get();
 			if(c=='y') break;
 			else{
-				askQuitNow = 0;			
+				askQuitNow = 0;
+				CatchInterrupt();
 				cout << "continuing ..." << endl;
+				cin.get();
 				}
 			}
 
@@ -646,7 +662,6 @@ void Population::Run(){
 		if(gen % 1000 == 0 || gen==1)
 			NNISpectrum(bestIndiv);
 #endif
-		CatchInterrupt();
 		if(!(gen%adap->intervalLength)){
 			cout.precision(10);
 			bool reduced=false;
@@ -1139,16 +1154,8 @@ void Population::PerformMutation(int indNum){
 				Individual *recompar=&indiv[ind->recombinewith];
 				ind->treeStruct->CalcBipartitions();
 				recompar->treeStruct->CalcBipartitions();
-/*				ofstream scr("scores.log", ios::app);
-				scr.precision(10);
-				OutputFilesForScoreDebugging(ind, tempGlobal++);
-				OutputFilesForScoreDebugging(recompar, tempGlobal++);
-				scr << ind->Fitness() << "\n" << recompar->Fitness() << "\n";
-*/				ind->CrossOverWith( *recompar, adap->branchOptPrecision);
-/*				OutputFilesForScoreDebugging(ind, tempGlobal++);
-				scr << ind->Fitness() << "\n";
-				scr.close();
-*/				ind->accurateSubtrees=false;
+				ind->CrossOverWith( *recompar, adap->branchOptPrecision);
+				ind->accurateSubtrees=false;
 				ind->treeStruct->calcs=calcCount;
 				calcCount=0;
 				}
@@ -1227,38 +1234,6 @@ void Population::NextGeneration(){
 
 	DetermineParentage();
 
-	//Determine who will recombine with whom
-	//DJZ 2-2-04 Also adding determination of the use of
-	//exhaustive NNI and semi-exhaustive SPR here
-	//each will be mutually exclusive with all other
-	//types of mutation and recombination
-/*
-	for(int l=params->holdover;l<params->nindivs;l++){
-		double r=params->rnd.uniform();
-		if(subtreeNode> 0 && r < adap->exNNIprob && topologies[newindiv[l].topo]->exNNItried != true)
-			newindiv[l].mutation_type |= Individual::exNNI;	
-		else if(subtreeNode> 0 && (r < adap->exNNIprob + adap->exlimSPRprob))
-			newindiv[l].mutation_type |= Individual::exlimSPR;
-		}			
-*/		//DJZ 5-17-04 not worrying about the old kind of recombination right now
-/*		//end new part
-		else if( params->rnd.uniform() < params->crossoverProb ){ // cross over
-			int mate;
-			newindiv[l].status |= Individual::recombined;
-			// find someone else to recombine with
-			do{
-				r = params->rnd.uniform();
-				for( mate = 0; mate < total_size; mate++ ) {
-					if( r < cumfit[mate][1] ) break;
-					}
-				}while(mate==newindiv[l].parent);//don't recombine with your parent
-			newindiv[l].recombinewith=mate;
-			indiv[mate].willrecombine=true;
-			//this will be a new topology, so mark it as topo -1.  This will be dealt with when we update the topolist
-			newindiv[l].topo=-1;
-			}
-*/
-
 	for(int i=0;i<ntopos;i++)
 		topologies[i]->NewGeneration();
 
@@ -1320,11 +1295,6 @@ void Population::NextGeneration(){
 	if(rank==0)	OutputFilesForScoreDebugging();
 	#endif
 	
-//	if(rank==0){
-		if(new_best_found && (indiv[bestIndiv].mutation_type&Individual::anyTopo)){
-			AppendTreeToTreeLog(indiv[bestIndiv].mutation_type);
-			}
-//		}
 	}
 
 void Population::OutputFate(){
@@ -3129,21 +3099,17 @@ void Population::keepTrack(){
 		if(typ > 0){
 			if(scoreDif>0){
 	//			if(i==bestIndiv){
-					//adap->improvetotal[0]+=scoreDif;
-					//7-2-05 keep track of when the last significant beneficial topo mutation occured as a potential
-					//stopping criterion.  In parallel, only the master needs to do this.
-					if(rank==0 && typ&Individual::anyTopo){
-//						ofstream deb("topoimprove.log", ios::app);
-						if(scoreDif > 0.01){
+					//keep track of when the last significant beneficial topo mutation occured
+					//this will be used for the stopping criterion, precision reduction and update reduction in the parallel version
+					if(typ&Individual::anyTopo){
+						if(scoreDif > significantTopoChange){
 							indiv[0].treeStruct->CalcBipartitions();
 							indiv[i].treeStruct->CalcBipartitions();
 							if(indiv[0].treeStruct->IdenticalTopology(indiv[i].treeStruct->root)==false){
-//								deb << gen << "\tnew better topo\t" << scoreDif << "\t" << typ << "\n";
 								lastTopoImprove=gen;
+								if(i == bestIndiv) AppendTreeToTreeLog(indiv[bestIndiv].mutation_type);
 								}
-//							else deb << gen << "\ttopo recreated\t" << scoreDif << "\t" << typ << "\n";
 							}
-//						deb.close();
 						}
 					
 					if(typ&(Individual::randNNI)){
@@ -4293,7 +4259,7 @@ void Population::LogNewBestFromRemote(double scorediff, int ind){
         if(indiv[0].treeStruct->IdenticalTopology(indiv[ind].treeStruct->root) == false){
 			debug_mpi("\ttopo different from prev best");
 			AppendTreeToTreeLog(-1, ind);
-			if(scorediff > 0.010) lastTopoImprove=gen;
+			if(scorediff > significantTopoChange) lastTopoImprove=gen;
 			}
 		else{
 			debug_mpi("\ttopo same as prev best");

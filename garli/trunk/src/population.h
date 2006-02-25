@@ -144,10 +144,12 @@ class ParallelManager{
 		minUpdateThresh = mc->minUpdateThresh;
 		//DJZ 2/20/06
 		//making the reduction factor depend on the min and max updateThreshes
-		//and the number of reductions that one wants (for now 38, the number
-		//required to reduce the opt precision from 0.5 to 0.01 by 0.9's
+		//and the number of reductions requested for the optprecision to 
+		//go from its start to min
 		//updateReductionFactor = mc->updateReductionFactor;
-		updateReductionFactor=pow(minUpdateThresh/startUpdateThresh, 1.0/38.0);
+		
+		updateReductionFactor=pow(minUpdateThresh/startUpdateThresh, 1.0/ (mc->numPrecReductions));
+
 
 //		subtreeThresh = mc->subtreeUpdateThresh;
 //		nonSubtreeThresh = mc->nonsubtreeUpdateThresh;
@@ -298,7 +300,9 @@ public:
 	bool enforceTermConditions;
 	int lastTopoImprove;
 	int lastTopoImproveThresh;
-	double improveOverStoredIntervalsThresh;		
+	double improveOverStoredIntervalsThresh;
+	double significantTopoChange;//the score difference from the current best required for 
+								 //a new topology to really be considered "better"
 	
 private:
 	//DJZ adding these streams directly to the class so that they can be opened once and left open
@@ -359,7 +363,8 @@ private:
 			 paraMan(NULL), doneWithRep(0),
 			 subtreeDefNumber(0), claMan(NULL), 
 			 inferInternalStateProbs(0), bootstrapReps(0),
-			 outputMostlyUselessFiles(0), outputPhylipTree(0)
+			 outputMostlyUselessFiles(0), outputPhylipTree(0),
+			 significantTopoChange(0.01)
 			{
 			allTimeBest.SetFitness(-1e100);
 			bestSinceRestart.SetFitness(-1e100);

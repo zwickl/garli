@@ -31,6 +31,7 @@ class GeneralGamlConfig{
 	int logevery;
 	int saveevery;
 	double megsClaMemory;
+	double availableMemory;
 	int randseed;
 
 	string datafname;
@@ -46,6 +47,7 @@ class GeneralGamlConfig{
 	bool enforceTermConditions;
 	int lastTopoImproveThresh;
 	double improveOverStoredIntervalsThresh;
+	double significantTopoChange;
 
 	//all of the following options can vary between master and remote
 	//general population stuff
@@ -59,6 +61,7 @@ class GeneralGamlConfig{
 	double startOptPrec;
 	double minOptPrec;
 	double precReductionFactor;
+	int numPrecReductions;
 
 	double treeRejectionThreshold;
 

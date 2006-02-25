@@ -1,4 +1,4 @@
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -61,6 +61,7 @@ int MPIMain(int argc, char** argv)	{
         	MasterGamlConfig conf;
 	        int err=conf.Read("garli.conf", true);
 		if(err != 0){
+			send_quit_messages(nprocs);
 			throw ErrorException("Error in config file (Master)...aborting.");
 			}
 		
@@ -1134,12 +1135,10 @@ int RemoteSubtreeWorker(Population& pop, const GeneralGamlConfig& conf){
 		pop.NextGeneration();
 
 	           if(pop.gen % pop.adap->intervalLength == 0){
-	               //DEBUG
-	              cout.precision(10);
 	                bool reduced=false;
 	                if(pop.gen-pop.lastTopoImprove > pop.adap->intervalsToStore*pop.adap->intervalLength){
 	                   reduced=pop.adap->ReducePrecision();
-	                        }
+	                   }
 	                if(reduced){
 	                   pop.lastTopoImprove=pop.gen;
 	                   pop.indiv[pop.bestIndiv].treeStruct->OptimizeAllBranches(pop.adap->branchOptPrecision);

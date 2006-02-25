@@ -1,4 +1,4 @@
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -47,16 +47,10 @@ void TranslateTable::Alloc()
 void TranslateTable::Destroy()
 {
         for( int i = 0; i < nTax; i++ ) {
-#				if 0
-					//POL 24-Feb-2006 VC 7.1 says "warning C4267: 'initializing' : conversion from 'size_t' to 'int', possible loss of data"
-				    int nmlen = strlen( taxonName[i] );
-#				else
-					//POL 24-Feb-2006 my fix
-				    int nmlen = (int)strlen( taxonName[i] );
-#				endif
-                assert(nmlen > 0);
-		MEM_DELETE_ARRAY(taxonName[i]); // taxonName[i] has length nmlen+1
-	}
+		    int nmlen = (int)strlen( taxonName[i] );
+            assert(nmlen > 0);
+			MEM_DELETE_ARRAY(taxonName[i]); // taxonName[i] has length nmlen+1
+			}
         MEM_DELETE_ARRAY(taxonName); // taxonName has length nTax
         taxonName = 0;
         nTax = 0;

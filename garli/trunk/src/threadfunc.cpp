@@ -1,5 +1,5 @@
 
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -372,8 +372,6 @@ int DoMasterSW(char *buf, int size, int who, int tag, thread_arg_t *targ)	{
 //on a subtree
 	
 	double updateThresh=paraMan->updateThresh;
-//DEBUG
-//	if(paraMan->subtreeModeActive==false && (paraMan->needToSend[who]==true || ((scorediff > nonSubThresh && paraMan->beforeFirstSubtree==false) || (scorediff > startThresh && paraMan->beforeFirstSubtree==true) || remoteSubtreeDef>0))){
 	if(paraMan->subtreeModeActive==false){
 		if((paraMan->perturbModeActive==false && (scorediff > updateThresh || remoteSubtreeDef>0))/* || (paraMan->needToSend[who]==true)*/){
 			debug_mpi("\tupdate thresh = %f, send indiv", updateThresh);

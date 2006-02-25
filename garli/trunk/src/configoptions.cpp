@@ -1,4 +1,4 @@
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -17,19 +17,23 @@
 
 #include <string.h>
 #include <cassert>
+#include <iostream>
 
 using namespace std;
 
 #include "configoptions.h"
 #include "configreader.h"
 #include "memchk.h"
+#include "errorexception.h"
 
 /////////////////////////////////////////////////////////////////////////
 // GamlConfig::General methods //////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
 GeneralGamlConfig::GeneralGamlConfig()	:bootstrapReps(0), outputMostlyUselessFiles(0), 
-		outputPhylipTree(0), treeRejectionThreshold(100.0), dontInferProportionInvariant(0){
+		outputPhylipTree(0), treeRejectionThreshold(100.0), dontInferProportionInvariant(0), 
+		numPrecReductions(-1), precReductionFactor(-1.0), availableMemory(-1), 
+		significantTopoChange(0.01){
 	//default values here //TODO
 	logevery = 10;
 	saveevery = 100;
@@ -49,9 +53,11 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.SetSection("general");
 	errors += cr.GetIntOption("logevery", logevery);
 	errors += cr.GetIntOption("saveevery", saveevery);
-	errors += cr.GetDoubleOption("megsclamemory", megsClaMemory);
+	int found=cr.GetDoubleOption("megsclamemory", megsClaMemory, true);
+	found += cr.GetDoubleOption("availablememory", availableMemory, true);
+	if(found == -2) throw ErrorException("Error: either \"megsclamemory\" or \"availablememory\" must be specified in conf!");
+	
 	errors += cr.GetStringOption("datafname", datafname);
-//	errors += cr.GetStringOption("method", method);
 	errors += cr.GetStringOption("ofprefix", ofprefix);
 	errors += cr.GetStringOption("streefname", streefname);
 	errors += cr.GetIntOption("randseed", randseed);
@@ -60,6 +66,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetBoolOption("enforcetermconditions", enforceTermConditions);
 	errors += cr.GetIntOption("genthreshfortopoterm", lastTopoImproveThresh);
 	errors += cr.GetDoubleOption("scorethreshforterm", improveOverStoredIntervalsThresh);
+	cr.GetDoubleOption("significanttopochange", significantTopoChange, true);
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
@@ -78,7 +85,14 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetIntOption("stoptime", stoptime);
 	errors += cr.GetDoubleOption("startoptprec", startOptPrec);
 	errors += cr.GetDoubleOption("minoptprec", minOptPrec);
-	errors += cr.GetDoubleOption("precreductionfactor", precReductionFactor);
+	//changing this to specify either the number of reductions in the precision or the 
+	//multiplier as before.  Prefer the number, since it should be easier to specify.  
+	//
+	found=0;
+	found=cr.GetIntOption("numberofprecreductions", numPrecReductions, true);
+	found += cr.GetDoubleOption("precreductionfactor", precReductionFactor, true);
+	if(found == -2) throw ErrorException("Error: either \"numberofprecreductions\" (preferably) or \"precreductionfactor\" must be specified in conf!");
+	
 	errors += cr.GetDoubleOption("topoweight", topoWeight);
 	errors += cr.GetDoubleOption("modweight", modWeight);	
 	errors += cr.GetDoubleOption("brlenweight", brlenWeight);	
@@ -249,9 +263,9 @@ int MasterGamlConfig::Read(const char* fname, bool isMaster){
 
 	errors += cr.GetDoubleOption("startupdatethresh", startUpdateThresh);
 	errors += cr.GetDoubleOption("minupdatethresh", minUpdateThresh);
-	errors += cr.GetDoubleOption("updatereductionfactor", updateReductionFactor);
+//	errors += cr.GetDoubleOption("updatereductionfactor", updateReductionFactor);
 				
-	errors += cr.GetIntOption("parallelinterval", subtreeInterval);
+//	errors += cr.GetIntOption("parallelinterval", subtreeInterval);
 #ifdef SUBTREE_VERSION
 	errors += cr.GetDoubleOption("subtreestartthresh", subtreeStartThresh);
 	errors += cr.GetIntOption("minsubtreesize", minSubtreeSize);

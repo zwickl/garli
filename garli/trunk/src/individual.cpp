@@ -1,4 +1,4 @@
-// GARLI version 0.93 source code
+// GARLI version 0.94 source code
 // Copyright  2005 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -18,6 +18,7 @@
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #include <iosfwd>
+#include <iomanip>
 
 using namespace std;
 
@@ -618,15 +619,25 @@ void Individual::RefineStartingConditions(bool optModel, double branchPrec){
 	for(int i=1;improve > branchPrec;i++){
 		double alphaImprove=0.0, pinvImprove=0.0, optImprove=0.0, scaleImprove=0.0;
 		
+		CalcFitness(0);
+		double passStart=Fitness();
+		
 		optImprove=treeStruct->OptimizeAllBranches(branchPrec);
+		SetDirty();
+		CalcFitness(0);
+		double trueImprove= Fitness() - passStart;
+		
 		scaleImprove=treeStruct->OptimizeTreeScale();
+		SetDirty();
 		if(optModel==true){
 			alphaImprove=treeStruct->OptimizeAlpha();
+			SetDirty();
 			}
-		improve=scaleImprove + optImprove + alphaImprove + pinvImprove;
-		cout << "pass " << i << ": tree scale=" << scaleImprove << "\tbranch opt=" << optImprove;
-		if(optModel==true) cout << "\talpha=" << alphaImprove << endl;
-		else cout << endl;
+		improve=scaleImprove + trueImprove + alphaImprove + pinvImprove;
+		cout.precision(8);
+		cout << "pass " << setw(2) << i << ": +" << setw(7) << improve << "\t(branch=" << trueImprove <<  " scale=" << scaleImprove;
+		if(optModel==true) cout << " alpha=" << alphaImprove << ")" << endl;
+		else cout << ")" << endl;
 		}
 
 	treeStruct->MakeAllNodesDirty();
