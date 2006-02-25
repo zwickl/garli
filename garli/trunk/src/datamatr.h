@@ -60,7 +60,7 @@ class DataMatrix
 						//both start at 0, so offset upon output
 						//This used to represent something else (I think)
 	char**          taxonLabel;
-	char**          taxonColor;	//POL-2/19/98
+	char**          taxonColor;
 	int		nConstant;
 	int 	lastConstant;//DJZ
 	int 	*constBases;//DJZ

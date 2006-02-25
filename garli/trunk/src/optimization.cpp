@@ -552,15 +552,9 @@ double Tree::BranchLike(TreeNode *optNode){
 			//now sum as if this were the root
 			if(mod->NRateCats()>1) ConditionalLikelihoodRateHet(ROOT, optNode->anc);
 			else ConditionalLikelihood(ROOT, optNode->anc);
-	/*		double *destination=claMan->GetTempCla()->arr;
-			int *underflow_mult=claMan->GetTempCla()->underflow_mult;
-			lnL=SumSiteLikes(destination, underflow_mult);
-	*/		return lnL;
+			return lnL;
 			}
-		//POL 24-Feb-2006 the line "catch(int err)" below produces this warning from VC 7.1
-		// warning C4101: 'err' : unreferenced local variable
-		// I'm not sure what you are doing here (catching a non-exception?) so I'm leaving this one alone
-		catch(bool){
+		catch(int){
 			scoreOK=false;
 			MakeAllNodesDirty();
 			rescaleEvery -= 2;

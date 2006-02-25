@@ -457,7 +457,7 @@ void Tree::AddRandomNode(int nodenum , int &placeInAllNodes){
 	
 	assert(nodenum>0 && nodenum<=numTipsTotal);  //should be adding a terminal
 	TreeNode* nd=allNodes[nodenum];
-	nd->dlen = Tree::exp_starting_brlen * rnd.gamma( 100 );
+	nd->dlen = Tree::exp_starting_brlen;// * rnd.gamma( 100 );
 	nd->dlen = (nd->dlen > min_brlen ? nd->dlen : min_brlen);
 	
 	nd->next=nd->prev=NULL;//in case this node was connected in some other tree

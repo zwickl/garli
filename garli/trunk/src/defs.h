@@ -4,8 +4,8 @@
 //unix is defined in the Makefile, so don't define
 //another system type here
 #ifndef UNIX
-#undef WINDOWS
-#define MAC
+#define WINDOWS
+#undef MAC
 #endif
 
 #ifndef NDEBUG
