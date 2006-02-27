@@ -87,22 +87,25 @@ int main( int argc, char* argv[] )	{
 	char conf_name[20];
 	strcpy(conf_name, "garli.conf");
 
+#ifdef UNIX
+	bool interactive=false;
+#else
+	bool interactive=true;
+#endif
+
     if (argc > 1) {
     	int curarg=1;
         while(curarg<argc){
-#ifdef GANESH 
-     		if(strlen(argv[curarg]) <= 2 && isdigit(argv[curarg][0])) {
-	        	Tree::p_value       = atoi(argv[curarg]);
-                if (Tree::p_value == 0) {
-                    Tree::random_p = true;
-                }
-//                else {
-  //                  Tree::ComputeRealCatalan();
-    //            }
-            }
-	      	else
-#endif
-	        	strcpy(conf_name, argv[curarg]);
+				if(argv[curarg][0]=='-'){
+					//command line arguments with a dash
+					if(argv[curarg][1]=='b') interactive=false;
+					else {
+						cout << "Unknown command line option " << argv[curarg] << endl;
+						exit(0);
+						}
+					}
+				//if anything else appears, we'll assume that it's a config file
+	        	else strcpy(conf_name, argv[curarg]);
 	        curarg++;
 			}
 		}
@@ -152,11 +155,10 @@ int main( int argc, char* argv[] )	{
 				return 0;
 				}
 
-#ifndef UNIX
-	cout << "-Press enter to close program.-" << endl;
-//	while( cin && (cin.get() != '\n') );
-	char d=getchar();
-#endif
+	if(interactive==true){
+		cout << "-Press enter to close program.-" << endl;
+		char d=getchar();
+		}
 	exit(0);
 
 

@@ -127,7 +127,7 @@ class ClaManager{
 		return holders[index].GetReclaimLevel();
 		}
 
-	inline void ClaManager::ReserveCla(int index, bool temp){
+	inline void ClaManager::ReserveCla(int index, bool temp/*=true*/){
 		if(temp==true) holders[index].tempReserved=true;
 		else holders[index].reserved=true;
 		}

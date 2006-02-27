@@ -55,6 +55,7 @@ int memLevel;
 int calcCount=0;
 int optCalcs;
 
+
 ofstream outf, paupf;
 int tempGlobal=1;
 
@@ -332,10 +333,10 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 	double memToUse;
 	if(conf->availableMemory > 0){
 		cout << "\nTotal system memory specified as " << conf->availableMemory << " megs" << endl;
-		memToUse=0.75*conf->availableMemory;
+		memToUse=0.8*conf->availableMemory;
 		}
 	else{
-		cout << "\nUsable system memory specified as " << conf->megsClaMemory << " megs" << endl;
+		cout << "\nMemory to be used for conditional likelihood arrays specified as " << conf->megsClaMemory << " megs" << endl;
 		memToUse=conf->megsClaMemory;
 		}
 		
@@ -869,11 +870,7 @@ double Population::CalcAverageFitness(){
 		//if we are at some level of memory restriction, mark the clas of the old best
 		//for reclamation, and protect those of the new best
 		SetNewBestIndiv(bestIndiv);
-/*		if(bestIndiv != 0){
-			indiv[0].treeStruct->UnprotectClas();
-			}
-		indiv[bestIndiv].treeStruct->ProtectClas();
-*/		}
+		}
 
 	//probability of reproduction based on more or less on AIC weights, although
 	//the strength of selection can be varied by changing the selectionIntensity
@@ -888,8 +885,7 @@ double Population::CalcAverageFitness(){
 		tot+=deltaAIC[i];
 		}
 
-	double holdoverPenalty=0.0;
-	deltaAIC[total_size-1]=holdoverPenalty;
+	deltaAIC[total_size-1]=params->holdoverPenalty;
 	deltaAIC[total_size-1]=exp(-params->selectionIntensity * deltaAIC[total_size-1]);
 	tot+=deltaAIC[total_size-1];
 
@@ -4191,7 +4187,9 @@ void Population::SetNewBestIndiv(int indivIndex){
 	bestIndiv=indivIndex;
 	globalBest=bestFitness=prevBestFitness=indiv[bestIndiv].Fitness();
 	for(int i=0;i<total_size;i++){
-		indiv[i].treeStruct->UnprotectClas();
+		if(i != bestIndiv){
+			indiv[i].treeStruct->UnprotectClas();
+			}
 		}
 	indiv[bestIndiv].treeStruct->ProtectClas();
 	}
