@@ -332,7 +332,7 @@ private:
 	ofstream logf;
 
 	private:
-		void QuickSort( int top, int bottom );
+		void QuickSort( double **scoreArray, int top, int bottom );
 
 	public:
 		enum { nomem=1, nofile, baddimen };
@@ -395,6 +395,7 @@ private:
 		int Restart(int type, int rank, int nprocs, int restart_count);
 		void SeedPopulationWithStartingTree();
 		double CalcAverageFitness();
+		void CalculateReproductionProbabilies(double **scoreArray, double selectionIntensity, int indivsInArray);
 		void NextGeneration();
 		void DetermineParentage();
 		void FindTreeStructsForNextGeneration();

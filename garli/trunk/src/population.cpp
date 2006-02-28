@@ -666,7 +666,7 @@ void Population::Run(){
 		if(!(gen%adap->intervalLength)){
 			cout.precision(10);
 			bool reduced=false;
-			if(gen-lastTopoImprove > adap->intervalsToStore*adap->intervalLength){
+			if(gen-lastTopoImprove >= adap->intervalsToStore*adap->intervalLength){
 				reduced=adap->ReducePrecision();
 				}
 			if(reduced){
@@ -787,20 +787,20 @@ void Population::Bootstrap(){
 	}
 
 
-void Population::QuickSort( int top, int bottom )
-{
+void Population::QuickSort( double **scoreArray, int top, int bottom ){
+
 	int i = top;
 	int j = bottom;
-	double x = cumfit[ (top + bottom) / 2 ][1];
+	double x = scoreArray[ (top + bottom) / 2 ][1];
 	do {
-		while( cumfit[i][1] < x  &&  i < bottom ) i++ ;
-		while( x < cumfit[j][1]  &&  j > top  ) j-- ;
+		while( scoreArray[i][1] < x  &&  i < bottom ) i++ ;
+		while( x < scoreArray[j][1]  &&  j > top  ) j-- ;
 
 		if( i <= j ) {
 			for( int k = 0; k < 2; k++ ) {
-				double y = cumfit[i][k];
-				cumfit[i][k] = cumfit[j][k];
-				cumfit[j][k] = y;
+				double y = scoreArray[i][k];
+				scoreArray[i][k] = scoreArray[j][k];
+				scoreArray[j][k] = y;
 			}
 			i++;
 			if(j) j--;
@@ -808,8 +808,8 @@ void Population::QuickSort( int top, int bottom )
 
 	} while( i <= j );
 
-	if( top  <    j    ) QuickSort( top, j );
-	if(  i   <  bottom ) QuickSort( i, bottom );
+	if( top  <    j    ) QuickSort( scoreArray, top, j );
+	if(  i   <  bottom ) QuickSort( scoreArray, i, bottom );
 }
 
 double Population::CalcAverageFitness(){
@@ -829,16 +829,8 @@ double Population::CalcAverageFitness(){
 
 	double avg = total / (double)total_size;
 
-	//if we're in subtree mode, give the indivs without accurate subtrees a really
-	//crappy lnL so they don't reproduce
-/*	if(rank==0)
-		if(paraMan->subtreeModeActive==true){
-			for(int i=0;i<total_size;i++)
-				if(indiv[i].accurateSubtrees==false) cumfit[i][1]=-1e100;	
-			}
-*/
 	// Sort fitnesses from low to high (bad to good)
-	QuickSort( 0, total_size-1 );
+	QuickSort( cumfit, 0, total_size-1 );
 
 	// keep track of which individual is most fit each generation we've stored the 
 	//fitnesses as ln-likelihoods in cumfit, so cumfit[0] will be the _least_ fit individual
@@ -862,8 +854,6 @@ double Population::CalcAverageFitness(){
 		}
 	else numgensamebest++;
 
-
-
 //	allTimeBest = &indiv[bestIndiv];
 
 	if(memLevel>0){
@@ -872,74 +862,8 @@ double Population::CalcAverageFitness(){
 		SetNewBestIndiv(bestIndiv);
 		}
 
-	//probability of reproduction based on more or less on AIC weights, although
-	//the strength of selection can be varied by changing the selectionIntensity
-	//A selectionIntensity of 1.0 makes this equivalent to AIC weights, while 
-	//smaller number make the selection less severe
-	double *deltaAIC=new double[total_size];
-	double tot=0.0;
 
-	for(int i=0;i<total_size-1;i++){
-		deltaAIC[i]=cumfit[total_size-1][1] - cumfit[i][1];
-		deltaAIC[i]=exp(-params->selectionIntensity * deltaAIC[i]);
-		tot+=deltaAIC[i];
-		}
-
-	deltaAIC[total_size-1]=params->holdoverPenalty;
-	deltaAIC[total_size-1]=exp(-params->selectionIntensity * deltaAIC[total_size-1]);
-	tot+=deltaAIC[total_size-1];
-
-	for(int i=0;i<total_size;i++)
-		deltaAIC[i] /= tot;
-	
-	double cum=deltaAIC[0];
-	cumfit[0][1] = cum;
-	for(int i = 1; i < total_size; i++ ) {
-		cum += deltaAIC[i];
-		cumfit[i][1] = cum;
-		}
-	delete []deltaAIC;
-
-//only allow the best indiv to reproduce
-/*	for(int i = 0; i < total_size; i++ ) {
-		if(cumfit[i][0]==0) cumfit[i][1]=1.0;
-		else cumfit[i][1]=0.0;
-		}
-	bestIndiv=0;		
-*/
-
-	//DEBUG
-/*	if(gen > 1){
-		bool same1, same2, same3;
-
-		indiv[0].treeStruct->CalcBipartitions();
-		indiv[1].treeStruct->CalcBipartitions();
-		indiv[2].treeStruct->CalcBipartitions();
-		indiv[3].treeStruct->CalcBipartitions();
-		
-		if(newindiv[indiv[1].parent].treeStruct){
-			same1=newindiv[indiv[1].parent].treeStruct->IdenticalSubtreeTopology(indiv[1].treeStruct->root);
-			if(same1 == false) assert(indiv[1].mutation_type & Individual::anyTopo);
-			else assert(!(indiv[1].mutation_type & Individual::anyTopo));
-			}
-
-		if(newindiv[indiv[2].parent].treeStruct){
-			same2=newindiv[indiv[2].parent].treeStruct->IdenticalSubtreeTopology(indiv[2].treeStruct->root);
-			if(same2 == false) assert(indiv[2].mutation_type & Individual::anyTopo);
-			else assert(!(indiv[2].mutation_type & Individual::anyTopo));
-			}
-
-		if(newindiv[indiv[3].parent].treeStruct){
-			same3=newindiv[indiv[3].parent].treeStruct->IdenticalSubtreeTopology(indiv[3].treeStruct->root);
-			if(same3 == false) assert(indiv[3].mutation_type & Individual::anyTopo);
-			else assert(!(indiv[3].mutation_type & Individual::anyTopo));
-			}
-			
-		ofstream deb("ident.log", ios::app);
-		deb << gen << "\n" << same1 << "\n" << same2 << "\n" << same3 << "\n";
-		deb.close();
-		}
-*/
+	CalculateReproductionProbabilies(cumfit, params->selectionIntensity, total_size);
 	return avg;
 	
 /*	Here's Paul's original selection criterion, based solely on rank
@@ -961,6 +885,47 @@ double Population::CalcAverageFitness(){
 		cumfit[i][1] = cumfit[i-1][1] + cum;
 	}
 */
+}
+
+void Population::CalculateReproductionProbabilies(double **scoreArray, double selectionIntensity, int indivsInArray){
+	//DJZ 2-28-06 Generalizing this so that it can be used in multiple places with different 
+	//subsets of individuals and selection intensities.  The 2-d array passed in (indivsInArray x 2)
+	//has the scores in the [x][1] slots, and the indiv numbers in the [x][0] slots, and should already
+	//be sorted from low to high (bad to good). The reproduction probs will be placed in the [x][1] before returning.
+
+	//Probability of reproduction based on more or less on AIC weights, although
+	//the strength of selection can be varied by changing the selectionIntensity
+	//A selectionIntensity of 0.5 makes this equivalent to AIC weights, while 
+	//smaller number makes the selection less severe
+	double *deltaAIC=new double[indivsInArray];
+	double tot=0.0;
+
+	for(int i=0;i<indivsInArray-1;i++){
+		deltaAIC[i]=scoreArray[indivsInArray-1][1] - scoreArray[i][1];
+		deltaAIC[i]=exp(-selectionIntensity * deltaAIC[i]);
+		tot+=deltaAIC[i];
+		}
+
+	if(indivsInArray == total_size){
+		deltaAIC[indivsInArray-1]=params->holdoverPenalty;
+		}
+	else deltaAIC[indivsInArray-1]=0.0;
+
+	deltaAIC[indivsInArray-1]=exp(-selectionIntensity * deltaAIC[indivsInArray-1]);
+	tot+=deltaAIC[indivsInArray-1];
+
+
+	for(int i=0;i<indivsInArray;i++)
+		deltaAIC[i] /= tot;
+	
+	double cum=deltaAIC[0];
+	scoreArray[0][1] = cum;
+	for(int i = 1; i < indivsInArray; i++ ) {
+		cum += deltaAIC[i];
+		scoreArray[i][1] = cum;
+		}
+	delete []deltaAIC;
+	assert(abs(scoreArray[indivsInArray-1][1] - 1.0) < 0.001);
 }
 
 void Population::CreateGnuPlotFile()
@@ -1037,27 +1002,53 @@ void Population::DetermineParentage(){
 #ifdef MPI_VERSION
 //new bipart recom conditions, 9-25-05
 
-			if(rank==0 && paraMan->subtreeModeActive==false && i>= (params->nindivs-paraMan->maxRecomIndivs)){
-				int *mates=new int[paraMan->nremotes];
+//DJZ 2-28-06 making recombination partner weakly tied to fitness (selctionIntensity of 0.01) rather than random
+
+			if(rank==0 && paraMan->subtreeModeActive==false && i>= (params->nindivs - paraMan->maxRecomIndivs)){
+/*				int *mates=new int[paraMan->nremotes];
 				for(int j=0;j<paraMan->nremotes;j++) mates[j]=params->nindivs+j;
 				ScrambleArray(paraMan->nremotes, mates);
-				int mateIndex=0;
+*/
+				int foo=2;
+				double **recomSelect=new double *[paraMan->nremotes];
+				for(int q=0;q<paraMan->nremotes;q++)
+					recomSelect[q]=new double[2];
+					
+				int potentialPartners=0;
+				for(int r=0;r<paraMan->nremotes;r++){
+					int ind=params->nindivs+r;
+					recomSelect[r][0]=(double)(ind);
+					if(ind==parent //don't recombine with your parent
+						|| (indiv[parent].topo == indiv[ind].topo) //don't recombine with another of the same topo	
+						|| (indiv[ind].willrecombine == true))//don't recombine with someone who is already doing so		
+						recomSelect[r][1]=-1e100;	
+					else{
+						recomSelect[r][1]=indiv[ind].Fitness();
+						potentialPartners++;
+						}
+					}
+				if(potentialPartners > 0){
+					QuickSort(recomSelect, 0, paraMan->nremotes-1);
+					CalculateReproductionProbabilies(recomSelect, 0.01, paraMan->nremotes);			
+									
+					int mateIndex;
 				int curMate;
 				// find someone else to recombine with
-				do{
-					curMate=mates[mateIndex++];
 
-					}while(mateIndex < paraMan->nremotes && 
-						(curMate==parent //don't recombine with your parent
-						|| (indiv[parent].topo == indiv[curMate].topo) //don't recombine with another of the same topo	
-						|| (indiv[curMate].willrecombine == true)));//don't recombine with someone who is already doing so
-			if(mateIndex < paraMan->nremotes){
+					double r=rnd.uniform();
+					for( mateIndex=0;mateIndex < paraMan->nremotes;mateIndex++)
+						if( r < recomSelect[mateIndex][1]) break;
+					curMate=recomSelect[mateIndex][0];
+
+
 					newindiv[i].recombinewith=curMate;
 					indiv[curMate].willrecombine=true;
 					//this will be a new topology, so mark it as topo -1.  This will be dealt with when we update the topolist
 					newindiv[i].topo=-1;
 					}
-				delete []mates;
+				for(int q=0;q<paraMan->nremotes;q++)
+					delete []recomSelect[q];
+				delete []recomSelect;
 				}
 #endif
 			}

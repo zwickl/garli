@@ -208,7 +208,7 @@ int MasterMaster(MasterGamlConfig& conf, HKYData& data)	{
 			if(pop.gen % pop.params->saveEvery == 0) pop.CreateTreeFile( pop.params->treefname );
 			if(pop.gen % pop.adap->intervalLength == 0){
 	            	bool reduced=false;
-	    	        if(pop.gen-pop.lastTopoImprove > pop.adap->intervalsToStore*pop.adap->intervalLength){
+	    	        if(pop.gen-pop.lastTopoImprove >= pop.adap->intervalsToStore*pop.adap->intervalLength){
 	         	           reduced=pop.adap->ReducePrecision();
 	            	        }
 	    	        if(reduced){
@@ -1136,7 +1136,7 @@ int RemoteSubtreeWorker(Population& pop, const GeneralGamlConfig& conf){
 
 	           if(pop.gen % pop.adap->intervalLength == 0){
 	                bool reduced=false;
-	                if(pop.gen-pop.lastTopoImprove > pop.adap->intervalsToStore*pop.adap->intervalLength){
+	                if(pop.gen-pop.lastTopoImprove >= pop.adap->intervalsToStore*pop.adap->intervalLength){
 	                   reduced=pop.adap->ReducePrecision();
 	                   }
 	                if(reduced){
