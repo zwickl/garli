@@ -2,7 +2,6 @@
 CC	  = g++
 #CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -DUNIX -DGCC295 -DNDEBUG -include defs.h #this must be used for gcc version 2.95!!!
 CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h #for other gcc versions
-#CC_FLAGS =  -O2 -g -pg -DUNIX -include defs.h #for icc
 #CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -include defs.h #for icc
 #CC_FLAGS = -g -DUNIX 				#for debugging
 EXEC     = Garli.94
