@@ -250,6 +250,14 @@ int MasterMaster(MasterGamlConfig& conf, HKYData& data)	{
 				pthread_cond_wait(&cond_pm, &lock_pm);
 		pthread_mutex_unlock(&lock_pm);
 		}
+	
+	//DJZ 3-1-06 Need to give control back to the thread one more time so that it can deal with any final messages
+	pthread_mutex_unlock(&lock_pop);
+	pthread_mutex_lock(&lock_pm);
+		while (g_processing_message)
+			pthread_cond_wait(&cond_pm, &lock_pm);
+	pthread_mutex_unlock(&lock_pm);
+		
 	pop.FinalOptimization();
 	pthread_join(thread, NULL);
 	return 0;
