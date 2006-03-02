@@ -694,10 +694,12 @@ void Population::Run(){
 #else
 			cout << "Perform final branch-length optimization and terminate now? (y/n)" << endl;
 			c = getchar();
-			cin.get();
 #endif
 			if(c=='y'){
 				if(bootstrapReps > 0) abandonedBootstrap=true;
+#ifdef MAC
+				cin.get();
+#endif   
 				break;
 				}
 			else{
