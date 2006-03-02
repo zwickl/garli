@@ -315,7 +315,7 @@ private:
 
 	int ntopos;
 	int is_setup;
-	bool doneWithRep;
+	bool abandonedBootstrap;
 
 	char *treeString;
 	long stringSize;
@@ -360,7 +360,7 @@ private:
 #ifdef INCLUDE_PERTURBATION			 
 			 pertMan(NULL),
 #endif
-			 paraMan(NULL), doneWithRep(0),
+			 paraMan(NULL), abandonedBootstrap(false),
 			 subtreeDefNumber(0), claMan(NULL), 
 			 inferInternalStateProbs(0), bootstrapReps(0),
 			 outputMostlyUselessFiles(0), outputPhylipTree(0),

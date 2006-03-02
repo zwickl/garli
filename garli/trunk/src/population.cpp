@@ -696,7 +696,10 @@ void Population::Run(){
 			c = getchar();
 			cin.get();
 #endif
-			if(c=='y') break;
+			if(c=='y'){
+				if(bootstrapReps > 0) abandonedBootstrap=true;
+				break;
+				}
 			else{
 				askQuitNow = 0;
 				CatchInterrupt();
@@ -830,11 +833,16 @@ void Population::Bootstrap(){
 		cout << "bootstrap replicate " << rep << endl;
 		SeedPopulationWithStartingTree();
 		Run();
-
-		doneWithRep = false;
-		adap->branchOptPrecision = adap->startOptPrecision;
-		AppendTreeToBootstrapLog(rep);
-		cout << "finished with bootstrap rep " << rep << endl;
+		
+		if(abandonedBootstrap == false){
+			adap->branchOptPrecision = adap->startOptPrecision;
+			AppendTreeToBootstrapLog(rep);
+			cout << "finished with bootstrap rep " << rep << endl;
+			}
+		else {
+			cout << "abandoning bootstrap rep " << rep << "....terminating" << endl;
+			break;
+			}
 		}
 	FinalizeOutputStreams();
 	}
