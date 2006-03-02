@@ -1,11 +1,13 @@
 #ifndef DEFS
 #define DEFS
 
-//unix is defined in the Makefile, so don't define
-//another system type here
+//UNIX is defined in the Makefile, and WIN32 is defined
+//by the system on windows.  So, all we should have to define
+//here is MAC
 #ifndef UNIX
-#define WINDOWS
-#undef MAC
+#ifndef WIN32
+#define MAC
+#endif
 #endif
 
 #ifndef NDEBUG

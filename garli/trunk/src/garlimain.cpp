@@ -18,7 +18,7 @@
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 
-#ifdef WINDOWS
+#ifdef WIN32
 #include <conio.h>
 #endif
 
@@ -36,13 +36,10 @@
 #include "errorexception.h"
 
 //include Sioux console manipulators
-#ifdef WINDOWS
-#include "winsioux.h"
-#else
 #ifdef MAC
-#include "sioux.h"
+	#include "sioux.h"
 #endif
-#endif
+
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
@@ -72,8 +69,7 @@ int main( int argc, char* argv[] )	{
 	SIOUXSettings.showstatusline = true;
 	SIOUXSetTitle("\pGARLI 0.94");
 	#endif
-
-
+	
 	bool poo=true;
 //	while(poo);
 

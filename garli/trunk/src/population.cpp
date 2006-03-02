@@ -27,8 +27,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
-#ifdef WINDOWS
+#ifdef WIN32
 #include <conio.h>
+#include <windows.h>
 #endif
 
 using namespace std;
@@ -92,6 +93,51 @@ int QuitNow()
 
 	return ( ch == 'y' ? 1 : 0 );
 }
+
+#ifdef WIN32
+// A function to get a single character from the windows console.  Provided by POL.
+// Prompts user with string s, then returns the first character typed. If any problems arise
+// (e.g. cannot obtain handle to console input buffer), bails out by returning the null
+// character (i.e. '\0').
+char AskUser(std::string s)
+   {
+   HANDLE h;
+   DWORD num_chars_read, new_console_mode, prev_console_mode;
+   char char_buffer[2]; // may be able to get away with [1]
+
+   // Output the prompt string
+   std::cerr << s << std::endl;
+
+   // Get handle to console input buffer
+   h = GetStdHandle(STD_INPUT_HANDLE);
+   if (h == INVALID_HANDLE_VALUE)
+       return '\0';
+
+   // Save the current input mode (will restore it before we leave this function)
+   if (!GetConsoleMode(h, &prev_console_mode) )
+       return '\0';
+
+   // Set new console mode. There are five mode flags defined in wincon.h (ENABLE_LINE_INPUT, ENABLE_ECHO_INPUT,
+   // ENABLE_PROCESSED_INPUT, ENABLE_WINDOW_INPUT and ENABLE_MOUSE_INPUT), only ENABLE_PROCESSED_INPUT is useful
+   // to us, and we specifically want to avoid ENABLE_LINE_INPUT because it requires the user to press the enter
+   // key before ReadConsole returns (much better to have this function return the instant the user presses any
+   // key).
+   new_console_mode = ENABLE_PROCESSED_INPUT;
+   if (!SetConsoleMode(h, new_console_mode))
+       return '\0';
+
+   // Read 1 character and place it in char_buffer. num_chars_read should be 1 afterwards. Note that
+   // the last argument is reserved and must be NULL.
+   if (!ReadConsole(h, char_buffer, 1, &num_chars_read, NULL))
+       return '\0';
+
+   // Be nice and return console mode to its previous value
+   if (!SetConsoleMode(h, prev_console_mode))
+       return '\0';
+
+   return char_buffer[0];
+   }
+#endif
 
 void InterruptMessage( int )
 {
@@ -642,15 +688,22 @@ void Population::Run(){
 			#endif
 			}
 		if(askQuitNow == 1){
+			char c;
+#if defined (WIN32)
+			c = AskUser("Perform final branch-length optimization and terminate now? (y/n)");
+#else
 			cout << "Perform final branch-length optimization and terminate now? (y/n)" << endl;
-			char c=getchar();
+			c = getchar();
 			cin.get();
+#endif
 			if(c=='y') break;
 			else{
 				askQuitNow = 0;
 				CatchInterrupt();
 				cout << "continuing ..." << endl;
+#ifndef WIN32
 				cin.get();
+#endif
 				}
 			}
 
