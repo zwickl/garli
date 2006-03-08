@@ -811,7 +811,7 @@ void Population::FinalOptimization(){
 	int pass=1;
 	double incr;
 	do{
-		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision * pow(0.5, pass));
+		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(max(adap->branchOptPrecision * pow(0.5, pass), 1e-10));
 		indiv[bestIndiv].SetDirty();
 		indiv[bestIndiv].CalcFitness(0);
 		cout << "\tpass " << pass++  << " " << indiv[bestIndiv].Fitness() << endl;
@@ -4147,7 +4147,7 @@ void ParallelManager::FindNonSubtreeNodes(TreeNode *nd){
 	}
 
 void Population::InitializeOutputStreams(){
-	char temp_buf[30];
+	char temp_buf[50];
 
 	if(outputMostlyUselessFiles){
 		//initialize the fate file
