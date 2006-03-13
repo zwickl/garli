@@ -259,6 +259,7 @@ int MasterMaster(MasterGamlConfig& conf, HKYData& data)	{
 	pthread_mutex_unlock(&lock_pm);
 		
 	pop.FinalOptimization();
+	pop.FinalizeOutputStreams();
 	pthread_join(thread, NULL);
 	return 0;
 }
@@ -1278,6 +1279,7 @@ int RemoteSubtreeWorker(Population& pop, const GeneralGamlConfig& conf){
 	SendMPIMessage(NULL, 0, 0, TAG_QUIT);
 	debug_mpi("\tsent: quit message");
 	delete [] which;
+	pop.FinalizeOutputStreams();
 	debug_mpi("quitting");
 	return 0;
 	}
