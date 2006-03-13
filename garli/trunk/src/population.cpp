@@ -741,10 +741,10 @@ void Population::Run(){
 #ifndef UNIX
 //					cout << "optimizing ...\t" << bestFitness << "->";
 #endif
-					indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
+/*					indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
 					indiv[bestIndiv].SetDirty();
 					CalcAverageFitness();
-//					cout << bestFitness << endl;				
+*///					cout << bestFitness << endl;				
 					}
 			
 			//termination conditions

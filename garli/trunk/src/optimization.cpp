@@ -203,7 +203,7 @@ double Tree::OptimizeAlpha(){
 		
 		double est=-d1/d2;
 		
-		if(abs(est) < 0.001 && d2 < 0.0){
+		if((abs(est) < 0.001 && d2 < 0.0) || (abs(d1) < 50.0)){
 			mod->SetAlpha(prevVal);
 			MakeAllNodesDirty();			
 			return prev-start;
@@ -691,7 +691,7 @@ double Tree::BranchLike(TreeNode *optNode){
 		double abs_d1 = fabs(d1);
 		if (d2 >= 0.0){
 														#ifdef OPT_DEBUG			
-														opt << "d2 > 0, try minbrlen";				
+														opt << "d2 > 0, try minbrlen?\t";				
 														#endif
 			//the only time this seems to happen is when the peak is at the min and the
 			//current point is far from that
@@ -699,6 +699,9 @@ double Tree::BranchLike(TreeNode *optNode){
 //			if(abs(nd->dlen - DEF_MIN_BRLEN) < DEF_MIN_BRLEN){				
 //			if(nd->dlen==DEF_MIN_BRLEN){
 			if(((DEF_MIN_BRLEN - nd->dlen)*d1) < precision1){
+				#ifdef OPT_DEBUG
+				opt << "no, return\n";
+				#endif
 				return totalEstImprove;
 				}
 			v=DEF_MIN_BRLEN;

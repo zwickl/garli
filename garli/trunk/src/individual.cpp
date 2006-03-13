@@ -616,6 +616,16 @@ void Individual::RefineStartingConditions(bool optModel, double branchPrec){
 	else cout << "optimizing starting branch lengths..." << endl;
 	double improve=999.9;
 	CalcFitness(0);
+
+/*
+ofstream poo("alphatree.tre");
+ofstream foo("models.log");
+char str[8000000];
+mod->OutputPaupBlockForModel(foo, "foo");
+treeStruct->root->MakeNewick(str, false);
+poo << endl << str << endl;
+*/
+
 	for(int i=1;improve > branchPrec;i++){
 		double alphaImprove=0.0, pinvImprove=0.0, optImprove=0.0, scaleImprove=0.0;
 		
@@ -623,10 +633,11 @@ void Individual::RefineStartingConditions(bool optModel, double branchPrec){
 		double passStart=Fitness();
 		
 		optImprove=treeStruct->OptimizeAllBranches(branchPrec);
+
 		SetDirty();
 		CalcFitness(0);
 		double trueImprove= Fitness() - passStart;
-		
+		assert(trueImprove > 0.0);
 		scaleImprove=treeStruct->OptimizeTreeScale();
 		SetDirty();
 		if(optModel==true){
