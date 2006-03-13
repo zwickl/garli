@@ -222,12 +222,12 @@ int MasterMaster(MasterGamlConfig& conf, HKYData& data)	{
 							pop.paraMan->ReduceUpdateThresh();
 							debug_mpi("Remote update threshold reduced from %f to %f", prev, pop.paraMan->updateThresh);	                    	
 							}
-	           		 else if(!(pop.gen%(pop.adap->intervalLength*pop.adap->intervalsToStore))){
+/*	           		 else if(!(pop.gen%(pop.adap->intervalLength*pop.adap->intervalsToStore))){
 	                            pop.indiv[pop.bestIndiv].treeStruct->OptimizeAllBranches(pop.adap->branchOptPrecision);
 	                            pop.indiv[pop.bestIndiv].SetDirty();
 	                            pop.CalcAverageFitness();
 	                            }
-
+*/
 				if(pop.enforceTermConditions == true
 					&& pop.gen-pop.lastTopoImprove > pop.lastTopoImproveThresh 
 					&& pop.adap->improveOverStoredIntervals < pop.improveOverStoredIntervalsThresh
@@ -1153,12 +1153,12 @@ int RemoteSubtreeWorker(Population& pop, const GeneralGamlConfig& conf){
 	                   pop.indiv[pop.bestIndiv].SetDirty();
 	                   pop.CalcAverageFitness();
 	                        }
-	                 else if(!(pop.gen%(pop.adap->intervalLength*pop.adap->intervalsToStore))){
+/*	                 else if(!(pop.gen%(pop.adap->intervalLength*pop.adap->intervalsToStore))){
 	                        pop.indiv[pop.bestIndiv].treeStruct->OptimizeAllBranches(pop.adap->branchOptPrecision);
 	                        pop.indiv[pop.bestIndiv].SetDirty();
 	                        pop.CalcAverageFitness();
 	                        }
-					}
+*/					}
 			
 
 
