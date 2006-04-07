@@ -111,7 +111,7 @@ int main( int argc, char* argv[] )	{
 
 		try{
 
-			cout << "Running serial GARLI, version 0.94 (Feb 06)" << endl;
+			cout << "Running serial GARLI, version 0.942 (Apr 06)" << endl;
 			MasterGamlConfig conf;
 			cout << "Reading config file " << conf_name << endl;
 			if (conf.Read(conf_name) < 0)	{
