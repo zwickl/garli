@@ -26,11 +26,12 @@
 
 %\newcommand{\ncat}{\mbox{$n_{\mbox{\tiny cat}}$}}
 \newcommand{\ncat}{n_c}
+\newcommand{\newprobmean}{\mu}
 
 \begin{document}
 
-\section{The FLEXCAT model for among-site rate heterogeneity}
-\subsubsection{Paul O. Lewis (6 May 2006)}
+\section{Notes on the FLEXCAT model for among-site rate heterogeneity}
+\subsubsection{Paul O. Lewis (9 May 2006)}
 
 This document represents my notes on a new Bayesian model (the FLEXCAT model) for among-site rate heterogeneity that has the following features. This document is not intended to be a manuscript because it is much too detailed and does not provide an appropriate introduction or discussion to the topic, but I have worked out here all details of the FLEXCAT model and thus writing a paper from these notes should be straightforward.
 
@@ -134,7 +135,7 @@ If $L=1$, the above density is Dirichlet($k$, $m-k$, $n-m+1$).
 
 \subsection{Reversible jump proposals}
 
-Changing the number of categories changes the model dimension. For example, changing $\ncat$ from 4 to 3 reduces the number of relative rates by 1 and the number of rate probabilities by 1, yielding a model with 2 fewer parameters than the model having $\ncat = 4$. Such manipulations of model dimension require the development of a reversible jump MCMC proposal \citep{Green1995}. I describe below two such proposals: one increases the number of relative rate categories by 1 (the ADDCAT proposal) and the other, complementary proposal reduces the number of rate categories by 1 (the DELCAT proposal). Given the fact that a decision has been made to propose a change to $\ncat$, the probability of the ADDCAT proposal is $\phi$ and the probability of the LESSCATS proposal is thus $1-\phi$. 
+Changing the number of categories changes the model dimension. For example, changing $\ncat$ from 4 to 3 reduces the number of relative rates by 1 and the number of rate probabilities by 1, yielding a model with 2 fewer parameters than the model having $\ncat = 4$. Such manipulations of model dimension require the development of a reversible jump MCMC proposal \citep{Green1995}. I describe below two such proposals: one increases the number of relative rate categories by 1 (the ADDCAT proposal) and the other, complementary proposal reduces the number of rate categories by 1 (the DELCAT proposal). Given the fact that a decision has been made to propose a change to $\ncat$, the probability of the ADDCAT proposal is $\phi$ and the probability of the DELCAT proposal is thus $1-\phi$. 
 
 The prior on the number of categories ($\ncat$) is assumed to be Poisson($\lambda$) conditional on $\ncat > 0$:
 
@@ -169,7 +170,7 @@ The prior on the number of categories ($\ncat$) is assumed to be Poisson($\lambd
 
 \subsubsection{The ADDCAT proposal}
 
-The ADDCAT proposal will be discussed in the context of Figure~\ref{addcat}, which illustrates a ADDCAT proposal resulting in an increase in the number of rate categories from $\ncat = 2$ to $\ncat' = 3$. The ADDCAT proposal adds one relative rate ($r'_i$) and one rate probability ($p'_i$). The new relative rate is chosen by drawing a Uniform(0, $L$) random deviate $u_1$. That is, $r'_i = u_1 L$. The new value $r'_i$ is guaranteed to be between the two values, $r'_{i-1} \ge r'_0$ and $r'_{i+1} \le r'_{\ncat'+1}$. In this example, the particular value chosen for $u_1$ places the new rate between $r_1$ and $r_2$, therefore $i=2$.
+The ADDCAT proposal will be discussed in the context of Figure~\ref{addcat}, which illustrates an ADDCAT proposal resulting in an increase in the number of rate categories from $\ncat = 2$ to $\ncat' = 3$. The ADDCAT proposal adds one relative rate ($r'_i$) and one rate probability ($p'_i$). The new relative rate is chosen by drawing a Uniform(0, $L$) random deviate $u_1$. That is, $r'_i = u_1 L$. The new value $r'_i$ is guaranteed to be between the two values, $r'_{i-1} \ge r'_0$ and $r'_{i+1} \le r'_{\ncat'+1}$. In this example, the particular value chosen for $u_1$ places the new rate between $r_1$ and $r_2$, therefore $i=2$. The new probability corresponding to $r'_i$ is obtained by drawing a random deviate from an exponential distribution having mean $\newprobmean$. That is, $p'_i = -\newprobmean \log(1 - u_2)$.
 
 %
 % Figure "addcat"
@@ -178,7 +179,7 @@ The ADDCAT proposal will be discussed in the context of Figure~\ref{addcat}, whi
 \begin{figure}
 \centering
 \hfil\includegraphics[scale=0.7]{addcat.eps}\hfil
-\caption{The ADDCAT proposal changing the number of categories from $\ncat = 2$ to $\ncat = 3$. (a) The 2-category situation before a ADDCAT proposal. (b) The 3-category situation after a ADDCAT proposal in which a new rate ($r'_2$) has been inserted between $r_1$ and $r_2$, which have been renumbered as $r'_1$ and $r'_3$ to accommodate the insertion. A new probability, $p'_2$, has been generated. One Uniform(0,1) random deviate ($u_1$) is used to determine the position of the new rate (i.e. $r'_2 = u_1 L$) and a second Uniform(0,1) random deviate is used to determine the value of $p'_2$(i.e. $p'_2 = u_2*(p_1 + p_2)$).}
+\caption{The ADDCAT proposal changing the number of categories from $\ncat = 2$ to $\ncat = 3$. (a) The 2-category situation before a ADDCAT proposal. (b) The 3-category situation after a ADDCAT proposal in which a new rate ($r'_2$) has been inserted between $r_1$ and $r_2$, which have been renumbered as $r'_1$ and $r'_3$ to accommodate the insertion. A new probability, $p'_2$, has been generated. One Uniform(0,1) random deviate ($u_1$) is used to determine the position of the new rate (i.e. $r'_2 = u_1 L$) and a second Uniform(0,1) random deviate is used to determine the value of $p'_2$ (i.e. $p'_2 = -\newprobmean \log(1 - u_2)$), where $\newprobmean$ is the mean of the exponential distribution used for proposing new probability values.}
 \label{addcat}
 \end{figure}
 
@@ -250,23 +251,23 @@ The probabilities prior ratio equals the joint prior probability density of all 
 
 {\em Hastings ratio} --- Here are the steps involved with the ADDCAT proposal:
 \begin{itemize}
-\item Choose to perform a ADDCAT move rather than a DELCAT move (probability $\phi$)
+\item Choose to perform an ADDCAT move rather than a DELCAT move (probability $\phi$)
 \item Choose a Uniform(0,1) random deviate $u_1$ and determine where the new relative rate will go ($u_1 L$). The existing rate to the left of this point will be called $r_{i-1}$ and the next rate to the right of this point will be $r_i$.
-\item Choose a second Uniform(0,1) random deviate $u_2$ to determine the unnormalized probability parameter associated with the new category. The new probability parameter ($p'_i$) will be $u_2*(p_{i-1} + p_i)$. This has the effect of making the new probability parameter possibly smaller or larger than either of the neighboring probability parameters, but never more than twice as large as the largest neighboring probability parameter. This is almost certainly less than optimal, but has the benefit of simplicity. 
+\item Choose a second Uniform(0,1) random deviate $u_2$ to determine the unnormalized probability parameter associated with the new category. The new probability parameter ($p'_i$) will be $-\newprobmean \log(1 - u_2)$. 
 \end{itemize}
 
 Thus, the total probability density of the ADDCAT proposal is simply $\phi$ because both $u_1$ and $u_2$ are Uniform(0,1). To compute the Hastings ratio, we also need the probability density of the reverse (DELCAT) proposal. To exactly reverse the ADDCAT proposal, we need to perform the following steps in order to eliminate the rate parameter $r'_i$:
 
 \begin{itemize}
 \item Choose to perform a DELCAT move rather than a ADDCAT move (probability $1-\phi$)
-\item Choose a specific rate to eliminate. There are $\ncat'$ total rate parameters, so the probability we will randomly choose to eliminate $r'_i$ is $1/\ncat'$.
+\item Choose a specific rate and probability to eliminate. There are $\ncat'$ total rate parameters, so the probability we will randomly choose to eliminate $r'_i$ is $1/\ncat'$. The probability that we will choose also to eliminate $p'_i$ given that we have chosen to eliminate rate $r'-i$ is 1.
 \end{itemize}
 
 The Hastings ratio is thus:
 
 \[ \mbox{Hastings ratio} = \frac{(1-\phi)(1/\ncat')}{\phi} \]
 
-{\em Jacobian} --- To determine the Jacobian, first enumerate all parameters that exist before and after the ADDCAT proposal. We can leave out parameters that have the same numerical value before and after. For example, $r_{i}$ is the same parameter as $r'_{i+1}$, only the labeling is different. The random deviates used to ``invent'' the parameters created during the ADDCAT proposal take the place of those parameters in the ``before'' category.
+{\em Jacobian} --- To determine the Jacobian, first enumerate all parameters that exist before and after the ADDCAT proposal. We can leave out parameters that have the same numerical value before and after. For example, $r_{i}$ is the same parameter as $r'_{i+1}$, only the labeling is different. The random Uniform(0,1) deviates used to ``invent'' the parameters created during the ADDCAT proposal take the place of those parameters in the ``before'' category.
 
 \begin{center}
 \begin{tabular}{lcc}
@@ -298,8 +299,11 @@ The derivative of $r'_i$ with respect to $u_1$ is
 The derivative of $p'_i$ with respect to $u_2$ is
 
 \begin{eqnarray*}
-\frac{d p'_i}{d u_2} & = & \frac{d (u_2*(p_{i-1} + p_i))}{d u_2} \\
-& = & p_{i-1} + p_i
+\frac{d p'_i}{d u_2} & = & \frac{d \left[ -\newprobmean \log(1 - u_2) \right]}{d u_2} \\
+& = & \frac{\newprobmean}{1 - u_2} \\
+& = & \frac{\newprobmean}{1 - \left[ 1 - e^{-p'_i/\newprobmean} \right]} \\
+& = & \frac{\newprobmean}{e^{-p'_i/\newprobmean}} \\
+& = & \newprobmean e^{p'_i/\newprobmean}
 \end{eqnarray*}
 
 The derivative of $r'_i$ with respect to $u_2$ is 
@@ -318,8 +322,8 @@ Putting these together yields
 
 \begin{eqnarray*}
 J & = & \left| \frac{d r'_i}{d u_1} \; \frac{d p'_i}{d u_2} - \frac{d r'_i}{d u_2} \; \frac{d p'_i}{d u_1} \right| \\
-& = & \left| (L)(p_{i-1} + p_i) - (0)(0) \right| \\
-& = & L(p_{i-1} + p_i)
+& = & \left| \left( L \right) \left( \newprobmean e^{p'_i/\newprobmean} \right) - \left( 0 \right) \left( 0 \right) \right| \\
+& = & L \newprobmean e^{p'_i/\newprobmean}
 \end{eqnarray*}
 
 {\em Acceptance ratio} --- Multiplying the likelihood ratio, prior ratio, Hastings ratio and Jacobian together yields:
@@ -351,7 +355,7 @@ J & = & \left| \frac{d r'_i}{d u_1} \; \frac{d p'_i}{d u_2} - \frac{d r'_i}{d u_
 \right\}
 % Jacobian
 \left\{ 
-  L(p_{i-1} + p_i) 
+  L \newprobmean e^{p'_i/\newprobmean} 
 \right\}
 \end{eqnarray*}
 
@@ -403,8 +407,8 @@ The acceptance ratio of a DELCAT proposal can be described as follows:
 
 \begin{eqnarray*}
 \mbox{Jacobian} & = & \left| \frac{d u'_1}{d r_2} \; \frac{d u'_2}{d p_2} - \frac{d u'_2}{d r_2} \; \frac{d u'_1}{d p_2} \right| \\
-& = & \left| \left( \frac{1}{L} \right) \left( \frac{1}{p'_{i-1} + p'_i} \right) - (0)(0) \right| \\
-& = & \frac{1}{L(p'_{i-1} + p'_i)}
+& = & \left| \left( \frac{1}{L} \right) \left( \frac{1}{\newprobmean e^{p_i/\newprobmean}} \right) - (0)(0) \right| \\
+& = & \left[ L \newprobmean e^{p_i/\newprobmean} \right]^{-1}
 \end{eqnarray*}
 
 {\em Acceptance ratio} --- Multiplying the likelihood ratio, prior ratio, Hastings ratio and Jacobian together yields:
@@ -436,7 +440,7 @@ The acceptance ratio of a DELCAT proposal can be described as follows:
 \right\}
 % Jacobian
 \left\{ 
-  \frac{1}{L(p'_{i-1} + p'_i)} 
+  \left[ L \newprobmean e^{p_i/\newprobmean} \right]^{-1} 
 \right\}
 \end{eqnarray*}
 
