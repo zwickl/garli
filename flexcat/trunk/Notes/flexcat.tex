@@ -179,11 +179,11 @@ The ADDCAT proposal will be discussed in the context of Figure~\ref{addcat}, whi
 \begin{figure}
 \centering
 \hfil\includegraphics[scale=0.7]{addcat.eps}\hfil
-\caption{The ADDCAT proposal changing the number of categories from $\ncat = 2$ to $\ncat = 3$. (a) The 2-category situation before a ADDCAT proposal. (b) The 3-category situation after a ADDCAT proposal in which a new rate ($r'_2$) has been inserted between $r_1$ and $r_2$, which have been renumbered as $r'_1$ and $r'_3$ to accommodate the insertion. A new probability, $p'_2$, has been generated. One Uniform(0,1) random deviate ($u_1$) is used to determine the position of the new rate (i.e. $r'_2 = u_1 L$) and a second Uniform(0,1) random deviate is used to determine the value of $p'_2$ (i.e. $p'_2 = -\newprobmean \log(1 - u_2)$), where $\newprobmean$ is the mean of the exponential distribution used for proposing new probability values.}
+\caption{The ADDCAT proposal changing the number of categories from $\ncat = 2$ to $\ncat = 3$. (a) The 2-category situation before an ADDCAT proposal. (b) The 3-category situation after an ADDCAT proposal in which a new rate ($r'_2$) has been inserted between $r_1$ and $r_2$, which have been renumbered as $r'_1$ and $r'_3$ to accommodate the insertion. A new probability, $p'_2$, has been generated. One Uniform(0,1) random deviate ($u_1$) is used to determine the position of the new rate (i.e. $r'_2 = u_1 L$) and a second Uniform(0,1) random deviate is used to determine the value of $p'_2$ (i.e. $p'_2 = -\newprobmean \log(1 - u_2)$), where $\newprobmean$ is the mean of the exponential distribution used for proposing new probability values.}
 \label{addcat}
 \end{figure}
 
-The acceptance ratio of a ADDCAT proposal can be described as follows:
+The acceptance ratio of an ADDCAT proposal can be described as follows:
 
 \[ R_{\mbox{\tiny ADDCAT}} = \min \left\{1, (\mbox{likelihood ratio}) \times (\mbox{prior ratio}) \times (\mbox{Hastings ratio}) \times (\mbox{Jacobian}) \right\} \]
 
@@ -228,7 +228,7 @@ Note that $r_{i-1}$ is not actually a rate parameter if $i=1$, and $r_i$ is not 
   \left[ \frac{(r'_i - r'_{i-1}) \; (r'_{i+1} - r'_i)}{(r_i - r_{i-1})} \right]
 \end{eqnarray*}
 
-The probabilities prior ratio equals the joint prior probability density of all $\ncat'$ category probability parameters after the proposal divided by the joint prior of the $\ncat$ probability parameters before the proposal. Each probability parameter is assumed to have a Gamma(a,b) prior. During a ADDCAT proposal, none of the original probability parameters change value: if the new rate $r'_i$ has been inserted between rates $r_{i-1}$ and $r_i$, then $p_{i-1}$ becomes $p'_{i-1}$, $p_i$ becomes $p'_{i+1}$, and a new probability $p'_i$ is created. Thus, the probability parameter prior ``ratio'' is really just the prior density of the new parameter $p'_i$:
+The probabilities prior ratio equals the joint prior probability density of all $\ncat'$ category probability parameters after the proposal divided by the joint prior of the $\ncat$ probability parameters before the proposal. Each probability parameter $p$ is assumed to have a prior density $f(p)$. During an ADDCAT proposal, none of the original probability parameters change value: if the new rate $r'_i$ has been inserted between rates $r_{i-1}$ and $r_i$, then $p_{i-1}$ becomes $p'_{i-1}$, $p_i$ becomes $p'_{i+1}$, and a new probability $p'_i$ is created. Thus, the probability parameter prior ``ratio'' is really just the prior density of the new parameter $p'_i$:
 %\begin{eqnarray*}
 %\mbox{probs. prior ratio} & = & 
 %  \frac{ 
@@ -246,20 +246,20 @@ The probabilities prior ratio equals the joint prior probability density of all 
 %\end{eqnarray*}
 %If none of the original probability parameters changes value (simplest case), then the probability prior ratio is simply:
 \begin{eqnarray*}
-\mbox{probs. prior ratio} & = & \frac{ {p'}_i^{a-1} \; e^{-p'_i/b} }{ b^a \; \Gamma(a) } 
+\mbox{probs. prior ratio} & = & f(p'_i)
 \end{eqnarray*}
 
 {\em Hastings ratio} --- Here are the steps involved with the ADDCAT proposal:
 \begin{itemize}
 \item Choose to perform an ADDCAT move rather than a DELCAT move (probability $\phi$)
 \item Choose a Uniform(0,1) random deviate $u_1$ and determine where the new relative rate will go ($u_1 L$). The existing rate to the left of this point will be called $r_{i-1}$ and the next rate to the right of this point will be $r_i$.
-\item Choose a second Uniform(0,1) random deviate $u_2$ to determine the unnormalized probability parameter associated with the new category. The new probability parameter ($p'_i$) will be $-\newprobmean \log(1 - u_2)$. 
+\item Choose a second Uniform(0,1) random deviate $u_2$ to determine the unnormalized probability parameter associated with the new category. The new probability parameter ($p'_i$) will be determined by drawing from the category probability prior. That is, choose $p'_i$ such that $u_2 = F(p'_i)$, where $F(p'_i)$ represents the cumulative distribution function for the category probability prior. This way of choosing the new value of $p'_i$ results in some convenient cancellation (see below).
 \end{itemize}
 
 Thus, the total probability density of the ADDCAT proposal is simply $\phi$ because both $u_1$ and $u_2$ are Uniform(0,1). To compute the Hastings ratio, we also need the probability density of the reverse (DELCAT) proposal. To exactly reverse the ADDCAT proposal, we need to perform the following steps in order to eliminate the rate parameter $r'_i$:
 
 \begin{itemize}
-\item Choose to perform a DELCAT move rather than a ADDCAT move (probability $1-\phi$)
+\item Choose to perform a DELCAT move rather than an ADDCAT move (probability $1-\phi$)
 \item Choose a specific rate and probability to eliminate. There are $\ncat'$ total rate parameters, so the probability we will randomly choose to eliminate $r'_i$ is $1/\ncat'$. The probability that we will choose also to eliminate $p'_i$ given that we have chosen to eliminate rate $r'-i$ is 1.
 \end{itemize}
 
@@ -296,14 +296,11 @@ The derivative of $r'_i$ with respect to $u_1$ is
 & = & L
 \end{eqnarray*}
 
-The derivative of $p'_i$ with respect to $u_2$ is
+The derivative of $p'_i$ with respect to $u_2$ is most easily calculated as the inverse of the derivative of $u_2$ with respect to $p'_i$:
 
 \begin{eqnarray*}
-\frac{d p'_i}{d u_2} & = & \frac{d \left[ -\newprobmean \log(1 - u_2) \right]}{d u_2} \\
-& = & \frac{\newprobmean}{1 - u_2} \\
-& = & \frac{\newprobmean}{1 - \left[ 1 - e^{-p'_i/\newprobmean} \right]} \\
-& = & \frac{\newprobmean}{e^{-p'_i/\newprobmean}} \\
-& = & \newprobmean e^{p'_i/\newprobmean}
+\left[ \frac{d u_2}{d p'_i} \right]^{-1} & = & \left[ \frac{d F(p'_i)}{d p'_i} \right]^{-1} \\
+& = & \left[ f(p'_i) \right]^{-1}
 \end{eqnarray*}
 
 The derivative of $r'_i$ with respect to $u_2$ is 
@@ -323,7 +320,7 @@ Putting these together yields
 \begin{eqnarray*}
 J & = & \left| \frac{d r'_i}{d u_1} \; \frac{d p'_i}{d u_2} - \frac{d r'_i}{d u_2} \; \frac{d p'_i}{d u_1} \right| \\
 & = & \left| \left( L \right) \left( \newprobmean e^{p'_i/\newprobmean} \right) - \left( 0 \right) \left( 0 \right) \right| \\
-& = & L \newprobmean e^{p'_i/\newprobmean}
+& = & \frac{L}{f(p'_i)} 
 \end{eqnarray*}
 
 {\em Acceptance ratio} --- Multiplying the likelihood ratio, prior ratio, Hastings ratio and Jacobian together yields:
@@ -347,7 +344,7 @@ J & = & \left| \frac{d r'_i}{d u_1} \; \frac{d p'_i}{d u_2} - \frac{d r'_i}{d u_
 & & \rule{.2in}{.0in} \cdot 
 % probs prior ratio
 \left\{ 
-  \frac{ {p'}_i^{a-1} \; e^{-p'_i/b} }{ b^a \; \Gamma(a) } 
+  f(p'_i)
 \right\} 
 % Hastings ratio
 \left\{ 
@@ -355,9 +352,11 @@ J & = & \left| \frac{d r'_i}{d u_1} \; \frac{d p'_i}{d u_2} - \frac{d r'_i}{d u_
 \right\}
 % Jacobian
 \left\{ 
-  L \newprobmean e^{p'_i/\newprobmean} 
+  \frac{L}{f(p'_i)}
 \right\}
 \end{eqnarray*}
+
+Note that the density of the new category probability ($f(p'_i)$) cancels.
 
 % ***********************************************************
 % ***********************************************************
@@ -400,15 +399,15 @@ The acceptance ratio of a DELCAT proposal can be described as follows:
 \end{eqnarray*}
 
 \begin{eqnarray*}
-\mbox{Probs. prior ratio} & = & \frac{ b^a \; \Gamma(a) }{ {p'}_i^{a-1} \; e^{-p'_i/b} } 
+\mbox{Probs. prior ratio} & = & \frac{1}{f(p_i)}
 \end{eqnarray*}
 
 \[ \mbox{Hastings ratio} = \frac{\phi}{(1-\phi)(1/\ncat)} \]
 
 \begin{eqnarray*}
 \mbox{Jacobian} & = & \left| \frac{d u'_1}{d r_2} \; \frac{d u'_2}{d p_2} - \frac{d u'_2}{d r_2} \; \frac{d u'_1}{d p_2} \right| \\
-& = & \left| \left( \frac{1}{L} \right) \left( \frac{1}{\newprobmean e^{p_i/\newprobmean}} \right) - (0)(0) \right| \\
-& = & \left[ L \newprobmean e^{p_i/\newprobmean} \right]^{-1}
+& = & \left| \left( \frac{1}{L} \right) \left( f(p_i) \right) - (0)(0) \right| \\
+& = & \frac{f(p_i)}{L}
 \end{eqnarray*}
 
 {\em Acceptance ratio} --- Multiplying the likelihood ratio, prior ratio, Hastings ratio and Jacobian together yields:
@@ -432,7 +431,7 @@ The acceptance ratio of a DELCAT proposal can be described as follows:
 & & \rule{.2in}{.0in} \cdot 
 % probs prior ratio
 \left\{ 
-  \frac{ b^a \; \Gamma(a) }{ {p'}_i^{a-1} \; e^{-p'_i/b} } 
+ \frac{1}{f(p_i)}
 \right\} 
 % Hastings ratio
 \left\{ 
@@ -440,9 +439,11 @@ The acceptance ratio of a DELCAT proposal can be described as follows:
 \right\}
 % Jacobian
 \left\{ 
-  \left[ L \newprobmean e^{p_i/\newprobmean} \right]^{-1} 
+ \frac{f(p_i)}{L}
 \right\}
 \end{eqnarray*}
+
+Note that the density of the category probability being deleted ($f(p_i)$) cancels out.
 
 \section{References}
 \renewcommand{\bibsection}{}
