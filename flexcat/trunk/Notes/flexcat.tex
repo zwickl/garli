@@ -26,12 +26,13 @@
 
 %\newcommand{\ncat}{\mbox{$n_{\mbox{\tiny cat}}$}}
 \newcommand{\ncat}{n_c}
+\newcommand{\nxtra}{n_{+}}
 \newcommand{\newprobmean}{\mu}
 
 \begin{document}
 
 \section{Notes on the FLEXCAT model for among-site rate heterogeneity}
-\subsubsection{Paul O. Lewis (9 May 2006)}
+\subsubsection{Paul O. Lewis (12 May 2006)}
 
 This document represents my notes on a new Bayesian model (the FLEXCAT model) for among-site rate heterogeneity that has the following features. This document is not intended to be a manuscript because it is much too detailed and does not provide an appropriate introduction or discussion to the topic, but I have worked out here all details of the FLEXCAT model and thus writing a paper from these notes should be straightforward.
 
@@ -137,9 +138,11 @@ If $L=1$, the above density is Dirichlet($k$, $m-k$, $n-m+1$).
 
 Changing the number of categories changes the model dimension. For example, changing $\ncat$ from 4 to 3 reduces the number of relative rates by 1 and the number of rate probabilities by 1, yielding a model with 2 fewer parameters than the model having $\ncat = 4$. Such manipulations of model dimension require the development of a reversible jump MCMC proposal \citep{Green1995}. I describe below two such proposals: one increases the number of relative rate categories by 1 (the ADDCAT proposal) and the other, complementary proposal reduces the number of rate categories by 1 (the DELCAT proposal). Given the fact that a decision has been made to propose a change to $\ncat$, the probability of the ADDCAT proposal is $\phi$ and the probability of the DELCAT proposal is thus $1-\phi$. 
 
-The prior on the number of categories ($\ncat$) is assumed to be Poisson($\lambda$) conditional on $\ncat > 0$:
+The prior on the number of {\em extra} categories ($\nxtra$) is assumed to be Poisson($\lambda$):
 
-\[ p(\ncat) = \frac{e^{-\lambda} \; \lambda^{\ncat}}{\left( 1 - e^{-\lambda} \right) {\ncat}!}  \].
+\[ p(\nxtra) = \frac{ e^{-\lambda} \; \lambda^{\nxtra} }{ {\nxtra}! }  \]
+
+The number of categories is always 1 greater than $\nxtra$: $\ncat = \nxtra + 1$.
 
 % unconditional
 % p(x) = lambda^x exp{-lambda} / x!
@@ -179,7 +182,7 @@ The ADDCAT proposal will be discussed in the context of Figure~\ref{addcat}, whi
 \begin{figure}
 \centering
 \hfil\includegraphics[scale=0.7]{addcat.eps}\hfil
-\caption{The ADDCAT proposal changing the number of categories from $\ncat = 2$ to $\ncat = 3$. (a) The 2-category situation before an ADDCAT proposal. (b) The 3-category situation after an ADDCAT proposal in which a new rate ($r'_2$) has been inserted between $r_1$ and $r_2$, which have been renumbered as $r'_1$ and $r'_3$ to accommodate the insertion. A new probability, $p'_2$, has been generated. One Uniform(0,1) random deviate ($u_1$) is used to determine the position of the new rate (i.e. $r'_2 = u_1 L$) and a second Uniform(0,1) random deviate is used to determine the value of $p'_2$ (i.e. $p'_2 = -\newprobmean \log(1 - u_2)$), where $\newprobmean$ is the mean of the exponential distribution used for proposing new probability values.}
+\caption{The ADDCAT proposal changing the number of categories from $\ncat = 2$ to $\ncat = 3$. (a) The 2-category situation before an ADDCAT proposal. (b) The 3-category situation after an ADDCAT proposal in which a new rate ($r'_2$) has been inserted between $r_1$ and $r_2$, which have been renumbered as $r'_1$ and $r'_3$ to accommodate the insertion. A new probability, $p'_2$, has also been generated. One Uniform(0,1) random deviate ($u_1$) is used to determine the position of the new rate (i.e. $r'_2 = u_1 L$) and a second Uniform(0,1) random deviate ($u_2$) is used to determine the value of $p'_2$. That is, $p'_2 = F^{-1}(u_2)$, where $F^{-1}(u)$ is the inverse of the cumulative distribution function of the prior probability distribution governing category probabilities. If an exponential distribution with mean $\mu$ is used as the category probability prior, then $u = F(p) = 1 - e^{-p/\mu}$ and $p = F^{-1}(u) = -\mu \ln (1 - u)$.}
 \label{addcat}
 \end{figure}
 
@@ -200,7 +203,7 @@ Here, $\theta$ represents all parameters not associated with rate heterogeneity,
 The $\ncat$ prior ratio equals the prior probability of $\ncat'$ rate categories divided by the prior probability of $\ncat$ categories:
 
 \begin{eqnarray*}
-\mbox{$\ncat$ prior ratio} & = & \frac{\frac{e^{-\lambda} \; \lambda^{\ncat'}}{\left( 1 - e^{-\lambda} \right) {\ncat'}!}}{\frac{e^{-\lambda} \; \lambda^{\ncat}}{\left( 1 - e^{-\lambda} \right) {\ncat}!}} =  \frac{\lambda}{\ncat'}
+\mbox{$\ncat$ prior ratio} & = & \frac{\frac{e^{-\lambda} \; \lambda^{\ncat' - 1}}{(\ncat' - 1)!}}{\frac{e^{-\lambda} \; \lambda^{\ncat - 1}}{(\ncat - 1)!}} =  \frac{\lambda}{\ncat}
 \end{eqnarray*}
 
 The rates prior ratio equals the joint prior probability density of all $\ncat'$ rate parameters after the proposal divided by the joint prior of the $\ncat$ rate parameters before the proposal. If the new rate $r'_i$ is inserted between the previous rates $r_{i-1}$ and $r_i$,
@@ -253,19 +256,23 @@ The probabilities prior ratio equals the joint prior probability density of all 
 \begin{itemize}
 \item Choose to perform an ADDCAT move rather than a DELCAT move (probability $\phi$)
 \item Choose a Uniform(0,1) random deviate $u_1$ and determine where the new relative rate will go ($u_1 L$). The existing rate to the left of this point will be called $r_{i-1}$ and the next rate to the right of this point will be $r_i$.
-\item Choose a second Uniform(0,1) random deviate $u_2$ to determine the unnormalized probability parameter associated with the new category. The new probability parameter ($p'_i$) will be determined by drawing from the category probability prior. That is, choose $p'_i$ such that $u_2 = F(p'_i)$, where $F(p'_i)$ represents the cumulative distribution function for the category probability prior. This way of choosing the new value of $p'_i$ results in some convenient cancellation (see below).
+\item Choose a second Uniform(0,1) random deviate $u_2$ to determine the unnormalized probability parameter associated with the new category. The new probability parameter ($p'_i$) will be determined by drawing from the category probability prior: $p'_i = F^{-1}(u_2)$. That is, choose $p'_i$ such that $u_2 = F(p'_i)$, where $F(p'_i)$ represents the cumulative distribution function for the category probability prior. This way of choosing the new value of $p'_i$ results in some convenient cancellation (see below).
 \end{itemize}
 
 Thus, the total probability density of the ADDCAT proposal is simply $\phi$ because both $u_1$ and $u_2$ are Uniform(0,1). To compute the Hastings ratio, we also need the probability density of the reverse (DELCAT) proposal. To exactly reverse the ADDCAT proposal, we need to perform the following steps in order to eliminate the rate parameter $r'_i$:
 
 \begin{itemize}
-\item Choose to perform a DELCAT move rather than an ADDCAT move (probability $1-\phi$)
+\item Choose to perform a DELCAT move (probability $1-\phi$) rather than an ADDCAT move 
 \item Choose a specific rate and probability to eliminate. There are $\ncat'$ total rate parameters, so the probability we will randomly choose to eliminate $r'_i$ is $1/\ncat'$. The probability that we will choose also to eliminate $p'_i$ given that we have chosen to eliminate rate $r'-i$ is 1.
 \end{itemize}
 
 The Hastings ratio is thus:
 
-\[ \mbox{Hastings ratio} = \frac{(1-\phi)(1/\ncat')}{\phi} \]
+\[ \mbox{Hastings ratio} = \frac{(1-\phi)(1/\ncat')}{\phi} = \frac{1-\phi}{\phi \; \ncat'} \]
+
+The above Hastings ratio is not completely general, however. When $\ncat = 1$, a DELCAT move is not possible and ADDCAT will be proposed with probability 1. The reverse move is a DELCAT move starting with $\ncat = 2$, which has probability $1 - \phi$. The Hastings ratio in this special case is
+
+\[ \mbox{Hastings ratio ($\ncat = 1$)} = \frac{1-\phi}{\ncat'} \]
 
 {\em Jacobian} --- To determine the Jacobian, first enumerate all parameters that exist before and after the ADDCAT proposal. We can leave out parameters that have the same numerical value before and after. For example, $r_{i}$ is the same parameter as $r'_{i+1}$, only the labeling is different. The random Uniform(0,1) deviates used to ``invent'' the parameters created during the ADDCAT proposal take the place of those parameters in the ``before'' category.
 
@@ -326,14 +333,15 @@ J & = & \left| \frac{d r'_i}{d u_1} \; \frac{d p'_i}{d u_2} - \frac{d r'_i}{d u_
 {\em Acceptance ratio} --- Multiplying the likelihood ratio, prior ratio, Hastings ratio and Jacobian together yields:
 
 \begin{eqnarray*}
+R_{\mbox{\tiny ADDCAT}} & = & \min \left\{1, 
 % likelihood ratio
-& & \left\{ 
+\left\{ 
   \frac{f(\mbox{data} | {\bf \theta}, {\bf r}', {\bf p}', \ncat')}{f(\mbox{data} | {\bf \theta}, {\bf r}, {\bf p}, \ncat)} 
 \right\}
 % ncat prior ratio
 \left\{ 
-  \frac{\lambda}{\ncat'} 
-\right\} \\
+  \frac{\lambda}{\ncat} 
+\right\} \right. \\
 & & \rule{.2in}{.0in} \cdot 
 % rates prior ratio
 \left\{ 
@@ -341,22 +349,23 @@ J & = & \left| \frac{d r'_i}{d u_1} \; \frac{d p'_i}{d u_2} - \frac{d r'_i}{d u_
     \left[ \frac{\Gamma\left( (s+1) (\ncat + 2) \right)}{\Gamma\left( (s+1) (\ncat + 1) \right)} \right] \;
     \left[ \frac{(r'_i - r'_{i-1})^s \; (r'_{i+1} - r'_i)^s}{(r_i - r_{i-1})^s} \right]
 \right\} \\
-& & \rule{.2in}{.0in} \cdot 
+& & \left. \rule{.2in}{.0in} \cdot 
 % probs prior ratio
 \left\{ 
   f(p'_i)
 \right\} 
 % Hastings ratio
 \left\{ 
-  \frac{(1-\phi)(1/\ncat')}{\phi} 
+  \frac{1-\phi}{\phi \; \ncat'} 
 \right\}
 % Jacobian
 \left\{ 
   \frac{L}{f(p'_i)}
 \right\}
+\right\}
 \end{eqnarray*}
 
-Note that the density of the new category probability ($f(p'_i)$) cancels.
+Note that the density of the new category probability ($f(p'_i)$) cancels. Also note that the above acceptance ratio should be multiplied by $\phi$ in the case $\ncat = 1$ to accommodate the fact that an ADDCAT move is proposed with probability 1 in this special case.
 
 % ***********************************************************
 % ***********************************************************
@@ -388,7 +397,7 @@ The acceptance ratio of a DELCAT proposal can be described as follows:
 \[ \mbox{Likelihood ratio} = \frac{f(\mbox{data} | {\bf \theta}, {\bf r}', {\bf p}', \ncat')}{f(\mbox{data} | {\bf \theta}, {\bf r}, {\bf p}, \ncat)}. \]
 
 \begin{eqnarray*}
-\mbox{$\ncat$ prior ratio} & = & \frac{\frac{e^{-\lambda} \; \lambda^{\ncat'}}{\left( 1 - e^{-\lambda} \right) {\ncat'}!}}{\frac{e^{-\lambda} \; \lambda^{\ncat}}{\left( 1 - e^{-\lambda} \right) {\ncat}!}} = \frac{\ncat}{\lambda}
+\mbox{$\ncat$ prior ratio} & = & \frac{\frac{e^{-\lambda} \; \lambda^{\ncat' - 1}}{(\ncat' - 1)!}}{\frac{e^{-\lambda} \; \lambda^{\ncat - 1}}{(\ncat - 1)!}} = \frac{\ncat'}{\lambda}
 \end{eqnarray*}
 
 \begin{eqnarray*}
@@ -402,7 +411,13 @@ The acceptance ratio of a DELCAT proposal can be described as follows:
 \mbox{Probs. prior ratio} & = & \frac{1}{f(p_i)}
 \end{eqnarray*}
 
-\[ \mbox{Hastings ratio} = \frac{\phi}{(1-\phi)(1/\ncat)} \]
+\[ \mbox{Hastings ratio} = \left\{
+  \begin{array}{lcl}
+    \frac{\ncat}{(1-\phi)} & & \mbox{$\ncat$ = 1} \\
+     & & \\
+    \frac{\phi \; \ncat}{(1-\phi)} & & \mbox{$\ncat$ $>$ 1}
+  \end{array}
+\right. \] 
 
 \begin{eqnarray*}
 \mbox{Jacobian} & = & \left| \frac{d u'_1}{d r_2} \; \frac{d u'_2}{d p_2} - \frac{d u'_2}{d r_2} \; \frac{d u'_1}{d p_2} \right| \\
@@ -413,14 +428,15 @@ The acceptance ratio of a DELCAT proposal can be described as follows:
 {\em Acceptance ratio} --- Multiplying the likelihood ratio, prior ratio, Hastings ratio and Jacobian together yields:
 
 \begin{eqnarray*}
+R_{\mbox{\tiny DELCAT}} & = & \min \left\{1, 
 % likelihood ratio
-& & \left\{ 
+\left\{ 
   \frac{f(\mbox{data} | {\bf \theta}, {\bf r}', {\bf p}', \ncat')}{f(\mbox{data} | {\bf \theta}, {\bf r}, {\bf p}, \ncat)} 
 \right\}
 % ncat prior ratio
 \left\{ 
-  \frac{\ncat}{\lambda} 
-\right\} \\
+  \frac{\ncat'}{\lambda} 
+\right\} \right. \\
 & & \rule{.2in}{.0in} \cdot 
 % rates prior ratio
 \left\{ 
@@ -428,22 +444,23 @@ The acceptance ratio of a DELCAT proposal can be described as follows:
   \left[ \frac{\Gamma\left( (s+1) (\ncat) \right)}{\Gamma\left( (s+1) (\ncat + 1) \right)} \right] \;
   \left[ \frac{(r'_i - r'_{i-1})^s}{(r_i - r_{i-1})^s \; (r_{i+1} - r_i)^s} \right]
 \right\} \\
-& & \rule{.2in}{.0in} \cdot 
+& & \left. \rule{.2in}{.0in} \cdot 
 % probs prior ratio
 \left\{ 
  \frac{1}{f(p_i)}
 \right\} 
 % Hastings ratio
 \left\{ 
-  \frac{\phi}{(1-\phi)(1/\ncat)} 
+  \frac{\phi \; \ncat}{1-\phi} 
 \right\}
 % Jacobian
 \left\{ 
  \frac{f(p_i)}{L}
 \right\}
+\right\}
 \end{eqnarray*}
 
-Note that the density of the category probability being deleted ($f(p_i)$) cancels out.
+Note that the density of the category probability being deleted ($f(p_i)$) cancels out. Also note that the above acceptance ratio should be divided by $\phi$ in the case $\ncat = 1$ to accommodate the fact that an ADDCAT move is proposed with probability 1 in this special case.
 
 \section{References}
 \renewcommand{\bibsection}{}
