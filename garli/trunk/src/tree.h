@@ -219,7 +219,9 @@ class Tree{
 		pair<double, double> CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2);
 		double NewtonRaphsonOptimizeBranchLength(double precision1, TreeNode *nd, bool goodGuess);
 		void GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1, double &d2);
+		void GetDerivsPartialTerminalFlexRates(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1Tot, double &d2Tot);
 		void GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1, double &d2);
+		void GetDerivsPartialInternalFlexRates(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1, double &d2);
 		double OptimizeBranchLength(double optPrecision, TreeNode *nd, bool goodGuess);
 		double OptimizeAlpha();
 		double GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const double *prmat, const char *Ldata);
@@ -297,6 +299,7 @@ class Tree{
 		int NodesToRoot(TreeNode *nd);
 		int GatherNodesInRadius(int range, TreeNode *sib, TreeNode *subtreeNode);
 		int NumNodesTotal() {return numNodesTotal;}
+		void SampleBlenCurve(TreeNode *nd, ofstream &out);
 		};
 
 inline int Tree::getNumTipsTotal()

@@ -43,6 +43,8 @@ class GeneralGamlConfig{
 	bool outputMostlyUselessFiles;
 	bool outputPhylipTree;
 	bool dontInferProportionInvariant;
+	bool useflexrates;
+	int numratecats;
 
 	bool enforceTermConditions;
 	int lastTopoImproveThresh;

@@ -19,6 +19,7 @@
 
 using namespace std;
 
+#include "defs.h"
 #include "memchk.h"
 #include "utility.h"
 #include "parameters.h"
@@ -28,8 +29,12 @@ using namespace std;
 
 extern rng rnd;
 double Model::mutationShape;
+
 double Model::maxPropInvar;
+bool Model::useFlexRates;
 bool Model::noPinvInModel;
+int Model::nRateCats;
+
 
 double PointNormal (double prob);
 double IncompleteGamma (double x, double alpha, double LnGamma_alpha);
@@ -192,7 +197,13 @@ void Model::CalcPmat(double blen, double *metaPmat, bool flip /*=false*/){
 				blen_multiplier=(.5/((qmat[0][1]*pi[0])+(qmat[0][2]*pi[0])+(qmat[0][3]*pi[0])+(qmat[1][2]*pi[1])+(qmat[1][3]*pi[1])+(qmat[2][3]*pi[2])));
 				dirty=false;
 				}
-			double tempblen=(blen * blen_multiplier) / (1.0-propInvar);
+
+			double tempblen;
+			if(noPinvInModel == true)
+				tempblen=(blen * blen_multiplier);
+			else
+				tempblen=(blen * blen_multiplier) / (1.0-propInvar);
+
 			CalcPij(c_ijk, nstates, eigvals, 1, tempblen, pmat[0], EigValexp);
 			}
 			
@@ -266,7 +277,13 @@ void Model::CalcPmatRateHet(double blen, double *metaPmat, bool flip /*=false*/)
 		if(nst==6){
 			if(dirty==true)
 				CalcEigenStuff();
-			double tempblen=(blen * blen_multiplier * gammaRates[r]) / (1.0-propInvar);
+
+			double tempblen;
+			if(noPinvInModel==true)
+				tempblen=(blen * blen_multiplier * rateMults[r]);
+			else
+				tempblen=(blen * blen_multiplier * rateMults[r]) / (1.0-propInvar);
+			
 			CalcPij(c_ijk, nstates, eigvals, 1, tempblen, pmat[0], EigValexp);
 			}
 			
@@ -357,7 +374,12 @@ void Model::CalcDerivatives(double dlen, double ***&pr, double ***&one, double *
 	for(int rate=0;rate<nRateCats;rate++){
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
-			const double scaledEigVal = eigvals[k]*gammaRates[rate]*blen_multiplier/(1.0-propInvar);
+			double scaledEigVal;
+			if(noPinvInModel==true)
+				scaledEigVal = eigvals[k]*rateMults[rate]*blen_multiplier;	
+			else
+				scaledEigVal = eigvals[k]*rateMults[rate]*blen_multiplier/(1.0-propInvar);
+
 			EigValexp[k+rateOffset] = exp(scaledEigVal * dlen);
 			EigValderiv[k+rateOffset] = scaledEigVal*EigValexp[k+rateOffset];
 			EigValderiv2[k+rateOffset] = scaledEigVal*EigValderiv[k+rateOffset];
@@ -471,14 +493,6 @@ void Model::MutateRates(){
 	dirty=true;
 	}
 
-void Model::MutateAlpha(){
-	
-//	alpha *= exp(MODEL_CHANGE_SCALER * (params->rnd.uniform()-.5));
-	alpha *=rnd.gamma( Model::mutationShape );
-	dirty=true;
-	DiscreteGamma();
-	}
-
 void Model::MutatePis(){
 	//dirichlet type proposal to all the pi's
 /*	double dirParams[4];
@@ -499,6 +513,32 @@ void Model::MutatePis(){
 	pi[piToChange]=newPi;
 	dirty=true;
 	}
+
+void Model::MutateRateProbs(){
+	int ProbToChange=int(rnd.uniform()*(double) nRateCats);
+	
+	double newProb=rateProbs[ProbToChange] * rnd.gamma( Model::mutationShape / 10.0 );
+	for(int b=0;b<nRateCats;b++)
+		if(b!=ProbToChange) rateProbs[b] *= (1.0-newProb)/(1.0-rateProbs[ProbToChange]);
+	rateProbs[ProbToChange]=newProb;
+	dirty=true;
+	NormalizeRates();
+	}
+
+void Model::MutateRateMults(){
+	int rateToChange=int(rnd.uniform()*nRateCats);
+	rateMults[rateToChange] *= rnd.gamma( Model::mutationShape / 10.0);
+	NormalizeRates();
+	}
+	
+void Model::MutateAlpha(){
+	
+//	alpha *= exp(MODEL_CHANGE_SCALER * (params->rnd.uniform()-.5));
+	alpha *=rnd.gamma( Model::mutationShape );
+	dirty=true;
+	DiscreteGamma(rateMults, rateProbs, alpha);
+	//change the proportion of rates in each gamma cat
+	}
 	
 void Model::MutatePropInvar(){
 //	propInvar *= exp(MODEL_CHANGE_SCALER * (params->rnd.uniform()-.5));
@@ -507,16 +547,25 @@ void Model::MutatePropInvar(){
 	propInvar *= mult;
 	propInvar = (propInvar > maxPropInvar ? maxPropInvar : propInvar);
 	dirty=true;
+	//change the proportion of rates in each gamma cat
+	for(int i=0;i<nRateCats;i++){
+		rateProbs[i]=(1.0-propInvar)/nRateCats;
+		}
 	}
-	
+
+
 void Model::CopyModel(const Model *from){
 	for(int i=0;i<nst-1;i++)
 		rates[i]=from->rates[i];
 		
 	memcpy(pi, from->pi, sizeof(double)*4);
+
+	memcpy(rateMults, from->rateMults, sizeof(double)*nRateCats);
+	memcpy(rateProbs, from->rateProbs, sizeof(double)*nRateCats);
+
 	alpha=from->alpha;
-	memcpy(gammaRates, from->gammaRates, sizeof(double)*4);
 	propInvar=from->propInvar;
+
 	dirty=true;
 	}	
 
@@ -526,12 +575,17 @@ void Model::SetModel(double *model_string){
 		rates[i]=model_string[slot++];
 	for(int j=0;j<4;j++)
 		pi[j]=model_string[slot++];
+		
+#ifdef FLEX_RATES
+
+#else
 	if(nRateCats>1) alpha=model_string[slot++];
-	DiscreteGamma();
+	DiscreteGamma(rateMults, rateProbs, alpha);
 	//using whether or not this individual had a PI of >0 in the first
 	//place to decide whether we should expect one in the string.
 	//Seems safe.
 	if(propInvar!=0.0) propInvar=model_string[slot++];
+#endif
 	dirty=true;
 	}
 
@@ -548,8 +602,20 @@ bool Model::IsModelEqual(const Model *other) const {
 	if(pi[0]!=other->pi[0]) return false;
 	if(pi[1]!=other->pi[1]) return false;
 	if(pi[2]!=other->pi[2]) return false;
+
+	if(rateMults[0] != other->rateMults[0]) return false;
+	if(rateMults[1] != other->rateMults[1]) return false;
+	if(rateMults[2] != other->rateMults[2]) return false;
+	if(rateMults[3] != other->rateMults[3]) return false;
+	
+	if(rateProbs[0] != other->rateProbs[0]) return false;
+	if(rateProbs[1] != other->rateProbs[1]) return false;
+	if(rateProbs[2] != other->rateProbs[2]) return false;
+	if(rateProbs[3] != other->rateProbs[3]) return false;
+
 	if(alpha!=other->alpha) return false;
 	if(propInvar!=other->propInvar) return false;
+
 	return true;
 	}
 
@@ -775,47 +841,57 @@ double PointChi2 (double prob, double v){
 }
 
 //function taken from MB and hard wired for use here	
-void Model::DiscreteGamma(){
+void Model::DiscreteGamma(double *rates, double *props, double shape){
 	bool median=false;
 	int 	i;
-	double 	gap05 = 1.0/(2.0*nRateCats), t, factor = alpha/alpha*nRateCats, lnga1;
+	double 	gap05 = 1.0/(2.0*nRateCats), t, factor = shape/shape*nRateCats, lnga1;
 
 	if (median){
 		for (i=0; i<nRateCats; i++) 
-			gammaRates[i] = POINTGAMMA((i*2.0+1)*gap05, alpha, alpha);
+			rates[i] = POINTGAMMA((i*2.0+1)*gap05, shape, shape);
 		for (i=0,t=0; i<nRateCats; i++) 
-			t += gammaRates[i];
+			t += rates[i];
 		for (i=0; i<nRateCats; i++)     
-			gammaRates[i] *= factor/t;
+			rates[i] *= factor/t;
 		}
 	else {
-		lnga1 = LnGamma(alpha+1);
+		lnga1 = LnGamma(shape+1);
 		
 		//DZ HACK
 		//I don't think that these lines are needed, since the frequencies are fixed at .25 anyway.
 		for (i=0; i<nRateCats-1; i++) 
-			gammaProps[i] = POINTGAMMA((i+1.0)/nRateCats, alpha, alpha);
+			props[i] = POINTGAMMA((i+1.0)/nRateCats, shape, shape);
 		for (i=0; i<nRateCats-1; i++) 
-			gammaProps[i] = IncompleteGamma(gammaProps[i]*alpha, alpha+1, lnga1);
+			props[i] = IncompleteGamma(props[i]*shape, shape+1, lnga1);
 		
 		
-		gammaRates[0] = gammaProps[0]*factor;
-		gammaRates[nRateCats-1] = (1-gammaProps[nRateCats-2])*factor;
+		rates[0] = props[0]*factor;
+		rates[nRateCats-1] = (1-props[nRateCats-2])*factor;
 		for (i=1; i<nRateCats-1; i++)  
-			gammaRates[i] = (gammaProps[i]-gammaProps[i-1])*factor;
+			rates[i] = (props[i]-props[i-1])*factor;
 		}
 	for (i=0; i<nRateCats; i++) 
-		gammaProps[i]=1.0/nRateCats;
+		props[i]=(1.0-propInvar)/nRateCats;
 	}	
-	
 	
 void Model::OutputPaupBlockForModel(ofstream &outf, const char *treefname){
 	outf << "begin paup;\nclear;\ngett file=" << treefname << " storebr;\nlset userbr ";
 	if(Nst() == 2) outf << "nst=2 k= " << Rates(0);
 	else outf << "nst=6 rmat=(" << Rates(0) << " " << Rates(1) << " " << Rates(2) << " " << Rates(3) << " " << Rates(4);
 	outf << ") base=(" << Pi(0) << " " << Pi(1) << " " << Pi(2);
-	if(NRateCats()>1) outf << ") rates=gamma shape= " << Alpha();
-	/*if(ProportionInvariant()!=0.0)*/ outf << " pinv= " << ProportionInvariant();
+	
+	if(useFlexRates==true){
+		outf << ") [FLEX RATES:\t";
+		for(int i=0;i<nRateCats;i++){
+			outf << rateMults[i] << "\t";
+			outf << rateProbs[i] << "\t";
+			}
+		outf << "]";
+		}
+	else{
+		if(NRateCats()>1) outf << ") rates=gamma shape= " << Alpha() << " ncat=" << NRateCats();
+		outf << " pinv= " << ProportionInvariant();
+		}
 	outf << ";\nend;\n";
 	}
 
@@ -823,8 +899,19 @@ void Model::OutputGamlFormattedModel(ostream &outf){
 	if(Nst() == 2) outf << "k " << Rates(0);
 	else outf << " r " << Rates(0) << " " << Rates(1) << " " << Rates(2) << " " << Rates(3) << " " << Rates(4);
 	outf << " b " << Pi(0) << " " << Pi(1) << " " << Pi(2) << " " << Pi(3);
-	if(NRateCats()>1) outf << " a " << Alpha();
-	if(ProportionInvariant()!=0.0) outf << " p " << ProportionInvariant();
+
+	
+	if(useFlexRates==true){
+		outf << " f " << NRateCats();
+		for(int i=0;i<nRateCats;i++){
+			outf << " " << rateMults[i] << "\t";
+			outf << rateProbs[i] << "\t";
+			}
+		}
+	else{
+		if(NRateCats()>1) outf << " a " << Alpha() << " n " << NRateCats();
+		if(ProportionInvariant()!=0.0) outf << " p " << ProportionInvariant();
+		}
 	outf << " ";
 	}
 /*	

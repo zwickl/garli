@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <vector>
 #include <list>
+#include <cassert>
 #ifdef UNIX
 	#include <sys/mman.h>
 #endif
@@ -2023,13 +2024,14 @@ bool Rescale(CondLikeArray *destCLA, int nsites){
 		}
 
 
-bool RescaleRateHet(CondLikeArray *destCLA, int nsites){
+bool RescaleRateHet(CondLikeArray *destCLA, int nsites, int nRateCats){
+
 		double *destination=destCLA->arr;
 		int *underflow_mult=destCLA->underflow_mult;
 		destCLA->rescaleRank=0;
 		//check if any clas are getting close to underflow
 #ifdef UNIX
-		madvise(destination, sizeof(double)*16*nsites, MADV_SEQUENTIAL);
+		madvise(destination, sizeof(double)*4*nRateCats*nsites, MADV_SEQUENTIAL);
 		madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
 #endif
 		bool reduceRescale=false;
@@ -2080,6 +2082,24 @@ bool RescaleRateHet(CondLikeArray *destCLA, int nsites){
 			large1= max(large1 , large2);
 			
 #else
+			small1= (destination[0] < destination[2] ? destination[0] : destination[2]);
+			large1= (destination[0] > destination[2] ? destination[0] : destination[2]);
+			small2= (destination[1] < destination[3] ? destination[1] : destination[3]);
+			large2= (destination[1] > destination[3] ? destination[1] : destination[3]);
+			small1 = (small1 < small2 ? small1 : small2);
+			large1= (large1 > large2 ? large1 : large2);
+
+			for(int r=1;r<nRateCats;r++){
+				small2= (destination[0 + r*4] < destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
+				large2= (destination[0 + r*4] > destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
+				small1 = (small1 < small2 ? small1 : small2);
+				large1= (large1 > large2 ? large1 : large2);				
+				small2= (destination[1 + r*4] < destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
+				large2= (destination[1 + r*4] > destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
+				small1 = (small1 < small2 ? small1 : small2);
+				large1= (large1 > large2 ? large1 : large2);	
+				}			
+/*
 			small1= (destination[0] < destination[8] ? destination[0] : destination[8]);
 			large1= (destination[0] > destination[8] ? destination[0] : destination[8]);
 			small2= (destination[1] < destination[9] ? destination[1] : destination[9]);
@@ -2122,6 +2142,7 @@ bool RescaleRateHet(CondLikeArray *destCLA, int nsites){
 			
 			small1 = (small1 < small2 ? small1 : small2);
 			large1= (large1 > large2 ? large1 : large2);
+*/
 #endif
 			if(large1< 1e-5){
 				if(large1 < 1e-150){
@@ -2132,7 +2153,7 @@ bool RescaleRateHet(CondLikeArray *destCLA, int nsites){
 
 				underflow_mult[i]+=incr;
 				double mult=exp((double)incr);
-				for(int r=0;r<4;r++){
+				for(int r=0;r<nRateCats;r++){
 					for(int q=0;q<4;q++){
 						destination[r*4 + q]*=mult;
 						assert(destination[r*4 +q] == destination[r*4 +q]);
@@ -2140,7 +2161,7 @@ bool RescaleRateHet(CondLikeArray *destCLA, int nsites){
 						}
 					}
 				}
-			destination+=16;
+			destination+= 4*nRateCats;
 			}
 		return reduceRescale;
 		}
@@ -2337,7 +2358,8 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 
 	TreeNode* Lchild, *Rchild;
 	CondLikeArray *LCLA=NULL, *RCLA=NULL, *partialCLA=NULL;
-	double Lprmat[64], Rprmat[64];
+	vector<double> Rprmat(16*mod->NRateCats());
+	vector<double> Lprmat(16*mod->NRateCats());	
 
 	if(direction != ROOT){
 		//the only complicated thing here will be to set up the two children depending on the direction
@@ -2352,8 +2374,8 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			if(Rchild->left!=NULL)
 				RCLA=GetClaDown(Rchild);
 			
-			mod->CalcPmatRateHet(Lchild->dlen, Lprmat, false);
-			mod->CalcPmatRateHet(Rchild->dlen, Rprmat, false);
+			mod->CalcPmatRateHet(Lchild->dlen, &Lprmat[0], false);
+			mod->CalcPmatRateHet(Rchild->dlen, &Rprmat[0], false);
 			}
 		else if(direction==UPRIGHT || direction==UPLEFT){
 			if(nd->anc){
@@ -2369,7 +2391,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 					//and right, but not the middle.  We will confusingly store this in the root's DOWN cla
 					LCLA=GetClaDown(Lchild);
 
-				mod->CalcPmatRateHet(nd->dlen, Lprmat, false);
+				mod->CalcPmatRateHet(nd->dlen, &Lprmat[0], false);
 			
 				if(direction==UPRIGHT) Rchild=nd->left;
 				else Rchild=nd->right;
@@ -2386,13 +2408,13 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 				if(Lchild->left!=NULL)
 					LCLA=GetClaDown(Lchild);
 
-				mod->CalcPmatRateHet(Lchild->dlen, Lprmat, false);
+				mod->CalcPmatRateHet(Lchild->dlen, &Lprmat[0], false);
 				}
 			
 			if(Rchild->left!=NULL)
 				RCLA=GetClaDown(Rchild);
 			
-			mod->CalcPmatRateHet(Rchild->dlen, Rprmat, false);
+			mod->CalcPmatRateHet(Rchild->dlen, &Rprmat[0], false);
 			}
 
 
@@ -2402,20 +2424,20 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 	
 		if(LCLA!=NULL && RCLA!=NULL)
 			//two internal children
-			CalcFullCLAInternalInternalRateHet(destCLA, LCLA, RCLA, Lprmat, Rprmat, nsites);
+			CalcFullCLAInternalInternalRateHet(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats());
 
 		else if(LCLA==NULL && RCLA==NULL){
 			//two terminal children
-			CalcFullCLATerminalTerminalRateHet(destCLA, Lprmat, Rprmat, Lchild->tipData, Rchild->tipData, nsites);
+			CalcFullCLATerminalTerminalRateHet(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData, nsites,  mod->NRateCats());
 			}
 
 		else{
 			//one terminal, one internal
 			if(LCLA==NULL){
-				CalcFullCLAInternalTerminalRateHet(destCLA, RCLA, Rprmat, Lprmat, Lchild->tipData, nsites);
+				CalcFullCLAInternalTerminalRateHet(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats());
 				}
 			else {
-				CalcFullCLAInternalTerminalRateHet(destCLA, LCLA, Lprmat, Rprmat, Rchild->tipData, nsites);
+				CalcFullCLAInternalTerminalRateHet(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats());
 				}
 			}
 		}
@@ -2425,7 +2447,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		//valid CLA that already represents two of these three. If so we can save a bit of
 		//computation.  This will mainly be the case during blen optimization, when when we 
 		//only change one of the branches again and again.
-		double prmat[64];
+		vector<double> prmat(16*mod->NRateCats());
 		TreeNode *child;
 		CondLikeArray *childCLA=NULL;
 		int *childUnderMult=NULL;
@@ -2436,7 +2458,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			if(child->left!=NULL){
 				childCLA=GetClaDown(child, true);
 				}
-			mod->CalcPmatRateHet(child->dlen, prmat, false);
+			mod->CalcPmatRateHet(child->dlen, &prmat[0], false);
 			}
 		else if(claMan->IsDirty(nd->claIndexUR) == false){
 			partialCLA=GetClaUpRight(nd, false);
@@ -2444,7 +2466,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			if(child->left!=NULL){
 				childCLA=GetClaDown(child, true);
 				}
-			mod->CalcPmatRateHet(child->dlen, prmat, false);
+			mod->CalcPmatRateHet(child->dlen, &prmat[0], false);
 			}
 		else{//both of the UP clas must be dirty.  We'll use the down one as the 
 			//partial, and calc it now if necessary
@@ -2465,23 +2487,23 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 					//direction is stored as the root DOWN direction
 					childCLA=GetClaDown(child);
 					}
-				mod->CalcPmatRateHet(nd->dlen, prmat, false);
+				mod->CalcPmatRateHet(nd->dlen, &prmat[0], false);
 				}
 			else{
 				child=nd->left->next;
 				if(child->left!=NULL){
 					childCLA=GetClaDown(child, true);
 					}
-				mod->CalcPmatRateHet(child->dlen, prmat, false);
+				mod->CalcPmatRateHet(child->dlen, &prmat[0], false);
 				}
 			}	
 		
 		if(fillFinalCLA==false){
 			if(childCLA!=NULL)//if child is internal
-				lnL = GetScorePartialInternalRateHet(partialCLA, childCLA, prmat);
+				lnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &prmat[0]);
 			
 			else
-				lnL = GetScorePartialTerminalRateHet(partialCLA, prmat, child->tipData);
+				lnL = GetScorePartialTerminalRateHet(partialCLA, &prmat[0], child->tipData);
 			}
 		
 		else{
@@ -2491,17 +2513,17 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			claMan->FillHolder(wholeTreeIndex, ROOT);
 			claMan->ReserveCla(wholeTreeIndex);
 			if(childCLA!=NULL)//if child is internal
-				CalcFullCLAPartialInternalRateHet(claMan->GetCla(wholeTreeIndex), childCLA, prmat, partialCLA, nsites);
+				CalcFullCLAPartialInternalRateHet(claMan->GetCla(wholeTreeIndex), childCLA, &prmat[0], partialCLA, nsites,  mod->NRateCats());
 			
 			else
-				CalcFullCLAPartialTerminalRateHet(claMan->GetCla(wholeTreeIndex), partialCLA, prmat, child->tipData, nsites);
+				CalcFullCLAPartialTerminalRateHet(claMan->GetCla(wholeTreeIndex), partialCLA, &prmat[0], child->tipData, nsites,  mod->NRateCats());
 			return wholeTreeIndex;
 			}
 		}
 
 	if(direction != ROOT)
 		if(destCLA->rescaleRank >= rescaleEvery)
-			RescaleRateHet(destCLA, nsites);
+			RescaleRateHet(destCLA, nsites, mod->NRateCats());
 
 	return -1;
 	}
@@ -2541,6 +2563,12 @@ int Tree::Score(int rootNodeNum /*=0*/){
 //	double templnL=lnL;
 	lnL=SumSiteLikes(cla, underflow_mult);
 //	assert(templnL == lnL);
+*/
+
+/*	//DEBUG
+	ofstream poo("firstclas.log");
+	OutputFirstClaAcrossTree(poo, root);
+	poo.close();
 */
 	return 1;
 	}
@@ -2997,6 +3025,7 @@ void Tree::SwapAndFreeNodes(TreeNode *cop){
 	if(cop->right->left) SwapAndFreeNodes(cop->right);	
 	}
 
+/*DEPRECATED
 double Tree::SumSiteLikes(const double *cla, const int *underflow_mult){
 	
 	int nSites=data->NChar();
@@ -3084,6 +3113,7 @@ double Tree::SumSiteLikes(const double *cla, const int *underflow_mult){
 		}
 	return totalL;
 	}
+*/
 
 void Tree::CalcBipartitions(){
 	root->CalcBipartition();
@@ -3107,11 +3137,13 @@ void Tree::SetDistanceBasedBranchLengthsAroundNode(TreeNode *nd){
 		T3=T4;
 		k3=k4;
 		}
-
+#ifdef FLEX_RATES
+	assert(0);
+#else
 	D1=CalculatePDistance(T1->tipData, T2->tipData, data->NChar())/(1.0-mod->ProportionInvariant()) - k1 -k2;
 	D2=CalculatePDistance(T1->tipData, T3->tipData, data->NChar())/(1.0-mod->ProportionInvariant()) - k1 -k3;
 	D3=CalculatePDistance(T2->tipData, T3->tipData, data->NChar())/(1.0-mod->ProportionInvariant()) - k2 -k3;
-
+#endif
 	b=(D3-D2+D1)*0.5;
 	if(b < min_brlen) b=min_brlen;
 	a=D1-b;
@@ -3804,30 +3836,35 @@ double Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, con
 	
 	//gamma and invariants
 	const int *countit=data->GetCounts();
+	
+	const int nRateCats=mod->NRateCats();
+	const double *rateProb=mod->GetRateProbs();
+
 	int lastConst=data->LastConstant();
 	const int *conBases=data->GetConstBases();
 	double prI=mod->ProportionInvariant();
-	double scaledGammaProp=(1.0-prI) / mod->NRateCats();
+//	double scaledGammaProp=(1.0-prI) / mod->NRateCats();
 	
 	for(int i=0;i<nchar;i++){
 		La=Lc=Lg=Lt=0.0;
 		if(*Ldata > -1){ //no ambiguity
-			for(int i=0;i<4;i++){
-				La  += prmat[(*Ldata)+16*i] * partial[0];
-				Lc  += prmat[(*Ldata+4)+16*i] * partial[1];
-				Lg  += prmat[(*Ldata+8)+16*i] * partial[2];
-				Lt  += prmat[(*Ldata+12)+16*i] * partial[3];
+			for(int i=0;i<nRateCats;i++){
+
+				La  += prmat[(*Ldata)+16*i] * partial[0] * rateProb[i];
+				Lc  += prmat[(*Ldata+4)+16*i] * partial[1] * rateProb[i];
+				Lg  += prmat[(*Ldata+8)+16*i] * partial[2] * rateProb[i];
+				Lt  += prmat[(*Ldata+12)+16*i] * partial[3] * rateProb[i];
 				partial += 4;
 				}
 			Ldata++;
 			}
 			
 		else if(*Ldata == -4){ //total ambiguity
-			for(int i=0;i<4;i++){
-				La += partial[0];
-				Lc += partial[1];
-				Lg += partial[2];
-				Lt += partial[3];
+			for(int i=0;i<nRateCats;i++){
+				La += partial[0] * rateProb[i];
+				Lc += partial[1] * rateProb[i];
+				Lg += partial[2] * rateProb[i];
+				Lt += partial[3] * rateProb[i];
 				partial += 4;
 				}
 			Ldata++;
@@ -3835,30 +3872,31 @@ double Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, con
 		else{ //partial ambiguity
 			char nstates=-1 * *(Ldata++);
 			for(int i=0;i<nstates;i++){
-				for(int i=0;i<4;i++){
-					La += prmat[(*Ldata)+16*i]  * partial[4*i];
-					Lc += prmat[(*Ldata+4)+16*i] * partial[1+4*i];
-					Lg += prmat[(*Ldata+8)+16*i]* partial[2+4*i];
-					Lt += prmat[(*Ldata+12)+16*i]* partial[3+4*i];
+				for(int i=0;i<nRateCats;i++){
+					La += prmat[(*Ldata)+16*i]  * partial[4*i] * rateProb[i];
+					Lc += prmat[(*Ldata+4)+16*i] * partial[1+4*i] * rateProb[i];
+					Lg += prmat[(*Ldata+8)+16*i]* partial[2+4*i] * rateProb[i];
+					Lt += prmat[(*Ldata+12)+16*i]* partial[3+4*i] * rateProb[i];
 					}
 				Ldata++;
 				}
-			partial+=16;
+			partial+=4*nRateCats;
 			}
 		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+			assert(mod->useFlexRates==false);
 			double btot=0.0;
 			if(conBases[i]&1) btot+=mod->Pi(0);
 			if(conBases[i]&2) btot+=mod->Pi(1);
 			if(conBases[i]&4) btot+=mod->Pi(2);
 			if(conBases[i]&8) btot+=mod->Pi(3);
 			if(underflow_mult[i]==0)
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp + prI*btot);
+				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) + prI*btot);
 			else 
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp + (prI*btot*exp((double)underflow_mult[i])));
+				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) + (prI*btot*exp((double)underflow_mult[i])));
 			}
 		else
-			siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp);
-		
+			siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)));
+
 		totallnL += (*countit++ * (log(siteL) - underflow_mult[i]));
 		}
 	return totallnL;
@@ -3884,16 +3922,19 @@ double Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, con
 
 	//gamma and invariants
 	const int *countit=data->GetCounts();
+
+	const int nRateCats=mod->NRateCats();
+	const double *rateProb=mod->GetRateProbs();
+	double prI=mod->ProportionInvariant();
 	int lastConst=data->LastConstant();
 	const int *conBases=data->GetConstBases();
-	double prI=mod->ProportionInvariant();
-	double scaledGammaProp=(1.0-prI) / mod->NRateCats();
 
 //	ofstream sit("sitelikes.log");
 
+/*
 	for(int i=0;i<nchar;i++){
 		La=Lc=Lg=Lt=0.0;
-		for(int r=0;r<4;r++){
+		for(int r=0;r<nRateCats;r++){
 			int rOff=r*16;
 			La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0];
 			Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1];
@@ -3914,9 +3955,36 @@ double Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, con
 				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp + (prI*btot*exp((double)underflow_mult1[i]+underflow_mult2[i])));
 			}
 		else
-			siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp);
+			siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp); 		
+*/
+	for(int i=0;i<nchar;i++){
+		La=Lc=Lg=Lt=0.0;
+		for(int r=0;r<nRateCats;r++){
+			int rOff=r*16;
+			La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
+			Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
+			Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
+			Lt += ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3]) * partial[3] * rateProb[r];
+			partial+=4;
+			CL1+=4;
+			}
+		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+			double btot=0.0;
+			if(conBases[i]&1) btot+=mod->Pi(0);
+			if(conBases[i]&2) btot+=mod->Pi(1);
+			if(conBases[i]&4) btot+=mod->Pi(2);
+			if(conBases[i]&8) btot+=mod->Pi(3);
+			if(underflow_mult1[i] + underflow_mult2[i] == 0)
+				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) + prI*btot);
+			else 
+				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) + (prI*btot*exp((double)underflow_mult1[i]+underflow_mult2[i])));
+			}
+		else
+			siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)));	
 		
 		totallnL += (*countit++ * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
+
+//DEBUG
 //		sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
 		}
 //	sit.close();

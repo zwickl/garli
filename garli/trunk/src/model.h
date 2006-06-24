@@ -20,6 +20,8 @@
 
 #include "memchk.h"
 #include <iostream>
+#include <cassert>
+#include <math.h>
 
 class Parameters;
 
@@ -32,14 +34,19 @@ class Model{
 	bool dirty;
 	double blen_multiplier;
 	
-	//rate het stuff
-	const int nRateCats;
+	double rateMults[10];
+	double rateProbs[10];
+	
 	double alpha;
-	double gammaRates[4];
-	double gammaProps[4];
 	double propInvar;
 	static double maxPropInvar;
-	
+
+public:
+	static bool noPinvInModel;
+	static bool useFlexRates;
+	static int nRateCats;
+
+	private:
 	//variables used for the eigen process if nst=6
 	int *iwork, *indx;
 	double *eigvals, *eigvalsimag, **eigvecs, **inveigvecs, **teigvecs, *work, *temp, *col, *c_ijk, *EigValexp;//, **p;
@@ -53,9 +60,8 @@ class Model{
 	
 	public:
 	static double mutationShape;
-	static bool noPinvInModel;
+	
 	Model(int _nst)
-		:nRateCats(4)
 		{
 		nstates=4;
 		nst=_nst;
@@ -80,14 +86,37 @@ class Model{
 		//will generally be overridden by the empirical freqs in Randomize()
 		pi[0]=pi[1]=pi[2]=pi[3]=0.25;
 		dirty=true;
+		
 		if(nRateCats>1){
 			alpha=.5;
-			DiscreteGamma();
+			DiscreteGamma(rateMults, rateProbs, alpha);
 			}
-		if(noPinvInModel==false)
+		if(noPinvInModel==false && useFlexRates==false)
 			propInvar=0.2;
 		else propInvar=0.0;
 		}
+	
+void NormalizeRates(){
+	double sum=0.0;
+//	assert(nRateCats==3);
+	for(int i=0;i<nRateCats;i++){
+		sum += rateProbs[i];
+		}
+	for(int i=0;i<nRateCats;i++)	{
+		rateProbs[i] /= sum;
+		}
+
+	sum=0.0;
+	for(int i=0;i<nRateCats;i++){
+		sum += rateMults[i]*rateProbs[i];
+		}
+	for(int i=0;i<nRateCats;i++)	{
+		rateMults[i] /= sum;
+		}
+//	assert(fabs((double)(flexRates[0]*rateProbs[0]+flexRates[1]*rateProbs[1]+flexRates[2]*rateProbs[2]+flexRates[3]*rateProbs[3] -1.0)) < .001);
+//	assert(fabs(rateProbs[0]+rateProbs[1]+rateProbs[2]+rateProbs[3]-1.0) < .001);
+	}
+		
 	void SetRmat(double *r){
 		for(int i=0;i<5;i++) rates[i]=r[i];
 		}
@@ -95,20 +124,7 @@ class Model{
 		for(int i=0;i<3;i++) pi[i]=b[i];
 		pi[3]=1.0 - pi[0] - pi[1] - pi[2];
 		}
-	void SetAlpha(double a){
-		alpha=a;
-		DiscreteGamma();
-		}
-	void SetPinv(double p){
-		if(noPinvInModel == true) assert(p==0);
-		propInvar=p;
-		}
-	void SetMaxPinv(double p){
-		Model::maxPropInvar=p;
-		}
-	double MaxPinv(){
-		return maxPropInvar;
-		}
+
 	private:
 	void AllocateEigenVariables();
 	void CalcEigenStuff();
@@ -120,7 +136,7 @@ class Model{
 	void CalcPmatRateHet(double blen, double *metaPmat, bool flip =false);
 	void CalcDerivatives(double, double ***&, double ***&, double ***&);
 	void UpdateQMat();
-	void DiscreteGamma();
+	void DiscreteGamma(double *, double *, double);
 	
 	void CopyModel(const Model *from);
 	void SetModel(double *model_string);
@@ -131,13 +147,64 @@ class Model{
 	void MutatePropInvar();
 	double TRatio() const;
 	inline double Pi(int p) const{ return pi[p];}
-	inline double Alpha() const {return alpha;}
 	inline int Nst() const {return nst;}
 	inline double Rates(int r) const { return rates[r];}
-	inline double ProportionInvariant() const { return propInvar;}
-	inline bool NoPinvInModel() const { return noPinvInModel;}
 	void SetParams(Parameters *p) {params=p;}
 	int NRateCats() const {return nRateCats;}
+
+	void MutateRateProbs();
+	void MutateRateMults();
+	const double *GetRateProbs() {
+		//DEBUG
+		double sum=0.0;
+		for(int i=0;i<nRateCats;i++){
+			sum += rateProbs[i];
+			}
+		sum+=propInvar;
+		assert(fabs(1.0-sum) < .001);
+		
+		return rateProbs;
+		}
+
+	void SetFlexRates(double *rates, double *probs){
+		for(int r=0;r<nRateCats;r++){
+			rateMults[r]=rates[r];
+			rateProbs[r]=probs[r];
+			}		
+		}
+	
+	void SetNRateCats(int r){
+		nRateCats=r;
+		}
+
+	const double *GetRateMults() {
+		return rateMults;
+		}
+	
+	inline double Alpha() const {return alpha;}
+	void SetAlpha(double a){
+		//assert(useFlexRates==false);
+		alpha=a;
+		DiscreteGamma(rateMults, rateProbs, alpha);
+		}
+	inline double ProportionInvariant() const { return propInvar;}
+	inline bool NoPinvInModel() const { return noPinvInModel;}
+	void SetPinv(double p){
+		assert(useFlexRates==false || p==0.0);
+		if(noPinvInModel == true) assert(p==0);
+		propInvar=p;
+		//change the proportion of rates in each gamma cat
+		for(int i=0;i<nRateCats;i++){
+			rateProbs[i]=(1.0-propInvar)/nRateCats;
+			}
+		}
+	void SetMaxPinv(double p){
+		Model::maxPropInvar=p;
+		}
+	double MaxPinv(){
+		return maxPropInvar;
+		}
+
 #ifdef GANESH
     int NStates() const {return nstates;}
 #endif

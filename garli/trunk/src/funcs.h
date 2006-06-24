@@ -80,15 +80,15 @@ void CalcDerivCLASPartialInternalRateHet(CondLikeArray *destCLA, CondLikeArray *
 void CalcDerivCLASPartialTerminalRateHet(CondLikeArray *destCLA, CondLikeArray *destD1CLA, CondLikeArray *destD2CLA, const CondLikeArray *partialCLA,
 	const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, int nchar);
 
-void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, int nchar);
+void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, int nchar, int nRateCats=4);
 void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, int nchar);
-void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, char *Ldata, char *Rdata, int nchar);
+void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, char *Ldata, char *Rdata, int nchar, int nRateCats=4);
 void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, char *Ldata, char *Rdata, int nchar);
-void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar);
+void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar, int nRateCats=4);
 void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar);
-void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar);
+void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats=4);
 void CalcFullCLAPartialInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar);
-void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar);
+void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar, int nRateCats=4);
 void CalcFullCLAPartialTerminal(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar);
 
 int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOuterL, double *midL, double *bestOuterL, double (*func)(TreeNode*, Tree*, double, bool), TreeNode *thisnode, Tree *thistree);

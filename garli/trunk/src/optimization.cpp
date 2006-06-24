@@ -517,14 +517,16 @@ pair<double, double> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2){
 	
 	mod->CalcDerivatives(nd2->dlen, prmat, deriv1, deriv2);
 
-	double d1=0.0, d2=0.0;	
+	double d1=0.0, d2=0.0;
+
 	if(nd2->left == NULL){
 		const char *childData=nd2->tipData;
-		GetDerivsPartialTerminalRateHet(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2);
+		GetDerivsPartialTerminalFlexRates(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2);
 		}
 	else {
-		GetDerivsPartialInternalRateHet(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2);
+		GetDerivsPartialInternalFlexRates(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2);
 		}
+
 	return pair<double, double>(d1, d2);
 }
 
@@ -567,6 +569,23 @@ double Tree::BranchLike(TreeNode *optNode){
 	return 0;
 	}
 
+
+void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
+	
+	double initialLen=nd->dlen;
+	Score();
+	
+	out << nd->dlen << "\t" << lnL << "\n";
+	
+	SetBranchLength(nd, 1e-4);
+	for(int i=0;i<15;i++){
+		Score();
+		out << nd->dlen << "\t" << lnL << "\n";
+		SetBranchLength(nd, nd->dlen * 2.0);	
+		}
+	SetBranchLength(nd, initialLen);	
+	} 
+
  double Tree::NewtonRaphsonOptimizeBranchLength(double precision1, TreeNode *nd, bool goodGuess){
 
 	if(goodGuess==false && (nd->dlen < 0.0001 || nd->dlen > .1)){
@@ -594,25 +613,46 @@ double Tree::BranchLike(TreeNode *optNode){
 //	nd->dlen=.3254;
 //	SweepDirtynessOverTree(nd);
 
+	//DEBUG
+/*	
+	ofstream deb("curves.log");
+	SampleBlenCurve(nd, deb);
+	deb.close();
+*/	
+
+//	MakeAllNodesDirty();
 /*
-	const double prevDLen = nd->dlen;
+	const double startDLen = nd->dlen;
 	double incr;
+	if(nd->nodeNum==1){
+		int poo=1;
+		}
 	if(nd->dlen > 1e-4)
-		incr=1.00001;
-	else incr=1.1;
+		incr=.00001;
+	else incr=.0000001;
+	
+	incr=nd->dlen/1000.0;
+	
 	Score();
 	double start=lnL;
-//	scr << nd->nodeNum << "\n" << lnL << "\t" << nd->dlen << "\n";
-	nd->dlen *= incr;
-	SweepDirtynessOverTree(nd);
-	Score();
-//	scr << lnL << "\t" << nd->dlen << "\n";
 
-	double deriv= (lnL - start)/(nd->dlen - prevDLen);
-
-	nd->dlen = prevDLen;
-	SweepDirtynessOverTree(nd);
+	SetBranchLength(nd, startDLen + incr);
 	Score();
+
+	double empD11= (lnL - start)/incr;
+
+//	SetBranchLength(nd, prevDLen);
+//	Score();
+
+	SetBranchLength(nd, startDLen - incr);
+	Score();
+
+	double empD12 = (lnL - start)/-incr;
+
+	double empD1=(empD11+empD12)*.5;
+	double empD2=(empD11-empD12)/incr;
+
+	SetBranchLength(nd, startDLen);
 */
 //	MakeAllNodesDirty();
 
@@ -675,6 +715,16 @@ double Tree::BranchLike(TreeNode *optNode){
 		double d1=derivs.first; //* 4.0 * pow(nd->dlen, 0.75);
 		double d2=derivs.second;// * 3.0 * pow(nd->dlen, -0.25);
 
+		//DEBUG
+/*		if(iter==0 && nd->dlen > 1e-7 && (abs(d1-empD1) > 1.0)){// || (abs(d2-empD2) > 50.0))){
+
+			ofstream bad("badD1.log", ios::app);
+			bad << nd->nodeNum << "\t" << nd->dlen << "\t" << d1 << "\t" << d2 << "\t" << empD1 << "\t" << empD2 << "\t";
+			mod->OutputGamlFormattedModel(bad);
+			bad << "\n";
+			bad.close();
+			}
+*/
 		double estDeltaNR=-d1/d2;
 		
 		//this was my original ad hoc estimated score change, which was always an overestimate
@@ -1275,7 +1325,7 @@ if(here->anc){
 	return initialScore - minScore;
 	}
 
-void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1Tot, double &d2Tot){
+void Tree::GetDerivsPartialTerminalFlexRates(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1Tot, double &d2Tot){
 
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
@@ -1293,18 +1343,133 @@ void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, cons
 	double D1a, D1c, D1g, D1t;
 	double D2a, D2c, D2g, D2t;
 	
+	const int *countit=data->GetCounts();
+	const double *rateProb=mod->GetRateProbs();
+	const int nRateCats=mod->NRateCats();
+	
+	int lastConst=data->LastConstant();
+	const int *conBases=data->GetConstBases();
+	double prI=mod->ProportionInvariant();
+
+	for(int i=0;i<nchar;i++){
+		if((*countit) != 0){
+			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=0.0;
+			if(*Ldata > -1){ //no ambiguity
+				for(int i=0;i<nRateCats;i++){
+					La  += prmat[(*Ldata)+16*i] * partial[0] * rateProb[i];
+					D1a += d1mat[(*Ldata)+16*i] * partial[0] * rateProb[i];
+					D2a += d2mat[(*Ldata)+16*i] * partial[0] * rateProb[i];
+					Lc  += prmat[(*Ldata+4)+16*i] * partial[1]* rateProb[i];
+					D1c += d1mat[(*Ldata+4)+16*i] * partial[1]* rateProb[i];
+					D2c += d2mat[(*Ldata+4)+16*i] * partial[1]* rateProb[i];
+					Lg  += prmat[(*Ldata+8)+16*i] * partial[2]* rateProb[i];
+					D1g += d1mat[(*Ldata+8)+16*i] * partial[2]* rateProb[i];
+					D2g += d2mat[(*Ldata+8)+16*i] * partial[2]* rateProb[i];
+					Lt  += prmat[(*Ldata+12)+16*i] * partial[3]* rateProb[i];
+					D1t += d1mat[(*Ldata+12)+16*i] * partial[3]* rateProb[i];
+					D2t += d2mat[(*Ldata+12)+16*i] * partial[3]* rateProb[i];
+					partial += 4;
+					}
+				Ldata++;
+				}
+				
+			else if(*Ldata == -4){ //total ambiguity
+				for(int i=0;i<nRateCats;i++){
+					La += partial[0]* rateProb[i];
+					Lc += partial[1]* rateProb[i];
+					Lg += partial[2]* rateProb[i];
+					Lt += partial[3]* rateProb[i];
+					partial += 4;
+					}
+				Ldata++;
+				}
+			else{ //partial ambiguity
+				char nstates=-1 * *(Ldata++);
+				for(int i=0;i<nstates;i++){
+					for(int i=0;i<nRateCats;i++){
+						La += prmat[(*Ldata)+16*i]  * partial[4*i]* rateProb[i];
+						D1a += d1mat[(*Ldata)+16*i] * partial[4*i]* rateProb[i];		
+						D2a += d2mat[(*Ldata)+16*i] * partial[4*i]* rateProb[i];
+											
+						Lc += prmat[(*Ldata+4)+16*i] * partial[1+4*i]* rateProb[i];
+						D1c += d1mat[(*Ldata+4)+16*i]* partial[1+4*i]* rateProb[i];
+						D2c += d2mat[(*Ldata+4)+16*i]* partial[1+4*i]* rateProb[i];
+											
+						Lg += prmat[(*Ldata+8)+16*i]* partial[2+4*i]* rateProb[i];
+						D1g += d1mat[(*Ldata+8)+16*i]* partial[2+4*i]* rateProb[i];
+						D2g += d2mat[(*Ldata+8)+16*i]* partial[2+4*i]* rateProb[i];
+						
+						Lt += prmat[(*Ldata+12)+16*i]* partial[3+4*i]* rateProb[i];
+						D1t += d1mat[(*Ldata+12)+16*i]* partial[3+4*i]* rateProb[i];
+						D2t += d2mat[(*Ldata+12)+16*i]* partial[3+4*i]* rateProb[i];
+						}
+					Ldata++;
+					}
+				partial+=4*nRateCats;
+				}
+			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+				double btot=0.0;
+				if(conBases[i]&1) btot+=mod->Pi(0);
+				if(conBases[i]&2) btot+=mod->Pi(1);
+				if(conBases[i]&4) btot+=mod->Pi(2);
+				if(conBases[i]&8) btot+=mod->Pi(3);
+				//6-27-05 fixed this to calc derivs correctly if constant site has been rescaled
+				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) + (prI*btot)*exp((double)partialCLA->underflow_mult[i]));
+				}
+			else
+				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)));
+
+			tempD1 = (((D1a*mod->Pi(0)+D1c*mod->Pi(1)+D1g*mod->Pi(2)+D1t*mod->Pi(3))) / siteL);
+			d1Tot += *countit * tempD1;
+			assert(d1Tot == d1Tot);
+			double siteD2=((D2a*mod->Pi(0)+D2c*mod->Pi(1)+D2g*mod->Pi(2)+D2t*mod->Pi(3)));
+			d2Tot += *countit * ((siteD2 / siteL) - tempD1*tempD1);
+			assert(d2Tot == d2Tot);
+			}
+		else{
+			partial+=4*nRateCats;
+			if(!(*Ldata < 0)) Ldata++;
+			else if(*Ldata == -4) Ldata++;
+			else{
+				char nstates=-1 * *(Ldata++);
+				for(int i=0;i<nstates;i++) Ldata++;
+				}
+			}
+		countit++;
+		}
+	}
+
+void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1Tot, double &d2Tot){
+
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	double *partial=partialCLA->arr;
+
+	int nchar=data->NChar();
+
+#ifdef UNIX
+	madvise(partial, nchar*4*mod->NRateCats()*sizeof(double), MADV_SEQUENTIAL);
+#endif
+
+	double siteL, tempD1, D1tot, D2tot;
+	D1tot=D2tot=0.0;
+	double La, Lc, Lg, Lt;
+	double D1a, D1c, D1g, D1t;
+	double D2a, D2c, D2g, D2t;
+	
 	//gamma and invariants
 	const int *countit=data->GetCounts();
 	int lastConst=data->LastConstant();
 	const int *conBases=data->GetConstBases();
 	double prI=mod->ProportionInvariant();
-	double scaledGammaProp=(1.0-prI) / mod->NRateCats();
+	int nRateCats=mod->NRateCats();
+	double scaledGammaProp=(1.0-prI) / nRateCats;
 	
 	for(int i=0;i<nchar;i++){
 		if((*countit) != 0){
 			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=0.0;
 			if(*Ldata > -1){ //no ambiguity
-				for(int i=0;i<4;i++){
+				for(int i=0;i<nRateCats;i++){
 					La  += prmat[(*Ldata)+16*i] * partial[0];
 					D1a += d1mat[(*Ldata)+16*i] * partial[0];
 					D2a += d2mat[(*Ldata)+16*i] * partial[0];
@@ -1323,7 +1488,7 @@ void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, cons
 				}
 				
 			else if(*Ldata == -4){ //total ambiguity
-				for(int i=0;i<4;i++){
+				for(int i=0;i<nRateCats;i++){
 					La += partial[0];
 					Lc += partial[1];
 					Lg += partial[2];
@@ -1335,7 +1500,7 @@ void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, cons
 			else{ //partial ambiguity
 				char nstates=-1 * *(Ldata++);
 				for(int i=0;i<nstates;i++){
-					for(int i=0;i<4;i++){
+					for(int i=0;i<nRateCats;i++){
 						La += prmat[(*Ldata)+16*i]  * partial[4*i];
 						D1a += d1mat[(*Ldata)+16*i] * partial[4*i];		
 						D2a += d2mat[(*Ldata)+16*i] * partial[4*i];
@@ -1387,8 +1552,8 @@ void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, cons
 		countit++;
 		}
 	}
-
-void Tree::GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1Tot, double &d2Tot){
+	
+void Tree::GetDerivsPartialInternalFlexRates(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1Tot, double &d2Tot){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *CL1=childCLA->arr;
@@ -1406,17 +1571,94 @@ void Tree::GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, cons
 	double D1a, D1c, D1g, D1t;
 	double D2a, D2c, D2g, D2t;
 	
+	const int *countit=data->GetCounts();
+	const double *rateProb=mod->GetRateProbs();
+	const int nRateCats=mod->NRateCats();
+	
+	int lastConst=data->LastConstant();
+	const int *conBases=data->GetConstBases();
+	double prI=mod->ProportionInvariant();	
+
+	for(int i=0;i<nchar;i++){
+		if((*countit) != 0){
+			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=0.0;
+			for(int r=0;r<nRateCats;r++){
+				int rOff=r*16;
+				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
+				Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
+				Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
+				Lt += ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3]) * partial[3] * rateProb[r];
+				
+				D1a += ( d1mat[rOff ]*CL1[0]+d1mat[rOff + 1]*CL1[1]+d1mat[rOff + 2]*CL1[2]+d1mat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
+				D1c += ( d1mat[rOff + 4]*CL1[0]+d1mat[rOff + 5]*CL1[1]+d1mat[rOff + 6]*CL1[2]+d1mat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
+				D1g += ( d1mat[rOff + 8]*CL1[0]+d1mat[rOff + 9]*CL1[1]+d1mat[rOff + 10]*CL1[2]+d1mat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
+				D1t += ( d1mat[rOff + 12]*CL1[0]+d1mat[rOff + 13]*CL1[1]+d1mat[rOff + 14]*CL1[2]+d1mat[rOff + 15]*CL1[3]) * partial[3] * rateProb[r];		
+
+				D2a += ( d2mat[rOff ]*CL1[0]+d2mat[rOff + 1]*CL1[1]+d2mat[rOff + 2]*CL1[2]+d2mat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
+				D2c += ( d2mat[rOff + 4]*CL1[0]+d2mat[rOff + 5]*CL1[1]+d2mat[rOff + 6]*CL1[2]+d2mat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
+				D2g += ( d2mat[rOff + 8]*CL1[0]+d2mat[rOff + 9]*CL1[1]+d2mat[rOff + 10]*CL1[2]+d2mat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
+				D2t += ( d2mat[rOff + 12]*CL1[0]+d2mat[rOff + 13]*CL1[1]+d2mat[rOff + 14]*CL1[2]+d2mat[rOff + 15]*CL1[3]) * partial[3] * rateProb[r];
+				
+				partial+=4;
+				CL1+=4;
+				}
+			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+				double btot=0.0;
+				if(conBases[i]&1) btot+=mod->Pi(0);
+				if(conBases[i]&2) btot+=mod->Pi(1);
+				if(conBases[i]&4) btot+=mod->Pi(2);
+				if(conBases[i]&8) btot+=mod->Pi(3);
+				//6-27-05 fixed this to calc derivs correctly if constant site has been rescaled
+				double underTot=childCLA->underflow_mult[i]+partialCLA->underflow_mult[i];
+				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) + (prI*btot)*exp(underTot));
+				}
+			else
+				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)));
+			tempD1 = (((D1a*mod->Pi(0)+D1c*mod->Pi(1)+D1g*mod->Pi(2)+D1t*mod->Pi(3))) / siteL);
+			d1Tot += *countit * tempD1;
+			assert(d1Tot == d1Tot);
+			double siteD2=((D2a*mod->Pi(0)+D2c*mod->Pi(1)+D2g*mod->Pi(2)+D2t*mod->Pi(3)));
+			d2Tot += *countit * ((siteD2 / siteL) - tempD1*tempD1);
+			assert(d2Tot == d2Tot);
+			}
+		else{
+			partial+=4*nRateCats;
+			CL1+=4*nRateCats;
+			}
+		countit++;
+		}
+	}
+
+void Tree::GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1Tot, double &d2Tot){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	double *CL1=childCLA->arr;
+	double *partial=partialCLA->arr;
+
+	int nchar=data->NChar();
+
+#ifdef UNIX
+	madvise(partial, nchar*mod->NRateCats()*4*sizeof(double), MADV_SEQUENTIAL);
+	madvise(CL1, nchar*mod->NRateCats()*4*sizeof(double), MADV_SEQUENTIAL);
+#endif
+
+	double siteL, tempD1;
+	double La, Lc, Lg, Lt;
+	double D1a, D1c, D1g, D1t;
+	double D2a, D2c, D2g, D2t;
+	
 	//gamma and invariants
 	const int *countit=data->GetCounts();
 	int lastConst=data->LastConstant();
 	const int *conBases=data->GetConstBases();
 	double prI=mod->ProportionInvariant();
-	double scaledGammaProp=(1.0-prI) / mod->NRateCats();
+	int nRateCats=mod->NRateCats();
+	double scaledGammaProp=(1.0-prI) / nRateCats;
 
 	for(int i=0;i<nchar;i++){
 		if((*countit) != 0){
 			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=0.0;
-			for(int r=0;r<4;r++){
+			for(int r=0;r<nRateCats;r++){
 				int rOff=r*16;
 				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0];
 				Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1];
@@ -1463,6 +1705,7 @@ void Tree::GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, cons
 		}
 	}
 
+/*DEPRECATED
 void Tree::FillSiteLikes(const CondLikeArray *fullCla, double *dest, bool addPinv){
 	
 	double *cla=fullCla->arr;
@@ -1498,8 +1741,8 @@ void Tree::FillSiteLikes(const CondLikeArray *fullCla, double *dest, bool addPin
 		dest[k] = Lk * scaledGammaProp;
 		}
 	}
-	
-	
+*/	
+
 	
 	
 	

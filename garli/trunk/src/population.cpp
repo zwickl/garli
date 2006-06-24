@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
+
 #ifdef WIN32
 #include <conio.h>
 #include <windows.h>
@@ -308,9 +309,6 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 	Bipartition::allBitsOn=(unsigned int)pow(2.0, Bipartition::blockBits)-1;
 	Bipartition::str=new char[params->data->NTax()+1];
 	Bipartition::str[params->data->NTax()] = '\0';
-
-	//make sure that this is set before allocating any models
-	Model::noPinvInModel = conf->dontInferProportionInvariant;
 
 	//this is a really cheap hack
 	Bipartition tmp;
@@ -737,14 +735,14 @@ void Population::Run(){
 				cout << bestFitness << endl;
 #endif
 				}
-			else if(!(gen%(2*adap->intervalLength*adap->intervalsToStore))){
+			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
 #ifndef UNIX
-//					cout << "optimizing ...\t" << bestFitness << "->";
+					cout << "optimizing ...\t" << bestFitness << "->";
 #endif
-/*					indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
+					indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
 					indiv[bestIndiv].SetDirty();
 					CalcAverageFitness();
-*///					cout << bestFitness << endl;				
+					cout << bestFitness << endl;				
 					}
 			
 			//termination conditions
@@ -1493,9 +1491,12 @@ if(rank > 0) return;
 			
 			else paupf << "nst=6 rmat=(" << indiv[i].mod->Rates(0) << " " << indiv[i].mod->Rates(1) << " " << indiv[i].mod->Rates(2) << " " << indiv[i].mod->Rates(3) << " " << indiv[i].mod->Rates(4) << ") " << " base=(" << indiv[i].mod->Pi(0) << " " << indiv[i].mod->Pi(1) << " " << indiv[i].mod->Pi(2) << ") ";
 			
+#ifdef FLEX_RATES			
+			paupf << "[FLEX RATES] ";
+#else
 			if(indiv[i].mod->NRateCats()>1) paupf << "rates=gamma shape=" << indiv[i].mod->Alpha() << " ";
-			
 			paupf << "pinv=" << indiv[i].mod->ProportionInvariant() << " "; 
+#endif
 
 			if(gen==1 && i==0) paupf << ";\n" << "lsc " << (gen-1)*total_size+i+1 << "/scorefile=paupscores.txt replace;\n";
 			else paupf << ";\n" << "lsc " << (gen-1)*total_size+i+1 << "/scorefile=paupscores.txt append;\n";
@@ -1510,10 +1511,14 @@ if(rank > 0) return;
 		if(ind->mod->Nst()==2) paupf << "nst=2 trat=" << ind->mod->Rates(0) << " base=(" << ind->mod->Pi(0) << " " << ind->mod->Pi(1) << " " << ind->mod->Pi(2) << ");\nlsc ";
 		
 		else paupf << "nst=6 rmat=(" << ind->mod->Rates(0) << " " << ind->mod->Rates(1) << " " << ind->mod->Rates(2) << " " << ind->mod->Rates(3) << " " << ind->mod->Rates(4) << ") " << " base=(" << ind->mod->Pi(0) << " " << ind->mod->Pi(1) << " " << ind->mod->Pi(2) << ") ";
-		
+
+#ifdef FLEX_RATES			
+			paupf << "[FLEX RATES] ";
+#else	
 		if(ind->mod->NRateCats()>1) paupf << "rates=gamma shape=" << ind->mod->Alpha() << " ";
-		
 		paupf << "pinv=" << ind->mod->ProportionInvariant() << " "; 
+#endif
+
 #ifndef NNI_SPECTRUM
 		if(num==1) paupf << ";\n" << "lsc " << num << "/scorefile=paupscores.txt replace;\n";
 		else paupf << ";\n" << "lsc " << num << "/scorefile=paupscores.txt append;\n";
@@ -2142,7 +2147,11 @@ int Population::GetSpecifiedModels(double** model_string, int n, int* indiv_list
 	string_size+=n*nrates;
 	string_size+=n*4;//the pi's
 	if(indiv[indiv_list[0]].mod->NRateCats()>1) string_size+=1*n;
+#ifdef FLEX_RATES
+	assert(0);
+#else
 	if(indiv[indiv_list[0]].mod->ProportionInvariant()!=0.0) string_size+=1*n;
+#endif
 	model=new double[string_size];
 	
 	int slot=0;
@@ -2155,13 +2164,17 @@ int Population::GetSpecifiedModels(double** model_string, int n, int* indiv_list
 		for(int b=0;b<4;b++)
 			model[slot++] = indiv[indiv_list[i]].mod->Pi(b);
 		
+#ifdef FLEX_RATES
+	assert(0);
+#else
 		//get alpha if we are using rate het
 		if(indiv[indiv_list[0]].mod->NRateCats()>1)
 			model[slot++] = indiv[indiv_list[i]].mod->Alpha();
-			
+		
 		//get pinv if we are using invariant sites
 		if(indiv[indiv_list[0]].mod->ProportionInvariant()!=0.0)
 			model[slot++] = indiv[indiv_list[i]].mod->ProportionInvariant();		
+#endif
 		}
 	return slot;
 	}
@@ -3151,7 +3164,7 @@ void Population::keepTrack(){
 	//			if(i==bestIndiv){
 					//keep track of when the last significant beneficial topo mutation occured
 					//this will be used for the stopping criterion, precision reduction and update reduction in the parallel version
-					if(typ&Individual::anyTopo){
+					if(typ&Individual::anyTopo || adap->topoWeight==0.0){
 						if(scoreDif > significantTopoChange){
 							indiv[0].treeStruct->CalcBipartitions();
 							indiv[i].treeStruct->CalcBipartitions();

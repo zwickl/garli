@@ -131,6 +131,11 @@ int main( int argc, char* argv[] )	{
 			Tree::meanBrlenMuts	= params.meanBrlenMuts;
 			Tree::alpha		= params.gammaShapeBrlen;
 
+			//make sure that this is set before allocating any models	
+			Model::noPinvInModel = conf.dontInferProportionInvariant;
+			Model::nRateCats = conf.numratecats;
+			Model::useFlexRates = conf.useflexrates;
+
 			// create the population object
 			Population pop;
 		

@@ -33,7 +33,7 @@ using namespace std;
 GeneralGamlConfig::GeneralGamlConfig()	:bootstrapReps(0), outputMostlyUselessFiles(0), 
 		outputPhylipTree(0), treeRejectionThreshold(100.0), dontInferProportionInvariant(0), 
 		numPrecReductions(-1), precReductionFactor(-1.0), availableMemory(-1), 
-		significantTopoChange(0.01){
+		significantTopoChange(0.01), useflexrates(false), numratecats(4){
 	//default values here //TODO
 	logevery = 10;
 	saveevery = 100;
@@ -71,7 +71,8 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
 	cr.GetBoolOption("dontinferproportioninvariant", dontInferProportionInvariant, true);
-	
+	cr.GetBoolOption("useflexrates", useflexrates, true);
+	cr.GetIntOption("numratecats", numratecats, true);	
 
 	if(isMaster) errors += cr.SetSection("master");
 	else errors += cr.SetSection("remote");

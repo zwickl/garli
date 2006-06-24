@@ -1280,7 +1280,7 @@ void CalcDerivCLASPartialTerminalRateHet(CondLikeArray *destCLA, CondLikeArray *
 		}
 	}
 
-void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, int nchar){
+void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, int nchar, int nRateCats /*=4*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *dest=destCLA->arr;
@@ -1292,185 +1292,94 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 	madvise((void *)LCL, nchar*16*sizeof(double), MADV_SEQUENTIAL);
 	madvise((void *)RCL, nchar*16*sizeof(double), MADV_SEQUENTIAL);
 #endif
-/*
-	double L1, L2, L3, L4, R1, R2, R3, R4;
-	for(int i=0;i<nchar;i++){
-		L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
-		L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
-		L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
-		L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
-
-		R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-		R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-		R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
-		R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-		
-		dest[0] = L1 * R1;
-		dest[1] = L2 * R2;
-		dest[2] = L3 * R3;
-		dest[3] = L4 * R4;
-
-		L1=( Lpr[16+0]*LCL[4+0]+Lpr[16+1]*LCL[4+1]+Lpr[16+2]*LCL[4+2]+Lpr[16+3]*LCL[4+3]);
-		L2=( Lpr[16+4]*LCL[4+0]+Lpr[16+5]*LCL[4+1]+Lpr[16+6]*LCL[4+2]+Lpr[16+7]*LCL[4+3]);
-		L3=( Lpr[16+8]*LCL[4+0]+Lpr[16+9]*LCL[4+1]+Lpr[16+10]*LCL[4+2]+Lpr[16+11]*LCL[4+3]);
-		L4=( Lpr[16+12]*LCL[4+0]+Lpr[16+13]*LCL[4+1]+Lpr[16+14]*LCL[4+2]+Lpr[16+15]*LCL[4+3]);
-
-		R1=(Rpr[16+0]*RCL[4+0]+Rpr[16+1]*RCL[4+1]+Rpr[16+2]*RCL[4+2]+Rpr[16+3]*RCL[4+3]);
-		R2=(Rpr[16+4]*RCL[4+0]+Rpr[16+5]*RCL[4+1]+Rpr[16+6]*RCL[4+2]+Rpr[16+7]*RCL[4+3]);
-		R3=(Rpr[16+8]*RCL[4+0]+Rpr[16+9]*RCL[4+1]+Rpr[16+10]*RCL[4+2]+Rpr[16+11]*RCL[4+3]);			
-		R4=(Rpr[16+12]*RCL[4+0]+Rpr[16+13]*RCL[4+1]+Rpr[16+14]*RCL[4+2]+Rpr[16+15]*RCL[4+3]);
-		
-		dest[4] = L1 * R1;
-		dest[5] = L2 * R2;
-		dest[6] = L3 * R3;
-		dest[7] = L4 * R4;
-
-		L1=( Lpr[32+0]*LCL[8+0]+Lpr[32+1]*LCL[8+1]+Lpr[32+2]*LCL[8+2]+Lpr[32+3]*LCL[8+3]);
-		L2=( Lpr[32+4]*LCL[8+0]+Lpr[32+5]*LCL[8+1]+Lpr[32+6]*LCL[8+2]+Lpr[32+7]*LCL[8+3]);
-		L3=( Lpr[32+8]*LCL[8+0]+Lpr[32+9]*LCL[8+1]+Lpr[32+10]*LCL[8+2]+Lpr[32+11]*LCL[8+3]);
-		L4=( Lpr[32+12]*LCL[8+0]+Lpr[32+13]*LCL[8+1]+Lpr[32+14]*LCL[8+2]+Lpr[32+15]*LCL[8+3]);
-
-		R1=(Rpr[32+0]*RCL[8+0]+Rpr[32+1]*RCL[8+1]+Rpr[32+2]*RCL[8+2]+Rpr[32+3]*RCL[8+3]);
-		R2=(Rpr[32+4]*RCL[8+0]+Rpr[32+5]*RCL[8+1]+Rpr[32+6]*RCL[8+2]+Rpr[32+7]*RCL[8+3]);
-		R3=(Rpr[32+8]*RCL[8+0]+Rpr[32+9]*RCL[8+1]+Rpr[32+10]*RCL[8+2]+Rpr[32+11]*RCL[8+3]);			
-		R4=(Rpr[32+12]*RCL[8+0]+Rpr[32+13]*RCL[8+1]+Rpr[32+14]*RCL[8+2]+Rpr[32+15]*RCL[8+3]);
-		
-		dest[8] = L1 * R1;
-		dest[9] = L2 * R2;
-		dest[10] = L3 * R3;
-		dest[11] = L4 * R4;
-
-		L1=( Lpr[48+0]*LCL[12+0]+Lpr[48+1]*LCL[12+1]+Lpr[48+2]*LCL[12+2]+Lpr[48+3]*LCL[12+3]);
-		L2=( Lpr[48+4]*LCL[12+0]+Lpr[48+5]*LCL[12+1]+Lpr[48+6]*LCL[12+2]+Lpr[48+7]*LCL[12+3]);
-		L3=( Lpr[48+8]*LCL[12+0]+Lpr[48+9]*LCL[12+1]+Lpr[48+10]*LCL[12+2]+Lpr[48+11]*LCL[12+3]);
-		L4=( Lpr[48+12]*LCL[12+0]+Lpr[48+13]*LCL[12+1]+Lpr[48+14]*LCL[12+2]+Lpr[48+15]*LCL[12+3]);
-
-		R1=(Rpr[48+0]*RCL[12+0]+Rpr[48+1]*RCL[12+1]+Rpr[48+2]*RCL[12+2]+Rpr[48+3]*RCL[12+3]);
-		R2=(Rpr[48+4]*RCL[12+0]+Rpr[48+5]*RCL[12+1]+Rpr[48+6]*RCL[12+2]+Rpr[48+7]*RCL[12+3]);
-		R3=(Rpr[48+8]*RCL[12+0]+Rpr[48+9]*RCL[12+1]+Rpr[48+10]*RCL[12+2]+Rpr[48+11]*RCL[12+3]);			
-		R4=(Rpr[48+12]*RCL[12+0]+Rpr[48+13]*RCL[12+1]+Rpr[48+14]*RCL[12+2]+Rpr[48+15]*RCL[12+3]);
-		
-		dest[12] = L1 * R1;
-		dest[13] = L2 * R2;
-		dest[14] = L3 * R3;
-		dest[15] = L4 * R4;
-
-		dest+=16;
-		LCL+=16;
-		RCL+=16;
-		}
-*/
-
 	
 	double L1, L2, L3, L4, R1, R2, R3, R4;
-	for(int i=0;i<nchar;i++){
+	
+	//if(0){
+	if(nRateCats==4){
+		for(int i=0;i<nchar;i++){
 
-		L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
-		L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
-		L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
-		L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
+			L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
+			L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
+			L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
+			L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
 
-		R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-		R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-		R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
-		R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-		
-		dest[0] = L1 * R1;
-		dest[1] = L2 * R2;
-		dest[2] = L3 * R3;
-		dest[3] = L4 * R4;
+			R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
+			R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
+			R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
+			R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
+			
+			dest[0] = L1 * R1;
+			dest[1] = L2 * R2;
+			dest[2] = L3 * R3;
+			dest[3] = L4 * R4;
 
-		assert(dest[0] < 1e50);
-		assert(dest[1] < 1e50);
-		assert(dest[2] < 1e50);
-		assert(dest[3] < 1e50);
+			assert(dest[0] < 1e50);
+			assert(dest[1] < 1e50);
+			assert(dest[2] < 1e50);
+			assert(dest[3] < 1e50);
 
-		dest+=4;
-		LCL+=4;
-		RCL+=4;
-		
-		L1=( Lpr[16+0]*LCL[0]+Lpr[16+1]*LCL[1]+Lpr[16+2]*LCL[2]+Lpr[16+3]*LCL[3]);
-		L2=( Lpr[16+4]*LCL[0]+Lpr[16+5]*LCL[1]+Lpr[16+6]*LCL[2]+Lpr[16+7]*LCL[3]);
-		L3=( Lpr[16+8]*LCL[0]+Lpr[16+9]*LCL[1]+Lpr[16+10]*LCL[2]+Lpr[16+11]*LCL[3]);
-		L4=( Lpr[16+12]*LCL[0]+Lpr[16+13]*LCL[1]+Lpr[16+14]*LCL[2]+Lpr[16+15]*LCL[3]);
+			dest+=4;
+			LCL+=4;
+			RCL+=4;
+			
+			L1=( Lpr[16+0]*LCL[0]+Lpr[16+1]*LCL[1]+Lpr[16+2]*LCL[2]+Lpr[16+3]*LCL[3]);
+			L2=( Lpr[16+4]*LCL[0]+Lpr[16+5]*LCL[1]+Lpr[16+6]*LCL[2]+Lpr[16+7]*LCL[3]);
+			L3=( Lpr[16+8]*LCL[0]+Lpr[16+9]*LCL[1]+Lpr[16+10]*LCL[2]+Lpr[16+11]*LCL[3]);
+			L4=( Lpr[16+12]*LCL[0]+Lpr[16+13]*LCL[1]+Lpr[16+14]*LCL[2]+Lpr[16+15]*LCL[3]);
 
-		R1=(Rpr[16+0]*RCL[0]+Rpr[16+1]*RCL[1]+Rpr[16+2]*RCL[2]+Rpr[16+3]*RCL[3]);
-		R2=(Rpr[16+4]*RCL[0]+Rpr[16+5]*RCL[1]+Rpr[16+6]*RCL[2]+Rpr[16+7]*RCL[3]);
-		R3=(Rpr[16+8]*RCL[0]+Rpr[16+9]*RCL[1]+Rpr[16+10]*RCL[2]+Rpr[16+11]*RCL[3]);			
-		R4=(Rpr[16+12]*RCL[0]+Rpr[16+13]*RCL[1]+Rpr[16+14]*RCL[2]+Rpr[16+15]*RCL[3]);
-		
-		dest[0] = L1 * R1;
-		dest[1] = L2 * R2;
-		dest[2] = L3 * R3;
-		dest[3] = L4 * R4;
+			R1=(Rpr[16+0]*RCL[0]+Rpr[16+1]*RCL[1]+Rpr[16+2]*RCL[2]+Rpr[16+3]*RCL[3]);
+			R2=(Rpr[16+4]*RCL[0]+Rpr[16+5]*RCL[1]+Rpr[16+6]*RCL[2]+Rpr[16+7]*RCL[3]);
+			R3=(Rpr[16+8]*RCL[0]+Rpr[16+9]*RCL[1]+Rpr[16+10]*RCL[2]+Rpr[16+11]*RCL[3]);			
+			R4=(Rpr[16+12]*RCL[0]+Rpr[16+13]*RCL[1]+Rpr[16+14]*RCL[2]+Rpr[16+15]*RCL[3]);
+			
+			dest[0] = L1 * R1;
+			dest[1] = L2 * R2;
+			dest[2] = L3 * R3;
+			dest[3] = L4 * R4;
 
-		assert(dest[0] < 1e50);
-		assert(dest[1] < 1e50);
-		assert(dest[2] < 1e50);
-		assert(dest[3] < 1e50);
+			assert(dest[0] < 1e50);
+			assert(dest[1] < 1e50);
+			assert(dest[2] < 1e50);
+			assert(dest[3] < 1e50);
 
-		dest+=4;
-		LCL+=4;
-		RCL+=4;		
+			dest+=4;
+			LCL+=4;
+			RCL+=4;		
 
-		L1=( Lpr[32+0]*LCL[0]+Lpr[32+1]*LCL[1]+Lpr[32+2]*LCL[2]+Lpr[32+3]*LCL[3]);
-		L2=( Lpr[32+4]*LCL[0]+Lpr[32+5]*LCL[1]+Lpr[32+6]*LCL[2]+Lpr[32+7]*LCL[3]);
-		L3=( Lpr[32+8]*LCL[0]+Lpr[32+9]*LCL[1]+Lpr[32+10]*LCL[2]+Lpr[32+11]*LCL[3]);
-		L4=( Lpr[32+12]*LCL[0]+Lpr[32+13]*LCL[1]+Lpr[32+14]*LCL[2]+Lpr[32+15]*LCL[3]);
+			L1=( Lpr[32+0]*LCL[0]+Lpr[32+1]*LCL[1]+Lpr[32+2]*LCL[2]+Lpr[32+3]*LCL[3]);
+			L2=( Lpr[32+4]*LCL[0]+Lpr[32+5]*LCL[1]+Lpr[32+6]*LCL[2]+Lpr[32+7]*LCL[3]);
+			L3=( Lpr[32+8]*LCL[0]+Lpr[32+9]*LCL[1]+Lpr[32+10]*LCL[2]+Lpr[32+11]*LCL[3]);
+			L4=( Lpr[32+12]*LCL[0]+Lpr[32+13]*LCL[1]+Lpr[32+14]*LCL[2]+Lpr[32+15]*LCL[3]);
 
-		R1=(Rpr[32+0]*RCL[0]+Rpr[32+1]*RCL[1]+Rpr[32+2]*RCL[2]+Rpr[32+3]*RCL[3]);
-		R2=(Rpr[32+4]*RCL[0]+Rpr[32+5]*RCL[1]+Rpr[32+6]*RCL[2]+Rpr[32+7]*RCL[3]);
-		R3=(Rpr[32+8]*RCL[0]+Rpr[32+9]*RCL[1]+Rpr[32+10]*RCL[2]+Rpr[32+11]*RCL[3]);			
-		R4=(Rpr[32+12]*RCL[0]+Rpr[32+13]*RCL[1]+Rpr[32+14]*RCL[2]+Rpr[32+15]*RCL[3]);
-		
-		dest[0] = L1 * R1;
-		dest[1] = L2 * R2;
-		dest[2] = L3 * R3;
-		dest[3] = L4 * R4;
+			R1=(Rpr[32+0]*RCL[0]+Rpr[32+1]*RCL[1]+Rpr[32+2]*RCL[2]+Rpr[32+3]*RCL[3]);
+			R2=(Rpr[32+4]*RCL[0]+Rpr[32+5]*RCL[1]+Rpr[32+6]*RCL[2]+Rpr[32+7]*RCL[3]);
+			R3=(Rpr[32+8]*RCL[0]+Rpr[32+9]*RCL[1]+Rpr[32+10]*RCL[2]+Rpr[32+11]*RCL[3]);			
+			R4=(Rpr[32+12]*RCL[0]+Rpr[32+13]*RCL[1]+Rpr[32+14]*RCL[2]+Rpr[32+15]*RCL[3]);
+			
+			dest[0] = L1 * R1;
+			dest[1] = L2 * R2;
+			dest[2] = L3 * R3;
+			dest[3] = L4 * R4;
 
-		assert(dest[0] < 1e50);
-		assert(dest[1] < 1e50);
-		assert(dest[2] < 1e50);
-		assert(dest[3] < 1e50);
+			assert(dest[0] < 1e50);
+			assert(dest[1] < 1e50);
+			assert(dest[2] < 1e50);
+			assert(dest[3] < 1e50);
 
-		dest+=4;
-		LCL+=4;
-		RCL+=4;
+			dest+=4;
+			LCL+=4;
+			RCL+=4;
 
-		L1=( Lpr[48+0]*LCL[0]+Lpr[48+1]*LCL[1]+Lpr[48+2]*LCL[2]+Lpr[48+3]*LCL[3]);
-		L2=( Lpr[48+4]*LCL[0]+Lpr[48+5]*LCL[1]+Lpr[48+6]*LCL[2]+Lpr[48+7]*LCL[3]);
-		L3=( Lpr[48+8]*LCL[0]+Lpr[48+9]*LCL[1]+Lpr[48+10]*LCL[2]+Lpr[48+11]*LCL[3]);
-		L4=( Lpr[48+12]*LCL[0]+Lpr[48+13]*LCL[1]+Lpr[48+14]*LCL[2]+Lpr[48+15]*LCL[3]);
+			L1=( Lpr[48+0]*LCL[0]+Lpr[48+1]*LCL[1]+Lpr[48+2]*LCL[2]+Lpr[48+3]*LCL[3]);
+			L2=( Lpr[48+4]*LCL[0]+Lpr[48+5]*LCL[1]+Lpr[48+6]*LCL[2]+Lpr[48+7]*LCL[3]);
+			L3=( Lpr[48+8]*LCL[0]+Lpr[48+9]*LCL[1]+Lpr[48+10]*LCL[2]+Lpr[48+11]*LCL[3]);
+			L4=( Lpr[48+12]*LCL[0]+Lpr[48+13]*LCL[1]+Lpr[48+14]*LCL[2]+Lpr[48+15]*LCL[3]);
 
-		R1=(Rpr[48+0]*RCL[0]+Rpr[48+1]*RCL[1]+Rpr[48+2]*RCL[2]+Rpr[48+3]*RCL[3]);
-		R2=(Rpr[48+4]*RCL[0]+Rpr[48+5]*RCL[1]+Rpr[48+6]*RCL[2]+Rpr[48+7]*RCL[3]);
-		R3=(Rpr[48+8]*RCL[0]+Rpr[48+9]*RCL[1]+Rpr[48+10]*RCL[2]+Rpr[48+11]*RCL[3]);			
-		R4=(Rpr[48+12]*RCL[0]+Rpr[48+13]*RCL[1]+Rpr[48+14]*RCL[2]+Rpr[48+15]*RCL[3]);
-		
-		dest[0] = L1 * R1;
-		dest[1] = L2 * R2;
-		dest[2] = L3 * R3;
-		dest[3] = L4 * R4;
-
-		assert(dest[0] < 1e50);
-		assert(dest[1] < 1e50);
-		assert(dest[2] < 1e50);
-		assert(dest[3] < 1e50);
-
-		dest+=4;
-		LCL+=4;
-		RCL+=4;
-/*		
-		for(int r=0;r<4;r++){
-			L1=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
-			L2=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
-			L3=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
-			L4=( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]);
-
-			R1=(Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
-			R2=(Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
-			R3=(Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);			
-			R4=(Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
+			R1=(Rpr[48+0]*RCL[0]+Rpr[48+1]*RCL[1]+Rpr[48+2]*RCL[2]+Rpr[48+3]*RCL[3]);
+			R2=(Rpr[48+4]*RCL[0]+Rpr[48+5]*RCL[1]+Rpr[48+6]*RCL[2]+Rpr[48+7]*RCL[3]);
+			R3=(Rpr[48+8]*RCL[0]+Rpr[48+9]*RCL[1]+Rpr[48+10]*RCL[2]+Rpr[48+11]*RCL[3]);			
+			R4=(Rpr[48+12]*RCL[0]+Rpr[48+13]*RCL[1]+Rpr[48+14]*RCL[2]+Rpr[48+15]*RCL[3]);
 			
 			dest[0] = L1 * R1;
 			dest[1] = L2 * R2;
@@ -1486,35 +1395,38 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 			LCL+=4;
 			RCL+=4;
 			}
-*/		}
-
-/*
-	for(int i=0;i<nchar;i++){
-		dest[0] = ( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]) * (Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-		dest[1] = ( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]) * (Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-		dest[2] = ( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]) * (Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);
-		dest[3] = ( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]) * (Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-		
-		dest[4] = ( Lpr[16]*LCL[4]+Lpr[17]*LCL[5]+Lpr[18]*LCL[6]+Lpr[19]*LCL[7]) * (Rpr[16]*RCL[4]+Rpr[17]*RCL[5]+Rpr[18]*RCL[6]+Rpr[19]*RCL[7]);
-		dest[5] = ( Lpr[20]*LCL[4]+Lpr[21]*LCL[5]+Lpr[22]*LCL[6]+Lpr[23]*LCL[7]) * (Rpr[20]*RCL[4]+Rpr[21]*RCL[5]+Rpr[22]*RCL[6]+Rpr[23]*RCL[7]);
-		dest[6] = ( Lpr[24]*LCL[4]+Lpr[25]*LCL[5]+Lpr[26]*LCL[6]+Lpr[27]*LCL[7]) * (Rpr[24]*RCL[4]+Rpr[25]*RCL[5]+Rpr[26]*RCL[6]+Rpr[27]*RCL[7]);
-		dest[7] = ( Lpr[28]*LCL[4]+Lpr[29]*LCL[5]+Lpr[30]*LCL[6]+Lpr[31]*LCL[7]) * (Rpr[28]*RCL[4]+Rpr[29]*RCL[5]+Rpr[30]*RCL[6]+Rpr[31]*RCL[7]);
-	
-		dest[8] = ( Lpr[32]*LCL[8]+Lpr[33]*LCL[9]+Lpr[34]*LCL[10]+Lpr[35]*LCL[11]) * (Rpr[32]*RCL[8]+Rpr[33]*RCL[9]+Rpr[34]*RCL[10]+Rpr[35]*RCL[11]);
-		dest[9] = ( Lpr[36]*LCL[8]+Lpr[37]*LCL[9]+Lpr[38]*LCL[10]+Lpr[39]*LCL[11]) * (Rpr[36]*RCL[8]+Rpr[37]*RCL[9]+Rpr[38]*RCL[10]+Rpr[39]*RCL[11]);
-		dest[10] = ( Lpr[40]*LCL[8]+Lpr[41]*LCL[9]+Lpr[42]*LCL[10]+Lpr[43]*LCL[11]) * (Rpr[40]*RCL[8]+Rpr[41]*RCL[9]+Rpr[42]*RCL[10]+Rpr[43]*RCL[11]);
-		dest[11] = ( Lpr[44]*LCL[8]+Lpr[45]*LCL[9]+Lpr[46]*LCL[10]+Lpr[47]*LCL[11]) * (Rpr[44]*RCL[8]+Rpr[45]*RCL[9]+Rpr[46]*RCL[10]+Rpr[47]*RCL[11]);
-	
-		dest[12] = ( Lpr[48]*LCL[12]+Lpr[49]*LCL[13]+Lpr[50]*LCL[14]+Lpr[51]*LCL[15]) * (Rpr[48]*RCL[12]+Rpr[49]*RCL[13]+Rpr[50]*RCL[14]+Rpr[51]*RCL[15]);
-		dest[13] = ( Lpr[52]*LCL[12]+Lpr[53]*LCL[13]+Lpr[54]*LCL[14]+Lpr[55]*LCL[15]) * (Rpr[52]*RCL[12]+Rpr[53]*RCL[13]+Rpr[54]*RCL[14]+Rpr[55]*RCL[15]);
-		dest[14] = ( Lpr[56]*LCL[12]+Lpr[57]*LCL[13]+Lpr[58]*LCL[14]+Lpr[59]*LCL[15]) * (Rpr[56]*RCL[12]+Rpr[57]*RCL[13]+Rpr[58]*RCL[14]+Rpr[59]*RCL[15]);
-		dest[15] = ( Lpr[60]*LCL[12]+Lpr[61]*LCL[13]+Lpr[62]*LCL[14]+Lpr[63]*LCL[15]) * (Rpr[60]*RCL[12]+Rpr[61]*RCL[13]+Rpr[62]*RCL[14]+Rpr[63]*RCL[15]);
-		assert(*(dest)<1e200);
-		dest+=16;
-		LCL+=16;
-		RCL+=16;		
 		}
-*/
+	
+	else{
+		for(int i=0;i<nchar;i++){
+			for(int r=0;r<nRateCats;r++){
+				L1=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
+				L2=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
+				L3=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
+				L4=( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]);
+
+				R1=(Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
+				R2=(Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
+				R3=(Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);			
+				R4=(Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
+				
+				dest[0] = L1 * R1;
+				dest[1] = L2 * R2;
+				dest[2] = L3 * R3;
+				dest[3] = L4 * R4;
+
+				assert(dest[0] < 1e50);
+				assert(dest[1] < 1e50);
+				assert(dest[2] < 1e50);
+				assert(dest[3] < 1e50);
+
+				dest+=4;
+				LCL+=4;
+				RCL+=4;
+				}
+			}
+		}
+
 	int *undermult=destCLA->underflow_mult;
 	int *left_mult=LCLA->underflow_mult;
 	int *right_mult=RCLA->underflow_mult;
@@ -1559,7 +1471,7 @@ void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LC
 	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
 	}
 
-void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, char *Ldata, char *Rdata, int nchar){
+void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, char *Ldata, char *Rdata, int nchar, int nRateCats /*=4*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *dest=destCLA->arr;
@@ -1570,11 +1482,11 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 
 	for(int i=0;i<nchar;i++){
 		if(*Ldata > -1 && *Rdata > -1){
-			for(int i=0;i<4;i++){
-				*(dest++) = Lpr[(*Ldata)+16*i] * Rpr[(*Rdata)+16*i];
-				*(dest++) = Lpr[(*Ldata+4)+16*i] * Rpr[(*Rdata+4)+16*i];
-				*(dest++) = Lpr[(*Ldata+8)+16*i] * Rpr[(*Rdata+8)+16*i];
-				*(dest++) = Lpr[(*Ldata+12)+16*i] * Rpr[(*Rdata+12)+16*i];
+			for(int r=0;r<nRateCats;r++){
+				*(dest++) = Lpr[(*Ldata)+16*r] * Rpr[(*Rdata)+16*r];
+				*(dest++) = Lpr[(*Ldata+4)+16*r] * Rpr[(*Rdata+4)+16*r];
+				*(dest++) = Lpr[(*Ldata+8)+16*r] * Rpr[(*Rdata+8)+16*r];
+				*(dest++) = Lpr[(*Ldata+12)+16*r] * Rpr[(*Rdata+12)+16*r];
 //				assert(*(dest-1)>0.0);
 				}
 			Ldata++;
@@ -1584,10 +1496,10 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 		else if((*Ldata == -4 && *Rdata == -4) || (*Ldata == -4 && *Rdata > -1) || (*Rdata == -4 && *Ldata > -1)){//total ambiguity of left, right or both
 			
 			if(*Ldata == -4 && *Rdata == -4) //total ambiguity of both
-				for(int i=0;i<16;i++) *(dest++) = 1.0;
+				for(int i=0;i< (4*nRateCats);i++) *(dest++) = 1.0;
 			
 			else if(*Ldata == -4){//total ambiguity of left
-				for(int i=0;i<4;i++){
+				for(int i=0;i<nRateCats;i++){
 					*(dest++) = Rpr[(*Rdata)+16*i];
 					*(dest++) = Rpr[(*Rdata+4)+16*i];
 					*(dest++) = Rpr[(*Rdata+8)+16*i];
@@ -1596,7 +1508,7 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 					}
 				}
 			else{//total ambiguity of right
-				for(int i=0;i<4;i++){
+				for(int i=0;i<nRateCats;i++){
 					*(dest++) = Lpr[(*Ldata)+16*i];
 					*(dest++) = Lpr[(*Ldata+4)+16*i];
 					*(dest++) = Lpr[(*Ldata+8)+16*i];
@@ -1609,7 +1521,7 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 			}	
 		else {//partial ambiguity of left, right or both
 			if(*Ldata>-1){//unambiguous left
-				for(int i=0;i<4;i++){
+				for(int i=0;i<nRateCats;i++){
 					*(dest+(i*4)) = Lpr[(*Ldata)+16*i];
 					*(dest+(i*4)+1) = Lpr[(*Ldata+4)+16*i];
 					*(dest+(i*4)+2) = Lpr[(*Ldata+8)+16*i];
@@ -1620,7 +1532,7 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 				}
 			else{
 				if(*Ldata==-4){//fully ambiguous left
-					for(int i=0;i<16;i++){
+					for(int i=0;i< (4*nRateCats);i++){
 						*(dest+i)=1.0;
 						}
 					Ldata++;
@@ -1628,13 +1540,13 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 			 
 				else{//partially ambiguous left
 					int nstates=-*(Ldata++);
-					for(int q=0;q<16;q++) dest[q]=0;
+					for(int q=0;q< (4*nRateCats);q++) dest[q]=0;
 					for(int i=0;i<nstates;i++){
-						for(int i=0;i<4;i++){
-							*(dest+(i*4)) += Lpr[(*Ldata)+16*i];
-							*(dest+(i*4)+1) += Lpr[(*Ldata+4)+16*i];
-							*(dest+(i*4)+2) += Lpr[(*Ldata+8)+16*i];
-							*(dest+(i*4)+3) += Lpr[(*Ldata+12)+16*i];
+						for(int r=0;r<nRateCats;r++){
+							*(dest+(r*4)) += Lpr[(*Ldata)+16*r];
+							*(dest+(r*4)+1) += Lpr[(*Ldata+4)+16*r];
+							*(dest+(r*4)+2) += Lpr[(*Ldata+8)+16*r];
+							*(dest+(r*4)+3) += Lpr[(*Ldata+12)+16*r];
 //							assert(*(dest-1)>0.0);
 							}
 						Ldata++;
@@ -1642,7 +1554,7 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 					}
 				}
 			if(*Rdata>-1){//unambiguous right
-				for(int i=0;i<4;i++){
+				for(int i=0;i<nRateCats;i++){
 					*(dest++) *= Rpr[(*Rdata)+16*i];
 					*(dest++) *= Rpr[(*Rdata+4)+16*i];
 					*(dest++) *= Rpr[(*Rdata+8)+16*i];
@@ -1655,29 +1567,29 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 				char nstates=-1 * *(Rdata++);
 				//create a temporary cla to hold the results from the ambiguity of the right, 
 				//which need to be +'s 
-				double tempcla[16];
-				for(int q=0;q<16;q++) tempcla[q]=0;
+				//double *tempcla=new double[4*nRateCats];
+				vector<double> tempcla(4*nRateCats);
 				for(int i=0;i<nstates;i++){
-					for(int i=0;i<4;i++){
-						tempcla[(i*4)]   += Rpr[(*Rdata)+16*i];
-						tempcla[(i*4)+1] += Rpr[(*Rdata+4)+16*i];
-						tempcla[(i*4)+2] += Rpr[(*Rdata+8)+16*i];
-						tempcla[(i*4)+3] += Rpr[(*Rdata+12)+16*i];
+					for(int r=0;r<nRateCats;r++){
+						tempcla[(r*4)]   += Rpr[(*Rdata)+16*r];
+						tempcla[(r*4)+1] += Rpr[(*Rdata+4)+16*r];
+						tempcla[(r*4)+2] += Rpr[(*Rdata+8)+16*r];
+						tempcla[(r*4)+3] += Rpr[(*Rdata+12)+16*r];
 //						assert(*(dest-1)>0.0);
 						}
 					Rdata++;
 					}
 				//Now multiply the temporary results against the already calced left
-				for(int i=0;i<4;i++){
+				for(int i=0;i<nRateCats;i++){
 					*(dest++) *= tempcla[(i*4)];
 					*(dest++) *= tempcla[(i*4)+1];
 					*(dest++) *= tempcla[(i*4)+2];
 					*(dest++) *= tempcla[(i*4)+3];
 //					assert(*(dest-1)>0.0);
-					}		
+					}
 				}
 			else{//fully ambiguous right
-				dest+=16;
+				dest+=(4*nRateCats);
 				Rdata++;
 				}
 			}
@@ -1796,7 +1708,7 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, cons
 		destCLA->rescaleRank=2;
 	}
 
-void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar){
+void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar, int nRateCats /*=4*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *dest=destCLA->arr;
@@ -1807,95 +1719,146 @@ void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeAr
 	madvise((void*)CL1, nchar*16*sizeof(double), MADV_SEQUENTIAL);	
 #endif
 
-	for(int i=0;i<nchar;i++){
-		if(*data2 > -1){ //no ambiguity
-			dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * pr2[(*data2)];
-			dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * pr2[(*data2+4)];
-			dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * pr2[(*data2+8)];
-			dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * pr2[(*data2+12)];
+	if(nRateCats ==4){
+		for(int i=0;i<nchar;i++){
+			if(*data2 > -1){ //no ambiguity
+				dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * pr2[(*data2)];
+				dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * pr2[(*data2+4)];
+				dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * pr2[(*data2+8)];
+				dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * pr2[(*data2+12)];
+				
+				dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]) * pr2[(*data2)+16];
+				dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]) * pr2[(*data2+4)+16];
+				dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]) * pr2[(*data2+8)+16];
+				dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]) * pr2[(*data2+12)+16];
 			
-			dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]) * pr2[(*data2)+16];
-			dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]) * pr2[(*data2+4)+16];
-			dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]) * pr2[(*data2+8)+16];
-			dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]) * pr2[(*data2+12)+16];
-		
-			dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]) * pr2[(*data2)+32];
-			dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]) * pr2[(*data2+4)+32];
-			dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]) * pr2[(*data2+8)+32];
-			dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]) * pr2[(*data2+12)+32];
-		
-			dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]) * pr2[(*data2)+48];
-			dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * pr2[(*data2+4)+48];
-			dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * pr2[(*data2+8)+48];
-			dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * pr2[(*data2+12)+48];
-//			assert(*(dest)>0.0);
-			dest+=16;
-			data2++;
-			}
-		else if(*data2 == -4){//total ambiguity
-			dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-			dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-			dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-			dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
+				dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]) * pr2[(*data2)+32];
+				dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]) * pr2[(*data2+4)+32];
+				dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]) * pr2[(*data2+8)+32];
+				dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]) * pr2[(*data2+12)+32];
 			
-			dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
-			dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
-			dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
-			dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
-		
-			dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
-			dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
-			dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
-			dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
-		
-			dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
-			dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
-			dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
-			dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-//			assert(*(dest)>0.0);
-			dest+=16;
-			data2++;
+				dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]) * pr2[(*data2)+48];
+				dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * pr2[(*data2+4)+48];
+				dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * pr2[(*data2+8)+48];
+				dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * pr2[(*data2+12)+48];
+	//			assert(*(dest)>0.0);
+				dest+=16;
+				data2++;
+				}
+			else if(*data2 == -4){//total ambiguity
+				dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
+				dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
+				dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
+				dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
+				
+				dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
+				dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
+				dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
+				dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
+			
+				dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
+				dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
+				dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
+				dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
+			
+				dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
+				dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
+				dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
+				dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
+	//			assert(*(dest)>0.0);
+				dest+=16;
+				data2++;
+				}
+			else {//partial ambiguity
+				//first figure in the ambiguous terminal
+				char nstates=-1 * *(data2++);
+				for(int q=0;q<16;q++) dest[q]=0;
+				for(int i=0;i<nstates;i++){
+					for(int r=0;r<4;r++){
+						*(dest+(r*4)) += pr2[(*data2)+16*r];
+						*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
+						*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
+						*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
+	//					assert(*(dest)>0.0);
+						}
+					data2++;
+					}
+				
+				//now add the internal child
+				*(dest++) *= ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
+				*(dest++) *= ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
+				*(dest++) *= ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
+				*(dest++) *= ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
+				
+				*(dest++) *= ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
+				*(dest++) *= ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
+				*(dest++) *= ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
+				*(dest++) *= ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
+			
+				*(dest++) *= ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
+				*(dest++) *= ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
+				*(dest++) *= ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
+				*(dest++) *= ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
+			
+				*(dest++) *= ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
+				*(dest++) *= ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
+				*(dest++) *= ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
+				*(dest++) *= ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
+	//			assert(*(dest-1)>0.0);
+				}
+				
+			CL1+=16;
 			}
-		else {//partial ambiguity
-			//first figure in the ambiguous terminal
-			char nstates=-1 * *(data2++);
-			for(int q=0;q<16;q++) dest[q]=0;
-			for(int i=0;i<nstates;i++){
-				for(int i=0;i<4;i++){
-					*(dest+(i*4)) += pr2[(*data2)+16*i];
-					*(dest+(i*4)+1) += pr2[(*data2+4)+16*i];
-					*(dest+(i*4)+2) += pr2[(*data2+8)+16*i];
-					*(dest+(i*4)+3) += pr2[(*data2+12)+16*i];
-//					assert(*(dest)>0.0);
+		}
+	else{
+		for(int i=0;i<nchar;i++){
+			if(*data2 > -1){ //no ambiguity
+				for(int r=0;r<nRateCats;r++){
+					dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * pr2[(*data2)+16*r];
+					dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * pr2[(*data2+4)+16*r];
+					dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * pr2[(*data2+8)+16*r];
+					dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * pr2[(*data2+12)+16*r];
+					dest+=4;
 					}
 				data2++;
 				}
-			
-			//now add the internal child
-			*(dest++) *= ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-			*(dest++) *= ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-			*(dest++) *= ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-			*(dest++) *= ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
-			
-			*(dest++) *= ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
-			*(dest++) *= ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
-			*(dest++) *= ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
-			*(dest++) *= ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
-		
-			*(dest++) *= ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
-			*(dest++) *= ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
-			*(dest++) *= ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
-			*(dest++) *= ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
-		
-			*(dest++) *= ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
-			*(dest++) *= ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
-			*(dest++) *= ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
-			*(dest++) *= ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-//			assert(*(dest-1)>0.0);
+			else if(*data2 == -4){//total ambiguity
+				for(int r=0;r<nRateCats;r++){
+					dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
+					dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
+					dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
+					dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
+					dest+=4;
+					}
+				data2++;
+				}
+			else {//partial ambiguity
+				//first figure in the ambiguous terminal
+				char nstates=-1 * *(data2++);
+				for(int q=0;q<4*nRateCats;q++) dest[q]=0;
+				for(int i=0;i<nstates;i++){
+					for(int i=0;i<nRateCats;i++){
+						*(dest+(i*4)) += pr2[(*data2)+16*i];
+						*(dest+(i*4)+1) += pr2[(*data2+4)+16*i];
+						*(dest+(i*4)+2) += pr2[(*data2+8)+16*i];
+						*(dest+(i*4)+3) += pr2[(*data2+12)+16*i];
+	//					assert(*(dest)>0.0);
+						}
+					data2++;
+					}
+				
+				//now add the internal child
+				for(int r=0;r<nRateCats;r++){
+					*(dest++) *= ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
+					*(dest++) *= ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
+					*(dest++) *= ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
+					*(dest++) *= ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
+					}
+				}
+			CL1 += 4*nRateCats;
 			}
-			
-		CL1+=16;
 		}
+		
 	for(int i=0;i<nchar;i++)
 		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
 	
@@ -1956,7 +1919,7 @@ void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LC
 		
 	} 
 
-void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar){
+void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats /*=4*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *dest=destCLA->arr;
@@ -1968,29 +1931,46 @@ void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArr
 	madvise((void*)CL1, nchar*16*sizeof(double), MADV_SEQUENTIAL);
 	madvise(partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
 #endif
-	for(int i=0;i<nchar;i++){
-		*(dest++) = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * *(partial++);
-		*(dest++) = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * *(partial++);
-		*(dest++) = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * *(partial++);
-		*(dest++) = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * *(partial++);
+
+	//if(0){
+	if(nRateCats==4){
+		for(int i=0;i<nchar;i++){
+			*(dest++) = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * *(partial++);
+			*(dest++) = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * *(partial++);
+			*(dest++) = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * *(partial++);
+			*(dest++) = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * *(partial++);
+			
+			*(dest++) = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]) * *(partial++);
+			*(dest++) = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]) * *(partial++);
+			*(dest++) = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]) * *(partial++);
+			*(dest++) = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]) * *(partial++);
 		
-		*(dest++) = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]) * *(partial++);
-		*(dest++) = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]) * *(partial++);
-		*(dest++) = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]) * *(partial++);
-		*(dest++) = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]) * *(partial++);
-	
-		*(dest++) = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]) * *(partial++);
-		*(dest++) = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]) * *(partial++);
-		*(dest++) = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]) * *(partial++);
-		*(dest++) = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]) * *(partial++);
-	
-		*(dest++) = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]) * *(partial++);
-		*(dest++) = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * *(partial++);
-		*(dest++) = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * *(partial++);
-		*(dest++) = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * *(partial++);
-		CL1+=16;
-//		assert(*(dest-1)>0.0);
+			*(dest++) = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]) * *(partial++);
+			*(dest++) = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]) * *(partial++);
+			*(dest++) = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]) * *(partial++);
+			*(dest++) = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]) * *(partial++);
+		
+			*(dest++) = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]) * *(partial++);
+			*(dest++) = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * *(partial++);
+			*(dest++) = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * *(partial++);
+			*(dest++) = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * *(partial++);
+			CL1+=16;
+	//		assert(*(dest-1)>0.0);
+			}
 		}
+	else{
+		for(int i=0;i<nchar;i++){
+			for(int r=0;r<nRateCats;r++){
+				*(dest++) = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * *(partial++);
+				CL1+=4;
+		//		assert(*(dest-1)>0.0);
+				}
+			}
+		}
+		
 	for(int site=0;site<nchar;site++){
 		destCLA->underflow_mult[site]=partialCLA->underflow_mult[site] + LCLA->underflow_mult[site];
 		}
@@ -2018,7 +1998,7 @@ void CalcFullCLAPartialInternal(CondLikeArray *destCLA, const CondLikeArray *LCL
 		}
 	}
 
-void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar){
+void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar, int nRateCats /*=4*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *dest=destCLA->arr;
@@ -2030,7 +2010,7 @@ void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArr
 
 	for(int i=0;i<nchar;i++){
 		if(*Ldata > -1){ //no ambiguity
-			for(int i=0;i<4;i++){
+			for(int i=0;i<nRateCats;i++){
 				*(dest++) = Lpr[(*Ldata)+16*i] * *(partial++);
 				*(dest++) = Lpr[(*Ldata+4)+16*i] * *(partial++);
 				*(dest++) = Lpr[(*Ldata+8)+16*i] * *(partial++);
@@ -2041,15 +2021,15 @@ void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArr
 			}
 			
 		else if(*Ldata == -4){ //total ambiguity
-			for(int i=0;i<16;i++) *(dest++) = *(partial++);
+			for(int i=0;i<4*nRateCats;i++) *(dest++) = *(partial++);
 			Ldata++;
 			}
 		else{ //partial ambiguity
 			//first figure in the ambiguous terminal
 			char nstates=-1 * *(Ldata++);
-			for(int q=0;q<16;q++) dest[q]=0;
+			for(int q=0;q<4*nRateCats;q++) dest[q]=0;
 			for(int i=0;i<nstates;i++){
-				for(int i=0;i<4;i++){
+				for(int i=0;i<nRateCats;i++){
 					*(dest+(i*4)) += Lpr[(*Ldata)+16*i];
 					*(dest+(i*4)+1) += Lpr[(*Ldata+4)+16*i];
 					*(dest+(i*4)+2) += Lpr[(*Ldata+8)+16*i];
@@ -2060,26 +2040,12 @@ void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArr
 				}
 			
 			//now add the partial
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-		
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-		
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-//			assert(*(dest-1)>0.0);
+			for(int r=0;r<nRateCats;r++){
+				*(dest++) *= *(partial++);
+				*(dest++) *= *(partial++);
+				*(dest++) *= *(partial++);
+				*(dest++) *= *(partial++);
+				}
 			}
 	
 		}

@@ -4,14 +4,16 @@
 //UNIX is defined in the Makefile, and WIN32 is defined
 //by the system on windows.  So, all we should have to define
 //here is MAC
+/*
 #ifndef UNIX
 #ifndef WIN32
 #define MAC
+//#endif
 #endif
-#endif
+*/
 
 #ifndef NDEBUG
-#define NDEBUG
+#undef NDEBUG
 #endif
 
 #undef INCLUDE_PERTURBATION

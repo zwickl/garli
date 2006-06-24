@@ -373,30 +373,42 @@ void Individual::Mutate(double optPrecision, Adaptation *adap){
 	else if( r < adap->modelMutateProb + adap->topoMutateProb){
 	  r = rnd.uniform();
 	  double p;
-	  if(mod->NoPinvInModel() == false)
+	  if(mod->useFlexRates==true)
+		p=1.0/13.0;
+	  else if(mod->NoPinvInModel() == false)
 	  	p=1.0/11.0;
 	  else p=1.0/10.0;
+
 	  if(r<p){
 		treeStruct->ScaleWholeTree();
 		mutation_type |= muScale;
 		}
-	  
 	  else if(r < p*6.0){
 	    mod->MutateRates();
 	    mutation_type |= rates;
-	  }
-	  else if(r < p*7.0){
+		}
+	  else if(r < p*9.0 && mod->useFlexRates==true){
+	    mod->MutateRateMults();
+	    mutation_type |= alpha;
+	    }
+	  else if(r < p*7 && mod->useFlexRates==false){
 	    mod->MutateAlpha();
-	    mutation_type |= alpha;		
-	  }
+	    mutation_type |= alpha;	
+		}
 	  else if(r < p*10.0){
 	    mod->MutatePis();
 	    mutation_type |= pi;
-	  }
-	  else{
-	    mod->MutatePropInvar();
-	    mutation_type |= pinv;
-	  }		
+		}
+	  else {
+		if(mod->useFlexRates==true){
+			mod->MutateRateProbs();
+			mutation_type |= pinv;
+			}
+		else{
+			mod->MutatePropInvar();
+			mutation_type |= pinv;	
+			}
+		}
 	  treeStruct->MakeAllNodesDirty();
 	  dirty = true;
 	}
@@ -448,7 +460,8 @@ void Individual::Randomize(char* fname, int rank){
 	double ebf[4];
 	params->data->CalcEmpiricalFreqs( ebf );
 	mod->SetPis(ebf);
-	if(mod->NoPinvInModel()){
+
+	if(mod->NoPinvInModel() || mod->useFlexRates==true){
 		mod->SetPinv(0.0);
 		mod->SetMaxPinv(0.0);		
 		}
@@ -561,19 +574,46 @@ void Individual::Randomize(char* fname, int rank){
 						foundModel=true;
 						}
 					else if(c == 'A' || c == 'a'){
+#ifdef FLEX_RATES
+						assert(0);
+#else
 						stf >> temp;
 						mod->SetAlpha(atof(temp));
 						foundModel=true;
 						c=stf.get();
+#endif
 						}				
 					else if(c == 'P' || c == 'p'){
+#ifdef FLEX_RATES
+						assert(0);
+#else
 						stf >> temp;
 						double p=atof(temp);
 						if(mod->NoPinvInModel() == true && p > 0.0) throw ErrorException("Error: Value for proportion of invariable sites\nspecified in %s, but not allowed in model\n(see dontinferproportioninvariant in conf file).", fname);
 						mod->SetPinv(p);
 						foundModel=true;
 						c=stf.get();
+#endif
 						}
+					else if(c == 'F' || c == 'f'){
+						stf >> temp;
+						if(!(isdigit(*temp))) throw ErrorException("Error: expecting number of flex rate categories after \'f\' in starting condition file");
+						int n=atoi(temp);
+						if(n > 10) throw ErrorException("Error: %d rate categories exceeds maximum number categories (10)", n);
+						mod->SetNRateCats(n);
+						double rates[10];
+						double probs[10];
+						for(int i=0;i<n;i++){
+							stf >> temp;
+							rates[i]=atof(temp);
+							stf >> temp;
+							probs[i]=atof(temp);
+							}		
+						mod->SetFlexRates(rates, probs);					
+						foundModel=true;
+						c=stf.get();						
+						}
+
 					else if(isalpha(c)) throw ErrorException("Unknown model parameter specification! \"%c\"", c);
 					else if(c != '(') c=stf.get();
 					}while(c != '(' && c != '\r' && c != '\n' && !stf.eof());
@@ -637,11 +677,51 @@ poo << endl << str << endl;
 		SetDirty();
 		CalcFitness(0);
 		double trueImprove= Fitness() - passStart;
-		assert(trueImprove > 0.0);
+		assert(trueImprove >= 0.0);
 		scaleImprove=treeStruct->OptimizeTreeScale();
 		SetDirty();
 		if(optModel==true){
-			alphaImprove=treeStruct->OptimizeAlpha();
+
+				//DEBUG
+/*						ofstream outf;
+						outf.open( "temp.tre" );
+						outf.precision(8);
+						outf << "#nexus" << endl << endl;
+						char treeString[100000];
+
+						//rewritting this to output standard nexus tree files, not gamlviewer stuff
+						int ntaxa = params->data->NTax();
+						outf << "begin trees;\ntranslate\n";
+						for(int k=0;k<ntaxa;k++){
+							outf << "  " << (k+1);
+							NxsString tnstr = params->data->TaxonLabel(k);
+							tnstr.blanks_to_underscores();
+							outf << "  " << tnstr.c_str();
+							if(k < ntaxa-1) 
+								outf << ",\n";
+							}		
+
+						outf << ";\n";
+						
+						outf << "tree best = [&U][" << Fitness() << "][";
+						mod->OutputGamlFormattedModel(outf);
+						outf << "]";
+
+						outf.setf( ios::floatfield, ios::fixed );
+						outf.setf( ios::showpoint );
+						treeStruct->root->MakeNewick(treeString, false);
+						outf << treeString << ";\n";
+						outf << "end;\n";
+						
+						//add a paup block setting the model params
+						mod->OutputPaupBlockForModel(outf, "temp.tre");
+						outf.close();
+*/				//
+
+			//DEBUG
+//			if(mod->useFlexRates==false)
+//				alphaImprove=treeStruct->OptimizeAlpha();
+
 			SetDirty();
 			}
 		improve=scaleImprove + trueImprove + alphaImprove + pinvImprove;
