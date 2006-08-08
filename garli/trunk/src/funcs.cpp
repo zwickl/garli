@@ -31,6 +31,9 @@
 #include "parameters.h"
 #include "tree.h"
 #include "defs.h"
+#include "outputman.h"
+
+extern OutputManager outman;
 
 #undef ROOT_OPT
 #define FOURTH_ROOT
@@ -70,10 +73,7 @@ int FileExists( const char* s )
 //
 void GetRestartParams( Parameters& params )
 {
-	if( !FileExists( params.statefname ) )	{
-	cout << "Error opening state file: " << params.statefname << endl;
-		exit(0);
-	}
+	if( !FileExists( params.statefname ) ) throw ErrorException("Error opening state file: %s", params.statefname);
 
 	ifstream sf( params.statefname );
 	sf >> params.prev_generations >> params.prev_time >> params.randomSeed;
@@ -84,44 +84,35 @@ void GetRestartParams( Parameters& params )
 
 int ReadData(const char* filename, HKYData* data)	{
 	if (!FileExists(filename))	{
-		cout << "ERROR - data file not found: " << filename << endl;
+		throw ErrorException("data file not found: %s!", filename);
 		return -1;
 	}
-#ifndef UD_VERSION
-	cout  << "Reading data file: " << filename << "..." << endl;
-#endif
+
+	outman.UserMessage("Reading data file: %s...", filename);
+
 	data->Read( filename );
-#ifndef UD_VERSION
-	if( data->AmbiguousStates() ) {
-		cout << "  At least one IUPAC/IUB ambiguity code found." << endl;
-		cout << "  Ambiguity codes are treated as missing data." << endl;
-	}
-#endif
+	if((data->NChar() > 0) == false) throw ErrorException("problem reading data!");
+
 	// report summary statistics about data
 	data->Summarize();
-#ifndef UD_VERSION
-	cout << "  " << data->NConstant() << " constant characters." << endl;
-	cout << "  " << data->NInformative() << " parsimony-informative characters." << endl;
-	cout << "  " << data->NAutapomorphic() << " autapomorphic characters." << endl;
+
+	outman.UserMessage(" %d constant characters.", data->NConstant());
+	outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
+	outman.UserMessage(" %d autapomorphic characters.", data->NAutapomorphic());
 	int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
-	cout << "  " << total << " total characters." << endl;
-#endif
+	outman.UserMessage(" %d total characters.", total);
+	outman.flush();
+
 	// try to compress
 	if (!data->Dense())	{
-	#ifndef UD_VERSION
-		cout << "Compressing data file..." << endl;
-	#endif
+		outman.UserMessage("Compressing data matrix...");
 		data->Collapse();
-	#ifndef UD_VERSION
-		cout << "  " << data->NChar() << " columns in data matrix after compression." << endl;
-	#endif
-	}
+		outman.UserMessage("%d columns in data matrix after compression.", data->NChar());
+		}
 	else {
-		#ifndef UD_VERSION
-		cout << endl << "Datafile already compressed."  << endl;
-		cout << data->NChar() << " columns in compressed data matrix." << endl;
-		#endif
-	}
+		outman.UserMessage("Datafile already compressed.");
+		outman.UserMessage("%d columns in compressed data matrix.", data->NChar());
+		}
 	data->DetermineConstantSites();
 	if(!data->Dense()) data->Save(filename, "new");
 	return 0;
@@ -131,57 +122,46 @@ int ReadData(const Parameters& params, HKYData* data)	{
 
 	// regurgitate params specified
 	if( params.restart ) {
-		cout << "  Restarting using state file \"" << params.statefname << "\"" << endl;
+		outman.UserMessage("Restarting using state file \"%s\"", params.statefname);
 		GetRestartParams( const_cast<Parameters&>(params) );
-		cout << "    random number seed set to " << params.randomSeed << endl;
-		cout << "    last generation from previous run was " << params.prev_generations << endl;
-		cout << "    starting with previous elapsed time, which was " << params.prev_time << " seconds" << endl;
-	}
+		outman.UserMessage("random number seed set to %d", params.randomSeed);
+		outman.UserMessage("last generation from previous run was %d", params.prev_generations);
+		outman.UserMessage("starting with previous elapsed time, which was %d seconds", params.prev_time);
+		}
 
 	const_cast<Parameters&>(params).BriefReport( cout );
-	cout << endl;
+	outman.UserMessage("");
 
 	// Check to be sure data file exists
 	//
-	if( !FileExists( params.datafname ) )	{
-		cout << "ERROR - data file does not exist: " << params.datafname << endl;
-		return -1;
-	}
+	if( !FileExists( params.datafname ) ) throw ErrorException("data file does not exist: %s", params.datafname);
 
 	// Read in the data matrix
-	//
-	cout.flush();
-	cout << endl << "Reading data file " << params.datafname << "..." << endl;
+	outman.flush();
+	outman.UserMessage("Reading data file %s...", params.datafname);
 	data->Read( params.datafname );
-	if( data->AmbiguousStates() ) {
-		cout << "  At least one IUPAC/IUB ambiguity code found" << endl;
-		cout << "    Ambiguity codes are treated as missing data." << endl;
-	}
 
 	// report summary statistics about data
 	data->Summarize();
-	cout << "  " << data->NConstant() << " constant characters" << endl;
-	cout << "  " << data->NInformative() << " parsimony-informative characters" << endl;
-	cout << "  " << data->NAutapomorphic() << " autapomorphic characters" << endl;
+	outman.UserMessage(" %d constant characters.", data->NConstant());
+	outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
+	outman.UserMessage(" %d autapomorphic characters.", data->NAutapomorphic());
 	int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
-	cout << "  " << total << " total characters" << endl;
-	cout.flush();
+	outman.UserMessage(" %d total characters.", total);
+	outman.flush();
 
 	//DZ Only compress and write data to file if dense=0 (data is not already compressed)
 	if(!(data->Dense())){
-		cout << endl << "Compressing data file..." << endl;
+		outman.UserMessage("Compressing data file...");
 		data->Collapse();
 		data->Save("compdata.nex", "new");
-		cout << "  " << data->NChar() << " columns in data matrix after compression" << endl;
-	}
-	else {
-		cout << endl << "Datafile already compressed."  << endl;
-		cout << data->NChar() << " columns in compressed data matrix" << endl;
+		outman.UserMessage("  %d columns in data matrix after compression", data->NChar());
 		}
+	else outman.UserMessage("Datafile already compressed.\n %d columns in compressed data matrix", data->NChar());
 
 	data->DetermineConstantSites();
-	cout << endl;
-	cout.flush();
+	outman.UserMessage("");
+	outman.flush();
 	return 0;
 
 }

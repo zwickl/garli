@@ -16,6 +16,9 @@
 #undef NDEBUG
 #endif
 
+#define CONSTRAINTS
+
+
 #undef INCLUDE_PERTURBATION
 #undef SUBTREE_VERSION
 

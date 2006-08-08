@@ -109,10 +109,10 @@ class Individual
 		void ReadTreeFromFile(istream & inf);
 
 		
-		void Mutate(int, double);
+//		void Mutate(int, double);
 		void Mutate(double optPrecision, Adaptation *adap);
-		void SubtreeMutate(int subdomain, double optPrecision, vector<int> const &subtreeList, Adaptation *adap);
-		void NonSubtreeMutate(const ParallelManager *, double optPrecision, Adaptation *adap);
+//		void SubtreeMutate(int subdomain, double optPrecision, vector<int> const &subtreeList, Adaptation *adap);
+//		void NonSubtreeMutate(const ParallelManager *, double optPrecision, Adaptation *adap);
 		
 		void CrossOverWith( Individual& so, double optPrecision);
 		

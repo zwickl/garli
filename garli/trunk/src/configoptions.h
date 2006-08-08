@@ -38,6 +38,7 @@ class GeneralGamlConfig{
 	string method;
 	string ofprefix;
 	string streefname;
+	string constraintfile;
 	bool refineStart;
 	bool outputTreelog;
 	bool outputMostlyUselessFiles;

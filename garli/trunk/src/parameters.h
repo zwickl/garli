@@ -35,6 +35,7 @@ class Parameters{
 	int showProgress;
 	char logfname[85];
 	char startfname[85];
+	string constraintFile;
 	char treefname[85];
 	char gnufname[85];
 	NxsString starting_tree;

@@ -2,6 +2,12 @@
 #define ERROREXCEPTION
 
 #include <stdarg.h>
+#include <ostream>
+#include "outputman.h"
+
+using namespace std;
+
+extern OutputManager outman;
 
 class ErrorException{
 	
@@ -15,7 +21,12 @@ class ErrorException{
 		}
 
 	void Print(ostream &out){
-		out << message << endl;
+		outman.UserMessage("ERROR!: %s\n\n", message);
+		//out << "ERROR!: " << message << endl << endl;
+		}
+
+	void Print(FILE *out){
+		fprintf(out, "ERROR!: %s\n\n", message);
 		}
 	};
 	

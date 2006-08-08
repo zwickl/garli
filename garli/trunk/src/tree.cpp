@@ -36,8 +36,10 @@ using namespace std;
 #include "defs.h"
 #include "tree.h"
 #include "datamatr.h"
+#include "reconnode.h"
 
 #include "memchk.h"
+
 
 extern rng rnd;
 
@@ -59,6 +61,7 @@ list<TreeNode *> Tree::nodeOptVector;
 HKYData *Tree::data;
 int Tree::rescaleEvery;
 double Tree::treeRejectionThreshold;
+vector<Constraint> Tree::constraints;
 
 void InferStatesFromCla(char *states, double *cla, int nchar);
 double CalculateHammingDistance(const char *str1, const char *str2, int nchar);
@@ -239,7 +242,7 @@ void Tree::AllocateTree(){
 //because by the time the internal node number would be read the treeNode structure would have already been created.
 //So, the internal node numbers will go just BEFORE the opening paren that represents that node
 //Example:  50(1:.05, 2:.02):.1 signifies a node numbered 50 that is ancestral to 1 and 2.
-Tree::Tree(const char* s, bool numericalTaxa /*=true*/){
+Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 	//if we are using this constructor, we can't guarantee that the tree will be specified unrooted (with 
 	//a trifurcating root), so use an allocation function that is guaranteed to have enough room and then
 	//trifurcate and delete if necessary
@@ -379,7 +382,7 @@ Tree::Tree(const char* s, bool numericalTaxa /*=true*/){
 	assert(root->left->next!=root->right);
 
 	root->CheckforLeftandRight();
-	root->CheckforPolytomies();
+	if(allowPolytomies == false) root->CheckforPolytomies();
 	root->CheckTreeFormation();
 	} 
 
@@ -463,8 +466,7 @@ void Tree::AddRandomNode(int nodenum , int &placeInAllNodes){
 	
 	nd->next=nd->prev=NULL;//in case this node was connected in some other tree
 	
-	// Pick a random tip node to add new node to
-	//DZ 11-5-02 Will this work to make a trifurcating root?
+	//Make sure that the root has 3 decendents
 	if(numBranchesAdded<3)
 		{root->AddDes(nd);
 		}
@@ -479,11 +481,72 @@ void Tree::AddRandomNode(int nodenum , int &placeInAllNodes){
 		connector->AddDes(nd);
 		
 		//select a branch to break with the connector
-		int k = rnd.random_int( numBranchesAdded );
-		k++;
+		int k = rnd.random_int( numBranchesAdded ) + 1;
 		TreeNode* otherDes = root->FindNode( k );
+
+		// replace puts connection in the tree where otherDes had been
+		otherDes->SubstituteNodeWithRespectToAnc(connector);
 		
-		// replace put connection in the tree where otherDes had been
+		//add otherDes back to the tree as the sister to the new tip
+		connector->AddDes(otherDes);
+		numBranchesAdded++;//numBranchesAdded needs to be incremented twice because a total of two branches have been added
+		}
+	numBranchesAdded++;
+	numNodesAdded++;
+	numTipsAdded++;
+	}
+
+
+void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition &mask){
+	//the trick here with the constraints is that only a subset of the taxa will be in the
+	//growing tree.  To properly determine bipartition comptability a mask consisting of only
+	//the present taxa with need to be used
+
+	assert(nodenum>0 && nodenum<=numTipsTotal);  //should be adding a terminal
+	TreeNode* nd=allNodes[nodenum];
+	Bipartition temp;
+	mask += temp.TerminalBipart(nodenum);
+	nd->dlen = Tree::exp_starting_brlen;// * rnd.gamma( 100 );
+	nd->dlen = (nd->dlen > min_brlen ? nd->dlen : min_brlen);
+	
+	nd->next=nd->prev=NULL;//in case this node was connected in some other tree
+	
+	//Make sure that the root has 3 decendents
+	if(numBranchesAdded<3)
+		{root->AddDes(nd);
+		}
+	else
+		{// If we're not adding directly to the root node, then we will need
+		// a connector node and make the new terminal its left des
+		TreeNode* connector=allNodes[placeInAllNodes++];
+		numNodesAdded++;
+		connector->dlen = Tree::exp_starting_brlen * rnd.gamma( 100 );
+		nd->dlen = (nd->dlen > min_brlen ? nd->dlen : min_brlen);
+		connector->left=connector->right=NULL;
+		connector->AddDes(nd);
+		
+		//select a branch to break with the connector
+		int k;
+		TreeNode *otherDes;
+		bool compat;
+
+		CalcBipartitions();
+		nd->CalcBipartition();
+		nd->bipart->Standardize();
+
+		do{
+			k = rnd.random_int( numBranchesAdded ) + 1;
+			otherDes = root->FindNode( k );
+			for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+				if((*conit).IsPositive())
+					compat=AllowedByPositiveConstraintWithMask(&(*conit), &mask, nd, otherDes);
+				else
+					compat=AllowedByNegativeConstraintWithMask(&(*conit), &mask, nd, otherDes);
+				if(compat==false) break;
+				} 
+			}while(compat == false);
+
+		// replace puts connection in the tree where otherDes had been
 		otherDes->SubstituteNodeWithRespectToAnc(connector);
 		
 		//add otherDes back to the tree as the sister to the new tip
@@ -601,23 +664,23 @@ void Tree::RecombineWith( Tree *t, bool sameModel, double optPrecision ){
 	OptimizeBranchesAroundNode(connector, optPrecision, 0);
 	}
 
-TreeNode *Tree::ContainsBipartition(Bipartition *bip){
+TreeNode *Tree::ContainsBipartition(const Bipartition *bip){
 	//note that this doesn't work for terminals (but there's no reason to call for them anyway)
 	//find a taxon that appears "on" in the bipartition
-	int tax=bip->FirstPresentTaxon();
+//	int tax=bip->FirstPresentTaxon();
 	
-	//now start moving down the tree from that taxon until a bipart that
+	//now start moving down the tree from taxon 1 until a bipart that
 	//conflicts or a match is found
-	TreeNode *nd=allNodes[tax]->anc;
+	TreeNode *nd=allNodes[1]->anc;
 	while(nd->anc){
-		if(nd->bipart->IsIncompatible(bip))	return NULL;
+		if(nd->bipart->IsASubsetOf(bip) == false) return NULL;
 		else if(nd->bipart->EqualsEquals(bip)) return nd;
 		else nd=nd->anc;
 		}
 	return NULL;
 	}
 
-TreeNode *Tree::ContainsBipartitionOrComplement(Bipartition *bip){
+TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition *bip){
 	//this version will detect if the same bipartition exists in the trees, even
 	//if it is in different orientation, which could happen due to rooting
 	//differences
@@ -629,7 +692,7 @@ TreeNode *Tree::ContainsBipartitionOrComplement(Bipartition *bip){
 	//conflicts or a match is found
 	TreeNode *nd=allNodes[tax]->anc;
 	while(nd->anc){
-		if(nd->bipart->IsIncompatible(bip)) break;
+		if(nd->bipart->IsASubsetOf(bip) == false) break;
 		else if(nd->bipart->EqualsEquals(bip)) return nd;
 		else nd=nd->anc;
 		}
@@ -641,10 +704,11 @@ TreeNode *Tree::ContainsBipartitionOrComplement(Bipartition *bip){
 	//conflicts or a match is found
 	nd=allNodes[tax]->anc;
 	while(nd->anc){
-		if(nd->bipart->IsIncompatibleComplement(bip)){
+		//if(nd->bipart->ComplementIsASubsetOf(bip) == false){
+		if(bip->IsASubsetOf(nd->bipart) == false){
 			return NULL;
 			}
-		else if(nd->bipart->EqualsEqualsComplement(bip)) return nd;
+		else if(nd->bipart->EqualsEquals(bip)) return nd;
 		else nd=nd->anc;
 		}
 		
@@ -722,7 +786,7 @@ bool Tree::IdenticalTopology(const TreeNode *other){
 	
 	if(other->anc!=NULL){
 		if(other->left==NULL) return true;
-		identical= (ContainsBipartitionOrComplement(other->bipart) != NULL);
+		identical= (ContainsBipartition(other->bipart) != NULL);
 		if(identical==true){
 			identical=IdenticalTopology(other->left);
 			if(identical==true)
@@ -1179,7 +1243,7 @@ void Tree::TaxonSwap(int tax1, int tax2, double optPrecision){
 void Tree::TaxonSwap(int range, double optPrecision){
 	assert(0);
 	//swap two terminal nodes, within a radius
-	int tax1, tax2;
+/*	int tax1, tax2;
 	
 	//choose the first taxon
 	tax1=GetRandomTerminalNode();
@@ -1257,7 +1321,7 @@ void Tree::TaxonSwap(int range, double optPrecision){
 	//Optionally, do some branchlength optimization
 	OptimizeBranchesAroundNode(t1->anc, optPrecision, 0);
 	OptimizeBranchesAroundNode(t2->anc, optPrecision, 0);	
-	}
+*/	}
 
 void Tree::VariableNNIMutate(int node, int branch, double optPrecision, int subtreeNode){
 	//this is just a spoof version of SPRMutate that will perform the same mutation
@@ -1304,6 +1368,7 @@ void Tree::VariableNNIMutate(int node, int branch, double optPrecision, int subt
 
 void Tree::NNIMutate(int node, int branch, double optPrecision, int subtreeNode){
 
+	assert(0);
 	TreeNode* connector=NULL;
 	TreeNode* cut=NULL;
 	TreeNode* broken=NULL;
@@ -1393,7 +1458,8 @@ int Tree::VariableSPRMutate(int range, double optPrecision){
 	double prec[5]={.5, .25, .1, .05, .01};
 	for(int i=0;i<5;i++){
 		savedSeed = rnd.seed();
-		tempIndiv.treeStruct->SPRMutate(range, prec[i]);
+		tempIndiv.treeStruct->TopologyMutator(prec[i], range, 0);
+		//tempIndiv.treeStruct->SPRMutate(range, prec[i]);
 		out << tempIndiv.treeStruct->lnL << "\t";
 		rnd.set_seed(savedSeed);
 		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
@@ -1405,235 +1471,127 @@ int Tree::VariableSPRMutate(int range, double optPrecision){
 	tempIndiv.treeStruct=NULL;
 	sourceIndiv.treeStruct=NULL;
 
-	SPRMutate(range, optPrecision);
+	TopologyMutator(optPrecision, range, 0);
+	//SPRMutate(range, optPrecision);
 	ofstream poo("3branchScores.log", ios::app);
 	poo << endl;
 	poo.close();
-
-	return 0; 
+	return 1;
 	}
- 
-int Tree::SPRMutate(int range, double optPrecision){
-	// Pick a random node whose branch we will cut.
-	//the nodes range from 0 to numNodesTotal-1, but we don't want to choose 0
-	TreeNode *cut=allNodes[GetRandomNonRootNode()];
-	TreeNode *sib;
-	//note that this assignment of the sib can be overridden below if cut is attached to the root
-	if(cut->next!=NULL) sib=cut->next;
-	else sib=cut->prev;
 
-	TreeNode *connector=NULL;
-	assert(cut!=NULL);
+void Tree::TopologyMutator(double optPrecision, int range, int subtreeNode){
 	
-	//determine who the connector node will be.  It will be cut->anc unless that is the root
-	//if cut->anc is the root, connector will be one of cut's siblings, which is freed when
-	//the basal trichotomy is reestablished after removing cut.
-	if(cut->anc->anc != NULL){
-		connector=cut->anc;
+	TreeNode *cut;
+	int broken;
+	
+	int err=0;
+	do{
+		do{
+			cut=allNodes[GetRandomNonRootNode()];
+			GatherValidReconnectionNodes(range, cut, NULL);
+			}while(sprRang.size()==0);
+		broken = sprRang.RandomNodeNum();
+		err=SPRMutate(cut->nodeNum, broken, optPrecision, subtreeNode, range);
+		}while(err<0);
+
+#ifdef CONSTRAINTS
+	CalcBipartitions();
+
+	for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+		if((*conit).IsPositive())
+			assert(ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL);
+		else assert(ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL);
+		}
+#endif
+	}
+
+void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNode *subtreeNode){
+	/* 7/11/06 making this function more multipurpose
+	It now assumes that the cut branch has NOT YET BEEN DETACHED. This is important so that
+	when branches are chosen without a viable reconnection due to a constraint another cut
+	can be chosen without having the put the tree back together again
+	1.	gather all nodes within maxRange, AVOIDING CUT SUBTREE
+	2.	filter for constraints
+	3.	
+	*/
+	sprRang.clear();
+	const TreeNode *center=cut->anc;
+	
+	//add the descendent branches
+	if(center->left != cut) 
+		sprRang.AddNode(center->left->nodeNum, 0, (float) center->left->dlen);
+	if(center->left->next != cut) 
+		sprRang.AddNode(center->left->next-> nodeNum, 0, (float) center->left->next->dlen);
+	
+	//add either the center node itself or the third descendent in the case of the root
+	if(center->anc != NULL){
+		if(center->anc != subtreeNode)
+			sprRang.AddNode(center->nodeNum, 0, (float) center->dlen);
 		}
 	else{
-		if(root->left!=cut && root->left->left != NULL) connector = root->left;
-		else if(root->left->next!=cut && root->left->next->left != NULL) connector = root->left->next;
-		else if(root->right!=cut && root->right->left != NULL) connector = root->right;
-		else{//this should be quite rare, and means that the three descendents of the root
-			//are cut and two terminals, so no viable swap exists, just try again
-			int numterms=0;
-			if(root->left->left==NULL) numterms++;
-			if(root->left->next->left==NULL) numterms++;
-			if(root->right->left==NULL) numterms++;
-			assert(numterms==2);
-			int cutNodeNum=SPRMutate(range, optPrecision);
-			return cutNodeNum;
-			}
+		if(center->left->next->next != cut)
+			sprRang.AddNode(center->left->next->next->nodeNum, 0, (float) center->left->next->next->dlen);
 		}
 	
-	//all clas below cut will need to be recalced
-	SweepDirtynessOverTree(cut);
-	TreeNode *replaceForConn;
-	if(cut->anc->anc){
-		//cut is not connected to the root, so we can steal it's ancestor as the new connector
-		//we've identified a connector node that we can recycle, now we need to disconnect it correctly
-	   	if(cut==connector->left)
-	   		{assert(cut->next==connector->right);
-	   		replaceForConn=connector->right;
-	   		}
-	   	else
-	   		{assert(cut==connector->right); 
-	   		replaceForConn=connector->left;
-	   		}
-		replaceForConn->dlen+=connector->dlen;
-	   	connector->SubstituteNodeWithRespectToAnc(replaceForConn);
-	   	}
-	else{//cut is connected to the root so we need to steal a non terminal sib node as the connector
-		MakeNodeDirty(root);
-		//Disconnect cut from the root
-		if(cut==root->left){
-			root->left=cut->next;
-			cut->next->prev=NULL;
-			}
-		else if(cut==root->right){
-			root->right=cut->prev;
-			cut->prev->next=NULL;
-			}
-		else{
-			assert(cut->prev==root->left && cut->next==root->right);//can only have a basal trifucation, or we're in trouble
-			cut->prev->next=cut->next;
-			cut->next->prev=cut->prev;
-			}
-		//root is now bifurcation
-		//preserve branch length info
-		if(root->right==connector){
-			root->left->dlen+=	connector->dlen;
-			sib=root->left;
-			}
-		else{
-			root->right->dlen+=	connector->dlen;	
-			sib=root->right;
-			}
+	assert(sprRang.size() == 2);
+	
+	for(int curDist = 0; curDist < maxDist; curDist++){
+		for(list<ReconNode>::iterator it=sprRang.GetFirstNodeAtDist(curDist); it != sprRang.end() && it->reconDist == curDist; it++){
+			TreeNode *cur=allNodes[it->nodeNum];
+			assert(cur->anc != NULL);
 			
-		//add the connectors two desccendants as descendants of the root
-		assert(connector->right==connector->left->next);
-		connector->SubstituteNodeWithRespectToAnc(connector->left);
-		root->AddDes(connector->right);
-		MakeNodeDirty(connector);
+			if(cur->left!=NULL && cur->left!=cut) 
+			    sprRang.AddNode(cur->left->nodeNum, curDist+1, (float) (it->pathlength + cur->left->dlen));
+			if(cur->right!=NULL && cur->right!=cut) 
+		    	sprRang.AddNode(cur->right->nodeNum, curDist+1, (float) (it->pathlength + cur->right->dlen));
+			if(cur->next!=NULL && cur->next!=cut){
+			    sprRang.AddNode(cur->next->nodeNum, curDist+1, (float) (it->pathlength + cur->next->dlen));
+			    if(cur->next->next!=NULL && cur->next->next!=cut){//if cur is the left descendent of the root
+			    	sprRang.AddNode(cur->next->next->nodeNum, curDist+1, (float) (it->pathlength + cur->next->next->dlen));
+			    	}
+			    }
+			if(cur->prev!=NULL && cur->prev!=cut){
+			    sprRang.AddNode(cur->prev->nodeNum, curDist+1, (float) (it->pathlength + cur->prev->dlen));
+			    if(cur->prev->prev!=NULL && cur->prev->prev!=cut){//if cur is the right descendent of the root
+			    	sprRang.AddNode(cur->prev->prev->nodeNum, curDist+1, (float) (it->pathlength + cur->prev->prev->dlen));
+			    	}
+			    }
+		    if(cur->anc->nodeNum != 0){//if the anc is not the root, add it.
+		    	if(cur->anc!=subtreeNode){
+			    	sprRang.AddNode(cur->anc->nodeNum, curDist+1, (float) (it->pathlength + cur->anc->dlen));
+			 		}
+			 	}
+		    }
 		}
 		
-	//establish correct topology for connector and cut nodes
-	cut->anc=connector;
-	connector->left=connector->right=cut;
-	connector->next=connector->prev=connector->anc=cut->next=cut->prev=NULL;
+    //remove general unwanted nodes from the subset
+	sprRang.RemoveNodesOfDist(0); //remove branches adjacent to cut
+	if(maxDist != 1)
+		sprRang.RemoveNodesOfDist(1); //remove branches equivalent to NNIs
+	
 
-	if(range!=0){
-		range=GatherNodesInRadius(range, sib, NULL);
-/*	
-	//if we are reconnecting within some particular range of branches, gather all the nodes within that range
-		sprRange.empty();
-		sprRange.setseed(sib->nodeNum);//the subset will be centered on cut's sib
-	    for(int i = 0;i<range;i++){
-	      int j = sprRange.total;
-			for(int k=0; k < j; k++){
-				if(sprRange.front[k]==i){
-					TreeNode *cur=allNodes[sprRange.element[k]];
-					if(cur->left!=NULL) 
-					    sprRange.addelement(cur->left->nodeNum, i+1, sprRange.pathlength[k] + cur->left->dlen);
-					if(cur->right!=NULL) 
-				    	sprRange.addelement(cur->right->nodeNum, i+1, sprRange.pathlength[k] + cur->right->dlen);
-					if(cur->next!=NULL){
-					    sprRange.addelement(cur->next->nodeNum, i+1, sprRange.pathlength[k] + cur->next->dlen);
-					    if(cur->next->next!=NULL){//if cur is the left descendent of the root
-					    	sprRange.addelement(cur->next->next->nodeNum, i+1, sprRange.pathlength[k] + cur->next->next->dlen);
-					    	}
-					    }
-					if(cur->prev!=NULL){
-					    sprRange.addelement(cur->prev->nodeNum, i+1, sprRange.pathlength[k] + cur->prev->dlen);
-					    if(cur->prev->prev!=NULL){//if cur is the right descendent of the root
-					    	sprRange.addelement(cur->prev->prev->nodeNum, i+1, sprRange.pathlength[k] + cur->prev->prev->dlen);
-					    	}
-					    }		    	
-					if(cur->anc!=NULL) 
-					    sprRange.addelement(cur->anc->nodeNum, i+1, sprRange.pathlength[k] + cur->anc->dlen);
-					else
-						sprRange.addelement(cur->left->next->nodeNum, i+1, sprRange.pathlength[k] + cur->left->next->dlen);
-					}// end of loop through element of current subset
-			    }// end of loop to findrange
+#ifdef CONSTRAINTS
+	//now deal with constraints, if any
+	CalcBipartitions();
+
+	for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+		if(sprRang.size() != 0){
+			listIt it=sprRang.begin();
+			do{
+				TreeNode* broken=allNodes[it->nodeNum];
+				if(AllowedByConstraint(&(*conit), cut, broken) == false) it=sprRang.RemoveElement(it);
+				else it++;
+				}while(it != sprRang.end());
 			}
-	    //remove unwanted nodes from the subset
-	    sprRange.elementremove(sib->nodeNum);
-	    if(sprRange.total>3) sprRange.removennis();
-	    sprRange.compact();		
-	    if(sprRange.total==0){//depending on how the tree was oriented and what was cut
-		//it's possible (rare) that the range is empty now.  In that case just abort on the
-		//range mutation and do a random one
-			range=0;
-			}
-*/		}
-
-	//--------------------------------------------------------------------
-	// Pick a random node whose branch we will bisected by the new subtree.
-	// Limited SPR within rangen, where range defined as the distance between two nodes.
-	TreeNode * broken = NULL;
-	do{
-		if(range == 0 ){
-		  int numAttachedToRoot=root->CountBranches(0);
-		  int n = rnd.random_int( numAttachedToRoot );
-		  broken = root->FindNode( ++n );
+		else return;
 		}
-		else  {
-		    int n = rnd.random_int(sprRange.total);
-		    broken = allNodes[sprRange.element[n]];
-		  }
-		}while(broken==sib);//if we reattach to the sib, we'll get the same topo back
-		
-
-	broken->SubstituteNodeWithRespectToAnc(connector);
-	connector->AddDes(broken);
-
-	if(broken->dlen*.5 > DEF_MIN_BRLEN){
-		connector->dlen=broken->dlen*.5;
-		broken->dlen-=connector->dlen;
-		}
-	else connector->dlen=broken->dlen=DEF_MIN_BRLEN;
-
-	SweepDirtynessOverTree(connector, cut);
-	MakeNodeDirty(connector);
-
-#ifdef OPT_DEBUG
-	opt << "SPR, lim " << range << "\n";
-	optsum << "SPR, lim " << range << "\n";
-#endif	
-
-	OptimizeBranchesWithinRadius(connector, optPrecision, 0, sib->anc);
-	return cut->nodeNum;
-}
-
-int Tree::GatherNodesInRadius(int range, TreeNode *sib, TreeNode *subtreeNode){
-	//if we are reconnecting within some particular range of branches, gather all the nodes within that range
-	sprRange.clear();
-	sprRange.setseed(sib->nodeNum);//the subset will be centered on cut's sib
-    for(int i = 0;i<range;i++){
-      int j = sprRange.total;
-		for(int k=0; k < j; k++){
-			if(sprRange.front[k]==i){
-				TreeNode *cur=allNodes[sprRange.element[k]];
-				if(cur->left!=NULL) 
-				    sprRange.addelement(cur->left->nodeNum, i+1, sprRange.pathlength[k] + cur->left->dlen);
-				if(cur->right!=NULL) 
-			    	sprRange.addelement(cur->right->nodeNum, i+1, sprRange.pathlength[k] + cur->right->dlen);
-				if(cur->next!=NULL){
-				    sprRange.addelement(cur->next->nodeNum, i+1, sprRange.pathlength[k] + cur->next->dlen);
-				    if(cur->next->next!=NULL){//if cur is the left descendent of the root
-				    	sprRange.addelement(cur->next->next->nodeNum, i+1, sprRange.pathlength[k] + cur->next->next->dlen);
-				    	}
-				    }
-				if(cur->prev!=NULL){
-				    sprRange.addelement(cur->prev->nodeNum, i+1, sprRange.pathlength[k] + cur->prev->dlen);
-				    if(cur->prev->prev!=NULL){//if cur is the right descendent of the root
-				    	sprRange.addelement(cur->prev->prev->nodeNum, i+1, sprRange.pathlength[k] + cur->prev->prev->dlen);
-				    	}
-				    }		    	
-				if(cur->anc!=NULL && cur->anc!=subtreeNode) 
-				    sprRange.addelement(cur->anc->nodeNum, i+1, sprRange.pathlength[k] + cur->anc->dlen);
-				else if(cur->anc==NULL)
-					sprRange.addelement(cur->left->next->nodeNum, i+1, sprRange.pathlength[k] + cur->left->next->dlen);
-				}// end of loop through element of current subset
-		    }// end of loop to findrange
-		}
-    //remove unwanted nodes from the subset
-    sprRange.elementremove(sib->nodeNum);
-    if(sprRange.total>4) sprRange.removennis();
-    sprRange.compact();		
-    if(sprRange.total==0){//depending on how the tree was oriented and what was cut
-	//it's possible (rare) that the range is empty now.  In that case just abort on the
-	//range mutation and do a random one
-		assert(subtreeNode==0);
-		return 0;
-		}
-	return range;
+#endif
 	}
 
-
+// 7/21/06 This function is now called by TopologyMutator to actually do the 
+//rearrangement
 //Here's another version of SPR that has the cut and broken nodenums passed in
-void Tree::SPRMutate(int cutnum, int broknum, double optPrecision, int subtreeNode, int range){
+int Tree::SPRMutate(int cutnum, int broknum, double optPrecision, int subtreeNode, int range){
 	TreeNode* cut = allNodes[cutnum];
 	TreeNode* prunePoint=NULL;
 	TreeNode *sib;
@@ -1662,7 +1620,7 @@ void Tree::SPRMutate(int cutnum, int broknum, double optPrecision, int subtreeNo
 		else if(root->right!=cut && root->right->left != NULL) connector = root->right;
 		else{//this should be quite rare, and means that the three descendents of the root
 			//are cut and two terminals, so no viable swap exists, just try again
-			assert(0);
+			return -1;
 			}
 		}
 	
@@ -1725,21 +1683,21 @@ void Tree::SPRMutate(int cutnum, int broknum, double optPrecision, int subtreeNo
 		assert(connector->right==connector->left->next);
 		connector->SubstituteNodeWithRespectToAnc(connector->left);
 		root->AddDes(connector->right);
-		MakeNodeDirty(connector);
 		}
-		
+	
 	//establish correct topology for connector and cut nodes
+	MakeNodeDirty(connector);
 	cut->anc=connector;
 	connector->left=connector->right=cut;
 	connector->next=connector->prev=connector->anc=cut->next=cut->prev=NULL;
 
 	TreeNode *broken;
 	if(broknum > 0) broken=allNodes[broknum];
-	else{
-		GatherNodesInRadius(range, sib, allNodes[subtreeNode]);
+	else{assert(0);
+	/*	GatherNodesInRadius(range, sib, allNodes[subtreeNode]);
 	  	int n = rnd.random_int(sprRange.total);
 		broken = allNodes[sprRange.element[n]];
-		}
+	*/	}
 
 	broken->SubstituteNodeWithRespectToAnc(connector);
 	connector->AddDes(broken);
@@ -1756,7 +1714,236 @@ void Tree::SPRMutate(int cutnum, int broknum, double optPrecision, int subtreeNo
 #ifdef OPT_DEBUG
 	opt << "SPR\n";
 #endif	
+	return 1;
 }
+
+
+void Tree::LoadConstraints(ifstream &con){
+	string temp;//=new char[numTipsTotal + 100];
+	Constraint constr;
+	int conNum=0;
+	do{
+		getline(con, temp);
+		//getline works strangely on some compilers.  temp should end with ; or \0 , but 
+		//might end with \r or \n
+		size_t len=temp.length();
+		char last=temp.c_str()[len-1];
+		if(last == '\r' || last == '\n'){
+			temp.erase(len-1, 1);
+			len--;
+			}
+		if(temp[0] != '\0'){
+			if(temp[0] != '+' && temp[0] != '-') throw ErrorException("constraint string must start with \'+\' (positive constraint) or \'-\' (negative constraint)");
+			if(temp[1] == '.' || temp[1] == '*'){//if individual biparts are specified in *. format
+				if(len != numTipsTotal+1) throw ErrorException("constraint # %d does not have the correct number of characters!\n(has %d) constraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format", conNum, len);
+				constr.ReadDotStarConstraint(temp.c_str());
+				constraints.push_back(constr);
+				conNum++;
+				}
+			else if(temp[1] == '('){//if a constraint tree in parenthetical notation is used
+				bool numericalTaxa=true;
+				for(unsigned i=0;i<len;i++){//see if we are dealing with a treestring with taxa as # or names
+					if(isalpha(temp[i])){
+						numericalTaxa=false;
+						break;
+						}
+					}
+				bool pos;
+				if(temp[0] == '+') pos=true;
+				else pos=false;
+				Tree contree(temp.c_str()+1, numericalTaxa, true);
+				contree.CalcBipartitions();
+				vector<Bipartition> bip;
+				contree.root->GatherConstrainedBiparitions(bip);
+				if(pos==false && (bip.size() > 1)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch (bipartition):-(");
+				for(vector<Bipartition>::iterator bit=bip.begin();bit!=bip.end();bit++){
+					constraints.push_back(Constraint(&(*bit), pos));
+					}
+				}
+			else{
+				throw ErrorException("problem with constraint # %d\nconstraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format", conNum, len);
+				}
+			}
+		}while(con.eof() == false);
+
+	//make sure the constraints are compatible with each other!
+	if(conNum > 1){
+		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
+			for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++){
+				if((*first).IsPositive() != (*sec).IsPositive()) throw ErrorException("cannot mix positive and negative constraints!");
+				if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
+				if((*first).IsCompatibleWithConstraint(&(*sec)) == false) throw ErrorException("constraints are not compatible with one another!");
+			}
+			}
+		}
+	}
+
+bool Tree::AllowedByConstraint(Constraint *constr, TreeNode *cut, TreeNode *broken) const{
+	Bipartition proposed;
+	proposed.FillWithXORComplement(cut->bipart, broken->bipart);
+	if(constr->IsPositive())
+		return constr->IsCompatibleWithConstraint(&proposed);
+	else{//this is trickier with a negative constraint
+		bool compat=constr->IsCompatibleWithConstraint(&proposed);
+		if(compat==false) return compat;
+		else{//here we need to check if the removal of the cut subtree would create the unallowed bipart
+			//I think this could happen about anywhere in the tree, so the cleanest way i see to check
+			//is to actually make the tree and verify that it doesn't have the constrained bipart
+			
+			Tree propTree;
+			propTree.MimicTopo(this);
+
+			TreeNode *tcut = propTree.allNodes[cut->nodeNum];
+			TreeNode *sib;
+			//note that this assignment of the sib can be overridden below if cut is attached to the root or the subtreeNode
+			if(tcut->next!=NULL) sib=tcut->next;
+			else sib=tcut->prev;
+			TreeNode *connector=NULL;
+	
+			//determine who the connector node will be.  It will be cut->anc unless that is the root
+			//if cut->anc is the root, connector will be one of cut's siblings, which is freed when
+			//the basal trichotomy is reestablished after removing cut.
+			if(tcut->anc->anc != NULL){
+				connector=tcut->anc;
+				}
+			else{
+				if(propTree.root->left!=tcut && propTree.root->left->left != NULL) connector = propTree.root->left;
+				else if(propTree.root->left->next!=tcut && propTree.root->left->next->left != NULL) connector = propTree.root->left->next;
+				else if(propTree.root->right!=tcut && propTree.root->right->left != NULL) connector = propTree.root->right;
+				else{//this should be quite rare, and means that the three descendents of the propTree.root
+					//are tcut and two terminals, so no viable swap exists, just try again
+					return false;
+					}
+				}
+	
+			TreeNode *replaceForConn;
+			if(tcut->anc->anc){
+				//tcut is not connected to the propTree.root, so we can steal it's ancestor as the new connector
+				if(tcut==connector->left){
+			   		assert(tcut->next==connector->right);
+					replaceForConn=connector->right;
+	   				}
+	   			else{
+	   				assert(tcut==connector->right); 
+			   		replaceForConn=connector->left;
+			   		}
+				replaceForConn->dlen+=connector->dlen;
+			   	connector->SubstituteNodeWithRespectToAnc(replaceForConn);
+	   			}
+			else{//tcut is connected to the propTree.root so we need to steal a non terminal sib node as the connector
+				//Disconnect tcut from the propTree.root
+				if(tcut==propTree.root->left){
+					propTree.root->left=tcut->next;
+					tcut->next->prev=NULL;
+					}
+				else if(tcut==propTree.root->right){
+					propTree.root->right=tcut->prev;
+					tcut->prev->next=NULL;
+					}
+				else{
+					assert(tcut->prev==propTree.root->left && tcut->next==propTree.root->right);//can only have a basal trifucation, or we're in trouble
+					tcut->prev->next=tcut->next;
+					tcut->next->prev=tcut->prev;
+					}
+				//propTree.root is now bifurcation
+				//preserve branch length info
+				if(propTree.root->right==connector){
+					propTree.root->left->dlen+=	connector->dlen;
+					sib=propTree.root->left;
+					}
+				else{
+					propTree.root->right->dlen+=	connector->dlen;	
+					sib=propTree.root->right;
+					}
+			
+				//add the connectors two desccendants as descendants of the propTree.root
+				assert(connector->right==connector->left->next);
+				connector->SubstituteNodeWithRespectToAnc(connector->left);
+				propTree.root->AddDes(connector->right);
+				}
+	
+			//establish correct topology for connector and tcut nodes
+			tcut->anc=connector;
+			connector->left=connector->right=tcut;
+			connector->next=connector->prev=connector->anc=tcut->next=tcut->prev=NULL;
+
+			TreeNode *tbroken;
+			tbroken=propTree.allNodes[broken->nodeNum];
+			
+			tbroken->SubstituteNodeWithRespectToAnc(connector);
+			connector->AddDes(tbroken);
+
+			propTree.CalcBipartitions();
+
+			bool containsBip = (propTree.ContainsBipartitionOrComplement(constr->GetBipartition()) != NULL);
+			return (containsBip == false);
+
+			//DEBUG
+/*			unsigned a[2], c[2];
+			a[0]=cut->anc->bipart->rep[0];
+			a[1]=cut->anc->bipart->rep[1];
+
+			c[0]=cut->bipart->rep[0];
+			c[1]=cut->bipart->rep[1];
+
+			proposed.ClearBipartition();
+			assert(cut->anc->anc);
+			proposed = cut->anc->anc->bipart;
+			proposed -= cut->bipart;
+			return constr->IsCompatibleWithConstraint(&proposed);
+*/			}
+		}
+	}
+
+bool Tree::AllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken){
+	Bipartition proposed;
+	proposed.FillWithXORComplement(cut->bipart, broken->bipart);
+	bool compat = constr->IsCompatibleWithConstraintWithMask(&proposed, mask);
+	if(compat==false) return compat;
+	else if(broken->left != NULL) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, mask, broken);
+	return compat;
+	}
+
+bool Tree::AllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken){
+	Bipartition proposed;
+	proposed.FillWithXORComplement(cut->bipart, broken->bipart);
+	bool compat = constr->IsCompatibleWithConstraintWithMask(&proposed, mask);
+	if(compat==true) return compat;
+	else if(broken->left != NULL) compat=RecursiveAllowedByNegativeConstraintWithMask(constr, mask, broken);
+	return compat;
+	}
+
+bool Tree::RecursiveAllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd){
+	bool compat = constr->IsCompatibleWithConstraintWithMask(nd->bipart, mask);
+	if(compat==false) return compat;
+	else if(nd->left->left != NULL) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, mask, nd->left);
+
+	if(compat==false) return compat;
+	else if(nd->left->next->left != NULL) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, mask, nd->left->next);
+	
+	if(compat==false) return compat;
+	if(nd->left->next->next != NULL)
+		if(nd->left->next->next->left != NULL)
+			compat=RecursiveAllowedByPositiveConstraintWithMask(constr, mask, nd->left->next);
+
+	return compat;
+	}
+
+bool Tree::RecursiveAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd){
+	bool compat = constr->IsCompatibleWithConstraintWithMask(nd->bipart, mask);
+	if(compat==true) return compat;
+	else if(nd->left->left != NULL) compat=RecursiveAllowedByNegativeConstraintWithMask(constr, mask, nd->left);
+
+	if(compat==true) return compat;
+	else if(nd->left->next->left != NULL) compat=RecursiveAllowedByNegativeConstraintWithMask(constr, mask, nd->left->next);
+	
+	if(compat==true) return compat;
+	if(nd->left->next->next != NULL)
+		if(nd->left->next->next->left != NULL)
+			compat=RecursiveAllowedByNegativeConstraintWithMask(constr, mask, nd->left->next);
+
+	return compat;
+	}
 
 //DJZ 8-11-04  This version is only for the master doing SPRs on nodes that aren't in a subtree when subtree
 //mode is on.  Basically the only difference is that if the ancestor of the cut node is the root, we need to 
@@ -3117,13 +3304,14 @@ double Tree::SumSiteLikes(const double *cla, const int *underflow_mult){
 
 void Tree::CalcBipartitions(){
 	root->CalcBipartition();
+	root->StandardizeBipartition();
 	}
 	
 void Tree::OutputBipartitions(){
 	ofstream out("biparts.log", ios::app);
 	root->OutputBipartition(out);
 	}
-
+/*
 void Tree::SetDistanceBasedBranchLengthsAroundNode(TreeNode *nd){
 	double D1, D2, D3, k1, k2, k3, k4, a, b, c;
 	TreeNode *T1, *T2, *T3, *T4;
@@ -3269,7 +3457,7 @@ void Tree::FindNearestTerminalsDown(TreeNode *start, TreeNode *from, TreeNode *&
 		}
 	assert(term1 != term2);
 	}
-
+*/
 void Tree::OptimizeBranchesAroundNode(TreeNode *nd, double optPrecision, int subtreeNode){
 	//depricated
 	assert(0);
@@ -3992,3 +4180,231 @@ double Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, con
 	}
 	
 	
+
+/* 7/21/06 DEPRECATED and replaced by GatherValidReconnectionNodes
+int Tree::GatherNodesInRadius(int range, TreeNode *sib, TreeNode *subtreeNode){
+	//if we are reconnecting within some particular range of branches, gather all the nodes within that range
+	sprRange.clear();
+	sprRange.setseed(sib->nodeNum);//the subset will be centered on cut's sib
+    for(int i = 0;i<range;i++){
+      int j = sprRange.total;
+		for(int k=0; k < j; k++){
+			if(sprRange.front[k]==i){
+				TreeNode *cur=allNodes[sprRange.element[k]];
+				if(cur->left!=NULL) 
+				    sprRange.addelement(cur->left->nodeNum, i+1, sprRange.pathlength[k] + cur->left->dlen);
+				if(cur->right!=NULL) 
+			    	sprRange.addelement(cur->right->nodeNum, i+1, sprRange.pathlength[k] + cur->right->dlen);
+				if(cur->next!=NULL){
+				    sprRange.addelement(cur->next->nodeNum, i+1, sprRange.pathlength[k] + cur->next->dlen);
+				    if(cur->next->next!=NULL){//if cur is the left descendent of the root
+				    	sprRange.addelement(cur->next->next->nodeNum, i+1, sprRange.pathlength[k] + cur->next->next->dlen);
+				    	}
+				    }
+				if(cur->prev!=NULL){
+				    sprRange.addelement(cur->prev->nodeNum, i+1, sprRange.pathlength[k] + cur->prev->dlen);
+				    if(cur->prev->prev!=NULL){//if cur is the right descendent of the root
+				    	sprRange.addelement(cur->prev->prev->nodeNum, i+1, sprRange.pathlength[k] + cur->prev->prev->dlen);
+				    	}
+				    }		    	
+				if(cur->anc!=NULL && cur->anc!=subtreeNode) 
+				    sprRange.addelement(cur->anc->nodeNum, i+1, sprRange.pathlength[k] + cur->anc->dlen);
+				else if(cur->anc==NULL)
+					sprRange.addelement(cur->left->next->nodeNum, i+1, sprRange.pathlength[k] + cur->left->next->dlen);
+				}// end of loop through element of current subset
+		    }// end of loop to findrange
+		}
+    //remove unwanted nodes from the subset
+    sprRange.elementremove(sib->nodeNum);
+    if(sprRange.total>4) sprRange.removennis();
+    sprRange.compact();		
+    if(sprRange.total==0){//depending on how the tree was oriented and what was cut
+	//it's possible (rare) that the range is empty now.  In that case just abort on the
+	//range mutation and do a random one
+		assert(subtreeNode==0);
+		return 0;
+		}
+	return range;
+	}
+*/
+
+/* 7/21/06 DEPRECATED all topology mutations now go through TopologyMutator()
+int Tree::SPRMutate(int range, double optPrecision){
+	// Pick a random node whose branch we will cut.
+	//the nodes range from 0 to numNodesTotal-1, but we don't want to choose 0
+	TreeNode *cut=allNodes[GetRandomNonRootNode()];
+	TreeNode *sib;
+	//note that this assignment of the sib can be overridden below if cut is attached to the root
+	if(cut->next!=NULL) sib=cut->next;
+	else sib=cut->prev;
+
+	TreeNode *connector=NULL;
+	assert(cut!=NULL);
+	
+	//for constraint purposes
+	vector<int> SPRList;
+	root->getSPRList(cut->nodeNum,SPRList);
+	
+	//determine who the connector node will be.  It will be cut->anc unless that is the root
+	//if cut->anc is the root, connector will be one of cut's siblings, which is freed when
+	//the basal trichotomy is reestablished after removing cut.
+	if(cut->anc->anc != NULL){
+		connector=cut->anc;
+		}
+	else{
+		if(root->left!=cut && root->left->left != NULL) connector = root->left;
+		else if(root->left->next!=cut && root->left->next->left != NULL) connector = root->left->next;
+		else if(root->right!=cut && root->right->left != NULL) connector = root->right;
+		else{//this should be quite rare, and means that the three descendents of the root
+			//are cut and two terminals, so no viable swap exists, just try again
+			int numterms=0;
+			if(root->left->left==NULL) numterms++;
+			if(root->left->next->left==NULL) numterms++;
+			if(root->right->left==NULL) numterms++;
+			assert(numterms==2);
+			int cutNodeNum=SPRMutate(range, optPrecision);
+			return cutNodeNum;
+			}
+		}
+	
+	//all clas below cut will need to be recalced
+	SweepDirtynessOverTree(cut);
+	TreeNode *replaceForConn;
+	if(cut->anc->anc){
+		//cut is not connected to the root, so we can steal it's ancestor as the new connector
+		//we've identified a connector node that we can recycle, now we need to disconnect it correctly
+	   	if(cut==connector->left)
+	   		{assert(cut->next==connector->right);
+	   		replaceForConn=connector->right;
+	   		}
+	   	else
+	   		{assert(cut==connector->right); 
+	   		replaceForConn=connector->left;
+	   		}
+		replaceForConn->dlen+=connector->dlen;
+	   	connector->SubstituteNodeWithRespectToAnc(replaceForConn);
+	   	}
+	else{//cut is connected to the root so we need to steal a non terminal sib node as the connector
+		MakeNodeDirty(root);
+		//Disconnect cut from the root
+		if(cut==root->left){
+			root->left=cut->next;
+			cut->next->prev=NULL;
+			}
+		else if(cut==root->right){
+			root->right=cut->prev;
+			cut->prev->next=NULL;
+			}
+		else{
+			assert(cut->prev==root->left && cut->next==root->right);//can only have a basal trifucation, or we're in trouble
+			cut->prev->next=cut->next;
+			cut->next->prev=cut->prev;
+			}
+		//root is now bifurcation
+		//preserve branch length info
+		if(root->right==connector){
+			root->left->dlen+=	connector->dlen;
+			sib=root->left;
+			}
+		else{
+			root->right->dlen+=	connector->dlen;	
+			sib=root->right;
+			}
+			
+		//add the connectors two desccendants as descendants of the root
+		assert(connector->right==connector->left->next);
+		connector->SubstituteNodeWithRespectToAnc(connector->left);
+		root->AddDes(connector->right);
+		MakeNodeDirty(connector);
+		}
+		
+	//establish correct topology for connector and cut nodes
+	cut->anc=connector;
+	connector->left=connector->right=cut;
+	connector->next=connector->prev=connector->anc=cut->next=cut->prev=NULL;
+
+	if(range!=0){
+		range=GatherNodesInRadius(range, sib, NULL);
+/*	
+	//if we are reconnecting within some particular range of branches, gather all the nodes within that range
+		sprRange.empty();
+		sprRange.setseed(sib->nodeNum);//the subset will be centered on cut's sib
+	    for(int i = 0;i<range;i++){
+	      int j = sprRange.total;
+			for(int k=0; k < j; k++){
+				if(sprRange.front[k]==i){
+					TreeNode *cur=allNodes[sprRange.element[k]];
+					if(cur->left!=NULL) 
+					    sprRange.addelement(cur->left->nodeNum, i+1, sprRange.pathlength[k] + cur->left->dlen);
+					if(cur->right!=NULL) 
+				    	sprRange.addelement(cur->right->nodeNum, i+1, sprRange.pathlength[k] + cur->right->dlen);
+					if(cur->next!=NULL){
+					    sprRange.addelement(cur->next->nodeNum, i+1, sprRange.pathlength[k] + cur->next->dlen);
+					    if(cur->next->next!=NULL){//if cur is the left descendent of the root
+					    	sprRange.addelement(cur->next->next->nodeNum, i+1, sprRange.pathlength[k] + cur->next->next->dlen);
+					    	}
+					    }
+					if(cur->prev!=NULL){
+					    sprRange.addelement(cur->prev->nodeNum, i+1, sprRange.pathlength[k] + cur->prev->dlen);
+					    if(cur->prev->prev!=NULL){//if cur is the right descendent of the root
+					    	sprRange.addelement(cur->prev->prev->nodeNum, i+1, sprRange.pathlength[k] + cur->prev->prev->dlen);
+					    	}
+					    }		    	
+					if(cur->anc!=NULL) 
+					    sprRange.addelement(cur->anc->nodeNum, i+1, sprRange.pathlength[k] + cur->anc->dlen);
+					else
+						sprRange.addelement(cur->left->next->nodeNum, i+1, sprRange.pathlength[k] + cur->left->next->dlen);
+					}// end of loop through element of current subset
+			    }// end of loop to findrange
+			}
+	    //remove unwanted nodes from the subset
+	    sprRange.elementremove(sib->nodeNum);
+	    if(sprRange.total>3) sprRange.removennis();
+	    sprRange.compact();		
+	    if(sprRange.total==0){//depending on how the tree was oriented and what was cut
+		//it's possible (rare) that the range is empty now.  In that case just abort on the
+		//range mutation and do a random one
+			range=0;
+			}
+*//*		}
+
+	//--------------------------------------------------------------------
+	// Pick a random node whose branch we will bisected by the new subtree.
+	// Limited SPR within rangen, where range defined as the distance between two nodes.
+	TreeNode * broken = NULL;
+	
+	do{
+		if(range == 0 ){
+		  int numAttachedToRoot=root->CountBranches(0);
+		  int n = rnd.random_int( numAttachedToRoot );
+		  broken = root->FindNode( ++n );
+		}
+		else  {
+		    int n = rnd.random_int(sprRange.total);
+		    broken = allNodes[sprRange.element[n]];
+		  }
+
+		}while(broken==sib);//if we reattach to the sib, we'll get the same topo back
+
+	broken->SubstituteNodeWithRespectToAnc(connector);
+	connector->AddDes(broken);
+
+	if(broken->dlen*.5 > DEF_MIN_BRLEN){
+		connector->dlen=broken->dlen*.5;
+		broken->dlen-=connector->dlen;
+		}
+	else connector->dlen=broken->dlen=DEF_MIN_BRLEN;
+
+	SweepDirtynessOverTree(connector, cut);
+	MakeNodeDirty(connector);
+
+#ifdef OPT_DEBUG
+	opt << "SPR, lim " << range << "\n";
+	optsum << "SPR, lim " << range << "\n";
+#endif	
+
+	OptimizeBranchesWithinRadius(connector, optPrecision, 0, sib->anc);
+	return cut->nodeNum;
+}
+*/
+

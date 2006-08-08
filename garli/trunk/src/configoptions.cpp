@@ -39,6 +39,7 @@ GeneralGamlConfig::GeneralGamlConfig()	:bootstrapReps(0), outputMostlyUselessFil
 	saveevery = 100;
 	datafname = "datafname";
 	ofprefix = "ofprefix";
+	constraintfile = "\0";
 	}
 
 int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
@@ -60,6 +61,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetStringOption("datafname", datafname);
 	errors += cr.GetStringOption("ofprefix", ofprefix);
 	errors += cr.GetStringOption("streefname", streefname);
+	cr.GetStringOption("constraintfile", constraintfile, true);
 	errors += cr.GetIntOption("randseed", randseed);
 	errors += cr.GetBoolOption("refinestart", refineStart);
 	errors += cr.GetBoolOption("outputeachbettertopology", outputTreelog);

@@ -34,6 +34,7 @@
 #include "tree.h"
 #include "mlhky.h"
 #include "errorexception.h"
+#include "outputman.h"
 
 //include Sioux console manipulators
 #ifdef MAC
@@ -58,6 +59,8 @@
 #endif
 
 char programName[81];
+
+OutputManager outman;
 
 int main( int argc, char* argv[] )	{
 
@@ -96,7 +99,7 @@ int main( int argc, char* argv[] )	{
 					//command line arguments with a dash
 					if(argv[curarg][1]=='b') interactive=false;
 					else {
-						cout << "Unknown command line option " << argv[curarg] << endl;
+						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						exit(0);
 						}
 					}
@@ -110,14 +113,19 @@ int main( int argc, char* argv[] )	{
 #endif
 
 		try{
-
-			cout << "Running serial GARLI, version 0.942 (Apr 06)" << endl;
 			MasterGamlConfig conf;
-			cout << "Reading config file " << conf_name << endl;
-			if (conf.Read(conf_name) < 0)	{
-				cout << "Error in config file...aborting." << endl;
-				return 0;
-			}
+			bool confOK;
+			confOK = ((conf.Read(conf_name) < 0) == false);
+			//if(conf.Read(conf_name) < 0) throw ErrorException("Error in config file...aborting");
+			
+			char temp_buf[50];
+			if(confOK == true) sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
+			else sprintf(temp_buf, "ERROR.log");
+			outman.SetLogFile(temp_buf);
+			
+			outman.UserMessage("Running serial GARLI, version 0.95 BETA2 (July 2006)\nFlex Rates and Constraints testing version\n");
+			outman.UserMessage("Reading config file %s", conf_name);
+			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
 			// Create the data object
 			HKYData data;
@@ -148,16 +156,16 @@ int main( int argc, char* argv[] )	{
 			pop.Run();
 			else pop.Bootstrap();
 			}catch(ErrorException err){
-				err.Print(cout);
-				return 0;
+//				err.Print(cout);
+				outman.UserMessage("ERROR: %s\n\n", err.message);
+				//err.Print(stderr);
 				}
 			catch(int error){
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
-				return 0;
 				}
 
 	if(interactive==true){
-		cout << "-Press enter to close program.-" << endl;
+		outman.UserMessage("\n-Press enter to close program.-");
 		char d=getchar();
 		}
 	exit(0);

@@ -35,9 +35,11 @@ using namespace std;
 #include "individual.h"
 #include "funcs.h"
 #include "errorexception.h"
+#include "outputman.h"
 
 extern int memLevel;
 extern int calcCount;
+extern OutputManager outman;
 
 #define MUTUALLY_EXCLUSIVE_MUTS
 
@@ -86,204 +88,6 @@ void Individual::CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const 
 	treeStruct->mod=mod;
 }
 
-void Individual::NonSubtreeMutate(const ParallelManager *pMan, double optPrecision, Adaptation *adap)
-{//this version is used only by the master when subtree mode is active
-//it will make a mutation on one of the nodes that are not contained within
-//a subtree, which are in a vector that is passed in
-
-	//because we don't do model mutations during subtree mode, factor the modelMutateProb out
-  	double effectiveTopoProb=adap->topoMutateProb / (1.0/(1.0-adap->modelMutateProb));
-	double r = rnd.uniform();
-
-#ifndef MUTUALLY_EXCLUSIVE_MUTS
-	if(adap->branchOptPrecision != adap->minOptPrecision || r >= effectiveTopoProb){
-#else
-	if(r >= effectiveTopoProb){
-#endif
-	 	mutated_brlen=treeStruct->BrlenMutateSubset(pMan->nonSubtreeNodesforSPR);
-		if(mutated_brlen > 0){
-			mutation_type |= brlen;
-			dirty=true;
-			}
-		}
-
-  if(r < effectiveTopoProb){
-	  double r = rnd.uniform();
-	  if(r<(adap->randNNIprob/(1.0-adap->randSPRprob)) && (pMan->nonSubtreeNodesforNNI.size() > 0)){
-	    int randint1;
-	    do{
-	    	randint1 = pMan->nonSubtreeNodesforNNI[(int)(pMan->nonSubtreeNodesforNNI.size() *  rnd.uniform())];
-	    	}while(randint1<=params->data->NTax());
-	    int branch = rnd.uniform() < .5;
-	    treeStruct->NNIMutate(randint1,branch,optPrecision, 0);
-	    mutation_type |= randNNI;
-	    if(treeStruct->lnL !=-1.0){
-		    fitness=treeStruct->lnL;
-		    dirty=false;
-	    	}
-   		else dirty=true;
-	  }
-	  
-	  else if(pMan->nonSubtreeNodesforSPR.size() > 3){
-	 	int randint1, randint2;
-	   	bool done;
-	    do{
-	    	done=false;
-	    	randint1 = pMan->nonSubtreeNodesforSPR[(int)(pMan->nonSubtreeNodesforSPR.size() *  rnd.uniform())];
-	    	randint2 = pMan->nonSubtreeNodesforSPR[(int)(pMan->nonSubtreeNodesforSPR.size() *  rnd.uniform())];
-	    	//check that the cut node (randint1) is not an ancestor of the attachment node (randint2)
-	    	TreeNode *tmp=treeStruct->allNodes[randint2];
-	    	while((tmp->nodeNum != 0) && (tmp->nodeNum != randint1)){
-	    		tmp=tmp->anc;
-	    		}
-	    	if(tmp->nodeNum==0) done=true;
-	    	
-	    	//check if the nodes are siblings 
-	    	tmp=treeStruct->allNodes[randint1]->anc;
-	    	if(tmp->left->nodeNum==randint2) done=false;
-	    	if(tmp->left->next->nodeNum==randint2) done=false;
-	    	if(tmp->left->next->next != NULL)
-	    		if(tmp->left->next->next->nodeNum == randint2) done=false;
-		       	
-	    	}while(done == false || treeStruct->allNodes[randint1]->anc->nodeNum==randint2); 
-	 
-	    treeStruct->SPRMutate(randint1, randint2, optPrecision, pMan->nonSubtreeNodesforNNI);
-	    mutation_type |= limSPR;
-	    if(treeStruct->lnL !=-1.0){
-		    fitness=treeStruct->lnL;
-		    dirty=false;
-	    	}
-   		else dirty=true;
-	  	}
-	}
-/*  
-  else{
-    assert(TaxonSwapList.size>0);
-    double s2, s1 = params->rnd.uniform();
-    int randint2, randint1 = TaxonSwapList.size * s1 + 1;
-    if(randint1>TaxonSwapList.size) randint1 = TaxonSwapList.size;
-    do{
-      s2 = params->rnd.uniform();
-      randint2 = TaxonSwapList.size * s2 + 1;
-    }while(randint2==randint1);
-
-    if(randint2>TaxonSwapList.size) randint2 = TaxonSwapList.size;
-
-    treeStruct->TaxonSwap(randint1, randint2, optPrecision);
-    mutation_type |= taxonSwap;
-  } 
-*/
-	CalcFitness(0);
-
-	treeStruct->calcs=calcCount;
-	calcCount=0;
-}
-
-void Individual::SubtreeMutate(int subdomain, double optPrecision, vector<int> const &subtreeMemberNodes, Adaptation *adap){
-  //this version is used only by remotes when they have had a subtree defined for them
-  //it will mutate only within that subtree, and because we know that the next mutation
-  //will also be within that subtree we can get away without recalculating some likelihood
-  //arrays
-
-	//because we don't do model mutations during subtree mode, factor the modelMutateProb out
-  	double effectiveTopoProb=adap->topoMutateProb / (1.0/(1.0-adap->modelMutateProb));
-	double r = rnd.uniform();
-#ifndef MUTUALLY_EXCLUSIVE_MUTS
-	if(adap->branchOptPrecision != adap->minOptPrecision || r > effectiveTopoProb){
-#else
-	if(r >= effectiveTopoProb){
-#endif
-		mutated_brlen=treeStruct->BrlenMutateSubset( subtreeMemberNodes );
-		if(mutated_brlen > 0){
-			mutation_type |= brlen;
-			dirty=true;
-			}
-		}
-
-	if(r < effectiveTopoProb){
-		r = rnd.uniform();
-		int cut;
-		if(r<adap->randNNIprob){
-		  	//the node passed to the nni function can only be an internal node, so
-		  	//pick from the first part of the list which contains the internals
-		    cut = subtreeMemberNodes[(int)(rnd.uniform()*(subtreeMemberNodes.size()/2-1))];
-		    int branch = rnd.uniform() < .5;
-		    treeStruct->NNIMutate(cut, branch, optPrecision, subdomain);
-		    mutation_type |= randNNI;
-		    if(treeStruct->lnL !=-1.0){
-			    fitness=treeStruct->lnL;
-			    dirty=false;
-		    	}
-	   		else dirty=true;
-		 	}
-	  
-		  else if(r < adap->randNNIprob + adap->randSPRprob){
-			int broken;
-		 	
-		 	//the nodes passed to the spr function can be internals or terminals, so 
-		 	//choose anywhere in the list
-			do{
-		    	cut=subtreeMemberNodes[(int)(rnd.uniform()*subtreeMemberNodes.size())];
-		    
-			    vector<int> SPRList;
-				SPRList.reserve(subtreeMemberNodes.size());
-			    treeStruct->allNodes[subdomain]->right->getSPRList(cut,SPRList);
-			    treeStruct->allNodes[subdomain]->left->getSPRList(cut,SPRList);
-			    
-			    broken=SPRList[(int)(rnd.uniform()*SPRList.size())];
-			    }while(treeStruct->allNodes[broken]->next==treeStruct->allNodes[cut] || 
-		    	           treeStruct->allNodes[broken]->prev==treeStruct->allNodes[cut]);
-		    	           //reattaching to cut's sib recreates the same tree, so avoid
-    
-		    treeStruct->SPRMutate(cut, broken, optPrecision, subdomain, 0);
-		    mutation_type |= randSPR;
-		    if(treeStruct->lnL !=-1.0){
-			    fitness=treeStruct->lnL;
-			    dirty=false;
-			    }
-	   		else dirty=true;
-		  }
-		  else{//limited spr
-		 	//the nodes passed to the spr function can be internals or terminals, so 
-		 	//choose anywhere in the list
-		 	TreeNode *sib;
-		 	do{
-		    	cut=subtreeMemberNodes[(int)(rnd.uniform()*subtreeMemberNodes.size())];
-		    	if(treeStruct->allNodes[cut]->next != NULL) sib=treeStruct->allNodes[cut]->next;
-		    	else sib=treeStruct->allNodes[cut]->prev;
-		    	}while(treeStruct->allNodes[cut]->anc->nodeNum == subdomain && sib->left==NULL);
-		    			
-		    treeStruct->SPRMutate(cut, -1, optPrecision, subdomain, adap->limSPRrange);
-		    mutation_type |= limSPR;
-		    if(treeStruct->lnL !=-1.0){
-			    fitness=treeStruct->lnL;
-			    dirty=false;
-			    }
-	   		else dirty=true;
-		  }
-		}
-/*  
-  else{
-    assert(TaxonSwapList.size>0);
-    double s2, s1 = params->rnd.uniform();
-    int randint2, randint1 = TaxonSwapList.size * s1 + 1;
-    if(randint1>TaxonSwapList.size) randint1 = TaxonSwapList.size;
-    do{
-      s2 = params->rnd.uniform();
-      randint2 = TaxonSwapList.size * s2 + 1;
-    }while(randint2==randint1);
-
-    if(randint2>TaxonSwapList.size) randint2 = TaxonSwapList.size;
-
-    treeStruct->TaxonSwap(randint1, randint2, optPrecision);
-    mutation_type |= taxonSwap;
-  } 
-*/
-	CalcFitness(subdomain);
-	treeStruct->calcs=calcCount;
-	calcCount=0;
-	}
-
 #ifdef VARIABLE_OPTIMIZATION
 
 #define SPRMutate VariableSPRMutate
@@ -316,7 +120,8 @@ void Individual::Mutate(double optPrecision, Adaptation *adap){
 	if(r <= adap->topoMutateProb){
 	  r = rnd.uniform();
 	  if(r<adap->limSPRprob){
-	    treeStruct->SPRMutate(adap->limSPRrange, optPrecision);
+	    treeStruct->TopologyMutator(optPrecision, adap->limSPRrange, 0);
+	    //treeStruct->SPRMutate(adap->limSPRrange, optPrecision);
 	    mutation_type |= limSPR;
 	    if(treeStruct->lnL !=-1.0){
 		    fitness=treeStruct->lnL;
@@ -325,7 +130,8 @@ void Individual::Mutate(double optPrecision, Adaptation *adap){
    		else dirty=true;
 	  }
 	  else if (r< adap->randSPRprob + adap->limSPRprob){
-	    treeStruct->SPRMutate(0, optPrecision);
+	    treeStruct->TopologyMutator(optPrecision, 999, 0);
+	    //treeStruct->SPRMutate(0, optPrecision);
 	    mutation_type |= randSPR;
 	    if(treeStruct->lnL !=-1.0){
 		    fitness=treeStruct->lnL;
@@ -333,34 +139,12 @@ void Individual::Mutate(double optPrecision, Adaptation *adap){
 		    }
 		else dirty=true;
 	  } 
-	  
-	  else if (r< adap->taxonSwapprob + adap->randSPRprob + adap->limSPRprob){
-	    treeStruct->TaxonSwap(6, optPrecision);
-	    mutation_type |= taxonSwap;
-	    
-	  } 
-#ifdef GANESH 
-     else if (r < adap->randPECRprob +  adap->taxonSwapprob + adap->randSPRprob + adap->limSPRprob){
-        if  (Tree::random_p == true) {
-            Tree::p_value = RandomInt(1, 9);
-            Tree::ComputeRealCatalan();
-        }
-		treeStruct->lnL=-1;
-        treeStruct->PECRMutate(rnd, optPrecision);
-	    mutation_type |= randPECR;
-	    if(treeStruct->lnL!=-1){
-		    fitness=treeStruct->lnL;
-		    dirty=false;
-		    }
-		else
-		    dirty=true;
-      }
-#endif
 	  else {
-  		int node=treeStruct->GetRandomInternalNode();
-	  	int branch=rnd.uniform() < .5;
-	    treeStruct->NNIMutate(node, branch, optPrecision, 0);
-	    mutation_type |= randNNI;
+// 		int node=treeStruct->GetRandomInternalNode();
+//	  	int branch=rnd.uniform() < .5;
+//	    treeStruct->NNIMutate(node, branch, optPrecision, 0);
+		treeStruct->TopologyMutator(optPrecision, 1, 0);
+		  mutation_type |= randNNI;
    	    if(treeStruct->lnL !=-1.0){
 		    fitness=treeStruct->lnL;
 		    dirty=false;
@@ -413,6 +197,7 @@ void Individual::Mutate(double optPrecision, Adaptation *adap){
 	  dirty = true;
 	}
 	//be sure that we have an accurate score before any CLAs get invalidated
+	
 	CalcFitness(0);
 	treeStruct->calcs=calcCount;
 	calcCount=0;
@@ -434,7 +219,7 @@ void Individual::CalcFitness(int subtreeNode){
 	}
 
 void Individual::MakeRandomTree(){
-	cout << "creating random starting tree..." << endl;
+	outman.UserMessage("creating random starting tree...");
 	treeStruct=new Tree();
 
 	int n = params->data->NTax();
@@ -444,12 +229,33 @@ void Individual::MakeRandomTree(){
 		
 	int placeInAllNodes=n+1;
 	
-	// add nodes randomly
-	for( int i = 0; i < n; i++ ) {
-		int pos = rnd.random_int( taxset.Size() );
-		int k = taxset[pos];
-		treeStruct->AddRandomNode(k, placeInAllNodes  );
-		taxset -= k;
+	if(treeStruct->constraints.empty() == true){
+		// add nodes randomly
+		for( int i = 0; i < n; i++ ) {
+			int pos = rnd.random_int( taxset.Size() );
+			int k = taxset[pos];
+			treeStruct->AddRandomNode(k, placeInAllNodes  );
+			taxset -= k;
+			}
+		}
+	else{
+		// add nodes randomly, ensuring that the resulting partial tree is compatible with constraints
+		Bipartition mask;
+		for( int i = 0; i < n; i++ ) {
+			int pos = rnd.random_int( taxset.Size() );
+			int k = taxset[pos];
+			treeStruct->AddRandomNodeWithConstraints(k, placeInAllNodes, mask );
+			taxset -= k;
+			}
+		#ifdef CONSTRAINTS
+		treeStruct->CalcBipartitions();
+		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
+			if((*conit).IsPositive() == true)
+				assert(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL);
+			else 
+				assert(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL);
+			}
+#endif
 		}
 	treeStruct->AssignCLAsFromMaster();
 	}
@@ -502,7 +308,7 @@ void Individual::Randomize(char* fname, int rank){
 			while(c!='\n' && c!='\r' && c!=';' && stf.eof()==false){
 				if(foundModel==false && foundTree==false){
 					if(isalpha(c)){
-						if(c=='r'||c=='R'||c=='b'||c=='B'||c=='a'||c=='A'||c=='p'||c=='P') foundModel=true;
+						if(c=='r'||c=='R'||c=='b'||c=='B'||c=='a'||c=='A'||c=='p'||c=='P'||c=='n') foundModel=true;
 						else throw ErrorException("Unknown model parameter specification! \"%c\"", c);
 						}
 					}
@@ -613,6 +419,10 @@ void Individual::Randomize(char* fname, int rank){
 						foundModel=true;
 						c=stf.get();						
 						}
+					else if(c == 'n'){
+						c=stf.get();
+						//need to put reading of number of rate cats here
+						}
 
 					else if(isalpha(c)) throw ErrorException("Unknown model parameter specification! \"%c\"", c);
 					else if(c != '(') c=stf.get();
@@ -623,21 +433,30 @@ void Individual::Randomize(char* fname, int rank){
 				stf >> temp;
 				params->starting_tree=temp;
 				treeStruct=new Tree( params->starting_tree.c_str(), numericalTaxa);
+
+				//check that any defined constraints are present in the starting tree
+				treeStruct->CalcBipartitions();
+				int conNum=1;
+				for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
+					if((*conit).IsPositive()){
+						if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
+					}
+					else if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
+					conNum++;
+					}
+
 				treeStruct->AssignCLAsFromMaster();
 				}
 			else MakeRandomTree();
 
-			if(foundTree==true){
-				cout << "Obtained starting tree from file " << fname << endl;
-				}
-			if(foundModel==true){
-				cout << "Obtained starting model from file " << fname << endl;
-				}
-			else{
-				cout << "No starting model found in " << fname << endl << "Using default parameter values." << endl;
-				}
+			if(foundTree==true) outman.UserMessage("Obtained starting tree from file %s", fname);
+
+			if(foundModel==true) outman.UserMessage("Obtained starting model from file %s", fname);
+				
+			else outman.UserMessage("No starting model found in %s\nUsing default parameter values.", fname);
+			
 			mod->OutputGamlFormattedModel(cout);
-			cout << endl << endl;
+			outman.UserMessage("\n");
 
 			mod->UpdateQMat();
 			stf.close();
@@ -652,8 +471,8 @@ void Individual::Randomize(char* fname, int rank){
 	}
 
 void Individual::RefineStartingConditions(bool optModel, double branchPrec){
-	if(optModel) cout << "optimizing starting branch lengths and model..." << endl;
-	else cout << "optimizing starting branch lengths..." << endl;
+	if(optModel) outman.UserMessage("optimizing starting branch lengths and rate heterogeneity parameters...");
+	else outman.UserMessage("optimizing starting branch lengths...");
 	double improve=999.9;
 	CalcFitness(0);
 
@@ -677,7 +496,7 @@ poo << endl << str << endl;
 		SetDirty();
 		CalcFitness(0);
 		double trueImprove= Fitness() - passStart;
-		assert(trueImprove >= 0.0);
+		assert(trueImprove >= -1e-5);
 		scaleImprove=treeStruct->OptimizeTreeScale();
 		SetDirty();
 		if(optModel==true){
@@ -718,17 +537,16 @@ poo << endl << str << endl;
 						outf.close();
 */				//
 
-			//DEBUG
+
 //			if(mod->useFlexRates==false)
-//				alphaImprove=treeStruct->OptimizeAlpha();
+			alphaImprove=treeStruct->OptimizeAlpha();
 
 			SetDirty();
 			}
 		improve=scaleImprove + trueImprove + alphaImprove + pinvImprove;
-		cout.precision(8);
-		cout << "pass " << setw(2) << i << ": +" << setw(7) << improve << "\t(branch=" << trueImprove <<  " scale=" << scaleImprove;
-		if(optModel==true) cout << " alpha=" << alphaImprove << ")" << endl;
-		else cout << ")" << endl;
+		outman.precision(8);
+		if(optModel==true) outman.UserMessage("pass %-2d: +%10.4f (branch=%8.2f scale=%8.2f alpha=%8.2f)", i, improve, trueImprove, scaleImprove, alphaImprove);
+		else outman.UserMessage("pass %-2d: +%10.4f (branch=%8.2f scale=%8.2f)", i, improve, trueImprove, scaleImprove);
 		}
 
 	treeStruct->MakeAllNodesDirty();
@@ -754,7 +572,7 @@ void Individual::ReadTreeFromFile(istream & inf)
 		else
 			s += ch;
 	}
-	treeStruct=new Tree(s.c_str());
+	treeStruct=new Tree(s.c_str(), true);
 	}
 
 void Individual::CopyNonTreeFields(const Individual* ind ){
@@ -770,3 +588,204 @@ void Individual::CopyNonTreeFields(const Individual* ind ){
 
 
 
+/* 7/21/06 needs to be fixed to correspond to changes in tree for constraints
+void Individual::SubtreeMutate(int subdomain, double optPrecision, vector<int> const &subtreeMemberNodes, Adaptation *adap){
+  //this version is used only by remotes when they have had a subtree defined for them
+  //it will mutate only within that subtree, and because we know that the next mutation
+  //will also be within that subtree we can get away without recalculating some likelihood
+  //arrays
+
+	//because we don't do model mutations during subtree mode, factor the modelMutateProb out
+  	double effectiveTopoProb=adap->topoMutateProb / (1.0/(1.0-adap->modelMutateProb));
+	double r = rnd.uniform();
+#ifndef MUTUALLY_EXCLUSIVE_MUTS
+	if(adap->branchOptPrecision != adap->minOptPrecision || r > effectiveTopoProb){
+#else
+	if(r >= effectiveTopoProb){
+#endif
+		mutated_brlen=treeStruct->BrlenMutateSubset( subtreeMemberNodes );
+		if(mutated_brlen > 0){
+			mutation_type |= brlen;
+			dirty=true;
+			}
+		}
+
+	if(r < effectiveTopoProb){
+		r = rnd.uniform();
+		int cut;
+		if(r<adap->randNNIprob){
+		  	//the node passed to the nni function can only be an internal node, so
+		  	//pick from the first part of the list which contains the internals
+		    cut = subtreeMemberNodes[(int)(rnd.uniform()*(subtreeMemberNodes.size()/2-1))];
+		    int branch = rnd.uniform() < .5;
+		    treeStruct->NNIMutate(cut, branch, optPrecision, subdomain);
+		    mutation_type |= randNNI;
+		    if(treeStruct->lnL !=-1.0){
+			    fitness=treeStruct->lnL;
+			    dirty=false;
+		    	}
+	   		else dirty=true;
+		 	}
+	  
+		  else if(r < adap->randNNIprob + adap->randSPRprob){
+			int broken;
+		 	
+		 	//the nodes passed to the spr function can be internals or terminals, so 
+		 	//choose anywhere in the list
+			do{
+		    	cut=subtreeMemberNodes[(int)(rnd.uniform()*subtreeMemberNodes.size())];
+		    
+			    vector<int> SPRList;
+				SPRList.reserve(subtreeMemberNodes.size());
+			    treeStruct->allNodes[subdomain]->right->getSPRList(cut,SPRList);
+			    treeStruct->allNodes[subdomain]->left->getSPRList(cut,SPRList);
+			    
+			    broken=SPRList[(int)(rnd.uniform()*SPRList.size())];
+			    }while(treeStruct->allNodes[broken]->next==treeStruct->allNodes[cut] || 
+		    	           treeStruct->allNodes[broken]->prev==treeStruct->allNodes[cut]);
+		    	           //reattaching to cut's sib recreates the same tree, so avoid
+    
+		    treeStruct->SPRMutate(cut, broken, optPrecision, subdomain, 0);
+		    mutation_type |= randSPR;
+		    if(treeStruct->lnL !=-1.0){
+			    fitness=treeStruct->lnL;
+			    dirty=false;
+			    }
+	   		else dirty=true;
+		  }
+		  else{//limited spr
+		 	//the nodes passed to the spr function can be internals or terminals, so 
+		 	//choose anywhere in the list
+		 	TreeNode *sib;
+		 	do{
+		    	cut=subtreeMemberNodes[(int)(rnd.uniform()*subtreeMemberNodes.size())];
+		    	if(treeStruct->allNodes[cut]->next != NULL) sib=treeStruct->allNodes[cut]->next;
+		    	else sib=treeStruct->allNodes[cut]->prev;
+		    	}while(treeStruct->allNodes[cut]->anc->nodeNum == subdomain && sib->left==NULL);
+		    			
+		    treeStruct->SPRMutate(cut, -1, optPrecision, subdomain, adap->limSPRrange);
+		    mutation_type |= limSPR;
+		    if(treeStruct->lnL !=-1.0){
+			    fitness=treeStruct->lnL;
+			    dirty=false;
+			    }
+	   		else dirty=true;
+		  }
+		}
+/*  
+  else{
+    assert(TaxonSwapList.size>0);
+    double s2, s1 = params->rnd.uniform();
+    int randint2, randint1 = TaxonSwapList.size * s1 + 1;
+    if(randint1>TaxonSwapList.size) randint1 = TaxonSwapList.size;
+    do{
+      s2 = params->rnd.uniform();
+      randint2 = TaxonSwapList.size * s2 + 1;
+    }while(randint2==randint1);
+
+    if(randint2>TaxonSwapList.size) randint2 = TaxonSwapList.size;
+
+    treeStruct->TaxonSwap(randint1, randint2, optPrecision);
+    mutation_type |= taxonSwap;
+  } 
+*//*
+	CalcFitness(subdomain);
+	treeStruct->calcs=calcCount;
+	calcCount=0;
+	}
+*/
+
+/*7/21/06 needs to be fixed to correspond to changes in tree for constraints
+void Individual::NonSubtreeMutate(const ParallelManager *pMan, double optPrecision, Adaptation *adap)
+{//this version is used only by the master when subtree mode is active
+//it will make a mutation on one of the nodes that are not contained within
+//a subtree, which are in a vector that is passed in
+
+	//because we don't do model mutations during subtree mode, factor the modelMutateProb out
+  	double effectiveTopoProb=adap->topoMutateProb / (1.0/(1.0-adap->modelMutateProb));
+	double r = rnd.uniform();
+
+#ifndef MUTUALLY_EXCLUSIVE_MUTS
+	if(adap->branchOptPrecision != adap->minOptPrecision || r >= effectiveTopoProb){
+#else
+	if(r >= effectiveTopoProb){
+#endif
+	 	mutated_brlen=treeStruct->BrlenMutateSubset(pMan->nonSubtreeNodesforSPR);
+		if(mutated_brlen > 0){
+			mutation_type |= brlen;
+			dirty=true;
+			}
+		}
+
+  if(r < effectiveTopoProb){
+	  double r = rnd.uniform();
+	  if(r<(adap->randNNIprob/(1.0-adap->randSPRprob)) && (pMan->nonSubtreeNodesforNNI.size() > 0)){
+	    int randint1;
+	    do{
+	    	randint1 = pMan->nonSubtreeNodesforNNI[(int)(pMan->nonSubtreeNodesforNNI.size() *  rnd.uniform())];
+	    	}while(randint1<=params->data->NTax());
+	    int branch = rnd.uniform() < .5;
+	    treeStruct->NNIMutate(randint1,branch,optPrecision, 0);
+	    mutation_type |= randNNI;
+	    if(treeStruct->lnL !=-1.0){
+		    fitness=treeStruct->lnL;
+		    dirty=false;
+	    	}
+   		else dirty=true;
+	  }
+	  
+	  else if(pMan->nonSubtreeNodesforSPR.size() > 3){
+	 	int randint1, randint2;
+	   	bool done;
+	    do{
+	    	done=false;
+	    	randint1 = pMan->nonSubtreeNodesforSPR[(int)(pMan->nonSubtreeNodesforSPR.size() *  rnd.uniform())];
+	    	randint2 = pMan->nonSubtreeNodesforSPR[(int)(pMan->nonSubtreeNodesforSPR.size() *  rnd.uniform())];
+	    	//check that the cut node (randint1) is not an ancestor of the attachment node (randint2)
+	    	TreeNode *tmp=treeStruct->allNodes[randint2];
+	    	while((tmp->nodeNum != 0) && (tmp->nodeNum != randint1)){
+	    		tmp=tmp->anc;
+	    		}
+	    	if(tmp->nodeNum==0) done=true;
+	    	
+	    	//check if the nodes are siblings 
+	    	tmp=treeStruct->allNodes[randint1]->anc;
+	    	if(tmp->left->nodeNum==randint2) done=false;
+	    	if(tmp->left->next->nodeNum==randint2) done=false;
+	    	if(tmp->left->next->next != NULL)
+	    		if(tmp->left->next->next->nodeNum == randint2) done=false;
+		       	
+	    	}while(done == false || treeStruct->allNodes[randint1]->anc->nodeNum==randint2); 
+	 
+	    treeStruct->SPRMutate(randint1, randint2, optPrecision, pMan->nonSubtreeNodesforNNI);
+	    mutation_type |= limSPR;
+	    if(treeStruct->lnL !=-1.0){
+		    fitness=treeStruct->lnL;
+		    dirty=false;
+	    	}
+   		else dirty=true;
+	  	}
+	}
+*/ /*  
+  else{
+    assert(TaxonSwapList.size>0);
+    double s2, s1 = params->rnd.uniform();
+    int randint2, randint1 = TaxonSwapList.size * s1 + 1;
+    if(randint1>TaxonSwapList.size) randint1 = TaxonSwapList.size;
+    do{
+      s2 = params->rnd.uniform();
+      randint2 = TaxonSwapList.size * s2 + 1;
+    }while(randint2==randint1);
+
+    if(randint2>TaxonSwapList.size) randint2 = TaxonSwapList.size;
+
+    treeStruct->TaxonSwap(randint1, randint2, optPrecision);
+    mutation_type |= taxonSwap;
+  } 
+*/
+/*	CalcFitness(0);
+
+	treeStruct->calcs=calcCount;
+	calcCount=0;
+}
+*/

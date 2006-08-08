@@ -34,6 +34,7 @@ using namespace std;
 #include "hashdefines.h"
 #include "model.h"
 #include "mlhky.h"
+#include "reconnode.h"
 
 #undef OPT_DEBUG
 #undef BRENT
@@ -82,7 +83,8 @@ class Tree{
 	public:
 		TreeNode *root;
 		TreeNode **allNodes;
-		subset sprRange;
+		ReconList sprRang;
+//		subset sprRange;
 		static double meanBrlenMuts;
 		static double alpha; //alpha shape of blen mutation, not gamma rate het
 		static double min_brlen;
@@ -91,8 +93,12 @@ class Tree{
 		static ClaManager *claMan;
 		static HKYData *data;
 		static double treeRejectionThreshold;
+		static vector<Constraint> constraints;
 
 		int calcs;
+		
+		void TopologyMutator(double optPrecision, int range, int subtreeNode);
+		void GatherValidReconnectionNodes(int maxRange, TreeNode *cut, const TreeNode *subtreeNode);
 		
 	enum{
 		DOWN = 1,
@@ -118,7 +124,7 @@ class Tree{
 		
 	public: 
 		Tree(HKYData*,CondLikeArray **sharedcl);
-		Tree(const char*, bool numericalTaxa=true);
+		Tree(const char*, bool numericalTaxa, bool allowPolytomies=false);
 		~Tree();
 		int FindUnusedNode(int start);
 		void MimicTopologyButNotInternNodeNums(TreeNode *copySource,TreeNode *replicate,int &placeInAllNodes);
@@ -131,6 +137,7 @@ class Tree{
 		void SharedTreeConstruction(CondLikeArray **sharedcl);
 		void RecombineWith( Tree *t, bool sameModel , double optPrecision );
 		void AddRandomNode(int nodenum, int & );
+		void AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition &mask);
 #ifdef GANESH
 		void PECRMutate(rng& rnd, double optPrecision);
         int IdentifyPSubtree(TreeNode **p_subtree_leaves, int *pedges, int p, rng& rnd);
@@ -172,7 +179,8 @@ class Tree{
 		inline void SetBranchLength(TreeNode *nd, double len);
 		int VariableSPRMutate(int range, double optPrecision);
 		int SPRMutate(int range, double optPrecision);
-		void SPRMutate(int cutnum, int broknum, double optPrecision, int subtreeNode, int range);
+		int ConstrainedSPRMutate(int range, double optPrecision);
+		int SPRMutate(int cutnum, int broknum, double optPrecision, int subtreeNode, int range);
 		void SPRMutate(int cutnum, int broknum, double optPrecision, const vector<int> &nonSubNodes);
 		void NNIMutate(int node, int branch, double optPrecision, int subtreeNode);
 		void VariableNNIMutate(int node, int branch, double optPrecision, int subtreeNode);
@@ -182,6 +190,12 @@ class Tree{
 		int BrlenMutate();
 		int BrlenMutateSubset(const vector<int> &subtreeList);
 		void LocalMove();
+		void LoadConstraints(ifstream &con);
+		bool AllowedByConstraint(Constraint *constr, TreeNode *cut, TreeNode *broken) const;
+		bool AllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
+		bool AllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
+		bool RecursiveAllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
+		bool RecursiveAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
 		// functions for computing likelihood
 		bool ConditionalLikelihood(int direction, TreeNode* nd);	
 		int ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA=false);
@@ -254,8 +268,8 @@ class Tree{
 		int SubtreeBasedRecombination( Tree *t, int recomNodeNum, bool sameModel, double optPrecision);
 		void CalcBipartitions();
 		void OutputBipartitions();
-		TreeNode *ContainsBipartition(Bipartition *bip);
-		TreeNode *ContainsBipartitionOrComplement(Bipartition *bip);
+		TreeNode *ContainsBipartition(const Bipartition *bip);
+		TreeNode *ContainsBipartitionOrComplement(const Bipartition *bip);
 		void SetAllTempClasDirty();
 		void SetAppropriateTempClasDirty(int first, int sec);
 		void SetTempClasDirtyWithinSubtree(int subtreeNode);

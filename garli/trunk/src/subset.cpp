@@ -101,7 +101,4 @@ void subset::print(){
   cout <<endl<<"  Print out for debug of subset SPRmutaion:"<<endl;
   cout <<"   Total number of the range : "<< total << endl;
   cout << "  Seed number is: "<< seednumber << endl;
-
-
-
-}
+	}

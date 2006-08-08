@@ -103,6 +103,9 @@ int Parameters::SetParams(const GeneralGamlConfig& conf, const HKYData& data_in)
 		strcpy(startfname, "random");
 	else
 		strncpy(startfname, conf.streefname.c_str(), 84);
+	
+	constraintFile = conf.constraintfile;
+
 	logEvery = conf.logevery;
 	saveEvery = conf.saveevery;
 

@@ -28,6 +28,9 @@ using namespace std;
 #include "bipartition.h"
 #include "subset.h"
 #include "errorexception.h"
+#include "outputman.h"
+
+extern OutputManager outman;
 
 #undef DEBUG_RECOMBINEWITH
 
@@ -416,7 +419,7 @@ void TreeNode::FindCrazyLongBranches(){
 		next->FindCrazyLongBranches();
 		}
 	if(dlen>1.0){
-		cout << "WTF?\n";
+		outman.UserMessage("WTF?");
 		}
 	}
 			
@@ -429,7 +432,7 @@ void TreeNode::FindCrazyShortBranches(){
 		next->FindCrazyShortBranches();
 }
 	if(anc&&dlen<.0001){
-		cout << "WTF?\n";
+		outman.UserMessage("WTF?");
 		}
 	}
 	
@@ -473,30 +476,49 @@ void TreeNode::CheckforPolytomies(){
 			}
 		}
 	}
-/*	
-void TreeNode::AllocateMultipliers(int nchar){	
-	underflow_mult=new double[nchar];
-	for(int i=0;i<nchar;i++) underflow_mult[i]=0.0;
-	}
-*/
 
 Bipartition* TreeNode::CalcBipartition(){	
-	if(left&&anc){
-		*bipart=left->CalcBipartition();
-		*bipart+=left->next->CalcBipartition();
+	if(left != NULL){//not terminal
+		TreeNode *nd=left;
+		*bipart = nd->CalcBipartition();
+		nd=nd->next;
+		do{
+			*bipart += nd->CalcBipartition();
+			nd=nd->next;
+			}while(nd != NULL);
 		return bipart;
 		}
-	else if(anc){
-		return bipart->TerminalBipart(nodeNum);	
-		}
-	else{
-		left->CalcBipartition();
-		left->next->CalcBipartition();
-		left->next->next->CalcBipartition();
+	else if(anc != NULL){//terminal
+		bipart=bipart->TerminalBipart(nodeNum);	
+		return bipart;
 		}
 	return NULL;
 	}
 
+void TreeNode::StandardizeBipartition(){
+	if(left != NULL){//not terminal
+		TreeNode *nd=left;
+		do{
+			nd->StandardizeBipartition();
+			nd=nd->next;
+			}while(nd != NULL);
+		}
+	bipart->Standardize();
+	}
+
+void TreeNode::GatherConstrainedBiparitions(vector<Bipartition> &biparts) {
+	if(left != NULL){
+		TreeNode *nd=left;
+		do{
+			nd->GatherConstrainedBiparitions(biparts);
+			nd=nd->next;
+			}while(nd != NULL);
+		if(anc != NULL){
+			Bipartition b(*bipart);
+			biparts.push_back(b);
+			}
+		}
+	}
 void TreeNode::OutputBipartition(ostream &out){	
 	if(left&&anc){
 		left->OutputBipartition(out);

@@ -28,10 +28,12 @@ using namespace std;
 #include "defs.h"
 #include "stricl.h"
 #include "errorexception.h"
+#include "outputman.h"
 
 #define MAX_TAXON_LABEL		80
 
 extern rng rnd;
+extern OutputManager outman;
 
 DataMatrix::~DataMatrix()
 {
@@ -752,17 +754,16 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 				}
 			}while(numread < 2);
 		if(!(num_taxa > 0) ){
-			cout << "Problem reading ntax on dimensions line of Nexus file!" << endl;
-			return -1;
+			throw ErrorException("Problem reading ntax on dimensions line of Nexus file!");
 			}
 		if(!(num_chars > 0) ){
-			cout << "Problem reading nchar on dimensions line of Nexus file!" << endl;
+			throw ErrorException("Problem reading nchar on dimensions line of Nexus file!");
 			return -1;
 			}
 		do{
 			inf >> buf;
 			if(inf.eof()){
-				cout << "Could not find data matrix!!" << endl;
+				throw ErrorException("Could not find data matrix!");
 				return -1;
 				}
 			}while(strcmp(buf, "matrix") && strcmp(buf, "Matrix") && strcmp(buf, "MATRIX"));
@@ -903,9 +904,9 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
    int k;
 	char nxspath[ MAXPATH ];
 	strcat( nxspath, ".nex" );
-#ifndef UD_VERSION
+
 	cerr << endl << "Opening file '" << nxspath << "' for saving..." << endl;
-#endif
+
 	ofstream nxsf( nxspath );
 	if( !nxsf ) {
 		cerr << endl << "Error: could not open file '" << nxspath << "' for saving" << endl;
@@ -956,14 +957,10 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 	//
 
 	strcat( newpath, ".comp" );
-#ifndef UD_VERSION
-	cerr << endl << "Opening file '" << newpath << "' for saving..." << endl;
-#endif
+	outman.UserMessage("Opening file \"%s\" for saving...", newpath);
+
 	ofstream outf( newpath );
-	if( !outf ) {
-		cerr << endl << "Error: could not open file '" << newpath << "' for saving" << endl;
-		return 0;
-	}
+	if( !outf ) throw ErrorException("Error: could not open file \"%s\"", newpath);
 
 /*	nchar_total = 0;
 	for( j = 0; j < nChar; j++ ) {

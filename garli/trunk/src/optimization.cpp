@@ -667,6 +667,7 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 		Score(nd->anc->nodeNum);
 		}
 	double delta;
+	
 #endif
 	double totalEstImprove=0.0;
 	bool continueOpt=false;
@@ -851,12 +852,12 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 					SetBranchLength(nd, v_prev);
 					MakeAllNodesDirty();
 					Score(nd->anc->nodeNum);
-					assert(fabs(prevScore - lnL) < .0001);
+//					assert(fabs(prevScore - lnL) < .0001);
 					
 					SetBranchLength(nd, v);
 					MakeAllNodesDirty();
 					Score(nd->anc->nodeNum);
-					assert(fabs(poo - lnL) < .0001);
+//					assert(fabs(poo - lnL) < .0001);
 					}
 				}
 			}

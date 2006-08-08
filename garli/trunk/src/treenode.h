@@ -82,6 +82,8 @@ class TreeNode
 		void CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, int dir);
 		void AllocateMultipliers(int nchar);
 		Bipartition* CalcBipartition();
+		void StandardizeBipartition();
+		void GatherConstrainedBiparitions(vector<Bipartition> &biparts);
 		void OutputBipartition(ostream &out);
 		void MarkUnattached(bool includenode);
 		void RotateDescendents();

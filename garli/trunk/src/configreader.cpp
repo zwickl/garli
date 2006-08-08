@@ -23,6 +23,7 @@
 using namespace std;
 
 #include "configreader.h"
+#include "errorexception.h"
 
 using std::pair;
 
@@ -50,10 +51,7 @@ int ConfigReader::Load(const char* filename)	{
 
 	file = fopen(filename, "r");
 
-	if (file == NULL)	{
-		printf("error opening file \"%s\".", filename);
-		return -1;
-	}
+	if (file == NULL) throw ErrorException("error opening file \"%s\".", filename);
 
 	int type;
 	string sectionName, name, val;
@@ -251,8 +249,7 @@ int ConfigReader::GetStringOption(const char* _option, string& val, bool optiona
 		oit = sit->second.find(option);
 		if (oit == sit->second.end())	{	// option doesn't exist, bomb out
 			rv = -1;
-			if(!optional)
-				cout << "error: could not find string configuration entry \"" << option << "\"" << endl;
+			if(!optional) throw ErrorException("could not find string configuration entry \"%s\"", option.c_str());
 		}
 		else	{	// option exists, get the value
 			val = oit->second;
@@ -287,8 +284,7 @@ int ConfigReader::GetBoolOption(const char* option, bool& val, bool optional /*=
 	}
 	else{
 		rv = -1;
-		if(!optional)
-			cout << "error: could not find boolean configuration entry \"" << option << "\"" << endl;
+		if(!optional) throw ErrorException("error: could not find boolean configuration entry \"%s\"", option);
 		}
 		
 	return rv;
@@ -306,8 +302,7 @@ int ConfigReader::GetIntOption(const char* option, int& val, bool optional /*=fa
 	}
 	else{
 		rv = -1;
-		if(!optional)
-			cout << "error: could not find integer configuration entry \"" << option << "\"" << endl;
+		if(!optional) throw ErrorException("error: could not find integer configuration entry \"%s\"", option);
 		}
 
 	return rv;
@@ -334,7 +329,7 @@ int ConfigReader::GetIntRangeOption(const char* option, int& val1, int& val2)	{
 	}
 	else{
 		rv = -1;
-		cout << "error: could not find integer range configuration entry \"" << option << "\"" << endl;
+		throw ErrorException("error: could not find integer range configuration entry \"%s\"", option);
 		}
 
 	return rv;
@@ -393,7 +388,7 @@ int ConfigReader::GetDoubleOption(const char* option, double& val, bool optional
 	}
 	else{
 		rv = -1;
-		if(!optional) cout << "error: could not float configuration entry \"" << option << "\"" << endl;
+		if(!optional) throw ErrorException("error: could not find float configuration entry \"%s\"", option);
 		}
 
 	return rv;
@@ -420,7 +415,7 @@ int ConfigReader::GetDoubleRangeOption(const char* option, double& val1, double&
 	}
 	else{
 		rv = -1;
-		cout << "error: could not float range configuration entry \"" << option << "\"" << endl;
+		throw ErrorException("error: could not find float range configuration entry \"%s\"", option);
 		}
 
 	return rv;

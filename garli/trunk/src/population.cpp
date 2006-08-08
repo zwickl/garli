@@ -50,8 +50,10 @@ using namespace std;
 #include "subset.h"
 #include "adaptation.h"
 #include "errorexception.h"
+#include "outputman.h"
 
 extern char programName[81];
+extern OutputManager outman;
 
 int memLevel;
 int calcCount=0;
@@ -306,7 +308,7 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 	Bipartition::ntax=params->data->NTax();
 	Bipartition::nBlocks=(int)ceil((double)params->data->NTax()/(double)Bipartition::blockBits);
 	Bipartition::largestBlockDigit=1<<(Bipartition::blockBits-1);
-	Bipartition::allBitsOn=(unsigned int)pow(2.0, Bipartition::blockBits)-1;
+	Bipartition::allBitsOn=(unsigned int)(pow(2.0, Bipartition::blockBits)-1);
 	Bipartition::str=new char[params->data->NTax()+1];
 	Bipartition::str[params->data->NTax()] = '\0';
 
@@ -376,11 +378,11 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 	//instantiate the clamanager and figure out how much memory to snatch
 	double memToUse;
 	if(conf->availableMemory > 0){
-		cout << "\nTotal system memory specified as " << conf->availableMemory << " megs" << endl;
+		outman.UserMessage("\nTotal system memory specified as %.1f megs", conf->availableMemory);
 		memToUse=0.8*conf->availableMemory;
 		}
 	else{
-		cout << "\nMemory to be used for conditional likelihood arrays specified as " << conf->megsClaMemory << " megs" << endl;
+		outman.UserMessage("\nMemory to be used for conditional likelihood arrays specified as %.1f megs", conf->megsClaMemory);
 		memToUse=conf->megsClaMemory;
 		}
 		
@@ -410,14 +412,14 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 	 	else memLevel=-1;
 		}
 
-	cout.precision(4);
-	cout << "allocating memory...\nusing " << (double)numClas*(double)claSizePerNode/(double)MB << " megs for conditional likelihood arrays.  Memlevel=" << memLevel << endl;
-	cout << "For this dataset:\n";
-	cout << "level 0: >= " << ceil(L0 * (claSizePerNode/(double)MB)) << " megs\n";
-	cout << "level 1: " << ceil(L0 * ((double)claSizePerNode/MB))-1 << " to " << ceil(L1 * ((double)claSizePerNode/MB)) << " megs\n";
-	cout << "level 2: " << ceil(L1 * ((double)claSizePerNode/MB))-1 << " to " << ceil(L2 * ((double)claSizePerNode/MB)) << " megs\n";
-	cout << "level 3: " << ceil(L2 * ((double)claSizePerNode/MB))-1 << " to " << ceil(L3 * ((double)claSizePerNode/MB)) << " megs\n";
-	cout << "not enough mem: <= " <<  ceil(L3 * ((double)claSizePerNode/MB))-1 << endl << endl;
+	outman.precision(4);
+	outman.UserMessage("allocating memory...\nusing %.1f megs for conditional likelihood arrays.  Memlevel= %d", (double)numClas*(double)claSizePerNode/(double)MB, memLevel);
+	outman.UserMessage("For this dataset:");
+	outman.UserMessage("level 0: >= %.0f megs", ceil(L0 * (claSizePerNode/(double)MB)));
+	outman.UserMessage("level 1: %.0f megs to %.0f megs", ceil(L0 * ((double)claSizePerNode/MB))-1, ceil(L1 * ((double)claSizePerNode/MB)));
+	outman.UserMessage("level 2: %.0f megs to %.0f megs", ceil(L1 * ((double)claSizePerNode/MB))-1, ceil(L2 * ((double)claSizePerNode/MB)));
+	outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((double)claSizePerNode/MB))-1, ceil(L3 * ((double)claSizePerNode/MB)));
+	outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((double)claSizePerNode/MB))-1);
 
 	if(memLevel==-1){
 		throw ErrorException("Not enough memory specified in config file (megsclamemory)!");
@@ -475,14 +477,9 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 		tmpf.close();
 
 	}
-	else
-	{
-		if(bootstrapReps==0) SeedPopulationWithStartingTree();
-	}
+	else if(bootstrapReps==0) SeedPopulationWithStartingTree();
 
-#ifndef UD_VERSION
 	if(bootstrapReps==0) AppendTreeToTreeLog(-1, -1);
-#endif
 
 	if( !error ) is_setup = 1;
 
@@ -522,7 +519,7 @@ void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
 void Population::SeedPopulationWithStartingTree(){
 	
 	if(strcmp(params->startfname, "random"))
-		cout << "Obtaining starting conditions from file " << params->startfname << endl;
+		outman.UserMessage("Obtaining starting conditions from file %s", params->startfname);
 	
 	//claMan->MakeAllHoldersDirty();
 	for(int i=0;i<total_size;i++){
@@ -530,6 +527,15 @@ void Population::SeedPopulationWithStartingTree(){
 		if(newindiv[i].treeStruct != NULL) newindiv[i].treeStruct->RemoveTreeFromAllClas();
 		}
 	
+	//first see if there are any constraints
+	ifstream con(params->constraintFile.c_str());
+	if(strlen(params->constraintFile.c_str()) != 0 && (con.good() == false)) throw ErrorException("Could not open constraint file %s!", params->constraintFile.c_str());
+	if(con.good()){//this is really distasteful
+		outman.UserMessage("Loading constraints from file %s", params->constraintFile.c_str());
+		Tree dummy;
+		dummy.LoadConstraints(con);
+		}
+
 	//if starting from a treefile, use the treestring
 	//to create the first indiv, and then copy the tree and clas
 	indiv[0].Randomize(params->startfname, rank);
@@ -537,15 +543,15 @@ void Population::SeedPopulationWithStartingTree(){
 	indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->mod=indiv[0].mod;
 
-	cout.precision(10);
-	cout << "Initial ln Likelihood: " << indiv[0].Fitness() << endl;
+	outman.precision(10);
+	outman.UserMessage("Initial ln Likelihood: %.4f", indiv[0].Fitness());
 	
 	indiv[0].treeStruct->CalcBipartitions();	
 	
 	if(refineStart==true){
 		indiv[0].RefineStartingConditions(!(adap->modWeight==0.0), adap->branchOptPrecision);
 		indiv[0].CalcFitness(0);
-		cout << "lnL after optimization: " << indiv[0].Fitness() << endl;
+		outman.UserMessage("lnL after optimization: %.4f", indiv[0].Fitness());
 		}	
 
 	globalBest=bestFitness=prevBestFitness=indiv[0].Fitness();
@@ -657,15 +663,12 @@ void Population::Run(){
 	calcCount=0;
 	optCalcs=0;
 
-	cout << "Running Genetic Algorithm with initial seed=" << rnd.init_seed() << endl;
+	outman.UserMessage("Running Genetic Algorithm with initial seed=%d", rnd.init_seed());
 	
 	avgfit = CalcAverageFitness();
 
-	#ifndef NO_OUTPUT
-	cout.setf(ios::left);
-	cout.precision(6);
-	cout << "\t" << setw(10) <<  "gen" << setw(15) << "current lnL" << setw(10) << "precision" << setw(10) << "lastChange"<< endl;			
-	#endif
+	outman.precision(6);
+	outman.UserMessage("\t%-10s%-15s%-10s%-10s", "gen", "current lnL", "precision", "lastChange");
 
 	gen=0;
 	OutputLog();
@@ -680,21 +683,19 @@ void Population::Run(){
 		if(!(gen % params->logEvery)) OutputLog();
 		if(!(gen % params->saveEvery)){
 			if(bootstrapReps==0) CreateTreeFile( params->treefname);
-			#ifndef NO_OUTPUT
-			cout.setf(ios::left);
-			cout << "\t" << setw(10) << gen << setw(15) << setprecision(10) << indiv[bestIndiv].Fitness() << setprecision(4) << setw(10) << adap->branchOptPrecision << setw(10) << lastTopoImprove << endl;			
-			#endif
+			outman.UserMessage("\t%-10d%-15.4f%-10.3f%-10d", gen, indiv[bestIndiv].Fitness(), adap->branchOptPrecision, lastTopoImprove);
 			}
 		if(askQuitNow == 1){
 			char c;
 #if defined (WIN32)
 			c = AskUser("Perform final branch-length optimization and terminate now? (y/n)");
 #else
-			cout << "Perform final branch-length optimization and terminate now? (y/n)" << endl;
+			outman.UserMessage("Perform final branch-length optimization and terminate now? (y/n)");
 			c = getchar();
 #endif
 			if(c=='y'){
 				if(bootstrapReps > 0) abandonedBootstrap=true;
+				signal( SIGINT, SIG_DFL );
 #ifdef MAC
 				cin.get();
 #endif   
@@ -703,7 +704,7 @@ void Population::Run(){
 			else{
 				askQuitNow = 0;
 				CatchInterrupt();
-				cout << "continuing ..." << endl;
+				outman.UserMessage("continuing ...");
 #ifndef WIN32
 				cin.get();
 #endif
@@ -720,38 +721,34 @@ void Population::Run(){
 			NNISpectrum(bestIndiv);
 #endif
 		if(!(gen%adap->intervalLength)){
-			cout.precision(10);
+			outman.precision(10);
 			bool reduced=false;
 			if(gen-lastTopoImprove >= adap->intervalsToStore*adap->intervalLength){
 				reduced=adap->ReducePrecision();
 				}
 			if(reduced){
 				lastTopoImprove=gen;
+				double before=bestFitness;
 				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
 				indiv[bestIndiv].SetDirty();
 				CalcAverageFitness();
-#ifndef UNIX
-				cout << "optimization precision reduced, optimizing ...\t" << bestFitness << "->";
-				cout << bestFitness << endl;
-#endif
+				outman.UserMessage("optimization precision reduced, optimizing branchlengths...\t%.4f -> %.4f", before, bestFitness);
 				}
 			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
-#ifndef UNIX
-					cout << "optimizing ...\t" << bestFitness << "->";
-#endif
-					indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-					indiv[bestIndiv].SetDirty();
-					CalcAverageFitness();
-					cout << bestFitness << endl;				
-					}
+				double before=bestFitness;
+				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
+				indiv[bestIndiv].SetDirty();
+				CalcAverageFitness();
+				outman.UserMessage("optimizing ...\t%.4f%.4f", before, bestFitness);
+				}
 			
 			//termination conditions
 			if(enforceTermConditions == true
 				&& gen-lastTopoImprove > lastTopoImproveThresh 
 				&& adap->improveOverStoredIntervals < improveOverStoredIntervalsThresh
 				&& adap->branchOptPrecision == adap->minOptPrecision){
-				cout << "Reached termination condition!\nlast topological improvement at gen " << lastTopoImprove << endl;
-				cout << "Improvement over last " << adap->intervalsToStore*adap->intervalLength << " gen = " << adap->improveOverStoredIntervals << endl;
+				outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
+				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
 				break;
 				}
 #ifdef INCLUDE_PERTURBATION
@@ -759,7 +756,7 @@ void Population::Run(){
 #endif
 			}
 		if(params->stoptime - stopwatch.SplitTime() < 120){
-			cout << "time limit of " << params->stoptime << " seconds reached..." << endl;
+			outman.UserMessage("time limit of %d seconds reached...", params->stoptime);
 			break;
 			}
 #ifdef INCLUDE_PERTURBATION
@@ -771,7 +768,7 @@ void Population::Run(){
 			bestSinceRestart.SetFitness(-1e100);
 			if(indiv[bestIndiv].Fitness() > allTimeBest.Fitness()) StoreAllTimeBest();
 			SeedPopulationWithStartingTree();
-			cout << "restarting ...." << endl;
+			outman.UserMessage("restarting ....");
 			}
 #endif
 		}
@@ -781,19 +778,19 @@ void Population::Run(){
 	if(bootstrapReps==0) FinalizeOutputStreams();
 	
 	if(inferInternalStateProbs == true){
-		cout << "Inferring internal state probabilities...." << endl;
+		outman.UserMessage("Inferring internal state probabilities....");
 		indiv[bestIndiv].treeStruct->InferAllInternalStateProbs(params->ofprefix);
 		}
 		
-	cout << "finished" << endl;
+	outman.UserMessage("finished");
 		
 //	log << calcCount << " cla calcs, " << optCalcs << " branch like calls\n";
 	}
 
 void Population::FinalOptimization(){
-	cout.setf(ios::fixed);
-	cout.precision(5);
-	cout << "Current score = " << indiv[bestIndiv].Fitness() << endl;
+	outman.setf(ios::fixed);
+	outman.precision(5);
+	outman.UserMessage("Current score = %.4f", indiv[bestIndiv].Fitness());
 	
 	if(pertMan->ratcheted) TurnOffRatchet();
 	
@@ -805,19 +802,19 @@ void Population::FinalOptimization(){
 		if(i != bestIndiv) indiv[i].treeStruct->RemoveTreeFromAllClas();
 		}
 	
-	cout << "Performing final branch optimization..." << endl;
+	outman.UserMessage("Performing final branch optimization...");
 	int pass=1;
 	double incr;
 	do{
 		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(max(adap->branchOptPrecision * pow(0.5, pass), 1e-10));
 		indiv[bestIndiv].SetDirty();
 		indiv[bestIndiv].CalcFitness(0);
-		cout << "\tpass " << pass++  << " " << indiv[bestIndiv].Fitness() << endl;
+		outman.UserMessage("\tpass %d %.4f", pass++, indiv[bestIndiv].Fitness());
 		}while(incr > .00001 || pass < 10);
-	cout << "Final score = " << indiv[bestIndiv].Fitness() << endl;
+	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	log << "Score after final optimization: " << indiv[bestIndiv].Fitness() << endl;
 	CreateTreeFile( params->treefname );
-	cout.unsetf(ios::fixed);
+	outman.unsetf(ios::fixed);
 	}
 
 void Population::Bootstrap(){
@@ -830,17 +827,17 @@ void Population::Bootstrap(){
 	for(int rep=1;rep<=bootstrapReps;rep++){
 		params->data->BootstrapReweight();
 		
-		cout << "bootstrap replicate " << rep << endl;
+		outman.UserMessage("bootstrap replicate %d", rep);
 		SeedPopulationWithStartingTree();
 		Run();
 		
 		if(abandonedBootstrap == false){
 			adap->branchOptPrecision = adap->startOptPrecision;
 			AppendTreeToBootstrapLog(rep);
-			cout << "finished with bootstrap rep " << rep << endl;
+			outman.UserMessage("finished with bootstrap rep %d", rep);
 			}
 		else {
-			cout << "abandoning bootstrap rep " << rep << "....terminating" << endl;
+			outman.UserMessage("abandoning bootstrap rep %d ....terminating", rep);
 			break;
 			}
 		}
@@ -1059,7 +1056,6 @@ void Population::DetermineParentage(){
 				}
 			parent = (int)cumfit[parent][0];
 
-
 #ifdef MPI_VERSION
 //new bipart recom conditions, 9-25-05
 
@@ -1113,7 +1109,7 @@ void Population::DetermineParentage(){
 				}
 #endif
 			}
-		
+
 		newindiv[i].parent=parent;
 		if(newindiv[i].mutation_type==Individual::subtreeRecom) newindiv[i].topo=-1; //VERIFY
 		else newindiv[i].topo=indiv[parent].topo;
@@ -1173,8 +1169,6 @@ void Population::PerformMutation(int indNum){
 	switch(ind->mutation_type){
 		case Individual::exNNI: //exNNI and exlimSPR trump all other mutation types
 			beforeScore=par->Fitness();
-			cout<< "\t EXNNI called at gen: "<< 
-			  gen<<" : l="<<params->holdover<<endl;
 			NNIoptimization(indNum, 1);
 			if(beforeScore==ind->Fitness()){
 				topologies[ind->topo]->exNNItried=true;
@@ -1183,9 +1177,10 @@ void Population::PerformMutation(int indNum){
 			break;
 		
 		case Individual::exlimSPR:
-			SPRoptimization(indNum);
+			assert(0);
+/*			SPRoptimization(indNum);
 			ind->accurateSubtrees=false;
-			break;
+*/			break;
 		
 		case Individual::subtreeRecom:
 			//perform subtree recom, which melds together the different subtrees worked on by the
@@ -1210,26 +1205,19 @@ void Population::PerformMutation(int indNum){
 			if(ind->recombinewith==-1){//all types of "normal" mutation that occur at the inidividual level
 				if(rank==0){//if we are the master
 				 	if(ind->accurateSubtrees==false || paraMan->subtreeModeActive==false){
-				 		//DEBUG
-				 		//this is really cheesey, but ...
-/*				 		int savedSeed=rnd.seed();
-				 		double r=rnd.uniform();
-				 		if(r < adap->topoMutateProb)
-				 			OutputFilesForScoreDebugging(ind, tempGlobal++);
-				 		rnd.set_seed(savedSeed);
-*/				 	
+			 	
 			       		ind->Mutate(adap->branchOptPrecision, adap);
 			       		//reclaim clas if the created tree has essentially no chance of reproducing
 			       		if(((ind->Fitness() - indiv[bestIndiv].Fitness()) < (-11.5/params->selectionIntensity))){
 			       			ind->treeStruct->ReclaimUniqueClas();
 			       			}
-			       		//DEBUG
-			       		//if(ind->mutation_type & Individual::anyTopo) OutputFilesForScoreDebugging(ind, tempGlobal++);
 						}
 					else{
+						assert(0);//7/21/06 subtree mode would need to be updated to work again
+
 						//if subtree mode is on and we are the master, mutate one of the nodes
 						//that isn't in a subtree, or alternatively pick a subtree and mutate it
-					#ifndef MASTER_DOES_SUBTREE
+/*					#ifndef MASTER_DOES_SUBTREE
 						if(paraMan->fewNonSubtreeNodes != true)
 							ind->NonSubtreeMutate(paraMan, adap->branchOptPrecision, adap);
 						else 
@@ -1237,12 +1225,13 @@ void Population::PerformMutation(int indNum){
 					#else
 						ind->SubtreeMutate(subtreeNode, adap->branchOptPrecision, subtreeMemberNodes, adap);
 					#endif					
-						}
+*/						}
 					}
 				else{//if we are a remote node
 				 	if(subtreeNode==0) ind->Mutate(adap->branchOptPrecision, adap);
 					else{
-						ind->SubtreeMutate(subtreeNode, adap->branchOptPrecision, subtreeMemberNodes, adap);
+						assert(0);
+						//ind->SubtreeMutate(subtreeNode, adap->branchOptPrecision, subtreeMemberNodes, adap);
 						}
 					}
 				}
@@ -1336,7 +1325,7 @@ void Population::NextGeneration(){
 	indiv = tmp;
 
 	if( params->showProgress )
-		cout << "Calculating average fitness" << endl;
+		outman.UserMessage("Calculating average fitness");
 	avgfit = CalcAverageFitness(); //score individuals that need it
 		
 	#ifdef DEBUG_SCORES
@@ -1398,42 +1387,6 @@ assert(0);
 	// save current population data
 //	outf << (*this) << endl;
 	outf.close();
-}
-
-int Population::TimeToQuit()
-{
-	int quit = 0;
-
-#if !defined( POWERMAC_VERSION )
-	// try to open the file 'stop_now'
-	// if this file does not exist (in the current directory)
-	//	then GAML will continue running
-	// if this file does exist, GAML will quit immediately
-#if 0
-	ifstream testf( "stop_now" );
-	if( testf ) {
-		quit = 1;
-		cout << endl << programName << " is shutting down..." << endl;
-	}
-	else {
-		cout << "  " << (gen+1) << " generations" << endl;
-	}
-	cout.flush();
-	testf.close();
-#else
-	if( FileExists( "stop_now" ) ) {
-		quit = 1;
-		cout << endl << programName << " is shutting down..." << endl;
-	}
-	else {
-		#ifndef UD_VERSION
-		cout << "  " << (gen+1) << " generations" << endl;
-		#endif
-	}
-#endif
-#endif
-
-	return quit;
 }
 
 void Population::OutputFilesForScoreDebugging(Individual *ind /*=NULL*/, int num){
@@ -1586,7 +1539,7 @@ void Population::CreateTreeFile( const char* treefname, int fst /* = -1 */, int 
 
 	outf.open( treefname );
 	outf.precision(8);
-#ifndef UD_VERSION
+
 	outf << "#nexus" << endl << endl;
 
 	//rewritting this to output standard nexus tree files, not gamlviewer stuff
@@ -1644,13 +1597,13 @@ void Population::CreateTreeFile( const char* treefname, int fst /* = -1 */, int 
 		phytree.close();
 		}
 	
-#else
+
 //if using the UD serial version, just output the best tree in phylip format, with it's score before it
-	best->treeStruct->root->MakeNewick(treeString, false);
+/*	best->treeStruct->root->MakeNewick(treeString, false);
 	outf << best->treeStruct->lnL << "\t" << best->kappa << "\t" << treeString << ";";
 	outf.close();
-#endif
-}
+*/
+	}
 
 char * Population::MakeNewick(int i, bool internalNodes)
 {
@@ -1998,10 +1951,8 @@ void Population::CheckIndividuals(){
 void Population::TopologyReport(){
 	//this is for debugging purposes
 	ofstream out("toporeport.log");
-	if(!(out.good())){
-		cout << "problem opening toporeport.log" << endl;
-		exit(0);
-		}
+	if(!(out.good())) throw ErrorException("problem opening toporeport.log");
+
 	for(int i=0;i<total_size;i++){
 		out << "topo# " << i << "\t" << "ngen " << topologies[i]->gensAlive << "\t";
 		out << "nInds " << topologies[i]->nInds << "\t" << "inds" << "\t";
@@ -2093,7 +2044,7 @@ int Population::ReplaceSpecifiedIndividuals(int count, int* which_array, const c
 		ind->mutation_type=-1;
 		
 		delete ind->treeStruct;
-		ind->treeStruct = new Tree(tree_strings);
+		ind->treeStruct = new Tree(tree_strings, true);
 		ind->treeStruct->AssignCLAsFromMaster();
 		ind->mod->SetModel(model_string);
 		ind->treeStruct->mod=ind->mod;
@@ -2192,7 +2143,7 @@ int Population::ReplicateSpecifiedIndividuals(int count, int* which, const char*
 	for (int i = 0; i < count; ++i)	{
 		indiv[which[i]].treeStruct->RemoveTreeFromAllClas();
 		delete indiv[which[i]].treeStruct;
-		indiv[which[i]].treeStruct = new Tree(tree_string);
+		indiv[which[i]].treeStruct = new Tree(tree_string, true);
 		indiv[which[i]].treeStruct->AssignCLAsFromMaster();
 		indiv[which[i]].mod->SetModel(model_string);
 		indiv[which[i]].treeStruct->mod=indiv[which[i]].mod;
@@ -2427,9 +2378,8 @@ void Population::NNIPerturbation(int sourceInd, int indivIndex){
 	pert.precision(10);
 	pert << "gen\t" << gen << "\tstart\t" << indiv[bestIndiv].Fitness() << "\n";
 
-	#ifndef NO_OUTPUT
-	cout << "Performing NNI Perturbation.  Starting score=" << indiv[bestIndiv].Fitness() << endl;
-	#endif
+	outman.UserMessage("Performing NNI Perturbation.  Starting score= %.4f", indiv[bestIndiv].Fitness());
+
 	
 	//DEBUG
 /*	char filename[50];
@@ -2443,10 +2393,8 @@ void Population::NNIPerturbation(int sourceInd, int indivIndex){
 //	for(int i=0;i<numNodes;i++){
 	int attempts, accepts;
 	for(accepts=0, attempts=0;(accepts<pertMan->nniTargetAccepts) && (attempts <= pertMan->nniMaxAttempts);){
-		#ifndef NO_OUTPUT
-		if(! (attempts++ % (pertMan->nniMaxAttempts/20))) cout << ".";
-		cout.flush();
-		#endif
+		if(! (attempts++ % (pertMan->nniMaxAttempts/20))) outman.UserMessage(".");
+		outman.flush();
 
 		optiNode=indiv[indivIndex].treeStruct->GetRandomInternalNode();
 //		optiNode=nodeArray[i];
@@ -2519,9 +2467,9 @@ void Population::NNIPerturbation(int sourceInd, int indivIndex){
 	calcCount=0;
 	indiv[indivIndex].mutation_type=-1;
 	pert << "end\t" << indiv[indivIndex].Fitness() << "\n";
-	#ifndef NO_OUTPUT
-	cout << "\nCompleted Perturbation.\n  " << accepts << " NNI's accepted in " << attempts << " attempts.  Current score=" << indiv[bestIndiv].Fitness() << endl;
-	#endif
+	
+	outman.UserMessage("Completed Perturbation.\n  %d NNI's accepted in %d attempts. Current score= %.4f", accepts, attempts, indiv[bestIndiv].Fitness());
+	
 //	delete []nodeArray;
 }
 
@@ -2615,390 +2563,6 @@ void Population::NNISpectrum(int sourceInd){
 	delete []nodeArray;
 }
 
-void Population::SPRoptimization(int indivIndex){
-//	for(int i=0;i<params->nindivs;i++)
-//		indiv[i].ResetIndiv();
-
-//	bool topoChange=false;
-
-	for(int reps=0;reps<1;reps++){
-		int cutnum = newindiv[indivIndex].treeStruct->GetRandomNonRootNode();
-		SPRoptimization(indivIndex, adap->limSPRrange, cutnum);
-		}
-	
-/*	if(topoChange==true){
-		if(topologies[indiv[bestIndiv].topo]->nInds>1){
-			topologies[indiv[bestIndiv].topo]->RemoveInd(bestIndiv);
-			indiv[bestIndiv].topo=ntopos++;
-			topologies[indiv[bestIndiv].topo]->AddInd(bestIndiv);
-			assert(topologies[indiv[bestIndiv].topo]->nInds==1);
-			}
-		topologies[indiv[bestIndiv].topo]->gensAlive=0;
-		TopologyList::ntoposexamined++;
-		UpdateTopologyList(indiv);
-		}	
-*/	
-//	CalcAverageFitness();
-//	OutputFilesForScoreDebugging();
-       
-}
-
-bool Population::SPRoptimization(int indivIndex, int range, int cutnum ){
-	//DJZ 1/23/04 this is based on the NNI optimization function by Alan (ie, exhaustive nnis)
-	//the main difference is that only one node will be used as the node to be cut off and
-	//reattached, but then all reattachment points within a radius will be tried.
-	//the marking of nodes as dirty is also necessarily different
-	subset sprRange;
-	
-	Individual  currentBest;
-	Individual  tempIndiv1;
-	double bestSPRFitness; 
-	bool topoChange=false;
-	
-	ofstream outf("sprdebug.tre");
-	ofstream scr("sprscores.tre");
-	scr.precision(10);
-
-	//DJZ
-	while(unusedTrees.size()<2){
-		Tree *temp=new Tree();
-		unusedTrees.push_back(temp);
-		}
-
-	//bestSPRFitness = indiv[newindiv[indivIndex].parent].Fitness();
-	bestSPRFitness = -1e100;
-
-
-	tempIndiv1.treeStruct=*(unusedTrees.end()-1);
-	unusedTrees.pop_back();
-	currentBest.treeStruct=*(unusedTrees.end()-1);
-	unusedTrees.pop_back();	
-	//
-
-	tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, &newindiv[indivIndex]);
-	currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, &newindiv[indivIndex]);
-
-	TreeNode **thenodes=tempIndiv1.treeStruct->allNodes;
-
-	//choose the nodenum to be cut
-//	int cutnum = params->rnd.random_int(tempIndiv1.treeStruct->numNodesTotal -1 ) +1;
-	TreeNode *cutnode= thenodes[cutnum];
-	
-	//now determine the nodes that fall within the reattachment radius
-	//this is Alan's code for putting together the subset, with a bit of my alteration
-	//the subset will be centered on cutnode's anc, AKA connector
-	sprRange.setseed(cutnode->anc->nodeNum);
-	int connector=cutnode->anc->nodeNum;
-	
-    for(int i = 0;i<range;i++){
-		int j = sprRange.total;
-		for(int k=0; k < j; k++){
-			if(sprRange.front[k]==i){
-				TreeNode *cur=thenodes[sprRange.element[k]];
-				if(cur->left!=NULL) 
-						sprRange.addelement(cur->left->nodeNum, i+1, sprRange.pathlength[k]+cur->left->dlen);
-				if(cur->right!=NULL)
-						sprRange.addelement(cur->right->nodeNum, i+1, sprRange.pathlength[k]+cur->right->dlen);
-				if(cur->anc!=NULL) 
-						sprRange.addelement(cur->anc->nodeNum, i+1, sprRange.pathlength[k]+cur->dlen);
-				}// end of loop through element of current subset
-		    }// end of loop to findrange
-		}
-
-	if(cutnode->next != NULL) sprRange.elementremove(cutnode->next->nodeNum);
-	if(cutnode->prev != NULL) sprRange.elementremove(cutnode->prev->nodeNum);
-	sprRange.elementremove(connector); //connecting to the sib recreates the original tree
-	//remove the nodes that are actually part of the subtree being cut, starting with connector
-	thenodes[cutnum]->RemoveSubTreeFromSubset(sprRange, true);
-
-	sprRange.compact();
-
-	int broken=0;
-	while(sprRange.element[broken]!=0){
-
-		tempIndiv1.treeStruct->SPRMutate(cutnum, sprRange.element[broken++], adap->branchOptPrecision, 0, 0);
-		if(sprRange.element[broken]==0 && sprRange.element[broken+1]!=0) broken++;
-
-		//indiv[indivIndex].treeStruct->SetAllTempClasDirty();
-		//Because a large section of the tree will be shared between the different attachment
-		//points, we should see a decent savings by only making the temp clas dirty that we 
-		//know might change, which should only be those that are considered as reattachments.
-		//newindiv[indivIndex].treeStruct->SetSpecifiedTempClasDirty(sprRange.element);
-				
-		tempIndiv1.SetDirty();
-		
-		tempIndiv1.CalcFitness(0);
-		
-		//debug the scoring of the spr trees
-/*		outf << "  utree " << gen << sprRange.element[broken] << "= ";
-		tempIndiv1.treeStruct->root->MakeNewick(treeString);
-		outf << treeString << ";" << endl;
-
-		scr << tempIndiv1.Fitness() << endl;
-		//
-*/		
-//		if(tempIndiv1.Fitness() > (bestSPRFitness + 0.01))
-		if(tempIndiv1.Fitness() > bestSPRFitness)
-			{
-			bestSPRFitness = tempIndiv1.Fitness();
-			currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, &tempIndiv1, true);
-			topoChange=true;
-			}
-	
-		//make the tempIndiv equal to the starting tree
-		tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, &newindiv[indivIndex], true);
-		} //end of loop through all possible NNIs 
-		
-	if(topoChange==true){
-		newindiv[indivIndex].CopySecByRearrangingNodesOfFirst(newindiv[indivIndex].treeStruct, &currentBest, true);
-		}
-	
-	//Return the treestructs that we used temporarily back to the unused tree vector
-	tempIndiv1.treeStruct->RemoveTreeFromAllClas();
-	unusedTrees.push_back(tempIndiv1.treeStruct);
-	tempIndiv1.treeStruct=NULL;
-	currentBest.treeStruct->RemoveTreeFromAllClas();
-	unusedTrees.push_back(currentBest.treeStruct);
-	currentBest.treeStruct=NULL;	
-	
-//	newindiv[indivIndex].treeStruct->SetAllTempClasDirty();
-	newindiv[indivIndex].mutation_type |= Individual::exlimSPR;
-	return topoChange;
-}
-
-void Population::SPRPerturbation(int sourceInd, int indivIndex){
-	Individual  currentBest;
-	Individual  tempIndiv1;
-	Individual *source=&indiv[sourceInd];
-	int range=pertMan->sprPertRange;
-	double thresh=10000.0;
-
-	
-//	ofstream outf("sprdebug.tre");
-//	ofstream scr("sprscores.tre");
-//	scr.precision(10);
-
-	//DJZ
-	while(unusedTrees.size()<2){
-		Tree *temp=new Tree();
-		unusedTrees.push_back(temp);
-		}
-
-	tempIndiv1.treeStruct=*(unusedTrees.end()-1);
-	unusedTrees.pop_back();
-	currentBest.treeStruct=*(unusedTrees.end()-1);
-	unusedTrees.pop_back();	
-	
-
-	for(int cycle=0;cycle < pertMan->numSprCycles;cycle++){
-		double previousFitness=source->Fitness();
-		double bestDiff=-thresh;
-
-		if(cycle==0){
-			tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, source);
-			currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, source);
-			}
-		else{
-			tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, source, true);
-			currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, source, true);			
-			}
-
-		TreeNode **thenodes=tempIndiv1.treeStruct->allNodes;
-
-		//this is a little odd, but just call a normal SPRMutate with the proper range
-		//so that the possible reattachment points within that range are gathered properly
-		int cutnum=tempIndiv1.treeStruct->SPRMutate(range, adap->branchOptPrecision);
-
-		tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, source, true);
-
-		char filename[50];
-		sprintf(filename, "pertreport%d.log", rank);
-		ofstream pert(filename, ios::app);
-		pert.precision(10);
-	
-		subset *sprRange=&(tempIndiv1.treeStruct->sprRange);
-		
-		pert.precision(10);
-	//	pert2.precision(10);
-		pert << "gen " << gen << " start " << source->Fitness() << "\t" << sprRange->total << " possible attachments\n";
-		
-		int bestDist=0;
-		int broken=sprRange->total-1;
-		while(broken>=0){
-			#ifndef NO_OUTPUT
-			if(! (broken % (int)ceil((double)sprRange->total/5))) cout << ".";
-			cout.flush();
-			#endif
-			tempIndiv1.treeStruct->SPRMutate(cutnum, sprRange->element[broken--], adap->branchOptPrecision, 0, 0);
-			if(sprRange->element[broken]==0 && broken>0) broken--;
-
-			tempIndiv1.SetFitness(tempIndiv1.treeStruct->lnL);;
-
-			//divide the score difference by the square root of the node distance, to favor longer moves
-			double diff=(tempIndiv1.Fitness()-previousFitness)/sqrt(sprRange->front[broken]+1.0);
-			if(diff>0) diff=(tempIndiv1.Fitness()-previousFitness)*(sprRange->front[broken]+1);
-	//		pert2 << "node=\t" << sprRange->element[broken] << "\tdist=\t" << sprRange->front[broken] << "\tscore=\t" << tempIndiv1.Fitness() << "\t" << diff << "\t" << tempIndiv1.Fitness()-previousFitness << "\n";
-			if(diff > bestDiff/* || diff > thresh*/){
-				bestDiff=diff;
-				currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, &tempIndiv1, true);
-				bestDist=sprRange->front[broken];
-				pert << diff << "\t" << bestDist << "\n";
-				}
-			tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, source, true);
-			} 
-					
-		if(bestDiff>-thresh){
-			indiv[indivIndex].CopySecByRearrangingNodesOfFirst(indiv[indivIndex].treeStruct, &currentBest, true);
-			}
-		//set this tree up as the source for the next cycle
-		source=&indiv[indivIndex];
-
-		indiv[indivIndex].mutation_type |= Individual::exlimSPR;
-		pert << "end score=" << currentBest.Fitness() << endl;
-		
-		#ifndef NO_OUTPUT
-		cout << "Accepted SPR with range of " << bestDist << ". Current score=" << indiv[indivIndex].Fitness() << endl;
-		#endif
-		}
-
-	
-	//Return the treestructs that we used temporarily back to the unused tree vector
-	tempIndiv1.treeStruct->RemoveTreeFromAllClas();
-	unusedTrees.push_back(tempIndiv1.treeStruct);
-	tempIndiv1.treeStruct=NULL;
-	currentBest.treeStruct->RemoveTreeFromAllClas();
-	unusedTrees.push_back(currentBest.treeStruct);
-	currentBest.treeStruct=NULL;
-	}
-
-void Population::CheckPerturbSerial(){
-
-	if(pertMan->pertType < 3 ){
-	 	if(pertMan->pertType==1 && (gen - pertMan->lastPertGeneration) >= pertMan->minPertInterval/2 
-	 		&& adap->randNNIweight != adap->origRandNNIweight){
-			adap->randNNIweight=adap->origRandNNIweight;
-//			pertMan->lastPertGeneration=gen;
-			}
-
-
-		if(pertMan->pertAbandoned==false && (gen - pertMan->lastPertGeneration) >= pertMan->minPertInterval 
-			&& (adap->improveOverStoredIntervals < pertMan->pertThresh) /*&& (adap->branchOptPrecision == adap->minOptPrecision)*/){
-			if(pertMan->numPertsNoImprove <= pertMan->maxPertsNoImprove){
-				if(indiv[bestIndiv].Fitness() > bestSinceRestart.Fitness()){
-					StoreBestForPert();
-					pertMan->numPertsNoImprove=0;
-					}
-				else{
-					//if we haven't done better than the best we had before the previous perturbation, restore to 
-					//that point and perturb again
-					pertMan->numPertsNoImprove++;
-					RestoreBestForPert();
-					//abandoning perturbations
-					if(pertMan->numPertsNoImprove > pertMan->maxPertsNoImprove){
-						pertMan->pertAbandoned=true;
-						pertMan->lastPertGeneration=gen;
-						return;
-						}
-					}
-												
-				if(pertMan->pertType==1){
-					int indToReplace = (bestIndiv==0 ? 1 : 0);
-					NNIPerturbation(bestIndiv, indToReplace);
-					SetNewBestIndiv(indToReplace);
-					FillPopWithClonesOfBest();
-					AppendTreeToTreeLog(-1, bestIndiv);
-					//DEBUG try disallowing NNIs immediately after the perturbation
-					adap->randNNIweight=0.0;
-					adap->randNNIprob=0.0;
-					}
-				else if(pertMan->pertType==0){
-					//branch length perturbation
-					int indToReplace = (bestIndiv==0 ? 1 : 0);
-					indiv[indToReplace].treeStruct->PerturbAllBranches();
-					indiv[indToReplace].SetDirty();
-					indiv[indToReplace].CalcFitness(0);
-					SetNewBestIndiv(indToReplace);
-					FillPopWithClonesOfBest();
-					}
-				else{
-					double startscore=indiv[bestIndiv].Fitness();
-					double curscore;
-//					do{
-					int indToReplace = (bestIndiv==0 ? 1 : 0);
-					int source=bestIndiv;
-					#ifndef NO_OUTPUT
-					cout << "Performing SPR Perturbation.  Starting score=" << indiv[bestIndiv].Fitness() << endl;
-					#endif
-					SPRPerturbation(source, indToReplace);
-					indiv[indToReplace].CalcFitness(0);
-					SetNewBestIndiv(indToReplace);
-					FillPopWithClonesOfBest();
-					curscore=indiv[indToReplace].Fitness();
-					AppendTreeToTreeLog(-1, bestIndiv);
-					}
-				pertMan->lastPertGeneration=gen;
-				adap->reset=true;
-				gen++;
-				OutputFate();
-				}
-			}
-		}
-
-	else if(pertMan->pertType==3){
-		if(pertMan->ratcheted==false){
-			if(pertMan->pertAbandoned==false && (gen - pertMan->lastPertGeneration) >= pertMan->minPertInterval && adap->improveOverStoredIntervals < pertMan->pertThresh){
-				if(indiv[bestIndiv].Fitness() > bestSinceRestart.Fitness()){
-					StoreBestForPert();
-					pertMan->numPertsNoImprove=0;
-					}
-				else{
-					//if we haven't done better than the best we had before the previous perturbation, restore to 
-					//that point and reweight again
-					RestoreBestForPert();
-					pertMan->numPertsNoImprove++;
-
-					//abandoning perturbations
-					if(pertMan->numPertsNoImprove > pertMan->maxPertsNoImprove){
-						pertMan->pertAbandoned=true;
-						return;
-						}
-					}
-				pertMan->ratcheted=true;
-				params->data->ReserveOriginalCounts();
-				params->data->Reweight(pertMan->ratchetProportion);
-			
-				claMan->MakeAllHoldersDirty();
-				for(int i=0;i<total_size;i++) indiv[i].SetDirty();
-				CalcAverageFitness();
-				bestFitness=indiv[bestIndiv].Fitness();
-				pertMan->lastPertGeneration=gen;
-				pertMan->scoreAfterRatchet=indiv[bestIndiv].Fitness();
-				adap->reset=true;
-				gen++;
-				OutputFate();
-				cout << "Performing ratcheting: reweighting " << pertMan->ratchetProportion*100 << " percent of characters." << endl; 
-				char filename[50];
-				if(rank < 10)
-					sprintf(filename, "pertreport0%d.log", rank);
-				else 
-					sprintf(filename, "pertreport%d.log", rank);
-				ofstream pert(filename, ios::app);
-				pert << "Performing ratcheting: reweighting " << pertMan->ratchetProportion*100 << " percent of characters." << endl; 
-				pert.close();
-				}
-			}
-
-		//turn ratchet off
-		else{
-			if((gen - pertMan->lastPertGeneration) >= pertMan->ratchetMaxGen || indiv[bestIndiv].Fitness() - pertMan->scoreAfterRatchet > pertMan->ratchetOffThresh){
-				TurnOffRatchet();
-				gen++;
-				OutputFate();
-				}
-			}
-		}
-	}
-
 void Population::TurnOffRatchet(){
 	params->data->RestoreOriginalCounts();
 	pertMan->ratcheted=false;
@@ -3009,7 +2573,7 @@ void Population::TurnOffRatchet(){
 	bestFitness=indiv[bestIndiv].Fitness();
 	pertMan->lastPertGeneration=gen;
 	adap->reset=true;
-	cout << "Returning to normal character weighting..." << endl;
+	outman.UserMessage("Returning to normal character weighting...");
 	char filename[50];
 	if(rank < 10)
 		sprintf(filename, "pertreport0%d.log", rank);
@@ -3019,37 +2583,6 @@ void Population::TurnOffRatchet(){
 	pert << "Returning to normal character weighting..." << endl;
 	pert.close();
 	}
-
-
-void Population::CheckPerturbParallel(){
-	if(paraMan->perturbModeActive==true){
-		if(paraMan->allSent == false){
-			for(int i=1;i<=paraMan->nremotes;i++){
-				if(paraMan->needToSend[i]==true) break;
-				if(i==paraMan->nremotes) paraMan->allSent=true;
-				}		
-			if(paraMan->allSent==true){
-				//the pert generation is recorded as when we sent our last message
-				pertMan->lastPertGeneration=gen;
-				}
-			}
-		//keep the perturbModeActive flag true for a while so the master doesn't replace the remotes perturbed trees
-		if(gen - pertMan->lastPertGeneration > pertMan->minPertInterval){
-			paraMan->perturbModeActive=false;
-//			pertMan->lastPertGeneration=gen;
-			}
-		}
-	else if(pertMan->pertAbandoned==false && (gen - pertMan->lastPertGeneration) >= pertMan->minPertInterval
-		&& (adap->improveOverStoredIntervals < pertMan->pertThresh)/* && (adap->branchOptPrecision == adap->minOptPrecision)*/){
-		for(int i=1;i<=paraMan->nremotes;i++){
-			paraMan->needToSend[i]=true;
-			}
-		paraMan->perturbModeActive=true;
-		paraMan->allSent=false;
-		pertMan->lastPertGeneration=gen;
-		}	
-	}
-
 void Population::RestoreAllTimeBest(){
 	UpdateTopologyList(indiv);
 	topologies[indiv[0].topo]->RemoveInd(0);
@@ -3083,9 +2616,7 @@ void Population::RestoreBestForPert(){
 	pert.precision(10);
 	pert << "restoring best individual with score of " << indiv[0].Fitness() << "\n";
 	pert.close();
-	#ifndef UNIX
-	cout << "restoring best individual with score of " << bestSinceRestart.Fitness() << ".\n" << pertMan->numPertsNoImprove << " perturbation(s) performed without improvement." << endl;
-	#endif
+	outman.UserMessage("restoring best individual with score of %.4f\n %d perturbation(s) performed without improvement.", bestSinceRestart.Fitness(), pertMan->numPertsNoImprove);
 	}
 
 void Population::StoreBestForPert(){
@@ -3113,9 +2644,7 @@ void Population::StoreBestForPert(){
 	pert.precision(10);
 	pert << "storing best individual with score of " << bestSinceRestart.Fitness() << "\n";
 	pert.close();
-	#ifndef UNIX
-	cout << "storing best individual with score of " << bestSinceRestart.Fitness() << endl;
-	#endif	
+	outman.UserMessage("storing best individual with score of %.4f", bestSinceRestart.Fitness());
 	}
 
 void Population::StoreAllTimeBest(){
@@ -4183,7 +3712,7 @@ void Population::InitializeOutputStreams(){
 		else
 			sprintf(temp_buf, "%s.problog0%d.log", params->ofprefix, rank);
 		probLog.open(temp_buf);
-		if(!probLog.good()) cout << "problem opening problog" << endl;
+		if(!probLog.good()) throw ErrorException("problem opening problog");
 		adap->BeginProbLog(probLog);
 		}
 
@@ -4347,3 +3876,424 @@ void Population::CheckRemoteReplaceThresh(){
 
 #endif
 }
+
+/* 7/21/06 needs to be updated
+void Population::SPRoptimization(int indivIndex){
+//	for(int i=0;i<params->nindivs;i++)
+//		indiv[i].ResetIndiv();
+
+//	bool topoChange=false;
+
+	for(int reps=0;reps<1;reps++){
+		int cutnum = newindiv[indivIndex].treeStruct->GetRandomNonRootNode();
+		SPRoptimization(indivIndex, adap->limSPRrange, cutnum);
+		}
+	
+/*	if(topoChange==true){
+		if(topologies[indiv[bestIndiv].topo]->nInds>1){
+			topologies[indiv[bestIndiv].topo]->RemoveInd(bestIndiv);
+			indiv[bestIndiv].topo=ntopos++;
+			topologies[indiv[bestIndiv].topo]->AddInd(bestIndiv);
+			assert(topologies[indiv[bestIndiv].topo]->nInds==1);
+			}
+		topologies[indiv[bestIndiv].topo]->gensAlive=0;
+		TopologyList::ntoposexamined++;
+		UpdateTopologyList(indiv);
+		}	
+*/	
+//	CalcAverageFitness();
+//	OutputFilesForScoreDebugging();
+       
+//}
+
+/* 7/21/06 needs to be updated
+bool Population::SPRoptimization(int indivIndex, int range, int cutnum ){
+	//DJZ 1/23/04 this is based on the NNI optimization function by Alan (ie, exhaustive nnis)
+	//the main difference is that only one node will be used as the node to be cut off and
+	//reattached, but then all reattachment points within a radius will be tried.
+	//the marking of nodes as dirty is also necessarily different
+	subset sprRange;
+	
+	Individual  currentBest;
+	Individual  tempIndiv1;
+	double bestSPRFitness; 
+	bool topoChange=false;
+	
+	ofstream outf("sprdebug.tre");
+	ofstream scr("sprscores.tre");
+	scr.precision(10);
+
+	//DJZ
+	while(unusedTrees.size()<2){
+		Tree *temp=new Tree();
+		unusedTrees.push_back(temp);
+		}
+
+	//bestSPRFitness = indiv[newindiv[indivIndex].parent].Fitness();
+	bestSPRFitness = -1e100;
+
+
+	tempIndiv1.treeStruct=*(unusedTrees.end()-1);
+	unusedTrees.pop_back();
+	currentBest.treeStruct=*(unusedTrees.end()-1);
+	unusedTrees.pop_back();	
+	//
+
+	tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, &newindiv[indivIndex]);
+	currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, &newindiv[indivIndex]);
+
+	TreeNode **thenodes=tempIndiv1.treeStruct->allNodes;
+
+	//choose the nodenum to be cut
+//	int cutnum = params->rnd.random_int(tempIndiv1.treeStruct->numNodesTotal -1 ) +1;
+	TreeNode *cutnode= thenodes[cutnum];
+	
+	//now determine the nodes that fall within the reattachment radius
+	//this is Alan's code for putting together the subset, with a bit of my alteration
+	//the subset will be centered on cutnode's anc, AKA connector
+	sprRange.setseed(cutnode->anc->nodeNum);
+	int connector=cutnode->anc->nodeNum;
+	
+    for(int i = 0;i<range;i++){
+		int j = sprRange.total;
+		for(int k=0; k < j; k++){
+			if(sprRange.front[k]==i){
+				TreeNode *cur=thenodes[sprRange.element[k]];
+				if(cur->left!=NULL) 
+						sprRange.addelement(cur->left->nodeNum, i+1, sprRange.pathlength[k]+cur->left->dlen);
+				if(cur->right!=NULL)
+						sprRange.addelement(cur->right->nodeNum, i+1, sprRange.pathlength[k]+cur->right->dlen);
+				if(cur->anc!=NULL) 
+						sprRange.addelement(cur->anc->nodeNum, i+1, sprRange.pathlength[k]+cur->dlen);
+				}// end of loop through element of current subset
+		    }// end of loop to findrange
+		}
+
+	if(cutnode->next != NULL) sprRange.elementremove(cutnode->next->nodeNum);
+	if(cutnode->prev != NULL) sprRange.elementremove(cutnode->prev->nodeNum);
+	sprRange.elementremove(connector); //connecting to the sib recreates the original tree
+	//remove the nodes that are actually part of the subtree being cut, starting with connector
+	thenodes[cutnum]->RemoveSubTreeFromSubset(sprRange, true);
+
+	sprRange.compact();
+
+	int broken=0;
+	while(sprRange.element[broken]!=0){
+
+		tempIndiv1.treeStruct->SPRMutate(cutnum, sprRange.element[broken++], adap->branchOptPrecision, 0, 0);
+		if(sprRange.element[broken]==0 && sprRange.element[broken+1]!=0) broken++;
+
+		//indiv[indivIndex].treeStruct->SetAllTempClasDirty();
+		//Because a large section of the tree will be shared between the different attachment
+		//points, we should see a decent savings by only making the temp clas dirty that we 
+		//know might change, which should only be those that are considered as reattachments.
+		//newindiv[indivIndex].treeStruct->SetSpecifiedTempClasDirty(sprRange.element);
+				
+		tempIndiv1.SetDirty();
+		
+		tempIndiv1.CalcFitness(0);
+		
+		//debug the scoring of the spr trees
+/*		outf << "  utree " << gen << sprRange.element[broken] << "= ";
+		tempIndiv1.treeStruct->root->MakeNewick(treeString);
+		outf << treeString << ";" << endl;
+
+		scr << tempIndiv1.Fitness() << endl;
+		//
+*/		
+//		if(tempIndiv1.Fitness() > (bestSPRFitness + 0.01))
+/*		if(tempIndiv1.Fitness() > bestSPRFitness)
+			{
+			bestSPRFitness = tempIndiv1.Fitness();
+			currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, &tempIndiv1, true);
+			topoChange=true;
+			}
+	
+		//make the tempIndiv equal to the starting tree
+		tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, &newindiv[indivIndex], true);
+		} //end of loop through all possible NNIs 
+		
+	if(topoChange==true){
+		newindiv[indivIndex].CopySecByRearrangingNodesOfFirst(newindiv[indivIndex].treeStruct, &currentBest, true);
+		}
+	
+	//Return the treestructs that we used temporarily back to the unused tree vector
+	tempIndiv1.treeStruct->RemoveTreeFromAllClas();
+	unusedTrees.push_back(tempIndiv1.treeStruct);
+	tempIndiv1.treeStruct=NULL;
+	currentBest.treeStruct->RemoveTreeFromAllClas();
+	unusedTrees.push_back(currentBest.treeStruct);
+	currentBest.treeStruct=NULL;	
+	
+//	newindiv[indivIndex].treeStruct->SetAllTempClasDirty();
+	newindiv[indivIndex].mutation_type |= Individual::exlimSPR;
+	return topoChange;
+}
+*/
+/* 7/21/06 needs to be update
+void Population::SPRPerturbation(int sourceInd, int indivIndex){
+	assert(0);
+	//7/21/06 needs to be fixed to deal with changes made in
+	//constraint implementation
+	
+	/*
+	Individual  currentBest;
+	Individual  tempIndiv1;
+	Individual *source=&indiv[sourceInd];
+	int range=pertMan->sprPertRange;
+	double thresh=10000.0;
+
+	
+//	ofstream outf("sprdebug.tre");
+//	ofstream scr("sprscores.tre");
+//	scr.precision(10);
+
+	//DJZ
+	while(unusedTrees.size()<2){
+		Tree *temp=new Tree();
+		unusedTrees.push_back(temp);
+		}
+
+	tempIndiv1.treeStruct=*(unusedTrees.end()-1);
+	unusedTrees.pop_back();
+	currentBest.treeStruct=*(unusedTrees.end()-1);
+	unusedTrees.pop_back();	
+	
+
+	for(int cycle=0;cycle < pertMan->numSprCycles;cycle++){
+		double previousFitness=source->Fitness();
+		double bestDiff=-thresh;
+
+		if(cycle==0){
+			tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, source);
+			currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, source);
+			}
+		else{
+			tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, source, true);
+			currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, source, true);			
+			}
+
+		TreeNode **thenodes=tempIndiv1.treeStruct->allNodes;
+
+		//this is a little odd, but just call a normal SPRMutate with the proper range
+		//so that the possible reattachment points within that range are gathered properly
+		int cutnum=tempIndiv1.treeStruct->SPRMutate(range, adap->branchOptPrecision);
+
+		tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, source, true);
+
+		char filename[50];
+		sprintf(filename, "pertreport%d.log", rank);
+		ofstream pert(filename, ios::app);
+		pert.precision(10);
+	
+		subset *sprRange=&(tempIndiv1.treeStruct->sprRange);
+		
+		pert.precision(10);
+	//	pert2.precision(10);
+		pert << "gen " << gen << " start " << source->Fitness() << "\t" << sprRange->total << " possible attachments\n";
+		
+		int bestDist=0;
+		int broken=sprRange->total-1;
+		while(broken>=0){
+			if(! (broken % (int)ceil((double)sprRange->total/5))) outman.UserMessageNoCR(".");
+			outman.flush();
+
+			tempIndiv1.treeStruct->SPRMutate(cutnum, sprRange->element[broken--], adap->branchOptPrecision, 0, 0);
+			if(sprRange->element[broken]==0 && broken>0) broken--;
+
+			tempIndiv1.SetFitness(tempIndiv1.treeStruct->lnL);;
+
+			//divide the score difference by the square root of the node distance, to favor longer moves
+			double diff=(tempIndiv1.Fitness()-previousFitness)/sqrt(sprRange->front[broken]+1.0);
+			if(diff>0) diff=(tempIndiv1.Fitness()-previousFitness)*(sprRange->front[broken]+1);
+	//		pert2 << "node=\t" << sprRange->element[broken] << "\tdist=\t" << sprRange->front[broken] << "\tscore=\t" << tempIndiv1.Fitness() << "\t" << diff << "\t" << tempIndiv1.Fitness()-previousFitness << "\n";
+			if(diff > bestDiff){
+				bestDiff=diff;
+				currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, &tempIndiv1, true);
+				bestDist=sprRange->front[broken];
+				pert << diff << "\t" << bestDist << "\n";
+				}
+			tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, source, true);
+			} 
+					
+		if(bestDiff>-thresh){
+			indiv[indivIndex].CopySecByRearrangingNodesOfFirst(indiv[indivIndex].treeStruct, &currentBest, true);
+			}
+		//set this tree up as the source for the next cycle
+		source=&indiv[indivIndex];
+
+		indiv[indivIndex].mutation_type |= Individual::exlimSPR;
+		pert << "end score=" << currentBest.Fitness() << endl;
+		
+		outman.UserMessage("Accepted SPR with range of %d.  Current score= %.4f", bestDist, indiv[indivIndex].Fitness());
+		}
+
+	
+	//Return the treestructs that we used temporarily back to the unused tree vector
+	tempIndiv1.treeStruct->RemoveTreeFromAllClas();
+	unusedTrees.push_back(tempIndiv1.treeStruct);
+	tempIndiv1.treeStruct=NULL;
+	currentBest.treeStruct->RemoveTreeFromAllClas();
+	unusedTrees.push_back(currentBest.treeStruct);
+	currentBest.treeStruct=NULL;
+	}
+*/
+
+/*
+void Population::CheckPerturbParallel(){
+	if(paraMan->perturbModeActive==true){
+		if(paraMan->allSent == false){
+			for(int i=1;i<=paraMan->nremotes;i++){
+				if(paraMan->needToSend[i]==true) break;
+				if(i==paraMan->nremotes) paraMan->allSent=true;
+				}		
+			if(paraMan->allSent==true){
+				//the pert generation is recorded as when we sent our last message
+				pertMan->lastPertGeneration=gen;
+				}
+			}
+		//keep the perturbModeActive flag true for a while so the master doesn't replace the remotes perturbed trees
+		if(gen - pertMan->lastPertGeneration > pertMan->minPertInterval){
+			paraMan->perturbModeActive=false;
+//			pertMan->lastPertGeneration=gen;
+			}
+		}
+	else if(pertMan->pertAbandoned==false && (gen - pertMan->lastPertGeneration) >= pertMan->minPertInterval
+		&& (adap->improveOverStoredIntervals < pertMan->pertThresh)/* && (adap->branchOptPrecision == adap->minOptPrecision)*/ /*){
+/*		for(int i=1;i<=paraMan->nremotes;i++){
+			paraMan->needToSend[i]=true;
+			}
+		paraMan->perturbModeActive=true;
+		paraMan->allSent=false;
+		pertMan->lastPertGeneration=gen;
+		}	
+	}
+*/
+
+/* 7/21/06 needs to be updated
+void Population::CheckPerturbSerial(){
+
+	if(pertMan->pertType < 3 ){
+	 	if(pertMan->pertType==1 && (gen - pertMan->lastPertGeneration) >= pertMan->minPertInterval/2 
+	 		&& adap->randNNIweight != adap->origRandNNIweight){
+			adap->randNNIweight=adap->origRandNNIweight;
+//			pertMan->lastPertGeneration=gen;
+			}
+
+
+		if(pertMan->pertAbandoned==false && (gen - pertMan->lastPertGeneration) >= pertMan->minPertInterval 
+			&& (adap->improveOverStoredIntervals < pertMan->pertThresh) /*&& (adap->branchOptPrecision == adap->minOptPrecision)*/ /*){
+			if(pertMan->numPertsNoImprove <= pertMan->maxPertsNoImprove){
+				if(indiv[bestIndiv].Fitness() > bestSinceRestart.Fitness()){
+					StoreBestForPert();
+					pertMan->numPertsNoImprove=0;
+					}
+				else{
+					//if we haven't done better than the best we had before the previous perturbation, restore to 
+					//that point and perturb again
+					pertMan->numPertsNoImprove++;
+					RestoreBestForPert();
+					//abandoning perturbations
+					if(pertMan->numPertsNoImprove > pertMan->maxPertsNoImprove){
+						pertMan->pertAbandoned=true;
+						pertMan->lastPertGeneration=gen;
+						return;
+						}
+					}
+												
+				if(pertMan->pertType==1){
+					int indToReplace = (bestIndiv==0 ? 1 : 0);
+					NNIPerturbation(bestIndiv, indToReplace);
+					SetNewBestIndiv(indToReplace);
+					FillPopWithClonesOfBest();
+					AppendTreeToTreeLog(-1, bestIndiv);
+					//DEBUG try disallowing NNIs immediately after the perturbation
+					adap->randNNIweight=0.0;
+					adap->randNNIprob=0.0;
+					}
+				else if(pertMan->pertType==0){
+					//branch length perturbation
+					int indToReplace = (bestIndiv==0 ? 1 : 0);
+					indiv[indToReplace].treeStruct->PerturbAllBranches();
+					indiv[indToReplace].SetDirty();
+					indiv[indToReplace].CalcFitness(0);
+					SetNewBestIndiv(indToReplace);
+					FillPopWithClonesOfBest();
+					}
+				else{
+					double startscore=indiv[bestIndiv].Fitness();
+					double curscore;
+//					do{
+					int indToReplace = (bestIndiv==0 ? 1 : 0);
+					int source=bestIndiv;
+					outman.UserMessage("Performing SPR Perturbation.  Starting score=%.4f", indiv[bestIndiv].Fitness());
+					SPRPerturbation(source, indToReplace);
+					indiv[indToReplace].CalcFitness(0);
+					SetNewBestIndiv(indToReplace);
+					FillPopWithClonesOfBest();
+					curscore=indiv[indToReplace].Fitness();
+					AppendTreeToTreeLog(-1, bestIndiv);
+					}
+				pertMan->lastPertGeneration=gen;
+				adap->reset=true;
+				gen++;
+				OutputFate();
+				}
+			}
+		}
+
+	else if(pertMan->pertType==3){
+		if(pertMan->ratcheted==false){
+			if(pertMan->pertAbandoned==false && (gen - pertMan->lastPertGeneration) >= pertMan->minPertInterval && adap->improveOverStoredIntervals < pertMan->pertThresh){
+				if(indiv[bestIndiv].Fitness() > bestSinceRestart.Fitness()){
+					StoreBestForPert();
+					pertMan->numPertsNoImprove=0;
+					}
+				else{
+					//if we haven't done better than the best we had before the previous perturbation, restore to 
+					//that point and reweight again
+					RestoreBestForPert();
+					pertMan->numPertsNoImprove++;
+
+					//abandoning perturbations
+					if(pertMan->numPertsNoImprove > pertMan->maxPertsNoImprove){
+						pertMan->pertAbandoned=true;
+						return;
+						}
+					}
+				pertMan->ratcheted=true;
+				params->data->ReserveOriginalCounts();
+				params->data->Reweight(pertMan->ratchetProportion);
+			
+				claMan->MakeAllHoldersDirty();
+				for(int i=0;i<total_size;i++) indiv[i].SetDirty();
+				CalcAverageFitness();
+				bestFitness=indiv[bestIndiv].Fitness();
+				pertMan->lastPertGeneration=gen;
+				pertMan->scoreAfterRatchet=indiv[bestIndiv].Fitness();
+				adap->reset=true;
+				gen++;
+				OutputFate();
+				outman.UserMessage("Performing ratcheting: reweighting %.1f percent of characters.", pertMan->ratchetProportion*100);
+				char filename[50];
+				if(rank < 10)
+					sprintf(filename, "pertreport0%d.log", rank);
+				else 
+					sprintf(filename, "pertreport%d.log", rank);
+				ofstream pert(filename, ios::app);
+				pert << "Performing ratcheting: reweighting " << pertMan->ratchetProportion*100 << " percent of characters." << endl; 
+				pert.close();
+				}
+			}
+
+		//turn ratchet off
+		else{
+			if((gen - pertMan->lastPertGeneration) >= pertMan->ratchetMaxGen || indiv[bestIndiv].Fitness() - pertMan->scoreAfterRatchet > pertMan->ratchetOffThresh){
+				TurnOffRatchet();
+				gen++;
+				OutputFate();
+				}
+			}
+		}
+	}
+*/

@@ -436,9 +436,9 @@ private:
 		void NNISpectrum(int sourceInd);
 
 		void NNIoptimization();
-		void SPRoptimization(int indivIndex);
+//		void SPRoptimization(int indivIndex);
 		bool NNIoptimization(int IndivIndex, int steps);
-		bool SPRoptimization(int indivIndex, int range, int cutnum );
+//		bool SPRoptimization(int indivIndex, int range, int cutnum );
 		void SPRPerturbation(int sourceInd, int indivIndex);
 		void keepTrack();
 		void DetermineSubsets(int);
