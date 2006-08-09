@@ -670,7 +670,6 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 	
 #endif
 	double totalEstImprove=0.0;
-	bool continueOpt=false;
 	int iter=0;
 	double abs_d1_prev=1e200;;
 	const double v_onEntry=nd->dlen;
@@ -680,6 +679,7 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 	double prevScore=lnL;
 	double curScore=lnL;
 	int negProposalNum=0;
+	double knownMin=DEF_MIN_BRLEN, knownMax=DEF_MAX_BRLEN;
 
 	do{
 		bool scoreOK;
@@ -710,53 +710,65 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 					sweeps++;
 					}
 				}
-			}while(scoreOK==false);	
-		
+			}while(scoreOK==false);		
 		
 		double d1=derivs.first; //* 4.0 * pow(nd->dlen, 0.75);
 		double d2=derivs.second;// * 3.0 * pow(nd->dlen, -0.25);
-
-		//DEBUG
-/*		if(iter==0 && nd->dlen > 1e-7 && (abs(d1-empD1) > 1.0)){// || (abs(d2-empD2) > 50.0))){
-
-			ofstream bad("badD1.log", ios::app);
-			bad << nd->nodeNum << "\t" << nd->dlen << "\t" << d1 << "\t" << d2 << "\t" << empD1 << "\t" << empD2 << "\t";
-			mod->OutputGamlFormattedModel(bad);
-			bad << "\n";
-			bad.close();
-			}
-*/
 		double estDeltaNR=-d1/d2;
-		
-		//this was my original ad hoc estimated score change, which was always an overestimate
-//		double estScoreDelta = .6666 * d1*estDeltaNR;
-		
 		//estimated change in score by a Taylor series (always an underestimate)
 		double estScoreDelta = d1*estDeltaNR + (d2 * estDeltaNR * estDeltaNR * 0.5);
-			
-		if(iter==0 && estScoreDelta > precision1) continueOpt=true;
-		
+
+		if(d1 <= 0.0 && nd->dlen < knownMax) knownMax = nd->dlen;
+		else if(d1 > 0.0 && nd->dlen > knownMin) knownMin = nd->dlen;
+
 														#ifdef OPT_DEBUG			
 														opt << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
 														#endif
 		double abs_d1 = fabs(d1);
-		if (d2 >= 0.0){
+		if (d2 >= 0.0){//curvature is wrong for NR use 
+			//this does NOT only happen when the peak is at the min, as I used to think
 														#ifdef OPT_DEBUG			
-														opt << "d2 > 0, try minbrlen?\t";				
+														opt << "d2 > 0\t";				
 														#endif
-			//the only time this seems to happen is when the peak is at the min and the
-			//current point is far from that
-			assert(d1 < 0.0);
-//			if(abs(nd->dlen - DEF_MIN_BRLEN) < DEF_MIN_BRLEN){				
-//			if(nd->dlen==DEF_MIN_BRLEN){
-			if(((DEF_MIN_BRLEN - nd->dlen)*d1) < precision1){
-				#ifdef OPT_DEBUG
-				opt << "no, return\n";
-				#endif
-				return totalEstImprove;
+			//if d1 is negative, try either the min length or halfway to the knownMin
+			if(d1 <= 0.0){
+				if(knownMin == DEF_MIN_BRLEN){
+					double estImp = ((DEF_MIN_BRLEN - nd->dlen)*d1);//this is not a good estimate, but is something
+					if(estImp < precision1){
+						#ifdef OPT_DEBUG
+						opt << "imp to min < prec, return\n";
+						#endif
+						return totalEstImprove;
+						}
+					v=DEF_MIN_BRLEN;
+					totalEstImprove += precision1;
+					}
+				else{
+					double proposed = (knownMin + nd->dlen) * 0.5;
+					double estImp = ((proposed - nd->dlen) * d1);//this is not a good estimate, but is something
+					if(estImp < precision1){
+						#ifdef OPT_DEBUG
+						opt << "imp to 1/2 way to knownMin < prec, return\n";
+						#endif
+						return totalEstImprove;
+						}
+					v=proposed;
+					totalEstImprove += precision1;
+					}
 				}
-			v=DEF_MIN_BRLEN;
-			totalEstImprove += precision1;
+			else{//d1 > 0.0
+				//try a step half-way to the knownMax
+				double proposed = (knownMax + nd->dlen) * 0.5;
+				double estImp = ((proposed - nd->dlen) * d1);//this is not a good estimate, but is something
+				if(estImp < precision1){
+					#ifdef OPT_DEBUG
+					opt << "imp to prop < prec, return\n";
+					#endif
+					return totalEstImprove;
+					}
+				v=proposed;
+				totalEstImprove += precision1;				
+				}
 			}
 		else{
 			if(estScoreDelta < precision1){
@@ -781,52 +793,81 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 														opt << "d1 increased!\t";	
 														#endif
 				}
-			if (v < DEF_MIN_BRLEN){
+			//if (v < DEF_MIN_BRLEN){
+			if (v < knownMin){
 				negProposalNum++;
-				double deltaToMin=DEF_MIN_BRLEN-nd->dlen;
-				double scoreDeltaToMin = (deltaToMin * d1 + (deltaToMin*deltaToMin*d2*.5));
-				if(scoreDeltaToMin < precision1){
-
-//				if(nd->dlen == DEF_MIN_BRLEN){
+				if(knownMin == DEF_MIN_BRLEN){
+					double deltaToMin=DEF_MIN_BRLEN-nd->dlen;
+					double scoreDeltaToMin = (deltaToMin * d1 + (deltaToMin*deltaToMin*d2*.5));
+					if(scoreDeltaToMin < precision1){
 													#ifdef OPT_DEBUG
 													assert(curScore != -1.0);		
 													opt << nd->dlen << "\t" << curScore  <<"\n";			
 													#endif
-					//if the blen was already the min and the proposed blen is negative,
-					//we don't need to continue sweeping over nodes
-					return totalEstImprove;
-					}
-				else if(v < -1.0){
-					//if the proposed blen is this negative, just try the min brlen
-					v=DEF_MIN_BRLEN;
-//					totalEstImprove += precision1;
-					totalEstImprove += scoreDeltaToMin;
+						return totalEstImprove;
+						}
+					else if(v < -1.0){
+						//if the proposed blen is this negative, just try the min brlen
+						v=DEF_MIN_BRLEN;
+//						totalEstImprove += precision1;
+						totalEstImprove += scoreDeltaToMin;
 													#ifdef OPT_DEBUG
 													Score(nd->anc->nodeNum);		
 													opt << nd->dlen << "\t" << lnL << "\n";			
 													#endif
+						}
+					else if(negProposalNum==1 && nd->dlen > 1e-4 && v_prev != 1e-4){
+						//try a somewhat smaller length before going all the way to the min
+						v = nd->dlen * .1;
+						double delta=v - nd->dlen;
+						totalEstImprove += (delta * d1 + (delta*delta*d2*.5));
+//						totalEstImprove += precision1;
+						}
+					else{
+						v = DEF_MIN_BRLEN;
+						totalEstImprove += scoreDeltaToMin;
+//						totalEstImprove += precision1;
+						}
 					}
-				else if(negProposalNum==1 && nd->dlen > 1e-4 && v_prev != 1e-4){
-					//try a somewhat smaller length before going all the way to the min
-					v = nd->dlen * .1;
-					double delta=v - nd->dlen;
-					totalEstImprove += (delta * d1 + (delta*delta*d2*.5));
-//					totalEstImprove += precision1;
-					}
-				else{
-					v = DEF_MIN_BRLEN;
-					totalEstImprove += scoreDeltaToMin;
-//					totalEstImprove += precision1;
+				else{//knownMin is > absolute min, so we must already have a better guess
+					//go half way to that guess
+					double proposed = (knownMin + nd->dlen) * 0.5;
+					double deltaToMin=proposed-nd->dlen;
+					double scoreDeltaToMin = (deltaToMin * d1 + (deltaToMin*deltaToMin*d2*.5));
+					if(scoreDeltaToMin < precision1){
+						#ifdef OPT_DEBUG
+						opt << "imp to prop < prec, return\n";
+						#endif
+						return totalEstImprove;
+						}
+					v=proposed;
+					totalEstImprove += scoreDeltaToMin;				
 					}
 				}
-			else if (v > DEF_MAX_BRLEN){
-				double deltaToMax=DEF_MAX_BRLEN - nd->dlen;
-				double scoreDeltaToMax = (deltaToMax * d1 + (deltaToMax*deltaToMax*d2*.5));
-				if(scoreDeltaToMax < precision1) return totalEstImprove;
-				else{
-					v = DEF_MAX_BRLEN;
+			//else if (v > DEF_MAX_BRLEN){
+			else if (v > knownMax){
+				if(knownMax == DEF_MAX_BRLEN){
+					double deltaToMax=DEF_MAX_BRLEN - nd->dlen;
+					double scoreDeltaToMax = (deltaToMax * d1 + (deltaToMax*deltaToMax*d2*.5));
+					if(scoreDeltaToMax < precision1) return totalEstImprove;
+					else{
+						v = DEF_MAX_BRLEN;
+						totalEstImprove += scoreDeltaToMax;
+						}
+					}
+				else{//knownMax is < absolute max, so we must already have a better guess
+					//go half way to that guess
+					double proposed = (knownMax + nd->dlen) * 0.5;
+					double deltaToMax=proposed-nd->dlen;
+					double scoreDeltaToMax = (deltaToMax * d1 + (deltaToMax*deltaToMax*d2*.5));
+					if(scoreDeltaToMax < precision1){
+						#ifdef OPT_DEBUG
+						opt << "imp to prop < prec, return\n";
+						#endif
+						return totalEstImprove;
+						}
+					v=proposed;
 					totalEstImprove += scoreDeltaToMax;
-	//				totalEstImprove += precision1;
 					}
 				}
 			else totalEstImprove += estScoreDelta;
@@ -834,6 +875,9 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 			abs_d1_prev = abs_d1;
 			}
 		assert(v >= DEF_MIN_BRLEN);
+		assert(v >= knownMin);
+		assert(v <= knownMax);
+
 		SetBranchLength(nd, v);
 #ifdef OPT_DEBUG
 		Score(nd->anc->nodeNum);
@@ -885,9 +929,8 @@ opt << v << "\t" << lnL << "\n";
 #ifdef OPT_DEBUG
 	opt << "final\t" << nd->dlen << "\t" << lnL << endl;
 #endif
-	assert(nd->dlen > 0.0);
-//	assert(curScore != -1.0);
-	return continueOpt;
+	assert(0);//shouldn't be exiting this way
+	return totalEstImprove;
 	}
 /*
 void Tree::RecursivelyOptimizeBranches(TreeNode *nd, double optPrecision, int subtreeNode, int radius, int centerNode, bool dontGoNext){
