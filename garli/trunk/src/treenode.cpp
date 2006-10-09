@@ -1,5 +1,5 @@
-// GARLI version 0.94 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,14 +7,11 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
-
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #include <cassert>
@@ -26,7 +23,6 @@ using namespace std;
 #include "treenode.h"
 #include "clamanager.h"
 #include "bipartition.h"
-#include "subset.h"
 #include "errorexception.h"
 #include "outputman.h"
 
@@ -56,10 +52,10 @@ TreeNode::~TreeNode(){
 }
 
 TreeNode* TreeNode::AddDes(TreeNode *d){
+	//leaves blens as-is
 	d->anc=this;
 	d->next=NULL;
-	if(left)
-		{
+	if(left){
 		if(right){
 			right->next=d;
 			d->prev=right;
@@ -71,11 +67,10 @@ TreeNode* TreeNode::AddDes(TreeNode *d){
 			d->prev=left;
 			}
 		}
-	else
-		{left=d;
+	else{
+		left=d;
 		d->prev=NULL;
 		}
-//	right=d;
 	d->attached=true;
 
 /* GANESH added this */
@@ -84,9 +79,39 @@ TreeNode* TreeNode::AddDes(TreeNode *d){
     leaf_mask = false;
 #endif
 	return d;
-
 }
-char *TreeNode::MakeNewick(char *s, bool internalNodes, bool branchLengths /*=true*/) const{
+
+void TreeNode::RemoveDes(TreeNode *d){
+	//leaves blens as-is
+	assert(d->anc == this);
+	//remove d from this
+	if(d->prev != NULL) d->prev->next=d->next;
+	if(d->next != NULL) d->next->prev=d->prev;
+	if(d == left)
+		left=d->next;
+	else if(d == right)
+		right=d->prev;
+
+	d->next = d->prev = NULL;
+	d->anc=NULL;
+	}
+
+void TreeNode::MoveDesToAnc(TreeNode *d){
+	//this assumes that the anc is currently NULL,
+	//and makes the specified des the new anc.
+	//*this is added as a des of that anc
+	//the blen of the des is trasfered to this
+	assert(anc == NULL);
+	dlen = d->dlen;
+	d->dlen=-1;
+	RemoveDes(d);
+
+	//now add this to d
+	d->AddDes(this);
+	}
+
+char *TreeNode::MakeNewick(char *s, bool internalNodes, bool branchLengths, bool highPrec /*=false*/) const{
+
 	if(left){
 		if(internalNodes==true && nodeNum!=0){
 			sprintf(s, "%d", nodeNum);
@@ -97,8 +122,9 @@ char *TreeNode::MakeNewick(char *s, bool internalNodes, bool branchLengths /*=tr
 		if(anc){
 			if(branchLengths==true){
 				*s++=':';
-				sprintf(s, "%.8lf", dlen);
-	//			strcpy(s, ".01");
+				if(highPrec == false)
+					sprintf(s, "%.8lf", dlen);
+				else sprintf(s, "%.10lf", dlen);
 				while(*s)s++;
 				}
 			}
@@ -112,8 +138,9 @@ char *TreeNode::MakeNewick(char *s, bool internalNodes, bool branchLengths /*=tr
 		while(*s)s++;
 		if(branchLengths==true){
 			*s++=':';
-			sprintf(s, "%.8lf", dlen);
-	//		strcpy(s, ".01");
+			if(highPrec == false)
+				sprintf(s, "%.8lf", dlen);
+			else sprintf(s, "%.10lf", dlen);
 			while(*s)s++;
 			}
 		}
@@ -224,8 +251,7 @@ void TreeNode::SubstituteNodeWithRespectToAnc(TreeNode *subs)//note THIS DOESN't
 		next=prev=anc=NULL;
 }
 
-int TreeNode::CountBranches(int s)
-{
+int TreeNode::CountBranches(int s){
 	if(left)
 		s=left->CountBranches(++s);
 	if(nodeNum==0)
@@ -247,7 +273,6 @@ int TreeNode::CountTerminals(int s){
 }
 
 int TreeNode::CountTerminalsDown(int s, TreeNode *calledFrom){
-	
 	TreeNode *sib;
 	
 	if(nodeNum!=0){		
@@ -265,16 +290,14 @@ int TreeNode::CountTerminalsDown(int s, TreeNode *calledFrom){
 		if(left->next!=calledFrom) s=left->next->CountTerminals(s);
 		if(right!=calledFrom) s=right->CountTerminals(s);
 		}
-		
-		
 	return s;
 }
 
-void TreeNode::CountSubtreeBranchesAndDepth(int &branches, int &sum, int depth, bool first) const
+void TreeNode::CountSubtreeBranchesAndDepth(int &branches, int &sum, int depth, bool first) const{
 //this is the version to use if you want to be
-//sure not to just to another subtree (ie, don't 
+//sure not to jump to another subtree (ie, don't 
 //go ->next from the calling node)
-{
+
 	if(left){
 		sum+=depth;
 		left->CountSubtreeBranchesAndDepth(++branches, sum, depth+1, false);
@@ -285,7 +308,6 @@ void TreeNode::CountSubtreeBranchesAndDepth(int &branches, int &sum, int depth, 
 		}
 }
 	
-
 void TreeNode::CalcDepth(int &dep){
 	dep++;
 	int l=0, r=0;
@@ -298,8 +320,8 @@ void TreeNode::CalcDepth(int &dep){
 	dep += (r > l ? r : l);
 	}
 
-void TreeNode::MarkTerminals(int *taxtags)
-{	if(left)
+void TreeNode::MarkTerminals(int *taxtags){
+	if(left)
 		left->MarkTerminals(taxtags);
 	else
 		taxtags[nodeNum]=1;
@@ -316,17 +338,17 @@ void TreeNode::MarkUnattached(bool includenode){
 	}
 	
 TreeNode* TreeNode::FindNode( int &n, TreeNode *tempno){		
-		//my version DZ.  It returns nodeNum n
-		if(left&&tempno!=NULL){
-			tempno=left->FindNode(n, tempno);
-			}
-		if(next&&tempno!=NULL){
-			tempno=left->FindNode(n, tempno);
-			}
-		if(nodeNum==n){
-			tempno=this;
-			}			
-		return tempno;
+	//my version DZ.  It returns nodeNum n
+	if(left&&tempno!=NULL){
+		tempno=left->FindNode(n, tempno);
+		}
+	if(next&&tempno!=NULL){
+		tempno=left->FindNode(n, tempno);
+		}
+	if(nodeNum==n){
+		tempno=this;
+		}			
+	return tempno;
 	}
 	
 //MTH
@@ -437,6 +459,7 @@ void TreeNode::FindCrazyShortBranches(){
 	}
 	
 void TreeNode::CheckTreeFormation()	{
+#ifndef NDEBUG
 	//make sure that nodes that this node points to also point back (ie this->ldes->anc=this)
 	if(left){
 		assert(left->anc==this);
@@ -453,6 +476,7 @@ void TreeNode::CheckTreeFormation()	{
 		assert(prev->next==this);
 		}
 	assert(!anc||dlen>0.0);
+#endif
 	}
 
 void TreeNode::CheckforPolytomies(){
@@ -519,6 +543,7 @@ void TreeNode::GatherConstrainedBiparitions(vector<Bipartition> &biparts) {
 			}
 		}
 	}
+
 void TreeNode::OutputBipartition(ostream &out){	
 	if(left&&anc){
 		left->OutputBipartition(out);
@@ -542,12 +567,6 @@ void TreeNode::RotateDescendents(){
 	left->next=right;
 	right->next=NULL;
 	}
-	
-void TreeNode::RemoveSubTreeFromSubset(subset &sub, bool startnode){
-	sub.elementremove(nodeNum);
-	if(left != NULL) left->RemoveSubTreeFromSubset(sub, false);
-	if(startnode==false && next != NULL) next->RemoveSubTreeFromSubset(sub, false);
-	}
 
 void TreeNode::AddNodesToList(vector<int> &list){
 	list.push_back(nodeNum);
@@ -558,6 +577,18 @@ void TreeNode::AddNodesToList(vector<int> &list){
 void TreeNode::FlipBlensToRoot(TreeNode *from){
 	if(anc!=NULL) anc->FlipBlensToRoot(this);
 	if(from==NULL) dlen=-1;
+	else dlen=from->dlen;
+	}
+
+void TreeNode::FlipBlensToNode(TreeNode *from, TreeNode *stopNode){
+	//for rerooting a subtree
+	//each node gets the get blen of the previous node (one of
+	//its des)
+	assert(anc != NULL);
+	assert(from != NULL);
+	assert(stopNode != NULL);
+	if(anc != stopNode) 
+		anc->FlipBlensToNode(this, stopNode);
 	else dlen=from->dlen;
 	}
 
@@ -579,39 +610,3 @@ void TreeNode::AdjustClasForReroot(int dir){
 		}
 	else assert(0);
 	}	
-
-void TreeNode::getTaxonSwapList(vector<int> &TaxonSwapList){
-  	if(left == NULL){
-		TaxonSwapList.push_back(nodeNum); 
-		}
-	else {
-	  	left->getTaxonSwapList(TaxonSwapList);
-	    right->getTaxonSwapList(TaxonSwapList);
-		}
-	}
-
-void TreeNode::getNNIList(vector<int> &NNIList){
-	if(left!=NULL){
-		NNIList.push_back(nodeNum);
-    	left->getNNIList(NNIList);
-    	right->getNNIList(NNIList);
-	    }
-	else
-		return;
-	}
-
-void TreeNode::getSPRList(int cut, vector<int> &SPRList){ 
-	if(nodeNum==cut) return;
-
-	if(left){
-		//if this is an internal node, only add it if it's not cut's ancestor
-		if((right->nodeNum!=cut) && (left->nodeNum!=cut)){
-			SPRList.push_back(nodeNum);
-			}
-		left->getSPRList(cut,SPRList);
-		right->getSPRList(cut,SPRList);
-		}
-	else{//if its a terminal node
-		SPRList.push_back(nodeNum);		
-		}
-	}

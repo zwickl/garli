@@ -1,5 +1,5 @@
-// GARLI version 0.93 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,14 +7,11 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
-
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 
@@ -24,7 +21,7 @@
 #include <vector>
 #include <cassert>
 using namespace std;
-//#include "gaml.h"
+
 #include "condlike.h"
 #include "clamanager.h"
 #include "bipartition.h"
@@ -32,11 +29,9 @@ using namespace std;
 /* GANESH included the following #includes */
 #include "hashdefines.h"
 
-class subset;
 class HKYdata;
 
-class TreeNode
-{
+class TreeNode{
 	public:
 		TreeNode* left,* right,* next,* prev,* anc;
  		int nodeNum;
@@ -44,24 +39,21 @@ class TreeNode
  		int claIndexUL;
  		int claIndexUR;
  		double dlen;
- /*		short rescaleRankDown;
- 		short rescaleRankUL;
- 		short rescaleRankUR;
- */		bool attached;
+		bool attached;
+		bool alreadyOptimized;
 		Bipartition *bipart;
-		//unsigned char *tipData;
 		char *tipData;
-
-#ifdef PECR_SET_PARSIMONY_BRLEN
-        bool leaf_mask;		
+#ifdef OPEN_MP
+		unsigned *ambigMap;
 #endif
 
 		TreeNode( const int i = -1 );
 		~TreeNode();
 		
-		char *MakeNewick(char *s, bool internalNodes, bool branchLengths=true) const;
-		void MakeNewickForSubtree(char *s) const;
+		//functions for manipulating nodes within a tree
 		TreeNode * AddDes(TreeNode *);//returns argument
+		void RemoveDes(TreeNode *d);
+		void MoveDesToAnc(TreeNode *d);
 		void SubstituteNodeWithRespectToAnc(TreeNode *subs);
 		int CountBranches(int s);
 		int CountTerminals(int s);
@@ -71,32 +63,38 @@ class TreeNode
 		void Prune();
         TreeNode* FindNode( int &n);
         TreeNode* FindNode( int &n,TreeNode *tempno);
-		bool IsGood();
-		void CheckforPolytomies();
 		void CountNumberofNodes(int &nnodes);
-		void CheckforLeftandRight();
-		void FindCrazyLongBranches();
-		void FindCrazyShortBranches();
-		void CheckTreeFormation();
+		void MarkUnattached(bool includenode);
+		void RotateDescendents();
+		void AdjustClasForReroot(int dir);
+		void AddNodesToList(vector<int> &list);
+		void FlipBlensToRoot(TreeNode *from);
+		void FlipBlensToNode(TreeNode *from, TreeNode *stopNode);
+		
+
+		//misc functions
+		char *MakeNewick(char *s, bool internalNodes, bool branchLengths, bool highPrec=false) const;
+		void MakeNewickForSubtree(char *s) const;
+		bool IsGood();
 		void CalcDepth(int &dep);
 		void CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, int dir);
-		void AllocateMultipliers(int nchar);
 		Bipartition* CalcBipartition();
 		void StandardizeBipartition();
 		void GatherConstrainedBiparitions(vector<Bipartition> &biparts);
 		void OutputBipartition(ostream &out);
-		void MarkUnattached(bool includenode);
-		void RotateDescendents();
-		void AdjustClasForReroot(int dir);
 		void PrintSubtreeMembers(ofstream &out);
-		
-		void RemoveSubTreeFromSubset(subset &sub, bool startnode);
-		void AddNodesToList(vector<int> &list);
-		void FlipBlensToRoot(TreeNode *from);
-		
-		void getNNIList(vector<int> &NNIList);
-		void getTaxonSwapList(vector<int> &TaxonSwapList);
-		void getSPRList(int cut, vector<int> &SPRList);
+		void SetUnoptimized(){
+			alreadyOptimized=false;
+			if(left) left->SetUnoptimized();
+			if(right) right->SetUnoptimized();
+			}
+
+		//debugging functions for checking tree formation
+		void CheckforPolytomies();
+		void CheckforLeftandRight();
+		void FindCrazyLongBranches();
+		void FindCrazyShortBranches();
+		void CheckTreeFormation();
 };
 
 inline void TreeNode::CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, int dir){
