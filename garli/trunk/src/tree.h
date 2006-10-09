@@ -1,5 +1,5 @@
-// GARLI version 0.93 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,14 +7,11 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
-
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 
@@ -30,13 +27,12 @@ using namespace std;
 #include "rng.h"
 #include "treenode.h"
 #include "clamanager.h"
-#include "subset.h"
 #include "hashdefines.h"
 #include "model.h"
 #include "mlhky.h"
 #include "reconnode.h"
 
-#undef OPT_DEBUG
+
 #undef BRENT
 
 class DNAData;
@@ -45,32 +41,6 @@ class Model;
 extern rng rnd;
 
 class Tree{
-
-#ifdef GANESH
-/* TODO explain these private variables */
-/* TODO variables like A are declared as private, yet are passed around in
- * function calls unnecessarily. Identify and eliminate such redundancies.
- * */
-    private:
-        int *iedges;    
-        int running_index;
-        int pedges_index; 
-        int **treecatalan;
-        int n_p_subtree_tips;
-        TreeNode *p_subtree_root;
-        int *postorder;
-        int *postorder_reverse;
-        int postorder_index;
-
-        int *masked_postorder;
-        int *masked_postorder_reverse;
-        int masked_postorder_index;
-
-        TreeNode **p_subtree_leaves;
-        int *pedges;
-        int *A;
-#endif
-
 	protected:
 		int numTipsTotal;
 		int numTipsAdded;
@@ -81,10 +51,13 @@ class Tree{
 			//allocated in SharedTreeConstruction, deleted in dest
 
 	public:
+		double lnL;	// holds likelihood score
+		Model *mod;
 		TreeNode *root;
 		TreeNode **allNodes;
 		ReconList sprRang;
-//		subset sprRange;
+
+		//a bunch of statics
 		static double meanBrlenMuts;
 		static double alpha; //alpha shape of blen mutation, not gamma rate het
 		static double min_brlen;
@@ -94,207 +67,123 @@ class Tree{
 		static HKYData *data;
 		static double treeRejectionThreshold;
 		static vector<Constraint> constraints;
+		static AttemptedSwapList attemptedSwaps;
+		static double uniqueSwapBias;
+		static double distanceSwapBias;
+		static int rescaleEvery;
+		static list<TreeNode *> nodeOptVector;
 
 		int calcs;
-		
-		void TopologyMutator(double optPrecision, int range, int subtreeNode);
-		void GatherValidReconnectionNodes(int maxRange, TreeNode *cut, const TreeNode *subtreeNode);
-		
-	enum{
+
+	enum{//the directions for sweeping of CLAs
 		DOWN = 1,
 		UPLEFT = 2,
 		UPRIGHT = 3,
 		ROOT = 4
 		};		
 		
-#ifdef GANESH
-/* the value of p in pECR */
-        static int p_value;
-        static bool random_p;
-        static int *C;
-        static int **realcat_intervals;
-        static int **inv_realcat_intervals;
-#endif
-			
-		double lnL;	// holds likelihood score
-		Model *mod;
-		
-		static int rescaleEvery;
-		static list<TreeNode *> nodeOptVector;
-		
 	public: 
+		//construction and allocation functions
+		Tree();
 		Tree(HKYData*,CondLikeArray **sharedcl);
 		Tree(const char*, bool numericalTaxa, bool allowPolytomies=false);
-		~Tree();
-		int FindUnusedNode(int start);
-		void MimicTopologyButNotInternNodeNums(TreeNode *copySource,TreeNode *replicate,int &placeInAllNodes);
-		void MimicTopo(TreeNode *, bool firstNode, bool sameModel);	
-     	void MimicTopo(const Tree *source);
-       
-		// mutation and recombination functions
-		Tree();
 		void AllocateTree();
-		void SharedTreeConstruction(CondLikeArray **sharedcl);
-		void RecombineWith( Tree *t, bool sameModel , double optPrecision );
+		void AssignCLAsFromMaster();
+	
+		//destructor
+		~Tree();
+
+		//functions for manipulating and making trees
 		void AddRandomNode(int nodenum, int & );
 		void AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition &mask);
-#ifdef GANESH
-		void PECRMutate(rng& rnd, double optPrecision);
-        int IdentifyPSubtree(TreeNode **p_subtree_leaves, int *pedges, int p, rng& rnd);
-        void GenerateMatching(int *A, int matching_number,
-                              int num_matchings, int num_p_subtree_vertices);
-        void RootWithMiddle(int node_number);
-        int  AlternateChoosePSubtreeGivenRoot(TreeNode **p_subtree_leaves,
-                                              int *pedges,
-                                              int p, TreeNode *subtree_root,  
-                                               rng& rnd);
-        int  ChoosePSubtreeGivenRoot(TreeNode **p_subtree_leaves,
-                                     int *pedges,
-                                     int p, TreeNode *subtree_root,  
-                                     rng& rnd);
-        static void ComputeRealCatalan();
-        void ComputeTreeCatalan(int p);
-        void ComputeNumInternalEdges(TreeNode *node, int *iedges);
-        bool IsALeaf(TreeNode *node);
-        bool IsALeaf(int nodeNum);
-        void SortMatching(int *A, int max_index);
-        void MatchingToTree(int *A, int max_index, TreeNode **p_subtree_leaves, 
-                            int *pedges);
-        void QSort(int *A, int left, int right);
-        int Partition(int *A, int left, int right, int pivot_index);
-        int Key(int *A, int i);
-        int MaxLabelPair(int *A, int i);
-        int Swap(int *A, int index1, int index2);
-        int CompareLabelPairs(int *A, int index1, int index2);
-        void PostOrderTraverse(TreeNode *node);
-        void PECRCleanUp(int p, int code);
-#ifdef PECR_SET_PARSIMONY_BRLEN
-        void MaskedPostOrderTraverse(TreeNode *node);
-        void ComputeParsimonyBrLen(int *pedges, TreeNode **p_subtree_leaves, int W[][4]);
-        bool IsLeafMaskOn(TreeNode *node);
-        bool IsLeafMaskOn(int nodeNum);
-        void TranslateTipString(const char *tip, char *string, int nsites);
-#endif
-#endif
-		inline void SetBranchLength(TreeNode *nd, double len);
-		int VariableSPRMutate(int range, double optPrecision);
-		int SPRMutate(int range, double optPrecision);
-		int ConstrainedSPRMutate(int range, double optPrecision);
-		int SPRMutate(int cutnum, int broknum, double optPrecision, int subtreeNode, int range);
-		void SPRMutate(int cutnum, int broknum, double optPrecision, const vector<int> &nonSubNodes);
-		void NNIMutate(int node, int branch, double optPrecision, int subtreeNode);
-		void VariableNNIMutate(int node, int branch, double optPrecision, int subtreeNode);
-		void TaxonSwap(int tax1, int tax2, double optPrecision);
-		void TaxonSwap(int range, double optPrecision);
 		void MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned);
-		int BrlenMutate();
-		int BrlenMutateSubset(const vector<int> &subtreeList);
-		void LocalMove();
-		void LoadConstraints(ifstream &con);
-		bool AllowedByConstraint(Constraint *constr, TreeNode *cut, TreeNode *broken) const;
-		bool AllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
-		bool AllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
-		bool RecursiveAllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
-		bool RecursiveAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
-		// functions for computing likelihood
-		bool ConditionalLikelihood(int direction, TreeNode* nd);	
-		int ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA=false);
-
-		int Score(int rootNodeNum =0);
-		double SumSiteLikes(const double *cla, const int *underflow_mult);
-		void FillSiteLikes(const CondLikeArray *fullCla, double *dest, bool addPinv);
-		int ScoreRateHet( const HKYData* data);
-		double ScoreAtSubtree(int subtreeNode);
-		bool IsGood();
-		// operators
-		friend ostream& operator <<( ostream&, Tree& );
-		void CopyBranchLens(const Tree *s);
 		void SortAllNodesArray();
 		void EliminateNode(int nn);
-		void AssignCLAs(CondLikeArray **sharedcl);
-		void AllocateCLAs(int ntax, int nchar);
-		void TraceDirtynessToRoot(TreeNode *nd);
-		void TraceDirtynessToNode(TreeNode *nd, int tonode);
-		void SweepDirtynessOverTree(TreeNode *nd, TreeNode *from=NULL);
-		void MakeNodeDirty(TreeNode *nd);
-		void MakeAllNodesDirty();
-		void CopyCLAs(Tree *source, int nchar);
-		void AssignCLAsFromMaster();
-		void CopyClaIndeces(const Tree *source, bool remove);
+		int FindUnusedNode(int start);
+		inline void SetBranchLength(TreeNode *nd, double len);
+		bool IdenticalSubtreeTopology(const TreeNode *other);
+		bool IdenticalTopology(const TreeNode *other);
 		void RotateNodesAtRoot(TreeNode *newroot);
 		void RerootHere(int newroot);
 		void SwapNodeDataForReroot(TreeNode *nroot);
 		void CheckBalance();
-		void RemoveTreeFromAllClas();
-		void CalcPmat(double *prmat, double t, double kappa, double beta, double piAG, double piCT, bool flip = 0);
 		void SwapAndFreeNodes(TreeNode *cop);
-		
-		//functions to partially optimize blens
-		pair<double, double> CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2);
-		double NewtonRaphsonOptimizeBranchLength(double precision1, TreeNode *nd, bool goodGuess);
-		void GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1, double &d2);
-		void GetDerivsPartialTerminalFlexRates(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1Tot, double &d2Tot);
-		void GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1, double &d2);
-		void GetDerivsPartialInternalFlexRates(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1, double &d2);
-		double OptimizeBranchLength(double optPrecision, TreeNode *nd, bool goodGuess);
-		double OptimizeAlpha();
-		double GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const double *prmat, const char *Ldata);
-		double GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat);
-		
-		void PerturbAllBranches();
+
+		//functions for copying trees
+		void MimicTopologyButNotInternNodeNums(TreeNode *copySource,TreeNode *replicate,int &placeInAllNodes);
+		void MimicTopo(TreeNode *, bool firstNode, bool sameModel);	
+     	void MimicTopo(const Tree *source);
+        void CopyBranchLens(const Tree *s);
+		void CopyClaIndeces(const Tree *source, bool remove);
+
+		// mutation functions
+		int TopologyMutator(double optPrecision, int range, int subtreeNode);
+		void GatherValidReconnectionNodes(int maxRange, TreeNode *cut, const TreeNode *subtreeNode);
+		void AssignWeightsToSwaps(TreeNode *cut);
+		int SPRMutate(int cutnum, ReconNode *broke, double optPrecision, int subtreeNode);
+		void ReorientSubtreeSPRMutate(int oldRoot, ReconNode *newRoot, double optPrecision);
+		int BrlenMutate();
+		int BrlenMutateSubset(const vector<int> &subtreeList);
 		void ScaleWholeTree(double factor=-1.0);
-		double OptimizeTreeScale();
-		double OptimizePinv();
-		double OptimizeAllBranches(double optPrecision);
-		void SetDistanceBasedBranchLengthsAroundNode(TreeNode *nd);
-		void FindNearestTerminalUp(TreeNode *start, TreeNode *&, double &dist);
-		void FindNearestTerminalsDown(TreeNode *start, TreeNode *from, TreeNode *&term1, TreeNode *&term2, double &dist1, double &dist2);
-		void TraceLikeUpFromRoot(TreeNode *here, TreeNode *calledfrom, bool firstNode);
-		void TraceLikeUpFromRootRateHet(TreeNode *here, TreeNode *calledfrom, bool firstNode);
-		double LocalLike(TreeNode *here);
-		double LocalLikeRateHet(TreeNode *here);
-		double BranchLike(TreeNode *optNode);
-		void OptimizeBranchesAroundNode(TreeNode *nd, double optPrecision, int subtreeNode);
-		void OptimizeBranchesWithinRadius(TreeNode *nd, double optPrecision, int subtreeNode, TreeNode *prune=NULL);
-		void OptimizeBranchesInArray(int *nodes, int numNodes, double optPrecision);
-		double RecursivelyOptimizeBranches(TreeNode *nd, double optPrecision, int subtreeNode, int radius, bool dontGoNext, double scoreIncrease, bool ignoreDelta=false);
-		double RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledFrom, double optPrecision, int subtreeNode, int radius, double scoreIncrease);
-		double BrentOptimizeBranchLength(double accuracy_cutoff, TreeNode *here, bool firstPass);
-		void CalcPartialCla(TreeNode *optNode);
-		void CalcPartialClaRateHet(TreeNode *optNode);
-		double SubTreeScore( TreeNode *nd);
-		double SubTreeScoreRateHet( TreeNode *nd);
+		//deprecated mutation functions
+		int VariableSPRMutate(int range, double optPrecision);
+		void SPRMutate(int cutnum, int broknum, double optPrecision, const vector<int> &nonSubNodes);
+		void NNIMutate(int node, int branch, double optPrecision, int subtreeNode);
+		void VariableNNIMutate(int node, int branch, double optPrecision, int subtreeNode);
+		void LocalMove();
+
+		//recombination
 		int BipartitionBasedRecombination( Tree *t, bool sameModel, double optPrecision);
 		int SubtreeBasedRecombination( Tree *t, int recomNodeNum, bool sameModel, double optPrecision);
+		void RecombineWith( Tree *t, bool sameModel , double optPrecision );
+
+		//functions for dealing with constraints and bipartitions
+		void LoadConstraints(ifstream &con);
+		bool AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *broken, Bipartition &proposed) const;
+		bool AllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
+		bool AllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
+		bool RecursiveAllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
+		bool RecursiveAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
 		void CalcBipartitions();
 		void OutputBipartitions();
 		TreeNode *ContainsBipartition(const Bipartition *bip);
 		TreeNode *ContainsBipartitionOrComplement(const Bipartition *bip);
-		void SetAllTempClasDirty();
-		void SetAppropriateTempClasDirty(int first, int sec);
-		void SetTempClasDirtyWithinSubtree(int subtreeNode);
-		void SetSpecifiedTempClasDirty(int *list);
-		void OutputTempClaStatus(bool test=false);
-		void OutputTreeStructure(TreeNode *);
-		int getNumTipsTotal();
-		int getNumNodesTotal() {return numNodesTotal;}
-		int GetRandomInternalNode() const;
-		int GetRandomTerminalNode() const;
-		int GetRandomNonRootNode() const;
-		void GetInternalStateString(char *string, int nodeNum);
-		void RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out);	
-		void InferAllInternalStateProbs(char *ofprefix);
+
+		// functions for computing likelihood
+		bool ConditionalLikelihood(int direction, TreeNode* nd);	
+		int ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA=false);
+		double GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const double *prmat, const char *Ldata);
+		double GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat);
+		int Score(int rootNodeNum =0);
+	
+		//functions to optimize blens and params
+		pair<double, double> CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2);
+		double NewtonRaphsonOptimizeBranchLength(double precision1, TreeNode *nd, bool goodGuess);
+		void GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1Tot, double &d2Tot, const unsigned *ambigMap =NULL);
+		void GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1, double &d2);
+		double OptimizeBranchLength(double optPrecision, TreeNode *nd, bool goodGuess);
+		double OptimizeAllBranches(double optPrecision);
+		void OptimizeBranchesAroundNode(TreeNode *nd, double optPrecision, int subtreeNode);
+		void OptimizeBranchesWithinRadius(TreeNode *nd, double optPrecision, int subtreeNode, TreeNode *prune);
+		void OptimizeBranchesInArray(int *nodes, int numNodes, double optPrecision);
+		double RecursivelyOptimizeBranches(TreeNode *nd, double optPrecision, int subtreeNode, int radius, bool dontGoNext, double scoreIncrease, bool ignoreDelta=false);
+		double RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledFrom, double optPrecision, int subtreeNode, int radius, double scoreIncrease);
+		double BrentOptimizeBranchLength(double accuracy_cutoff, TreeNode *here, bool firstPass);
+		double BranchLike(TreeNode *optNode);
+		double OptimizeAlpha();
+		double OptimizeTreeScale(double);
+		double OptimizePinv();
+		void SetNodesUnoptimized();
+
+		//functions for dealing with conditional likelihood arrays
 		void MarkUpwardClasToReclaim(int subtreeNode);
 		void MarkDownwardClasToReclaim(int subtreeNode);
 		void MarkClasNearTipsToReclaim(int subtreeNode);
 		void ProtectClas();
 		void UnprotectClas();
-		
 		inline CondLikeArray *GetClaDown(TreeNode *nd, bool calc=true);
 		inline CondLikeArray *GetClaUpLeft(TreeNode *nd, bool calc=true);
 		inline CondLikeArray *GetClaUpRight(TreeNode *nd, bool calc=true);
-
-
 		void OutputValidClaIndeces();
 		void OutputFirstClaAcrossTree(ofstream &deb, TreeNode *nd);
 		void ClaReport(ofstream &cla);
@@ -307,23 +196,35 @@ class Tree{
 		void CopyClaIndecesInSubtree(const TreeNode *from, bool remove);
 		void DirtyNodesInSubtree(TreeNode *nd);
 		void ReclaimUniqueClas();
-		bool IdenticalSubtreeTopology(const TreeNode *other);
-		bool IdenticalTopology(const TreeNode *other);
+		void RemoveTreeFromAllClas();
+		void TraceDirtynessToRoot(TreeNode *nd);
+		void TraceDirtynessToNode(TreeNode *nd, int tonode);
+		void SweepDirtynessOverTree(TreeNode *nd, TreeNode *from=NULL);
+		void MakeNodeDirty(TreeNode *nd);
+		void MakeAllNodesDirty();
+
+		//accessor funcs
+		bool IsGood() const {return root->IsGood();}
+		int getNumTipsTotal() const {return numTipsTotal;}
+		int getNumNodesTotal() const {return numNodesTotal;}
+		int GetRandomInternalNode() const {return numTipsTotal+rnd.random_int(numTipsTotal-3)+1;}
+		int GetRandomTerminalNode() const {return rnd.random_int(numTipsTotal)+1;}
+		int GetRandomNonRootNode() const {return rnd.random_int(numNodesTotal-1)+1;}
+
+		//odds and ends
+		void PerturbAllBranches();
 		int NodeToNodeDistance(int num1, int num2);
 		int NodesToRoot(TreeNode *nd);
-		int GatherNodesInRadius(int range, TreeNode *sib, TreeNode *subtreeNode);
-		int NumNodesTotal() {return numNodesTotal;}
 		void SampleBlenCurve(TreeNode *nd, ofstream &out);
+		void SetDistanceBasedBranchLengthsAroundNode(TreeNode *nd);
+		void FindNearestTerminalUp(TreeNode *start, TreeNode *&, double &dist);
+		void FindNearestTerminalsDown(TreeNode *start, TreeNode *from, TreeNode *&term1, TreeNode *&term2, double &dist1, double &dist2);
+		void OutputTreeStructure(TreeNode *);
+		void GetInternalStateString(char *string, int nodeNum);
+		void RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out);	
+		void InferAllInternalStateProbs(const char *ofprefix);
+
 		};
-
-inline int Tree::getNumTipsTotal()
-{
-	return numTipsTotal;
-}
-
-inline bool Tree::IsGood(){
-	return root->IsGood();
-	}
 	
 inline void Tree::CopyBranchLens(const Tree *s){
 	for(int i=1;i<numNodesTotal;i++)
@@ -348,9 +249,6 @@ inline int Tree::FindUnusedNode(int start){
 			{allNodes[i]->left=allNodes[i]->right=NULL;
 			return i;
 			}
-//	bool poo=true;
-//	while(poo);
-
 	assert(0);
 	return -1;
 	}	
@@ -437,18 +335,6 @@ inline void Tree::RemoveTreeFromAllClas(){
 		}
 	}
 	
-inline int Tree::GetRandomInternalNode() const{
-	return numTipsTotal+rnd.random_int(numTipsTotal-3)+1;
-	}	
-
-inline int Tree::GetRandomTerminalNode() const{
-	return rnd.random_int(numTipsTotal)+1;
-	}	
-	
-inline int Tree::GetRandomNonRootNode() const{
-	return rnd.random_int(numNodesTotal-1)+1;
-	}
-	
 inline void Tree::SetBranchLength(TreeNode *nd, double len){
 	assert(!(len < DEF_MIN_BRLEN) && !(len > DEF_MAX_BRLEN));
 	nd->dlen=len;
@@ -458,8 +344,7 @@ inline void Tree::SetBranchLength(TreeNode *nd, double len){
 inline CondLikeArray *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){
 	if(claMan->IsDirty(nd->claIndexDown)){
 		if(calc==true){
-			if(mod->NRateCats()>1) ConditionalLikelihoodRateHet(DOWN, nd);
-			else ConditionalLikelihood(DOWN, nd);
+			ConditionalLikelihoodRateHet(DOWN, nd);
 			}
 		else claMan->FillHolder(nd->claIndexDown, 1);
 		}
@@ -470,8 +355,7 @@ inline CondLikeArray *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){
 inline CondLikeArray *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
 	if(claMan->IsDirty(nd->claIndexUL)){
 		if(calc==true){
-			if(mod->NRateCats()>1) ConditionalLikelihoodRateHet(UPLEFT, nd);
-			else ConditionalLikelihood(UPLEFT, nd);
+			ConditionalLikelihoodRateHet(UPLEFT, nd);
 			}
 		else claMan->FillHolder(nd->claIndexUL, 2);
 		}
@@ -482,8 +366,7 @@ inline CondLikeArray *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
 inline CondLikeArray *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/){
 	if(claMan->IsDirty(nd->claIndexUR)){
 		if(calc==true){
-			if(mod->NRateCats()>1) ConditionalLikelihoodRateHet(UPRIGHT, nd);
-			else ConditionalLikelihood(UPRIGHT, nd);
+			ConditionalLikelihoodRateHet(UPRIGHT, nd);
 			}
 		else claMan->FillHolder(nd->claIndexUR, 2);
 		}
@@ -546,7 +429,6 @@ inline int Tree::NodesToRoot(TreeNode *nd){
 		}
 	return i;
 	}
-
 
 #endif
 
