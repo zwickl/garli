@@ -1,5 +1,5 @@
-// GARLI version 0.94 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,18 +7,20 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
-
 
 #include "tree.h"
 #include "model.h"
 #include "funcs.h"
+#include "defs.h"
+#include "outputman.h"
+
+extern bool REDUCED;
+
 
 //a bunch of functions from the Tree class, relating to optimization
 
@@ -26,19 +28,16 @@ extern double globalBest;
 
 extern int optCalcs;
 
-#undef OPT_DEBUG
-
 #define FOURTH_ROOT
 
-
-#ifdef OPT_DEBUG
-#include "optimizationinfo.h"
-OptimizationInfo optInfo;
-ofstream opt("optimization.log");
-//ofstream der("derivs.log");
-ofstream optsum("optsummary.log");
-ofstream curves("curves.log");
-#endif
+		#ifdef OPT_DEBUG
+			#include "optimizationinfo.h"
+			OptimizationInfo optInfo;
+			ofstream opt("optimization.log");
+			//ofstream der("derivs.log");
+			ofstream optsum("optsummary.log");
+			ofstream curves("curves.log");
+		#endif
 
 #ifdef FOURTH_ROOT
 #define effectiveMin 0.01
@@ -84,6 +83,7 @@ void Tree::OptimizeBranchesInArray(int *nodes, int numNodes, double optPrecision
 
 double Tree::OptimizeAllBranches(double optPrecision){
 	double improve=0.0;
+	SetNodesUnoptimized();
 	improve = RecursivelyOptimizeBranches(root->left, optPrecision, 0, numNodesTotal, true, improve, true);
 	improve = RecursivelyOptimizeBranches(root->left->next, optPrecision, 0, numNodesTotal, true, improve, true);
 	improve = RecursivelyOptimizeBranches(root->right, optPrecision, 0, numNodesTotal, true, improve, true);
@@ -91,13 +91,14 @@ double Tree::OptimizeAllBranches(double optPrecision){
 	return improve;
 	}
 
-double Tree::OptimizeTreeScale(){
+double Tree::OptimizeTreeScale(double optPrecision){
 	if(lnL==-1.0) Score();
 	Score();
 	double start=lnL;
 	double prev=lnL;
 	double cur;
 	double scale;
+	double lastChange=9999.9;
 
 /*
 	ofstream deb("debug.log");
@@ -111,6 +112,8 @@ double Tree::OptimizeTreeScale(){
 		}
 	deb.close();
 */
+
+	
 
 	while(1){
 		double incr=0.0001;
@@ -136,22 +139,33 @@ double Tree::OptimizeTreeScale(){
 		
 		//return the tree to its original scale		
 		ScaleWholeTree(1.0/scale);
-		if(abs(est) < 0.001 && d2 < 0.0) return prev-start;
+		if((abs(est) < 0.01 || lastChange < optPrecision) && d2 < 0.0){
+			return prev-start;
+			}
 		
 		double t;
 		if(d2 < 0.0){
 			t=1.0 + est;
-			if(t<.95) t=.95;
+			if(t<0.95) t=.95;
+//			if(t>1.05) t=1.05;
 			}
-		else{
-			if(d1 > 0.0) t=1.01;
-			else t=.99;
+		else{//if we have lots of data, move
+			//very slowly here
+			if(data->NInformative() > 500){
+				if(d1 > 0.0) t=1.01;
+				else t=.99;
+				}
+			else{
+				if(d1 > 0.0) t=1.05;
+				else t=.95;
+				}
 			}
 		
 		scale=t;
 		ScaleWholeTree(scale);
 		Score();
 		cur=lnL;
+		lastChange = cur - prev;
 		prev=cur;
 		}
 	return -1;
@@ -181,7 +195,7 @@ double Tree::OptimizeAlpha(){
 	double start=lnL;
 	double prev=lnL;
 	double cur;
-	double prevVal=mod->Alpha();;
+	double prevVal=mod->Alpha();
 	
 	while(1){
 		double incr=0.001;
@@ -249,7 +263,7 @@ double Tree::OptimizePinv(){
 	double start=lnL;
 	double prev=lnL;
 	double cur;
-	double prevVal=mod->ProportionInvariant();
+	double prevVal=mod->PropInvar();
 	
 	while(1){
 		double incr=0.001;
@@ -301,6 +315,7 @@ double Tree::OptimizePinv(){
 	}
 
 double Tree::OptimizeBranchLength(double optPrecision, TreeNode *nd, bool goodGuess){
+	nd->alreadyOptimized=true;
 	double improve;
 	
 #ifdef OPT_DEBUG
@@ -320,66 +335,84 @@ double Tree::OptimizeBranchLength(double optPrecision, TreeNode *nd, bool goodGu
 	return improve;
 	}
 
-void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, double optPrecision, int subtreeNode, TreeNode *prune/*=NULL*/){
+void Tree::SetNodesUnoptimized(){
+	root->left->SetUnoptimized();
+	root->left->next->SetUnoptimized();
+	root->right->SetUnoptimized();
+	}
+
+void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, double optPrecision, int subtreeNode, TreeNode *prune){
 	nodeOptVector.clear();
-	
-	
-	double totalIncrease=0.0, prunePointIncrease=0.0, thisIncr;
+	SetNodesUnoptimized();
+
+	double totalIncrease=0.0, prunePointIncrease=0.0, thisIncr, pruneRadIncrease=0.0;
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->left, false);
 	totalIncrease += OptimizeBranchLength(optPrecision, nd, false);
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->right, false);	
 
-	Score(nd->nodeNum);
-	if(lnL < globalBest - treeRejectionThreshold){
-		#ifdef OPT_DEBUG
-		optsum << "3 branch total\t" << totalIncrease << endl;
-		optsum << "bailing early\t" << globalBest-lnL << endl;
-		#endif
-		return;
-		}
-	
 	nodeOptVector.push_back(nd->left);
 	nodeOptVector.push_back(nd);
 	nodeOptVector.push_back(nd->right);
 
 	if(prune!=NULL){
-		thisIncr = OptimizeBranchLength(optPrecision, prune->left, true);
-		//if(thisIncr > optPrecision) nodeOptVector.push_back(prune->left);
-		nodeOptVector.push_back(prune->left);
-		prunePointIncrease += thisIncr;
-		if(prune->anc==NULL){
-			thisIncr = OptimizeBranchLength(optPrecision, prune->left->next, true);
-			//if(thisIncr > optPrecision) nodeOptVector.push_back(prune);
-			nodeOptVector.push_back(prune->left->next);
-			prunePointIncrease += thisIncr;
-			}
-		else{
-			thisIncr = OptimizeBranchLength(optPrecision, prune, true);
-			//if(thisIncr > optPrecision) nodeOptVector.push_back(prune);
-			nodeOptVector.push_back(prune);
-			prunePointIncrease += thisIncr;
-			}	
-		thisIncr = OptimizeBranchLength(optPrecision, prune->right, true);
-		//if(thisIncr > optPrecision) nodeOptVector.push_back(prune->right);
-		nodeOptVector.push_back(prune->right);
-		prunePointIncrease += thisIncr;
+		prunePointIncrease = OptimizeBranchLength(optPrecision, prune, true);
+		if(prunePointIncrease > 0.0) nodeOptVector.push_back(prune);
 		totalIncrease+=prunePointIncrease;
+		Score(prune->anc->nodeNum);
+		#ifdef OPT_DEBUG
+		optsum << "prune total\t" << prunePointIncrease << endl;
+		#endif
+		}
+	else Score(nd->nodeNum);
+
+	double fourBranchTot = totalIncrease;
+	if(lnL < globalBest - treeRejectionThreshold){
+		#ifdef OPT_DEBUG
+		optsum << "4 branch total\t" << totalIncrease << endl;
+		optsum << "bailing early\t" << globalBest-lnL << endl;
+		#endif
+		return;
 		}
 
-	//now spread out from there
+//	if(REDUCED == false) return;
+
+	//now spread out
 	int rad=10;
 
 	if(rad>0){
-		if(nd->right->left!=NULL) totalIncrease += RecursivelyOptimizeBranches(nd->right->left, optPrecision, subtreeNode, rad, false, 0.0);
-		if(nd->left->left!=NULL) totalIncrease += RecursivelyOptimizeBranches(nd->left->left, optPrecision, subtreeNode, rad, false, 0.0);
-		if(nd->anc!=root) totalIncrease += RecursivelyOptimizeBranchesDown(nd->anc, nd, optPrecision, subtreeNode, rad, 0.0);
+		if(nd->right->left!=NULL && nd->right->left->alreadyOptimized==false) totalIncrease += RecursivelyOptimizeBranches(nd->right->left, optPrecision, subtreeNode, rad, false, 0.0);
+		if(nd->left->left!=NULL && nd->left->left->alreadyOptimized==false) totalIncrease += RecursivelyOptimizeBranches(nd->left->left, optPrecision, subtreeNode, rad, false, 0.0);
+		if(nd->anc!=root && nd->anc->alreadyOptimized==false) totalIncrease += RecursivelyOptimizeBranchesDown(nd->anc, nd, optPrecision, subtreeNode, rad, 0.0);
 		else{
-			if(root->left != nd) totalIncrease +=  RecursivelyOptimizeBranches(root->left, optPrecision, subtreeNode, rad, true, 0.0);
-			if(root->left->next != nd) totalIncrease +=  RecursivelyOptimizeBranches(root->left->next, optPrecision, subtreeNode, rad, true, 0.0);
-			if(root->right != nd) totalIncrease +=  RecursivelyOptimizeBranches(root->right, optPrecision, subtreeNode, rad, true, 0.0);
+			if(root->left != nd && root->left->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->left, optPrecision, subtreeNode, rad, true, 0.0);
+			if(root->left->next != nd && root->left->next->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->left->next, optPrecision, subtreeNode, rad, true, 0.0);
+			if(root->right != nd && root->right->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->right, optPrecision, subtreeNode, rad, true, 0.0);
 			}
 		
-		if(prunePointIncrease > 0.0 ){
+		if(prunePointIncrease > 0.0){//now doing a radius opt at the prune point starting from the 4 branches attached to that branch
+			//in other words, this is no longer centered on a node, but on a branch
+			if(prune->left != NULL){
+				if(prune->right->alreadyOptimized==false) pruneRadIncrease += RecursivelyOptimizeBranches(prune->right, optPrecision, subtreeNode, rad, true, 0.0);
+				if(prune->left->alreadyOptimized==false) pruneRadIncrease += RecursivelyOptimizeBranches(prune->left, optPrecision, subtreeNode, rad, true, 0.0);
+				}
+			if(prune == root){
+				assert(0);
+				//pruneRadIncrease += RecursivelyOptimizeBranches(prune->left->next, optPrecision, subtreeNode, rad, false, 0.0);
+				}
+			else{//this RecursivelyOptimizeBranchesDown will implicitly also optimize prune's next or prev
+				if(prune->anc!=root){
+					pruneRadIncrease += RecursivelyOptimizeBranchesDown(prune->anc, prune, optPrecision, subtreeNode, rad, 0.0);
+					}
+				else{
+					if(root->left != prune && root->left->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->left, optPrecision, subtreeNode, rad, true, 0.0);
+					if(root->left->next != prune && root->left->next->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->left->next, optPrecision, subtreeNode, rad, true, 0.0);
+					if(root->right != prune && root->right->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->right, optPrecision, subtreeNode, rad, true, 0.0);
+					}
+				}
+//				if(prune->next != NULL) pruneRadIncrease += RecursivelyOptimizeBranches(prune->next, optPrecision, subtreeNode, rad, true, 0.0);
+//				if(prune->prev != NULL) pruneRadIncrease += RecursivelyOptimizeBranches(prune->prev, optPrecision, subtreeNode, rad, true, 0.0);
+//				}
+			/*
 			if(prune->right->left!=NULL) totalIncrease += RecursivelyOptimizeBranches(prune->right->left, optPrecision, subtreeNode, rad, false, 0.0);
 			if(prune->left->left!=NULL) totalIncrease += RecursivelyOptimizeBranches(prune->left->left, optPrecision, subtreeNode, rad, false, 0.0);
 			if(prune==root){
@@ -395,6 +428,11 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, double optPrecision, int s
 						}
 					}
 				}
+			*/
+			totalIncrease += pruneRadIncrease;
+			#ifdef OPT_DEBUG
+			optsum << "pruneRadOpt total\t" << pruneRadIncrease << endl;
+			#endif
 			}
 		}
 #ifdef OPT_DEBUG
@@ -403,8 +441,9 @@ optsum << "radiusopt intial pass total\t" << totalIncrease << endl;
 
 	double postIncr=0.0;
 	TreeNode *finalNode;
-	
-		if(nodeOptVector.empty()==false && prune != NULL){//remove any duplicate entries caused by an overlaping radius around connector and prune
+
+	//no longer need to do this because checking if nodes have already been optimized before doing it again
+/*		if(nodeOptVector.empty()==false && prune != NULL){//remove any duplicate entries caused by an overlaping radius around connector and prune
 			for(list<TreeNode*>::iterator fir=nodeOptVector.begin();fir!=nodeOptVector.end();fir++){
 				list<TreeNode*>::iterator sec=fir;
 				sec++;
@@ -420,7 +459,7 @@ optsum << "radiusopt intial pass total\t" << totalIncrease << endl;
 					}
 				}
 			}
-	while(nodeOptVector.empty() == false){
+*/	while(nodeOptVector.empty() == false){
 		list<TreeNode*>::iterator it=nodeOptVector.begin();
 		while(it!=nodeOptVector.end()){
 			if(nodeOptVector.size() == 1) finalNode=*it;
@@ -437,7 +476,10 @@ optsum << "radiusopt intial pass total\t" << totalIncrease << endl;
 	if(finalNode != root)
 		Score(finalNode->anc->nodeNum);
 	else Score(0);
+	totalIncrease += postIncr;
 
+//	if(fourBranchTot > treeRejectionThreshold ) cout << "r\t" << (totalIncrease - fourBranchTot) << endl;
+//	else if(treeRejectionThreshold < (totalIncrease - fourBranchTot)) cout << (totalIncrease - fourBranchTot) << endl;
 
 #ifdef OPT_DEBUG
 optsum << "postopt total\t" << postIncr << endl;
@@ -445,17 +487,19 @@ optsum << "postopt total\t" << postIncr << endl;
 	}
 
 double Tree::RecursivelyOptimizeBranches(TreeNode *nd, double optPrecision, int subtreeNode, int radius, bool dontGoNext, double scoreIncrease, bool ignoreDelta/*=false*/){
-	double delta = OptimizeBranchLength(optPrecision, nd, true);
+	double delta = 0.0;
+	
+	if(nd->alreadyOptimized == false) delta = OptimizeBranchLength(optPrecision, nd, true);
 	scoreIncrease += delta;
 	
 	if(!(delta < optPrecision))
 		nodeOptVector.push_back(nd);
 //	if(radius==0) cout << "hit max radius!" <<endl;
 	if(nd->left!=NULL && radius>1 && (!(delta < optPrecision) || ignoreDelta == true)){
-		scoreIncrease += RecursivelyOptimizeBranches(nd->left, optPrecision, subtreeNode, radius-1, false, 0, ignoreDelta);
+		/*if(nd->left->alreadyOptimized == false)*/ scoreIncrease += RecursivelyOptimizeBranches(nd->left, optPrecision, subtreeNode, radius-1, false, 0, ignoreDelta);
 		}
 	if(nd->next!=NULL && dontGoNext==false){
-		scoreIncrease += RecursivelyOptimizeBranches(nd->next, optPrecision, subtreeNode, radius, false, 0, ignoreDelta);
+		if(nd->next->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranches(nd->next, optPrecision, subtreeNode, radius, false, 0, ignoreDelta);
 		}
 	if(memLevel > 1) RemoveTempClaReservations();
 	return scoreIncrease;
@@ -463,7 +507,10 @@ double Tree::RecursivelyOptimizeBranches(TreeNode *nd, double optPrecision, int 
 
 double Tree::RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledFrom, double optPrecision, int subtreeNode, int radius, double scoreIncrease){
 		
-	double delta = OptimizeBranchLength(optPrecision, nd, true);
+	double delta = 0.0;
+	if(nd->alreadyOptimized==false)//because the next or prev of calledFrom could be unoptimized
+		//even if nd has been, this check needs to be done here, rather than before calling this func
+		delta = OptimizeBranchLength(optPrecision, nd, true);
 	scoreIncrease += delta;
 
 	if(nd->nodeNum == subtreeNode){
@@ -473,17 +520,23 @@ double Tree::RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledFrom,
 	if(!(delta < optPrecision))
 		nodeOptVector.push_back(nd);
 //	if(radius==0) cout << "hit max radius!" <<endl;
-	if(nd->left!=NULL && nd->left!=calledFrom && radius>1) scoreIncrease += RecursivelyOptimizeBranches(nd->left, optPrecision, subtreeNode, radius, true, 0);
-	else if(radius>1) scoreIncrease += RecursivelyOptimizeBranches(nd->left->next, optPrecision, subtreeNode, radius, false, 0);
+	if(nd->left!=NULL && nd->left!=calledFrom && radius>1){
+		if(nd->left->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranches(nd->left, optPrecision, subtreeNode, radius, true, 0);
+		}
+	else if(radius>1 && nd->left->next->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranches(nd->left->next, optPrecision, subtreeNode, radius, false, 0);
 	if(nd->anc!=root && radius>1 && !(delta < optPrecision)){
-		scoreIncrease += RecursivelyOptimizeBranchesDown(nd->anc, nd, optPrecision, subtreeNode, radius-1, 0);
+		if(nd->anc->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranchesDown(nd->anc, nd, optPrecision, subtreeNode, radius-1, 0);
 		}
 	if(nd->anc==root){
 		if(radius>1 && !(delta < optPrecision)){
-			if(nd->next!=NULL) scoreIncrease += RecursivelyOptimizeBranches(nd->next, optPrecision, subtreeNode, radius-1, true, 0);
-			else scoreIncrease += RecursivelyOptimizeBranches(nd->prev->prev, optPrecision, subtreeNode, radius-1, true, 0);
-			if(nd->prev!=NULL) scoreIncrease += RecursivelyOptimizeBranches(nd->prev, optPrecision, subtreeNode, radius-1, true, 0);
-			else scoreIncrease += RecursivelyOptimizeBranches(nd->next->next, optPrecision, subtreeNode, radius-1, true, 0);
+			if(nd->next!=NULL){
+				if(nd->next->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranches(nd->next, optPrecision, subtreeNode, radius-1, true, 0);
+				}
+			else if(nd->prev->prev->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranches(nd->prev->prev, optPrecision, subtreeNode, radius-1, true, 0);
+			if(nd->prev!=NULL){
+				if(nd->prev->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranches(nd->prev, optPrecision, subtreeNode, radius-1, true, 0);
+				}
+			else if(nd->next->next->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranches(nd->next->next, optPrecision, subtreeNode, radius-1, true, 0);
 			}
 		}
 	if(memLevel > 1) RemoveTempClaReservations();
@@ -495,10 +548,6 @@ pair<double, double> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2){
 	//nd1 will always be the "lower" one, and will always be internal, while
 	//nd2 can be internal or terminal
 	int nsites=data->NChar();
-	
-//	CondLikeArray *destCLA=claMan->GetTempCla(0);
-//	CondLikeArray *destDeriv1=claMan->GetTempCla(1);
-//	CondLikeArray *destDeriv2=claMan->GetTempCla(2);
 	
 	const CondLikeArray *claOne;
 	if(nd1->left == nd2)
@@ -520,11 +569,15 @@ pair<double, double> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2){
 	double d1=0.0, d2=0.0;
 
 	if(nd2->left == NULL){
-		const char *childData=nd2->tipData;
-		GetDerivsPartialTerminalFlexRates(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2);
+		char *childData=nd2->tipData;
+#ifdef OPEN_MP
+		GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, nd2->ambigMap);
+#else
+		GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2);
+#endif
 		}
 	else {
-		GetDerivsPartialInternalFlexRates(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2);
+		GetDerivsPartialInternal(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2);
 		}
 
 	return pair<double, double>(d1, d2);
@@ -552,8 +605,7 @@ double Tree::BranchLike(TreeNode *optNode){
 				}
 			
 			//now sum as if this were the root
-			if(mod->NRateCats()>1) ConditionalLikelihoodRateHet(ROOT, optNode->anc);
-			else ConditionalLikelihood(ROOT, optNode->anc);
+			ConditionalLikelihoodRateHet(ROOT, optNode->anc);
 			return lnL;
 			}
 		catch(int){
@@ -568,7 +620,6 @@ double Tree::BranchLike(TreeNode *optNode){
 		}while(scoreOK==false);
 	return 0;
 	}
-
 
 void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 	
@@ -592,14 +643,16 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 		SetBranchLength(nd, .001);
 		}
 
-/*if(nd->dlen==DEF_MIN_BRLEN){
-//if(nd->nodeNum == 20){
+//if(nd->dlen==DEF_MIN_BRLEN){
+#ifdef OPT_DEBUG
+/*
+if(nd->nodeNum == 60){
 	ofstream scr("NRcurve.log");
 	scr.precision(20);
 	assert(scr.good());
 	scr.precision(15);
 	double initDlen = nd->dlen;
-	for(double d=1e-8;d<.1;d*=1.33){
+	for(double d=1e-8;d<.5;d*=1.33){
 		nd->dlen = d;
 		SweepDirtynessOverTree(nd);
 		Score();
@@ -610,10 +663,10 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 	scr.close();
 	}	
 */
+#endif
 //	nd->dlen=.3254;
 //	SweepDirtynessOverTree(nd);
 
-	//DEBUG
 /*	
 	ofstream deb("curves.log");
 	SampleBlenCurve(nd, deb);
@@ -690,8 +743,7 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 			try{
 				scoreOK=true;
 				derivs = CalcDerivativesRateHet(nd->anc, nd);
-				}
-			catch(int err){
+				}catch(int err){
 				scoreOK=false;
 				if(err==1){
 					MakeAllNodesDirty();
@@ -699,7 +751,7 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 					ofstream resc("rescale.log", ios::app);
 					resc << "rescale reduced to " << rescaleEvery << endl;
 					resc.close();
-					if(rescaleEvery<2) rescaleEvery=2;
+					if(rescaleEvery<2) throw(ErrorException("Problem with rescaling in branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d iter=%d neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, iter, negProposalNum));
 					}
 				else if(err==2){
 					//this is necessary because rarely it is possible that attempted optimization at nodes
@@ -732,13 +784,38 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 														#endif
 			//if d1 is negative, try either the min length or halfway to the knownMin
 			if(d1 <= 0.0){
+
+#ifdef OLDWAY
 				if(knownMin == DEF_MIN_BRLEN){
-					double estImp = ((DEF_MIN_BRLEN - nd->dlen)*d1);//this is not a good estimate, but is something
+#else
+//				if(knownMin == DEF_MIN_BRLEN && nd->dlen <= 1e-4){
+				double proposed;
+				if(knownMin == DEF_MIN_BRLEN){
+					if(nd->dlen <= 1.0e-4) proposed = DEF_MIN_BRLEN;
+					else proposed = 1.0e-4;
+					}
+				else proposed = (knownMin + nd->dlen) * 0.5;
+
+				if(proposed != 1.0e-4){//don't let this bail out based on the estimated change if we are jumping to 1e-4
+					//because we are just trying to get to a point where we can actually trust the derivs
+					double estImp = ((proposed - nd->dlen)*d1);//this is not a good estimate, but is something
+					if(estImp < precision1){
+						#ifdef OPT_DEBUG
+						opt << "imp to proposed " << proposed << " < prec, return\n";
+						#endif
+						return totalEstImprove;
+						}
+					}
+				v=proposed;
+				totalEstImprove += precision1;
+				}
+#endif
+/*					double estImp = ((DEF_MIN_BRLEN - nd->dlen)*d1);//this is not a good estimate, but is something
 					if(estImp < precision1){
 						#ifdef OPT_DEBUG
 						opt << "imp to min < prec, return\n";
 						#endif
-						return totalEstImprove;
+ 						return totalEstImprove;
 						}
 					v=DEF_MIN_BRLEN;
 					totalEstImprove += precision1;
@@ -756,7 +833,7 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 					totalEstImprove += precision1;
 					}
 				}
-			else{//d1 > 0.0
+*/			else{//d1 > 0.0
 				//try a step half-way to the knownMax
 				double proposed = (knownMax + nd->dlen) * 0.5;
 				double estImp = ((proposed - nd->dlen) * d1);//this is not a good estimate, but is something
@@ -770,7 +847,7 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 				totalEstImprove += precision1;				
 				}
 			}
-		else{
+		else{//trying NR is feasible
 			if(estScoreDelta < precision1){
 														#ifdef OPT_DEBUG			
 														opt << "delta < prec, return\n";
@@ -806,6 +883,7 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 													#endif
 						return totalEstImprove;
 						}
+#ifdef OLDWAY
 					else if(v < -1.0){
 						//if the proposed blen is this negative, just try the min brlen
 						v=DEF_MIN_BRLEN;
@@ -828,6 +906,31 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 						totalEstImprove += scoreDeltaToMin;
 //						totalEstImprove += precision1;
 						}
+#else
+					else if(negProposalNum==1 && nd->dlen > 1e-4 && v_prev != 1e-4){
+						//try a somewhat smaller length before going all the way to the min
+						v = nd->dlen * .1;
+						double delta=v - nd->dlen;
+						totalEstImprove += (delta * d1 + (delta*delta*d2*.5));
+//						totalEstImprove += precision1;
+						}
+					else if(v < -1.0){
+						//if the proposed blen is this negative, just try the min brlen
+						v=DEF_MIN_BRLEN;
+//						totalEstImprove += precision1;
+						totalEstImprove += scoreDeltaToMin;
+													#ifdef OPT_DEBUG
+													Score(nd->anc->nodeNum);		
+													opt << nd->dlen << "\t" << lnL << "\n";			
+													#endif
+						}
+					else{
+						v = DEF_MIN_BRLEN;
+						totalEstImprove += scoreDeltaToMin;
+//						totalEstImprove += precision1;
+						}
+
+#endif
 					}
 				else{//knownMin is > absolute min, so we must already have a better guess
 					//go half way to that guess
@@ -916,14 +1019,41 @@ opt << v << "\t" << lnL << "\n";
 		
 		iter++;
 		if(iter>50){
-			ofstream deb("optdeb.log");
+/*			ofstream deb("optdeb.log");
 			deb << "initial length " << v_onEntry << endl;
 			deb << "current length " << nd->dlen << endl;
 			deb << "prev length " << v_prev << endl;
 			deb << "d1 " << d1 << " d2 " << d2 << endl;
 			deb << "neg proposal num " << negProposalNum << endl;			
 			deb.close();
-			assert(iter<=50);
+*/
+			throw(ErrorException("Problem with branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
+/*
+				ofstream scr("NRcurve.log");
+				scr.precision(20);
+				assert(scr.good());
+				scr.precision(15);
+				double initDlen = nd->dlen;
+				for(double d=1e-8;d<.5;d*=1.33){
+					nd->dlen = d;
+					SweepDirtynessOverTree(nd);
+					Score();
+					scr << d << "\t" << lnL << endl;
+					}
+				nd->dlen=initDlen;
+				SweepDirtynessOverTree(nd);
+				scr.close();
+
+			bool poo=true;
+			outman.UserMessage("long opt: %d", iter);
+			ofstream deb("longopt.log", ios::app);
+			deb << iter << "\t" << precision1 << "\t" << nd->nodeNum << "\t" << v_onEntry << "\t" << nd->dlen << "\t" << d1 << "\t" << d2 << "\t" << estDeltaNR << "\t" << estScoreDelta << "\t" << negProposalNum << "\n";
+			deb.close();
+*/
+//			while(poo){
+//				opt.close();
+//				}
+			//assert(iter<=50);
 			}		
 		}while(moveOn==false);
 #ifdef OPT_DEBUG
@@ -1369,83 +1499,92 @@ if(here->anc){
 	return initialScore - minScore;
 	}
 
-void Tree::GetDerivsPartialTerminalFlexRates(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1Tot, double &d2Tot){
+void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldat, double &d1Tot, double &d2Tot, const unsigned *ambigMap /*=NULL*/){
 
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *partial=partialCLA->arr;
-
-	int nchar=data->NChar();
+	const int nchar=data->NChar();
+	const int nRateCats=mod->NRateCats();
 
 #ifdef UNIX
-	madvise(partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+	madvise(partial, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
 #endif
 
-	double siteL, tempD1, D1tot, D2tot;
-	D1tot=D2tot=0.0;
+	double siteL;
 	double La, Lc, Lg, Lt;
 	double D1a, D1c, D1g, D1t;
 	double D2a, D2c, D2g, D2t;
-	
+	double tot1=0.0, tot2=0.0;//can't use d1Tot and d2Tot in OMP reduction because they are references
+
+	const char *Ldata=Ldat;
 	const int *countit=data->GetCounts();
 	const double *rateProb=mod->GetRateProbs();
-	const int nRateCats=mod->NRateCats();
-	
-	int lastConst=data->LastConstant();
+	const int lastConst=data->LastConstant();
 	const int *conBases=data->GetConstBases();
-	double prI=mod->ProportionInvariant();
+	const double prI=mod->PropInvar();
 
+	double freqs[4];
+	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+
+#ifdef OMP_TERMDERIV
+	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, Ldata, siteL) reduction(+ : tot1, tot2)
 	for(int i=0;i<nchar;i++){
-		if((*countit) != 0){
+		Ldata = &Ldat[ambigMap[i]];
+		partial = &partialCLA->arr[i*4*nRateCats];
+#else
+	for(int i=0;i<nchar;i++){
+#endif
+		if((countit[i]) != 0){//this check speeds us up in the case of bootstrapping
 			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=0.0;
 			if(*Ldata > -1){ //no ambiguity
-				for(int i=0;i<nRateCats;i++){
-					La  += prmat[(*Ldata)+16*i] * partial[0] * rateProb[i];
-					D1a += d1mat[(*Ldata)+16*i] * partial[0] * rateProb[i];
-					D2a += d2mat[(*Ldata)+16*i] * partial[0] * rateProb[i];
-					Lc  += prmat[(*Ldata+4)+16*i] * partial[1]* rateProb[i];
-					D1c += d1mat[(*Ldata+4)+16*i] * partial[1]* rateProb[i];
-					D2c += d2mat[(*Ldata+4)+16*i] * partial[1]* rateProb[i];
-					Lg  += prmat[(*Ldata+8)+16*i] * partial[2]* rateProb[i];
-					D1g += d1mat[(*Ldata+8)+16*i] * partial[2]* rateProb[i];
-					D2g += d2mat[(*Ldata+8)+16*i] * partial[2]* rateProb[i];
-					Lt  += prmat[(*Ldata+12)+16*i] * partial[3]* rateProb[i];
-					D1t += d1mat[(*Ldata+12)+16*i] * partial[3]* rateProb[i];
-					D2t += d2mat[(*Ldata+12)+16*i] * partial[3]* rateProb[i];
+				for(int r=0;r<nRateCats;r++){
+					La  += prmat[(*Ldata)+16*r] * partial[0] * rateProb[r];
+					D1a += d1mat[(*Ldata)+16*r] * partial[0] * rateProb[r];
+					D2a += d2mat[(*Ldata)+16*r] * partial[0] * rateProb[r];
+					Lc  += prmat[(*Ldata+4)+16*r] * partial[1]* rateProb[r];
+					D1c += d1mat[(*Ldata+4)+16*r] * partial[1]* rateProb[r];
+					D2c += d2mat[(*Ldata+4)+16*r] * partial[1]* rateProb[r];
+					Lg  += prmat[(*Ldata+8)+16*r] * partial[2]* rateProb[r];
+					D1g += d1mat[(*Ldata+8)+16*r] * partial[2]* rateProb[r];
+					D2g += d2mat[(*Ldata+8)+16*r] * partial[2]* rateProb[r];
+					Lt  += prmat[(*Ldata+12)+16*r] * partial[3]* rateProb[r];
+					D1t += d1mat[(*Ldata+12)+16*r] * partial[3]* rateProb[r];
+					D2t += d2mat[(*Ldata+12)+16*r] * partial[3]* rateProb[r];
 					partial += 4;
 					}
 				Ldata++;
 				}
 				
 			else if(*Ldata == -4){ //total ambiguity
-				for(int i=0;i<nRateCats;i++){
-					La += partial[0]* rateProb[i];
-					Lc += partial[1]* rateProb[i];
-					Lg += partial[2]* rateProb[i];
-					Lt += partial[3]* rateProb[i];
+				for(int r=0;r<nRateCats;r++){
+					La += partial[0]* rateProb[r];
+					Lc += partial[1]* rateProb[r];
+					Lg += partial[2]* rateProb[r];
+					Lt += partial[3]* rateProb[r];
 					partial += 4;
 					}
 				Ldata++;
 				}
 			else{ //partial ambiguity
-				char nstates=-1 * *(Ldata++);
-				for(int i=0;i<nstates;i++){
-					for(int i=0;i<nRateCats;i++){
-						La += prmat[(*Ldata)+16*i]  * partial[4*i]* rateProb[i];
-						D1a += d1mat[(*Ldata)+16*i] * partial[4*i]* rateProb[i];		
-						D2a += d2mat[(*Ldata)+16*i] * partial[4*i]* rateProb[i];
+				int nstates=-1 * *(Ldata++);
+				for(int s=0;s<nstates;s++){
+					for(int r=0;r<nRateCats;r++){
+						La += prmat[(*Ldata)+16*r]  * partial[4*r]* rateProb[r];
+						D1a += d1mat[(*Ldata)+16*r] * partial[4*r]* rateProb[r];		
+						D2a += d2mat[(*Ldata)+16*r] * partial[4*r]* rateProb[r];
 											
-						Lc += prmat[(*Ldata+4)+16*i] * partial[1+4*i]* rateProb[i];
-						D1c += d1mat[(*Ldata+4)+16*i]* partial[1+4*i]* rateProb[i];
-						D2c += d2mat[(*Ldata+4)+16*i]* partial[1+4*i]* rateProb[i];
+						Lc += prmat[(*Ldata+4)+16*r] * partial[1+4*r]* rateProb[r];
+						D1c += d1mat[(*Ldata+4)+16*r]* partial[1+4*r]* rateProb[r];
+						D2c += d2mat[(*Ldata+4)+16*r]* partial[1+4*r]* rateProb[r];
 											
-						Lg += prmat[(*Ldata+8)+16*i]* partial[2+4*i]* rateProb[i];
-						D1g += d1mat[(*Ldata+8)+16*i]* partial[2+4*i]* rateProb[i];
-						D2g += d2mat[(*Ldata+8)+16*i]* partial[2+4*i]* rateProb[i];
+						Lg += prmat[(*Ldata+8)+16*r]* partial[2+4*r]* rateProb[r];
+						D1g += d1mat[(*Ldata+8)+16*r]* partial[2+4*r]* rateProb[r];
+						D2g += d2mat[(*Ldata+8)+16*r]* partial[2+4*r]* rateProb[r];
 						
-						Lt += prmat[(*Ldata+12)+16*i]* partial[3+4*i]* rateProb[i];
-						D1t += d1mat[(*Ldata+12)+16*i]* partial[3+4*i]* rateProb[i];
-						D2t += d2mat[(*Ldata+12)+16*i]* partial[3+4*i]* rateProb[i];
+						Lt += prmat[(*Ldata+12)+16*r]* partial[3+4*r]* rateProb[r];
+						D1t += d1mat[(*Ldata+12)+16*r]* partial[3+4*r]* rateProb[r];
+						D2t += d2mat[(*Ldata+12)+16*r]* partial[3+4*r]* rateProb[r];
 						}
 					Ldata++;
 					}
@@ -1453,178 +1592,76 @@ void Tree::GetDerivsPartialTerminalFlexRates(const CondLikeArray *partialCLA, co
 				}
 			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 				double btot=0.0;
-				if(conBases[i]&1) btot+=mod->Pi(0);
-				if(conBases[i]&2) btot+=mod->Pi(1);
-				if(conBases[i]&4) btot+=mod->Pi(2);
-				if(conBases[i]&8) btot+=mod->Pi(3);
+				if(conBases[i]&1) btot+=freqs[0];
+				if(conBases[i]&2) btot+=freqs[1];
+				if(conBases[i]&4) btot+=freqs[2];
+				if(conBases[i]&8) btot+=freqs[3];
 				//6-27-05 fixed this to calc derivs correctly if constant site has been rescaled
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) + (prI*btot)*exp((double)partialCLA->underflow_mult[i]));
+				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot)*exp((double)partialCLA->underflow_mult[i]));
 				}
 			else
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)));
+				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
 
-			tempD1 = (((D1a*mod->Pi(0)+D1c*mod->Pi(1)+D1g*mod->Pi(2)+D1t*mod->Pi(3))) / siteL);
-			d1Tot += *countit * tempD1;
-			assert(d1Tot == d1Tot);
-			double siteD2=((D2a*mod->Pi(0)+D2c*mod->Pi(1)+D2g*mod->Pi(2)+D2t*mod->Pi(3)));
-			d2Tot += *countit * ((siteD2 / siteL) - tempD1*tempD1);
-			assert(d2Tot == d2Tot);
+			double tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
+			tot1+= countit[i] * tempD1;
+			double siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
+			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
 			}
+#ifndef OMP_TERMDERIV
 		else{
 			partial+=4*nRateCats;
 			if(!(*Ldata < 0)) Ldata++;
 			else if(*Ldata == -4) Ldata++;
 			else{
-				char nstates=-1 * *(Ldata++);
-				for(int i=0;i<nstates;i++) Ldata++;
+				int nstates=-1 * *(Ldata++);
+				for(int s=0;s<nstates;s++) Ldata++;
 				}
 			}
-		countit++;
-		}
-	}
-
-void Tree::GetDerivsPartialTerminalRateHet(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1Tot, double &d2Tot){
-
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	double *partial=partialCLA->arr;
-
-	int nchar=data->NChar();
-
-#ifdef UNIX
-	madvise(partial, nchar*4*mod->NRateCats()*sizeof(double), MADV_SEQUENTIAL);
 #endif
-
-	double siteL, tempD1, D1tot, D2tot;
-	D1tot=D2tot=0.0;
-	double La, Lc, Lg, Lt;
-	double D1a, D1c, D1g, D1t;
-	double D2a, D2c, D2g, D2t;
-	
-	//gamma and invariants
-	const int *countit=data->GetCounts();
-	int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstBases();
-	double prI=mod->ProportionInvariant();
-	int nRateCats=mod->NRateCats();
-	double scaledGammaProp=(1.0-prI) / nRateCats;
-	
-	for(int i=0;i<nchar;i++){
-		if((*countit) != 0){
-			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=0.0;
-			if(*Ldata > -1){ //no ambiguity
-				for(int i=0;i<nRateCats;i++){
-					La  += prmat[(*Ldata)+16*i] * partial[0];
-					D1a += d1mat[(*Ldata)+16*i] * partial[0];
-					D2a += d2mat[(*Ldata)+16*i] * partial[0];
-					Lc  += prmat[(*Ldata+4)+16*i] * partial[1];
-					D1c += d1mat[(*Ldata+4)+16*i] * partial[1];
-					D2c += d2mat[(*Ldata+4)+16*i] * partial[1];
-					Lg  += prmat[(*Ldata+8)+16*i] * partial[2];
-					D1g += d1mat[(*Ldata+8)+16*i] * partial[2];
-					D2g += d2mat[(*Ldata+8)+16*i] * partial[2];
-					Lt  += prmat[(*Ldata+12)+16*i] * partial[3];
-					D1t += d1mat[(*Ldata+12)+16*i] * partial[3];
-					D2t += d2mat[(*Ldata+12)+16*i] * partial[3];
-					partial += 4;
-					}
-				Ldata++;
-				}
-				
-			else if(*Ldata == -4){ //total ambiguity
-				for(int i=0;i<nRateCats;i++){
-					La += partial[0];
-					Lc += partial[1];
-					Lg += partial[2];
-					Lt += partial[3];
-					partial += 4;
-					}
-				Ldata++;
-				}
-			else{ //partial ambiguity
-				char nstates=-1 * *(Ldata++);
-				for(int i=0;i<nstates;i++){
-					for(int i=0;i<nRateCats;i++){
-						La += prmat[(*Ldata)+16*i]  * partial[4*i];
-						D1a += d1mat[(*Ldata)+16*i] * partial[4*i];		
-						D2a += d2mat[(*Ldata)+16*i] * partial[4*i];
-											
-						Lc += prmat[(*Ldata+4)+16*i] * partial[1+4*i];
-						D1c += d1mat[(*Ldata+4)+16*i]* partial[1+4*i];
-						D2c += d2mat[(*Ldata+4)+16*i]* partial[1+4*i];
-											
-						Lg += prmat[(*Ldata+8)+16*i]* partial[2+4*i];
-						D1g += d1mat[(*Ldata+8)+16*i]* partial[2+4*i];
-						D2g += d2mat[(*Ldata+8)+16*i]* partial[2+4*i];
-						
-						Lt += prmat[(*Ldata+12)+16*i]* partial[3+4*i];
-						D1t += d1mat[(*Ldata+12)+16*i]* partial[3+4*i];
-						D2t += d2mat[(*Ldata+12)+16*i]* partial[3+4*i];
-						}
-					Ldata++;
-					}
-				partial+=16;
-				}
-			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
-				double btot=0.0;
-				if(conBases[i]&1) btot+=mod->Pi(0);
-				if(conBases[i]&2) btot+=mod->Pi(1);
-				if(conBases[i]&4) btot+=mod->Pi(2);
-				if(conBases[i]&8) btot+=mod->Pi(3);
-				//6-27-05 fixed this to calc derivs correctly if constant site has been rescaled
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp + (prI*btot)*exp((double)partialCLA->underflow_mult[i]));
-				}
-			else
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp);
-
-			tempD1 = (((D1a*mod->Pi(0)+D1c*mod->Pi(1)+D1g*mod->Pi(2)+D1t*mod->Pi(3)) * scaledGammaProp) / siteL);
-			d1Tot += *countit * tempD1;
-			assert(d1Tot == d1Tot);
-			double siteD2=((D2a*mod->Pi(0)+D2c*mod->Pi(1)+D2g*mod->Pi(2)+D2t*mod->Pi(3)) * scaledGammaProp);
-			d2Tot += *countit * ((siteD2 / siteL) - tempD1*tempD1);
-			assert(d2Tot == d2Tot);
-			}
-		else{
-			partial+=16;
-			if(!(*Ldata < 0)) Ldata++;
-			else if(*Ldata == -4) Ldata++;
-			else{
-				char nstates=-1 * *(Ldata++);
-				for(int i=0;i<nstates;i++) Ldata++;
-				}
-			}
-		countit++;
 		}
+	d1Tot = tot1;
+	d2Tot = tot2;
 	}
 	
-void Tree::GetDerivsPartialInternalFlexRates(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1Tot, double &d2Tot){
+void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1Tot, double &d2Tot){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *CL1=childCLA->arr;
 	double *partial=partialCLA->arr;
 
-	int nchar=data->NChar();
+	const int nchar=data->NChar();
 
 #ifdef UNIX
 	madvise(partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
 	madvise(CL1, nchar*16*sizeof(double), MADV_SEQUENTIAL);
 #endif
 
-	double siteL, tempD1;
+	double siteL;
 	double La, Lc, Lg, Lt;
 	double D1a, D1c, D1g, D1t;
 	double D2a, D2c, D2g, D2t;
+	double tot1=0.0, tot2=0.0;//can't use d1Tot and d2Tot in OMP reduction because they are references
 	
 	const int *countit=data->GetCounts();
 	const double *rateProb=mod->GetRateProbs();
 	const int nRateCats=mod->NRateCats();
 	
-	int lastConst=data->LastConstant();
+	const int lastConst=data->LastConstant();
 	const int *conBases=data->GetConstBases();
-	double prI=mod->ProportionInvariant();	
+	const double prI=mod->PropInvar();	
 
+	double freqs[4];
+	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+
+#ifdef OMP_INTDERIV
+#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, CL1, siteL) reduction(+ : tot1, tot2)
 	for(int i=0;i<nchar;i++){
-		if((*countit) != 0){
+		partial = &(partialCLA->arr[4*i*nRateCats]);
+		CL1		= &(childCLA->arr[4*i*nRateCats]);
+#else
+	for(int i=0;i<nchar;i++){
+#endif
+		if((countit[i]) != 0){
 			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=0.0;
 			for(int r=0;r<nRateCats;r++){
 				int rOff=r*16;
@@ -1647,146 +1684,31 @@ void Tree::GetDerivsPartialInternalFlexRates(const CondLikeArray *partialCLA, co
 				CL1+=4;
 				}
 			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
-				double btot=0.0;
-				if(conBases[i]&1) btot+=mod->Pi(0);
-				if(conBases[i]&2) btot+=mod->Pi(1);
-				if(conBases[i]&4) btot+=mod->Pi(2);
-				if(conBases[i]&8) btot+=mod->Pi(3);
+				double	btot=0.0;
+				if(conBases[i]&1) btot+=freqs[0];
+				if(conBases[i]&2) btot+=freqs[1];
+				if(conBases[i]&4) btot+=freqs[2];
+				if(conBases[i]&8) btot+=freqs[3];
 				//6-27-05 fixed this to calc derivs correctly if constant site has been rescaled
-				double underTot=childCLA->underflow_mult[i]+partialCLA->underflow_mult[i];
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) + (prI*btot)*exp(underTot));
+				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot)*exp((double)childCLA->underflow_mult[i]+partialCLA->underflow_mult[i]));
 				}
 			else
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)));
-			tempD1 = (((D1a*mod->Pi(0)+D1c*mod->Pi(1)+D1g*mod->Pi(2)+D1t*mod->Pi(3))) / siteL);
-			d1Tot += *countit * tempD1;
+				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
+			double tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
 			assert(d1Tot == d1Tot);
-			double siteD2=((D2a*mod->Pi(0)+D2c*mod->Pi(1)+D2g*mod->Pi(2)+D2t*mod->Pi(3)));
-			d2Tot += *countit * ((siteD2 / siteL) - tempD1*tempD1);
+			double siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
+			tot1 += countit[i] * tempD1;
+			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
 			assert(d2Tot == d2Tot);
 			}
+#ifndef OMP_INTDERIV
 		else{
 			partial+=4*nRateCats;
-			CL1+=4*nRateCats;
+			CL1+=4*nRateCats;			
 			}
-		countit++;
-		}
-	}
-
-void Tree::GetDerivsPartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1Tot, double &d2Tot){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	double *CL1=childCLA->arr;
-	double *partial=partialCLA->arr;
-
-	int nchar=data->NChar();
-
-#ifdef UNIX
-	madvise(partial, nchar*mod->NRateCats()*4*sizeof(double), MADV_SEQUENTIAL);
-	madvise(CL1, nchar*mod->NRateCats()*4*sizeof(double), MADV_SEQUENTIAL);
 #endif
-
-	double siteL, tempD1;
-	double La, Lc, Lg, Lt;
-	double D1a, D1c, D1g, D1t;
-	double D2a, D2c, D2g, D2t;
-	
-	//gamma and invariants
-	const int *countit=data->GetCounts();
-	int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstBases();
-	double prI=mod->ProportionInvariant();
-	int nRateCats=mod->NRateCats();
-	double scaledGammaProp=(1.0-prI) / nRateCats;
-
-	for(int i=0;i<nchar;i++){
-		if((*countit) != 0){
-			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=0.0;
-			for(int r=0;r<nRateCats;r++){
-				int rOff=r*16;
-				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0];
-				Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1];
-				Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * partial[2];
-				Lt += ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3]) * partial[3];
-				
-				D1a += ( d1mat[rOff ]*CL1[0]+d1mat[rOff + 1]*CL1[1]+d1mat[rOff + 2]*CL1[2]+d1mat[rOff + 3]*CL1[3]) * partial[0];
-				D1c += ( d1mat[rOff + 4]*CL1[0]+d1mat[rOff + 5]*CL1[1]+d1mat[rOff + 6]*CL1[2]+d1mat[rOff + 7]*CL1[3]) * partial[1];
-				D1g += ( d1mat[rOff + 8]*CL1[0]+d1mat[rOff + 9]*CL1[1]+d1mat[rOff + 10]*CL1[2]+d1mat[rOff + 11]*CL1[3]) * partial[2];
-				D1t += ( d1mat[rOff + 12]*CL1[0]+d1mat[rOff + 13]*CL1[1]+d1mat[rOff + 14]*CL1[2]+d1mat[rOff + 15]*CL1[3]) * partial[3];		
-
-				D2a += ( d2mat[rOff ]*CL1[0]+d2mat[rOff + 1]*CL1[1]+d2mat[rOff + 2]*CL1[2]+d2mat[rOff + 3]*CL1[3]) * partial[0];
-				D2c += ( d2mat[rOff + 4]*CL1[0]+d2mat[rOff + 5]*CL1[1]+d2mat[rOff + 6]*CL1[2]+d2mat[rOff + 7]*CL1[3]) * partial[1];
-				D2g += ( d2mat[rOff + 8]*CL1[0]+d2mat[rOff + 9]*CL1[1]+d2mat[rOff + 10]*CL1[2]+d2mat[rOff + 11]*CL1[3]) * partial[2];
-				D2t += ( d2mat[rOff + 12]*CL1[0]+d2mat[rOff + 13]*CL1[1]+d2mat[rOff + 14]*CL1[2]+d2mat[rOff + 15]*CL1[3]) * partial[3];
-				
-				partial+=4;
-				CL1+=4;
-				}
-			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
-				double btot=0.0;
-				if(conBases[i]&1) btot+=mod->Pi(0);
-				if(conBases[i]&2) btot+=mod->Pi(1);
-				if(conBases[i]&4) btot+=mod->Pi(2);
-				if(conBases[i]&8) btot+=mod->Pi(3);
-				//6-27-05 fixed this to calc derivs correctly if constant site has been rescaled
-				double underTot=childCLA->underflow_mult[i]+partialCLA->underflow_mult[i];
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp + (prI*btot)*exp(underTot));
-				}
-			else
-				siteL  = ((La*mod->Pi(0)+Lc*mod->Pi(1)+Lg*mod->Pi(2)+Lt*mod->Pi(3)) * scaledGammaProp);
-			tempD1 = (((D1a*mod->Pi(0)+D1c*mod->Pi(1)+D1g*mod->Pi(2)+D1t*mod->Pi(3)) * scaledGammaProp) / siteL);
-			d1Tot += *countit * tempD1;
-			assert(d1Tot == d1Tot);
-			double siteD2=((D2a*mod->Pi(0)+D2c*mod->Pi(1)+D2g*mod->Pi(2)+D2t*mod->Pi(3)) * scaledGammaProp);
-			d2Tot += *countit * ((siteD2 / siteL) - tempD1*tempD1);
-			assert(d2Tot == d2Tot);
-			}
-		else{
-			partial+=16;
-			CL1+=16;
-			}
-		countit++;
 		}
+	d1Tot = tot1;
+	d2Tot = tot2;
 	}
 
-/*DEPRECATED
-void Tree::FillSiteLikes(const CondLikeArray *fullCla, double *dest, bool addPinv){
-	
-	double *cla=fullCla->arr;
-	
-	int nSites=data->NChar();
-	const int *countit=data->GetCounts();
-	double Lk;
-	//gamma and invariants
-	int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstBases();
-	double prI=mod->ProportionInvariant();
-	double scaledGammaProp=(1.0-prI) / mod->NRateCats();
-	
-	//if we're doing these calcs for the first or second derivatives, the contribution
-	//of pinv should not be included.  This is indicated by addPinv being false, so we 
-	//just jump to the second loop for all sites
-	int lastPinvIndex = (addPinv ? lastConst : -1);
-		
-	for( int k = 0; k <= lastPinvIndex; k++ ){
-		Lk = mod->Pi(0)*(cla[0] + cla[4] + cla[8] + cla[12]) + mod->Pi(1)*(cla[1] + cla[5] + cla[9] + cla[13]) + mod->Pi(2)*(cla[2] + cla[6] + cla[10] + cla[14]) + mod->Pi(3)*(cla[3] + cla[7] + cla[11] + cla[15]);	
-		cla+=16;
-		double btot=0.0;
-		if(conBases[k]&1) btot+=mod->Pi(0);
-		if(conBases[k]&2) btot+=mod->Pi(1);
-		if(conBases[k]&4) btot+=mod->Pi(2);
-		if(conBases[k]&8) btot+=mod->Pi(3);
-		dest[k] = Lk * scaledGammaProp + (prI * btot);
-		}			
-	
-	for( int k = lastPinvIndex+1; k < nSites; k++ ){
-		Lk = mod->Pi(0)*(cla[0] + cla[4] + cla[8] + cla[12]) + mod->Pi(1)*(cla[1] + cla[5] + cla[9] + cla[13]) + mod->Pi(2)*(cla[2] + cla[6] + cla[10] + cla[14]) + mod->Pi(3)*(cla[3] + cla[7] + cla[11] + cla[15]);	
-		cla+=16;
-		dest[k] = Lk * scaledGammaProp;
-		}
-	}
-*/	
-
-	
-	
-	
