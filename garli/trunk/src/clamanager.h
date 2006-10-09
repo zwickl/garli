@@ -36,12 +36,14 @@ class ClaManager{
 	ClaManager(int nnod, int nClas, int nHolders, int nchar, int nrates) : numNodes(nnod), numClas(nClas), numHolders(nHolders), numRates(nrates){
 		maxUsed=0;
 		allClas=new CondLikeArray*[numClas];
+		claStack.reserve(numClas);
 		for(int i=numClas-1;i>=0;i--){
 			allClas[i]=new CondLikeArray;
 			allClas[i]->Allocate(4, nchar, numRates);
 			claStack.push_back(allClas[i]);
 			}
 		holders = new CondLikeArrayHolder[numHolders];
+		holderStack.reserve(numHolders);
 		for(int i=numHolders-1;i>=0;i--)
 			holderStack.push_back(i);
 		}
@@ -98,29 +100,6 @@ class ClaManager{
 		holders[index].theArray = AssignFreeCla();
 		holders[index].reclaimLevel=dir;
 		}
-	
-	inline CondLikeArray* ClaManager::AssignFreeCla(){
-		#ifdef CLA_DEBUG
-		ofstream deb("cladebug.log", ios::app);
-		#endif
-
-		if(claStack.empty() == true) RecycleClas();
-		
-		CondLikeArray *arr=claStack[claStack.size()-1];
-
-//#define PREFETCH_CLA	
-#ifdef PREFETCH_CLA
-
-		madvise(arr->arr, arr->NSites()*16*sizeof(double), MADV_WILLNEED);
-	
-#endif
-		
-		assert(arr != NULL);
-		claStack.pop_back();
-		if(numClas - (int)claStack.size() > maxUsed) maxUsed=numClas - (int)claStack.size();
-		
-		return arr;
-		}
 
 	inline int ClaManager::GetReclaimLevel(int index){
 		if(holders[index].theArray == NULL) return -1;
@@ -154,40 +133,6 @@ class ClaManager{
 			if(holders[i].tempReserved ==true) tempres++;
 			if(holders[i].reserved==true) res++;
 			}		
-		}
-
-
-	inline void ClaManager::RecycleClas(){
-		int numReclaimed=0;
-		for(int i=0;i<numHolders;i++){
-			if(holders[i].theArray != NULL){
-				if(holders[i].GetReclaimLevel() == 2 && holders[i].tempReserved == false && holders[i].reserved == false){
-					assert(holders[i].theArray->NStates()==4);
-					claStack.push_back(holders[i].theArray);
-					holders[i].SetReclaimLevel(0);
-					holders[i].theArray=NULL;
-					numReclaimed++;
-					}
-				}
-			if(memLevel<2) if(numReclaimed>50) return;
-			}
-		if(numReclaimed>10) return;
-		for(int i=0;i<numHolders;i++){
-			if(holders[i].theArray != NULL){
-				if((holders[i].GetReclaimLevel() == 1 && holders[i].tempReserved == false && holders[i].reserved == false)){
-					assert(holders[i].theArray->NStates()==4);
-					claStack.push_back(holders[i].theArray);
-					holders[i].SetReclaimLevel(0);
-					holders[i].theArray=NULL;
-					numReclaimed++;
-					}
-				}
-			if(numReclaimed==20) return;
-			}
-		if(numReclaimed==0){
-			throw(2);
-			}
-		assert(numReclaimed > 0);
 		}
 	
 	inline int ClaManager::GetClaNumber(int index){
