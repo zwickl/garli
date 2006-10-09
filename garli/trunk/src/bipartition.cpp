@@ -1,5 +1,5 @@
-// GARLI version 0.94 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,15 +7,14 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
 
 #include "bipartition.h"
+#include "reconnode.h"
 
 int Bipartition::nBlocks;
 int Bipartition:: blockBits;
@@ -30,5 +29,15 @@ Bipartition::~Bipartition(){
 	rep=NULL;
 	}	
 
-
+//note that this is "less than" for sorting purposes, not in a subset sense
+bool BipartitionLessThan(const Bipartition &lhs, const Bipartition &rhs){
+	int i;
+	for(i=0;i<Bipartition::nBlocks-1;i++){
+		if(lhs.rep[i] > rhs.rep[i]) return false;
+		else if(lhs.rep[i] < rhs.rep[i]) return true;
+		}
+		
+	if(((lhs.rep[i]) & lhs.partialBlockMask) > ((rhs.rep[i]) & lhs.partialBlockMask)) return false;
+	else return true;
+	}
 

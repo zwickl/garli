@@ -1,5 +1,5 @@
-// GARLI version 0.93 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,13 +7,12 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
+
 
 #ifndef BIPARTITION
 #define BIPARTITION
@@ -22,9 +21,10 @@
 #include <string>
 #include <vector>
 #include <cassert>
-#include "errorexception.h"
 
 using namespace std;
+
+#include "errorexception.h"
 
 class Bipartition{
 	public:	
@@ -46,7 +46,20 @@ class Bipartition{
 		}
 	Bipartition(const Bipartition &b){//copy constructor
 		rep=new unsigned int[nBlocks];
-		for(int i=0;i<nBlocks;i++) rep[i] = b.rep[i];
+		memcpy(rep, b.rep, nBlocks*sizeof(int));
+		//for(int i=0;i<nBlocks;i++) rep[i] = b.rep[i];
+		}
+
+	Bipartition(const char *c){//construct from a ***.... string
+		rep=new unsigned int[nBlocks];
+		ClearBipartition();
+		size_t len=strlen(c);
+		assert(len == ntax);
+		Bipartition tmp;
+		for(unsigned i=0;i<len;i++){
+			if(c[i] == '*') *this += tmp.TerminalBipart(i+1);
+			}
+		Standardize();
 		}
 
 	~Bipartition();
@@ -82,7 +95,7 @@ class Bipartition{
 		else{
 			for(int i=0;i<nBlocks;i++){
 				rep[i] |= ~rhs->rep[i];
-			}
+				}
 			}
 		}
 
@@ -91,6 +104,8 @@ class Bipartition{
 		}
 
 	bool EqualsEquals(const Bipartition *rhs){
+		assert(this->ContainsTaxon(1));
+		assert(rhs->ContainsTaxon(1));
 		int i;
 		for(i=0;i<nBlocks-1;i++){
 			if(rep[i]!=rhs->rep[i]) return false;
@@ -350,6 +365,7 @@ class Bipartition{
 		}
 
 	Bipartition *TerminalBipart(int taxNum){
+		assert(taxNum > 0 && taxNum <= ntax);
 		for(int i=0;i<nBlocks;i++) rep[i]=0;
 		//8-19-05 fixed this bit of stupidity
 		//rep[(taxNum)/blockBits]|=(largestBlockDigit>>((taxNum-1)%blockBits));
@@ -360,6 +376,7 @@ class Bipartition{
 		for(int i=0;i<nBlocks;i++){
 			unsigned int t=rep[i];
 			for(int j=0;j<blockBits;j++){
+				if(i*blockBits+j >= ntax) break;
 				if(t&largestBlockDigit) str[i*blockBits+j]='*';
 				else str[i*blockBits+j]='-';
 				t=t<<1;
@@ -375,9 +392,7 @@ class Bipartition{
 		}
 	};
 
-class BipartitionSet{
-	Bipartition *allParts;
-	};
+bool BipartitionLessThan(const Bipartition &lhs, const Bipartition &rhs);
 
 class Constraint{
 	//a very simple class that just contains a bipartition and whether
