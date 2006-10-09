@@ -1,5 +1,5 @@
-// GARLI version 0.94 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,16 +7,14 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
-
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
+#include "defs.h"
 #include "mlhky.h"
 
 #undef DEBUG_CALCFREQ
@@ -28,16 +26,9 @@
 #	include <io.h>
 #endif
 
-//DJZ 2-10-04.  Don't really need the other pi variables anymore, but 
-//want determine the empirical freqs so we can start there.
-//void HKYData::CalcEmpiricalFreqs( double* p, double* P, double* PInv )
-void HKYData::CalcEmpiricalFreqs( double* p)
-{
-	p[0] = 0.0;
-	p[1] = 0.0;
-	p[2] = 0.0;
-	p[3] = 0.0;
-
+void HKYData::CalcEmpiricalFreqs(){
+	empStateFreqs=new double[4];
+	empStateFreqs[1]=empStateFreqs[2]=empStateFreqs[3]=empStateFreqs[0]=0.0;
 	double total = 0.0;
 	for( int i = 0; i < NTax(); i++ ) {
 		for( int j = 0; j < NChar(); j++ ) {
@@ -55,33 +46,24 @@ void HKYData::CalcEmpiricalFreqs( double* p)
 			if(nstates < 4){
 				//now divide the states up to the bases
 				if(thischar & 1)
-					p[0] += (double) Count(j)/nstates;
+					empStateFreqs[0] += (double) Count(j)/nstates;
 				if(thischar & 2)
-					p[1] += (double) Count(j)/nstates;
+					empStateFreqs[1] += (double) Count(j)/nstates;
 				if(thischar & 4)
-					p[2] += (double) Count(j)/nstates;
+					empStateFreqs[2] += (double) Count(j)/nstates;
 				if(thischar & 8) 
-					p[3] += (double) Count(j)/nstates;				
+					empStateFreqs[3] += (double) Count(j)/nstates;				
 				
 				total += Count(j);
 				}
+			}
 		}
-	}
 	assert( total > 0.0 );
 
-#if 1
-	p[0] /= total;
-	p[1] /= total;
-	p[2] /= total;
-	p[3] /= total;
-#else
-	cerr << endl << "**** warning: all base frequencies being set";
-	cerr << " to 0.25 ****" << endl;
-	p[0] = 0.25;
-	p[1] = 0.25;
-	p[2] = 0.25;
-	p[3] = 0.25;
-#endif
+	empStateFreqs[0] /= total;
+	empStateFreqs[1] /= total;
+	empStateFreqs[2] /= total;
+	empStateFreqs[3] /= total;
 
 #if defined( DEBUG_CALCFREQ )
 	cerr << endl << "Frequency of A: " << p[0] << endl;
@@ -103,6 +85,8 @@ void HKYData::CalcEmpiricalFreqs( double* p)
 void HKYData::MakeAmbigStrings(){
 	//this will populate the ambigStrings vector with the data in the typical ambiguity format
 	
+	ambigStrings.reserve(NTax());
+
 	for(int i=0;i<NTax();i++){
 		unsigned char* thisdata=GetRow(i);
 		
@@ -131,10 +115,18 @@ void HKYData::MakeAmbigStrings(){
 			}
 	
 		char *thisString=new char[totalStates];
-		
+
+#ifdef OPEN_MP
+		unsigned *thisMap=new unsigned[NChar()];
+#endif
+
 		//now do it for real
 		int index=0;
 		for(int j=0;j<NChar();j++){
+
+#ifdef OPEN_MP
+			thisMap[j]=index;
+#endif
 			char thisbase=thisdata[j];
 			int numstates=0;
 			char thiscode;
@@ -170,6 +162,9 @@ void HKYData::MakeAmbigStrings(){
 				}
 			}
 		ambigStrings.push_back(thisString);
+#ifdef OPEN_MP
+		ambigToCharMap.push_back(thisMap);
+#endif
 		}
 	}
 
