@@ -34,7 +34,7 @@ class OutputManager{
 			defaultOut=&out;
 			}
 
-		void SetLogFile(char *logname){
+		void SetLogFile(const char *logname){
 			log=true;
 			logOut.open(logname);
 			}
