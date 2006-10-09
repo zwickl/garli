@@ -1,5 +1,5 @@
-// GARLI version 0.93 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,24 +7,21 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
+
 
 #ifndef INDIVIDUAL_H
 #define INDIVIDUAL_H
 
 #include "memchk.h"
-#include "parameters.h"
 #include "tree.h"
 #include "model.h"
 #include "hashdefines.h"
 
-class Parameters;
 class CondLikeArray;
 class Tree;
 class ParallelManager;
@@ -36,17 +33,16 @@ class Individual
 	bool dirty;      // individual becomes dirty if mutated in any way
 
 	public:
-		Parameters* params;
 
 		int mutation_type;
 		//here we define the binary equivalents of the mutation types, so that they can all be rolled
 		//into a single int with bit flags
 		enum {	//normal mutation types
 				randNNI 	= 0x0001,  //1
-			 	exNNI	 	= 0x0002,  //2
+			 	randSPRCon	= 0x0002,  //2
 			 	randSPR		= 0x0004,  //4			
 			 	limSPR		= 0x0008,  //8
-			 	exlimSPR	= 0x0010,  //16
+			 	limSPRCon	= 0x0010,  //16
 			 	randRecom	= 0x0020,  //32
 			 	bipartRecom	= 0x0040,  //64
 				taxonSwap   = 0x1000,  //4096
@@ -73,8 +69,8 @@ class Individual
 			 		 | exlimSPR | randRecom | bipartRecom | taxonSwap
                      | subtreeRecom | randPECR ) ,
 #else
-			 	anyTopo		= (randNNI | exNNI | randSPR | limSPR 
-			 		 | exlimSPR | randRecom | bipartRecom | taxonSwap | subtreeRecom ) ,
+			 	anyTopo		= (randNNI | randSPRCon | randSPR | limSPR 
+			 		 | limSPRCon | randRecom | bipartRecom | taxonSwap | subtreeRecom ) ,
 #endif
 			 	anyModel	= rates | pi | alpha | pinv | muScale
 			 	};
@@ -84,7 +80,7 @@ class Individual
 		Model *mod;
 		
 		Tree *treeStruct;
-			//still need to look over alloc and delalloc carefully
+
 		bool reproduced;
 		bool willreproduce;
 		bool willrecombine;
@@ -96,14 +92,12 @@ class Individual
 		double Fitness() const { return fitness; }
 		void SetDirty() { dirty = true; }
 		bool IsDirty() const { return dirty; }
-		void SetParams( Parameters* p ) {
-			params = p;
-			}
+
 		void SetFitness( double f ) {
 			fitness = f;
 			dirty=false;
 			}
-		void Randomize(char *fname, int rank);
+		void GetStartingConditionsFromFile(const char *fname, int rank, int nTax, bool restart=false);
 		void RefineStartingConditions(bool optModel, double branchPrec);
 		void CalcFitness(int subtreeNode);
 		void ReadTreeFromFile(istream & inf);
@@ -121,7 +115,7 @@ class Individual
 		void CopySecByStealingFirstTree(Individual * sourceOfTreePtr, const Individual *sourceOfInformation);
 		void CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const Individual *sourceOfInformation, bool CLAassigned=false);
 		void ResetIndiv();
-		void MakeRandomTree();
+		void MakeRandomTree(int nTax);
 	};
 
 
