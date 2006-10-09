@@ -1,5 +1,5 @@
-// GARLI version 0.94 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,13 +7,12 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
+
 
 #include <string.h>
 #include <cassert>
@@ -31,15 +30,20 @@ using namespace std;
 /////////////////////////////////////////////////////////////////////////
 
 GeneralGamlConfig::GeneralGamlConfig()	:bootstrapReps(0), outputMostlyUselessFiles(0), 
-		outputPhylipTree(0), treeRejectionThreshold(100.0), dontInferProportionInvariant(0), 
+		outputPhylipTree(0), treeRejectionThreshold(100.0), 
 		numPrecReductions(-1), precReductionFactor(-1.0), availableMemory(-1), 
-		significantTopoChange(0.01), useflexrates(false), numratecats(4){
+		significantTopoChange(0.01), numRateCats(4), uniqueSwapBias(1.0),
+		restart(false), checkpoint(false), distanceSwapBias(1.0){
 	//default values here //TODO
 	logevery = 10;
 	saveevery = 100;
 	datafname = "datafname";
 	ofprefix = "ofprefix";
 	constraintfile = "\0";
+	stateFrequencies = "estimate";
+	rateMatrix = "6rate";
+	proportionInvariant = "estimate";
+	rateHetModel = "gamma";
 	}
 
 int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
@@ -72,15 +76,22 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
-	cr.GetBoolOption("dontinferproportioninvariant", dontInferProportionInvariant, true);
-	cr.GetBoolOption("useflexrates", useflexrates, true);
-	cr.GetIntOption("numratecats", numratecats, true);	
+
+	cr.GetBoolOption("restart", restart, true);
+	cr.GetBoolOption("writecheckpoints", checkpoint, true);
+
+	//cr.GetBoolOption("useflexrates", useflexrates, true);
+	//cr.GetBoolOption("dontinferproportioninvariant", dontInferProportionInvariant, true);
+	cr.GetStringOption("ratehetmodel", rateHetModel, true);
+	cr.GetIntOption("numratecats", numRateCats, true);	
+	cr.GetStringOption("statefrequencies", stateFrequencies, true);
+	cr.GetStringOption("ratematrix", rateMatrix, true);
+	cr.GetStringOption("invariantsites", proportionInvariant, true);
 
 	if(isMaster) errors += cr.SetSection("master");
 	else errors += cr.SetSection("remote");
 	
-	errors += cr.GetIntOption("nindivs", min_nindivs);
-	max_nindivs=min_nindivs;
+	errors += cr.GetIntOption("nindivs", nindivs);
 	errors += cr.GetIntOption("holdover", holdover);
 	errors += cr.GetDoubleOption("selectionintensity", selectionIntensity);
 	errors += cr.GetDoubleOption("holdoverpenalty", holdoverPenalty);
@@ -103,6 +114,9 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetDoubleOption("randsprweight", randSPRweight);	
 	errors += cr.GetDoubleOption("limsprweight", limSPRweight);
 	
+	cr.GetDoubleOption("uniqueswapbias", uniqueSwapBias, true);
+	cr.GetDoubleOption("distanceswapbias", distanceSwapBias, true);
+
 	cr.GetDoubleOption("treerejectionthreshold", treeRejectionThreshold, true);
 
 	cr.GetIntOption("bootstrapreps", bootstrapReps, true);
@@ -126,8 +140,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetIntOption("limsprrange", limSPRrange);
 	errors += cr.GetIntOption("intervallength", intervalLength);
 	errors += cr.GetIntOption("intervalstostore", intervalsToStore);
-	errors += cr.GetDoubleOption("meanbrlenmuts", minBrlenMuts);
-	maxBrlenMuts=minBrlenMuts;
+	errors += cr.GetDoubleOption("meanbrlenmuts", meanBrlenMuts);
 
 #ifdef INCLUDE_PERTURBATION
 	errors += cr.SetSection("perturbation");

@@ -1,5 +1,5 @@
-// GARLI version 0.93 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,13 +7,12 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
+
 
 
 #ifndef CONFIGOPTIONS_H
@@ -43,18 +42,27 @@ class GeneralGamlConfig{
 	bool outputTreelog;
 	bool outputMostlyUselessFiles;
 	bool outputPhylipTree;
-	bool dontInferProportionInvariant;
-	bool useflexrates;
-	int numratecats;
+	bool restart;
+	bool checkpoint;
 
 	bool enforceTermConditions;
 	int lastTopoImproveThresh;
 	double improveOverStoredIntervalsThresh;
 	double significantTopoChange;
 
+	//model settings
+	string stateFrequencies; //equal, estimate, emprical, fixed
+	string rateMatrix;		 //6rate, 2rate, 1rate, fixed, custom(
+	string proportionInvariant; //none, fixed, estimate
+	string rateHetModel;			//gamma, gammafixed, flex, none
+
+//	bool dontInferProportionInvariant;
+//	bool useflexrates;
+	int numRateCats;	
+
 	//all of the following options can vary between master and remote
 	//general population stuff
-	int max_nindivs, min_nindivs;
+	int nindivs;
 	int holdover;
 	double selectionIntensity;
 	double holdoverPenalty;
@@ -84,10 +92,12 @@ class GeneralGamlConfig{
 	bool inferInternalStateProbs;
 
 	//parameters affecting other details of mutations				
-	double maxBrlenMuts, minBrlenMuts;
+	double meanBrlenMuts;
 	int gammaShapeBrlen;
 	int gammaShapeModel;
 	int limSPRrange;		
+	double uniqueSwapBias;
+	double distanceSwapBias;
 
 	//perturbation parameters
 	int pertType;			
