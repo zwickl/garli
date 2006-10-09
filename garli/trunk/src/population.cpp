@@ -3615,6 +3615,7 @@ void Population::FinalizeOutputStreams(){
 	fate.close();
 	log.close();
 	if(treeLog.is_open()){
+		AppendTreeToTreeLog(-1);
 		treeLog << "end;\n";
 		treeLog.close();
 		}
