@@ -1,5 +1,5 @@
-// GARLI version 0.93 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,14 +7,11 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
-
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #ifndef POPULATION_H
@@ -22,6 +19,7 @@
 
 #include <iostream>
 #include <vector>
+#include <cfloat>
 
 using namespace std;
 
@@ -30,7 +28,6 @@ using namespace std;
 #include "stopwatch.h"
 #include "errorexception.h"
 
-class Parameters;
 class CondLikeArray;
 class TopologyList;
 class Tree;
@@ -267,10 +264,9 @@ class PerturbManager{
 class Population
 {
 public:
-	int original_size;	// cjb
-	int current_size; //cjb
-	int total_size;
-
+	int total_size; //this will be equal to conf->nindiv, except in 
+					//the case of the parallel master
+					
 	Individual* indiv;
 	Individual* newindiv;
 	double bestFitness;
@@ -309,13 +305,13 @@ private:
 	ofstream fate;
 	ofstream log;
 	ofstream treeLog;
-	ofstream modelLog;
 	ofstream probLog;
 	ofstream bootLog;
+	ofstream swapLog;
+	char besttreefile[100];
 
 	int ntopos;
-	int is_setup;
-	bool abandonedBootstrap;
+	bool prematureTermination;//if the user killed the run
 
 	char *treeString;
 	long stringSize;
@@ -326,6 +322,7 @@ private:
 	int new_best_found;
 		
 	int numgensamebest;
+	
 
 	char* logfname;
 	
@@ -343,31 +340,33 @@ private:
 		TopologyList **topologies;
 			//allocated in Setup(), deleted in dest
 		long gen;
-		Parameters* params;
-		Individual allTimeBest; //this is only used for perturbation or ratcheting
-		Individual bestSinceRestart;
+		GeneralGamlConfig *conf;
+		HKYData* data;
+		Individual *allTimeBest; //this is only used for perturbation or ratcheting
+		Individual *bestSinceRestart;
 		Stopwatch stopwatch;
         	double starting_wtime;
             double final_wtime;
 
 	public:
-		Population() : params(NULL), error(0)
-			, bestFitness(0.0), bestIndiv(0)
-			, prevBestFitness(0.0), logfname(0)
-			, is_setup(0), indiv(0), newindiv(0)
-			, cumfit(0), new_best_found(0), avgfit(0.0),
-			 gen(1), starting_wtime(0.0), final_wtime(0.0),
+		Population() : error(0), conf(NULL),
+			bestFitness(-(DBL_MAX)), bestIndiv(0),
+			prevBestFitness(-(DBL_MAX)), logfname(0),
+			indiv(NULL), newindiv(NULL),
+			cumfit(NULL), new_best_found(0), avgfit(0.0),
+			gen(0), starting_wtime(0.0), final_wtime(0.0),
 #ifdef INCLUDE_PERTURBATION			 
 			 pertMan(NULL),
 #endif
-			 paraMan(NULL), abandonedBootstrap(false),
-			 subtreeDefNumber(0), claMan(NULL), 
+			 paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			 inferInternalStateProbs(0), bootstrapReps(0),
 			 outputMostlyUselessFiles(0), outputPhylipTree(0),
-			 significantTopoChange(0.01)
+			 significantTopoChange(0.01), allTimeBest(NULL),
+			 bestSinceRestart(NULL), treeString(NULL), adap(NULL),
+			 topologies(NULL), prematureTermination(false)
 			{
-			allTimeBest.SetFitness(-1e100);
-			bestSinceRestart.SetFitness(-1e100);
+			//allTimeBest.SetFitness(-1e100);
+			//bestSinceRestart.SetFitness(-1e100);
 			
 			lastTopoImprove = 0;
 			lastTopoImproveThresh = 1000;
@@ -388,10 +387,14 @@ private:
 		char *TreeStructToNewick(int i);
 		char *MakeNewick(int, bool);
 		void CreateGnuPlotFile();
-		void CreateStateFile();
-		void CreateTreeFile( const char* treefname, int fst = -1, int lst = -1 );
+		void WritePopulationCheckpoint(ofstream &out);
+		void ReadPopulationCheckpoint();
+		void WriteStateFiles();
+		void ReadStateFiles();
+		void GetConstraints();
+		void WriteTreeFile( const char* treefname, int fst = -1, int lst = -1 );
 
-		void Setup(const Parameters& params_, GeneralGamlConfig *conf, int nprocs = 1, int rank = 0);
+		void Setup(GeneralGamlConfig *conf, HKYData *, int nprocs = 1, int rank = 0);
 		int Restart(int type, int rank, int nprocs, int restart_count);
 		void SeedPopulationWithStartingTree();
 		double CalcAverageFitness();
@@ -401,7 +404,6 @@ private:
 		void FindTreeStructsForNextGeneration();
 		void PerformMutation(int indNum);
 
-		int IsSetup() const { return is_setup; }
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );
 		void CompactTopologiesList();
@@ -474,7 +476,8 @@ private:
 		
 		void OutputFate();
 		void OutputLog();
-		
+		void OutputModelReport();
+
 		void OutputModelAddresses();
 		void OutputClaReport(Individual *arr);
 		void OutputFilesForScoreDebugging(Individual *ind=NULL, int num=0);

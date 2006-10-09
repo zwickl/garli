@@ -1,5 +1,5 @@
-// GARLI version 0.94 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,13 +7,12 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
+
 
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
@@ -38,7 +37,6 @@ using namespace std;
 #include <signal.h>
 #include "population.h"
 #include "individual.h"
-#include "parameters.h"
 #include "translatetable.h"
 #include "mlhky.h"
 #include "tree.h"
@@ -47,18 +45,20 @@ using namespace std;
 #include "clamanager.h"
 #include "stopwatch.h"
 #include "bipartition.h"
-#include "subset.h"
 #include "adaptation.h"
 #include "errorexception.h"
 #include "outputman.h"
+#include "model.h"
 
 extern char programName[81];
 extern OutputManager outman;
 
+bool REDUCED;
+
 int memLevel;
 int calcCount=0;
 int optCalcs;
-
+ModelSpecification modSpec;
 
 ofstream outf, paupf;
 int tempGlobal=1;
@@ -75,6 +75,7 @@ double globalBest;
 
 #undef VARIABLE_OPTIMIZATION
 
+int CheckRestartNumber(const string str);
 int debug_mpi(const char* fmt, ...);
 int QuitNow();
 void InterruptMessage( int );
@@ -191,16 +192,18 @@ void ClearDebugLogs(){
 
 Population::~Population()
 {
-	EliminateDuplicateTreeReferences();  // TODO this be broken
+//	EliminateDuplicateTreeReferences();  // TODO this be broken
 	
-	for (int i = 0; i < total_size; ++i)	{
-		for (int j = 0; j < total_size; ++j)	{
-			if (newindiv[i].treeStruct == indiv[j].treeStruct)	{
-				newindiv[i].treeStruct = NULL;
-				break;
+	if(indiv != NULL){
+		for (int i = 0; i < total_size; ++i)	{
+			for (int j = 0; j < total_size; ++j)	{
+				if (newindiv[i].treeStruct == indiv[j].treeStruct)	{
+					newindiv[i].treeStruct = NULL;
+					break;
+					}
+				}
 			}
 		}
-	}
 	
 	if( indiv!=NULL )
 		MEM_DELETE_ARRAY(indiv); // indiv has length params.nindivs
@@ -209,7 +212,7 @@ Population::~Population()
 		MEM_DELETE_ARRAY(newindiv); // newindiv has length params.nindivs
 
 	if( cumfit!=NULL ) {
-		for( int i = 0; i < params->nindivs; i++ )
+		for( int i = 0; i < total_size; i++ )
 			MEM_DELETE_ARRAY(cumfit[i]); // cumfit[i] has length 2
 		MEM_DELETE_ARRAY(cumfit); // cumfit has length params.nindivs
 	}
@@ -221,7 +224,7 @@ Population::~Population()
 		MEM_DELETE_ARRAY(treeString);
 
 	if(topologies!=NULL){
-		for(int i=0;i<params->nindivs;i++){
+		for(int i=0;i<total_size;i++){
 			if(*(topologies+i)!=NULL){
 				delete *(topologies+i);
 				}
@@ -274,74 +277,73 @@ void Population::ErrorMsg( char* msgstr, int len )
 	}
 }
 
-void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int nprocs, int r){
+void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
+	//most of the allocation occurs here or in children
 	rank=r;
-	params = const_cast<Parameters*>(&params_); 
+	conf=c;
+	data=d;
+
+	REDUCED=false;
 
 	stopwatch.Start();
 
-	//this is where most of the allocation occurs
-	int i, N;
-	char nindivs_str[81];
-	char ch;
+	int i;
+	subtreeNode=0;
 
+	if(rank == 0) 
+		total_size = conf->nindivs + nprocs-1;
+	else
+		total_size = conf->nindivs;
+
+	//setup the model specification
+	modSpec.SetStateFrequencies(conf->stateFrequencies.c_str());
+	modSpec.SetRateMatrix(conf->rateMatrix.c_str());
+	modSpec.SetProportionInvariant(conf->proportionInvariant.c_str());
+	modSpec.SetRateHetModel(conf->rateHetModel.c_str());
+	modSpec.SetNumRateCats(conf->numRateCats, true);
+
+	//put info that was read from the config file in its place
 	adap=new Adaptation(conf);
 	refineStart=conf->refineStart;
 	outputTreelog=conf->outputTreelog;
 	outputMostlyUselessFiles = conf->outputMostlyUselessFiles;
 	outputPhylipTree = conf->outputPhylipTree;
-	
 	enforceTermConditions = conf->enforceTermConditions;
 	lastTopoImproveThresh = conf->lastTopoImproveThresh;
 	improveOverStoredIntervalsThresh = conf->improveOverStoredIntervalsThresh;
-	
+	significantTopoChange = conf->significantTopoChange;
 	bootstrapReps = conf->bootstrapReps;
 	inferInternalStateProbs = conf->inferInternalStateProbs;
 
-	InitializeOutputStreams();
-	
-	subtreeNode=0;
-	
-	params->data->MakeAmbigStrings();
 	//setup the bipartition statics
 	Bipartition::blockBits=sizeof(int)*8;
-	Bipartition::ntax=params->data->NTax();
-	Bipartition::nBlocks=(int)ceil((double)params->data->NTax()/(double)Bipartition::blockBits);
+	Bipartition::ntax=data->NTax();
+	Bipartition::nBlocks=(int)ceil((double)data->NTax()/(double)Bipartition::blockBits);
 	Bipartition::largestBlockDigit=1<<(Bipartition::blockBits-1);
 	Bipartition::allBitsOn=(unsigned int)(pow(2.0, Bipartition::blockBits)-1);
-	Bipartition::str=new char[params->data->NTax()+1];
-	Bipartition::str[params->data->NTax()] = '\0';
-
+	Bipartition::str=new char[data->NTax()+1];
+	Bipartition::str[data->NTax()] = '\0';
 	//this is a really cheap hack
 	Bipartition tmp;
 	tmp.SetPartialBlockMask();
 
-	if(rank == 0) 
-		total_size = params->nindivs + nprocs-1;
-	else
-		total_size = params->nindivs;
+	InitializeOutputStreams();
 
-	int max_indivs = total_size;
+	data->MakeAmbigStrings();	
+	data->CalcEmpiricalFreqs();
 
 	//allocate the treeString
 	//remember that we also encode internal node numbers sometimes
-	double taxsize=log10((double) ((double)params->data->NTax())*params->data->NTax()*2);
-	stringSize=(int)((params->data->NTax()*2)*(8+DEF_PRECISION)+taxsize);
+	double taxsize=log10((double) ((double)data->NTax())*data->NTax()*2);
+	stringSize=(int)((data->NTax()*2)*(10+DEF_PRECISION)+taxsize);
 	treeString=new char[stringSize];
 	stringSize--;
 	treeString[stringSize]='\0';
 
 	//allocate the indiv array
-	MEM_NEW_ARRAY(indiv,Individual,total_size);
-
+	indiv = new Individual[total_size];
+//	MEM_NEW_ARRAY(indiv,Individual,total_size);
 	MEM_NEW_ARRAY(newindiv,Individual,total_size);
-
-	for( i = 0; i < total_size; i++ ){
-		newindiv[i].SetParams( params );
-		newindiv[i].mod->SetParams( params );
-		indiv[i].SetParams(params);
-		indiv[i].mod->SetParams( params );
-		}
 
 	MEM_NEW_ARRAY(cumfit,double*,total_size);
 
@@ -349,7 +351,8 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 		MEM_NEW_ARRAY(cumfit[i],double,2);
 		}
 
-	int max_topos = max_indivs;
+	//setup the topology list
+	int max_topos = total_size;
 	topologies=new TopologyList*[max_topos];
 	TopologyList::SetIndL(indiv);
 	ntopos=total_size;
@@ -366,7 +369,7 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 	//instantiate the ParallelManager
 	if(rank==0){
 		MasterGamlConfig *mastConf = (MasterGamlConfig*) (conf);
-		paraMan = new ParallelManager(params->data->NTax(), nprocs, mastConf);
+		paraMan = new ParallelManager(data->NTax(), nprocs, mastConf);
 		}
 
 #ifdef INCLUDE_PERTURBATION
@@ -388,8 +391,8 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 		
 	const int KB = 1024;
 	const int MB = KB*KB;
-	int claSizePerNode = (4 * indiv[0].mod->NRateCats() * params->data->NChar() * sizeof(double)) + (params->data->NChar() * sizeof(int));
-	int numNodesPerIndiv = params->data->NTax()-2;
+	int claSizePerNode = (4 * modSpec.numRateCats * data->NChar() * sizeof(double)) + (data->NChar() * sizeof(int));
+	int numNodesPerIndiv = data->NTax()-2;
 	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
 	int maxClas = (int)((memToUse*MB)/ claSizePerNode);
@@ -429,67 +432,32 @@ void Population::Setup(const Parameters& params_, GeneralGamlConfig *conf, int n
 	//if we do tons of recombination 
 	idealClas *= 2;
 	//allocate an extra bunch of claHolders to allow for temporary trees that are necessary during perturbation
-	claMan=new ClaManager(params->data->NTax()-2, numClas, idealClas, params->data->NChar(), indiv[0].mod->NRateCats());
-	//set the trees static pointer to the clamanager
+	claMan=new ClaManager(data->NTax()-2, numClas, idealClas, data->NChar(), modSpec.numRateCats);
+
+	//set the tree statics
 	Tree::claMan=claMan;
-	Tree::data=params->data;
+	Tree::data=data;
 	Tree::rescaleEvery=16;
-	Tree::meanBrlenMuts	= params->meanBrlenMuts;
-	Tree::alpha		= params->gammaShapeBrlen;
-	Tree::treeRejectionThreshold = params->treeRejectionThreshold;
-	Model::mutationShape = params->gammaShapeModel;
+	Tree::uniqueSwapBias = conf->uniqueSwapBias;
+	Tree::distanceSwapBias = conf->distanceSwapBias;
+	Tree::meanBrlenMuts	= conf->meanBrlenMuts;
+	Tree::alpha		= conf->gammaShapeBrlen;
+	Tree::treeRejectionThreshold = conf->treeRejectionThreshold;
+
+	Model::mutationShape = conf->gammaShapeModel;
 	
-	if( params->restart )
-	{
-		// restarting: read individuals from file having name params->statefname
-		ifstream gmlf( params->statefname );
-
-		// ignore first line this time; contains gen, time and seed and was already read by GetRestartParams in gamlmain.cpp
-		
-		gmlf.get( nindivs_str, 80, '\n' );
-		gmlf.get(ch);
-		assert( ch == '\n' );
-
-		gmlf.get( nindivs_str, 80, '\n' );
-		gmlf.get(ch);
-		assert( ch == '\n' );
-
-		N = atoi(nindivs_str);
-		assert( N == params->nindivs );
-
-		for( i = 0; i < params->nindivs; i++ ) {
-			indiv[i].ReadTreeFromFile(gmlf);
-			indiv[i].SetParams( params );
-		}
-
-		gmlf.close();
-		ofstream tmpf( "restart_test.tre" );
-		tmpf << "#nexus" << endl << endl;
-		tmpf << "begin trees;" << endl;
-
-		for( i = 0; i < params->nindivs; i++ ) {
-			tmpf.setf( ios::floatfield, ios::fixed );
-			tmpf.setf( ios::showpoint );
-			tmpf << "tree gaml" << i << " = " << MakeNewick(i, false) << endl;
-		}
-
-		tmpf << "end;" << endl;
-		tmpf.close();
-
-	}
-	else if(bootstrapReps==0) SeedPopulationWithStartingTree();
-
-	if(bootstrapReps==0) AppendTreeToTreeLog(-1, -1);
-
-	if( !error ) is_setup = 1;
-
-	current_size = original_size = total_size;
-	
-	for (i = params->nindivs; i < total_size; i++)	{
+	for (i = conf->nindivs; i < total_size; i++)	{
 		indiv[i].reproduced = indiv[i].willreproduce = 1;
 		newindiv[i].reproduced = newindiv[i].willreproduce = 1;
 		indiv[i].parent=i;
 		newindiv[i].parent=i;	
+		}
+
+	//if there are not mutable params in the model, remove any weight assigned to the model
+	if(indiv[0].mod->NumMutatableParams() == 0) {
+		outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
+		adap->modelMutateProb=0.0;
+		adap->UpdateProbs();
 		}
 }
 
@@ -497,7 +465,7 @@ void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
 	const int KB = 1024;
 	const int MB = KB*KB;
 	
-	int claSizePerNode = (4 * indiv[0].mod->NRateCats() * params->data->NChar() * sizeof(double)) + (params->data->NChar() * sizeof(int));
+	int claSizePerNode = (4 * modSpec.numRateCats * data->NChar() * sizeof(double)) + (data->NChar() * sizeof(int));
 	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
 
@@ -516,32 +484,61 @@ void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
 	}
 
 
+void Population::GetConstraints(){
+	//first see if there are any constraints
+	if((strlen(conf->constraintfile.c_str()) != 0) && (strcmp(conf->constraintfile.c_str(), "none") != 0)){
+		ifstream con(conf->constraintfile.c_str());
+		if(con.good() == false) throw ErrorException("Could not open constraint file %s!", conf->constraintfile.c_str());
+		if(con.good()){
+			outman.UserMessage("Loading constraints from file %s", conf->constraintfile.c_str());
+			indiv[0].treeStruct->LoadConstraints(con);
+			}
+		}
+	}
+
 void Population::SeedPopulationWithStartingTree(){
 	
-	if(strcmp(params->startfname, "random"))
-		outman.UserMessage("Obtaining starting conditions from file %s", params->startfname);
-	
-	//claMan->MakeAllHoldersDirty();
 	for(int i=0;i<total_size;i++){
 		if(indiv[i].treeStruct != NULL) indiv[i].treeStruct->RemoveTreeFromAllClas();
 		if(newindiv[i].treeStruct != NULL) newindiv[i].treeStruct->RemoveTreeFromAllClas();
 		}
-	
-	//first see if there are any constraints
-	ifstream con(params->constraintFile.c_str());
-	if(strlen(params->constraintFile.c_str()) != 0 && (con.good() == false)) throw ErrorException("Could not open constraint file %s!", params->constraintFile.c_str());
-	if(con.good()){//this is really distasteful
-		outman.UserMessage("Loading constraints from file %s", params->constraintFile.c_str());
-		Tree dummy;
-		dummy.LoadConstraints(con);
-		}
 
 	//if starting from a treefile, use the treestring
 	//to create the first indiv, and then copy the tree and clas
-	indiv[0].Randomize(params->startfname, rank);
+	indiv[0].mod->SetDefaultModelParameters(data);
+	if(strcmp(conf->streefname.c_str(), "random") != 0){
+		outman.UserMessage("Obtaining starting conditions from file %s", conf->streefname.c_str());
+		indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank, data->NTax());
+		}
+	else{
+		//we shouldn't be here if something was designated to be fixed
+		if(modSpec.fixStateFreqs && modSpec.empiricalStateFreqs==false && modSpec.equalStateFreqs==false) throw(ErrorException("state frequencies specified as fixed, but no\nstarting condition file (streefname) specified!!"));
+		else if(modSpec.fixAlpha) throw(ErrorException("alpha parameter specified as fixed, but no\nstarting condition file (streefname) specified!!"));
+		else if(modSpec.fixInvariantSites) throw(ErrorException("proportion of invariant sites specified as fixed, but no\nstarting condition file (streefname) specified!!"));
+		else if(modSpec.fixRelativeRates) throw(ErrorException("relative rate matrix specified as fixed, but no\nstarting condition file (streefname) specified!!"));
+
+		if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
+		else outman.UserMessage("creating random starting tree (compatible with constraints)...");
+		indiv[0].MakeRandomTree(data->NTax());
+		}
+	
+	//if no model mutations will be performed, starting values should have been read 
+	if(adap->modWeight == 0.0){
+		if(modSpec.empiricalStateFreqs==false && modSpec.equalStateFreqs==false && modSpec.gotStateFreqsFromFile == false) throw(ErrorException("If model mutation weight is set to zero, state frequencies must be\nset to equal, set to empirical or specified in a starting file!"));
+		else if(modSpec.numRateCats > 1 && modSpec.flexRates == false && modSpec.gotAlphaFromFile == false) throw(ErrorException("If model mutation weight is set to zero, alpha parameter must be\nspecified in a starting file!"));
+		else if(modSpec.numRateCats > 1 && modSpec.flexRates == true && modSpec.gotFlexFromFile == false) throw(ErrorException("If model mutation weight is set to zero, flex rates must be\nspecified in a starting file!"));
+		else if(modSpec.includeInvariantSites == true && modSpec.gotPinvFromFile == false) throw(ErrorException("If model mutation weight is set to zero, proportion of invariant sites must be\nspecified in a starting file!"));
+		else if(modSpec.nst > 1 && modSpec.gotRmatFromFile == false) throw(ErrorException("If model mutation weight is set to zero, relative rate matrix must be\n specified in a starting file!"));
+		}
+
+
 	indiv[0].treeStruct->root->CheckforPolytomies();
 	indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->mod=indiv[0].mod;
+	indiv[0].SetDirty();
+	indiv[0].CalcFitness(0);
+
+	OutputModelReport();
 
 	outman.precision(10);
 	outman.UserMessage("Initial ln Likelihood: %.4f", indiv[0].Fitness());
@@ -560,130 +557,175 @@ void Population::SeedPopulationWithStartingTree(){
 		indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
 		indiv[i].treeStruct->mod=indiv[i].mod;
 		}
+
 	UpdateTopologyList(indiv);
 	CalcAverageFitness();
 	}
 
-int Population::Restart(int type, int rank, int nprocs, int count)	{
-	//not working currently
-	assert(0);
-	if (type == 1)	{
-		/* don't need this stuff
-		EliminateDuplicateTreeReferences(); 			
-		for (int i = 0; i < total_size; ++i)	{
-			for (int j = 0; j < total_size; ++j)	{
-				if (newindiv[i].treeStruct == indiv[j].treeStruct)	{
-					newindiv[i].treeStruct = NULL;
-					break;
-				}
-			}
-		}
-		*/
-		bool readFromFile=false;
-//		claMan->ClearAllClas();
-		delete indiv[0].treeStruct;
-		//fprintf(stderr, "entering Restart\n");
-/*		if (!FileExists( params->startfname ))	{
-			printf("starting tree file \"%s\" does not exist, using random start tree\n", params->startfname);
-			indiv[0].Randomize("random", rank, sharedcl);
-		}
-		else{
-			char temp[10000];
-			ifstream stf( params->startfname, ios::in );
-			if (!stf)	{
-				printf("could not open file\"%s\", using random start tree\n", params->startfname);
-				indiv[0].Randomize("random", rank, sharedcl);
-			}
-			else{
-				for(int r=-1;r<nprocs*count+rank;r++)	{
-					stf >> temp;//get the score
-					stf >> temp;//get the tree or maybe kappa
-					if(stf.eof())
-						break;
-					if(isdigit(temp[0])){
-						assert(0);
-						//indiv[0].kappa=atof(temp);
-						stf >> temp;//get the tree
-					}
-				}
-				if (stf.eof())	{
-					printf("not enough trees in file, using random tree.\n");
-					indiv[0].Randomize("random", rank, sharedcl); // carefull, this allocates a new treeStruct...
-					params->starting_tree = "";
-				}
-				else{
-					params->starting_tree=temp;
-					readFromFile=true;
-					}
-			}
-			stf.close();
-		}
-		for (int i = 0; i < total_size; ++i){
-			if(i==0 && readFromFile){ // we don't want to be allocating a new treeStruct if we called Individual::Randomize()
-				indiv[0].treeStruct=new Tree( params->starting_tree.c_str());
-				indiv[0].treeStruct->AssignCLAsFromMaster();
-				indiv[0].treeStruct->CheckBalance();		
-				}		
-			else indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
-			indiv[i].ResetIndiv();
-			indiv[i].SetDirty();
-			}
+void Population::OutputModelReport(){
+	//Report on the model setup
+	outman.UserMessage("\nMODEL REPORT:");
+	outman.UserMessage("\tNumber of states = 4 (nucleotide data)");
+	
+	outman.UserMessageNoCR("\tRelative Rate Matrix: ");
+	if(modSpec.nst == 6 && modSpec.fixRelativeRates == false) outman.UserMessage("6 rates");
+	else if(modSpec.nst == 6 && modSpec.fixRelativeRates == true) outman.UserMessage("specified by user (fixed)");
+	else if(modSpec.nst == 2) outman.UserMessage("2 rates (transition and transversion)");
+	else outman.UserMessage("1 rate");
 
-		allTimeBest=&indiv[0];
-		allTimeBest->CalcFitness(0);
-		bestFitness=prevBestFitness=allTimeBest->Fitness();
-		
-		//reset the topology list.  All individuals will be the same topology
-		delete []topologies;
-		int max_indivs=total_size;
-		topologies=new TopologyList*[max_indivs];
-		TopologyList::SetIndL(indiv);
-		ntopos=total_size;
-		for(int i=0;i<max_indivs;i++){
-			topologies[i]=new TopologyList();
-			topologies[i]->Allocate(100<(max_indivs +1) ? 100 : (max_indivs+1));
-			topologies[0]->AddInd(i);
-			indiv[i].topo=0;
+	outman.UserMessageNoCR("\tEquilibrium State Frequencies: ");
+	if(modSpec.equalStateFreqs == true) outman.UserMessage("equal (0.25, fixed)");
+	else if(modSpec.empiricalStateFreqs == true) outman.UserMessage("empirical values (fixed)");
+	else if(modSpec.fixStateFreqs == true) outman.UserMessage("specified by user (fixed)");
+	else outman.UserMessage("estimated");
+
+	outman.UserMessage("\tRate Heterogeneity Model:");
+	if(modSpec.numRateCats == 1){
+		if(modSpec.includeInvariantSites == false) outman.UserMessage("\t\tno rate heterogeneity");
+		else{
+			if(modSpec.fixInvariantSites == true) outman.UserMessage("\t\tonly an invariant (invariable) site category,\t\tproportion specified by user (fixed)");
+			else outman.UserMessage("\t\tonly an invariant (invariable) site category,\t\tproportion estimated");
 			}
-*//*		for(int i=0;i<max_indivs;i++){
-			topologies[i]=new TopologyList();
-			topologies[i]->Allocate(100<(max_indivs +1) ? 100 : (max_indivs+1));
-			if(i<total_size){
-				topologies[i]->AddInd(i);
-				TopologyList::ntoposexamined++;
-				indiv[i].topo=i;
+		}
+	else{
+		outman.UserMessageNoCR("\t\t%d ", modSpec.numRateCats);
+		if(modSpec.flexRates == false){
+			if(modSpec.fixAlpha == true) outman.UserMessage("discrete gamma distributed rate cats, alpha param specified by user (fixed)");
+			else outman.UserMessage("discrete gamma distributed rate cats, alpha param estimated");
+			if(modSpec.includeInvariantSites == true) outman.UserMessage("\t\twith an invariant (invariable) site category");
+			}
+		else{
+			outman.UserMessage("FLEX rate categories, rate and proportion of each estimated");
+			if(modSpec.includeInvariantSites == true){
+				if(modSpec.fixInvariantSites == true) outman.UserMessage("\t\twithan invariant (invariable) site category,\t\tproportion specified by user (fixed)");				
+				else outman.UserMessage("\t\twith an invariant (invariable) site category, proportion estimated");
 				}
 			}
-*/		}	
-	return 0;
-}
+		}
+	outman.UserMessage("\n");
+	}
+
+void Population::WriteStateFiles(){
+	char str[100];
+
+	//write the adaptation info checkpoint in binary format
+	sprintf(str, "%s.adap.check", conf->ofprefix.c_str());
+	ofstream out(str, ios::binary | ios::out);
+	adap->WriteToCheckpoint(out);
+	out.close();
+
+	//write the state of the population, including the seed, generation, elapsed time,
+	//lastTopoImprove and specifications of the current individuals
+	sprintf(str, "%s.pop.check", conf->ofprefix.c_str());
+	ofstream pout(str);
+	pout.precision(10);
+	WritePopulationCheckpoint(pout);
+	pout.close();
+
+	//if we are keeping track of swaps, write a checkpoint for that
+	if(conf->uniqueSwapBias > 0.0){
+		sprintf(str, "%s.swaps.check", conf->ofprefix.c_str());
+		ofstream sout(str);
+		Tree::attemptedSwaps.WriteSwapCheckpoint(sout);
+		sout.close();
+		}	
+	}
+
+void Population::ReadStateFiles(){
+	char str[100];
+	outman.UserMessage("Reading checkpoint from previous run....\n");
+
+	//read the adaptation binary checkpoint
+	sprintf(str, "%s.adap.check", conf->ofprefix.c_str());
+	if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
+	ifstream in(str, ios::binary | ios::in);
+	adap->ReadFromCheckpoint(in);
+
+	//Read the population checkpoint
+	ReadPopulationCheckpoint();
+
+	//Read the swap checkpoint, if necessary
+	if(conf->uniqueSwapBias > 0.0){
+		sprintf(str, "%s.swaps.check", conf->ofprefix.c_str());
+		if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
+		ifstream sin(str);
+		Tree::attemptedSwaps.ReadSwapCheckpoint(sin, data->NTax());
+		sin.close();
+		}	
+	}
+
+void Population::WritePopulationCheckpoint(ofstream &out){
+	//we'll just have a single line for each indiv, with the 
+	//model followed by the parenthetical tree
+	out << rnd.seed() << "\t" << gen << "\t" << stopwatch.SplitTime() << "\t" << lastTopoImprove << "\n";
+
+	for(int i=0;i<total_size;i++){
+		indiv[i].mod->OutputGarliFormattedModel(out);
+		indiv[i].treeStruct->root->MakeNewick(treeString, true, true, true);
+		out << treeString << ";" << endl;
+		}
+	}
+
+void Population::ReadPopulationCheckpoint(){
+	//we'll just have a single line for each indiv, with the 
+	//model followed by the parenthetical tree
+	char str[100];
+	sprintf(str, "%s.pop.check", conf->ofprefix.c_str());
+	if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
+	ifstream pin(str);
+	int tmp;
+	pin >> tmp;
+	rnd.set_seed(tmp);
+	pin >> gen;
+	pin >> tmp;
+	stopwatch.AddPreviousTime(tmp);
+	pin >> lastTopoImprove;
+	pin.close();
+
+	for(int i=0;i<total_size;i++){
+		indiv[i].mod->SetDefaultModelParameters(data);
+		indiv[i].GetStartingConditionsFromFile(str, i, data->NTax(), true);
+		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].SetDirty();
+		indiv[i].CalcFitness(0);
+		}
+	}
 
 void Population::Run(){
-
 	calcCount=0;
 	optCalcs=0;
 
-	outman.UserMessage("Running Genetic Algorithm with initial seed=%d", rnd.init_seed());
+	if(conf->restart == false){
+		if(bootstrapReps == 0) outman.UserMessage("Running Genetic Algorithm with initial seed=%d", rnd.init_seed());
+		}
+	else{
+		outman.UserMessage("Restarting Genetic Algorithm from checkpoint");
+		outman.UserMessage("generation %d, seed %d, best lnL %.3f", gen, rnd.init_seed(), indiv[bestIndiv].Fitness());
+		}
 	
 	avgfit = CalcAverageFitness();
 
 	outman.precision(6);
 	outman.UserMessage("\t%-10s%-15s%-10s%-10s", "gen", "current lnL", "precision", "lastChange");
-
-	gen=0;
+	outman.UserMessage("\t%-10d%-15.4f%-10.3f%-10d", gen, indiv[bestIndiv].Fitness(), adap->branchOptPrecision, lastTopoImprove);
 	OutputLog();
+	if(outputMostlyUselessFiles) OutputFate();	
 
 	CatchInterrupt();
 
-	for (gen = 1; gen < params->stopgen+1; ++gen){
-		
+	gen++;
+	for (; gen < conf->stopgen+1; ++gen){
+
 		NextGeneration();
 		keepTrack();
 		if(outputMostlyUselessFiles) OutputFate();		 
-		if(!(gen % params->logEvery)) OutputLog();
-		if(!(gen % params->saveEvery)){
-			if(bootstrapReps==0) CreateTreeFile( params->treefname);
+		if(!(gen % conf->logevery)) OutputLog();
+		if(!(gen % conf->saveevery)){
+			if(bootstrapReps==0) WriteTreeFile( besttreefile );
 			outman.UserMessage("\t%-10d%-15.4f%-10.3f%-10d", gen, indiv[bestIndiv].Fitness(), adap->branchOptPrecision, lastTopoImprove);
+			
+			if(conf->uniqueSwapBias > 0.0)
+				swapLog << gen << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique() << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetTotal() << endl;
 			}
 		if(askQuitNow == 1){
 			char c;
@@ -694,7 +736,7 @@ void Population::Run(){
 			c = getchar();
 #endif
 			if(c=='y'){
-				if(bootstrapReps > 0) abandonedBootstrap=true;
+				prematureTermination=true;
 				signal( SIGINT, SIG_DFL );
 #ifdef MAC
 				cin.get();
@@ -721,33 +763,38 @@ void Population::Run(){
 			NNISpectrum(bestIndiv);
 #endif
 		if(!(gen%adap->intervalLength)){
+
+			if(conf->checkpoint==true && (gen%(adap->intervalLength*adap->intervalsToStore)) == 0) WriteStateFiles();
+
 			outman.precision(10);
 			bool reduced=false;
 			if(gen-lastTopoImprove >= adap->intervalsToStore*adap->intervalLength){
 				reduced=adap->ReducePrecision();
 				}
 			if(reduced){
+//				REDUCED = true;
 				lastTopoImprove=gen;
 				double before=bestFitness;
 				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
 				indiv[bestIndiv].SetDirty();
 				CalcAverageFitness();
-				outman.UserMessage("optimization precision reduced, optimizing branchlengths...\t%.4f -> %.4f", before, bestFitness);
+				outman.UserMessage("opt. precision reduced, optimizing branchlengths:%.4f -> %.4f", before, bestFitness);
 				}
-			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
+/*			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
 				double before=bestFitness;
 				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
 				indiv[bestIndiv].SetDirty();
 				CalcAverageFitness();
-				outman.UserMessage("optimizing ...\t%.4f%.4f", before, bestFitness);
+				outman.UserMessage("optimizing branchlengths...\t%.4f %.4f", before, bestFitness);
 				}
-			
+*/			
 			//termination conditions
 			if(enforceTermConditions == true
-				&& gen-lastTopoImprove > lastTopoImproveThresh 
+				&& (gen-lastTopoImprove > lastTopoImproveThresh || adap->topoMutateProb == 0.0) 
 				&& adap->improveOverStoredIntervals < improveOverStoredIntervalsThresh
 				&& adap->branchOptPrecision == adap->minOptPrecision){
-				outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
+				if(adap->topoMutateProb > 0.0) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
+				else outman.UserMessage("Reached termination condition!\n");
 				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
 				break;
 				}
@@ -755,8 +802,8 @@ void Population::Run(){
 			CheckPerturbSerial();
 #endif
 			}
-		if(params->stoptime - stopwatch.SplitTime() < 120){
-			outman.UserMessage("time limit of %d seconds reached...", params->stoptime);
+		if(conf->stoptime - stopwatch.SplitTime() < 120){
+			outman.UserMessage("time limit of %d seconds reached...", conf->stoptime);
 			break;
 			}
 #ifdef INCLUDE_PERTURBATION
@@ -772,6 +819,7 @@ void Population::Run(){
 			}
 #endif
 		}
+
 	FinalOptimization();
 	gen=-1;
 	OutputLog();
@@ -779,7 +827,7 @@ void Population::Run(){
 	
 	if(inferInternalStateProbs == true){
 		outman.UserMessage("Inferring internal state probabilities....");
-		indiv[bestIndiv].treeStruct->InferAllInternalStateProbs(params->ofprefix);
+		indiv[bestIndiv].treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
 		}
 		
 	outman.UserMessage("finished");
@@ -794,8 +842,10 @@ void Population::FinalOptimization(){
 	
 	if(pertMan->ratcheted) TurnOffRatchet();
 	
-	if(indiv[bestIndiv].Fitness() < allTimeBest.Fitness()){
-		RestoreAllTimeBest();
+	if(allTimeBest != NULL){
+		if(indiv[bestIndiv].Fitness() < allTimeBest->Fitness()){
+			RestoreAllTimeBest();
+			}
 		}
 	
 	for(int i=0;i<total_size;i++){
@@ -813,25 +863,29 @@ void Population::FinalOptimization(){
 		}while(incr > .00001 || pass < 10);
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	log << "Score after final optimization: " << indiv[bestIndiv].Fitness() << endl;
-	CreateTreeFile( params->treefname );
+	if(bootstrapReps == 0){
+		WriteTreeFile( besttreefile );
+		if(prematureTermination == true) outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
+		}
 	outman.unsetf(ios::fixed);
 	}
 
 void Population::Bootstrap(){
 	
-	params->data->ReserveOriginalCounts();
+	data->ReserveOriginalCounts();
 
 	stopwatch.Start();
 	CatchInterrupt();
 
 	for(int rep=1;rep<=bootstrapReps;rep++){
-		params->data->BootstrapReweight();
+		gen=0;
+		outman.UserMessage("bootstrap replicate %d (seed %d)", rep, rnd.seed());
+		data->BootstrapReweight();
 		
-		outman.UserMessage("bootstrap replicate %d", rep);
 		SeedPopulationWithStartingTree();
 		Run();
 		
-		if(abandonedBootstrap == false){
+		if(prematureTermination == false){
 			adap->branchOptPrecision = adap->startOptPrecision;
 			AppendTreeToBootstrapLog(rep);
 			outman.UserMessage("finished with bootstrap rep %d", rep);
@@ -921,7 +975,7 @@ double Population::CalcAverageFitness(){
 		}
 
 
-	CalculateReproductionProbabilies(cumfit, params->selectionIntensity, total_size);
+	CalculateReproductionProbabilies(cumfit, conf->selectionIntensity, total_size);
 	return avg;
 	
 /*	Here's Paul's original selection criterion, based solely on rank
@@ -965,7 +1019,7 @@ void Population::CalculateReproductionProbabilies(double **scoreArray, double se
 		}
 
 	if(indivsInArray == total_size){
-		deltaAIC[indivsInArray-1]=params->holdoverPenalty;
+		deltaAIC[indivsInArray-1]=conf->holdoverPenalty;
 		}
 	else deltaAIC[indivsInArray-1]=0.0;
 
@@ -985,7 +1039,7 @@ void Population::CalculateReproductionProbabilies(double **scoreArray, double se
 	delete []deltaAIC;
 	assert(abs(scoreArray[indivsInArray-1][1] - 1.0) < 0.001);
 }
-
+/*
 void Population::CreateGnuPlotFile()
 {
 	char tmpstr[51];
@@ -1000,7 +1054,7 @@ void Population::CreateGnuPlotFile()
 
 	// alternate title containing config settings
 	gnuf << "#set title \"";
-	gnuf << "N=" << params->nindivs;
+	gnuf << "N=" << conf->nindivs;
 	gnuf << " h=" << params->holdover;
 	gnuf << " b=" << params->meanBrlenMuts;
 	gnuf << " s=" << params->gammaShapeBrlen;
@@ -1030,13 +1084,13 @@ void Population::CreateGnuPlotFile()
 
 	gnuf.close();
 }
-
+*/
 void Population::DetermineParentage(){
 	//determine each individual's parentage
 	int parent;
 	double r;
-	for(int i = 0; i < params->nindivs; i++ ){
-		if( i < params->holdover ){// copy best individual's genotype to next generation
+	for(int i = 0; i < conf->nindivs; i++ ){
+		if( i < conf->holdover ){// copy best individual's genotype to next generation
 			if(rank==0){
 				if(paraMan->subtreeModeActive==true) parent=bestAccurateIndiv;
 				else parent=bestIndiv;
@@ -1061,9 +1115,9 @@ void Population::DetermineParentage(){
 
 //DJZ 2-28-06 making recombination partner weakly tied to fitness (selctionIntensity of 0.01) rather than random
 
-			if(rank==0 && paraMan->subtreeModeActive==false && i>= (params->nindivs - paraMan->maxRecomIndivs)){
+			if(rank==0 && paraMan->subtreeModeActive==false && i>= (conf->nindivs - paraMan->maxRecomIndivs)){
 /*				int *mates=new int[paraMan->nremotes];
-				for(int j=0;j<paraMan->nremotes;j++) mates[j]=params->nindivs+j;
+				for(int j=0;j<paraMan->nremotes;j++) mates[j]=conf->nindivs+j;
 				ScrambleArray(paraMan->nremotes, mates);
 */
 				int foo=2;
@@ -1073,7 +1127,7 @@ void Population::DetermineParentage(){
 					
 				int potentialPartners=0;
 				for(int r=0;r<paraMan->nremotes;r++){
-					int ind=params->nindivs+r;
+					int ind=conf->nindivs+r;
 					recomSelect[r][0]=(double)(ind);
 					if(ind==parent //don't recombine with your parent
 						|| (indiv[parent].topo == indiv[ind].topo) //don't recombine with another of the same topo	
@@ -1122,7 +1176,7 @@ void Population::FindTreeStructsForNextGeneration(){
 	//generation or by getting one from the unusedTree stack
 	for(int i = 0; i < total_size; i++ ){
 		//see if the parent indiv has already been used in the new generation, or if it will recombine
-		if( i < params->nindivs && (indiv[newindiv[i].parent].reproduced||indiv[newindiv[i].parent].willrecombine )){	      
+		if( i < conf->nindivs && (indiv[newindiv[i].parent].reproduced||indiv[newindiv[i].parent].willrecombine )){	      
 			//See if there is another ind with the same topology that also will not recombine
 			int sot=-1;
 			if(topologies[indiv[newindiv[i].parent].topo]->nInds>1)//if this isn't the only individual of this topo
@@ -1154,7 +1208,7 @@ void Population::FindTreeStructsForNextGeneration(){
 			//if the tree will not be used in recombination and has not already been used
 			newindiv[i].CopyByStealingTree(&indiv[newindiv[i].parent]);
 			indiv[ newindiv[i].parent].reproduced=true;
-			if(i>params->nindivs) newindiv[i].mutation_type=indiv[i].mutation_type;
+			if(i>conf->nindivs) newindiv[i].mutation_type=indiv[i].mutation_type;
 			}
 		}
 	}
@@ -1163,11 +1217,11 @@ void Population::PerformMutation(int indNum){
 	Individual *ind=&newindiv[indNum];
 	Individual *par=&indiv[newindiv[indNum].parent];
 
-	double beforeScore;
+	//double beforeScore;
 	bool recomPerformed;
 
 	switch(ind->mutation_type){
-		case Individual::exNNI: //exNNI and exlimSPR trump all other mutation types
+/*		case Individual::exNNI: //exNNI and exlimSPR trump all other mutation types
 			beforeScore=par->Fitness();
 			NNIoptimization(indNum, 1);
 			if(beforeScore==ind->Fitness()){
@@ -1178,10 +1232,10 @@ void Population::PerformMutation(int indNum){
 		
 		case Individual::exlimSPR:
 			assert(0);
-/*			SPRoptimization(indNum);
+			SPRoptimization(indNum);
 			ind->accurateSubtrees=false;
-*/			break;
-		
+			break;
+*/		
 		case Individual::subtreeRecom:
 			//perform subtree recom, which melds together the different subtrees worked on by the
 			//remote nodes
@@ -1208,7 +1262,7 @@ void Population::PerformMutation(int indNum){
 			 	
 			       		ind->Mutate(adap->branchOptPrecision, adap);
 			       		//reclaim clas if the created tree has essentially no chance of reproducing
-			       		if(((ind->Fitness() - indiv[bestIndiv].Fitness()) < (-11.5/params->selectionIntensity))){
+			       		if(((ind->Fitness() - indiv[bestIndiv].Fitness()) < (-11.5/conf->selectionIntensity))){
 			       			ind->treeStruct->ReclaimUniqueClas();
 			       			}
 						}
@@ -1281,7 +1335,7 @@ void Population::NextGeneration(){
 	//return any treestructs from the indivs that won't be used in recombination
 	//and weren't used to make the newindivs.  This is necessary to keep from having
 	//too many CLAs in use at any one time 
-	for(int j=0;j<params->nindivs;j++){
+	for(int j=0;j<conf->nindivs;j++){
 		if(indiv[j].reproduced==false && indiv[j].willrecombine==false){
 			//this reclaims all indiv's treestructs who have no offspring and no recombination partner
 			indiv[j].treeStruct->RemoveTreeFromAllClas();
@@ -1295,7 +1349,7 @@ void Population::NextGeneration(){
 	UpdateTreeModels();
 	
 	//this loop is only for mutation and recom, so start from holdover
-	for(int indnum = params->holdover; indnum < params->nindivs; indnum++ ){
+	for(int indnum = conf->holdover; indnum < conf->nindivs; indnum++ ){
 		PerformMutation(indnum);
 		}
 
@@ -1305,7 +1359,7 @@ void Population::NextGeneration(){
 	//the only trees that we need to return at this point are ones that
 	//did not reproduce AND were used in recom.  Those that weren't used 
 	//in recom were already reclaimed above, and the treestructs set to NULL
-	for(int j=0;j<params->nindivs;j++){
+	for(int j=0;j<conf->nindivs;j++){
 		if(indiv[j].reproduced==false && indiv[j].treeStruct!=NULL){
 			indiv[j].treeStruct->RemoveTreeFromAllClas();
 			unusedTrees.push_back(indiv[j].treeStruct);
@@ -1315,17 +1369,15 @@ void Population::NextGeneration(){
 		}
 
 	// swap newindiv and indiv
-	for(int i=0;i<params->nindivs;i++)
+	for(int i=0;i<conf->nindivs;i++)
 		indiv[i].ResetIndiv();
-	for(int i=params->nindivs;i<total_size;i++)
+	for(int i=conf->nindivs;i<total_size;i++)
 		indiv[i].willrecombine=false;
 
 	Individual* tmp = newindiv;
 	newindiv = indiv;
 	indiv = tmp;
 
-	if( params->showProgress )
-		outman.UserMessage("Calculating average fitness");
 	avgfit = CalcAverageFitness(); //score individuals that need it
 		
 	#ifdef DEBUG_SCORES
@@ -1361,33 +1413,7 @@ void Population::OutputFate(){
 		}
 //	fate << claMan->NumFreeClas() << "\n";
 	if(gen%20 ==0) fate.flush();
-	
-}
-
-void Population::CreateStateFile(){
-assert(0);
-	ofstream outf( params->statefname );
-	outf<<setprecision(DEF_PRECISION);
-
-   // save current generation (note: this is one less than the generation number
-   // reported in the log file since this gen starts at 0 and the log file
-   // generation count starts at 1).
-   outf << gen << '\t';
-
-   // save total elapsed time, which is sum of elapsed time from previous runs
-   // and current elapsed time
-   double seconds = stopwatch.SplitTime();
-
-	outf << ( params->prev_time + seconds ) << '\t';
-
-   // save current random number seed
-   outf << rnd.seed() << '\t';
-   outf << endl;
-
-	// save current population data
-//	outf << (*this) << endl;
-	outf.close();
-}
+	}
 
 void Population::OutputFilesForScoreDebugging(Individual *ind /*=NULL*/, int num){
 	//create three files, one with all of the trees in each gen in nexus format
@@ -1419,13 +1445,13 @@ if(rank > 0) return;
 	
 		outf << "#nexus" << endl << endl;
 		outf << "begin trees;" << endl;
-		TranslateTable tt( params->data );
+		TranslateTable tt( data );
 		outf << tt << endl;
 		
 		paupf << "#nexus\n\n";
 		paupf << "begin paup;\n";
 		paupf << "set warnreset=no incr=auto;\n";
-		paupf << "execute " << params->ofprefix << ".nex;\n";
+		paupf << "execute " << conf->ofprefix.c_str() << ".nex;\n";
 #ifndef NNI_SPECTRUM
 		paupf << "gett file=toscore.tre storebr;" << endl;
 #else
@@ -1436,19 +1462,19 @@ if(rank > 0) return;
 	if(ind==NULL){
 		for(int i=0;i<total_size;i++){
 			outf << "  utree " << gen << i << "= ";
-			indiv[i].treeStruct->root->MakeNewick(treeString, false);
+			indiv[i].treeStruct->root->MakeNewick(treeString, false, true);
 			outf << treeString << ";\n";
 			
 			paupf << "lset userbr ";
-			if(indiv[i].mod->Nst()==2) paupf << "nst=2 trat=" << indiv[i].mod->Rates(0) << " base=(" << indiv[i].mod->Pi(0) << " " << indiv[i].mod->Pi(1) << " " << indiv[i].mod->Pi(2) << ");\n" << "lsc " << (gen-1)*params->nindivs+i+1;
+			if(indiv[i].mod->Nst()==2) paupf << "nst=2 trat=" << indiv[i].mod->Rates(0) << " base=(" << indiv[i].mod->StateFreq(0) << " " << indiv[i].mod->StateFreq(1) << " " << indiv[i].mod->StateFreq(2) << ");\n" << "lsc " << (gen-1)*conf->nindivs+i+1;
 			
-			else paupf << "nst=6 rmat=(" << indiv[i].mod->Rates(0) << " " << indiv[i].mod->Rates(1) << " " << indiv[i].mod->Rates(2) << " " << indiv[i].mod->Rates(3) << " " << indiv[i].mod->Rates(4) << ") " << " base=(" << indiv[i].mod->Pi(0) << " " << indiv[i].mod->Pi(1) << " " << indiv[i].mod->Pi(2) << ") ";
+			else paupf << "nst=6 rmat=(" << indiv[i].mod->Rates(0) << " " << indiv[i].mod->Rates(1) << " " << indiv[i].mod->Rates(2) << " " << indiv[i].mod->Rates(3) << " " << indiv[i].mod->Rates(4) << ") " << " base=(" << indiv[i].mod->StateFreq(0) << " " << indiv[i].mod->StateFreq(1) << " " << indiv[i].mod->StateFreq(2) << ") ";
 			
 #ifdef FLEX_RATES			
 			paupf << "[FLEX RATES] ";
 #else
 			if(indiv[i].mod->NRateCats()>1) paupf << "rates=gamma shape=" << indiv[i].mod->Alpha() << " ";
-			paupf << "pinv=" << indiv[i].mod->ProportionInvariant() << " "; 
+			paupf << "pinv=" << indiv[i].mod->PropInvar() << " "; 
 #endif
 
 			if(gen==1 && i==0) paupf << ";\n" << "lsc " << (gen-1)*total_size+i+1 << "/scorefile=paupscores.txt replace;\n";
@@ -1457,19 +1483,19 @@ if(rank > 0) return;
 		}
 	else{
 		outf << "  utree " << num << "= ";
-		ind->treeStruct->root->MakeNewick(treeString, false);
+		ind->treeStruct->root->MakeNewick(treeString, false, true);
 		outf << treeString << ";\n";
 		
 		paupf << "lset userbr ";
-		if(ind->mod->Nst()==2) paupf << "nst=2 trat=" << ind->mod->Rates(0) << " base=(" << ind->mod->Pi(0) << " " << ind->mod->Pi(1) << " " << ind->mod->Pi(2) << ");\nlsc ";
+		if(ind->mod->Nst()==2) paupf << "nst=2 trat=" << ind->mod->Rates(0) << " base=(" << ind->mod->StateFreq(0) << " " << ind->mod->StateFreq(1) << " " << ind->mod->StateFreq(2) << ");\nlsc ";
 		
-		else paupf << "nst=6 rmat=(" << ind->mod->Rates(0) << " " << ind->mod->Rates(1) << " " << ind->mod->Rates(2) << " " << ind->mod->Rates(3) << " " << ind->mod->Rates(4) << ") " << " base=(" << ind->mod->Pi(0) << " " << ind->mod->Pi(1) << " " << ind->mod->Pi(2) << ") ";
+		else paupf << "nst=6 rmat=(" << ind->mod->Rates(0) << " " << ind->mod->Rates(1) << " " << ind->mod->Rates(2) << " " << ind->mod->Rates(3) << " " << ind->mod->Rates(4) << ") " << " base=(" << ind->mod->StateFreq(0) << " " << ind->mod->StateFreq(1) << " " << ind->mod->StateFreq(2) << ") ";
 
 #ifdef FLEX_RATES			
 			paupf << "[FLEX RATES] ";
 #else	
 		if(ind->mod->NRateCats()>1) paupf << "rates=gamma shape=" << ind->mod->Alpha() << " ";
-		paupf << "pinv=" << ind->mod->ProportionInvariant() << " "; 
+		paupf << "pinv=" << ind->mod->PropInvar() << " "; 
 #endif
 
 #ifndef NNI_SPECTRUM
@@ -1495,8 +1521,8 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	else ind=&indiv[indNum];
 
 	treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
-	ind->mod->OutputGamlFormattedModel(treeLog);
-	ind->treeStruct->root->MakeNewick(treeString, false);
+	ind->mod->OutputGarliFormattedModel(treeLog);
+	ind->treeStruct->root->MakeNewick(treeString, false, true);
 	treeLog << "]" << treeString << ";" << endl;
 	}
 
@@ -1509,7 +1535,7 @@ void Population::AppendTreeToBootstrapLog(int rep){
 
 	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << ind->Fitness() << " ";
 	
-	ind->mod->OutputGamlFormattedModel(bootLog);
+	ind->mod->OutputGarliFormattedModel(bootLog);
 /*	
 	const Model *m=ind->mod;
 	if(m->Nst() == 2) bootLog << "nst=2 k=" << m->Rates(0) << "\t";
@@ -1517,37 +1543,37 @@ void Population::AppendTreeToBootstrapLog(int rep){
 	bootLog << "base=(" << m->Pi(0) << " " << m->Pi(1) << " " << m->Pi(2) << ") ";
 
 	if(m->NRateCats()>1) bootLog << "rates=g shape=" << m->Alpha() << " ";
-	if(m->ProportionInvariant()!=0.0) bootLog << "pinv=" << m->ProportionInvariant();
+	if(m->PropInvar()!=0.0) bootLog << "pinv=" << m->PropInvar();
 */	
-	ind->treeStruct->root->MakeNewick(treeString, false);
+	ind->treeStruct->root->MakeNewick(treeString, false, true);
 	bootLog << "] " << treeString << ";" << endl;
 	}
 
 
-void Population::CreateTreeFile( const char* treefname, int fst /* = -1 */, int lst /* = -1 */ )
-{
+void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int lst /* = -1 */ ){
 	int k;
 	int first = ( fst < 0 ? 0 : fst );
-	int last = ( lst < 0 ? params->nindivs : lst );
-	assert( last <= params->nindivs );
+	int last = ( lst < 0 ? conf->nindivs : lst );
+	assert( last <= conf->nindivs );
 
 	assert( treefname );
 	ofstream outf;
 
 	Individual *best=&indiv[bestIndiv];
-	if(best->Fitness() < allTimeBest.Fitness() || pertMan->ratcheted==true) return;
+	if(allTimeBest != NULL){
+		if(best->Fitness() < allTimeBest->Fitness() || pertMan->ratcheted==true) return;
+		}
 
 	outf.open( treefname );
 	outf.precision(8);
 
 	outf << "#nexus" << endl << endl;
 
-	//rewritting this to output standard nexus tree files, not gamlviewer stuff
-	int ntaxa = params->data->NTax();
+	int ntaxa = data->NTax();
 	outf << "begin trees;\ntranslate\n";
 	for(k=0;k<ntaxa;k++){
 		outf << "  " << (k+1);
-		NxsString tnstr = params->data->TaxonLabel(k);
+		NxsString tnstr = data->TaxonLabel(k);
 		tnstr.blanks_to_underscores();
 		outf << "  " << tnstr.c_str();
 		if(k < ntaxa-1) 
@@ -1555,19 +1581,20 @@ void Population::CreateTreeFile( const char* treefname, int fst /* = -1 */, int 
 		}		
 
 	outf << ";\n";
-	
+	if(prematureTermination == true) outf << "[NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!]" << endl;
 	outf << "tree best = [&U][" << best->Fitness() << "][";
-	best->mod->OutputGamlFormattedModel(outf);
+	best->mod->OutputGarliFormattedModel(outf);
 	outf << "]";
 
 	outf.setf( ios::floatfield, ios::fixed );
 	outf.setf( ios::showpoint );
-	best->treeStruct->root->MakeNewick(treeString, false);
+	best->treeStruct->root->MakeNewick(treeString, false, true);
 	outf << treeString << ";\n";
 	outf << "end;\n";
 	
 	//add a paup block setting the model params
 	best->mod->OutputPaupBlockForModel(outf, treefname);
+	if(prematureTermination == true) outf << "[! ****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****]" << endl;
 	outf.close();
 	
 	if(outputPhylipTree){//output a phylip formatted tree if desired
@@ -1589,7 +1616,7 @@ void Population::CreateTreeFile( const char* treefname, int fst /* = -1 */, int 
 			else{
 				while(isdigit(*loc))
 					temp += *loc++;
-				phytree << params->data->TaxonLabel(atoi(temp.c_str())-1);
+				phytree << data->TaxonLabel(atoi(temp.c_str())-1);
 				temp="";
 				}
 			}
@@ -1607,7 +1634,7 @@ void Population::CreateTreeFile( const char* treefname, int fst /* = -1 */, int 
 
 char * Population::MakeNewick(int i, bool internalNodes)
 {
-	indiv[i].treeStruct->root->MakeNewick(treeString, internalNodes);
+	indiv[i].treeStruct->root->MakeNewick(treeString, internalNodes, true);
 	assert(!treeString[stringSize]);
 	return treeString;
 }
@@ -1638,7 +1665,7 @@ void Population::EliminateDuplicateTreeReferences(){
 	vector<Tree *> tstructs;
 	
 	//go through the indiv array
-	for(int i=0;i<params->nindivs;i++){
+	for(int i=0;i<conf->nindivs;i++){
 		//check if we have already encountered this treeStruct
 		dupe=false;
 		for(vector<Tree *>::iterator tit=tstructs.begin();tit!=tstructs.end();tit++){
@@ -1654,7 +1681,7 @@ void Population::EliminateDuplicateTreeReferences(){
 		}
 	
 	//go through the newindiv array
-	for(int i=0;i<params->nindivs;i++){
+	for(int i=0;i<conf->nindivs;i++){
 		//check if we have already encountered this treeStruct
 		dupe=false;
 		for(vector<Tree *>::iterator tit=tstructs.begin();tit!=tstructs.end();tit++){
@@ -1684,233 +1711,14 @@ void Population::EliminateDuplicateTreeReferences(){
 
 	}
 
-/*	this method extends the current population by n using the tree strings in tree_strs to build the
-	new individuals.
-
-	side affects:	members indiv and newindiv arrays are extended and new entries filled in.
-					member topologies array is extended and new entries filled in.
-					member nindiv is changed to reflect the new bigger indiv/newindiv arrays.
-					member old_nindiv is changed to hold what nindiv previously held.
-					member ntopos is updated to reflect the changes.
-
-*/
-/*
-int Population::ExtendPopulation(int delta, char* tree_strs, double* kappa_probs)	{
-
-	// sanity check
-	assert(current_size == params->nindivs);
-
-	EliminateDuplicateTreeReferences();	// cleans up ptr mess between indiv and newindiv
-	
-	prResizeIndividualArray(delta, tree_strs, kappa_probs);
-	prResizeNewIndividualArray(delta);
-	prResizeTopologyListArray(delta);
-	prResizeCumFitArray(delta);
-
-	current_size += delta;
-	total_size = params->nindivs = current_size;
-
-	return 0;
-}
-*/
-/*
-int Population::ShrinkPopulation(int delta, char** tree_strings_, double** kappa_probs_)	{
-	char*& tree_strings = *tree_strings_;
-	double*& kappa_probs = *kappa_probs_;
-
-	EliminateDuplicateTreeReferences();	// // cleans up ptr mess between indiv and newindiv
-
-	int* to_remove;
-	GetNRandomIndivIndices(&to_remove, delta);
-	GetSpecifiedTreeStrings(&tree_strings, delta, to_remove);
-	GetSpecifiedKappas(&kappa_probs, delta, to_remove);
-	delete [] to_remove;
-
-	// TODO the follow funcs don't shrink the population by the indivs in to_remove[] (see above)
-	prResizeIndividualArray(-delta);
-	prResizeNewIndividualArray(-delta);
-	prResizeTopologyListArray(-delta);
-	prResizeCumFitArray(-delta);
-
-	current_size -= delta;
-	params->nindivs = current_size;
-	 
-	return 0;
-}*/	
-/*
-int Population::prResizeIndividualArray(int n, char* tree_strs, double* kappa_probs)	{
-	int new_size = current_size + n;
-	assert(new_size >= 0);
-	assert(current_size >= 0);
-		
-	if (new_size == current_size)	{
-		return 0;
-	}
-	else if (new_size == 0)	{
-		assert(indiv);
-		for (int i = 0; i < current_size; ++i)
-			indiv[i].treeStruct->RemoveTreeFromAllClas();
-		delete [] indiv;
-		indiv = NULL;
-	}
-	else if (new_size > current_size)	{
-		assert(tree_strs != NULL);
-		assert(kappa_probs != NULL);
-		Individual* temp_indiv = new Individual[new_size];
-		for (int i = 0; i < current_size; ++i)	{
-			temp_indiv[i] = indiv[i];
-			indiv[i].treeStruct = NULL; // so ~Individual won't destroy its tree
-		}
-		char* p = tree_strs;
-		int j = 0;
-		for (int i = current_size; i < new_size; ++i)	{
-			temp_indiv[i].treeStruct = new Tree(p, params->data, sharedcl);
-			temp_indiv[i].treeStruct->AssignCLAsFromMaster();
-			temp_indiv[i].mod->CopyModel(mod);
-			temp_indiv[i].params = params;
-			p += strlen(p) + 1;
-		}
-		if (current_size > 0)	{
-			assert(indiv);
-			delete [] indiv;
-		}
-		indiv = temp_indiv;
-	}
-	else if (new_size < current_size)	{
-		assert(tree_strs == NULL);
-		Individual* temp_indiv = new Individual[new_size];
-		for (int i = 0; i < new_size; ++i)	{
-			temp_indiv[i] = indiv[i];
-			indiv[i].treeStruct = NULL;
-		}
-		for (int i = new_size; i < current_size; ++i)
-			indiv[i].treeStruct->RemoveTreeFromAllClas();
-		delete [] indiv;
-		indiv = temp_indiv;
-	}
-	else	{
-		// shouldn't get here
-		assert(false);
-	}
-
-	// sanity check:  make sure each indiv's params ptr is pointing to the right place.
-	// sanity check:  make sure each indiv's treeStruct is not NULL.
-	for (int i = 0; i < new_size; i++)	{
-		assert(indiv[i].params == params);
-		assert(indiv[i].treeStruct != NULL);
-	}
-
-	return 0;
-}
-
-int Population::prResizeNewIndividualArray(int n)	{
-	int new_size = current_size + n;
-	assert(new_size >= 0);
-	assert(current_size >= 0);
-
-	if (current_size == new_size)
-		return 0;
-	if (current_size > 0)	{
-		assert(newindiv);
-		delete [] newindiv;
-	}
-	else
-		assert(newindiv == NULL);
-	if (new_size > 0)
-		newindiv = new Individual[new_size];
-	else
-		newindiv = NULL;
-
-	return 0;
-}
-*/
-/*	precondition:	indiv[] must be of size "current_size".
-*/
-/*
-int Population::prResizeTopologyListArray(int n)	{
-	int new_size = current_size + n;
-	assert(new_size > 0);
-
-	for (int i = 0; i < current_size; ++i)
-		delete topologies[i];
-	delete [] topologies;
-	TopologyList::ntoposexamined = 0;
-
-	topologies = new TopologyList*[new_size];
-	TopologyList::SetIndL(indiv);
-	for(int i = 0; i < new_size; i++)	{
-		topologies[i] = new TopologyList();
-		topologies[i]->Allocate( (100 < new_size+1) ? 100 : (new_size+1) );
-		topologies[i]->AddInd(i);
-		TopologyList::ntoposexamined++;
-		indiv[i].topo=i;
-	}
-	
-	ntopos = new_size;
-
-	return 0;
-}
-*/
-
-/*	this is a reincarnation of UpdateTopologyList().
-	precondition:  indivs[] must be of size new_size
-	question:  topology list grows only and never shrinks?  it seems like ntopos just gets bigger and bigger.
-*/
-int Population::prResizeTopologyListArray(int n)	{
-	int new_size = current_size + n;
-	int new_topos=0;
-	assert(current_size >= 0);
-	assert(new_size >= 0);
-	for(int i=0; i < new_size; i++){
-		if(indiv[i].topo < 0)	{
-			indiv[i].topo=ntopos+new_topos++;
-		}
-	}
-	ntopos+=new_topos;
-	TopologyList::SetIndL(indiv);
-	for(int i=0;i<ntopos;i++)
-		topologies[i]->Clear();
-	for(int i = 0; i < new_size; i++ )
-		topologies[indiv[i].topo]->AddInd(i);
-	CompactTopologiesList();
-
-	return 0;
-}
-
-int Population::prResizeCumFitArray(int n)	{
-	int new_size = current_size + n;
-	assert(current_size >= 0);
-	assert(new_size >= 0);
-
-	if (current_size == new_size)
-		return 0;
-	if (current_size > 0)	{
-		assert(cumfit);
-		for (int i = 0; i < current_size; ++i)
-			delete [] cumfit[i];
-		delete [] cumfit;
-	}
-	else
-		assert(cumfit == NULL);
-	if (new_size > 0)	{
-		cumfit = new double*[new_size];
-		for (int i = 0; i < new_size; ++i)
-			cumfit[i] = new double[2];
-	}
-	else
-		cumfit = NULL;
-
-	return 0;
-}
-
 void Population::CheckAllTrees(){//debugging function
-	for(int i=0;i<indiv[0].params->nindivs;i++){
+	for(int i=0;i<conf->nindivs;i++){
 		//check that trees are properly formed
 		indiv[i].treeStruct->root->CheckforLeftandRight();
 		indiv[i].treeStruct->root->CheckforPolytomies();
 		indiv[i].treeStruct->root->CheckTreeFormation();
 		//check that no individuals point to the same treeStruct
-		for(int j=i+1;j<indiv[0].params->nindivs;j++)
+		for(int j=i+1;j<conf->nindivs;j++)
 			assert(!(indiv[i].treeStruct==indiv[j].treeStruct));
 			}
 		}
@@ -1918,7 +1726,7 @@ void Population::CheckAllTrees(){//debugging function
 void Population::UpdateTopologyList(Individual *inds){
 	//bring topo list up to date
 	//also checks if any individuals have not been assigned a topo (topo=-1), and does so.
-	//BE SURE that params->nindivs has been updated to the new size before calling this.
+	//BE SURE that conf->nindivs has been updated to the new size before calling this.
 	int new_topos=0;
 	for(int i=0;i<total_size;i++){
 		if(inds[i].topo<0){
@@ -1943,7 +1751,7 @@ void Population::RemoveFromTopologyList(Individual *ind){
 	}			
 
 void Population::CheckIndividuals(){
-	for(int i=0;i<params->nindivs;i++){
+	for(int i=0;i<conf->nindivs;i++){
 		assert(!(indiv[i].topo>ntopos));
 		}
 	}
@@ -1962,7 +1770,7 @@ void Population::TopologyReport(){
 		out << endl;
 		}
 	out << "ind\ttopo" << endl;
-	for(int i=0;i<params->nindivs;i++){
+	for(int i=0;i<conf->nindivs;i++){
 		out << i << "\t" << indiv[i].topo << endl;
 		}
 	out.close();
@@ -2059,10 +1867,10 @@ int Population::ReplaceSpecifiedIndividuals(int count, int* which_array, const c
 }
 
 int Population::GetNRandomIndivIndices(int** indiv_list, int n)	{
-	int* ar = new int[current_size];
-	for (int i = 0; i < current_size; ++i)
+	int* ar = new int[total_size];
+	for (int i = 0; i < total_size; ++i)
 		ar[i] = i;
-	ScrambleArray<int>(current_size, ar);
+	ScrambleArray<int>(total_size, ar);
 	*indiv_list = new int[n];
 	for (int i = 0; i < n; ++i)
 		(*indiv_list)[i] = ar[i];
@@ -2073,7 +1881,7 @@ int Population::GetNRandomIndivIndices(int** indiv_list, int n)	{
 int Population::GetNBestIndivIndices(int** indiv_list, int n)	{
 	*indiv_list = new int[n];
 	for (int i = 0; i < n; ++i)
-		(*indiv_list)[i] = (int)cumfit[current_size-i-1][0];
+		(*indiv_list)[i] = (int)cumfit[total_size-i-1][0];
 	return 0;
 }
 
@@ -2101,7 +1909,7 @@ int Population::GetSpecifiedModels(double** model_string, int n, int* indiv_list
 #ifdef FLEX_RATES
 	assert(0);
 #else
-	if(indiv[indiv_list[0]].mod->ProportionInvariant()!=0.0) string_size+=1*n;
+	if(indiv[indiv_list[0]].mod->PropInvar()!=0.0) string_size+=1*n;
 #endif
 	model=new double[string_size];
 	
@@ -2113,7 +1921,7 @@ int Population::GetSpecifiedModels(double** model_string, int n, int* indiv_list
 		
 		//get the pi's
 		for(int b=0;b<4;b++)
-			model[slot++] = indiv[indiv_list[i]].mod->Pi(b);
+			model[slot++] = indiv[indiv_list[i]].mod->StateFreq(b);
 		
 #ifdef FLEX_RATES
 	assert(0);
@@ -2123,8 +1931,8 @@ int Population::GetSpecifiedModels(double** model_string, int n, int* indiv_list
 			model[slot++] = indiv[indiv_list[i]].mod->Alpha();
 		
 		//get pinv if we are using invariant sites
-		if(indiv[indiv_list[0]].mod->ProportionInvariant()!=0.0)
-			model[slot++] = indiv[indiv_list[i]].mod->ProportionInvariant();		
+		if(indiv[indiv_list[0]].mod->PropInvar()!=0.0)
+			model[slot++] = indiv[indiv_list[i]].mod->PropInvar();		
 #endif
 		}
 	return slot;
@@ -2154,7 +1962,7 @@ int Population::ReplicateSpecifiedIndividuals(int count, int* which, const char*
 }
 
 void Population::UpdateTreeModels(){
-	for(int ind=0;ind<current_size;ind++){
+	for(int ind=0;ind<total_size;ind++){
 		newindiv[ind].treeStruct->mod=newindiv[ind].mod;
 //		indiv[ind].treeStruct->mod=indiv[ind].mod;
 		}
@@ -2177,10 +1985,10 @@ void Population::OutputModelAddresses(){
 /*  Methods added by Alan Zhang on Jan,09,2004     */
 
 void Population::NNIoptimization(){
-	for(int i=0;i<params->nindivs;i++)
+	for(int i=0;i<conf->nindivs;i++)
 		indiv[i].ResetIndiv();
 
-	//	for(int i = 0;i<params->nindivs;i++){
+	//	for(int i = 0;i<conf->nindivs;i++){
 		bool topoChange=NNIoptimization(bestIndiv, 1);
 	//	}
 	
@@ -2217,7 +2025,7 @@ bool Population::NNIoptimization(int indivIndex, int steps){
 	bestNNIFitness = -1e100;
 	
 	steps = min(max(0,steps),newindiv[indivIndex].treeStruct->getNumTipsTotal()-3);
-	indivIndex = min(max(0,indivIndex),params->nindivs-1);
+	indivIndex = min(max(0,indivIndex),conf->nindivs-1);
 
 	//DJZ
 	while(unusedTrees.size()<3){
@@ -2312,7 +2120,7 @@ bool Population::NNIoptimization(int indivIndex, int steps){
 	currentBest.treeStruct=NULL;
 	
 //	newindiv[indivIndex].treeStruct->SetAllTempClasDirty();
-	newindiv[indivIndex].mutation_type |= Individual::exNNI;
+//	newindiv[indivIndex].mutation_type |= Individual::exNNI;
 
 	return betterScore;
 }
@@ -2336,7 +2144,7 @@ void Population::NNIPerturbation(int sourceInd, int indivIndex){
 /*	
 	for(int i=0;i<numNodes;i++){
 		nodeArray[i]=indiv[indivIndex].treeStruct->GetRandomInternalNode();
-		//DEBUG get all of the nodes, in order
+		//get all of the nodes, in order
 //		nodeArray[i]=numNodes+i+4;
 		}
 */
@@ -2381,7 +2189,6 @@ void Population::NNIPerturbation(int sourceInd, int indivIndex){
 	outman.UserMessage("Performing NNI Perturbation.  Starting score= %.4f", indiv[bestIndiv].Fitness());
 
 	
-	//DEBUG
 /*	char filename[50];
 	double localprec=.5;
 	sprintf(filename, "%d.%.4fscores.log", gen, localprec);
@@ -2398,7 +2205,7 @@ void Population::NNIPerturbation(int sourceInd, int indivIndex){
 
 		optiNode=indiv[indivIndex].treeStruct->GetRandomInternalNode();
 //		optiNode=nodeArray[i];
-		//DEBUG
+
 //		tempIndiv1.treeStruct->NNIMutate(optiNode,0, localprec, 0);
 //		tempIndiv2.treeStruct->NNIMutate(optiNode,1, localprec, 0);
 
@@ -2411,7 +2218,7 @@ void Population::NNIPerturbation(int sourceInd, int indivIndex){
 		tempIndiv1.SetFitness(tempIndiv1.treeStruct->lnL);
 		tempIndiv2.SetFitness(tempIndiv2.treeStruct->lnL);
 
-		//DEBUG
+
 //		temp << tempIndiv1.Fitness() << "\n" << tempIndiv2.Fitness() << "\n";
 
 		double diff1=tempIndiv1.Fitness() - previousFitness;
@@ -2424,7 +2231,7 @@ void Population::NNIPerturbation(int sourceInd, int indivIndex){
 			if((diff1 < 0.0) && ((diff1 > diff2) || (diff2 >= 0.0))) best=&tempIndiv1;
 			else best=&tempIndiv2;
 			
-			double acceptanceProb=exp(-params->selectionIntensity * (previousFitness - best->Fitness()));
+			double acceptanceProb=exp(-conf->selectionIntensity * (previousFitness - best->Fitness()));
 			if(rnd.uniform() < acceptanceProb){
 				double thisdiff=best->Fitness() - previousFitness;
 				assert(thisdiff < 0);
@@ -2517,7 +2324,7 @@ void Population::NNISpectrum(int sourceInd){
 		localprec=prec[q];
 
 		char filename[50];
-		sprintf(filename, "%d.%.4fscores.log", gen, localprec);
+	//	sprintf(filename, "%d.%.4fscores.log", gen, localprec);
 		ofstream temp(filename);
 		temp.precision(12);
 		temp << "start\t" << indiv[bestIndiv].Fitness() << "\n";
@@ -2526,7 +2333,7 @@ void Population::NNISpectrum(int sourceInd){
 		for(int i=0;i<numNodes;i++){
 
 			optiNode=nodeArray[i];
-			//DEBUG
+
 			tempIndiv1.treeStruct->NNIMutate(optiNode,0, localprec, 0);
 			tempIndiv2.treeStruct->NNIMutate(optiNode,1, localprec, 0);
 
@@ -2536,7 +2343,7 @@ void Population::NNISpectrum(int sourceInd){
 			tempIndiv1.SetFitness(tempIndiv1.treeStruct->lnL);
 			tempIndiv2.SetFitness(tempIndiv2.treeStruct->lnL);
 
-			//DEBUG
+
 			temp << tempIndiv1.Fitness() << "\n" << tempIndiv2.Fitness() << "\n";
 			if(q==0){
 				OutputFilesForScoreDebugging(&tempIndiv1, tempGlobal++);
@@ -2564,7 +2371,7 @@ void Population::NNISpectrum(int sourceInd){
 }
 
 void Population::TurnOffRatchet(){
-	params->data->RestoreOriginalCounts();
+	data->RestoreOriginalCounts();
 	pertMan->ratcheted=false;
 	
 	claMan->MakeAllHoldersDirty();
@@ -2587,7 +2394,7 @@ void Population::RestoreAllTimeBest(){
 	UpdateTopologyList(indiv);
 	topologies[indiv[0].topo]->RemoveInd(0);
 	CompactTopologiesList();
-	indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, &allTimeBest, true);
+	indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, allTimeBest, true);
 	indiv[0].treeStruct->AssignCLAsFromMaster();
 	AssignNewTopology(indiv, 0);
 	indiv[0].CalcFitness(0);
@@ -2600,7 +2407,7 @@ void Population::RestoreBestForPert(){
 	UpdateTopologyList(indiv);
 	topologies[indiv[0].topo]->RemoveInd(0);
 	CompactTopologiesList();
-	indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, &bestSinceRestart, true);
+	indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, bestSinceRestart, true);
 	indiv[0].treeStruct->AssignCLAsFromMaster();
 	AssignNewTopology(indiv, 0);
 	indiv[0].CalcFitness(0);
@@ -2616,24 +2423,24 @@ void Population::RestoreBestForPert(){
 	pert.precision(10);
 	pert << "restoring best individual with score of " << indiv[0].Fitness() << "\n";
 	pert.close();
-	outman.UserMessage("restoring best individual with score of %.4f\n %d perturbation(s) performed without improvement.", bestSinceRestart.Fitness(), pertMan->numPertsNoImprove);
+	outman.UserMessage("restoring best individual with score of %.4f\n %d perturbation(s) performed without improvement.", bestSinceRestart->Fitness(), pertMan->numPertsNoImprove);
 	}
 
 void Population::StoreBestForPert(){
-	if(indiv[bestIndiv].Fitness() > allTimeBest.Fitness()) StoreAllTimeBest();
+	if(indiv[bestIndiv].Fitness() > allTimeBest->Fitness()) StoreAllTimeBest();
 	
-	if(bestSinceRestart.treeStruct==NULL){
+	if(bestSinceRestart->treeStruct==NULL){
 		if(unusedTrees.empty()){
 			Tree *temp=new Tree();
 			unusedTrees.push_back(temp);
 			}					
-		bestSinceRestart.treeStruct=*(unusedTrees.end()-1);
+		bestSinceRestart->treeStruct=*(unusedTrees.end()-1);
 		unusedTrees.pop_back();
 		}
-	bestSinceRestart.CopySecByRearrangingNodesOfFirst(bestSinceRestart.treeStruct, &indiv[bestIndiv]);
-	bestSinceRestart.topo=-1;
+	bestSinceRestart->CopySecByRearrangingNodesOfFirst(bestSinceRestart->treeStruct, &indiv[bestIndiv]);
+	bestSinceRestart->topo=-1;
 	//need to do this to be sure that the bestSinceRestart isn't tying up clas
-	bestSinceRestart.treeStruct->RemoveTreeFromAllClas();
+	bestSinceRestart->treeStruct->RemoveTreeFromAllClas();
 	
 	char filename[50];
 	if(rank < 10)
@@ -2642,25 +2449,25 @@ void Population::StoreBestForPert(){
 		sprintf(filename, "pertreport%d.log", rank);
 	ofstream pert(filename, ios::app);
 	pert.precision(10);
-	pert << "storing best individual with score of " << bestSinceRestart.Fitness() << "\n";
+	pert << "storing best individual with score of " << bestSinceRestart->Fitness() << "\n";
 	pert.close();
-	outman.UserMessage("storing best individual with score of %.4f", bestSinceRestart.Fitness());
+	outman.UserMessage("storing best individual with score of %.4f", bestSinceRestart->Fitness());
 	}
 
 void Population::StoreAllTimeBest(){
-	CreateTreeFile(params->treefname);
-	if(allTimeBest.treeStruct==NULL){
+	WriteTreeFile(besttreefile);
+	if(allTimeBest->treeStruct==NULL){
 		if(unusedTrees.empty()){
 			Tree *temp=new Tree();
 			unusedTrees.push_back(temp);
 			}					
-		allTimeBest.treeStruct=*(unusedTrees.end()-1);
+		allTimeBest->treeStruct=*(unusedTrees.end()-1);
 		unusedTrees.pop_back();
 		}
-	allTimeBest.CopySecByRearrangingNodesOfFirst(allTimeBest.treeStruct, &indiv[bestIndiv]);
-	allTimeBest.topo=-1;
+	allTimeBest->CopySecByRearrangingNodesOfFirst(allTimeBest->treeStruct, &indiv[bestIndiv]);
+	allTimeBest->topo=-1;
 	//need to do this to be sure that the alltimebest isn't tying up clas
-	allTimeBest.treeStruct->RemoveTreeFromAllClas();
+	allTimeBest->treeStruct->RemoveTreeFromAllClas();
 	}
 
 void Population::keepTrack(){
@@ -2684,7 +2491,7 @@ void Population::keepTrack(){
 		
 	adap->improvetotal[0] = indiv[bestIndiv].Fitness() - adap->laststepscore;
 
-	for(int i=0;i<params->nindivs;i++){
+	for(int i=0;i<conf->nindivs;i++){
 //		double scoreDif=indiv[i].Fitness() - newindiv[indiv[i].parent].Fitness();
 		double scoreDif=indiv[i].Fitness() - adap->lastgenscore;
 		int typ = indiv[i].mutation_type;
@@ -2694,12 +2501,17 @@ void Population::keepTrack(){
 					//keep track of when the last significant beneficial topo mutation occured
 					//this will be used for the stopping criterion, precision reduction and update reduction in the parallel version
 					if(typ&Individual::anyTopo || adap->topoWeight==0.0){
+						//clearing of the swaps records needs to be done for _any_ new best topo, not
+						//just ones that are significantly better
+						if(i == bestIndiv) indiv[0].treeStruct->attemptedSwaps.ClearAttemptedSwaps();
 						if(scoreDif > significantTopoChange){
 							indiv[0].treeStruct->CalcBipartitions();
 							indiv[i].treeStruct->CalcBipartitions();
 							if(indiv[0].treeStruct->IdenticalTopology(indiv[i].treeStruct->root)==false){
 								lastTopoImprove=gen;
-								if(i == bestIndiv) AppendTreeToTreeLog(indiv[bestIndiv].mutation_type);
+								if(i == bestIndiv){
+									AppendTreeToTreeLog(indiv[bestIndiv].mutation_type);
+									}
 								}
 							}
 						}
@@ -2707,10 +2519,10 @@ void Population::keepTrack(){
 					if(typ&(Individual::randNNI)){
 						adap->randNNI[0] += scoreDif;
 						}
-					if(typ&(Individual::exNNI)) 		adap->exNNI[0] += scoreDif;
+//					if(typ&(Individual::exNNI)) 		adap->exNNI[0] += scoreDif;
 					if(typ&(Individual::randSPR)) 	adap->randSPR[0] += scoreDif;
 					if(typ&(Individual::limSPR)) 		adap->limSPR[0] += scoreDif;
-					if(typ&(Individual::exlimSPR)) 	 	adap->exlimSPR[0] += scoreDif;
+//					if(typ&(Individual::exlimSPR)) 	 	adap->exlimSPR[0] += scoreDif;
 	#ifdef GANESH
 					if(typ&(Individual::randPECR)) 	 	adap->randPECR[0] += scoreDif;
 	#endif
@@ -2731,10 +2543,10 @@ void Population::keepTrack(){
 	//				}
 				}
 			if(typ&(Individual::randNNI)) 	adap->randNNInum[0]++;
-			if(typ&(Individual::exNNI)) 	 	adap->exNNInum[0]++;
+//			if(typ&(Individual::exNNI)) 	 	adap->exNNInum[0]++;
 			if(typ&(Individual::randSPR)) 	adap->randSPRnum[0]++;
 			if(typ&(Individual::limSPR))	 	adap->limSPRnum[0]++;
-			if(typ&(Individual::exlimSPR)) 	adap->exlimSPRnum[0]++;
+//			if(typ&(Individual::exlimSPR)) 	adap->exlimSPRnum[0]++;
 	#ifdef GANESH
 			if(typ&(Individual::randPECR)) 	adap->randPECRnum[0]++;
 	#endif
@@ -3297,7 +3109,7 @@ void Population::CheckSubtrees(){
 		int count=0;
 		for(int i=0;i<total_size;i++){
 			if(indiv[i].accurateSubtrees==true){
-			    if(i<params->nindivs) count++;
+			    if(i<conf->nindivs) count++;
 //				if(indiv[i].Fitness() > subMan->currentBest) subMan->currentBest=indiv[i].Fitness();
 				}
 			}
@@ -3341,7 +3153,7 @@ void Population::FillPopWithClonesOfBest(){
 	UpdateTopologyList(indiv);
 	Individual *best=&indiv[bestIndiv];
 	best->treeStruct->mod=best->mod;
-	for(int i=0;i<params->nindivs;i++){
+	for(int i=0;i<conf->nindivs;i++){
 		if(&indiv[i]!=best){
 			indiv[i].treeStruct->RemoveTreeFromAllClas();
 			topologies[indiv[i].topo]->RemoveInd(i);
@@ -3360,12 +3172,12 @@ void Population::AssignSubtree(int st, int indNum){
 
 	//we'll do all of this stuff if we are assigning a new subtree or if 
 	//we are assigning 0 (turning off subtree mode)
-	for(int i=0;i<params->nindivs;i++){
+	for(int i=0;i<conf->nindivs;i++){
 	    indiv[i].accurateSubtrees=false;
 		newindiv[i].accurateSubtrees=false;
 		indiv[i].treeStruct->UnprotectClas();
 		}
-	ResetMemLevel(params->data->NTax()-2,claMan->NumClas());
+	ResetMemLevel(data->NTax()-2,claMan->NumClas());
 	indiv[bestIndiv].treeStruct->ProtectClas();
 
 	subtreeMemberNodes.clear();
@@ -3377,7 +3189,7 @@ void Population::AssignSubtree(int st, int indNum){
 	
 		sort(subtreeMemberNodes.begin(),subtreeMemberNodes.end());
 		reverse(subtreeMemberNodes.begin(),subtreeMemberNodes.end());
-		for(int i=0;i<params->nindivs;i++){
+		for(int i=0;i<conf->nindivs;i++){
 		    indiv[i].accurateSubtrees=true;
 		    newindiv[i].accurateSubtrees=true;
 			}
@@ -3394,7 +3206,7 @@ void Population::AssignSubtree(int st, int indNum){
 		}
 /*	else{
 	//	subMan->active=false;
-		for(int i=0;i<params->nindivs;i++){
+		for(int i=0;i<conf->nindivs;i++){
 		    indiv[i].accurateSubtrees=false;
 			newindiv[i].accurateSubtrees=false;
 			indiv[i].treeStruct->UnprotectClas();
@@ -3430,11 +3242,11 @@ int poo=1;
 	
 #ifndef FAKE_PARALLEL	
 	int count=0;
-	for(int i=params->nindivs;i<total_size;i++){
-		if(indiv[i].accurateSubtrees==true && (paraMan->localSubtreeAssign[i-params->nindivs+1] > 0)){
+	for(int i=conf->nindivs;i<total_size;i++){
+		if(indiv[i].accurateSubtrees==true && (paraMan->localSubtreeAssign[i-conf->nindivs+1] > 0)){
 			paraMan->CheckSubtreeAccuracy(indiv[i].treeStruct);
 	       	recomEligable[i]=true;
-			if(i>=params->nindivs)count++;
+			if(i>=conf->nindivs)count++;
 			}
 		else recomEligable[i]=false;
 		}
@@ -3468,7 +3280,7 @@ int poo=1;
 		}
 	subrec << totnode << " taxa are in a subtree\nremote\tlocalnode\tassignednode\tscore\n";
 	for(int p=1;p<paraMan->nremotes+1;p++){
-		subrec << p << "\t" << paraMan->localSubtreeAssign[p] << "\t" << paraMan->remoteSubtreeAssign[p] << "\t" << indiv[p+params->nindivs-1].Fitness() << "\n";
+		subrec << p << "\t" << paraMan->localSubtreeAssign[p] << "\t" << paraMan->remoteSubtreeAssign[p] << "\t" << indiv[p+conf->nindivs-1].Fitness() << "\n";
 		}
 
 	subrec << "gen\t" << gen << "\nstart\t" << indiv[newindiv[indivIndex].parent].Fitness() << "\n";
@@ -3483,19 +3295,18 @@ int poo=1;
 	recomEligable[indivIndex]=false;
 	
 #ifndef FAKE_PARALLEL
-	for(int who=params->nindivs;who<total_size;who++){
+	for(int who=conf->nindivs;who<total_size;who++){
 #else
 	for(int who=0;who<total_size;who++){
 #endif
 		if(recomEligable[who]==true){
 
 #ifndef FAKE_PARALLEL
-			tempIndiv1.treeStruct->SubtreeBasedRecombination(indiv[who].treeStruct, paraMan->localSubtreeAssign[who - params->nindivs + 1], false, adap->branchOptPrecision);
+			tempIndiv1.treeStruct->SubtreeBasedRecombination(indiv[who].treeStruct, paraMan->localSubtreeAssign[who - conf->nindivs + 1], false, adap->branchOptPrecision);
 #else
 			tempIndiv1.treeStruct->SubtreeBasedRecombination(newindiv[who].treeStruct, subtreeNode , tempIndiv1.mod->IsModelEqual(newindiv[who].mod), adap->branchOptPrecision);
 #endif		
 
-			//DEBUG
 //			OutputFilesForScoreDebugging(&tempIndiv1, poo++);
 		//	paupf.flush();
 		//	outf.flush();
@@ -3503,20 +3314,19 @@ int poo=1;
 			tempIndiv1.SetDirty();
 			tempIndiv1.CalcFitness(subtreeNode);
 			
-			//DEBUG
 /*			ofstream poo("debug.log");
 			poo.precision(10);
 			tempIndiv1.treeStruct->OutputFirstClaAcrossTree(poo, tempIndiv1.treeStruct->root);
 			poo.close();
 */			
-			subrec << "with " << who << "\t(node " << paraMan->localSubtreeAssign[who - params->nindivs + 1] << ")\t" << tempIndiv1.Fitness() << "\n";
+			subrec << "with " << who << "\t(node " << paraMan->localSubtreeAssign[who - conf->nindivs + 1] << ")\t" << tempIndiv1.Fitness() << "\n";
 			if(tempIndiv1.Fitness() > currentBest.Fitness()){
 				//if the recombinant we create is better, make it the current best, mark it as 
 				//ineligable so we don't try to add it again, and start back at the first eligable
 				//recominant
 				currentBest.CopySecByRearrangingNodesOfFirst(currentBest.treeStruct, &tempIndiv1, true);
 				recomEligable[who]=false;
-				//who=params->nindivs-1;
+				//who=conf->nindivs-1;
 				}
 			else{
 			    tempIndiv1.CopySecByRearrangingNodesOfFirst(tempIndiv1.treeStruct, &currentBest, true);
@@ -3689,14 +3499,23 @@ void ParallelManager::FindNonSubtreeNodes(TreeNode *nd){
 	}
 
 void Population::InitializeOutputStreams(){
-	char temp_buf[50];
+	char temp_buf[100];
+	char restart[12];
+
+	if(conf->restart == true){
+		//check if this run has been restarted before.  If so, increment the restart number
+		sprintf(restart, ".restart%d", CheckRestartNumber(conf->ofprefix));
+		}
+	else restart[0]='\0';
+
+	sprintf(besttreefile, "%s%s.best.tre", conf->ofprefix.c_str(), restart);
 
 	if(outputMostlyUselessFiles){
 		//initialize the fate file
 		if (rank > 9)
-			sprintf(temp_buf, "%s.fate%d.log", params->ofprefix, rank);
+			sprintf(temp_buf, "%s%s.fate%d.log", conf->ofprefix.c_str(), restart, rank);
 		else
-			sprintf(temp_buf, "%s.fate0%d.log", params->ofprefix, rank);
+			sprintf(temp_buf, "%s%s.fate0%d.log", conf->ofprefix.c_str(), restart, rank);
 		
 		fate.open(temp_buf);
 		fate.precision(10);
@@ -3708,9 +3527,9 @@ void Population::InitializeOutputStreams(){
 
 		//initialize the problog
 		if (rank > 9)
-			sprintf(temp_buf, "%s.problog%d.log", params->ofprefix, rank);
+			sprintf(temp_buf, "%s%s.problog%d.log", conf->ofprefix.c_str(), restart, rank);
 		else
-			sprintf(temp_buf, "%s.problog0%d.log", params->ofprefix, rank);
+			sprintf(temp_buf, "%s%s.problog0%d.log", conf->ofprefix.c_str(), restart, rank);
 		probLog.open(temp_buf);
 		if(!probLog.good()) throw ErrorException("problem opening problog");
 		adap->BeginProbLog(probLog);
@@ -3718,9 +3537,9 @@ void Population::InitializeOutputStreams(){
 
 	//initialize the log file
 	if (rank > 9)
-		sprintf(temp_buf, "%s.log%d.log", params->ofprefix, rank);
+		sprintf(temp_buf, "%s%s.log%d.log", conf->ofprefix.c_str(), restart, rank);
 	else
-		sprintf(temp_buf, "%s.log0%d.log", params->ofprefix, rank);
+		sprintf(temp_buf, "%s%s.log0%d.log", conf->ofprefix.c_str(), restart, rank);
 	log.open(temp_buf);
 	log.precision(10);
 	log << "random seed = " << rnd.init_seed() << "\n";
@@ -3729,34 +3548,32 @@ void Population::InitializeOutputStreams(){
 	//initialize the treelog
 	if(outputTreelog){
 		if (rank > 9)
-			sprintf(temp_buf, "%s.treelog%d.log", params->ofprefix, rank);
+			sprintf(temp_buf, "%s%s.treelog%d.log", conf->ofprefix.c_str(), restart, rank);
 		else
-			sprintf(temp_buf, "%s.treelog0%d.log", params->ofprefix, rank);
+			sprintf(temp_buf, "%s%s.treelog0%d.log", conf->ofprefix.c_str(), restart, rank);
 
 		treeLog.open(temp_buf);
 		treeLog.precision(10);
 
-		params->data->BeginNexusTreesBlock(treeLog);
+		data->BeginNexusTreesBlock(treeLog);
 		}
 	
 	//initialize the bootstrap tree file
-		if(bootstrapReps > 0 && rank==0){
-			sprintf(temp_buf, "%s.boot.tre", params->ofprefix);
-	
-			bootLog.open(temp_buf);
-			bootLog.precision(10);
+	if(bootstrapReps > 0 && rank==0){
+		sprintf(temp_buf, "%s%s.boot.tre", conf->ofprefix.c_str(), restart);
 
-			params->data->BeginNexusTreesBlock(bootLog);
-			}	
-/*	//initialize the modellog
-	if (rank > 9)
-		sprintf(temp_buf, "%s.modellog%d.log", params->ofprefix, rank);
-	else
-		sprintf(temp_buf, "%s.modellog0%d.log", params->ofprefix, rank);
-	modelLog.open(temp_buf);
-	
-	modelLog << "gen\tr1\tr2\tr3\tr4\tr5\tpiA\tpiC\tpiG\tpiT\talpha\tpinv\n";
-*/	
+		bootLog.open(temp_buf);
+		bootLog.precision(10);
+
+		data->BeginNexusTreesBlock(bootLog);
+		}	
+
+	//initialize the swaplog
+	if(conf->uniqueSwapBias != 1.0){
+		sprintf(temp_buf, "%s%s.swap.log", conf->ofprefix.c_str(), restart);
+		swapLog.open(temp_buf);
+		swapLog << "gen\tuniqueSwaps\ttotalSwaps\n";
+		}
 
 	ClearDebugLogs();
 	
@@ -3791,16 +3608,22 @@ void Population::SetNewBestIndiv(int indivIndex){
 	}
 
 void Population::FinalizeOutputStreams(){
+	if(prematureTermination == true){
+		log << "***NOTE: Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***" << endl;
+		if(treeLog.is_open()) treeLog << "[! ***NOTE: GARLI run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***]" << endl;
+		}
 	fate.close();
 	log.close();
-	treeLog << "end;\n";
-	treeLog.close();
+	if(treeLog.is_open()){
+		treeLog << "end;\n";
+		treeLog.close();
+		}
 	if(bootLog.is_open()){
 		bootLog << "end;\n";
 		bootLog.close();
 		}
-	modelLog.close();
 	probLog.close();
+	if(swapLog.is_open()) swapLog.close();
 	
 	#ifdef DEBUG_SCORES
 	outf << "end;\n";
@@ -3879,7 +3702,7 @@ void Population::CheckRemoteReplaceThresh(){
 
 /* 7/21/06 needs to be updated
 void Population::SPRoptimization(int indivIndex){
-//	for(int i=0;i<params->nindivs;i++)
+//	for(int i=0;i<conf->nindivs;i++)
 //		indiv[i].ResetIndiv();
 
 //	bool topoChange=false;
@@ -4207,7 +4030,7 @@ void Population::CheckPerturbSerial(){
 					SetNewBestIndiv(indToReplace);
 					FillPopWithClonesOfBest();
 					AppendTreeToTreeLog(-1, bestIndiv);
-					//DEBUG try disallowing NNIs immediately after the perturbation
+					//try disallowing NNIs immediately after the perturbation
 					adap->randNNIweight=0.0;
 					adap->randNNIprob=0.0;
 					}
