@@ -1,5 +1,5 @@
-// GARLI version 0.94 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,14 +7,11 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
-
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #include <iostream>
@@ -232,10 +229,10 @@ void DataMatrix::Summarize()
 	   stateDistr[i] = 0.0;
 
 	//DJZ moved these out of PatternType to reduce the amount of allocation
-	int *c;
- 	MEM_NEW_ARRAY(c,int,nTax);
-	unsigned char *s;
-	MEM_NEW_ARRAY(s,unsigned char,nTax);
+	int *c = new int[nTax];
+ 	//MEM_NEW_ARRAY(c,int,nTax);
+	unsigned char *s = new unsigned char[nTax];
+//	MEM_NEW_ARRAY(s,unsigned char,nTax);
 	
 	for( k = 0; k < nChar; k++ ) {
 		int ptFlags = PatternType(k, c, s);
@@ -837,6 +834,16 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 			if( left_margin )
 				debug << left_margin << "No counts found" << endl;
 		}
+		//DJZ 9-13-06
+		//It is very important to properly set the totalNChar variable now
+		//to be the sum of the counts, otherwise bootstrapping after reading
+		//a .cond file will give wrong resampling!!!!!
+		totalNChar=0;
+		for(int i=0;i<num_chars;i++){
+			totalNChar += count[i];
+			}
+
+
 	}
 
 	// read in the line containing the number of states for each character
@@ -1482,7 +1489,7 @@ void DataMatrix::Reweight(double prob){
 	}
 
 void DataMatrix::BootstrapReweight(){
-	
+
 	RestoreOriginalCounts();
 	
 	double *cumProbs = new double[nChar];
@@ -1495,16 +1502,21 @@ void DataMatrix::BootstrapReweight(){
 		
 	for(int q=0;q<nChar;q++) count[q]=0;
 
+//	ofstream deb("counts.log", ios::app);
+
 	for(int c=0;c<totalNChar;c++){
 		double p=rnd.uniform();
-		int pat=0;
+		int pat=0; 
 		while(p > cumProbs[pat]) pat++;
 		count[pat]++;
 		}
 	int num0=0;
 	for(int d=0;d<nChar;d++){
 		if(count[d]==0) num0++;
+//		deb << count[d] << "\t";
 		}
+//	deb << endl;
+//	deb.close();
 	}
 
 

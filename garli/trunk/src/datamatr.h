@@ -1,5 +1,5 @@
-// GARLI version 0.93 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,14 +7,11 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
-
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #ifndef __DATAMATR_H
@@ -208,10 +205,10 @@ class DataMatrix
 			{ if( matrix && (i < nTax) && (j < nChar) ) matrix[i][j] = c; }
 
 		int MatrixExists() const { return ( matrix && nTax>0 && nChar>0 ? 1 : 0 ); }
-		int NConstant() { return nConstant; }
+		int NConstant() const { return nConstant; }
 		int LastConstant() const {return lastConstant;}
-		int NInformative() { return nInformative; }
-		int NAutapomorphic() { return nAutapomorphic; }
+		int NInformative() const { return nInformative; }
+		int NAutapomorphic() const { return nAutapomorphic; }
 
 		DataMatrix& operator =(const DataMatrix&);
 
