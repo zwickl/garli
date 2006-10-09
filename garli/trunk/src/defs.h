@@ -1,24 +1,42 @@
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
+// All rights reserved.
+//
+// This code may be used and modified for non-commercial purposes
+// but redistribution in any form requires written permission.
+// Please contact:
+//
+//  Derrick Zwickl
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
+//
+
 #ifndef DEFS
 #define DEFS
 
-//UNIX is defined in the Makefile, and WIN32 is defined
-//by the system on windows.  So, all we should have to define
-//here is MAC
-/*
-#ifndef UNIX
-#ifndef WIN32
-#define MAC
-//#endif
+//these will be defined by either the Microsoft compiler
+//or the intel compiler when openmp support is turned on
+//by compiling with /openmp (ms) or -openmp (icc)
+//Nothing else should need to be defined anywhere to get 
+//openMP working
+#if defined (__OPENMP) || defined (_OPENMP)
+	#include "omp.h"
+	#define OPEN_MP
+	#define OMP_INTINTCLA
+	#define OMP_INTTERMCLA
+	#define OMP_TERMDERIV
+	#define OMP_INTDERIV
 #endif
-*/
 
+/*
 #ifndef NDEBUG
 #undef NDEBUG
 #endif
+*/
 
 #define CONSTRAINTS
-
-
 #undef INCLUDE_PERTURBATION
 #undef SUBTREE_VERSION
 
@@ -26,8 +44,8 @@
 #define DEF_MAX_BRLEN 10.0
 #define DEF_STARTING_BRLEN		0.05
 #define MAXPATH   		256
-#define DEF_PRECISION	10
-
+#define DEF_PRECISION	8
+#define DEF_EXTRA_PRECISION	 10
 
 #define MEM_DELETE_ARRAY(v)		{ delete [] v; v=NULL; }
 #define MEM_NEW_ARRAY(a,t,n)	{ a = new t[n]; }
