@@ -1,5 +1,5 @@
-// GARLI version 0.93 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,13 +7,12 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
+
 
 #ifndef FUNCS_H
 #define FUNCS_H
@@ -22,7 +21,6 @@
 
 #include <stdlib.h>
 
-#include "parameters.h"
 #include "population.h"
 #include "mlhky.h"
 #ifdef UNIX
@@ -55,9 +53,9 @@ class InternalState{
 	};
 
 int FileExists(const char* s);
-int ReadData(const Parameters& params, HKYData* data);
+int ReadData(GeneralGamlConfig *, HKYData* data);
 int ReadData(const char* filename, HKYData* data);
-void GetRestartParams(Parameters& params);
+//void GetRestartParams(Parameters& params);
 int RandomInt(int lb, int ub);
 double RandomFrac();
 double RandomDouble(double lb, double ub);
@@ -67,7 +65,7 @@ double brent(double ax, double bx, double cx, double (*f)(TreeNode *, Tree*, dou
 double DZbrent(double ax, double bx, double cx, double fa, double fb, double fc, double (*f)(TreeNode *, Tree*, double), double tol, double *xmin, TreeNode *thisnode, Tree *thistree);
 void DirichletRandomVariable (double *alp, double *z, int n);
 void InferStatesFromCla(char *states, double *cla, int nchar);
-vector<InternalState *> *InferStatesFromCla(double *cla, int nchar);
+vector<InternalState *> *InferStatesFromCla(double *cla, int nchar, int nrates);
 double CalculatePDistance(const char *str1, const char *str2, int nchar);
 #ifndef GANESH
 double CalculateHammingDistance(const char *str1, const char *str2, int nchar);
@@ -75,21 +73,12 @@ double CalculateHammingDistance(const char *str1, const char *str2, int nchar);
 double CalculateHammingDistance(const char *str1, const char *str2, const int *col_count, int nchar)
 #endif
 void SampleBranchLengthCurve(double (*func)(TreeNode*, Tree*, double, bool), TreeNode *thisnode, Tree *thistree);
-void CalcDerivCLASPartialInternalRateHet(CondLikeArray *destCLA, CondLikeArray *destD1CLA, CondLikeArray *destD2CLA, const CondLikeArray *partialCLA, const CondLikeArray *childCLA,
-	const double *prmat, const double *d1mat, const double *d2mat, int nchar);
-void CalcDerivCLASPartialTerminalRateHet(CondLikeArray *destCLA, CondLikeArray *destD1CLA, CondLikeArray *destD2CLA, const CondLikeArray *partialCLA,
-	const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, int nchar);
 
-void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, int nchar, int nRateCats=4);
-void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, int nchar);
-void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, char *Ldata, char *Rdata, int nchar, int nRateCats=4);
-void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, char *Ldata, char *Rdata, int nchar);
-void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar, int nRateCats=4);
-void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar);
+void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, const int nchar, const int nRateCats);
+void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats);
+void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar, int nRateCats, const unsigned *ambigMap=NULL);
 void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats=4);
-void CalcFullCLAPartialInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar);
 void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar, int nRateCats=4);
-void CalcFullCLAPartialTerminal(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar);
 
 int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOuterL, double *midL, double *bestOuterL, double (*func)(TreeNode*, Tree*, double, bool), TreeNode *thisnode, Tree *thistree);
 double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc, double (*f)(TreeNode *, Tree*, double, bool), double tol, double *xmin, TreeNode *thisnode, Tree *thistree);

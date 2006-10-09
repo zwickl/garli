@@ -1,5 +1,5 @@
-// GARLI version 0.94 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,14 +7,11 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
-
 //	NOTE: Portions of this source adapted from:
 //	Press, W. H., B. P. Flannery, S. A. Teukolsky, and W. T. Vetterling.  1992. 
 //	Numerical Recipes in C : The Art of Scientific Computing.  Cambridge University Press, Cambridge.
@@ -28,7 +25,6 @@
 
 #include "funcs.h"
 #include "population.h"
-#include "parameters.h"
 #include "tree.h"
 #include "defs.h"
 #include "outputman.h"
@@ -61,7 +57,7 @@ int FileExists( const char* s )
 
 	return 0;
 }
-
+/*
 // GetRestartParams extracts the following pieces of information from
 // the first line of the state file:
 //	1. the last generation done on previous run (prev_generations)
@@ -81,7 +77,7 @@ void GetRestartParams( Parameters& params )
 	
 	rnd.set_seed( params.randomSeed );
 }
-
+*/
 int ReadData(const char* filename, HKYData* data)	{
 	if (!FileExists(filename))	{
 		throw ErrorException("data file not found: %s!", filename);
@@ -111,35 +107,35 @@ int ReadData(const char* filename, HKYData* data)	{
 		}
 	else {
 		outman.UserMessage("Datafile already compressed.");
-		outman.UserMessage("%d columns in compressed data matrix.", data->NChar());
+		outman.UserMessage("%d columns in compressed data matrix.\n", data->NChar());
 		}
 	data->DetermineConstantSites();
 	if(!data->Dense()) data->Save(filename, "new");
 	return 0;
 	}
 
-int ReadData(const Parameters& params, HKYData* data)	{
+int ReadData(GeneralGamlConfig *conf, HKYData* data)	{
 
 	// regurgitate params specified
-	if( params.restart ) {
+/*	if( params.restart ) {
 		outman.UserMessage("Restarting using state file \"%s\"", params.statefname);
 		GetRestartParams( const_cast<Parameters&>(params) );
 		outman.UserMessage("random number seed set to %d", params.randomSeed);
 		outman.UserMessage("last generation from previous run was %d", params.prev_generations);
 		outman.UserMessage("starting with previous elapsed time, which was %d seconds", params.prev_time);
 		}
-
-	const_cast<Parameters&>(params).BriefReport( cout );
-	outman.UserMessage("");
+*/
+//	const_cast<Parameters&>(params).BriefReport( cout );
+//	outman.UserMessage("");
 
 	// Check to be sure data file exists
 	//
-	if( !FileExists( params.datafname ) ) throw ErrorException("data file does not exist: %s", params.datafname);
+	if( !FileExists( conf->datafname.c_str() ) ) throw ErrorException("data file does not exist: %s", conf->datafname.c_str());
 
 	// Read in the data matrix
 	outman.flush();
-	outman.UserMessage("Reading data file %s...", params.datafname);
-	data->Read( params.datafname );
+	outman.UserMessage("Reading data file %s...", conf->datafname.c_str());
+	data->Read( conf->datafname.c_str() );
 
 	// report summary statistics about data
 	data->Summarize();
@@ -545,117 +541,7 @@ int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOute
 		}while(1);
 	assert(0);
 	return 0;
-	/*
-	while(*midL>*bestOuterL){
-		
-		if(curveDif > 0 && slopeCB < 0){
-			//if this is the case, the surface is either convex or not concave enough
-			//across our evals, and a parabolic estimate will suck (or fail outright), so do a GOLD
-			nextTry=((*bestOuter)+2.0*(*bestOuter-*mid));
-			tryPara=false;
-			}
-		else if(possibleZeroMLE==true){
-			nextTry=effectiveMin;
-			}
-		else{
-			r=(*mid-*worstOuter)*(*midL-*bestOuterL);
-			q=(*mid-*bestOuter)*(*midL-*worstOuterL);			
-			nextTry=(*mid)-((*mid-*bestOuter)*q-(*mid-*worstOuter)*r)/(2.0*SIGN(FMAX(fabs(q-r),TINY), q-r));
-			}
-		
-		if(nextTry<effectiveMin){
-			if(*bestOuter==effectiveMin){
-				return 1;
-				}
-			nextTry=effectiveMin;
-			nextTryL=(*func)(thisnode, thistree, nextTry, true);
-			if(nextTryL < *bestOuterL){
-				return 1;
-				}
-			else if(nextTryL > *midL){
-				*bestOuter=nextTry;
-				*bestOuterL=nextTryL;
-				return 0;
-				}
-			}
-		else{
-			ulim=(*mid)+GLIMIT*(*bestOuter-*mid);
-			if(((*mid-nextTry)*(nextTry-*bestOuter)>0.0)){	//if the proposed point is between mid and bestOuter
-				nextTryL=(*func)(thisnode, thistree, nextTry, true);
-				if(nextTryL < *midL){			//if the new score is better than our second best
-					*worstOuter=*mid;			//b becomes a, nextTry becomes b
-					*mid=nextTry;
-					*worstOuterL=*midL;
-					*midL=nextTryL;
-					if(nextTryL < *bestOuterL){		//if the new score is also better that the previous best
-						return 0;		//we've found our bracket.  Return.
-						}
-					}
-				else {//this shouldn't really happen.  Implies multiple optima
-					cout.precision(11);
-					cout << "multiple optima????\n";
-					cout << "a=" << *worstOuter << " worstOuterL=" << *worstOuterL << endl;
-					cout << "b=" << *mid << " midL=" << *midL << endl;
-					cout << "c=" << *bestOuter << " bestOuterL=" << *bestOuterL << endl;
-					cout << "nextTry=" << nextTry << " nextTryL=" << nextTryL << endl;
-					*bestOuter=nextTry;
-					*bestOuterL=nextTryL;
-					return 0;
-					}
-		/*		if(*bestOuter==effectiveMin) return 1;//if we just took a parabolic step, but our best remains at the min,
-											   //assume that we have a zero MLE
-				if(*bestOuter > *mid) nextTry=(*bestOuter)+2.0*(*bestOuter-*mid);
-				else nextTry=(*bestOuter)+GOLD*(*bestOuter-*mid);  //the parabolic step didn't do so well, so do a gold step
-				nextTry = (nextTry > effectiveMin ? (nextTry < effectiveMworstOuter ? nextTry : effectiveMworstOuter) : effectiveMin);
-				nextTryL=(*func)(thisnode, thistree, nextTry, true);
-		*/	/*	}
-			else if((nextTry < *bestOuter && *bestOuter < *mid)){ //if the proposed parabolic estimate lies to the left of our current evaluations
-				nextTryL=(*func)(thisnode, thistree, nextTry, true);
-				if(nextTryL > *bestOuterL){ //we found our bracket
-					SHFT(*worstOuter, *mid, *bestOuter, nextTry)
-					SHFT(*worstOuterL, *midL, *bestOuterL, nextTryL)
-*/	/*				*worstOuter=*mid;
-					*mid=nextTry;
-					*worstOuterL=*midL;
-					*midL=nextTryL;*/
-/*					return 0;
-					}
-				SHFT(*worstOuter, *mid, *bestOuter, nextTry)
-				SHFT(*worstOuterL, *midL, *bestOuterL, nextTryL)
-				}
-			else{//the proposed parabolic estimate is to the right of our current evaluations, where it tends 
-				//to undershoot.  GOLD tends to be too conservative as well.  Try a GOLD style step, but with
-				//the multiplier equal to 2*GOLD
-				//nextTry=((*bestOuter)+GOLD*(*bestOuter-*mid));
-			//	nextTry=nextTry+GOLD*(nextTry-*mid);
-			//	nextTry = (nextTry > effectiveMin ? (nextTry < effectiveMworstOuter ? nextTry : effectiveMworstOuter) : effectiveMin);
-				//try the parabolic estimate
-				if(nextTry>.84) tryPara=false;
-				if(tryPara==false){
-					nextTry=((*bestOuter)+2.0*(*bestOuter-*mid));
-					}
-				tryPara = !tryPara;
-				nextTryL=(*func)(thisnode, thistree, nextTry, true);
-				//I think these shifts need to be within this loop, not outside of the below closing bracket
-				SHFT(*worstOuter, *mid, *bestOuter, nextTry)
-				SHFT(*worstOuterL, *midL, *bestOuterL, nextTryL)
-				}
-			if(*bestOuter==effectiveMin && *bestOuterL < *midL){
-				numAttemptsWithBestAtMin++;
-				}
-			if(numAttemptsWithBestAtMin>=1 && *mid<.08){
-				return 1;
-				}
-			}
-	/*	if(((*worstOuter < -18.42) && (*mid < -18.42)) || ((*worstOuter<-10) && (*mid<-10) && (*bestOuter>1))){
-			//DZ 12-18-03 if our three best points are all < ln(1e-8), just give up and take that as a blen
-			//the MLE is probably essentially 0.  Note that sometimes when worstOuter and mid are very small this 
-			//func tries very large values for bestOuter, which I think is a bug.  This hack also avoids that
-			return 1;
-			}
-		}
-	return 0;
-*/	}
+}
 	
 //I'm reworking this a bit to better use the information that has already been generated in the bracketing function
 //since we already have those function evaluations, we might as well pass them in and use them
@@ -869,12 +755,12 @@ void InferStatesFromCla(char *states, double *cla, int nchar){
 	//this function takes a cla that contains the contribution of the whole tree
 	//and calculates the most probable state at each site.  The resulting array of
 	//states is placed into *states, which should already be allocated.
+	assert(0);//need to generalize this for n rates is it ever needs to be used again
 	double stateProbs[4];
-	int nrates=4;
 	
 	for(int c=0;c<nchar;c++){
 		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=0.0;
-		for(int i=0;i<nrates;i++){
+		for(int i=0;i<4;i++){
 			for(int j=0;j<4;j++){
 				stateProbs[j] += *cla++;
 				}
@@ -892,9 +778,8 @@ void InferStatesFromCla(char *states, double *cla, int nchar){
 		}
 	}
 
-vector<InternalState *> *InferStatesFromCla(double *cla, int nchar){
+vector<InternalState *> *InferStatesFromCla(double *cla, int nchar, int nrates){
 	double stateProbs[4];
-	int nrates=4;
 	
 	vector<InternalState *> *stateVec = new vector<InternalState *>;
 	
@@ -992,292 +877,31 @@ void SampleBranchLengthCurve(double (*func)(TreeNode*, Tree*, double, bool), Tre
 		(*func)(thisnode, thistree, len, true);
 	}
 
-void CalcDerivCLASPartialInternalRateHet(CondLikeArray *destCLA, CondLikeArray *destD1CLA, CondLikeArray *destD2CLA, const CondLikeArray *partialCLA, const CondLikeArray *childCLA,
-	const double *prmat, const double *d1mat, const double *d2mat, int nchar){
+void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, const int nchar, const int nRateCats){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *dest=destCLA->arr;
-	double *destD1=destD1CLA->arr;
-	double *destD2=destD2CLA->arr;
-	double *CL1=childCLA->arr;
-	double *partial=partialCLA->arr;
-	
-#ifdef UNIX
-	madvise(dest, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-	madvise(partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-#endif
-
-//	register double c0, c1, c2, c3;
-/*	for(int i=0;i<nchar;i++){
-		c0=CL1[0];
-		c1=CL1[1];
-		c2=CL1[2];
-		c3=CL1[3];
-		dest[0] = ( prmat[0]*c0+prmat[1]*c1+prmat[2]*c2+prmat[3]*c3) * partial[0];
-		dest[1] = ( prmat[4]*c0+prmat[5]*c1+prmat[6]*c2+prmat[7]*c3) * partial[1];
-		dest[2] = ( prmat[8]*c0+prmat[9]*c1+prmat[10]*c2+prmat[11]*c3) * partial[2];
-		dest[3] = ( prmat[12]*c0+prmat[13]*c1+prmat[14]*c2+prmat[15]*c3) * partial[3];
-
-		destD1[0] = ( d1mat[0]*c0+d1mat[1]*c1+d1mat[2]*c2+d1mat[3]*c3) * partial[0];
-		destD1[1] = ( d1mat[4]*c0+d1mat[5]*c1+d1mat[6]*c2+d1mat[7]*c3) * partial[1];
-		destD1[2] = ( d1mat[8]*c0+d1mat[9]*c1+d1mat[10]*c2+d1mat[11]*c3) * partial[2];
-		destD1[3] = ( d1mat[12]*c0+d1mat[13]*c1+d1mat[14]*c2+d1mat[15]*c3) * partial[3];
-
-		destD2[0] = ( d2mat[0]*c0+d2mat[1]*c1+d2mat[2]*c2+d2mat[3]*c3) * partial[0];
-		destD2[1] = ( d2mat[4]*c0+d2mat[5]*c1+d2mat[6]*c2+d2mat[7]*c3) * partial[1];
-		destD2[2] = ( d2mat[8]*c0+d2mat[9]*c1+d2mat[10]*c2+d2mat[11]*c3) * partial[2];
-		destD2[3] = ( d2mat[12]*c0+d2mat[13]*c1+d2mat[14]*c2+d2mat[15]*c3) * partial[3];
-
-		c0=CL1[4];
-		c1=CL1[5];
-		c2=CL1[6];
-		c3=CL1[7];
-		dest[4] = ( prmat[16]*c0+prmat[17]*c1+prmat[18]*c2+prmat[19]*c3) * partial[4];
-		dest[5] = ( prmat[20]*c0+prmat[21]*c1+prmat[22]*c2+prmat[23]*c3) * partial[5];
-		dest[6] = ( prmat[24]*c0+prmat[25]*c1+prmat[26]*c2+prmat[27]*c3) * partial[6];
-		dest[7] = ( prmat[28]*c0+prmat[29]*c1+prmat[30]*c2+prmat[31]*c3) * partial[7];
-
-		destD1[4] = ( d1mat[16]*c0+d1mat[17]*c1+d1mat[18]*c2+d1mat[19]*c3) * partial[4];
-		destD1[5] = ( d1mat[20]*c0+d1mat[21]*c1+d1mat[22]*c2+d1mat[23]*c3) * partial[5];
-		destD1[6] = ( d1mat[24]*c0+d1mat[25]*c1+d1mat[26]*c2+d1mat[27]*c3) * partial[6];
-		destD1[7] = ( d1mat[28]*c0+d1mat[29]*c1+d1mat[30]*c2+d1mat[31]*c3) * partial[7];
-
-		destD2[4] = ( d2mat[16]*c0+d2mat[17]*c1+d2mat[18]*c2+d2mat[19]*c3) * partial[4];
-		destD2[5] = ( d2mat[20]*c0+d2mat[21]*c1+d2mat[22]*c2+d2mat[23]*c3) * partial[5];
-		destD2[6] = ( d2mat[24]*c0+d2mat[25]*c1+d2mat[26]*c2+d2mat[27]*c3) * partial[6];
-		destD2[7] = ( d2mat[28]*c0+d2mat[29]*c1+d2mat[30]*c2+d2mat[31]*c3) * partial[7];
-
-		c0=CL1[8];
-		c1=CL1[9];
-		c2=CL1[10];
-		c3=CL1[11];
-		dest[8] = ( prmat[32]*c0+prmat[33]*c1+prmat[34]*c2+prmat[35]*c3) * partial[8];
-		dest[9] = ( prmat[36]*c0+prmat[37]*c1+prmat[38]*c2+prmat[39]*c3) * partial[9];
-		dest[10] = ( prmat[40]*c0+prmat[41]*c1+prmat[42]*c2+prmat[43]*c3) * partial[10];
-		dest[11] = ( prmat[44]*c0+prmat[45]*c1+prmat[46]*c2+prmat[47]*c3) * partial[11];
-
-		destD1[8] = ( d1mat[32]*c0+d1mat[33]*c1+d1mat[34]*c2+d1mat[35]*c3) * partial[8];
-		destD1[9] = ( d1mat[36]*c0+d1mat[37]*c1+d1mat[38]*c2+d1mat[39]*c3) * partial[9];
-		destD1[10] = ( d1mat[40]*c0+d1mat[41]*c1+d1mat[42]*c2+d1mat[43]*c3) * partial[10];
-		destD1[11] = ( d1mat[44]*c0+d1mat[45]*c1+d1mat[46]*c2+d1mat[47]*c3) * partial[11];
-
-		destD2[8] = ( d2mat[32]*c0+d2mat[33]*c1+d2mat[34]*c2+d2mat[35]*c3) * partial[8];
-		destD2[9] = ( d2mat[36]*c0+d2mat[37]*c1+d2mat[38]*c2+d2mat[39]*c3) * partial[9];
-		destD2[10] = ( d2mat[40]*c0+d2mat[41]*c1+d2mat[42]*c2+d2mat[43]*c3) * partial[10];
-		destD2[11] = ( d2mat[44]*c0+d2mat[45]*c1+d2mat[46]*c2+d2mat[47]*c3) * partial[11];
-
-		c0=CL1[12];
-		c1=CL1[13];
-		c2=CL1[14];
-		c3=CL1[15];
-		dest[12] = ( prmat[48]*c0+prmat[49]*c1+prmat[50]*c2+prmat[51]*c3) * partial[12];
-		dest[13] = ( prmat[52]*c0+prmat[53]*c1+prmat[54]*c2+prmat[55]*c3) * partial[13];
-		dest[14] = ( prmat[56]*c0+prmat[57]*c1+prmat[58]*c2+prmat[59]*c3) * partial[14];
-		dest[15] = ( prmat[60]*c0+prmat[61]*c1+prmat[62]*c2+prmat[63]*c3) * partial[15];
-
-		destD1[12] = ( d1mat[48]*c0+d1mat[49]*c1+d1mat[50]*c2+d1mat[51]*c3) * partial[12];
-		destD1[13] = ( d1mat[52]*c0+d1mat[53]*c1+d1mat[54]*c2+d1mat[55]*c3) * partial[13];
-		destD1[14] = ( d1mat[56]*c0+d1mat[57]*c1+d1mat[58]*c2+d1mat[59]*c3) * partial[14];
-		destD1[15] = ( d1mat[60]*c0+d1mat[61]*c1+d1mat[62]*c2+d1mat[63]*c3) * partial[15];
-		
-		destD2[12] = ( d2mat[48]*c0+d2mat[49]*c1+d2mat[50]*c2+d2mat[51]*c3) * partial[12];
-		destD2[13] = ( d2mat[52]*c0+d2mat[53]*c1+d2mat[54]*c2+d2mat[55]*c3) * partial[13];
-		destD2[14] = ( d2mat[56]*c0+d2mat[57]*c1+d2mat[58]*c2+d2mat[59]*c3) * partial[14];
-		destD2[15] = ( d2mat[60]*c0+d2mat[61]*c1+d2mat[62]*c2+d2mat[63]*c3) * partial[15];
-		partial+=16;
-		CL1+=16;
-		destD1+=16;
-		destD2+=16;
-		dest+=16;
-		}
-*/
-
-
-	for(int i=0;i<nchar;i++){
-		dest[0] = ( prmat[0]*CL1[0]+prmat[1]*CL1[1]+prmat[2]*CL1[2]+prmat[3]*CL1[3]) * partial[0];
-		dest[1] = ( prmat[4]*CL1[0]+prmat[5]*CL1[1]+prmat[6]*CL1[2]+prmat[7]*CL1[3]) * partial[1];
-		dest[2] = ( prmat[8]*CL1[0]+prmat[9]*CL1[1]+prmat[10]*CL1[2]+prmat[11]*CL1[3]) * partial[2];
-		dest[3] = ( prmat[12]*CL1[0]+prmat[13]*CL1[1]+prmat[14]*CL1[2]+prmat[15]*CL1[3]) * partial[3];
-		
-		dest[4] = ( prmat[16]*CL1[4]+prmat[17]*CL1[5]+prmat[18]*CL1[6]+prmat[19]*CL1[7]) * partial[4];
-		dest[5] = ( prmat[20]*CL1[4]+prmat[21]*CL1[5]+prmat[22]*CL1[6]+prmat[23]*CL1[7]) * partial[5];
-		dest[6] = ( prmat[24]*CL1[4]+prmat[25]*CL1[5]+prmat[26]*CL1[6]+prmat[27]*CL1[7]) * partial[6];
-		dest[7] = ( prmat[28]*CL1[4]+prmat[29]*CL1[5]+prmat[30]*CL1[6]+prmat[31]*CL1[7]) * partial[7];
-
-		dest[8] = ( prmat[32]*CL1[8]+prmat[33]*CL1[9]+prmat[34]*CL1[10]+prmat[35]*CL1[11]) * partial[8];
-		dest[9] = ( prmat[36]*CL1[8]+prmat[37]*CL1[9]+prmat[38]*CL1[10]+prmat[39]*CL1[11]) * partial[9];
-		dest[10] = ( prmat[40]*CL1[8]+prmat[41]*CL1[9]+prmat[42]*CL1[10]+prmat[43]*CL1[11]) * partial[10];
-		dest[11] = ( prmat[44]*CL1[8]+prmat[45]*CL1[9]+prmat[46]*CL1[10]+prmat[47]*CL1[11]) * partial[11];
-
-		dest[12] = ( prmat[48]*CL1[12]+prmat[49]*CL1[13]+prmat[50]*CL1[14]+prmat[51]*CL1[15]) * partial[12];
-		dest[13] = ( prmat[52]*CL1[12]+prmat[53]*CL1[13]+prmat[54]*CL1[14]+prmat[55]*CL1[15]) * partial[13];
-		dest[14] = ( prmat[56]*CL1[12]+prmat[57]*CL1[13]+prmat[58]*CL1[14]+prmat[59]*CL1[15]) * partial[14];
-		dest[15] = ( prmat[60]*CL1[12]+prmat[61]*CL1[13]+prmat[62]*CL1[14]+prmat[63]*CL1[15]) * partial[15];
-			
-		destD1[0] = ( d1mat[0]*CL1[0]+d1mat[1]*CL1[1]+d1mat[2]*CL1[2]+d1mat[3]*CL1[3]) * partial[0];
-		destD1[1] = ( d1mat[4]*CL1[0]+d1mat[5]*CL1[1]+d1mat[6]*CL1[2]+d1mat[7]*CL1[3]) * partial[1];
-		destD1[2] = ( d1mat[8]*CL1[0]+d1mat[9]*CL1[1]+d1mat[10]*CL1[2]+d1mat[11]*CL1[3]) * partial[2];
-		destD1[3] = ( d1mat[12]*CL1[0]+d1mat[13]*CL1[1]+d1mat[14]*CL1[2]+d1mat[15]*CL1[3]) * partial[3];
-
-		destD1[4] = ( d1mat[16]*CL1[4]+d1mat[17]*CL1[5]+d1mat[18]*CL1[6]+d1mat[19]*CL1[7]) * partial[4];
-		destD1[5] = ( d1mat[20]*CL1[4]+d1mat[21]*CL1[5]+d1mat[22]*CL1[6]+d1mat[23]*CL1[7]) * partial[5];
-		destD1[6] = ( d1mat[24]*CL1[4]+d1mat[25]*CL1[5]+d1mat[26]*CL1[6]+d1mat[27]*CL1[7]) * partial[6];
-		destD1[7] = ( d1mat[28]*CL1[4]+d1mat[29]*CL1[5]+d1mat[30]*CL1[6]+d1mat[31]*CL1[7]) * partial[7];
-
-		destD1[8] = ( d1mat[32]*CL1[8]+d1mat[33]*CL1[9]+d1mat[34]*CL1[10]+d1mat[35]*CL1[11]) * partial[8];
-		destD1[9] = ( d1mat[36]*CL1[8]+d1mat[37]*CL1[9]+d1mat[38]*CL1[10]+d1mat[39]*CL1[11]) * partial[9];
-		destD1[10] = ( d1mat[40]*CL1[8]+d1mat[41]*CL1[9]+d1mat[42]*CL1[10]+d1mat[43]*CL1[11]) * partial[10];
-		destD1[11] = ( d1mat[44]*CL1[8]+d1mat[45]*CL1[9]+d1mat[46]*CL1[10]+d1mat[47]*CL1[11]) * partial[11];
-
-		destD1[12] = ( d1mat[48]*CL1[12]+d1mat[49]*CL1[13]+d1mat[50]*CL1[14]+d1mat[51]*CL1[15]) * partial[12];
-		destD1[13] = ( d1mat[52]*CL1[12]+d1mat[53]*CL1[13]+d1mat[54]*CL1[14]+d1mat[55]*CL1[15]) * partial[13];
-		destD1[14] = ( d1mat[56]*CL1[12]+d1mat[57]*CL1[13]+d1mat[58]*CL1[14]+d1mat[59]*CL1[15]) * partial[14];
-		destD1[15] = ( d1mat[60]*CL1[12]+d1mat[61]*CL1[13]+d1mat[62]*CL1[14]+d1mat[63]*CL1[15]) * partial[15];
-
-		destD2[0] = ( d2mat[0]*CL1[0]+d2mat[1]*CL1[1]+d2mat[2]*CL1[2]+d2mat[3]*CL1[3]) * partial[0];
-		destD2[1] = ( d2mat[4]*CL1[0]+d2mat[5]*CL1[1]+d2mat[6]*CL1[2]+d2mat[7]*CL1[3]) * partial[1];
-		destD2[2] = ( d2mat[8]*CL1[0]+d2mat[9]*CL1[1]+d2mat[10]*CL1[2]+d2mat[11]*CL1[3]) * partial[2];
-		destD2[3] = ( d2mat[12]*CL1[0]+d2mat[13]*CL1[1]+d2mat[14]*CL1[2]+d2mat[15]*CL1[3]) * partial[3];
-		
-		destD2[4] = ( d2mat[16]*CL1[4]+d2mat[17]*CL1[5]+d2mat[18]*CL1[6]+d2mat[19]*CL1[7]) * partial[4];
-		destD2[5] = ( d2mat[20]*CL1[4]+d2mat[21]*CL1[5]+d2mat[22]*CL1[6]+d2mat[23]*CL1[7]) * partial[5];
-		destD2[6] = ( d2mat[24]*CL1[4]+d2mat[25]*CL1[5]+d2mat[26]*CL1[6]+d2mat[27]*CL1[7]) * partial[6];
-		destD2[7] = ( d2mat[28]*CL1[4]+d2mat[29]*CL1[5]+d2mat[30]*CL1[6]+d2mat[31]*CL1[7]) * partial[7];
-		
-		destD2[8] = ( d2mat[32]*CL1[8]+d2mat[33]*CL1[9]+d2mat[34]*CL1[10]+d2mat[35]*CL1[11]) * partial[8];
-		destD2[9] = ( d2mat[36]*CL1[8]+d2mat[37]*CL1[9]+d2mat[38]*CL1[10]+d2mat[39]*CL1[11]) * partial[9];
-		destD2[10] = ( d2mat[40]*CL1[8]+d2mat[41]*CL1[9]+d2mat[42]*CL1[10]+d2mat[43]*CL1[11]) * partial[10];
-		destD2[11] = ( d2mat[44]*CL1[8]+d2mat[45]*CL1[9]+d2mat[46]*CL1[10]+d2mat[47]*CL1[11]) * partial[11];
-		
-		destD2[12] = ( d2mat[48]*CL1[12]+d2mat[49]*CL1[13]+d2mat[50]*CL1[14]+d2mat[51]*CL1[15]) * partial[12];
-		destD2[13] = ( d2mat[52]*CL1[12]+d2mat[53]*CL1[13]+d2mat[54]*CL1[14]+d2mat[55]*CL1[15]) * partial[13];
-		destD2[14] = ( d2mat[56]*CL1[12]+d2mat[57]*CL1[13]+d2mat[58]*CL1[14]+d2mat[59]*CL1[15]) * partial[14];
-		destD2[15] = ( d2mat[60]*CL1[12]+d2mat[61]*CL1[13]+d2mat[62]*CL1[14]+d2mat[63]*CL1[15]) * partial[15];
-		partial+=16;
-		CL1+=16;
-		destD1+=16;
-		destD2+=16;
-		dest+=16;
-		}
-	}
-
-
-void CalcDerivCLASPartialTerminalRateHet(CondLikeArray *destCLA, CondLikeArray *destD1CLA, CondLikeArray *destD2CLA, const CondLikeArray *partialCLA,
-	const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, int nchar){
-
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	double *destD1=destD1CLA->arr;
-	double *destD2=destD2CLA->arr;
-	double *partial=partialCLA->arr;
-#ifdef UNIX
-	madvise(dest, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-#endif
-
-	for(int i=0;i<nchar;i++){
-		if(*Ldata > -1){ //no ambiguity
-			for(int i=0;i<4;i++){
-				*(dest++) = prmat[(*Ldata)+16*i] * *(partial);
-				*(destD1++) = d1mat[(*Ldata)+16*i] * *(partial);
-				*(destD2++) = d2mat[(*Ldata)+16*i] * *(partial);
-				partial++;
-				*(dest++) = prmat[(*Ldata+4)+16*i] * *(partial);
-				*(destD1++) = d1mat[(*Ldata+4)+16*i] * *(partial);
-				*(destD2++) = d2mat[(*Ldata+4)+16*i] * *(partial);
-				partial++;
-				*(dest++) = prmat[(*Ldata+8)+16*i] * *(partial);
-				*(destD1++) = d1mat[(*Ldata+8)+16*i] * *(partial);
-				*(destD2++) = d2mat[(*Ldata+8)+16*i] * *(partial);
-				partial++;
-				*(dest++) = prmat[(*Ldata+12)+16*i] * *(partial);
-				*(destD1++) = d1mat[(*Ldata+12)+16*i] * *(partial);
-				*(destD2++) = d2mat[(*Ldata+12)+16*i] * *(partial);
-				partial++;
-				}
-			Ldata++;
-			}
-			
-		else if(*Ldata == -4){ //total ambiguity
-			for(int i=0;i<16;i++){
-				*(dest++) = *(partial++);
-				*(destD1++) = 0.0;
-				*(destD2++) = 0.0;
-				}
-			Ldata++;
-			}
-		else{ //partial ambiguity
-			//first figure in the ambiguous terminal
-			char nstates=-1 * *(Ldata++);
-			for(int q=0;q<16;q++){
-				dest[q]=0;
-				destD1[q]=0;
-				destD2[q]=0;
-				}
-			for(int i=0;i<nstates;i++){
-				for(int i=0;i<4;i++){
-					*(dest+(i*4)) += prmat[(*Ldata)+16*i];
-					*(dest+(i*4)+1) += prmat[(*Ldata+4)+16*i];
-					*(dest+(i*4)+2) += prmat[(*Ldata+8)+16*i];
-					*(dest+(i*4)+3) += prmat[(*Ldata+12)+16*i];
-					
-					*(destD1+(i*4)) += d1mat[(*Ldata)+16*i];
-					*(destD1+(i*4)+1) += d1mat[(*Ldata+4)+16*i];
-					*(destD1+(i*4)+2) += d1mat[(*Ldata+8)+16*i];
-					*(destD1+(i*4)+3) += d1mat[(*Ldata+12)+16*i];
-
-					*(destD2+(i*4)) += d2mat[(*Ldata)+16*i];
-					*(destD2+(i*4)+1) += d2mat[(*Ldata+4)+16*i];
-					*(destD2+(i*4)+2) += d2mat[(*Ldata+8)+16*i];
-					*(destD2+(i*4)+3) += d2mat[(*Ldata+12)+16*i];
-					}
-				Ldata++;
-				}
-			
-			//now add the partial
-			for(int i=0;i<4;i++){
-				*(dest++) *= *(partial);
-				*(destD1++) *= *(partial);
-				*(destD2++) *= *(partial);
-				partial++;
-				*(dest++) *= *(partial);
-				*(destD1++) *= *(partial);
-				*(destD2++) *= *(partial);
-				partial++;
-				*(dest++) *= *(partial);
-				*(destD1++) *= *(partial);
-				*(destD2++) *= *(partial);
-				partial++;
-				*(dest++) *= *(partial);
-				*(destD1++) *= *(partial);
-				*(destD2++) *= *(partial);
-				partial++;			
-				}
-			}
-	
-		}
-	}
-
-void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, int nchar, int nRateCats /*=4*/){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	double *LCL=LCLA->arr;
-	double *RCL=RCLA->arr;
-	
-#ifdef UNIX
-	madvise(dest, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-#endif
-	
+	const double *LCL=LCLA->arr;
+	const double *RCL=RCLA->arr;
 	double L1, L2, L3, L4, R1, R2, R3, R4;
 	
-	//if(0){
-	if(nRateCats==4){
+#ifdef UNIX
+	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise((void *)LCL, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise((void *)RCL, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+#endif
+	
+	if(nRateCats == 4){//the unrolled 4 rate version
+#ifdef OMP_INTINTCLA
+		#pragma omp parallel for private(dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
 		for(int i=0;i<nchar;i++){
+			int index=4*4*i;
+			dest = &(destCLA->arr[index]);
+			LCL = &(LCLA->arr[index]); 
+			RCL= &(RCLA->arr[index]);
+#else
+			for(int i=0;i<nchar;i++){
+#endif
 
 			L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
 			L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
@@ -1293,11 +917,6 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 			dest[1] = L2 * R2;
 			dest[2] = L3 * R3;
 			dest[3] = L4 * R4;
-
-			assert(dest[0] < 1e50);
-			assert(dest[1] < 1e50);
-			assert(dest[2] < 1e50);
-			assert(dest[3] < 1e50);
 
 			dest+=4;
 			LCL+=4;
@@ -1318,11 +937,6 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 			dest[2] = L3 * R3;
 			dest[3] = L4 * R4;
 
-			assert(dest[0] < 1e50);
-			assert(dest[1] < 1e50);
-			assert(dest[2] < 1e50);
-			assert(dest[3] < 1e50);
-
 			dest+=4;
 			LCL+=4;
 			RCL+=4;		
@@ -1341,11 +955,6 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 			dest[1] = L2 * R2;
 			dest[2] = L3 * R3;
 			dest[3] = L4 * R4;
-
-			assert(dest[0] < 1e50);
-			assert(dest[1] < 1e50);
-			assert(dest[2] < 1e50);
-			assert(dest[3] < 1e50);
 
 			dest+=4;
 			LCL+=4;
@@ -1366,20 +975,26 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 			dest[2] = L3 * R3;
 			dest[3] = L4 * R4;
 
-			assert(dest[0] < 1e50);
-			assert(dest[1] < 1e50);
-			assert(dest[2] < 1e50);
-			assert(dest[3] < 1e50);
-
 			dest+=4;
 			LCL+=4;
 			RCL+=4;
 			}
 		}
 	
-	else{
-		for(int i=0;i<nchar;i++){
-			for(int r=0;r<nRateCats;r++){
+	else{//the general N rate version
+		int r;
+#ifdef OMP_INTINTCLA
+		int index;
+		#pragma omp parallel for private(r, index, dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
+		for(int i=0;i<nchar;i++) {
+			index=4*nRateCats*i;
+			dest = &(destCLA->arr[index]);
+			LCL = &(LCLA->arr[index]); 
+			RCL= &(RCLA->arr[index]);
+#else			
+		for(int i=0;i<nchar;i++) {
+#endif
+			for(r=0;r<nRateCats;r++){
 				L1=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
 				L2=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
 				L3=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
@@ -1389,27 +1004,23 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 				R2=(Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
 				R3=(Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);			
 				R4=(Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
-				
+					
 				dest[0] = L1 * R1;
 				dest[1] = L2 * R2;
 				dest[2] = L3 * R3;
 				dest[3] = L4 * R4;
-
-				assert(dest[0] < 1e50);
-				assert(dest[1] < 1e50);
-				assert(dest[2] < 1e50);
-				assert(dest[3] < 1e50);
-
+#ifndef OMP_INTINTCLA
 				dest+=4;
 				LCL+=4;
 				RCL+=4;
+#endif
 				}
 			}
 		}
 
+	const int *left_mult=LCLA->underflow_mult;
+	const int *right_mult=RCLA->underflow_mult;
 	int *undermult=destCLA->underflow_mult;
-	int *left_mult=LCLA->underflow_mult;
-	int *right_mult=RCLA->underflow_mult;
 	
 	for(int i=0;i<nchar;i++){
 		undermult[i] = left_mult[i] + right_mult[i];
@@ -1417,47 +1028,13 @@ void CalcFullCLAInternalInternalRateHet(CondLikeArray *destCLA, const CondLikeAr
 	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
 	}
 
-
-void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, int nchar){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	double *LCL=LCLA->arr;
-	double *RCL=RCLA->arr;
-	
-#ifdef UNIX
-	madvise(dest, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-#endif
-	for(int i=0;i<nchar;i++){
-		dest[0] = ( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]) * (Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-		dest[1] = ( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]) * (Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-		dest[2] = ( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]) * (Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);
-		dest[3] = ( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]) * (Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-
-		dest+=4;
-		LCL+=4;
-		RCL+=4;		
-		}
-
-	int *undermult=destCLA->underflow_mult;
-	int *left_mult=LCLA->underflow_mult;
-	int *right_mult=RCLA->underflow_mult;
-	
-	for(int i=0;i<nchar;i++){
-		undermult[i] = left_mult[i] + right_mult[i];
-		}
-	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
-	}
-
-void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, char *Ldata, char *Rdata, int nchar, int nRateCats /*=4*/){
+void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	double *dest=destCLA->arr;
 	
 #ifdef UNIX
-	madvise(dest, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
 #endif
 
 	for(int i=0;i<nchar;i++){
@@ -1467,7 +1044,6 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 				*(dest++) = Lpr[(*Ldata+4)+16*r] * Rpr[(*Rdata+4)+16*r];
 				*(dest++) = Lpr[(*Ldata+8)+16*r] * Rpr[(*Rdata+8)+16*r];
 				*(dest++) = Lpr[(*Ldata+12)+16*r] * Rpr[(*Rdata+12)+16*r];
-//				assert(*(dest-1)>0.0);
 				}
 			Ldata++;
 			Rdata++;
@@ -1581,126 +1157,30 @@ void CalcFullCLATerminalTerminalRateHet(CondLikeArray *destCLA, const double *Lp
 		destCLA->rescaleRank=2;
 	}
 
-void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, char *Ldata, char *Rdata, int nchar){
+void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *dat2, const int nchar, const int nRateCats, const unsigned *ambigMap /*=NULL*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	
-#ifdef UNIX
-	madvise(dest, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-#endif
+	double *des=destCLA->arr;
+	double *dest=des;
+	const double *CL=LCLA->arr;
+	const double *CL1=CL;
+	const char *data2=dat2;
 
-	for(int i=0;i<nchar;i++){
-		if(*Ldata > -1 && *Rdata > -1){
-			*(dest++) = Lpr[(*Ldata)] * Rpr[(*Rdata)];
-			*(dest++) = Lpr[(*Ldata+4)] * Rpr[(*Rdata+4)];
-			*(dest++) = Lpr[(*Ldata+8)] * Rpr[(*Rdata+8)];
-			*(dest++) = Lpr[(*Ldata+12)] * Rpr[(*Rdata+12)];
-			Ldata++;
-			Rdata++;
-			}
-			
-		else if((*Ldata == -4 && *Rdata == -4) || (*Ldata == -4 && *Rdata > -1) || (*Rdata == -4 && *Ldata > -1)){//total ambiguity of left, right or both
-			
-			if(*Ldata == -4 && *Rdata == -4) //total ambiguity of both
-				for(int i=0;i<4;i++) *(dest++) = 1.0;
-			
-			else if(*Ldata == -4){//total ambiguity of left
-				*(dest++) = Rpr[(*Rdata)];
-				*(dest++) = Rpr[(*Rdata+4)];
-				*(dest++) = Rpr[(*Rdata+8)];
-				*(dest++) = Rpr[(*Rdata+12)];
-				}
-			else{//total ambiguity of right
-				*(dest++) = Lpr[(*Ldata)];
-				*(dest++) = Lpr[(*Ldata+4)];
-				*(dest++) = Lpr[(*Ldata+8)];
-				*(dest++) = Lpr[(*Ldata+12)];
-				}
-			Ldata++;
-			Rdata++;
-			}	
-		else {//partial ambiguity of left, right or both
-			if(*Ldata>-1){//unambiguous left
-				*(dest) = Lpr[(*Ldata)];
-				*(dest+1) = Lpr[(*Ldata+4)];
-				*(dest+2) = Lpr[(*Ldata+8)];
-				*(dest+3) = Lpr[(*Ldata+12)];
-				Ldata++;
-				}
-			else{
-				if(*Ldata==-4){//fully ambiguous left
-					for(int i=0;i<4;i++){
-						*(dest+i)=1.0;
-						}
-					Ldata++;
-					}
-			 
-				else{//partially ambiguous left
-					int nstates=-*(Ldata++);
-					for(int q=0;q<4;q++) dest[q]=0;
-					for(int i=0;i<nstates;i++){
-						*(dest) += Lpr[(*Ldata)];
-						*(dest+1) += Lpr[(*Ldata+4)];
-						*(dest+2) += Lpr[(*Ldata+8)];
-						*(dest+3) += Lpr[(*Ldata+12)];
-						Ldata++;
-						}
-					}
-				}
-			if(*Rdata>-1){//unambiguous right
-				*(dest++) *= Rpr[(*Rdata)];
-				*(dest++) *= Rpr[(*Rdata+4)];
-				*(dest++) *= Rpr[(*Rdata+8)];
-				*(dest++) *= Rpr[(*Rdata+12)];
-				Rdata++;		
-				}
-			else if(*Rdata != -4){//partially ambiguous right
-				char nstates=-1 * *(Rdata++);
-				//create a temporary cla to hold the results from the ambiguity of the right, 
-				//which need to be +'s 
-				double tempcla[4];
-				for(int q=0;q<4;q++) tempcla[q]=0;
-				for(int i=0;i<nstates;i++){
-					tempcla[0]   += Rpr[(*Rdata)];
-					tempcla[1] += Rpr[(*Rdata+4)];
-					tempcla[2] += Rpr[(*Rdata+8)];
-					tempcla[3] += Rpr[(*Rdata+12)];
-					Rdata++;
-					}
-				//Now multiply the temporary results against the already calced left
-				*(dest++) *= tempcla[0];
-				*(dest++) *= tempcla[1];
-				*(dest++) *= tempcla[2];
-				*(dest++) *= tempcla[3];
-
-				}
-			else{//fully ambiguous right
-				dest+=4;
-				Rdata++;
-				}
-			}
-			}
-	
-		for(int site=0;site<nchar;site++){
-			destCLA->underflow_mult[site]=0;
-			}
-		destCLA->rescaleRank=2;
-	}
-
-void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar, int nRateCats /*=4*/){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	double *CL1=LCLA->arr;
-	
 #ifdef UNIX	
-	madvise(dest, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*16*sizeof(double), MADV_SEQUENTIAL);	
+	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);	
 #endif
 
-	if(nRateCats ==4){
+	if(nRateCats==4){//unrolled 4 rate version
+#ifdef OMP_INTTERMCLA
+		#pragma omp parallel for private(dest, CL1, data2)
 		for(int i=0;i<nchar;i++){
+			dest=&des[4*4*i];
+			CL1=&CL[4*4*i];
+			data2=&dat2[ambigMap[i]];
+#else
+		for(int i=0;i<nchar;i++){
+#endif
 			if(*data2 > -1){ //no ambiguity
 				dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * pr2[(*data2)];
 				dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * pr2[(*data2+4)];
@@ -1721,9 +1201,10 @@ void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeAr
 				dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * pr2[(*data2+4)+48];
 				dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * pr2[(*data2+8)+48];
 				dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * pr2[(*data2+12)+48];
-	//			assert(*(dest)>0.0);
+#ifndef OMP_INTTERMCLA
 				dest+=16;
 				data2++;
+#endif
 				}
 			else if(*data2 == -4){//total ambiguity
 				dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
@@ -1745,21 +1226,21 @@ void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeAr
 				dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
 				dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
 				dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-	//			assert(*(dest)>0.0);
+#ifndef OMP_INTTERMCLA
 				dest+=16;
 				data2++;
+#endif
 				}
 			else {//partial ambiguity
 				//first figure in the ambiguous terminal
-				char nstates=-1 * *(data2++);
-				for(int q=0;q<16;q++) dest[q]=0;
-				for(int i=0;i<nstates;i++){
+				int nstates=-1 * *(data2++);
+				for(int j=0;j<16;j++) dest[j]=0.0;
+				for(int s=0;s<nstates;s++){
 					for(int r=0;r<4;r++){
 						*(dest+(r*4)) += pr2[(*data2)+16*r];
 						*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
 						*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
 						*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
-	//					assert(*(dest)>0.0);
 						}
 					data2++;
 					}
@@ -1784,14 +1265,22 @@ void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeAr
 				*(dest++) *= ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
 				*(dest++) *= ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
 				*(dest++) *= ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-	//			assert(*(dest-1)>0.0);
 				}
-				
+#ifndef OMP_INTTERMCLA		
 			CL1+=16;
+#endif
 			}
 		}
-	else{
+	else{//general N rate version
+#ifdef OMP_INTTERMCLA
+		#pragma omp parallel for private(dest, CL1, data2)
 		for(int i=0;i<nchar;i++){
+			dest=&des[4*nRateCats*i];
+			CL1=&CL[4*nRateCats*i];
+			data2=&dat2[ambigMap[i]];
+#else
+		for(int i=0;i<nchar;i++){
+#endif
 			if(*data2 > -1){ //no ambiguity
 				for(int r=0;r<nRateCats;r++){
 					dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * pr2[(*data2)+16*r];
@@ -1814,15 +1303,14 @@ void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeAr
 				}
 			else {//partial ambiguity
 				//first figure in the ambiguous terminal
-				char nstates=-1 * *(data2++);
+				int nstates=-1 * *(data2++);
 				for(int q=0;q<4*nRateCats;q++) dest[q]=0;
-				for(int i=0;i<nstates;i++){
-					for(int i=0;i<nRateCats;i++){
-						*(dest+(i*4)) += pr2[(*data2)+16*i];
-						*(dest+(i*4)+1) += pr2[(*data2+4)+16*i];
-						*(dest+(i*4)+2) += pr2[(*data2+8)+16*i];
-						*(dest+(i*4)+3) += pr2[(*data2+12)+16*i];
-	//					assert(*(dest)>0.0);
+				for(int s=0;s<nstates;s++){
+					for(int r=0;r<nRateCats;r++){
+						*(dest+(r*4)) += pr2[(*data2)+16*r];
+						*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
+						*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
+						*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
 						}
 					data2++;
 					}
@@ -1835,68 +1323,16 @@ void CalcFullCLAInternalTerminalRateHet(CondLikeArray *destCLA, const CondLikeAr
 					*(dest++) *= ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
 					}
 				}
+#ifndef OMP_INTTERMCLA	
 			CL1 += 4*nRateCats;
-			}
-		}
-		
-	for(int i=0;i<nchar;i++)
-		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
-	
-	destCLA->rescaleRank=LCLA->rescaleRank+2; 
-		
-	} 
-
-void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	double *CL1=LCLA->arr;
-	
-#ifdef UNIX	
-	madvise(dest, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*sizeof(double), MADV_SEQUENTIAL);	
 #endif
-
-	for(int i=0;i<nchar;i++){
-		if(*data2 > -1){ //no ambiguity
-			*(dest++) = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * pr2[(*data2)];
-			*(dest++) = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * pr2[(*data2+4)];
-			*(dest++) = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * pr2[(*data2+8)];
-			*(dest++) = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * pr2[(*data2+12)];
-			data2++;
 			}
-		else if(*data2 == -4){//total ambiguity
-			*(dest++) = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-			*(dest++) = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-			*(dest++) = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-			*(dest++) = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
-			data2++;
-			}
-		else {//partial ambiguity
-			//first figure in the ambiguous terminal
-			char nstates=-1 * *(data2++);
-			for(int q=0;q<4;q++) dest[q]=0;
-			for(int i=0;i<nstates;i++){
-				*(dest) += pr2[(*data2)];
-				*(dest+1) += pr2[(*data2+4)];
-				*(dest+2) += pr2[(*data2+8)];
-				*(dest+3) += pr2[(*data2+12)];
-				data2++;
-				}
-			
-			//now add the internal child
-			*(dest++) *= ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-			*(dest++) *= ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-			*(dest++) *= ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-			*(dest++) *= ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
-			}
-		CL1+=4;
 		}
+		
 	for(int i=0;i<nchar;i++)
 		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
 	
-	destCLA->rescaleRank=LCLA->rescaleRank+2; 
-		
+	destCLA->rescaleRank=LCLA->rescaleRank+2;
 	} 
 
 void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats /*=4*/){
@@ -1907,12 +1343,11 @@ void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArr
 	double *partial=partialCLA->arr;
 	
 #ifdef UNIX
-	madvise(dest, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-	madvise(partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise(partial, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
 #endif
 
-	//if(0){
 	if(nRateCats==4){
 		for(int i=0;i<nchar;i++){
 			*(dest++) = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * *(partial++);
@@ -1935,7 +1370,7 @@ void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArr
 			*(dest++) = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * *(partial++);
 			*(dest++) = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * *(partial++);
 			CL1+=16;
-	//		assert(*(dest-1)>0.0);
+			assert(*(dest-1)>0.0);
 			}
 		}
 	else{
@@ -1946,33 +1381,11 @@ void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArr
 				*(dest++) = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * *(partial++);
 				*(dest++) = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * *(partial++);
 				CL1+=4;
-		//		assert(*(dest-1)>0.0);
+				assert(*(dest-1)>0.0);
 				}
 			}
 		}
 		
-	for(int site=0;site<nchar;site++){
-		destCLA->underflow_mult[site]=partialCLA->underflow_mult[site] + LCLA->underflow_mult[site];
-		}
-	}
-
-void CalcFullCLAPartialInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar){
-	double *dest=destCLA->arr;
-	double *CL1=LCLA->arr;
-	double *partial=partialCLA->arr;
-	
-#ifdef UNIX
-	madvise(dest, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-	madvise(partial, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-#endif
-	for(int i=0;i<nchar;i++){
-		*(dest++) = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * *(partial++);
-		*(dest++) = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * *(partial++);
-		*(dest++) = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * *(partial++);
-		*(dest++) = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * *(partial++);
-		CL1+=4;
-		}
 	for(int site=0;site<nchar;site++){
 		destCLA->underflow_mult[site]=partialCLA->underflow_mult[site] + LCLA->underflow_mult[site];
 		}
@@ -1984,8 +1397,8 @@ void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArr
 	double *dest=destCLA->arr;
 	double *partial=partialCLA->arr;
 #ifdef UNIX
-	madvise(dest, nchar*16*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)partial, nchar*16*sizeof(double), MADV_SEQUENTIAL);
+	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise((void*)partial, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
 #endif
 
 	for(int i=0;i<nchar;i++){
@@ -2027,56 +1440,7 @@ void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArr
 				*(dest++) *= *(partial++);
 				}
 			}
-	
 		}
 	for(int i=0;i<nchar;i++)
 		destCLA->underflow_mult[i]=partialCLA->underflow_mult[i];
-	}
-
-void CalcFullCLAPartialTerminal(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	double *partial=partialCLA->arr;
-#ifdef UNIX
-	madvise(dest, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)partial, nchar*4*sizeof(double), MADV_SEQUENTIAL);
-#endif
-
-	for(int i=0;i<nchar;i++){
-		if(*Ldata > -1){ //no ambiguity
-			*(dest++) = Lpr[(*Ldata)] * *(partial++);
-			*(dest++) = Lpr[(*Ldata+4)] * *(partial++);
-			*(dest++) = Lpr[(*Ldata+8)] * *(partial++);
-			*(dest++) = Lpr[(*Ldata+12)] * *(partial++);
-			Ldata++;
-	}
-			
-		else if(*Ldata == -4){ //total ambiguity
-			for(int i=0;i<4;i++) *(dest++) = *(partial++);
-			Ldata++;
-			}
-		else{ //partial ambiguity
-			//first figure in the ambiguous terminal
-			char nstates=-1 * *(Ldata++);
-			for(int q=0;q<4;q++) dest[q]=0;
-			for(int i=0;i<nstates;i++){
-				*(dest) += Lpr[(*Ldata)];
-				*(dest+1) += Lpr[(*Ldata+4)];
-				*(dest+2) += Lpr[(*Ldata+8)];
-				*(dest+3) += Lpr[(*Ldata+12)];
-				Ldata++;
-				}
-			
-			//now add the partial
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			*(dest++) *= *(partial++);
-			
-			}
-	
-		}
-	for(int i=0;i<nchar;i++)
-		destCLA->underflow_mult[i]=partialCLA->underflow_mult[i];
-	}
+}
