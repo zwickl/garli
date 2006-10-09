@@ -1,5 +1,5 @@
-// GARLI version 0.93 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -7,13 +7,12 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
+
 
 #ifndef ADAPTION_H
 #define ADAPTION_H
@@ -27,15 +26,47 @@ using namespace std;
 
 class Adaptation{
 	public:
-	int intervalLength;
+	//here are all of the scalars:
+	//4 ints, 1 bool, 23 doubles
+	int intervalLength; 
 	int intervalsToStore;
 	double lastgenscore;
 	double laststepscore;
 
 	double improveOverStoredIntervals;
-	double *improvetotal;
 	
 	bool reset;
+
+	double startOptPrecision;
+	double branchOptPrecision;
+	double minOptPrecision;
+	double precReductionFactor;
+	int numPrecReductions;
+	
+	double topoWeight;
+	double modWeight;
+	double brlenWeight;
+	
+	double randNNIweight;
+	double origRandNNIweight;
+	double randSPRweight;
+	double limSPRweight;
+	
+	double recTopImproveSize;
+	double exNNIprob;
+	double exlimSPRprob;
+
+	double topoMutateProb;
+	double randNNIprob;
+	double randSPRprob;
+	double limSPRprob;
+	
+	double modelMutateProb;
+
+	int limSPRrange;
+
+	//the arrays. All will be of length intervalsToStore
+	double *improvetotal;
 
 	double *randNNI;
 	int *randNNInum;
@@ -52,15 +83,6 @@ class Adaptation{
 	double *exlimSPR;
 	int *exlimSPRnum;
 
-#ifdef GANESH
-	double *randPECR;
-	int *randPECRnum;
-#endif 
-
-
-	double *taxonSwap;
-	int *taxonSwapnum;
-	
 	double *randRecom;
 	int *randRecomnum;
 	
@@ -73,53 +95,15 @@ class Adaptation{
 	double *anyModel;
 	int *anyModelnum;
 	
+#ifdef MPI_VERSION
 	double *fromRemoteSubtree;
 	double *fromRemoteNonSubtree;
-	
-	double *slopes;
-	
-	double startOptPrecision;
-	double branchOptPrecision;
-	double minOptPrecision;
-	double precReductionFactor;
-	int numPrecReductions;
-	
-	double topoWeight;
-	double modWeight;
-	double brlenWeight;
-	
-	double randNNIweight;
-	double origRandNNIweight;
-	double randSPRweight;
-	double limSPRweight;
-#ifdef GANESH
-	double randPECRweight; 
-#endif
-	
-	double recTopImproveSize;
-	double exNNIprob;
-	double exlimSPRprob;
-
-	double topoMutateProb;
-	double randNNIprob;
-	double randSPRprob;
-#ifdef GANESH
-	double randPECRprob;
-#endif
-	double limSPRprob;
-	double taxonSwapprob;
-	
-	double modelMutateProb;
-
-	int limSPRrange;
-
-#ifdef MPI_VERSION
 	int *bestFromRemoteNum;
 	double *bestFromRemote;
 #endif
 
 	Adaptation(const GeneralGamlConfig *gc);
-
+	~Adaptation();
 	public:
 	void PrepareForNextInterval();
 	void UpdateProbs();
@@ -127,14 +111,18 @@ class Adaptation{
 	void BeginProbLog(ofstream &plot);
 	bool ReducePrecision(){
 		if(branchOptPrecision==minOptPrecision) return false;
-		if(topoMutateProb > .1 || topoWeight==0.0){
-			branchOptPrecision*=precReductionFactor;
+		if(topoMutateProb > .01 || topoWeight==0.0){
+			//changing this to a linear reduction in prec.  Geometric was too fast
+			//branchOptPrecision*=precReductionFactor;
+			branchOptPrecision -= precReductionFactor;
 			if(branchOptPrecision < minOptPrecision) branchOptPrecision=minOptPrecision;
 			return true;
 			}
 		else return false;
 		}
-
+	void WriteToCheckpoint(ofstream &out);
+	void ReadFromCheckpoint(ifstream &in);
+	
 };
 
 #endif

@@ -1,7 +1,7 @@
 
 
-// GARLI version 0.94 source code
-// Copyright  2005 by Derrick J. Zwickl
+// GARLI version 0.95b6 source code
+// Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -9,13 +9,12 @@
 // Please contact:
 //
 //  Derrick Zwickl
-//	Integrative Biology, UT
-//	1 University Station, C0930
-//	Austin, TX  78712
-//  email: zwickl@mail.utexas.edu
+//	National Evolutionary Synthesis Center
+//	2024 W. Main Street, Suite A200
+//	Durham, NC 27705
+//  email: zwickl@nescent.org
 //
-//	Note: In 2006  moving to NESCENT (The National
-//	Evolutionary Synthesis Center) for a postdoc
+
 
 #include <iostream>
 #include <fstream>
@@ -23,6 +22,7 @@
 
 using namespace std;
 
+#include "defs.h"
 #include "adaptation.h"
 #include "math.h"
 #include "configoptions.h"
@@ -37,8 +37,9 @@ Adaptation::Adaptation(const GeneralGamlConfig *gc){
 	minOptPrecision = gc->minOptPrec;
 
 	numPrecReductions=gc->numPrecReductions;
-	if(gc->numPrecReductions > 0)
-		precReductionFactor = pow((minOptPrecision/startOptPrecision), 1.0/numPrecReductions);
+	if(gc->numPrecReductions > 0)//changing prec reduction to linear rather than geometric
+		//precReductionFactor = pow((minOptPrecision/startOptPrecision), 1.0/numPrecReductions);
+		precReductionFactor = (startOptPrecision - minOptPrecision)/double(numPrecReductions);
 	else
 		precReductionFactor = gc->precReductionFactor;
 
@@ -75,7 +76,6 @@ Adaptation::Adaptation(const GeneralGamlConfig *gc){
 
 	exNNIprob = 0.0;
 	exlimSPRprob = 0.0;
-	taxonSwapprob=0.0;
 
 	lastgenscore = 0.0;
 	laststepscore=0.0;
@@ -116,8 +116,104 @@ Adaptation::Adaptation(const GeneralGamlConfig *gc){
 #ifdef MPI_VERSION
 	bestFromRemote[i]=0.0;	bestFromRemoteNum[i]=0;
 #endif
+
 	}
 }
+
+Adaptation::~Adaptation(){
+	delete []randNNI; delete []randNNInum;
+	delete []exNNI; delete []exNNInum;
+	delete []randSPR; delete []randSPRnum ;
+#ifdef GANESH
+	delete []randPECR ; delete []randPECRnum ;
+#endif
+	delete []limSPR ; delete []limSPRnum ;
+	delete []exlimSPR ; delete []exlimSPRnum ;
+	delete []randRecom ;	 delete []randRecomnum ;
+	delete []bipartRecom ;	 delete []bipartRecomnum ;
+	delete []onlyBrlen ; delete []onlyBrlennum ;
+	delete []improvetotal ;
+	delete []anyModel ; delete []anyModelnum ;
+	}
+
+void Adaptation::WriteToCheckpoint(ofstream &out){
+	//this function assumes that it has been passed a stream that is already open for 
+	//binary writing
+	assert(out.good());
+
+	//first take care of the scalars, which all come first in the class
+	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(double)*23;
+	out.write((char *) this, scalarSize);
+
+	//now the arrays, which should be of length intervalsToStore
+	out.write((char *) improvetotal, sizeof(double)*intervalsToStore);
+
+	out.write((char *) randNNI, sizeof(double)*intervalsToStore);
+	out.write((char *) randNNInum, sizeof(int)*intervalsToStore);
+	
+	out.write((char *) exNNI, sizeof(double)*intervalsToStore);
+	out.write((char *) exNNInum, sizeof(int)*intervalsToStore);
+
+	out.write((char *) randSPR, sizeof(double)*intervalsToStore);
+	out.write((char *) randSPRnum, sizeof(int)*intervalsToStore);
+	
+	out.write((char *) limSPR, sizeof(double)*intervalsToStore);
+	out.write((char *) limSPRnum, sizeof(int)*intervalsToStore);
+
+	out.write((char *) exlimSPR, sizeof(double)*intervalsToStore);
+	out.write((char *) exlimSPRnum, sizeof(int)*intervalsToStore);
+
+	out.write((char *) randRecom, sizeof(double)*intervalsToStore);
+	out.write((char *) randRecomnum, sizeof(int)*intervalsToStore);
+	
+	out.write((char *) bipartRecom, sizeof(double)*intervalsToStore);
+	out.write((char *) bipartRecomnum, sizeof(int)*intervalsToStore);
+
+	out.write((char *) onlyBrlen, sizeof(double)*intervalsToStore);
+	out.write((char *) onlyBrlennum, sizeof(int)*intervalsToStore);
+
+	out.write((char *) anyModel, sizeof(double)*intervalsToStore);
+	out.write((char *) anyModelnum, sizeof(int)*intervalsToStore);
+	}
+
+void Adaptation::ReadFromCheckpoint(ifstream &in){
+	//this function assumes that it has been passed a stream that is already open for 
+	//binary reading
+	assert(in.good());
+	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(double)*23;
+
+	in.read((char *) this, scalarSize);
+
+	//now the arrays, which should be of length intervalsToStore
+	in.read((char *) improvetotal, sizeof(double)*intervalsToStore);
+
+	in.read((char *) randNNI, sizeof(double)*intervalsToStore);
+	in.read((char *) randNNInum, sizeof(int)*intervalsToStore);
+	
+	in.read((char *) exNNI, sizeof(double)*intervalsToStore);
+	in.read((char *) exNNInum, sizeof(int)*intervalsToStore);
+
+	in.read((char *) randSPR, sizeof(double)*intervalsToStore);
+	in.read((char *) randSPRnum, sizeof(int)*intervalsToStore);
+	
+	in.read((char *) limSPR, sizeof(double)*intervalsToStore);
+	in.read((char *) limSPRnum, sizeof(int)*intervalsToStore);
+
+	in.read((char *) exlimSPR, sizeof(double)*intervalsToStore);
+	in.read((char *) exlimSPRnum, sizeof(int)*intervalsToStore);
+
+	in.read((char *) randRecom, sizeof(double)*intervalsToStore);
+	in.read((char *) randRecomnum, sizeof(int)*intervalsToStore);
+	
+	in.read((char *) bipartRecom, sizeof(double)*intervalsToStore);
+	in.read((char *) bipartRecomnum, sizeof(int)*intervalsToStore);
+
+	in.read((char *) onlyBrlen, sizeof(double)*intervalsToStore);
+	in.read((char *) onlyBrlennum, sizeof(int)*intervalsToStore);
+
+	in.read((char *) anyModel, sizeof(double)*intervalsToStore);
+	in.read((char *) anyModelnum, sizeof(int)*intervalsToStore);
+	}
 
 void Adaptation::PrepareForNextInterval(){
  //if we're on the first generation of a new recording period, shift everything over
@@ -245,7 +341,7 @@ void Adaptation::UpdateProbs(){
 	if(totNumBipartRecom > 0) perBipartRecom=(totBipartRecom/totNumBipartRecom);
 	else perBipartRecom=0.0;
 	
-	//version 0.94 - The reduction of precision that used to appear here has been
+	//version 0.95b3 - The reduction of precision that used to appear here has been
 	//moved to Adaptation::ReducePrecision, which is called from Run, MasterMaster and
 	//RemoteSubtreeWorker when lastTopoImprove is > that #int * intLength generations ago
 	
