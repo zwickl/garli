@@ -183,6 +183,13 @@ char **argv=NULL;
 			else{
 				if(conf.restart == true) throw(ErrorException("Restarting of bootstrap runs is not supported.\nYou should simply start a new bootstrap run and\ncombine all trees obtained into one bootstrap sample."));
 				if(conf.inferInternalStateProbs == true) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
+				pop.OutputModelReport();
+				//if there are not mutable params in the model, remove any weight assigned to the model
+				if(pop.indiv[0].mod->NumMutatableParams() == 0) {
+					outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
+					pop.adap->modelMutateProb=0.0;
+					pop.adap->UpdateProbs();
+					}
 				pop.Bootstrap();
 				}
 			}catch(ErrorException err){

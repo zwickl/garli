@@ -452,13 +452,6 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 		indiv[i].parent=i;
 		newindiv[i].parent=i;	
 		}
-
-	//if there are not mutable params in the model, remove any weight assigned to the model
-	if(indiv[0].mod->NumMutatableParams() == 0) {
-		outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
-		adap->modelMutateProb=0.0;
-		adap->UpdateProbs();
-		}
 }
 
 void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
@@ -531,14 +524,21 @@ void Population::SeedPopulationWithStartingTree(){
 		else if(modSpec.nst > 1 && modSpec.gotRmatFromFile == false) throw(ErrorException("If model mutation weight is set to zero, relative rate matrix must be\n specified in a starting file!"));
 		}
 
-
 	indiv[0].treeStruct->root->CheckforPolytomies();
 	indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->mod=indiv[0].mod;
 	indiv[0].SetDirty();
 	indiv[0].CalcFitness(0);
 
-	OutputModelReport();
+	if(bootstrapReps == 0){
+		OutputModelReport();
+		//if there are not mutable params in the model, remove any weight assigned to the model
+		if(indiv[0].mod->NumMutatableParams() == 0) {
+			outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
+			adap->modelMutateProb=0.0;
+			adap->UpdateProbs();
+			}
+		}
 
 	outman.precision(10);
 	outman.UserMessage("Initial ln Likelihood: %.4f", indiv[0].Fitness());
@@ -583,8 +583,8 @@ void Population::OutputModelReport(){
 	if(modSpec.numRateCats == 1){
 		if(modSpec.includeInvariantSites == false) outman.UserMessage("\t\tno rate heterogeneity");
 		else{
-			if(modSpec.fixInvariantSites == true) outman.UserMessage("\t\tonly an invariant (invariable) site category,\t\tproportion specified by user (fixed)");
-			else outman.UserMessage("\t\tonly an invariant (invariable) site category,\t\tproportion estimated");
+			if(modSpec.fixInvariantSites == true) outman.UserMessage("\t\tonly an invariant (invariable) site category,\n\t\tproportion specified by user (fixed)");
+			else outman.UserMessage("\t\tonly an invariant (invariable) site category,\n\t\tproportion estimated");
 			}
 		}
 	else{
@@ -597,7 +597,7 @@ void Population::OutputModelReport(){
 		else{
 			outman.UserMessage("FLEX rate categories, rate and proportion of each estimated");
 			if(modSpec.includeInvariantSites == true){
-				if(modSpec.fixInvariantSites == true) outman.UserMessage("\t\twithan invariant (invariable) site category,\t\tproportion specified by user (fixed)");				
+				if(modSpec.fixInvariantSites == true) outman.UserMessage("\t\twith an invariant (invariable) site category,\n\t\tproportion specified by user (fixed)");				
 				else outman.UserMessage("\t\twith an invariant (invariable) site category, proportion estimated");
 				}
 			}
@@ -830,7 +830,7 @@ void Population::Run(){
 		indiv[bestIndiv].treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
 		}
 		
-	outman.UserMessage("finished");
+	if(bootstrapReps==0) outman.UserMessage("finished");
 		
 //	log << calcCount << " cla calcs, " << optCalcs << " branch like calls\n";
 	}
@@ -888,7 +888,7 @@ void Population::Bootstrap(){
 		if(prematureTermination == false){
 			adap->branchOptPrecision = adap->startOptPrecision;
 			AppendTreeToBootstrapLog(rep);
-			outman.UserMessage("finished with bootstrap rep %d", rep);
+			outman.UserMessage("finished with bootstrap rep %d\n", rep);
 			}
 		else {
 			outman.UserMessage("abandoning bootstrap rep %d ....terminating", rep);
