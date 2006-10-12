@@ -724,7 +724,7 @@ void Population::Run(){
 			if(bootstrapReps==0) WriteTreeFile( besttreefile );
 			outman.UserMessage("\t%-10d%-15.4f%-10.3f%-10d", gen, indiv[bestIndiv].Fitness(), adap->branchOptPrecision, lastTopoImprove);
 			
-			if(conf->uniqueSwapBias > 0.0)
+			if(outputMostlyUselessFiles)
 				swapLog << gen << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique() << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetTotal() << endl;
 			}
 		if(askQuitNow == 1){
@@ -3533,6 +3533,13 @@ void Population::InitializeOutputStreams(){
 		probLog.open(temp_buf);
 		if(!probLog.good()) throw ErrorException("problem opening problog");
 		adap->BeginProbLog(probLog);
+
+		//initialize the swaplog
+		if(conf->uniqueSwapBias != 1.0){
+			sprintf(temp_buf, "%s%s.swap.log", conf->ofprefix.c_str(), restart);
+			swapLog.open(temp_buf);
+			swapLog << "gen\tuniqueSwaps\ttotalSwaps\n";
+			}
 		}
 
 	//initialize the log file
@@ -3567,13 +3574,6 @@ void Population::InitializeOutputStreams(){
 
 		data->BeginNexusTreesBlock(bootLog);
 		}	
-
-	//initialize the swaplog
-	if(conf->uniqueSwapBias != 1.0){
-		sprintf(temp_buf, "%s%s.swap.log", conf->ofprefix.c_str(), restart);
-		swapLog.open(temp_buf);
-		swapLog << "gen\tuniqueSwaps\ttotalSwaps\n";
-		}
 
 	ClearDebugLogs();
 	
