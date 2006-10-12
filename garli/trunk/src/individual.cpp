@@ -311,6 +311,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				double r[5];
 				for(int i=0;i<5;i++){
 					stf >> temp;
+					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading rate matrix parameters in file %s!\nExamine file and check manual for format.\n", fname));
 					r[i]=atof(temp);
 					}
 				mod->SetRmat(r);
@@ -325,6 +326,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				double b[3];
 				for(int i=0;i<3;i++){
 					stf >> temp;
+					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading base frequency parameters in file %s!\nExamine file and check manual for format.\n", fname));
 					b[i]=atof(temp);
 					}
 				mod->SetPis(b);
@@ -338,12 +340,14 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 			else if(c == 'A' || c == 'a'){//alpha shape
 				if(modSpec.flexRates==true) throw(ErrorException("Config file specifies ratehetmodel = flex, but starting model contains alpha!\n"));
 				stf >> temp;
+				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading alpha parameter in file %s!\nExamine file and check manual for format.\n", fname));
 				mod->SetAlpha(atof(temp));
 				c=stf.get();
 				modSpec.gotAlphaFromFile=true;
 				}				
 			else if(c == 'P' || c == 'p'){//proportion invariant
 				stf >> temp;
+				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading proportion of invariant sites parameter in file %s!\nExamine file and check manual for format.\n", fname));
 				double p=atof(temp);
 				mod->SetPinv(p);
 				c=stf.get();
@@ -369,7 +373,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				c=stf.get();
 				assert(0);
 				}
-			else if(isalpha(c)) throw ErrorException("Unknown model parameter specification! \"%c\"", c);
+			else if(isalpha(c)) throw(ErrorException("Unknown model parameter specification in file %s!\nExamine file and check manual for format.\n", fname));
 			else if(c != '(') c=stf.get();
 			}while(c != '(' && c != '\r' && c != '\n' && !stf.eof());
 
