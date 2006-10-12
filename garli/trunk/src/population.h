@@ -295,6 +295,7 @@ public:
 	//termination related variables
 	bool enforceTermConditions;
 	int lastTopoImprove;
+	int lastPrecisionReduction;
 	int lastTopoImproveThresh;
 	double improveOverStoredIntervalsThresh;
 	double significantTopoChange;//the score difference from the current best required for 
@@ -369,6 +370,7 @@ private:
 			//bestSinceRestart.SetFitness(-1e100);
 			
 			lastTopoImprove = 0;
+			lastPrecisionReduction = 0;
 			lastTopoImproveThresh = 1000;
 			improveOverStoredIntervalsThresh = 0.1;
 			}

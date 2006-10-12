@@ -657,7 +657,7 @@ void Population::ReadStateFiles(){
 void Population::WritePopulationCheckpoint(ofstream &out){
 	//we'll just have a single line for each indiv, with the 
 	//model followed by the parenthetical tree
-	out << rnd.seed() << "\t" << gen << "\t" << stopwatch.SplitTime() << "\t" << lastTopoImprove << "\n";
+	out << rnd.seed() << "\t" << gen << "\t" << stopwatch.SplitTime() << "\t" << lastTopoImprove << "\t" << lastPrecisionReduction << "\n";
 
 	for(int i=0;i<total_size;i++){
 		indiv[i].mod->OutputGarliFormattedModel(out);
@@ -680,6 +680,7 @@ void Population::ReadPopulationCheckpoint(){
 	pin >> tmp;
 	stopwatch.AddPreviousTime(tmp);
 	pin >> lastTopoImprove;
+	pin >> lastPrecisionReduction;
 	pin.close();
 
 	for(int i=0;i<total_size;i++){
@@ -706,8 +707,8 @@ void Population::Run(){
 	avgfit = CalcAverageFitness();
 
 	outman.precision(6);
-	outman.UserMessage("\t%-10s%-15s%-10s%-10s", "gen", "current lnL", "precision", "lastChange");
-	outman.UserMessage("\t%-10d%-15.4f%-10.3f%-10d", gen, indiv[bestIndiv].Fitness(), adap->branchOptPrecision, lastTopoImprove);
+	outman.UserMessage("\t%-10s%-15s%-10s%-10s", "gen", "current_lnL", "precision", "last_tree_improvement");
+	outman.UserMessage("\t%-10d%-15.4f%-10.3f\t%-10d", gen, indiv[bestIndiv].Fitness(), adap->branchOptPrecision, lastTopoImprove);
 	OutputLog();
 	if(outputMostlyUselessFiles) OutputFate();	
 
@@ -722,7 +723,7 @@ void Population::Run(){
 		if(!(gen % conf->logevery)) OutputLog();
 		if(!(gen % conf->saveevery)){
 			if(bootstrapReps==0) WriteTreeFile( besttreefile );
-			outman.UserMessage("\t%-10d%-15.4f%-10.3f%-10d", gen, indiv[bestIndiv].Fitness(), adap->branchOptPrecision, lastTopoImprove);
+			outman.UserMessage("\t%-10d%-15.4f%-10.3f\t%-10d", gen, indiv[bestIndiv].Fitness(), adap->branchOptPrecision, lastTopoImprove);
 			
 			if(outputMostlyUselessFiles)
 				swapLog << gen << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique() << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetTotal() << endl;
@@ -768,12 +769,12 @@ void Population::Run(){
 
 			outman.precision(10);
 			bool reduced=false;
-			if(gen-lastTopoImprove >= adap->intervalsToStore*adap->intervalLength){
+			if(gen-(max(lastTopoImprove, lastPrecisionReduction)) >= adap->intervalsToStore*adap->intervalLength){
 				reduced=adap->ReducePrecision();
 				}
 			if(reduced){
 //				REDUCED = true;
-				lastTopoImprove=gen;
+				lastPrecisionReduction=gen;
 				double before=bestFitness;
 				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
 				indiv[bestIndiv].SetDirty();
