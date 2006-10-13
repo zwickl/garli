@@ -440,7 +440,8 @@ void Individual::RefineStartingConditions(bool optModel, double branchPrec){
 		SetDirty();
 		CalcFitness(0);
 		double trueImprove= Fitness() - passStart;
-		assert(trueImprove >= -0.1);
+		assert(trueImprove >= -1.0);
+//		if(trueImprove < 0.0) trueImprove = 0.0;
 		scaleImprove=treeStruct->OptimizeTreeScale(branchPrec);
 		SetDirty();
 		if(optModel==true && mod->NRateCats() > 1 && modSpec.fixAlpha == false && modSpec.gotFlexFromFile == false){
