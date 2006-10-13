@@ -792,12 +792,14 @@ if(nd->nodeNum == 60){
 				double proposed;
 				if(knownMin == DEF_MIN_BRLEN){
 					if(nd->dlen <= 1.0e-4) proposed = DEF_MIN_BRLEN;
-					else proposed = 1.0e-4;
+					else if(nd->dlen <= 0.05) proposed = 1.0e-4;
+					else proposed = nd->dlen * 0.1;
 					}
 				else proposed = (knownMin + nd->dlen) * 0.5;
 
-				if(proposed != 1.0e-4){//don't let this bail out based on the estimated change if we are jumping to 1e-4
-					//because we are just trying to get to a point where we can actually trust the derivs
+				if(proposed != 1.0e-4 && proposed != nd->dlen * 0.1){//don't let this bail out based on the estimated
+					//change if we are jumping to an arbitrary point, because we are just trying to get to a point
+					//where we can actually trust the derivs
 					double estImp = ((proposed - nd->dlen)*d1);//this is not a good estimate, but is something
 					if(estImp < precision1){
 						#ifdef OPT_DEBUG
