@@ -913,7 +913,7 @@ if(nd->nodeNum == 60){
 #else
 					else if(negProposalNum==1 && nd->dlen > 1e-4 && v_prev != 1e-4){
 						//try a somewhat smaller length before going all the way to the min
-						if(nd->dlen < .25) v = nd->dlen * .1;
+						if(nd->dlen < .05 ) v = nd->dlen * .1;
 						else v = nd->dlen * .25;
 						double delta=v - nd->dlen;
 						totalEstImprove += (delta * d1 + (delta*delta*d2*.5));
