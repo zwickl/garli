@@ -793,11 +793,13 @@ if(nd->nodeNum == 60){
 				if(knownMin == DEF_MIN_BRLEN){
 					if(nd->dlen <= 1.0e-4) proposed = DEF_MIN_BRLEN;
 					else if(nd->dlen <= 0.05) proposed = 1.0e-4;
-					else proposed = nd->dlen * 0.1;
+					else if(nd->dlen <= 0.25) proposed = nd->dlen * 0.1;
+					else proposed = nd->dlen * 0.25;
 					}
 				else proposed = (knownMin + nd->dlen) * 0.5;
 
-				if(proposed != 1.0e-4 && proposed != nd->dlen * 0.1){//don't let this bail out based on the estimated
+				//if(proposed != 1.0e-4 && proposed != nd->dlen * 0.1){//don't let this bail out based on the estimated
+				if(iter > 1 || proposed == DEF_MIN_BRLEN){//don't let this bail out based on the estimated
 					//change if we are jumping to an arbitrary point, because we are just trying to get to a point
 					//where we can actually trust the derivs
 					double estImp = ((proposed - nd->dlen)*d1);//this is not a good estimate, but is something
@@ -911,7 +913,8 @@ if(nd->nodeNum == 60){
 #else
 					else if(negProposalNum==1 && nd->dlen > 1e-4 && v_prev != 1e-4){
 						//try a somewhat smaller length before going all the way to the min
-						v = nd->dlen * .1;
+						if(nd->dlen < .25) v = nd->dlen * .1;
+						else v = nd->dlen * .25;
 						double delta=v - nd->dlen;
 						totalEstImprove += (delta * d1 + (delta*delta*d2*.5));
 //						totalEstImprove += precision1;
