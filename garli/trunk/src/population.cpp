@@ -879,7 +879,7 @@ void Population::Bootstrap(){
 	CatchInterrupt();
 
 	for(int rep=1;rep<=bootstrapReps;rep++){
-		gen=0;
+		lastTopoImprove = lastPrecisionReduction = gen = 0;
 		outman.UserMessage("bootstrap replicate %d (seed %d)", rep, rnd.seed());
 		data->BootstrapReweight();
 		
