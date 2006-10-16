@@ -1,19 +1,30 @@
-#CC       = icpc
-CC	  = g++
-#CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -DUNIX -DGCC295 -DNDEBUG -include defs.h #this must be used for gcc version 2.95!!!
-CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h #for other gcc versions
-#CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -include defs.h #for icc
-#CC_FLAGS = -g -DUNIX 				#for debugging
-EXEC     = Garli.95b6
+#uncomment one of the following CC lines and one of the CC_FLAGS lines depending on your situation
+
+#CC       = icpc #intel compiler (icc)
+CC	  = g++  #gnu compiler   (gcc)
+
+#gcc: must be used if you are using  gcc version 2.95!!!
+#CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -DUNIX -DGCC295 -DNDEBUG -include defs.h
+
+#gcc: OSX universal binary (may only compile on intel machines)
+#CC_FLAGS = -O3 -fstrict-aliasing -arch i386 -arch ppc -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h
+
+#gcc: linux or OSX binary that will work on the machine type that it is compiled on
+CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h
+
+#icc: any machine type
+#CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -include defs.h
+
+EXEC     = Garli0.95
 
 OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		population.o rng.o set.o\
 		stricl.o topologylist.o translatetable.o tree.o treenode.o\
 		funcs.o	configreader.o configoptions.o\
-		bipartition.o model.o linalg.o adaptation.o subset.o mlhky.o\
+		bipartition.o model.o linalg.o adaptation.o mlhky.o\
 		optimization.o
 
-Garli.95b6: $(OBJECT_LIST) garlimain.o
+Garli0.95: $(OBJECT_LIST) garlimain.o
 	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) garlimain.o
 
 garlimain.o:	mlhky.h tree.h population.h \
@@ -43,5 +54,4 @@ rng.o:           rng.h
 stricl.o:        stricl.h defs.h
 topologylist.o:  topologylist.h
 adaptation.o:	 	 adaptation.h hashdefines.h
-subset.o:		 subset.h
 mlhky.o:		 mlhky.h
