@@ -69,6 +69,7 @@ inline GAMLfloat CallBranchLike(TreeNode *thisnode, Tree *thistree, GAMLfloat bl
 #ifdef OPT_DEBUG
 	if(brak) optInfo.BrakAdd(blen, like);
 	else optInfo.BrentAdd(blen, like);
+
 #endif
 
 	return like;
@@ -325,7 +326,10 @@ double Tree::OptimizeBranchLength(double optPrecision, TreeNode *nd, bool goodGu
 #ifdef BRENT
 	improve = BrentOptimizeBranchLength(optPrecision, nd, goodGuess);
 #else
-	improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, goodGuess);
+	//improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, goodGuess);
+	//abandoning use of goodGuess.  Doesn't seem to be reducing opt passes, which
+	//was the point.
+	improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, true);
 #endif
 
 #ifdef OPT_DEBUG
@@ -637,8 +641,44 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 	SetBranchLength(nd, initialLen);	
 	} 
 
- double Tree::NewtonRaphsonOptimizeBranchLength(double precision1, TreeNode *nd, bool goodGuess){
+#ifdef OPT_DEBUG
+double Tree::NewtonRaphsonOptimizeBranchLength(double precision1, TreeNode *nd, bool goodGuess){
+	double origLen =  nd->dlen;
+	Score();
+	double origScore = lnL;
 
+	double estNRImprove = NewtonRaphsonSpoof(precision1, nd, goodGuess);
+
+	double nrLen = nd->dlen;
+	Score();
+	double nrScore = lnL;
+
+
+	SetBranchLength(nd, origLen);
+	double estBestImprove = NewtonRaphsonSpoof(0.0001, nd, goodGuess);
+
+	double bestLen = nd->dlen;
+	Score();
+	double bestScore = lnL;
+	
+	double trueNRImprove = nrScore - origScore;
+	double trueBestImprove = bestScore - origScore;
+
+	SetBranchLength(nd, nrLen);
+
+	ofstream spoof("optspoof.log", ios::app);
+	spoof << nd->nodeNum << "\t" << origLen << "\t" << origScore << "\t" << goodGuess << "\n";
+	spoof << "\t" << nrLen << "\t" << nrScore << "\t" << estNRImprove << "\t" << trueNRImprove << "\n";
+	spoof << "\t" << bestLen << "\t" << bestScore << "\t" << estBestImprove << "\t" << trueBestImprove << "\n";
+	spoof.close();
+
+	return estNRImprove;
+}
+
+double Tree::NewtonRaphsonSpoof(double precision1, TreeNode *nd, bool goodGuess){
+#else
+ double Tree::NewtonRaphsonOptimizeBranchLength(double precision1, TreeNode *nd, bool goodGuess){
+#endif
 	if(goodGuess==false && (nd->dlen < 0.0001 || nd->dlen > .1)){
 		SetBranchLength(nd, .001);
 		}
@@ -764,10 +804,10 @@ if(nd->nodeNum == 60){
 				}
 			}while(scoreOK==false);		
 		
-		double d1=derivs.first; //* 4.0 * pow(nd->dlen, 0.75);
-		double d2=derivs.second;// * 3.0 * pow(nd->dlen, -0.25);
+		double d1=derivs.first;
+		double d2=derivs.second;
 		double estDeltaNR=-d1/d2;
-		//estimated change in score by a Taylor series (always an underestimate)
+		//estimated change in score by a Taylor series
 		double estScoreDelta = d1*estDeltaNR + (d2 * estDeltaNR * estDeltaNR * 0.5);
 
 		if(d1 <= 0.0 && nd->dlen < knownMax) knownMax = nd->dlen;
@@ -782,27 +822,21 @@ if(nd->nodeNum == 60){
 														#ifdef OPT_DEBUG			
 														opt << "d2 > 0\t";				
 														#endif
-			//if d1 is negative, try either the min length or halfway to the knownMin
-			if(d1 <= 0.0){
 
-#ifdef OLDWAY
-				if(knownMin == DEF_MIN_BRLEN){
-#else
-//				if(knownMin == DEF_MIN_BRLEN && nd->dlen <= 1e-4){
+			if(d1 <= 0.0){//if d1 is negative, try shortening arbitrarily, or go halfway to the knownMin
 				double proposed;
 				if(knownMin == DEF_MIN_BRLEN){
 					if(nd->dlen <= 1.0e-4) proposed = DEF_MIN_BRLEN;
-					else if(nd->dlen <= 0.05) proposed = 1.0e-4;
-					else if(nd->dlen <= 0.25) proposed = nd->dlen * 0.1;
+					else if(nd->dlen <= 0.005) proposed = 1.0e-4;
+					else if(nd->dlen <= 0.05) proposed = nd->dlen * 0.1;
 					else proposed = nd->dlen * 0.25;
 					}
 				else proposed = (knownMin + nd->dlen) * 0.5;
 
-				//if(proposed != 1.0e-4 && proposed != nd->dlen * 0.1){//don't let this bail out based on the estimated
-				if(iter > 1 || proposed == DEF_MIN_BRLEN){//don't let this bail out based on the estimated
+				if(iter > 0 || proposed == DEF_MIN_BRLEN){//don't let this bail out on the first iteration based on the estimated
 					//change if we are jumping to an arbitrary point, because we are just trying to get to a point
 					//where we can actually trust the derivs
-					double estImp = ((proposed - nd->dlen)*d1);//this is not a good estimate, but is something
+					double estImp = d1*(proposed - nd->dlen) + (d2 * (proposed - nd->dlen) * (proposed - nd->dlen) * 0.5);
 					if(estImp < precision1){
 						#ifdef OPT_DEBUG
 						opt << "imp to proposed " << proposed << " < prec, return\n";
@@ -813,39 +847,24 @@ if(nd->nodeNum == 60){
 				v=proposed;
 				totalEstImprove += precision1;
 				}
-#endif
-/*					double estImp = ((DEF_MIN_BRLEN - nd->dlen)*d1);//this is not a good estimate, but is something
-					if(estImp < precision1){
-						#ifdef OPT_DEBUG
-						opt << "imp to min < prec, return\n";
-						#endif
- 						return totalEstImprove;
-						}
-					v=DEF_MIN_BRLEN;
-					totalEstImprove += precision1;
+
+			else{//d1 > 0.0, try increasing the blen by 10 or 2 if knownMax==DEF_MAX_BRLEN, otherwise try a step half-way to the knownMax
+				double proposed;
+				if(knownMax == DEF_MAX_BRLEN){
+					if(nd->dlen < 0.1) proposed = nd->dlen * 10.0;
+					else proposed = nd->dlen * 2.0;
 					}
-				else{
-					double proposed = (knownMin + nd->dlen) * 0.5;
-					double estImp = ((proposed - nd->dlen) * d1);//this is not a good estimate, but is something
+				else proposed = (knownMax + nd->dlen) * 0.5;
+				if(iter > 0){//don't let this bail out on the first iteration based on the estimated
+					//change if we are jumping to an arbitrary point, because we are just trying to get to a point
+					//where we can actually trust the derivs
+					double estImp = d1*(proposed - nd->dlen) + (d2 * (proposed - nd->dlen) * (proposed - nd->dlen) * 0.5);
 					if(estImp < precision1){
 						#ifdef OPT_DEBUG
-						opt << "imp to 1/2 way to knownMin < prec, return\n";
+						opt << "imp to prop < prec, return\n";
 						#endif
 						return totalEstImprove;
 						}
-					v=proposed;
-					totalEstImprove += precision1;
-					}
-				}
-*/			else{//d1 > 0.0
-				//try a step half-way to the knownMax
-				double proposed = (knownMax + nd->dlen) * 0.5;
-				double estImp = ((proposed - nd->dlen) * d1);//this is not a good estimate, but is something
-				if(estImp < precision1){
-					#ifdef OPT_DEBUG
-					opt << "imp to prop < prec, return\n";
-					#endif
-					return totalEstImprove;
 					}
 				v=proposed;
 				totalEstImprove += precision1;				
@@ -874,7 +893,6 @@ if(nd->nodeNum == 60){
 														opt << "d1 increased!\t";	
 														#endif
 				}
-			//if (v < DEF_MIN_BRLEN){
 			if (v < knownMin){
 				negProposalNum++;
 				if(knownMin == DEF_MIN_BRLEN){
@@ -887,39 +905,16 @@ if(nd->nodeNum == 60){
 													#endif
 						return totalEstImprove;
 						}
-#ifdef OLDWAY
-					else if(v < -1.0){
-						//if the proposed blen is this negative, just try the min brlen
-						v=DEF_MIN_BRLEN;
-//						totalEstImprove += precision1;
-						totalEstImprove += scoreDeltaToMin;
-													#ifdef OPT_DEBUG
-													Score(nd->anc->nodeNum);		
-													opt << nd->dlen << "\t" << lnL << "\n";			
-													#endif
-						}
+
 					else if(negProposalNum==1 && nd->dlen > 1e-4 && v_prev != 1e-4){
 						//try a somewhat smaller length before going all the way to the min
-						v = nd->dlen * .1;
-						double delta=v - nd->dlen;
-						totalEstImprove += (delta * d1 + (delta*delta*d2*.5));
-//						totalEstImprove += precision1;
-						}
-					else{
-						v = DEF_MIN_BRLEN;
-						totalEstImprove += scoreDeltaToMin;
-//						totalEstImprove += precision1;
-						}
-#else
-					else if(negProposalNum==1 && nd->dlen > 1e-4 && v_prev != 1e-4){
-						//try a somewhat smaller length before going all the way to the min
-						if(nd->dlen < .05 ) v = nd->dlen * .1;
+						if(nd->dlen < .005 ) v = 1e-4;
+						else if(nd->dlen < 0.05) v = nd->dlen * .1;
 						else v = nd->dlen * .25;
 						double delta=v - nd->dlen;
 						totalEstImprove += (delta * d1 + (delta*delta*d2*.5));
-//						totalEstImprove += precision1;
 						}
-					else if(v < -1.0){
+/*					else if(v < -1.0){
 						//if the proposed blen is this negative, just try the min brlen
 						v=DEF_MIN_BRLEN;
 //						totalEstImprove += precision1;
@@ -929,13 +924,10 @@ if(nd->nodeNum == 60){
 													opt << nd->dlen << "\t" << lnL << "\n";			
 													#endif
 						}
-					else{
+*/					else{
 						v = DEF_MIN_BRLEN;
 						totalEstImprove += scoreDeltaToMin;
-//						totalEstImprove += precision1;
 						}
-
-#endif
 					}
 				else{//knownMin is > absolute min, so we must already have a better guess
 					//go half way to that guess
@@ -952,7 +944,7 @@ if(nd->nodeNum == 60){
 					totalEstImprove += scoreDeltaToMin;				
 					}
 				}
-			//else if (v > DEF_MAX_BRLEN){
+			
 			else if (v > knownMax){
 				if(knownMax == DEF_MAX_BRLEN){
 					double deltaToMax=DEF_MAX_BRLEN - nd->dlen;
