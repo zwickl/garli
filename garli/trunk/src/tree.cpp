@@ -1131,6 +1131,7 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, double optPrecision, int subtr
 
 	broken->SubstituteNodeWithRespectToAnc(connector);
 	connector->AddDes(broken);
+	assert(connector->right == broken);
 
 	if(broken->dlen*.5 > DEF_MIN_BRLEN){
 		connector->dlen=broken->dlen*.5;
@@ -2673,7 +2674,7 @@ void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, double optPreci
 
 	//these are the only blens that need to be dealt with specially
 	double fusedBlen = oldroot->left->dlen + oldroot->right->dlen;
-	double dividedBlen = 0.5 * newroot->dlen;
+	double dividedBlen = max(0.5 * newroot->dlen, DEF_MIN_BRLEN);
 
 	//first detatch the subtree and make it free floating.  This will
 	//leave oroot in its place and fuse two branches in the subtree
@@ -2742,7 +2743,6 @@ void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, double optPreci
 		if(nroot->reconDist > 1) OptimizeBranchesWithinRadius(oldroot, optPrecision, 0, prunePoint);
 		else OptimizeBranchesWithinRadius(oldroot, optPrecision, 0, NULL);
 		}
-	//NEED TO FIGURE OUT THE PRUNE POINT EQUIVALENT HERE!
 	}
 
 void Tree::SwapNodeDataForReroot(TreeNode *nroot){

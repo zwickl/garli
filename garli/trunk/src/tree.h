@@ -159,6 +159,9 @@ class Tree{
 		//functions to optimize blens and params
 		pair<double, double> CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2);
 		double NewtonRaphsonOptimizeBranchLength(double precision1, TreeNode *nd, bool goodGuess);
+#ifdef OPT_DEBUG
+		double NewtonRaphsonSpoof(double precision1, TreeNode *nd, bool goodGuess);
+#endif
 		void GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const double *prmat, const double *d1mat, const double *d2mat, const char *Ldata, double &d1Tot, double &d2Tot, const unsigned *ambigMap =NULL);
 		void GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const double *prmat, const double *d1mat, const double *d2mat, double &d1, double &d2);
 		double OptimizeBranchLength(double optPrecision, TreeNode *nd, bool goodGuess);
