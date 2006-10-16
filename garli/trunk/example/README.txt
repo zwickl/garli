@@ -1,13 +1,17 @@
-The Rana dataset is from Hillis and Wilcox. 2005. Phylogeny of the New World true frogs (Rana). Mol Phylogenet Evol. 34(2):299-314. 	
-The 2 best trees for this dataset under the GTR+I+G model have log likelihood scores of -21812.66941 and -21812.64132.  See if you can find them...  
+Garli version 0.95 - October 2006
 
 Compilation help:
 -to make the serial version type "make s" (or simply "make")
--to make the parallel version type "make p"
 -If using gcc version 2.95, be sure to change which CC_FLAGS line you use in the Makefile.  The optimization in that version breaks the code.
 -icc tends to make faster executables that gcc on intel hardware, so choose a compiler accordingly
 -There have been reports of problems (crashes) when using gcc version 4.0 with the GARLI code, but I have not verified them.
 -I may be able to provide compilation help if you've exhausted all other resources.
+
+SAMPLE DATASET:
+-The Rana dataset is from Hillis and Wilcox. 2005. Phylogeny of the New World true frogs (Rana). Mol Phylogenet Evol. 34(2):299-314. 	
+-The 2 best trees for this dataset under the GTR+I+G model have log likelihood scores of -21812.66941 and -21812.64132. See if you can find them...  
+-A sample starting tree is contained in ranastart.tre
+-A sample constraint tree is contained in ranaconstraint.tre
 
 Disclaimers:
 This software is copyright Derrick Joel Zwickl, 2006.
