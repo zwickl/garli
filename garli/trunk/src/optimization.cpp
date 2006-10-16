@@ -822,6 +822,12 @@ if(nd->nodeNum == 60){
 														#ifdef OPT_DEBUG			
 														opt << "d2 > 0\t";				
 														#endif
+			if(fabs(d1) < 1.0){//don't bother doing anything if the surface is this flat
+														#ifdef OPT_DEBUG			
+														opt << "very small d1.  Return.\n";				
+														#endif				
+				return totalEstImprove;
+				}
 
 			if(d1 <= 0.0){//if d1 is negative, try shortening arbitrarily, or go halfway to the knownMin
 				double proposed;
@@ -852,7 +858,7 @@ if(nd->nodeNum == 60){
 				double proposed;
 				if(knownMax == DEF_MAX_BRLEN){
 					if(nd->dlen < 0.1) proposed = nd->dlen * 10.0;
-					else proposed = nd->dlen * 2.0;
+					else proposed = min(nd->dlen * 2.0, DEF_MAX_BRLEN);
 					}
 				else proposed = (knownMax + nd->dlen) * 0.5;
 				if(iter > 0){//don't let this bail out on the first iteration based on the estimated
@@ -914,17 +920,7 @@ if(nd->nodeNum == 60){
 						double delta=v - nd->dlen;
 						totalEstImprove += (delta * d1 + (delta*delta*d2*.5));
 						}
-/*					else if(v < -1.0){
-						//if the proposed blen is this negative, just try the min brlen
-						v=DEF_MIN_BRLEN;
-//						totalEstImprove += precision1;
-						totalEstImprove += scoreDeltaToMin;
-													#ifdef OPT_DEBUG
-													Score(nd->anc->nodeNum);		
-													opt << nd->dlen << "\t" << lnL << "\n";			
-													#endif
-						}
-*/					else{
+					else{
 						v = DEF_MIN_BRLEN;
 						totalEstImprove += scoreDeltaToMin;
 						}
