@@ -791,7 +791,7 @@ void Population::Run(){
 */			
 			//termination conditions
 			if(enforceTermConditions == true
-				&& (gen-lastTopoImprove > lastTopoImproveThresh || adap->topoMutateProb == 0.0) 
+				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > lastTopoImproveThresh || adap->topoMutateProb == 0.0) 
 				&& adap->improveOverStoredIntervals < improveOverStoredIntervalsThresh
 				&& adap->branchOptPrecision == adap->minOptPrecision){
 				if(adap->topoMutateProb > 0.0) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
