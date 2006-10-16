@@ -138,7 +138,7 @@ class Tree{
 		void RecombineWith( Tree *t, bool sameModel , double optPrecision );
 
 		//functions for dealing with constraints and bipartitions
-		void LoadConstraints(ifstream &con);
+		void LoadConstraints(ifstream &con, int nTaxa);
 		bool AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *broken, Bipartition &proposed) const;
 		bool AllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
 		bool AllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);

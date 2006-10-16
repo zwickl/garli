@@ -484,7 +484,10 @@ void Population::GetConstraints(){
 		if(con.good() == false) throw ErrorException("Could not open constraint file %s!", conf->constraintfile.c_str());
 		if(con.good()){
 			outman.UserMessage("Loading constraints from file %s", conf->constraintfile.c_str());
-			indiv[0].treeStruct->LoadConstraints(con);
+			//this temporary tree is just a very hacky way to get at the tree statics in LoadConstraints
+			//DO NOT use a tree from the population, since they haven't been alocated yet
+			Tree temp;
+			temp.LoadConstraints(con, data->NTax());
 			}
 		}
 	}

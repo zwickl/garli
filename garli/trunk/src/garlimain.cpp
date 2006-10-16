@@ -150,7 +150,7 @@ char **argv=NULL;
 			else sprintf(temp_buf, "ERROR.log");
 			outman.SetLogFile(temp_buf);
 			
-			outman.UserMessage("Running serial GARLI, version 0.95 BETA6 (Oct 2006)\nFlex Rates, Constrained searches, Swap Tracking and biasing,\nFlexible model specification, checkpointing and\nopenMP multithreading test version\n");
+			outman.UserMessage("Running serial GARLI, version 0.95 (Oct 2006)\n");
 			outman.UserMessage("Reading config file %s", conf_name);
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 

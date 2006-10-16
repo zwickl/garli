@@ -1150,7 +1150,7 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, double optPrecision, int subtr
 }
 
 
-void Tree::LoadConstraints(ifstream &con){
+void Tree::LoadConstraints(ifstream &con, int nTaxa){
 	string temp;//=new char[numTipsTotal + 100];
 	Constraint constr;
 	int conNum=0;
@@ -1167,7 +1167,7 @@ void Tree::LoadConstraints(ifstream &con){
 		if(temp[0] != '\0'){
 			if(temp[0] != '+' && temp[0] != '-') throw ErrorException("constraint string must start with \'+\' (positive constraint) or \'-\' (negative constraint)");
 			if(temp[1] == '.' || temp[1] == '*'){//if individual biparts are specified in *. format
-				if(len != numTipsTotal+1) throw ErrorException("constraint # %d does not have the correct number of characters!\n(has %d) constraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format", conNum, len);
+				if(len != nTaxa+1) throw ErrorException("constraint # %d does not have the correct number of characters!\n(has %d) constraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format", conNum, len);
 				constr.ReadDotStarConstraint(temp.c_str());
 				constraints.push_back(constr);
 				conNum++;
