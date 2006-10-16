@@ -863,6 +863,13 @@ void Population::FinalOptimization(){
 		outman.UserMessage("\tpass %d %.4f", pass++, indiv[bestIndiv].Fitness());
 		}while(incr > .00001 || pass < 10);
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
+	unsigned totalSecs = stopwatch.SplitTime();
+	unsigned secs = totalSecs % 60;
+	totalSecs -= secs;
+	unsigned min = (totalSecs % 3600)/60;
+	totalSecs -= min * 60;
+	unsigned hours = totalSecs / 3600;
+	outman.UserMessage("Time used = %d hours, %d minutes and %d seconds", hours, min, secs);
 	log << "Score after final optimization: " << indiv[bestIndiv].Fitness() << endl;
 	if(bootstrapReps == 0){
 		WriteTreeFile( besttreefile );
