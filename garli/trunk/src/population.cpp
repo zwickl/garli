@@ -32,6 +32,11 @@
 #include <windows.h>
 #endif
 
+#ifdef MAC_FRONTEND
+#import <Foundation/Foundation.h>
+#import "MFEInterfaceClient.h"
+#endif
+
 using namespace std;
 
 #include <signal.h>
@@ -545,6 +550,11 @@ void Population::SeedPopulationWithStartingTree(){
 
 	outman.precision(10);
 	outman.UserMessage("Initial ln Likelihood: %.4f", indiv[0].Fitness());
+#ifdef MAC_FRONTEND
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+	[[MFEInterfaceClient sharedClient] didBeginInitializingSearch];
+	[pool release];
+#endif		
 	
 	indiv[0].treeStruct->CalcBipartitions();	
 	
@@ -706,6 +716,11 @@ void Population::Run(){
 		outman.UserMessage("Restarting Genetic Algorithm from checkpoint");
 		outman.UserMessage("generation %d, seed %d, best lnL %.3f", gen, rnd.init_seed(), indiv[bestIndiv].Fitness());
 		}
+#ifdef MAC_FRONTEND
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+	[[MFEInterfaceClient sharedClient] didBeginRun];
+	[pool release];
+#endif	
 	
 	avgfit = CalcAverageFitness();
 
@@ -737,7 +752,14 @@ void Population::Run(){
 			c = AskUser("Perform final branch-length optimization and terminate now? (y/n)");
 #else
 			outman.UserMessage("Perform final branch-length optimization and terminate now? (y/n)");
+	#ifdef MAC_FRONTEND
+			NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+			BOOL shouldQuit = [[MFEInterfaceClient sharedClient] programShouldTerminate];
+			c = shouldQuit ? 'y' : 'n';
+			[pool release];
+	#else
 			c = getchar();
+	#endif
 #endif
 			if(c=='y'){
 				prematureTermination=true;
@@ -751,8 +773,10 @@ void Population::Run(){
 				askQuitNow = 0;
 				CatchInterrupt();
 				outman.UserMessage("continuing ...");
+#ifndef MAC_FRONTEND
 #ifndef WIN32
 				cin.get();
+#endif
 #endif
 				}
 			}
@@ -857,6 +881,11 @@ void Population::FinalOptimization(){
 		}
 	
 	outman.UserMessage("Performing final branch optimization...");
+#ifdef MAC_FRONTEND
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+	[[MFEInterfaceClient sharedClient] didBeginBranchOptimization];
+	[pool release];
+#endif	
 	int pass=1;
 	double incr;
 	do{
@@ -874,6 +903,11 @@ void Population::FinalOptimization(){
 	unsigned hours = totalSecs / 3600;
 	outman.UserMessage("Time used = %d hours, %d minutes and %d seconds", hours, min, secs);
 	log << "Score after final optimization: " << indiv[bestIndiv].Fitness() << endl;
+#ifdef MAC_FRONTEND
+	pool = [[NSAutoreleasePool alloc] init];
+	[[MFEInterfaceClient sharedClient] reportFinalScore:indiv[bestIndiv].Fitness()];
+	[pool release];
+#endif	
 	if(bootstrapReps == 0){
 		WriteTreeFile( besttreefile );
 		if(prematureTermination == true) outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
@@ -891,6 +925,11 @@ void Population::Bootstrap(){
 	for(int rep=1;rep<=bootstrapReps;rep++){
 		lastTopoImprove = lastPrecisionReduction = gen = 0;
 		outman.UserMessage("bootstrap replicate %d (seed %d)", rep, rnd.seed());
+#ifdef MAC_FRONTEND
+		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+		[[MFEInterfaceClient sharedClient] didBeginBootstrapReplicate:rep];
+		[pool release];
+#endif				
 		data->BootstrapReweight();
 		
 		SeedPopulationWithStartingTree();
@@ -900,6 +939,11 @@ void Population::Bootstrap(){
 			adap->branchOptPrecision = adap->startOptPrecision;
 			AppendTreeToBootstrapLog(rep);
 			outman.UserMessage("finished with bootstrap rep %d\n", rep);
+#ifdef MAC_FRONTEND
+			pool = [[NSAutoreleasePool alloc] init];
+			[[MFEInterfaceClient sharedClient] didCompleteBoostrapReplicate:rep];
+			[pool release];
+#endif		
 			}
 		else {
 			outman.UserMessage("abandoning bootstrap rep %d ....terminating", rep);
@@ -1951,8 +1995,15 @@ int Population::GetSpecifiedModels(double** model_string, int n, int* indiv_list
 
 void Population::OutputLog()	{
 	//log << gen << "\t" << bestFitness << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
-	if(gen > -1)
+	if(gen > -1) {
 		log << gen << "\t" << indiv[bestIndiv].Fitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
+#ifdef MAC_FRONTEND
+		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+		NSDictionary *progressDict = [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithInt:gen], @"generation", [NSNumber numberWithDouble:indiv[bestIndiv].Fitness()], @"likelihood", [NSNumber numberWithInt:stopwatch.SplitTime()], @"time", [NSNumber numberWithDouble:adap->branchOptPrecision], @"precision", [NSNumber numberWithInt:lastTopoImprove], @"lastImprovement", nil];
+		[[MFEInterfaceClient sharedClient] reportProgress:progressDict];
+		[pool release];
+#endif		
+	}
 	else
 		log << "Final\t" << indiv[bestIndiv].Fitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
 	}

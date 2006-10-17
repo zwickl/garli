@@ -45,6 +45,11 @@
 	#include "sioux.h"
 #endif
 
+#ifdef MAC_FRONTEND
+#import <Foundation/Foundation.h>
+#import "MFEInterfaceClient.h"
+#endif
+
 #ifdef PROFILE
 #include "profiler.h"
 #endif
@@ -114,6 +119,19 @@ char **argv=NULL;
 				if(argv[curarg][0]=='-'){
 					//command line arguments with a dash
 					if(argv[curarg][1]=='b') interactive=false;
+#ifdef MAC_FRONTEND
+					else if (argv[curarg][1] == 'i') {
+						NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+						NSString *arg = [[[NSProcessInfo processInfo] arguments] objectAtIndex:curarg];
+						NSString *serverName = [[arg componentsSeparatedByString:@"="] objectAtIndex:1];
+						BOOL success = [[MFEInterfaceClient sharedClient] connectToServerWithName:serverName];
+						if (!success) {
+							NSLog(@"Failed to connect to interface server");
+							EXIT_FAILURE;
+						}
+						[pool release];
+					}
+#endif															
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						exit(0);
@@ -194,6 +212,12 @@ char **argv=NULL;
 				}
 			}catch(ErrorException err){
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
+#ifdef MAC_FRONTEND
+				NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+				NSString *messageForInterface = [NSString stringWithUTF8String:err.message];
+				[[MFEInterfaceClient sharedClient] didEncounterError:messageForInterface];
+				[pool release];
+#endif				
 				}
 			catch(int error){
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
