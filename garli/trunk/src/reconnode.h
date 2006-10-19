@@ -339,6 +339,7 @@ public:
 			total++;
 			}
 		assert(swaps.size() == unique);
+		delete swap;
 		}
 
 	list<Swap>::iterator FindSwap(Swap &swap, bool &found){
