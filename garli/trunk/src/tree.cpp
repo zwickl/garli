@@ -958,7 +958,7 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 		sprRang.AddNode(cut->left->nodeNum, 0, (float) cut->left->dlen, true);
 		sprRang.AddNode(cut->right->nodeNum, 0, (float) cut->right->dlen, true);
 
-		for(int curDist = 0; curDist < maxDist; curDist++){
+		for(int curDist = 0; curDist < maxDist || maxDist < 0; curDist++){
 			list<ReconNode>::iterator it=sprRang.GetFirstNodeAtDistWithinCutSubtree(curDist);	
 			if(it == sprRang.end()){
 				break; //need this to break out of loop when curDist exceeds any branches in the tree
