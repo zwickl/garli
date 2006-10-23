@@ -208,6 +208,7 @@ char **argv=NULL;
 					pop.adap->modelMutateProb=0.0;
 					pop.adap->UpdateProbs();
 					}
+				pop.GetConstraints();
 				pop.Bootstrap();
 				}
 			}catch(ErrorException err){

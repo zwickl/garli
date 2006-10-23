@@ -1190,6 +1190,7 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 				if(pos==false && (bip.size() > 1)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch (bipartition):-(");
 				for(vector<Bipartition>::iterator bit=bip.begin();bit!=bip.end();bit++){
 					constraints.push_back(Constraint(&(*bit), pos));
+					conNum++;
 					}
 				}
 			else{
