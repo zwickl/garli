@@ -100,11 +100,13 @@ char **argv=NULL;
 	#else
 	// init some stuff
 
-	char conf_name[40];
+	string conf_name;
 #ifndef SUBROUTINE_GARLI
-	strcpy(conf_name, "garli.conf");
+	conf_name = "garli.conf";
 #else
-	sprintf(conf_name, "run%d.conf", rank);
+	char temp[100];
+	sprintf(temp, "run%d.conf", rank);
+	conf_name = temp;
 #endif
 
 #ifdef UNIX
@@ -138,7 +140,7 @@ char **argv=NULL;
 						}
 					}
 				//if anything else appears, we'll assume that it's a config file
-	        	else strcpy(conf_name, argv[curarg]);
+				else conf_name = argv[curarg];
 	        curarg++;
 			}
 		}
@@ -149,7 +151,7 @@ char **argv=NULL;
 		try{
 			MasterGamlConfig conf;
 			bool confOK;
-			confOK = ((conf.Read(conf_name) < 0) == false);
+			confOK = ((conf.Read(conf_name.c_str()) < 0) == false);
 
 			// now set the random seed
 			int randomSeed;
@@ -169,7 +171,7 @@ char **argv=NULL;
 			outman.SetLogFile(temp_buf);
 			
 			outman.UserMessage("Running serial GARLI, version 0.95 (Oct 2006)\n");
-			outman.UserMessage("Reading config file %s", conf_name);
+			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
 			// Create the data object
