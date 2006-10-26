@@ -1,4 +1,10 @@
-Garli version 0.95 - October 2006
+Garli version 0.951 - October 2006
+
+Fixes in version 0.951:
+-Fixed small memory leak
+-Allowed a few branch swaps that were being avoided
+-Allowed constraints during bootstrap
+-Minor output changes
 
 Compilation help:
 -to make the serial version type "make s" (or simply "make")
