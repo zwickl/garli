@@ -17,7 +17,7 @@ SAMPLE DATASET:
 -The Rana dataset is from Hillis and Wilcox. 2005. Phylogeny of the New World true frogs (Rana). Mol Phylogenet Evol. 34(2):299-314. 	
 -The 2 best trees for this dataset under the GTR+I+G model have log likelihood scores of -21812.66941 and -21812.64132. See if you can find them...  
 -A sample starting tree is contained in ranastart.tre
--A sample constraint tree is contained in ranaconstraint.tre
+-A sample constraint is contained in the files ranaconstraint.format1 and ranaconstraint.format2.  The best tree with this constraint has an optimized log likelihood score of -21821.57688
 
 Disclaimers:
 This software is copyright Derrick Joel Zwickl, 2006.
