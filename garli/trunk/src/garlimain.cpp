@@ -1,4 +1,4 @@
-// GARLI version 0.95b6 source code
+// GARLI version 0.951 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -170,7 +170,7 @@ char **argv=NULL;
 			else sprintf(temp_buf, "ERROR.log");
 			outman.SetLogFile(temp_buf);
 			
-			outman.UserMessage("Running serial GARLI, version 0.95 (Oct 2006)\n");
+			outman.UserMessage("Running serial GARLI, version 0.951 (Oct 2006)\n");
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
