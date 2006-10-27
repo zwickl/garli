@@ -162,7 +162,7 @@ char **argv=NULL;
 			else randomSeed=conf.randseed;
 			rnd.set_seed(randomSeed);
 			
-			char temp_buf[50];
+			char temp_buf[100];
 			if(confOK == true){
 				if(conf.restart == false) sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
 				else sprintf(temp_buf, "%s.restart%d.screen.log", conf.ofprefix.c_str(), CheckRestartNumber(conf.ofprefix));
