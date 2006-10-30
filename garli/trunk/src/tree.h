@@ -72,6 +72,9 @@ class Tree{
 		static double distanceSwapBias;
 		static int rescaleEvery;
 		static list<TreeNode *> nodeOptVector;
+		
+		static float uniqueSwapPrecalc[500];
+		static float distanceSwapPrecalc[500];
 
 		int calcs;
 

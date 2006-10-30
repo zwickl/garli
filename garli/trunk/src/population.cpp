@@ -445,6 +445,11 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 	Tree::rescaleEvery=16;
 	Tree::uniqueSwapBias = conf->uniqueSwapBias;
 	Tree::distanceSwapBias = conf->distanceSwapBias;
+	for(int i=0;i<500;i++){
+		Tree::uniqueSwapPrecalc[i] = pow(Tree::uniqueSwapBias, i);
+		Tree::distanceSwapPrecalc[i] = pow(Tree::distanceSwapBias, i);
+		}
+
 	Tree::meanBrlenMuts	= conf->meanBrlenMuts;
 	Tree::alpha		= conf->gammaShapeBrlen;
 	Tree::treeRejectionThreshold = conf->treeRejectionThreshold;
@@ -636,7 +641,7 @@ void Population::WriteStateFiles(){
 	pout.close();
 
 	//if we are keeping track of swaps, write a checkpoint for that
-	if(conf->uniqueSwapBias > 0.0){
+	if(conf->uniqueSwapBias != 1.0){
 		sprintf(str, "%s.swaps.check", conf->ofprefix.c_str());
 		ofstream sout(str);
 		Tree::attemptedSwaps.WriteSwapCheckpoint(sout);
@@ -658,7 +663,7 @@ void Population::ReadStateFiles(){
 	ReadPopulationCheckpoint();
 
 	//Read the swap checkpoint, if necessary
-	if(conf->uniqueSwapBias > 0.0){
+	if(conf->uniqueSwapBias != 1.0){
 		sprintf(str, "%s.swaps.check", conf->ofprefix.c_str());
 		if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
 		ifstream sin(str);

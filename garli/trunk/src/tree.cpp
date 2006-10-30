@@ -62,6 +62,9 @@ AttemptedSwapList Tree::attemptedSwaps;
 double Tree::uniqueSwapBias;
 double Tree::distanceSwapBias;
 
+float Tree::uniqueSwapPrecalc[500];
+float Tree::distanceSwapPrecalc[500];
+
 
 void InferStatesFromCla(char *states, double *cla, int nchar);
 double CalculateHammingDistance(const char *str1, const char *str2, int nchar);
@@ -841,7 +844,7 @@ int Tree::TopologyMutator(double optPrecision, int range, int subtreeNode){
 			GatherValidReconnectionNodes(range, cut, NULL);
 			}while(sprRang.size()==0);
 
-		if((uniqueSwapBias == 1.0 && distanceSwapBias ==0.0) || range < 0)
+		if((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)
 			broken = sprRang.RandomReconNode();
 		else{//only doing this on limSPR and NNI
 			AssignWeightsToSwaps(cut);
@@ -850,7 +853,7 @@ int Tree::TopologyMutator(double optPrecision, int range, int subtreeNode){
 			}
 
 		//log the swap about to be performed
-		if( ! ((uniqueSwapBias == 1.0 && distanceSwapBias ==0.0) || range < 0)){ 
+		if( ! ((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)){ 
 			Bipartition proposed;
 			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
 			attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
@@ -1015,10 +1018,19 @@ void Tree::AssignWeightsToSwaps(TreeNode *cut){
 		proposed.FillWithXORComplement(cut->bipart, allNodes[(*it).nodeNum]->bipart);
 		Swap tmp=Swap(proposed, cut->nodeNum, (*it).nodeNum, (*it).reconDist);
 		thisSwap = attemptedSwaps.FindSwap(tmp, found);
-		if(found == false) (*it).weight = pow(distanceSwapBias, (1-(*it).reconDist));
+
+		if(found == false) (*it).weight = distanceSwapPrecalc[(*it).reconDist - 1];
 		else
-			(*it).weight = pow(uniqueSwapBias, (*thisSwap).Count()) * pow(distanceSwapBias, (1-(*it).reconDist));
-		}			
+			(*it).weight = uniqueSwapPrecalc[(*thisSwap).Count()] * distanceSwapPrecalc[(*it).reconDist - 1];
+		
+/*		double first=(*it).weight;
+
+		if(found == false) (*it).weight = pow(distanceSwapBias, ((*it).reconDist) - 1);
+		else
+			(*it).weight = pow(uniqueSwapBias, (*thisSwap).Count()) * pow(distanceSwapBias, ((*it).reconDist) - 1);
+		
+		assert(fabs((*it).weight - first) < 0.001);
+*/		}			
 	}
 
 // 7/21/06 This function is now called by TopologyMutator to actually do the rearrangement
