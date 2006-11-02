@@ -80,6 +80,8 @@ double globalBest;
 
 #undef VARIABLE_OPTIMIZATION
 
+#undef DETAILED_SWAP_REPORT
+
 int CheckRestartNumber(const string str);
 int debug_mpi(const char* fmt, ...);
 int QuitNow();
@@ -446,8 +448,12 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 	Tree::uniqueSwapBias = conf->uniqueSwapBias;
 	Tree::distanceSwapBias = conf->distanceSwapBias;
 	for(int i=0;i<500;i++){
-		Tree::uniqueSwapPrecalc[i] = pow(Tree::uniqueSwapBias, i);
-		Tree::distanceSwapPrecalc[i] = pow(Tree::distanceSwapBias, i);
+		Tree::uniqueSwapPrecalc[i] = (float) pow(Tree::uniqueSwapBias, i);
+		if(Tree::uniqueSwapPrecalc[i] != Tree::uniqueSwapPrecalc[i]) Tree::uniqueSwapPrecalc[i]=0.0f;
+		}
+	for(int i=0;i<1000;i++){
+		Tree::distanceSwapPrecalc[i] = (float) pow(Tree::distanceSwapBias, i);
+		if(Tree::distanceSwapPrecalc[i] != Tree::distanceSwapPrecalc[i]) Tree::distanceSwapPrecalc[i]=0.0f;	
 		}
 
 	Tree::meanBrlenMuts	= conf->meanBrlenMuts;
@@ -564,7 +570,7 @@ void Population::SeedPopulationWithStartingTree(){
 	indiv[0].treeStruct->CalcBipartitions();	
 	
 	if(refineStart==true){
-		indiv[0].RefineStartingConditions(!(adap->modWeight==0.0), adap->branchOptPrecision);
+		indiv[0].RefineStartingConditions((adap->modWeight == 0.0 || modSpec.fixAlpha == true) == false, adap->branchOptPrecision);
 		indiv[0].CalcFitness(0);
 		outman.UserMessage("lnL after optimization: %.4f", indiv[0].Fitness());
 		}	
@@ -610,7 +616,10 @@ void Population::OutputModelReport(){
 		if(modSpec.flexRates == false){
 			if(modSpec.fixAlpha == true) outman.UserMessage("discrete gamma distributed rate cats, alpha param specified by user (fixed)");
 			else outman.UserMessage("discrete gamma distributed rate cats, alpha param estimated");
-			if(modSpec.includeInvariantSites == true) outman.UserMessage("\t\twith an invariant (invariable) site category");
+			if(modSpec.includeInvariantSites == true){
+				if(modSpec.fixInvariantSites == true) outman.UserMessage("\t\twith an invariant (invariable) site category,\n\t\tproportion specified by user (fixed)");				
+				else outman.UserMessage("\t\twith an invariant (invariable) site category, proportion estimated");
+				}
 			}
 		else{
 			outman.UserMessage("FLEX rate categories, rate and proportion of each estimated");
@@ -748,8 +757,15 @@ void Population::Run(){
 			if(bootstrapReps==0) WriteTreeFile( besttreefile );
 			outman.UserMessage("\t%-10d%-15.4f%-10.3f\t%-10d", gen, indiv[bestIndiv].Fitness(), adap->branchOptPrecision, lastTopoImprove);
 			
-			if(outputMostlyUselessFiles)
+			if(outputMostlyUselessFiles){
+#ifdef DETAILED_SWAP_REPORT
+				swapLog << gen << "\t";
+				indiv[bestIndiv].treeStruct->attemptedSwaps.SwapReport(swapLog);
+#else
 				swapLog << gen << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique() << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetTotal() << endl;
+#endif
+				}
+
 			}
 		if(askQuitNow == 1){
 			char c;
@@ -825,7 +841,7 @@ void Population::Run(){
 			if(enforceTermConditions == true
 				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > lastTopoImproveThresh || adap->topoMutateProb == 0.0) 
 				&& adap->improveOverStoredIntervals < improveOverStoredIntervalsThresh
-				&& adap->branchOptPrecision == adap->minOptPrecision){
+				&& (adap->branchOptPrecision == adap->minOptPrecision || adap->numPrecReductions==0)){
 				if(adap->topoMutateProb > 0.0) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
 				else outman.UserMessage("Reached termination condition!\n");
 				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
