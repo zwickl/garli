@@ -191,9 +191,16 @@ char **argv=NULL;
 			if(pop.bootstrapReps == 0){
 				if(conf.restart == false){
 					pop.GetConstraints();
+			
 					pop.SeedPopulationWithStartingTree();
 					pop.AppendTreeToTreeLog(-1, -1);
-					}
+		//DEBUG - to look at effect of prec during init opt on score
+	/*				for(double prec=0.5;prec > 0.00;prec -= 0.01){
+						pop.adap->branchOptPrecision = prec;
+						pop.SeedPopulationWithStartingTree();
+						pop.AppendTreeToTreeLog(-1, -1);
+						}
+	*/				}
 				else{
 					pop.GetConstraints();
 					pop.ReadStateFiles();
@@ -230,8 +237,8 @@ char **argv=NULL;
 		outman.UserMessage("\n-Press enter to close program.-");
 		char d=getchar();
 		}
-//	exit(0);
-
+	
+	outman.CloseLogFile();
 
 #endif
 	}
