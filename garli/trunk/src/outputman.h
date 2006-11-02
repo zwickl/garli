@@ -39,6 +39,10 @@ class OutputManager{
 			logOut.open(logname);
 			}
 
+		void CloseLogFile(){
+			logOut.close();
+			}
+
 		void SetNoOutput(bool o){
 			noOutput=o;	
 			}
