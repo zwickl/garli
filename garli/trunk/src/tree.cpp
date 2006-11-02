@@ -63,7 +63,7 @@ double Tree::uniqueSwapBias;
 double Tree::distanceSwapBias;
 
 float Tree::uniqueSwapPrecalc[500];
-float Tree::distanceSwapPrecalc[500];
+float Tree::distanceSwapPrecalc[1000];
 
 
 void InferStatesFromCla(char *states, double *cla, int nchar);
@@ -1019,10 +1019,16 @@ void Tree::AssignWeightsToSwaps(TreeNode *cut){
 		Swap tmp=Swap(proposed, cut->nodeNum, (*it).nodeNum, (*it).reconDist);
 		thisSwap = attemptedSwaps.FindSwap(tmp, found);
 
-		if(found == false) (*it).weight = distanceSwapPrecalc[(*it).reconDist - 1];
-		else
-			(*it).weight = uniqueSwapPrecalc[(*thisSwap).Count()] * distanceSwapPrecalc[(*it).reconDist - 1];
-		
+		if(found == false){
+			if((*it).reconDist - 1 < 1000)
+				(*it).weight = distanceSwapPrecalc[(*it).reconDist - 1];
+			else (*it).weight = 0.0;
+			}
+		else{
+			if((*it).reconDist - 1 < 1000 && (*thisSwap).Count() < 500)
+				(*it).weight = uniqueSwapPrecalc[(*thisSwap).Count()] * distanceSwapPrecalc[(*it).reconDist - 1];
+			else (*it).weight = 0.0;
+			}
 /*		double first=(*it).weight;
 
 		if(found == false) (*it).weight = pow(distanceSwapBias, ((*it).reconDist) - 1);

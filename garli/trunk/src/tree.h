@@ -74,7 +74,7 @@ class Tree{
 		static list<TreeNode *> nodeOptVector;
 		
 		static float uniqueSwapPrecalc[500];
-		static float distanceSwapPrecalc[500];
+		static float distanceSwapPrecalc[1000];
 
 		int calcs;
 
