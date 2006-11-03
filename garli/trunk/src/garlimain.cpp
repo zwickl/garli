@@ -204,6 +204,7 @@ char **argv=NULL;
 				else{
 					pop.GetConstraints();
 					pop.ReadStateFiles();
+					pop.adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(&conf);
 					}
 				pop.Run();
 				}

@@ -136,6 +136,29 @@ Adaptation::~Adaptation(){
 	delete []anyModel ; delete []anyModelnum ;
 	}
 
+void Adaptation::SetChangeableVariablesFromConfAfterReadingCheckpoint(const GeneralGamlConfig *gc){
+	//this just sets a few adaptation members to their values in the conf file
+	//potentially overriding some values read from a checkpoint.  This would
+	//be useful if multiple runs with different settings were to be restarted from
+	//a single checkpoint
+	minOptPrecision = gc->minOptPrec;
+
+	numPrecReductions=gc->numPrecReductions;
+	if(gc->numPrecReductions > 0)
+		precReductionFactor = (gc->startOptPrec- minOptPrecision)/double(numPrecReductions);
+	else
+		precReductionFactor = gc->precReductionFactor;
+
+	topoWeight = gc->topoWeight;
+	modWeight = gc->modWeight;
+	brlenWeight = gc->brlenWeight;
+	
+	origRandNNIweight = randNNIweight = gc->randNNIweight;
+	randSPRweight = gc->randSPRweight;
+	limSPRweight = gc->limSPRweight;
+	limSPRrange = gc->limSPRrange;
+	}
+
 void Adaptation::WriteToCheckpoint(ofstream &out){
 	//this function assumes that it has been passed a stream that is already open for 
 	//binary writing

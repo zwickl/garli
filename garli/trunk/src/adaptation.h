@@ -105,6 +105,7 @@ class Adaptation{
 	Adaptation(const GeneralGamlConfig *gc);
 	~Adaptation();
 	public:
+	void SetChangeableVariablesFromConfAfterReadingCheckpoint(const GeneralGamlConfig *gc);
 	void PrepareForNextInterval();
 	void UpdateProbs();
 	void OutputProbs(ofstream &plog, int gen);
