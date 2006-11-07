@@ -533,14 +533,13 @@ void Population::SeedPopulationWithStartingTree(){
 		else outman.UserMessage("creating random starting tree (compatible with constraints)...");
 		indiv[0].MakeRandomTree(data->NTax());
 		}
-	
-	//if no model mutations will be performed, starting values should have been read 
+
+	//if no model mutations will be performed, parameters cannot be estimated.
 	if(adap->modWeight == 0.0){
-		if(modSpec.empiricalStateFreqs==false && modSpec.equalStateFreqs==false && modSpec.gotStateFreqsFromFile == false) throw(ErrorException("If model mutation weight is set to zero, state frequencies must be\nset to equal, set to empirical or specified in a starting file!"));
-		else if(modSpec.numRateCats > 1 && modSpec.flexRates == false && modSpec.gotAlphaFromFile == false) throw(ErrorException("If model mutation weight is set to zero, alpha parameter must be\nspecified in a starting file!"));
-		else if(modSpec.numRateCats > 1 && modSpec.flexRates == true && modSpec.gotFlexFromFile == false) throw(ErrorException("If model mutation weight is set to zero, flex rates must be\nspecified in a starting file!"));
-		else if(modSpec.includeInvariantSites == true && modSpec.gotPinvFromFile == false) throw(ErrorException("If model mutation weight is set to zero, proportion of invariant sites must be\nspecified in a starting file!"));
-		else if(modSpec.nst > 1 && modSpec.gotRmatFromFile == false) throw(ErrorException("If model mutation weight is set to zero, relative rate matrix must be\n specified in a starting file!"));
+		if(modSpec.fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
+		if(modSpec.includeInvariantSites == true && modSpec.fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
+		if(modSpec.nst > 1 && modSpec.fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
+		if(modSpec.numRateCats > 1 && modSpec.flexRates == false && modSpec.fixAlpha == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
 		}
 
 	indiv[0].treeStruct->root->CheckforPolytomies();

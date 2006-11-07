@@ -457,7 +457,8 @@ class Model{
 		eigenDirty=true;
 		}
 	void SetPis(double *b){
-		if(modSpec.equalStateFreqs==true && (b[0]==b[1] && b[1]==b[2]) == false) throw(ErrorException("Config file specifies equal statefrequencies, but starting model has nonequal frequencies!\n"));
+		if(modSpec.equalStateFreqs==true && (b[0]==b[1] && b[1]==b[2]) == false) throw(ErrorException("Config file specifies equal statefrequencies,\nbut starting model has nonequal frequencies!\n"));
+		if(modSpec.empiricalStateFreqs==true) throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model specifies frequencies!\n"));
 		for(int i=0;i<3;i++) *stateFreqs[i]=b[i];
 		*stateFreqs[3]=1.0 - *stateFreqs[0] - *stateFreqs[1] - *stateFreqs[2];
 		eigenDirty=true;

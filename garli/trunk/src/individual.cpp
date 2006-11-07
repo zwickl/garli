@@ -380,6 +380,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		if(foundTree == true) stf.putback(c);
 		}//if(foundModel == true)
 
+	//Here we'll error out if something was fixed but didn't appear
 	if(modSpec.fixRelativeRates == true && modSpec.gotRmatFromFile == false) throw ErrorException("ratematrix = fixed in conf file, but parameter values not found in %s.", fname);
 	if(modSpec.fixStateFreqs == true && modSpec.equalStateFreqs == false && modSpec.empiricalStateFreqs == false && modSpec.gotStateFreqsFromFile == false) throw ErrorException("statefrequencies = fixed in conf file, but parameter values not found in %s.", fname);
 	if(modSpec.fixAlpha == true && modSpec.gotAlphaFromFile == false) throw ErrorException("ratehetmodel = gammafixed in conf file, but no parameter value for alpha found in %s.", fname);
