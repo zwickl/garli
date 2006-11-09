@@ -58,8 +58,6 @@ using namespace std;
 extern char programName[81];
 extern OutputManager outman;
 
-bool REDUCED;
-
 int memLevel;
 int calcCount=0;
 int optCalcs;
@@ -290,8 +288,6 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 	conf=c;
 	data=d;
 
-	REDUCED=false;
-
 	stopwatch.Start();
 
 	int i;
@@ -333,8 +329,6 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 	//this is a really cheap hack
 	Bipartition tmp;
 	tmp.SetPartialBlockMask();
-
-	InitializeOutputStreams();
 
 	data->MakeAmbigStrings();	
 	data->CalcEmpiricalFreqs();
@@ -820,7 +814,6 @@ void Population::Run(){
 				reduced=adap->ReducePrecision();
 				}
 			if(reduced){
-//				REDUCED = true;
 				lastPrecisionReduction=gen;
 				double before=bestFitness;
 				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
@@ -3614,7 +3607,7 @@ void Population::InitializeOutputStreams(){
 			sprintf(temp_buf, "%s%s.problog0%d.log", conf->ofprefix.c_str(), restart, rank);
 		probLog.open(temp_buf);
 		if(!probLog.good()) throw ErrorException("problem opening problog");
-		adap->BeginProbLog(probLog);
+		adap->BeginProbLog(probLog, gen);
 
 		//initialize the swaplog
 		if(conf->uniqueSwapBias != 1.0){
@@ -3631,7 +3624,10 @@ void Population::InitializeOutputStreams(){
 		sprintf(temp_buf, "%s%s.log0%d.log", conf->ofprefix.c_str(), restart, rank);
 	log.open(temp_buf);
 	log.precision(10);
-	log << "random seed = " << rnd.init_seed() << "\n";
+	if(restart == false)
+		log << "random seed = " << rnd.init_seed() << "\n";
+	else log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
+
 	log << "gen\tbest_like\ttime\toptPrecision\n";
 
 	//initialize the treelog

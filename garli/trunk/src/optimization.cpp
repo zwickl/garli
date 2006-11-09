@@ -19,9 +19,6 @@
 #include "defs.h"
 #include "outputman.h"
 
-extern bool REDUCED;
-
-
 //a bunch of functions from the Tree class, relating to optimization
 
 extern double globalBest;
@@ -377,8 +374,6 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, double optPrecision, int s
 		#endif
 		return;
 		}
-
-//	if(REDUCED == false) return;
 
 	//now spread out
 	int rad=10;

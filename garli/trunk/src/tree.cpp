@@ -44,7 +44,6 @@ extern int optCalcs;
 extern ofstream opt;
 extern ofstream optsum;
 extern int memLevel;
-extern bool REDUCED;
 
 //Tree static definitions
 double Tree::meanBrlenMuts;

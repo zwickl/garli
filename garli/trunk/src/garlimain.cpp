@@ -193,7 +193,6 @@ char **argv=NULL;
 					pop.GetConstraints();
 			
 					pop.SeedPopulationWithStartingTree();
-					pop.AppendTreeToTreeLog(-1, -1);
 		//DEBUG - to look at effect of prec during init opt on score
 	/*				for(double prec=0.5;prec > 0.00;prec -= 0.01){
 						pop.adap->branchOptPrecision = prec;
@@ -206,9 +205,12 @@ char **argv=NULL;
 					pop.ReadStateFiles();
 					pop.adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(&conf);
 					}
+				pop.InitializeOutputStreams();
+				pop.AppendTreeToTreeLog(-1, -1);
 				pop.Run();
 				}
 			else{
+				pop.InitializeOutputStreams();
 				if(conf.restart == true) throw(ErrorException("Restarting of bootstrap runs is not supported.\nYou should simply start a new bootstrap run and\ncombine all trees obtained into one bootstrap sample."));
 				if(conf.inferInternalStateProbs == true) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
 				pop.OutputModelReport();

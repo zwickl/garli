@@ -109,7 +109,7 @@ class Adaptation{
 	void PrepareForNextInterval();
 	void UpdateProbs();
 	void OutputProbs(ofstream &plog, int gen);
-	void BeginProbLog(ofstream &plot);
+	void BeginProbLog(ofstream &plot, int gen);
 	bool ReducePrecision(){
 		if(branchOptPrecision==minOptPrecision || numPrecReductions == 0) return false;
 		if(topoMutateProb > .01 || topoWeight==0.0){

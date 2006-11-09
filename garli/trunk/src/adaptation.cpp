@@ -290,9 +290,10 @@ void Adaptation::PrepareForNextInterval(){
 //	fromRemoteNonSubtree[0] = 0.0;
 	}
 
-void Adaptation::BeginProbLog(ofstream &plog){
+void Adaptation::BeginProbLog(ofstream &plog, int gen){
 	plog << "gen\tmod\ttopo\tbrlen\tNNI\trandSPR\tlimSPR\n";
-	OutputProbs(plog, 0);
+	//gen could be non-zero if we restarted
+	OutputProbs(plog, gen);
 	}
 
 void Adaptation::OutputProbs(ofstream &plog, int gen){
