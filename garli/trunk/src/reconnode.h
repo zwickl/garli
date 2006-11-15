@@ -319,7 +319,7 @@ public:
 			}
 		}
 
-	void AddSwap(Bipartition &bip, int cut, int broke, int dist){
+	bool AddSwap(Bipartition &bip, int cut, int broke, int dist){
 		//see if the bipartition already exists in the list
 		//if so, increment the count, otherwise add it
 		assert(bip.ContainsTaxon(1));
@@ -344,6 +344,7 @@ public:
 			}
 		assert(swaps.size() == unique);
 		delete swap;
+		return (found == false);//return value is true if the swap is _unique_
 		}
 
 	list<Swap>::iterator FindSwap(Swap &swap, bool &found){
