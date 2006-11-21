@@ -111,8 +111,6 @@ double Tree::OptimizeTreeScale(double optPrecision){
 	deb.close();
 */
 
-	
-
 	while(1){
 		double incr=0.0001;
 		scale=1.0 + incr;
@@ -134,18 +132,19 @@ double Tree::OptimizeTreeScale(double optPrecision){
 		double d2=(d11-d12)/incr;
 		
 		double est=-d1/d2;
-		
+
 		//return the tree to its original scale		
 		ScaleWholeTree(1.0/scale);
-		if((abs(est) < 0.01 || lastChange < optPrecision) && d2 < 0.0){
+		if((abs(est) < 0.01 || (lastChange < optPrecision && lastChange > 0.0)) && d2 < 0.0){
 			return prev-start;
 			}
 		
 		double t;
 		if(d2 < 0.0){
 			t=1.0 + est;
+			//these bounds are arbitrary, but chosen from experience
 			if(t<0.95) t=.95;
-//			if(t>1.05) t=1.05;
+			else if(t>1.5) t=1.5;
 			}
 		else{//if we have lots of data, move
 			//very slowly here
