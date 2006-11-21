@@ -404,7 +404,7 @@ void Model::SetDefaultModelParameters(const HKYData *data){
 	if(modSpec.equalStateFreqs == false){
 		double f[4];
 		data->GetEmpiricalFreqs(f);
-		SetPis(f);
+		SetEmpiricalPis(f);
 		}
 
 	if(modSpec.includeInvariantSites==false){

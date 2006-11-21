@@ -463,6 +463,12 @@ class Model{
 		*stateFreqs[3]=1.0 - *stateFreqs[0] - *stateFreqs[1] - *stateFreqs[2];
 		eigenDirty=true;
 		}
+	void SetEmpiricalPis(double *b){
+		for(int i=0;i<3;i++) *stateFreqs[i]=b[i];
+		*stateFreqs[3]=1.0 - *stateFreqs[0] - *stateFreqs[1] - *stateFreqs[2];
+		eigenDirty=true;
+		}
+
 	void SetFlexRates(double *rates, double *probs){
 		if(modSpec.flexRates == false) throw ErrorException("Error: Flex rate values specified in start file,\nbut ratehetmodel is = flex in conf file.");
 		for(int r=0;r<NRateCats();r++){
