@@ -1599,7 +1599,8 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	if(indNum==-1) ind=&indiv[bestIndiv];
 	else ind=&indiv[indNum];
 
-	treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
+	if(gen == -1) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
+	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
 	ind->mod->OutputGarliFormattedModel(treeLog);
 	ind->treeStruct->root->MakeNewick(treeString, false, true);
 	treeLog << "]" << treeString << ";" << endl;
