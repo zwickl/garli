@@ -84,12 +84,6 @@ void Individual::CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const 
 	treeStruct->mod=mod;
 }
 
-#ifdef VARIABLE_OPTIMIZATION
-
-#define SPRMutate VariableSPRMutate
-#define NNIMutate VariableNNIMutate
-#endif
-
 void Individual::Mutate(double optPrecision, Adaptation *adap){
 	//this is the original version of mutate, and will be called by both 
 	//master and remote when they are mutating a tree that does not have

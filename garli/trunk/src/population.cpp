@@ -80,6 +80,8 @@ double globalBest;
 
 #undef DETAILED_SWAP_REPORT
 
+bool output_tree=false;
+
 int CheckRestartNumber(const string str);
 int debug_mpi(const char* fmt, ...);
 int QuitNow();
@@ -1171,12 +1173,12 @@ void Population::DetermineParentage(){
 				parent=bestIndiv;
 				newindiv[i].mutation_type=Individual::subtreeRecom;
 				}
-		else {// find a parent
-			r = rnd.uniform();
-			for( parent = 0; parent < total_size; parent++ ){
-				if( r < cumfit[parent][1] ) break;
-				}
-			parent = (int)cumfit[parent][0];
+			else {// find a parent
+				r = rnd.uniform();
+				for( parent = 0; parent < total_size; parent++ ){
+					if( r < cumfit[parent][1] ) break;
+					}
+				parent = (int)cumfit[parent][0];
 
 #ifdef MPI_VERSION
 //new bipart recom conditions, 9-25-05
@@ -1329,6 +1331,16 @@ void Population::PerformMutation(int indNum){
 				 	if(ind->accurateSubtrees==false || paraMan->subtreeModeActive==false){
 			 	
 			       		ind->Mutate(adap->branchOptPrecision, adap);
+
+						//DEBUG
+						if(output_tree){
+							treeLog << "  tree gen" << gen <<  "." << indNum << "= [&U] [" << ind->Fitness() << "][ ";
+							ind->mod->OutputGarliFormattedModel(treeLog);
+							ind->treeStruct->root->MakeNewick(treeString, false, true);
+							treeLog << "]" << treeString << ";" << endl;
+							output_tree=false;
+							}
+
 			       		//reclaim clas if the created tree has essentially no chance of reproducing
 			       		if(((ind->Fitness() - indiv[bestIndiv].Fitness()) < (-11.5/conf->selectionIntensity))){
 			       			ind->treeStruct->ReclaimUniqueClas();

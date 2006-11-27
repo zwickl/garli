@@ -37,6 +37,7 @@ using namespace std;
 #include "memchk.h"
 
 extern rng rnd;
+extern bool output_tree;
 
 //external global variables
 extern int calcCount;
@@ -116,7 +117,8 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 				s++;
 				}
 			else if(*s==','||*s==')')
-				temp->dlen=.05;
+				temp->dlen=Tree::exp_starting_brlen;
+				//temp->dlen=rnd.uniform();
 			else
 				{
 				if(*s==';'){
@@ -205,7 +207,10 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 						temp->dlen = atof( info.c_str() );
 						temp->dlen = (temp->dlen > min_brlen ? temp->dlen : min_brlen);
 						}
-					else temp->dlen= Tree::exp_starting_brlen;// * rnd.gamma( alpha );
+					else{
+						temp->dlen= Tree::exp_starting_brlen;
+						//temp->dlen=rnd.uniform();
+						}
 					}
 				}
 			}
@@ -820,11 +825,14 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, double optPrec
 		SweepDirtynessOverTree(tonode);
 		//OptimizeBranchLength(optPrecision, tonode, true);
 		OptimizeBranchesWithinRadius(tonode, optPrecision, 0, NULL);
+
 		Score(tonode->nodeNum);
 		}
 	else return -1;
 	return 1;
 	}
+
+#undef VARIABLE_OPTIMIZATION
 
 //this function now returns the reconnection distance, with it being negative if its a
 //subtree reorientation swap
@@ -852,29 +860,41 @@ int Tree::TopologyMutator(double optPrecision, int range, int subtreeNode){
 			}
 
 		//log the swap about to be performed
-		if( ! ((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)){ 
+		bool unique=false;
+		if( ! ((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)){
 			Bipartition proposed;
 			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
-			attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 			}
 
 		if(broken->withinCutSubtree == true){
 			#ifdef OPT_DEBUG
 				optsum << "reorientSPR\t" << broken->reconDist << "\t" << range << "\n";
-			#endif	
+			#endif
+			#ifdef VARIABLE_OPTIMIZATION
+				if(unique == true) ReorientSubtreeSPRMutateDummy(cut->nodeNum, broken, optPrecision);
+				else
+			#endif
 			ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
 			ret=broken->reconDist * -1;
 			}
 		else{
 			#ifdef OPT_DEBUG
 				optsum << "SPR\t" << broken->reconDist << "\t" << range << "\n";
-			#endif	
+			#endif
+			#ifdef VARIABLE_OPTIMIZATION
+				if(unique == true) err=SPRMutateDummy(cut->nodeNum, broken, optPrecision, subtreeNode);
+				else
+			#endif
 			err=SPRMutate(cut->nodeNum, broken, optPrecision, subtreeNode);
 			ret=broken->reconDist;
 			}
+		#ifdef VARIABLE_OPTIMIZATION
+			output_tree = unique;
+		#endif
 		}while(err<0);
 
-#ifdef NDEBUG
+#ifndef NDEBUG
 	CalcBipartitions();
 
 	for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
@@ -1028,15 +1048,54 @@ void Tree::AssignWeightsToSwaps(TreeNode *cut){
 				(*it).weight = uniqueSwapPrecalc[(*thisSwap).Count()] * distanceSwapPrecalc[(*it).reconDist - 1];
 			else (*it).weight = 0.0;
 			}
-/*		double first=(*it).weight;
-
-		if(found == false) (*it).weight = pow(distanceSwapBias, ((*it).reconDist) - 1);
-		else
-			(*it).weight = pow(uniqueSwapBias, (*thisSwap).Count()) * pow(distanceSwapBias, ((*it).reconDist) - 1);
-		
-		assert(fabs((*it).weight - first) < 0.001);
-*/		}			
+		}
 	}
+
+int Tree::SPRMutateDummy(int cutnum, ReconNode *broke, double optPrecision, int subtreeNode){
+	//this is just a spoof version of SPRMutate that will perform the same mutation
+	//several times with different optimiation settings, but will otherwise 
+	//maintain exactly the same program flow because it resets the seed
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	
+	Individual sourceIndiv;
+	sourceIndiv.treeStruct=this;
+	sourceIndiv.mod->CopyModel(this->mod);
+		
+	int savedSeed;
+	
+	ofstream out("variable.log", ios::app);
+	out.precision(9);
+	out << "SPR" << "\t" << broke->reconDist << "\t" << lnL << "\t";
+	
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv);
+	
+	double origThresh = treeRejectionThreshold;
+	treeRejectionThreshold = 10000;
+	double prec[5]={.01, .01, .01, .01, .01};
+	for(int i=0;i<1;i++){
+		savedSeed = rnd.seed();
+		tempIndiv.treeStruct->SPRMutate(cutnum, broke, prec[i], 0);
+		out << tempIndiv.treeStruct->lnL << "\t";
+		rnd.set_seed(savedSeed);
+		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
+		}
+	out << "\n";
+
+	treeRejectionThreshold = origThresh;
+
+	tempIndiv.treeStruct->RemoveTreeFromAllClas();
+	delete tempIndiv.treeStruct;
+	tempIndiv.treeStruct=NULL;
+	sourceIndiv.treeStruct=NULL;
+
+	SPRMutate(cutnum, broke, optPrecision, 0);
+/*	ofstream poo("3branchScores.log", ios::app);
+	poo << endl;
+	poo.close();
+*/	return 1;
+	}
+
 
 // 7/21/06 This function is now called by TopologyMutator to actually do the rearrangement
 //It has the cut and broken nodenums passed in.  It also does NNI's
@@ -1166,6 +1225,140 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, double optPrecision, int subtr
 	return 1;
 }
 
+void Tree::ReorientSubtreeSPRMutateDummy(int oroot, ReconNode *nroot, double optPrecision){
+	//this is just a spoof version of SPRMutate that will perform the same mutation
+	//several times with different optimiation settings, but will otherwise 
+	//maintain exactly the same program flow because it resets the seed
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	
+	Individual sourceIndiv;
+	sourceIndiv.treeStruct=this;
+	sourceIndiv.mod->CopyModel(this->mod);
+		
+	int savedSeed;
+	
+	ofstream out("variable.log", ios::app);
+	out.precision(9);
+	out << "reSPR" << "\t" << nroot->reconDist << "\t" << lnL << "\t";
+	
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv);
+	
+	double origThresh = treeRejectionThreshold;
+	treeRejectionThreshold = 10000;
+
+	double prec[5]={.01, .01, .01, .01, .01};
+	for(int i=0;i<1;i++){
+		savedSeed = rnd.seed();
+		tempIndiv.treeStruct->ReorientSubtreeSPRMutate(oroot, nroot, prec[i]);
+		out << tempIndiv.treeStruct->lnL << "\t";
+		rnd.set_seed(savedSeed);
+		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
+		}
+	out << "\n";
+	treeRejectionThreshold = origThresh;
+
+	tempIndiv.treeStruct->RemoveTreeFromAllClas();
+	delete tempIndiv.treeStruct;
+	tempIndiv.treeStruct=NULL;
+	sourceIndiv.treeStruct=NULL;
+
+	ReorientSubtreeSPRMutate(oroot, nroot, optPrecision);
+/*	ofstream poo("3branchScores.log", ios::app);
+	poo << endl;
+	poo.close();
+*/	
+	}
+
+void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, double optPrecision){
+	//this is used to allow the other half of SPR rearrangements in which
+	//the part of the tree containing the root is considered the subtree
+	//to be attached.  Terminology is VERY confusing here. newRoot is the 
+	//branch to be bisected (rooted at).  oldRoot is the node that is at the 
+	//base of the subtree currently.  After the rearrangement it will still
+	//be at the base of the subtree, but in the middle of a different branch
+
+	//if the optPrecision passed in is < 0 it means that we're just trying to 
+	//make the tree structure for some reason, but don't have CLAs allocated
+	//and don't intend to do blen opt
+	bool createTopologyOnly=false;
+	if(optPrecision < 0.0) createTopologyOnly=true;
+
+	TreeNode *newroot=allNodes[nroot->nodeNum];
+	TreeNode *oldroot=allNodes[oroot];
+
+	//these are the only blens that need to be dealt with specially
+	double fusedBlen = oldroot->left->dlen + oldroot->right->dlen;
+	double dividedBlen = max(0.5 * newroot->dlen, DEF_MIN_BRLEN);
+
+	//first detatch the subtree and make it free floating.  This will
+	//leave oroot in its place and fuse two branches in the subtree
+	//into a branch connecting one of oroots des to its other des
+	//This makes that des a tricotomy with a NULL anc.  Then the rotating 
+	//begins.
+	if(createTopologyOnly == false){
+		SweepDirtynessOverTree(oldroot->left);
+		SweepDirtynessOverTree(oldroot->right);
+		}
+	
+	TreeNode *prunePoint;
+	TreeNode *tempRoot;
+	if(oldroot->left->left != NULL){
+		tempRoot=oldroot->left;
+		prunePoint=oldroot->right;
+		}
+	else{
+		tempRoot=oldroot->right;
+		prunePoint=oldroot->left;
+		}
+
+	tempRoot->AddDes(prunePoint);
+	prunePoint->dlen=fusedBlen;
+	tempRoot->anc=NULL;
+
+	if(createTopologyOnly == false) MakeNodeDirty(tempRoot);
+	
+	//collect each of the nodes that will need to be flipped
+	vector<TreeNode *> path;
+	path.reserve(10);
+	TreeNode *tmp=newroot->anc;
+	while(tmp){
+		path.push_back(tmp);
+		tmp=tmp->anc;
+		}
+	reverse(path.begin(),path.end());
+
+	for(vector<TreeNode*>::iterator it=path.begin();(it+1)!=path.end();it++){
+		(*it)->MoveDesToAnc(*(it+1));
+		}
+
+	//now disconnect the oldroot
+	oldroot->left = NULL;
+	oldroot->right = NULL;
+	
+	//and add the new des
+	TreeNode *oldanc=newroot->anc;
+	oldanc->RemoveDes(newroot);
+	oldroot->AddDes(oldanc);
+	oldroot->AddDes(newroot);
+	oldroot->left->dlen = oldroot->right->dlen = dividedBlen;
+
+	root->CheckTreeFormation();
+
+	//dirty CLAs as needed
+/*	for(vector<TreeNode*>::iterator it=path.begin();it!=path.end();it++){
+		SweepDirtynessOverTree(*it);
+		}
+*/
+	if(createTopologyOnly == false){
+		SweepDirtynessOverTree(newroot);
+		SweepDirtynessOverTree(oldroot);
+		SweepDirtynessOverTree(tempRoot);
+		SweepDirtynessOverTree(prunePoint);
+		if(nroot->reconDist > 1) OptimizeBranchesWithinRadius(oldroot, optPrecision, 0, prunePoint);
+		else OptimizeBranchesWithinRadius(oldroot, optPrecision, 0, NULL);
+		}
+	}
 
 void Tree::LoadConstraints(ifstream &con, int nTaxa){
 	string temp;//=new char[numTipsTotal + 100];
@@ -2673,96 +2866,6 @@ void Tree::RerootHere(int newroot){
 	root->CheckTreeFormation();
 	}
 
-void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, double optPrecision){
-	//this is used to allow the other half of SPR rearrangements in which
-	//the part of the tree containing the root is considered the subtree
-	//to be attached.  Terminology is VERY confusing here. newRoot is the 
-	//branch to be bisected (rooted at).  oldRoot is the node that is at the 
-	//base of the subtree currently.  After the rearrangement it will still
-	//be at the base of the subtree, but in the middle of a different branch
-
-	//if the optPrecision passed in is < 0 it means that we're just trying to 
-	//make the tree structure for some reason, but don't have CLAs allocated
-	//and don't intend to do blen opt
-	bool createTopologyOnly=false;
-	if(optPrecision < 0.0) createTopologyOnly=true;
-
-	TreeNode *newroot=allNodes[nroot->nodeNum];
-	TreeNode *oldroot=allNodes[oroot];
-
-	//these are the only blens that need to be dealt with specially
-	double fusedBlen = oldroot->left->dlen + oldroot->right->dlen;
-	double dividedBlen = max(0.5 * newroot->dlen, DEF_MIN_BRLEN);
-
-	//first detatch the subtree and make it free floating.  This will
-	//leave oroot in its place and fuse two branches in the subtree
-	//into a branch connecting one of oroots des to its other des
-	//This makes that des a tricotomy with a NULL anc.  Then the rotating 
-	//begins.
-	if(createTopologyOnly == false){
-		SweepDirtynessOverTree(oldroot->left);
-		SweepDirtynessOverTree(oldroot->right);
-		}
-	
-	TreeNode *prunePoint;
-	TreeNode *tempRoot;
-	if(oldroot->left->left != NULL){
-		tempRoot=oldroot->left;
-		prunePoint=oldroot->right;
-		}
-	else{
-		tempRoot=oldroot->right;
-		prunePoint=oldroot->left;
-		}
-
-	tempRoot->AddDes(prunePoint);
-	prunePoint->dlen=fusedBlen;
-	tempRoot->anc=NULL;
-
-	if(createTopologyOnly == false) MakeNodeDirty(tempRoot);
-	
-	//collect each of the nodes that will need to be flipped
-	vector<TreeNode *> path;
-	path.reserve(10);
-	TreeNode *tmp=newroot->anc;
-	while(tmp){
-		path.push_back(tmp);
-		tmp=tmp->anc;
-		}
-	reverse(path.begin(),path.end());
-
-	for(vector<TreeNode*>::iterator it=path.begin();(it+1)!=path.end();it++){
-		(*it)->MoveDesToAnc(*(it+1));
-		}
-
-	//now disconnect the oldroot
-	oldroot->left = NULL;
-	oldroot->right = NULL;
-	
-	//and add the new des
-	TreeNode *oldanc=newroot->anc;
-	oldanc->RemoveDes(newroot);
-	oldroot->AddDes(oldanc);
-	oldroot->AddDes(newroot);
-	oldroot->left->dlen = oldroot->right->dlen = dividedBlen;
-
-	root->CheckTreeFormation();
-
-	//dirty CLAs as needed
-/*	for(vector<TreeNode*>::iterator it=path.begin();it!=path.end();it++){
-		SweepDirtynessOverTree(*it);
-		}
-*/
-	if(createTopologyOnly == false){
-		SweepDirtynessOverTree(newroot);
-		SweepDirtynessOverTree(oldroot);
-		SweepDirtynessOverTree(tempRoot);
-		SweepDirtynessOverTree(prunePoint);
-		if(nroot->reconDist > 1) OptimizeBranchesWithinRadius(oldroot, optPrecision, 0, prunePoint);
-		else OptimizeBranchesWithinRadius(oldroot, optPrecision, 0, NULL);
-		}
-	}
-
 void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	TreeNode tempold;
 	tempold.left=root->left;
@@ -3603,49 +3706,6 @@ void Tree::LocalMove(){
 		}
 	}	
 
-void Tree::VariableNNIMutate(int node, int branch, double optPrecision, int subtreeNode){
-	//this is just a spoof version of NNIMutate that will perform the same mutation
-	//several times with different levels of optimiation, but will otherwise 
-	//maintain exactly the same program flow because it resets the seed
-	assert(0); //this needs to be verified
-	Individual tempIndiv;
-	tempIndiv.treeStruct=new Tree();
-	
-	Individual sourceIndiv;
-	sourceIndiv.treeStruct=this;
-	sourceIndiv.mod->CopyModel(this->mod);
-		
-	int savedSeed;
-	
-	ofstream out("variable.log", ios::app);
-	out.precision(9);
-	out << "NNI\t" << lnL << "\t";
-	
-	
-	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv);
-	
-	double prec[5]={.5, .25, .1, .05, .01};
-	for(int i=0;i<5;i++){
-		savedSeed = rnd.seed();
-		tempIndiv.treeStruct->NNIMutate(node, branch, prec[i], subtreeNode);
-		out << tempIndiv.treeStruct->lnL << "\t";
-		rnd.set_seed(savedSeed);
-		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
-		}
-	out << "\n";
-	
-	tempIndiv.treeStruct->RemoveTreeFromAllClas();
-	delete tempIndiv.treeStruct;
-	tempIndiv.treeStruct=NULL;
-	sourceIndiv.treeStruct=NULL;
-
-	NNIMutate(node, branch, optPrecision, subtreeNode);
-
-	ofstream poo("3branchScores.log", ios::app);
-	poo << endl;
-	poo.close();
-	}
-
 void Tree::NNIMutate(int node, int branch, double optPrecision, int subtreeNode){
 
 	assert(0);
@@ -3711,50 +3771,4 @@ void Tree::NNIMutate(int node, int branch, double optPrecision, int subtreeNode)
 #endif
 
 	OptimizeBranchesWithinRadius(connector, optPrecision, subtreeNode, NULL);
-	}
- 
- 
-int Tree::VariableSPRMutate(int range, double optPrecision){
-	//this is just a spoof version of SPRMutate that will perform the same mutation
-	//several times with different levels of optimiation, but will otherwise 
-	//maintain exactly the same program flow because it resets the seed
-	assert(0); //this needs to be verified
-	Individual tempIndiv;
-	tempIndiv.treeStruct=new Tree();
-	
-	Individual sourceIndiv;
-	sourceIndiv.treeStruct=this;
-	sourceIndiv.mod->CopyModel(this->mod);
-		
-	int savedSeed;
-	
-	ofstream out("variable.log", ios::app);
-	out.precision(9);
-	out << "SPR" << range << "\t" << lnL << "\t";
-	
-	
-	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv);
-	
-	double prec[5]={.5, .25, .1, .05, .01};
-	for(int i=0;i<5;i++){
-		savedSeed = rnd.seed();
-		tempIndiv.treeStruct->TopologyMutator(prec[i], range, 0);
-		//tempIndiv.treeStruct->SPRMutate(range, prec[i]);
-		out << tempIndiv.treeStruct->lnL << "\t";
-		rnd.set_seed(savedSeed);
-		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
-		}
-	out << "\n";
-
-	tempIndiv.treeStruct->RemoveTreeFromAllClas();
-	delete tempIndiv.treeStruct;
-	tempIndiv.treeStruct=NULL;
-	sourceIndiv.treeStruct=NULL;
-
-	TopologyMutator(optPrecision, range, 0);
-	//SPRMutate(range, optPrecision);
-	ofstream poo("3branchScores.log", ios::app);
-	poo << endl;
-	poo.close();
-	return 1;
 	}

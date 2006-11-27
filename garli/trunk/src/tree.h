@@ -124,7 +124,9 @@ class Tree{
 		void GatherValidReconnectionNodes(int maxRange, TreeNode *cut, const TreeNode *subtreeNode);
 		void AssignWeightsToSwaps(TreeNode *cut);
 		int SPRMutate(int cutnum, ReconNode *broke, double optPrecision, int subtreeNode);
+		int SPRMutateDummy(int cutnum, ReconNode *broke, double optPrecision, int subtreeNode);
 		void ReorientSubtreeSPRMutate(int oldRoot, ReconNode *newRoot, double optPrecision);
+		void ReorientSubtreeSPRMutateDummy(int oldRoot, ReconNode *newRoot, double optPrecision);
 		int BrlenMutate();
 		int BrlenMutateSubset(const vector<int> &subtreeList);
 		void ScaleWholeTree(double factor=-1.0);

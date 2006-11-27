@@ -193,13 +193,24 @@ char **argv=NULL;
 					pop.GetConstraints();
 			
 					pop.SeedPopulationWithStartingTree();
-		//DEBUG - to look at effect of prec during init opt on score
-	/*				for(double prec=0.5;prec > 0.00;prec -= 0.01){
-						pop.adap->branchOptPrecision = prec;
-						pop.SeedPopulationWithStartingTree();
-						pop.AppendTreeToTreeLog(-1, -1);
+					//DEBUG - to look at effect of prec during init opt on score
+/*					pop.InitializeOutputStreams();
+					time_t repStart;
+					ofstream res("optresults.log");
+					for(double prec=0.5;prec > 0.0001;){
+						repStart = pop.stopwatch.SplitTime();
+						for(int rep=0;rep<10;rep++){
+							pop.adap->branchOptPrecision = prec;
+							pop.SeedPopulationWithStartingTree();
+							pop.AppendTreeToTreeLog(-1, -1);
+							res << prec << "\t" << pop.indiv[0].Fitness() << endl;
+							}
+						res << "TIME: " << prec << "\t" << pop.stopwatch.SplitTime() - repStart << endl;
+						if(prec > 0.051) prec -= 0.05;
+						else prec -= 0.01;
 						}
-	*/				}
+					return 1;
+*/					}
 				else{
 					pop.GetConstraints();
 					pop.ReadStateFiles();
