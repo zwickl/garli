@@ -1332,7 +1332,6 @@ void Population::PerformMutation(int indNum){
 			 	
 			       		ind->Mutate(adap->branchOptPrecision, adap);
 
-						//DEBUG
 						if(output_tree){
 							treeLog << "  tree gen" << gen <<  "." << indNum << "= [&U] [" << ind->Fitness() << "][ ";
 							ind->mod->OutputGarliFormattedModel(treeLog);

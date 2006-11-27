@@ -442,28 +442,27 @@ class Model{
 
 	//Setting things
 	void SetDefaultModelParameters(const HKYData *data);
-	void SetRmat(double *r){
-		if(nst==1){
-			if((r[0]==r[1] && r[1]==r[2] &&
-				r[2]==r[3] && r[3]==r[4])==false)
-				throw(ErrorException("Config file specifies ratematrix = 1rate, but starting model has nonequal rates!\n"));
-			}
-		if(nst==2){
-			if(((r[0]==r[2]  && r[2]==r[3] && r[1]==r[4]))==false)
-				throw(ErrorException("Config file specifies ratematrix = 2rate, but starting model does not match!\n"));
+	void SetRmat(double *r, bool checkValidity){
+		if(checkValidity == true){
+			if(nst==1){
+				if((r[0]==r[1] && r[1]==r[2] &&
+					r[2]==r[3] && r[3]==r[4])==false)
+					throw(ErrorException("Config file specifies ratematrix = 1rate, but starting model has nonequal rates!\n"));
+				}
+			if(nst==2){
+				if(((r[0]==r[2]  && r[2]==r[3] && r[1]==r[4]))==false)
+					throw(ErrorException("Config file specifies ratematrix = 2rate, but starting model does not match!\n"));
+				}
 			}
 		for(int i=0;i<5;i++) *relRates[i]=r[i];
 		*relRates[5]=1.0;
 		eigenDirty=true;
 		}
-	void SetPis(double *b){
-		if(modSpec.equalStateFreqs==true && (b[0]==b[1] && b[1]==b[2]) == false) throw(ErrorException("Config file specifies equal statefrequencies,\nbut starting model has nonequal frequencies!\n"));
-		if(modSpec.empiricalStateFreqs==true) throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model specifies frequencies!\n"));
-		for(int i=0;i<3;i++) *stateFreqs[i]=b[i];
-		*stateFreqs[3]=1.0 - *stateFreqs[0] - *stateFreqs[1] - *stateFreqs[2];
-		eigenDirty=true;
-		}
-	void SetEmpiricalPis(double *b){
+	void SetPis(double *b, bool checkValidity){
+		if(checkValidity == true){
+			if(modSpec.equalStateFreqs==true && (b[0]==b[1] && b[1]==b[2]) == false) throw(ErrorException("Config file specifies equal statefrequencies,\nbut starting model has nonequal frequencies!\n"));
+			if(modSpec.empiricalStateFreqs==true) throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model specifies frequencies!\n"));
+			}
 		for(int i=0;i<3;i++) *stateFreqs[i]=b[i];
 		*stateFreqs[3]=1.0 - *stateFreqs[0] - *stateFreqs[1] - *stateFreqs[2];
 		eigenDirty=true;
@@ -476,16 +475,18 @@ class Model{
 			rateProbs[r]=probs[r];
 			}		
 		}
-	void SetAlpha(double a){
-		if(modSpec.numRateCats==1) throw(ErrorException("Config file specifies ratehetmodel = none, but starting model contains alpha!\n"));
+	void SetAlpha(double a, bool checkValidity){
+		if(checkValidity == true)
+			if(modSpec.numRateCats==1) throw(ErrorException("Config file specifies ratehetmodel = none, but starting model contains alpha!\n"));
 		*alpha=a;
 		DiscreteGamma(rateMults, rateProbs, *alpha);
 		//This is odd, but we need to call normalize rates here if we are just using a gamma distrib to get starting rates for 
 		//flex.  Flex expects that the rates will be normalized including pinv elsewhere
 		if(modSpec.flexRates == true) NormalizeRates();
 		}
-	void SetPinv(double p){
-		if(modSpec.includeInvariantSites==false && p!=0.0) throw(ErrorException("Config file specifies invariantsites = none, but starting model contains it!\n"));
+	void SetPinv(double p, bool checkValidity){
+		if(checkValidity == true)
+			if(modSpec.includeInvariantSites==false && p!=0.0) throw(ErrorException("Config file specifies invariantsites = none, but starting model contains it!\n"));
 		*propInvar=p;
 		//change the proportion of rates in each gamma cat
 		for(int i=0;i<NRateCats();i++){

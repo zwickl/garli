@@ -196,14 +196,14 @@ double Tree::OptimizeAlpha(){
 	
 	while(1){
 		double incr=0.001;
-		mod->SetAlpha(prevVal+incr);
+		mod->SetAlpha(prevVal+incr, false);
 		
 		MakeAllNodesDirty();
 		Score();
 		cur=lnL;
 		double d11=(cur-prev)/incr;
 		
-		mod->SetAlpha(prevVal-incr);
+		mod->SetAlpha(prevVal-incr, false);
 		MakeAllNodesDirty();
 		Score();
 		cur=lnL;
@@ -215,7 +215,7 @@ double Tree::OptimizeAlpha(){
 		double est=-d1/d2;
 		
 		if((abs(est) < 0.001 && d2 < 0.0) || (abs(d1) < 50.0)){
-			mod->SetAlpha(prevVal);
+			mod->SetAlpha(prevVal, false);
 			MakeAllNodesDirty();			
 			return prev-start;
 			}
@@ -232,7 +232,7 @@ double Tree::OptimizeAlpha(){
 			else t=prevVal*0.91;
 			}
 		
-		mod->SetAlpha(t);
+		mod->SetAlpha(t, false);
 		assert((prevVal==0.05 && mod->Alpha()==0.05)==false);
 		MakeAllNodesDirty();			
 		Score();
@@ -264,14 +264,14 @@ double Tree::OptimizePinv(){
 	
 	while(1){
 		double incr=0.001;
-		mod->SetPinv(prevVal+incr);
+		mod->SetPinv(prevVal+incr, false);
 		
 		MakeAllNodesDirty();
 		Score();
 		cur=lnL;
 		double d11=(cur-prev)/incr;
 		
-		mod->SetPinv(prevVal-incr);
+		mod->SetPinv(prevVal-incr, false);
 		MakeAllNodesDirty();
 		Score();
 		cur=lnL;
@@ -283,7 +283,7 @@ double Tree::OptimizePinv(){
 		double est=-d1/d2;
 		
 		if((abs(est) < 0.001 && d2 < 0.0) || (d1>0.0 && prevVal==mod->MaxPinv())){
-			mod->SetPinv(prevVal);
+			mod->SetPinv(prevVal, false);
 			MakeAllNodesDirty();			
 			return prev-start;
 			}
@@ -302,7 +302,7 @@ double Tree::OptimizePinv(){
 			if(t > mod->MaxPinv()) t=mod->MaxPinv();
 			}
 			
-		mod->SetPinv(t);
+		mod->SetPinv(t, false);
 		MakeAllNodesDirty();			
 		Score();
 		prev=lnL;

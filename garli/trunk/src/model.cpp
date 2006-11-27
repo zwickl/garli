@@ -404,15 +404,15 @@ void Model::SetDefaultModelParameters(const HKYData *data){
 	if(modSpec.equalStateFreqs == false){
 		double f[4];
 		data->GetEmpiricalFreqs(f);
-		SetEmpiricalPis(f);
+		SetPis(f, false);
 		}
 
 	if(modSpec.includeInvariantSites==false){
-		SetPinv(0.0);
+		SetPinv(0.0, false);
 		SetMaxPinv(0.0);
 		}
 	else{
-		SetPinv(0.25 * ((double)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic())));
+		SetPinv(0.25 * ((double)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic())), false);
 		SetMaxPinv((double)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic()));
 		if(modSpec.flexRates == true) NormalizeRates();
 		else AdjustRateProportions();

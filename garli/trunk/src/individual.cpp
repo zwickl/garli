@@ -308,7 +308,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading rate matrix parameters in file %s!\nExamine file and check manual for format.\n", fname));
 					r[i]=atof(temp);
 					}
-				mod->SetRmat(r);
+				mod->SetRmat(r, restart==false);
 				do{c=stf.get();}while(c==' ');
 				if(isdigit(c) || c=='.'){
 					stf >> temp;//this is necessary incase GT is included
@@ -323,7 +323,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading base frequency parameters in file %s!\nExamine file and check manual for format.\n", fname));
 					b[i]=atof(temp);
 					}
-				mod->SetPis(b);
+				mod->SetPis(b, restart==false);
 				do{c=stf.get();}while(c==' ');
 				if(isdigit(c) || c=='.'){
 					stf >> temp;
@@ -335,7 +335,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				if(modSpec.flexRates==true) throw(ErrorException("Config file specifies ratehetmodel = flex, but starting model contains alpha!\n"));
 				stf >> temp;
 				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading alpha parameter in file %s!\nExamine file and check manual for format.\n", fname));
-				mod->SetAlpha(atof(temp));
+				mod->SetAlpha(atof(temp), restart==false);
 				c=stf.get();
 				modSpec.gotAlphaFromFile=true;
 				}				
@@ -343,7 +343,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				stf >> temp;
 				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading proportion of invariant sites parameter in file %s!\nExamine file and check manual for format.\n", fname));
 				double p=atof(temp);
-				mod->SetPinv(p);
+				mod->SetPinv(p, restart==false);
 				c=stf.get();
 				modSpec.gotPinvFromFile=true;
 				}
