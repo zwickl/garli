@@ -165,7 +165,7 @@ void Adaptation::WriteToCheckpoint(ofstream &out){
 	assert(out.good());
 
 	//first take care of the scalars, which all come first in the class
-	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(double)*23;
+	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(double)*22;
 	out.write((char *) this, scalarSize);
 
 	//now the arrays, which should be of length intervalsToStore
@@ -203,7 +203,7 @@ void Adaptation::ReadFromCheckpoint(ifstream &in){
 	//this function assumes that it has been passed a stream that is already open for 
 	//binary reading
 	assert(in.good());
-	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(double)*23;
+	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(double)*22;
 
 	in.read((char *) this, scalarSize);
 
