@@ -80,6 +80,8 @@ double globalBest;
 
 #undef DETAILED_SWAP_REPORT
 
+#undef NO_EVOLUTION
+
 bool output_tree=false;
 
 int CheckRestartNumber(const string str);
@@ -1017,7 +1019,11 @@ double Population::CalcAverageFitness(){
 	// keep track of which individual is most fit each generation we've stored the 
 	//fitnesses as ln-likelihoods in cumfit, so cumfit[0] will be the _least_ fit individual
 	int mostFit = total_size-1;
+#ifndef NO_EVOLUTION
 	bestAccurateIndiv=bestIndiv = (int)cumfit[mostFit][0];
+#else
+	bestAccurateIndiv=bestIndiv = 0;
+#endif
 	//if subtree mode is active, we also want to find the best accurate indiv
 	if(rank==0){
 		while(paraMan->subtreeModeActive==true && indiv[bestAccurateIndiv].accurateSubtrees==false){
@@ -1233,6 +1239,10 @@ void Population::DetermineParentage(){
 				}
 #endif
 			}
+
+#ifdef NO_EVOLUTION
+		parent = 0;
+#endif
 
 		newindiv[i].parent=parent;
 		if(newindiv[i].mutation_type==Individual::subtreeRecom) newindiv[i].topo=-1; //VERIFY
@@ -2587,6 +2597,7 @@ void Population::keepTrack(){
 	//			if(i==bestIndiv){
 					//keep track of when the last significant beneficial topo mutation occured
 					//this will be used for the stopping criterion, precision reduction and update reduction in the parallel version
+#ifndef NO_EVOLUTION
 					if(typ&Individual::anyTopo || adap->topoWeight==0.0){
 						//clearing of the swaps records needs to be done for _any_ new best topo, not
 						//just ones that are significantly better
@@ -2601,7 +2612,8 @@ void Population::keepTrack(){
 									}
 								}
 							}
-						}
+					}
+#endif
 					
 					if(typ&(Individual::randNNI)){
 						adap->randNNI[0] += scoreDif;
