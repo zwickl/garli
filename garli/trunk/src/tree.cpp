@@ -57,7 +57,7 @@ double Tree::exp_starting_brlen    = DEF_STARTING_BRLEN; // expected starting br
 ClaManager *Tree::claMan;
 list<TreeNode *> Tree::nodeOptVector;
 HKYData *Tree::data;
-int Tree::rescaleEvery;
+unsigned Tree::rescaleEvery;
 double Tree::treeRejectionThreshold;
 vector<Constraint> Tree::constraints;
 AttemptedSwapList Tree::attemptedSwaps;

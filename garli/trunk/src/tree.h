@@ -70,7 +70,7 @@ class Tree{
 		static AttemptedSwapList attemptedSwaps;
 		static double uniqueSwapBias;
 		static double distanceSwapBias;
-		static int rescaleEvery;
+		static unsigned rescaleEvery;
 		static list<TreeNode *> nodeOptVector;
 		
 		static float uniqueSwapPrecalc[500];

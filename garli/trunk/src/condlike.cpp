@@ -17,27 +17,42 @@
 #include "memchk.h"
 #include "condlike.h"
 #include "clamanager.h"
+#include "utility.h"
+
+#undef ALIGN_CLAS
+#define CLA_ALIGNMENT 32
 
 CondLikeArray::~CondLikeArray(){
 	//don't want to delete shared CL from nodes.  Should only
 	//be called from Population level if CONDLIKE SHARED is defined
 	if( arr ){
-		 delete []arr;
-		 arr=NULL;
+#ifndef ALIGN_CLAS
+		delete []arr;
+#else
+		DeleteAlignedArray(arr);
+#endif
+		arr=NULL;
 		 }
 	if(underflow_mult!=NULL) delete []underflow_mult;
 }
 
 void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	if( arr ){
-		 delete []arr;
-		 arr=NULL;
-		 //MEM_DELETE_ARRAY(arr); // arr is of length max
-		 }
+#ifndef ALIGN_CLAS
+		delete []arr;
+#else
+		DeleteAlignedArray(arr);
+#endif
+		arr=NULL;
+		}
 	nrates = nr;
 	nsites = ns;
 	nstates = nk;
+#ifndef ALIGN_CLAS
 	arr=new double[nk*nr*ns];
+#else
+	arr = NewAlignedArray<double>(nk*nr*ns, CLA_ALIGNMENT);
+#endif
 	if(arr==NULL){
 		throw(1);
 		}

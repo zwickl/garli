@@ -53,11 +53,11 @@ class CondLikeArray
 {
 	friend class CondLikeArrayIterator;
 
-	int nsites, nrates, nstates;
+	unsigned nsites, nrates, nstates;
 	public:
 		double* arr;
 		int* underflow_mult;
-		short rescaleRank;
+		unsigned rescaleRank;
 		CondLikeArray()
 			: nsites(0), nrates(0), nstates(0), arr(0), underflow_mult(0), rescaleRank(1){}
 		~CondLikeArray();

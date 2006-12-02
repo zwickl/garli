@@ -27,6 +27,8 @@ using namespace std;
 #include "mlhky.h"
 #include "rng.h"
 
+#undef ALIGN_MODEL
+
 extern rng rnd;
 double Model::mutationShape;
 
@@ -73,23 +75,31 @@ Model::~Model(){
 		delete []indx;
 		delete []c_ijk;
 		delete []EigValexp;
-		delete []*eigvecs;
-		delete []eigvecs;
-		delete []*teigvecs;
-		delete []teigvecs;
-		delete []*inveigvecs;
-		delete []inveigvecs;
+
+#ifndef ALIGN_MODEL
+		Delete2DArray(eigvecs);
+		Delete2DArray(teigvecs);
+		Delete2DArray(inveigvecs);
 		Delete3DArray(pmat);
-		delete []*qmat;
-		delete []qmat;
-		delete []*tempqmat;
-		delete []tempqmat;
+		Delete2DArray(qmat);
+		Delete2DArray(tempqmat);
 		Delete3DArray(deriv1);
 		Delete3DArray(deriv2);
+#else
+		Delete2DAlignedArray(eigvecs);
+		Delete2DAlignedArray(teigvecs);
+		Delete2DAlignedArray(inveigvecs);
+		Delete3DAlignedArray(pmat);
+		Delete2DAlignedArray(qmat);
+		Delete2DAlignedArray(tempqmat);
+		Delete3DAlignedArray(deriv1);
+		Delete3DAlignedArray(deriv2);
+#endif
 		}
 	}
 
 void Model::AllocateEigenVariables(){
+#ifndef ALIGN_MODEL
 	//a bunch of allocation here for all of the qmatrix->eigenvector->pmatrix related variables
 	eigvals=new double[nstates];//eigenvalues
 	eigvalsimag=new double[nstates];
@@ -101,44 +111,54 @@ void Model::AllocateEigenVariables(){
 	EigValexp=new double[nstates*NRateCats()];	
 
 	//create the matrix for the eigenvectors
-	temp=new double[nstates*nstates];
-	eigvecs=new double*[nstates];
-	for(int x=0;x<nstates;x++){
-		eigvecs[x]=&temp[nstates*x];
-		}
+	eigvecs=New2DArray<double>(nstates,nstates);
 
 	//create a temporary matrix to hold the eigenvectors that will be destroyed during the invertization
-	temp=new double[nstates*nstates];
-	teigvecs=new double*[nstates];
-	for(int x=0;x<nstates;x++){
-		teigvecs[x]=&temp[nstates*x];
-		}
+	teigvecs=New2DArray<double>(nstates,nstates);
 
 	//create the matrix for the inverse eigenvectors
-	temp=new double[nstates*nstates];
-	inveigvecs=new double*[nstates];
-	for(int x=0;x<nstates;x++){
-		inveigvecs[x]=&temp[nstates*x];
-		}
+	inveigvecs=New2DArray<double>(nstates,nstates);	
 
 	//allocate the pmat
 	pmat=New3DArray<double>(NRateCats(), nstates, nstates);
 
 	//allocate qmat and tempqmat
-	temp=new double[nstates*nstates];
-	qmat=new double*[nstates];
-	for(int x=0;x<nstates;x++){
-		qmat[x]=&temp[nstates*x];
-		}
-
-	temp=new double[nstates*nstates];
-	tempqmat=new double*[nstates];
-	for(int x=0;x<nstates;x++){
-		tempqmat[x]=&temp[nstates*x];
-		}	
+	qmat=New2DArray<double>(nstates,nstates);
+	tempqmat=New2DArray<double>(nstates,nstates);
 
 	deriv1=New3DArray<double>(NRateCats(), nstates, nstates);
 	deriv2=New3DArray<double>(NRateCats(), nstates, nstates);
+#else
+
+	//a bunch of allocation here for all of the qmatrix->eigenvector->pmatrix related variables
+	eigvals=new double[nstates];//eigenvalues
+	eigvalsimag=new double[nstates];
+	iwork=new int[nstates];
+	work=new double[nstates];
+	col=new double[nstates];
+	indx=new int[nstates];
+	c_ijk=new double[nstates*nstates*nstates];	
+	EigValexp=new double[nstates*NRateCats()];	
+
+	//create the matrix for the eigenvectors
+	eigvecs=New2DAlignedArray<double>(nstates,nstates);
+
+	//create a temporary matrix to hold the eigenvectors that will be destroyed during the invertization
+	teigvecs=New2DAlignedArray<double>(nstates,nstates);
+
+	//create the matrix for the inverse eigenvectors
+	inveigvecs=New2DAlignedArray<double>(nstates,nstates);	
+
+	//allocate the pmat
+	pmat=New3DAlignedArray<double>(NRateCats(), nstates, nstates);
+
+	//allocate qmat and tempqmat
+	qmat=New2DAlignedArray<double>(nstates,nstates);
+	tempqmat=New2DAlignedArray<double>(nstates,nstates);
+
+	deriv1=New3DAlignedArray<double>(NRateCats(), nstates, nstates);
+	deriv2=New3DAlignedArray<double>(NRateCats(), nstates, nstates);
+#endif
 	}
 
 void Model::UpdateQMat(){
