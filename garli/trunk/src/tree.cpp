@@ -38,6 +38,8 @@ using namespace std;
 
 extern rng rnd;
 extern bool output_tree;
+#undef OUTPUT_UNIQUE_TREES
+#undef VARIABLE_OPTIMIZATION
 
 //external global variables
 extern int calcCount;
@@ -832,7 +834,6 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, double optPrec
 	return 1;
 	}
 
-#undef VARIABLE_OPTIMIZATION
 
 //this function now returns the reconnection distance, with it being negative if its a
 //subtree reorientation swap
@@ -889,8 +890,15 @@ int Tree::TopologyMutator(double optPrecision, int range, int subtreeNode){
 			err=SPRMutate(cut->nodeNum, broken, optPrecision, subtreeNode);
 			ret=broken->reconDist;
 			}
-		#ifdef VARIABLE_OPTIMIZATION
-			output_tree = unique;
+		#ifdef OUTPUT_UNIQUE_TREES
+		if(unique == true){
+			output_tree = true;
+			ofstream out("unique.log", ios::app);
+			out.precision(9);
+			if(broken->withinCutSubtree == false) out << "SPR" << "\t" << broken->reconDist << "\t" << lnL << "\n";
+			else out << "reSPR" << "\t" << broken->reconDist << "\t" << lnL << "\n";
+			out.close();
+			}
 		#endif
 		}while(err<0);
 
@@ -1090,6 +1098,8 @@ int Tree::SPRMutateDummy(int cutnum, ReconNode *broke, double optPrecision, int 
 	sourceIndiv.treeStruct=NULL;
 
 	SPRMutate(cutnum, broke, optPrecision, 0);
+	out << lnL << "\n";
+	out.close();
 /*	ofstream poo("3branchScores.log", ios::app);
 	poo << endl;
 	poo.close();
@@ -1264,6 +1274,8 @@ void Tree::ReorientSubtreeSPRMutateDummy(int oroot, ReconNode *nroot, double opt
 	sourceIndiv.treeStruct=NULL;
 
 	ReorientSubtreeSPRMutate(oroot, nroot, optPrecision);
+	out << lnL << "\n";
+	out.close();
 /*	ofstream poo("3branchScores.log", ios::app);
 	poo << endl;
 	poo.close();
