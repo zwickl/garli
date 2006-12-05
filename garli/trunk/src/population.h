@@ -264,7 +264,7 @@ class PerturbManager{
 class Population
 {
 public:
-	int total_size; //this will be equal to conf->nindiv, except in 
+	unsigned total_size; //this will be equal to conf->nindiv, except in 
 					//the case of the parallel master
 					
 	Individual* indiv;
@@ -294,9 +294,9 @@ public:
 
 	//termination related variables
 	bool enforceTermConditions;
-	int lastTopoImprove;
-	int lastPrecisionReduction;
-	int lastTopoImproveThresh;
+	unsigned lastTopoImprove;
+	unsigned lastPrecisionReduction;
+	unsigned lastTopoImproveThresh;
 	double improveOverStoredIntervalsThresh;
 	double significantTopoChange;//the score difference from the current best required for 
 								 //a new topology to really be considered "better"
@@ -308,10 +308,11 @@ private:
 	ofstream treeLog;
 	ofstream probLog;
 	ofstream bootLog;
+	ofstream bootLogPhylip;
 	ofstream swapLog;
 	char besttreefile[100];
 
-	int ntopos;
+	unsigned ntopos;
 	bool prematureTermination;//if the user killed the run
 
 	char *treeString;
@@ -340,7 +341,7 @@ private:
 		//allocated in setup, deleted in dest
 		TopologyList **topologies;
 			//allocated in Setup(), deleted in dest
-		long gen;
+		unsigned gen;
 		GeneralGamlConfig *conf;
 		HKYData* data;
 		Individual *allTimeBest; //this is only used for perturbation or ratcheting
@@ -441,7 +442,7 @@ private:
 
 		void NNIoptimization();
 //		void SPRoptimization(int indivIndex);
-		bool NNIoptimization(int IndivIndex, int steps);
+		bool NNIoptimization(unsigned IndivIndex, int steps);
 //		bool SPRoptimization(int indivIndex, int range, int cutnum );
 		void SPRPerturbation(int sourceInd, int indivIndex);
 		void keepTrack();

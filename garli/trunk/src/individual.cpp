@@ -124,12 +124,12 @@ void Individual::Mutate(double optPrecision, Adaptation *adap){
 	    int reconDist = treeStruct->TopologyMutator(optPrecision, -1, 0);
 		if(reconDist < 0){
 			if(reconDist == -1) mutation_type |= randNNI;
-			else if(reconDist <  -adap->limSPRrange) mutation_type |= randSPRCon;
+			else if(reconDist < -1 * (int)adap->limSPRrange) mutation_type |= randSPRCon;
 			else mutation_type |= limSPRCon;
 			}
 		else {
 			if(reconDist == 1) mutation_type |= randNNI;
-			else if(reconDist >  adap->limSPRrange) mutation_type |= randSPR;
+			else if(reconDist >  (int) adap->limSPRrange) mutation_type |= randSPR;
 			else mutation_type |= limSPR;
 			}
 	    if(treeStruct->lnL !=-1.0){
@@ -440,7 +440,7 @@ void Individual::RefineStartingConditions(bool optModel, double branchPrec){
 		scaleImprove=treeStruct->OptimizeTreeScale(branchPrec);
 		SetDirty();
 		if(optModel==true && mod->NRateCats() > 1 && modSpec.fixAlpha == false && modSpec.gotFlexFromFile == false){
-			alphaImprove=treeStruct->OptimizeAlpha();
+			alphaImprove=treeStruct->OptimizeAlpha(branchPrec);
 			SetDirty();
 			}
 		improve=scaleImprove + trueImprove + alphaImprove;

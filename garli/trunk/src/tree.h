@@ -178,7 +178,7 @@ class Tree{
 		double RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledFrom, double optPrecision, int subtreeNode, int radius, double scoreIncrease);
 		double BrentOptimizeBranchLength(double accuracy_cutoff, TreeNode *here, bool firstPass);
 		double BranchLike(TreeNode *optNode);
-		double OptimizeAlpha();
+		double OptimizeAlpha(double);
 		double OptimizeTreeScale(double);
 		double OptimizePinv();
 		void SetNodesUnoptimized();

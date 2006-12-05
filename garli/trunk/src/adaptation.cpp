@@ -99,7 +99,7 @@ Adaptation::Adaptation(const GeneralGamlConfig *gc){
 #ifdef MPI_VERSION
 	bestFromRemote=new double[intervalsToStore];bestFromRemoteNum=new int[intervalsToStore];
 #endif
-	for(int i=0;i<intervalsToStore;i++){
+	for(unsigned i=0;i<intervalsToStore;i++){
 	randNNI[i] = 0.0; randNNInum[i] = 0;
 	exNNI[i] = 0.0; exNNInum[i] = 0;
 	randSPR[i] = 0.0; randSPRnum[i] = 0;
@@ -320,7 +320,7 @@ void Adaptation::UpdateProbs(){
 	int totNumRandPECR=0;
 #endif
 	
-	for(int i=0;i<intervalsToStore;i++){
+	for(unsigned i=0;i<intervalsToStore;i++){
 #ifdef GANESH
 		topoTot += randNNI[i] + randSPR[i] + limSPR[i] + randPECR[i];
 		numTopos += randNNInum[i] + randSPRnum[i] + limSPRnum[i] +
