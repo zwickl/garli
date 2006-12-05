@@ -396,6 +396,7 @@ private:
 		void ReadStateFiles();
 		void GetConstraints();
 		void WriteTreeFile( const char* treefname, int fst = -1, int lst = -1 );
+		void WritePhylipTree(ofstream &phytree);
 
 		void Setup(GeneralGamlConfig *conf, HKYData *, int nprocs = 1, int rank = 0);
 		int Restart(int type, int rank, int nprocs, int restart_count);

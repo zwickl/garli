@@ -1638,7 +1638,7 @@ void Population::AppendTreeToBootstrapLog(int rep){
 	bootLog << "] " << treeString << ";" << endl;
 
 	if(outputPhylipTree == true){
-		bootLogPhylip << treeString << ";" << endl;
+		WritePhylipTree(bootLogPhylip);
 		}
 	}
 
@@ -1695,28 +1695,9 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 		sprintf(phyname, "%s.phy", treefname);
 		ofstream phytree(phyname);
 		phytree.precision(8);
-		char *loc=treeString;
-		NxsString temp;
-		while(*loc){
-			if(*loc == ':'){
-				temp += *loc++;
-				while(*loc != ',' && *loc != ')')
-					temp += *loc++;
-				phytree << temp.c_str();
-				temp="";				
-				}
-			if(isdigit(*loc) == false) phytree << *loc++;
-			else{
-				while(isdigit(*loc))
-					temp += *loc++;
-				phytree << data->TaxonLabel(atoi(temp.c_str())-1);
-				temp="";
-				}
-			}
-		phytree << ";";
+		WritePhylipTree(phytree);
 		phytree.close();
 		}
-	
 
 //if using the UD serial version, just output the best tree in phylip format, with it's score before it
 /*	best->treeStruct->root->MakeNewick(treeString, false);
@@ -1724,6 +1705,34 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 	outf.close();
 */
 	}
+
+//CAREFUL HERE!  This function assumes the the treestring was just
+//filled with MakeNewick, making a tree with taxon NUMBERS in the specification.
+//This function then just reads that treestring and translates to taxon NAMES
+//on the fly and outputs everything to the string passed in, which needs to 
+//be already open
+void Population::WritePhylipTree(ofstream &phytree){
+	char *loc=treeString;
+	NxsString temp;
+	while(*loc){
+		if(*loc == ':'){
+			temp += *loc++;
+			while(*loc != ',' && *loc != ')')
+				temp += *loc++;
+			phytree << temp.c_str();
+			temp="";				
+			}
+		if(isdigit(*loc) == false) phytree << *loc++;
+		else{
+			while(isdigit(*loc))
+				temp += *loc++;
+			phytree << data->TaxonLabel(atoi(temp.c_str())-1);
+			temp="";
+			}
+		}
+	phytree << ";\n";
+	}
+
 
 char * Population::MakeNewick(int i, bool internalNodes)
 {
