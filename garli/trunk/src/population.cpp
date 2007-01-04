@@ -408,7 +408,7 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 	int L3=(int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size);//one full set, enough to reserve at least all of the full internals of the 
 													 //best indiv and enough for each root
 	if(maxClas >= L0){
-		numClas=idealClas;
+		numClas=maxClas;
 		memLevel = 0;		
 		}
 	else{
@@ -814,6 +814,9 @@ void Population::Run(){
 			outman.precision(10);
 			bool reduced=false;
 			if(gen-(max(lastTopoImprove, lastPrecisionReduction)) >= adap->intervalsToStore*adap->intervalLength){
+				//this allows the program to bail if numPrecReductions < 0, which can be handy to get to this point
+				//with checkpointing in and then restart from the same checkpoint with various values of numPrecReductions
+				if(adap->numPrecReductions < 0) return;
 				reduced=adap->ReducePrecision();
 				}
 			if(reduced){
@@ -865,7 +868,7 @@ void Population::Run(){
 		}
 
 	FinalOptimization();
-	gen=-1;
+	gen = UINT_MAX;
 	OutputLog();
 	if(bootstrapReps==0) FinalizeOutputStreams();
 	
@@ -1608,7 +1611,7 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	if(indNum==-1) ind=&indiv[bestIndiv];
 	else ind=&indiv[indNum];
 
-	if(gen == -1) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
+	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
 	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
 	ind->mod->OutputGarliFormattedModel(treeLog);
 	ind->treeStruct->root->MakeNewick(treeString, false, true);
@@ -2042,7 +2045,7 @@ int Population::GetSpecifiedModels(double** model_string, int n, int* indiv_list
 
 void Population::OutputLog()	{
 	//log << gen << "\t" << bestFitness << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
-	if(gen > -1) {
+	if(gen < UINT_MAX) {
 		log << gen << "\t" << indiv[bestIndiv].Fitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
 #ifdef MAC_FRONTEND
 		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
