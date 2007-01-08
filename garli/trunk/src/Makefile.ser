@@ -10,12 +10,12 @@ CC	  = g++  #gnu compiler   (gcc)
 #CC_FLAGS = -O3 -fstrict-aliasing -arch i386 -arch ppc -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h
 
 #gcc: linux or OSX binary that will work on the machine type that it is compiled on
-CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h
+CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -fsigned-char -DUNIX -DNDEBUG -include defs.h
 
 #icc: any machine type
 #CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -include defs.h
 
-EXEC     = Garli0.951
+EXEC     = Garli0.952.rev150
 
 OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		population.o rng.o set.o\
@@ -24,7 +24,7 @@ OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		bipartition.o model.o linalg.o adaptation.o mlhky.o\
 		optimization.o
 
-Garli0.951: $(OBJECT_LIST) garlimain.o
+Garli0.952 : $(OBJECT_LIST) garlimain.o
 	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) garlimain.o
 
 garlimain.o:	mlhky.h tree.h population.h \
@@ -43,7 +43,7 @@ optimization.o:	 tree.h funcs.h defs.h
 population.o:    population.h clamanager.h
 individual.o:    individual.h clamanager.h
 datamatr.o:      datamatr.h defs.h
-model.o:         model.h 
+model.o:         model.h defs.h
 funcs.o:         funcs.h defs.h
 linalg.o:        linalg.h
 treenode.o:      treenode.h
@@ -53,5 +53,5 @@ set.o:           set.h
 rng.o:           rng.h
 stricl.o:        stricl.h defs.h
 topologylist.o:  topologylist.h
-adaptation.o:	 	 adaptation.h hashdefines.h
-mlhky.o:		 mlhky.h
+adaptation.o:	 	 adaptation.h hashdefines.h defs.h
+mlhky.o:		 mlhky.h defs.h
