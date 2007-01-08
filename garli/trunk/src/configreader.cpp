@@ -304,7 +304,7 @@ int ConfigReader::GetIntOption(const char* option, int& val, bool optional /*=fa
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
 		dummy = atof(str.c_str());
 		if(dummy > (INT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (INT_MAX-1));
-		if(fabs(dummy - (unsigned)dummy) > 0.0) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
+		if(fabs(dummy - (int)dummy) > 0.0) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
 		val = (int) dummy;
 		rv = 0;
 	}

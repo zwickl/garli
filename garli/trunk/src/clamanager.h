@@ -59,6 +59,7 @@ class ClaManager{
 		}
 	
 	int NumClas() {return numClas;}
+	int MaxUsedClas() {return maxUsed;}
 	int NumFreeClas() {return (int) claStack.size();}
 	int NumFreeHolders() {return (int) holderStack.size();}
 

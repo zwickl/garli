@@ -408,7 +408,7 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 	int L3=(int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size);//one full set, enough to reserve at least all of the full internals of the 
 													 //best indiv and enough for each root
 	if(maxClas >= L0){
-		numClas=maxClas;
+		numClas = min(maxClas, idealClas);
 		memLevel = 0;		
 		}
 	else{
@@ -871,6 +871,8 @@ void Population::Run(){
 	gen = UINT_MAX;
 	OutputLog();
 	if(bootstrapReps==0) FinalizeOutputStreams();
+
+	//outman.UserMessage("Maximum # clas used = %d out of %d", claMan->MaxUsedClas(), claMan->NumClas());
 	
 	if(inferInternalStateProbs == true){
 		outman.UserMessage("Inferring internal state probabilities....");
@@ -2137,7 +2139,7 @@ bool Population::NNIoptimization(unsigned indivIndex, int steps){
 	bestNNIFitness = -1e100;
 	
 	steps = min(max(0,steps),newindiv[indivIndex].treeStruct->getNumTipsTotal()-3);
-	indivIndex = min(max(0,indivIndex),conf->nindivs-1);
+	indivIndex = min(max(0,(int)indivIndex),(int)conf->nindivs-1);
 
 	//DJZ
 	while(unusedTrees.size()<3){
@@ -3663,7 +3665,7 @@ void Population::InitializeOutputStreams(){
 		sprintf(temp_buf, "%s%s.log0%d.log", conf->ofprefix.c_str(), restart, rank);
 	log.open(temp_buf);
 	log.precision(10);
-	if(restart == false)
+	if(conf->restart == false)
 		log << "random seed = " << rnd.init_seed() << "\n";
 	else log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
 

@@ -1162,13 +1162,13 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, double optPrecision, int subtr
 		   		assert(cut==connector->right); 
 		   		replaceForConn=connector->left;
 		   		}
-			replaceForConn->dlen+=connector->dlen;
-		   	connector->SubstituteNodeWithRespectToAnc(replaceForConn);
+			SetBranchLength(replaceForConn, min(DEF_MAX_BRLEN, replaceForConn->dlen+connector->dlen));
+			connector->SubstituteNodeWithRespectToAnc(replaceForConn);
 		   	}
 		else{//cut is attached to the subtreeNode, so we will have to use it's sib as the connector
 			//connector's two children become the subtreeNodes new children, and connector's dlen gets added to subtreeNodes
 			TreeNode *subnode=allNodes[subtreeNode];
-			subnode->dlen += connector->dlen;
+			SetBranchLength(subnode, min(DEF_MAX_BRLEN, subnode->dlen+connector->dlen));
 			SweepDirtynessOverTree(connector);
 			subnode->left=connector->left;
 			subnode->right=connector->right;
@@ -1195,11 +1195,11 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, double optPrecision, int subtr
 		//root is now bifurcation
 		//preserve branch length info
 		if(root->right==connector){
-			root->left->dlen+=	connector->dlen;
+			SetBranchLength(root->left, min(DEF_MAX_BRLEN, root->left->dlen+connector->dlen));
 			sib=root->left;
 			}
 		else{
-			root->right->dlen+=	connector->dlen;	
+			SetBranchLength(root->right, min(DEF_MAX_BRLEN, root->right->dlen+connector->dlen));
 			sib=root->right;
 			}
 			
@@ -1219,11 +1219,8 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, double optPrecision, int subtr
 	connector->AddDes(broken);
 	assert(connector->right == broken);
 
-	if(broken->dlen*.5 > DEF_MIN_BRLEN){
-		connector->dlen=broken->dlen*.5;
-		broken->dlen-=connector->dlen;
-		}
-	else connector->dlen=broken->dlen=DEF_MIN_BRLEN;
+	SetBranchLength(connector, max(DEF_MIN_BRLEN, broken->dlen*.5));
+	SetBranchLength(broken, connector->dlen);
 
 	if(createTopologyOnly == false){
 		SweepDirtynessOverTree(connector, cut);
@@ -1300,7 +1297,7 @@ void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, double optPreci
 	TreeNode *oldroot=allNodes[oroot];
 
 	//these are the only blens that need to be dealt with specially
-	double fusedBlen = oldroot->left->dlen + oldroot->right->dlen;
+	double fusedBlen = min(DEF_MAX_BRLEN, oldroot->left->dlen + oldroot->right->dlen);
 	double dividedBlen = max(0.5 * newroot->dlen, DEF_MIN_BRLEN);
 
 	//first detatch the subtree and make it free floating.  This will
@@ -1325,7 +1322,8 @@ void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, double optPreci
 		}
 
 	tempRoot->AddDes(prunePoint);
-	prunePoint->dlen=fusedBlen;
+	//prunePoint->dlen=fusedBlen;
+	SetBranchLength(prunePoint, fusedBlen);
 	tempRoot->anc=NULL;
 
 	if(createTopologyOnly == false) MakeNodeDirty(tempRoot);
@@ -1353,7 +1351,9 @@ void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, double optPreci
 	oldanc->RemoveDes(newroot);
 	oldroot->AddDes(oldanc);
 	oldroot->AddDes(newroot);
-	oldroot->left->dlen = oldroot->right->dlen = dividedBlen;
+
+	SetBranchLength(oldroot->left, dividedBlen);
+	SetBranchLength(oldroot->right, dividedBlen);
 
 	root->CheckTreeFormation();
 

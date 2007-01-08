@@ -432,6 +432,8 @@ void Model::SetDefaultModelParameters(const HKYData *data){
 		SetMaxPinv(0.0);
 		}
 	else{
+		//if there are no constant sites, warn user that Pinv should not be used
+		if(data->NConstant() == 0) throw(ErrorException("This dataset contains no constant characters!\nInference of the proportion of invariant sites is therefore meaningless.\nPlease set invariantsites to \"none\""));
 		SetPinv(0.25 * ((double)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic())), false);
 		SetMaxPinv((double)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic()));
 		if(modSpec.flexRates == true) NormalizeRates();
