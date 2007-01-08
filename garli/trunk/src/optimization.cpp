@@ -112,22 +112,28 @@ double Tree::OptimizeTreeScale(double optPrecision){
 */
 
 	while(1){
-		double incr=0.0001;
-		scale=1.0 + incr;
-		ScaleWholeTree(scale);
-		Score();
-		cur=lnL;
-		double d11=(cur-prev)/incr;
+		//reversed this now so the reduction in scale is done first when getting the 
+		//derivs.  This works better if some blens are at DEF_MAX_BLEN because the 
+		//scaling up causes them to hit the max and the relative blens to change
 
-		//return the tree to its original scale		
-		ScaleWholeTree(1.0/scale);
+		double incr=0.0001;
+	
 		scale=1.0-incr;
 
 		ScaleWholeTree(scale);
 		Score();
 		cur=lnL;
 		double d12=(cur-prev)/-incr;
-		
+
+		//return the tree to its original scale		
+		ScaleWholeTree(1.0/scale);
+
+		scale=1.0 + incr;
+		ScaleWholeTree(scale);
+		Score();
+		cur=lnL;
+		double d11=(cur-prev)/incr;
+
 		double d1=(d11+d12)*.5;
 		double d2=(d11-d12)/incr;
 		
@@ -144,7 +150,7 @@ double Tree::OptimizeTreeScale(double optPrecision){
 			t=1.0 + est;
 			//these bounds are arbitrary, but chosen from experience
 			if(t<0.95) t=.95;
-			else if(t>1.5) t=1.5;
+			else if(t>1.05) t=1.05;
 			}
 		else{//if we have lots of data, move
 			//very slowly here
@@ -225,7 +231,8 @@ double Tree::OptimizeAlpha(double optPrecision){
 		double t;
 		if(d2 < 0.0){
 			//don't move too much in any one step, or it tends to way overshoot
-			if(abs(est) > 0.1) est *= 0.5;
+			if(est > 0.1) est = min(0.5*est, 0.25);
+			else if (est < -0.1) est = max(0.5*est, -0.25);
 			t=prevVal+est;
 			if((t < 0.05) && (d1 < 0) && (prevVal*0.5 > t)){
 				t=prevVal*.5;
@@ -640,7 +647,10 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 	SetBranchLength(nd, initialLen);	
 	} 
 
-#ifdef OPT_DEBUG
+
+
+#ifdef SPOOF_NEWTON_RAPHSON
+//this allows the ability to play with optimization without actually disrupting program flow
 double Tree::NewtonRaphsonOptimizeBranchLength(double precision1, TreeNode *nd, bool goodGuess){
 	double origLen =  nd->dlen;
 	Score();
@@ -821,11 +831,12 @@ if(nd->nodeNum == 60){
 														#ifdef OPT_DEBUG			
 														opt << "d2 > 0\t";				
 														#endif
+			//Not allowing this escape anymore
 			if(fabs(d1) < 1.0){//don't bother doing anything if the surface is this flat
 														#ifdef OPT_DEBUG			
 														opt << "very small d1.  Return.\n";				
 														#endif				
-				return totalEstImprove;
+//				return totalEstImprove;
 				}
 
 			if(d1 <= 0.0){//if d1 is negative, try shortening arbitrarily, or go halfway to the knownMin
@@ -898,15 +909,14 @@ if(nd->nodeNum == 60){
 														opt << "d1 increased!\t";	
 														#endif
 				}
-			if (v < knownMin){
+			if (v <= knownMin){
 				negProposalNum++;
 				if(knownMin == DEF_MIN_BRLEN){
 					double deltaToMin=DEF_MIN_BRLEN-nd->dlen;
 					double scoreDeltaToMin = (deltaToMin * d1 + (deltaToMin*deltaToMin*d2*.5));
 					if(scoreDeltaToMin < precision1){
 													#ifdef OPT_DEBUG
-													assert(curScore != -1.0);		
-													opt << nd->dlen << "\t" << curScore  <<"\n";			
+													opt << "imp to MIN < prec, return\n";			
 													#endif
 						return totalEstImprove;
 						}
@@ -931,7 +941,7 @@ if(nd->nodeNum == 60){
 					double scoreDeltaToMin = (deltaToMin * d1 + (deltaToMin*deltaToMin*d2*.5));
 					if(scoreDeltaToMin < precision1){
 						#ifdef OPT_DEBUG
-						opt << "imp to prop < prec, return\n";
+						opt << "imp to knownMIN < prec, return\n";
 						#endif
 						return totalEstImprove;
 						}
@@ -940,11 +950,16 @@ if(nd->nodeNum == 60){
 					}
 				}
 			
-			else if (v > knownMax){
+			else if (v >= knownMax){
 				if(knownMax == DEF_MAX_BRLEN){
 					double deltaToMax=DEF_MAX_BRLEN - nd->dlen;
 					double scoreDeltaToMax = (deltaToMax * d1 + (deltaToMax*deltaToMax*d2*.5));
-					if(scoreDeltaToMax < precision1) return totalEstImprove;
+					if(scoreDeltaToMax < precision1){
+						#ifdef OPT_DEBUG
+						opt << "imp to MAX < prec, return\n";
+						#endif
+						return totalEstImprove;
+						}
 					else{
 						v = DEF_MAX_BRLEN;
 						totalEstImprove += scoreDeltaToMax;
@@ -957,7 +972,7 @@ if(nd->nodeNum == 60){
 					double scoreDeltaToMax = (deltaToMax * d1 + (deltaToMax*deltaToMax*d2*.5));
 					if(scoreDeltaToMax < precision1){
 						#ifdef OPT_DEBUG
-						opt << "imp to prop < prec, return\n";
+						opt << "imp to knownMAX < prec, return\n";
 						#endif
 						return totalEstImprove;
 						}
@@ -1003,7 +1018,7 @@ if(nd->nodeNum == 60){
 				
 		curScore=lnL;	
 		delta=prevScore - lnL;
-opt.precision(7);
+
 opt << v << "\t" << lnL << "\n";
 #endif
 		prevScore=lnL;
