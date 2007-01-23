@@ -96,20 +96,24 @@ double Tree::OptimizeTreeScale(double optPrecision){
 	double prev=lnL;
 	double cur;
 	double scale;
+	double t;
 	double lastChange=9999.9;
+	double effectiveScale = 1.0; //this measures the change in scale relative to what it began at.
+	double upperBracket = DBL_MAX;   //the smallest value we know of with a negative d1 (relative to inital scale of 1.0!)
+	double lowerBracket = DBL_MIN;   //the largest value we know of with a positive d1 (relative to inital scale of 1.0!)
 
-/*
-	ofstream deb("debug.log");
+#ifdef DEBUG_SCALE_OPT
+	ofstream deb("scaleTrace.log");
 	deb.precision(20);
-	for(int s=0;s<30;s++){
-		double scale=.85 + s*.01;
+	for(int s=0;s<50;s++){
+		double scale=1.0 + s*.025;
 		ScaleWholeTree(scale);
 		Score();
 		deb << scale << "\t" << lnL << endl;
 		ScaleWholeTree(1.0/scale);	
 		}
 	deb.close();
-*/
+#endif
 
 	while(1){
 		//reversed this now so the reduction in scale is done first when getting the 
@@ -123,34 +127,30 @@ double Tree::OptimizeTreeScale(double optPrecision){
 		ScaleWholeTree(scale);
 		Score();
 		cur=lnL;
+		ScaleWholeTree(1.0/scale);//return the tree to its original scale	
 		double d12=(cur-prev)/-incr;
-
-		//return the tree to its original scale		
-		ScaleWholeTree(1.0/scale);
 
 		scale=1.0 + incr;
 		ScaleWholeTree(scale);
 		Score();
 		cur=lnL;
+		ScaleWholeTree(1.0/scale);//return the tree to its original scale
 		double d11=(cur-prev)/incr;
 
 		double d1=(d11+d12)*.5;
 		double d2=(d11-d12)/incr;
 		
-		double est=-d1/d2;
+		double est = -d1/d2;
+		double estImprove = d1*est + d2*(est*est*0.5);
 
-		//return the tree to its original scale		
-		ScaleWholeTree(1.0/scale);
-		if((abs(est) < 0.01 || (lastChange < optPrecision && lastChange > 0.0)) && d2 < 0.0){
+		//return conditions
+		if(estImprove < optPrecision && d2 < 0.0){
 			return prev-start;
 			}
 		
-		double t;
 		if(d2 < 0.0){
+			est = max(min(0.1, est), -0.1);
 			t=1.0 + est;
-			//these bounds are arbitrary, but chosen from experience
-			if(t<0.95) t=.95;
-			else if(t>1.05) t=1.05;
 			}
 		else{//if we have lots of data, move
 			//very slowly here
@@ -164,7 +164,23 @@ double Tree::OptimizeTreeScale(double optPrecision){
 				}
 			}
 		
+		//update the brackets
+		if(d1 <= 0.0 && effectiveScale < upperBracket)
+			upperBracket = effectiveScale;
+		else if(d1 > 0.0 && effectiveScale > lowerBracket)
+			lowerBracket = effectiveScale;
+
+		//if the surface is wacky and we are going to shoot past one of our brackets
+		//take evasive action by going halfway to the bracket
+		if((effectiveScale * t) <= lowerBracket){
+			t = (lowerBracket + effectiveScale) / (2.0 * effectiveScale);
+			}
+		else if((effectiveScale * t) >= upperBracket){
+			t = (upperBracket + effectiveScale) / (2.0 * effectiveScale);
+			}
+
 		scale=t;
+		effectiveScale *= scale;
 		ScaleWholeTree(scale);
 		Score();
 		cur=lnL;
@@ -176,31 +192,32 @@ double Tree::OptimizeTreeScale(double optPrecision){
 
 double Tree::OptimizeAlpha(double optPrecision){
 
-/*
+#ifdef DEBUG_ALPHA_OPT
 	double initVal=mod->Alpha();
 
-	ofstream deb("debug.log");
+	ofstream deb("alphaTrace.log");
 	deb.precision(20);
-	for(int s=0;s<30;s++){
-		double scale=.01 + s*.01;
-		mod->SetAlpha(scale, false);
+	for(int s=0;s<50;s++){
+		double a=.3 + s*.025;
+		mod->SetAlpha(a, false);
 		MakeAllNodesDirty();
 		Score();
-		deb << scale << "\t" << lnL << endl;
+		deb << a << "\t" << lnL << endl;
 		}
 	deb.close();
 	mod->SetAlpha(initVal, false);
 	MakeAllNodesDirty();
 	Score();	
-*/	
+#endif
 
 	if(lnL==-1) Score();
-	double start=lnL;
-	double prev=lnL;
-	double cur;
+	double start, prev, cur;
+	prev = start = cur = lnL;
 	double prevVal=mod->Alpha();
 	double lastChange=9999.9;
-	
+	double upperBracket = DBL_MAX;   //the smallest value we know of with a negative d1 
+	double lowerBracket = DBL_MIN;   //the largest value we know of with a positive d1 
+
 	while(1){
 		double incr=0.001;
 		mod->SetAlpha(prevVal+incr, false);
@@ -220,9 +237,9 @@ double Tree::OptimizeAlpha(double optPrecision){
 		double d2=(d11-d12)/incr;
 		
 		double est=-d1/d2;
+		double estImprove = d1*est + d2*(est*est*0.5);
 		
-		if((abs(est) < 0.001 || (lastChange < optPrecision && lastChange > 0.0)) && d2 < 0.0){
-		//if((abs(est) < 0.001 && d2 < 0.0) || (abs(d1) < 50.0)){
+		if(estImprove < optPrecision && d2 <= 0.0){
 			mod->SetAlpha(prevVal, false);
 			MakeAllNodesDirty();			
 			return prev-start;
@@ -230,19 +247,31 @@ double Tree::OptimizeAlpha(double optPrecision){
 		
 		double t;
 		if(d2 < 0.0){
-			//don't move too much in any one step, or it tends to way overshoot
-			if(est > 0.1) est = min(0.5*est, 0.25);
-			else if (est < -0.1) est = max(0.5*est, -0.25);
 			t=prevVal+est;
 			if((t < 0.05) && (d1 < 0) && (prevVal*0.5 > t)){
 				t=prevVal*.5;
 				}
 			}
 		else{
-			if(d1 > 0.0) t=prevVal*1.1;
-			else t=prevVal*0.91;
+			if(d1 > 0.0) t=prevVal*1.25;
+			else t=prevVal*0.8;
 			}
 		
+		//update the brackets
+		if(d1 <= 0.0 && prevVal < upperBracket)
+			upperBracket = prevVal;
+		else if(d1 > 0.0 && prevVal > lowerBracket)
+			lowerBracket = prevVal;
+
+		//if the surface is wacky and we are going to shoot past one of our brackets
+		//take evasive action by going halfway to the bracket
+		if(t <= lowerBracket){
+			t = (lowerBracket + prevVal) * 0.5;
+			}
+		else if(t >= upperBracket){
+			t = (upperBracket + prevVal) * 0.5;
+			}
+
 		mod->SetAlpha(t, false);
 		assert((prevVal==0.05 && mod->Alpha()==0.05)==false);
 		MakeAllNodesDirty();			
