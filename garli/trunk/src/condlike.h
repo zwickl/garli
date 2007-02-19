@@ -45,6 +45,7 @@
 #include <vector>
 using namespace std;
 
+#include "defs.h"
 
 //******************************************************************************
 //  CondLikeArray
@@ -55,7 +56,7 @@ class CondLikeArray
 
 	unsigned nsites, nrates, nstates;
 	public:
-		double* arr;
+		FLOAT_TYPE* arr;
 		int* underflow_mult;
 		unsigned rescaleRank;
 		CondLikeArray()

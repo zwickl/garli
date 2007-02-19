@@ -91,6 +91,7 @@ class ClaManager{
 	};
 	
 	inline int ClaManager::AssignClaHolder(){
+		assert(holderStack.size() > 0);
 		int index=holderStack[holderStack.size()-1];
 		IncrementCla(index);
 		holderStack.pop_back();

@@ -49,9 +49,9 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	nsites = ns;
 	nstates = nk;
 #ifndef ALIGN_CLAS
-	arr=new double[nk*nr*ns];
+	arr=new FLOAT_TYPE[nk*nr*ns];
 #else
-	arr = NewAlignedArray<double>(nk*nr*ns, CLA_ALIGNMENT);
+	arr = NewAlignedArray<FLOAT_TYPE>(nk*nr*ns, CLA_ALIGNMENT);
 #endif
 	if(arr==NULL){
 		throw(1);

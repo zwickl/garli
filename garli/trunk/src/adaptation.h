@@ -27,79 +27,79 @@ using namespace std;
 class Adaptation{
 	public:
 	//here are all of the scalars:
-	//4 ints, 1 bool, 23 doubles
+	//4 ints, 1 bool, 23 FLOAT_TYPEs
 	unsigned intervalLength; 
 	unsigned intervalsToStore;
-	double lastgenscore;
-	double laststepscore;
+	FLOAT_TYPE lastgenscore;
+	FLOAT_TYPE laststepscore;
 
-	double improveOverStoredIntervals;
+	FLOAT_TYPE improveOverStoredIntervals;
 	
 	bool reset;
 
-	double startOptPrecision;
-	double branchOptPrecision;
-	double minOptPrecision;
-	double precReductionFactor;
+	FLOAT_TYPE startOptPrecision;
+	FLOAT_TYPE branchOptPrecision;
+	FLOAT_TYPE minOptPrecision;
+	FLOAT_TYPE precReductionFactor;
 	int numPrecReductions;
 	
-	double topoWeight;
-	double modWeight;
-	double brlenWeight;
+	FLOAT_TYPE topoWeight;
+	FLOAT_TYPE modWeight;
+	FLOAT_TYPE brlenWeight;
 	
-	double randNNIweight;
-	double origRandNNIweight;
-	double randSPRweight;
-	double limSPRweight;
+	FLOAT_TYPE randNNIweight;
+	FLOAT_TYPE origRandNNIweight;
+	FLOAT_TYPE randSPRweight;
+	FLOAT_TYPE limSPRweight;
 	
-	double recTopImproveSize;
-	double exNNIprob;
-	double exlimSPRprob;
+	FLOAT_TYPE recTopImproveSize;
+	FLOAT_TYPE exNNIprob;
+	FLOAT_TYPE exlimSPRprob;
 
-	double topoMutateProb;
-	double randNNIprob;
-	double randSPRprob;
-	double limSPRprob;
+	FLOAT_TYPE topoMutateProb;
+	FLOAT_TYPE randNNIprob;
+	FLOAT_TYPE randSPRprob;
+	FLOAT_TYPE limSPRprob;
 	
-	double modelMutateProb;
+	FLOAT_TYPE modelMutateProb;
 
 	unsigned limSPRrange;
 
 	//the arrays. All will be of length intervalsToStore
-	double *improvetotal;
+	FLOAT_TYPE *improvetotal;
 
-	double *randNNI;
+	FLOAT_TYPE *randNNI;
 	int *randNNInum;
 	
-	double *exNNI;
+	FLOAT_TYPE *exNNI;
 	int *exNNInum;
 
-	double *randSPR;
+	FLOAT_TYPE *randSPR;
 	int *randSPRnum;
 	
-	double *limSPR;
+	FLOAT_TYPE *limSPR;
 	int *limSPRnum;
 
-	double *exlimSPR;
+	FLOAT_TYPE *exlimSPR;
 	int *exlimSPRnum;
 
-	double *randRecom;
+	FLOAT_TYPE *randRecom;
 	int *randRecomnum;
 	
-	double *bipartRecom;
+	FLOAT_TYPE *bipartRecom;
 	int *bipartRecomnum;
 
-	double *onlyBrlen;
+	FLOAT_TYPE *onlyBrlen;
 	int *onlyBrlennum;
 
-	double *anyModel;
+	FLOAT_TYPE *anyModel;
 	int *anyModelnum;
 	
 #ifdef MPI_VERSION
-	double *fromRemoteSubtree;
-	double *fromRemoteNonSubtree;
+	FLOAT_TYPE *fromRemoteSubtree;
+	FLOAT_TYPE *fromRemoteNonSubtree;
 	int *bestFromRemoteNum;
-	double *bestFromRemote;
+	FLOAT_TYPE *bestFromRemote;
 #endif
 
 	Adaptation(const GeneralGamlConfig *gc);

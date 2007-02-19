@@ -50,9 +50,9 @@ public:
 	int GetUnsignedOption(const char* option, unsigned& val, bool optional=false);
 	int GetFloatOption(const char*, float&);
 	int GetFloatRangeOption(const char*, float&, float&);
-	int GetDoubleOption(const char*, double&, bool optional=false);
-	int GetDoubleRangeOption(const char*, double&, double&);
-	int GetPositiveDoubleOption(const char*, double&, bool optional=false);
+	int GetDoubleOption(const char*, FLOAT_TYPE&, bool optional=false);
+	int GetDoubleRangeOption(const char*, FLOAT_TYPE&, FLOAT_TYPE&);
+	int GetPositiveDoubleOption(const char*, FLOAT_TYPE&, bool optional=false);
 
 	Sections::const_iterator BeginSection() const	{
 		return sections.begin();

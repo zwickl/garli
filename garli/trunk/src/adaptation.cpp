@@ -39,7 +39,7 @@ Adaptation::Adaptation(const GeneralGamlConfig *gc){
 	numPrecReductions=gc->numPrecReductions;
 	if(gc->numPrecReductions > 0)//changing prec reduction to linear rather than geometric
 		//precReductionFactor = pow((minOptPrecision/startOptPrecision), 1.0/numPrecReductions);
-		precReductionFactor = (startOptPrecision - minOptPrecision)/double(numPrecReductions);
+		precReductionFactor = (startOptPrecision - minOptPrecision)/FLOAT_TYPE(numPrecReductions);
 	else
 		precReductionFactor = gc->precReductionFactor;
 
@@ -57,7 +57,7 @@ Adaptation::Adaptation(const GeneralGamlConfig *gc){
 	randPECRweight = gc->randPECRweight;
 #endif
 
-	double tot = topoWeight+modWeight+brlenWeight;
+	FLOAT_TYPE tot = topoWeight+modWeight+brlenWeight;
 	topoMutateProb = topoWeight / tot;
 	modelMutateProb = modWeight / tot; 	
 
@@ -82,22 +82,22 @@ Adaptation::Adaptation(const GeneralGamlConfig *gc){
 	improveOverStoredIntervals=0.0;
 	recTopImproveSize = 1.0;
 
-	randNNI = new double[intervalsToStore]; randNNInum = new int[intervalsToStore];
-	exNNI = new double[intervalsToStore]; exNNInum = new int[intervalsToStore];
-	randSPR = new double[intervalsToStore]; randSPRnum = new int[intervalsToStore];
+	randNNI = new FLOAT_TYPE[intervalsToStore]; randNNInum = new int[intervalsToStore];
+	exNNI = new FLOAT_TYPE[intervalsToStore]; exNNInum = new int[intervalsToStore];
+	randSPR = new FLOAT_TYPE[intervalsToStore]; randSPRnum = new int[intervalsToStore];
 #ifdef GANESH
-	randPECR = new double[intervalsToStore]; randPECRnum = new int[intervalsToStore];
+	randPECR = new FLOAT_TYPE[intervalsToStore]; randPECRnum = new int[intervalsToStore];
 #endif
-	limSPR = new double[intervalsToStore]; limSPRnum = new int[intervalsToStore];
-	exlimSPR = new double[intervalsToStore]; exlimSPRnum = new int[intervalsToStore];
-	randRecom = new double[intervalsToStore];	 randRecomnum = new int[intervalsToStore];
-	bipartRecom = new double[intervalsToStore];	 bipartRecomnum = new int[intervalsToStore];
-	onlyBrlen = new double[intervalsToStore]; onlyBrlennum = new int[intervalsToStore];
-	improvetotal = new double[intervalsToStore];
-	anyModel = new double[intervalsToStore]; anyModelnum = new int[intervalsToStore];
+	limSPR = new FLOAT_TYPE[intervalsToStore]; limSPRnum = new int[intervalsToStore];
+	exlimSPR = new FLOAT_TYPE[intervalsToStore]; exlimSPRnum = new int[intervalsToStore];
+	randRecom = new FLOAT_TYPE[intervalsToStore];	 randRecomnum = new int[intervalsToStore];
+	bipartRecom = new FLOAT_TYPE[intervalsToStore];	 bipartRecomnum = new int[intervalsToStore];
+	onlyBrlen = new FLOAT_TYPE[intervalsToStore]; onlyBrlennum = new int[intervalsToStore];
+	improvetotal = new FLOAT_TYPE[intervalsToStore];
+	anyModel = new FLOAT_TYPE[intervalsToStore]; anyModelnum = new int[intervalsToStore];
 
 #ifdef MPI_VERSION
-	bestFromRemote=new double[intervalsToStore];bestFromRemoteNum=new int[intervalsToStore];
+	bestFromRemote=new FLOAT_TYPE[intervalsToStore];bestFromRemoteNum=new int[intervalsToStore];
 #endif
 	for(unsigned i=0;i<intervalsToStore;i++){
 	randNNI[i] = 0.0; randNNInum[i] = 0;
@@ -145,7 +145,7 @@ void Adaptation::SetChangeableVariablesFromConfAfterReadingCheckpoint(const Gene
 
 	numPrecReductions=gc->numPrecReductions;
 	if(gc->numPrecReductions > 0)
-		precReductionFactor = (gc->startOptPrec- minOptPrecision)/double(numPrecReductions);
+		precReductionFactor = (gc->startOptPrec- minOptPrecision)/FLOAT_TYPE(numPrecReductions);
 	else
 		precReductionFactor = gc->precReductionFactor;
 
@@ -165,37 +165,37 @@ void Adaptation::WriteToCheckpoint(ofstream &out){
 	assert(out.good());
 
 	//first take care of the scalars, which all come first in the class
-	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(double)*22;
+	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(FLOAT_TYPE)*22;
 	out.write((char *) this, scalarSize);
 
 	//now the arrays, which should be of length intervalsToStore
-	out.write((char *) improvetotal, sizeof(double)*intervalsToStore);
+	out.write((char *) improvetotal, sizeof(FLOAT_TYPE)*intervalsToStore);
 
-	out.write((char *) randNNI, sizeof(double)*intervalsToStore);
+	out.write((char *) randNNI, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) randNNInum, sizeof(int)*intervalsToStore);
 	
-	out.write((char *) exNNI, sizeof(double)*intervalsToStore);
+	out.write((char *) exNNI, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) exNNInum, sizeof(int)*intervalsToStore);
 
-	out.write((char *) randSPR, sizeof(double)*intervalsToStore);
+	out.write((char *) randSPR, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) randSPRnum, sizeof(int)*intervalsToStore);
 	
-	out.write((char *) limSPR, sizeof(double)*intervalsToStore);
+	out.write((char *) limSPR, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) limSPRnum, sizeof(int)*intervalsToStore);
 
-	out.write((char *) exlimSPR, sizeof(double)*intervalsToStore);
+	out.write((char *) exlimSPR, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) exlimSPRnum, sizeof(int)*intervalsToStore);
 
-	out.write((char *) randRecom, sizeof(double)*intervalsToStore);
+	out.write((char *) randRecom, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) randRecomnum, sizeof(int)*intervalsToStore);
 	
-	out.write((char *) bipartRecom, sizeof(double)*intervalsToStore);
+	out.write((char *) bipartRecom, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) bipartRecomnum, sizeof(int)*intervalsToStore);
 
-	out.write((char *) onlyBrlen, sizeof(double)*intervalsToStore);
+	out.write((char *) onlyBrlen, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) onlyBrlennum, sizeof(int)*intervalsToStore);
 
-	out.write((char *) anyModel, sizeof(double)*intervalsToStore);
+	out.write((char *) anyModel, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) anyModelnum, sizeof(int)*intervalsToStore);
 	}
 
@@ -203,38 +203,38 @@ void Adaptation::ReadFromCheckpoint(ifstream &in){
 	//this function assumes that it has been passed a stream that is already open for 
 	//binary reading
 	assert(in.good());
-	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(double)*22;
+	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(FLOAT_TYPE)*22;
 
 	in.read((char *) this, scalarSize);
 
 	//now the arrays, which should be of length intervalsToStore
-	in.read((char *) improvetotal, sizeof(double)*intervalsToStore);
+	in.read((char *) improvetotal, sizeof(FLOAT_TYPE)*intervalsToStore);
 
-	in.read((char *) randNNI, sizeof(double)*intervalsToStore);
+	in.read((char *) randNNI, sizeof(FLOAT_TYPE)*intervalsToStore);
 	in.read((char *) randNNInum, sizeof(int)*intervalsToStore);
 	
-	in.read((char *) exNNI, sizeof(double)*intervalsToStore);
+	in.read((char *) exNNI, sizeof(FLOAT_TYPE)*intervalsToStore);
 	in.read((char *) exNNInum, sizeof(int)*intervalsToStore);
 
-	in.read((char *) randSPR, sizeof(double)*intervalsToStore);
+	in.read((char *) randSPR, sizeof(FLOAT_TYPE)*intervalsToStore);
 	in.read((char *) randSPRnum, sizeof(int)*intervalsToStore);
 	
-	in.read((char *) limSPR, sizeof(double)*intervalsToStore);
+	in.read((char *) limSPR, sizeof(FLOAT_TYPE)*intervalsToStore);
 	in.read((char *) limSPRnum, sizeof(int)*intervalsToStore);
 
-	in.read((char *) exlimSPR, sizeof(double)*intervalsToStore);
+	in.read((char *) exlimSPR, sizeof(FLOAT_TYPE)*intervalsToStore);
 	in.read((char *) exlimSPRnum, sizeof(int)*intervalsToStore);
 
-	in.read((char *) randRecom, sizeof(double)*intervalsToStore);
+	in.read((char *) randRecom, sizeof(FLOAT_TYPE)*intervalsToStore);
 	in.read((char *) randRecomnum, sizeof(int)*intervalsToStore);
 	
-	in.read((char *) bipartRecom, sizeof(double)*intervalsToStore);
+	in.read((char *) bipartRecom, sizeof(FLOAT_TYPE)*intervalsToStore);
 	in.read((char *) bipartRecomnum, sizeof(int)*intervalsToStore);
 
-	in.read((char *) onlyBrlen, sizeof(double)*intervalsToStore);
+	in.read((char *) onlyBrlen, sizeof(FLOAT_TYPE)*intervalsToStore);
 	in.read((char *) onlyBrlennum, sizeof(int)*intervalsToStore);
 
-	in.read((char *) anyModel, sizeof(double)*intervalsToStore);
+	in.read((char *) anyModel, sizeof(FLOAT_TYPE)*intervalsToStore);
 	in.read((char *) anyModelnum, sizeof(int)*intervalsToStore);
 	}
 
@@ -302,21 +302,21 @@ void Adaptation::OutputProbs(ofstream &plog, int gen){
 	}
 
 void Adaptation::UpdateProbs(){
-	double topoTot=0.0, modTot=0.0, onlyBrlenTot=0.0;
+	FLOAT_TYPE topoTot=0.0, modTot=0.0, onlyBrlenTot=0.0;
 	int numTopos=0, numMod=0, numOnlyBrlen=0;
 	
-	double totRandNNI=0.0, totLimSPR=0.0, totRandSPR=0.0;
+	FLOAT_TYPE totRandNNI=0.0, totLimSPR=0.0, totRandSPR=0.0;
 	int totNumRandNNI=0, totNumLimSPR=0, totNumRandSPR=0;
-	double totBipartRecom=0.0;
+	FLOAT_TYPE totBipartRecom=0.0;
 	int totNumBipartRecom=0;
 
 #ifdef MPI_VERSION
-	double totalFromRemote;
+	FLOAT_TYPE totalFromRemote;
 #endif
 
 
 #ifdef GANESH
-	double totRandPECR=0.0;
+	FLOAT_TYPE totRandPECR=0.0;
 	int totNumRandPECR=0;
 #endif
 	
@@ -354,14 +354,14 @@ void Adaptation::UpdateProbs(){
 #endif
 		}
 	
-	double perTopo, perModel, perBrlen;
+	FLOAT_TYPE perTopo, perModel, perBrlen;
 	if(numTopos!=0) perTopo=(topoTot/numTopos);
 	else perTopo=0.0;
 	if(numMod!=0) perModel=(modTot/numMod);
 	else perModel=0.0;
 	if(numOnlyBrlen>0) perBrlen=(onlyBrlenTot/numOnlyBrlen);
 	else perBrlen= 0.0;
-	double perBipartRecom;
+	FLOAT_TYPE perBipartRecom;
 	if(totNumBipartRecom > 0) perBipartRecom=(totBipartRecom/totNumBipartRecom);
 	else perBipartRecom=0.0;
 	
@@ -373,9 +373,9 @@ void Adaptation::UpdateProbs(){
 	perModel += modWeight;
 	perBrlen += brlenWeight;
 	
-	double tot=perTopo+perModel+perBrlen;
+	FLOAT_TYPE tot=perTopo+perModel+perBrlen;
 
-	double brlenOnlyMut;
+	FLOAT_TYPE brlenOnlyMut;
 
 	//only update these probs if model mutations are turned off completely
 	//or if some model mutations have been done (ie not in subtree mode)
@@ -387,7 +387,7 @@ void Adaptation::UpdateProbs(){
 
 	//enforce a minimum probability
 	if(modWeight != 0.0 && topoWeight != 0.0){
-		double minProb=.02;	
+		FLOAT_TYPE minProb= (FLOAT_TYPE) 0.02;	
 		if(topoMutateProb < minProb){
 			modelMutateProb -= minProb - topoMutateProb;
 			topoMutateProb=minProb;
@@ -397,10 +397,10 @@ void Adaptation::UpdateProbs(){
 			modelMutateProb=minProb;
 			}
 		if(1.0 - (modelMutateProb + topoMutateProb) < minProb){
-			double diff=minProb - (1.0 - (modelMutateProb + topoMutateProb));
+			FLOAT_TYPE diff=minProb - (FLOAT_TYPE)(1.0 - (modelMutateProb + topoMutateProb));
 			if(modelMutateProb - diff/2.0 > .02 && topoMutateProb - diff/2.0 > .02){
-				modelMutateProb -= diff/2.0;
-				topoMutateProb -= diff/2.0;
+				modelMutateProb -= diff/(FLOAT_TYPE)2.0;
+				topoMutateProb -= diff/(FLOAT_TYPE)2.0;
 				}
 			else{
 				if(modelMutateProb - diff/2.0 < .02){
@@ -428,11 +428,11 @@ void Adaptation::UpdateProbs(){
 	if(totNumRandPECR==0) totNumRandPECR=1;
 #endif
 		
-	double perRandNNI=totRandNNI/totNumRandNNI + randNNIweight;
-	double perLimSPR=totLimSPR/totNumLimSPR + limSPRweight;
-	double perRandSPR=totRandSPR/totNumRandSPR + randSPRweight;
+	FLOAT_TYPE perRandNNI=totRandNNI/totNumRandNNI + randNNIweight;
+	FLOAT_TYPE perLimSPR=totLimSPR/totNumLimSPR + limSPRweight;
+	FLOAT_TYPE perRandSPR=totRandSPR/totNumRandSPR + randSPRweight;
 #ifdef GANESH
-	double perRandPECR=totRandPECR/totNumRandPECR + randPECRweight;
+	FLOAT_TYPE perRandPECR=totRandPECR/totNumRandPECR + randPECRweight;
 	tot=perRandNNI+perLimSPR+perRandSPR+perRandPECR;
 	randNNIprob=perRandNNI/tot;
 	randSPRprob=perRandSPR/tot;

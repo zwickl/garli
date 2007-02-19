@@ -23,6 +23,7 @@
 
 using namespace std;
 
+#include "defs.h"
 #include "configreader.h"
 #include "errorexception.h"
 
@@ -300,9 +301,9 @@ int ConfigReader::GetBoolOption(const char* option, bool& val, bool optional /*=
 int ConfigReader::GetIntOption(const char* option, int& val, bool optional /*=false*/)	{
 	int rv;
 	string str;
-	double dummy;//read into a double first to check bounds
+	FLOAT_TYPE dummy;//read into a FLOAT_TYPE first to check bounds
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		dummy = atof(str.c_str());
+		dummy = (FLOAT_TYPE) atof(str.c_str());
 		if(dummy > (INT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (INT_MAX-1));
 		if(fabs(dummy - (int)dummy) > 0.0) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
 		val = (int) dummy;
@@ -322,9 +323,9 @@ int ConfigReader::GetIntOption(const char* option, int& val, bool optional /*=fa
 int ConfigReader::GetUnsignedOption(const char* option, unsigned& val, bool optional /*=false*/)	{
 	int rv;
 	string str;
-	double dummy;//read into a double first to check sign and bounds
+	FLOAT_TYPE dummy;//read into a FLOAT_TYPE first to check sign and bounds
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		dummy = atof(str.c_str());
+		dummy = (FLOAT_TYPE) atof(str.c_str());
 		if(dummy < 0.0) throw ErrorException("entry for option \"%s\" must be >=0", option);
 		if(dummy > (UINT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (UINT_MAX-1));
 		if(fabs(dummy - (unsigned)dummy) > 0.0) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
@@ -410,11 +411,11 @@ int ConfigReader::GetFloatRangeOption(const char* option, float& val1, float& va
 /****************************************************************************************/
 /*** GetDoubleOption() ***/
 /****************************************************************************************/
-int ConfigReader::GetDoubleOption(const char* option, double& val, bool optional /*=false*/)	{
+int ConfigReader::GetDoubleOption(const char* option, FLOAT_TYPE& val, bool optional /*=false*/)	{
 	int rv;
 	string str;
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		val = atof(str.c_str());
+		val = (FLOAT_TYPE) atof(str.c_str());
 		rv = 0;
 	}
 	else{
@@ -429,11 +430,11 @@ int ConfigReader::GetDoubleOption(const char* option, double& val, bool optional
 /*** GetPositiveDoubleOption() ***/
 /****************************************************************************************/
 //this is just a version of GetDoubleOption that checks that the value is non-negative
-int ConfigReader::GetPositiveDoubleOption(const char* option, double& val, bool optional /*=false*/)	{
+int ConfigReader::GetPositiveDoubleOption(const char* option, FLOAT_TYPE& val, bool optional /*=false*/)	{
 	int rv;
 	string str;
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		val = atof(str.c_str());
+		val = (FLOAT_TYPE) atof(str.c_str());
 		if(val < 0.0) throw ErrorException("configuration entry \"%s\" cannot be negative", option);
 		rv = 0;
 	}
@@ -448,7 +449,7 @@ int ConfigReader::GetPositiveDoubleOption(const char* option, double& val, bool 
 /****************************************************************************************/
 /*** GetDoubleRangeOption() ***/
 /****************************************************************************************/
-int ConfigReader::GetDoubleRangeOption(const char* option, double& val1, double& val2)	{
+int ConfigReader::GetDoubleRangeOption(const char* option, FLOAT_TYPE& val1, FLOAT_TYPE& val2)	{
 	int rv;
 	string str;
 	if (GetStringOption(option, str) == 0)	{  // option exists
@@ -459,8 +460,8 @@ int ConfigReader::GetDoubleRangeOption(const char* option, double& val1, double&
 		if (i < 0)
 			rv = -1;
 		else	{
-			val1 = atof(str.substr(0, i).c_str());
-			val2 = atof(str.substr(i+1, len-i).c_str());
+			val1 = (FLOAT_TYPE) atof(str.substr(0, i).c_str());
+			val2 = (FLOAT_TYPE) atof(str.substr(i+1, len-i).c_str());
 			rv = 0;
 		}
 	}
