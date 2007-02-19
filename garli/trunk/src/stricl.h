@@ -144,7 +144,7 @@ class NxsString : public Stri
 		//		s += 4;
 		// results in s.str being "Locus-4"
 		NxsString& operator +=(const int);
-		NxsString& operator +=(const double i);
+		NxsString& operator +=(const FLOAT_TYPE i);
 
 		// must override the other += operators since we overrode the one above
 		NxsString& operator +=( const char );

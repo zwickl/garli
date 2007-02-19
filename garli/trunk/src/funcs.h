@@ -32,13 +32,13 @@ extern rng rnd;
 class InternalState{
 	private:
 	char best;
-	double probs[4];
+	FLOAT_TYPE probs[4];
 	
 	public:
-	InternalState(double *tots){
+	InternalState(FLOAT_TYPE *tots){
 		char bases[4]={'A', 'C', 'G', 'T'};
 
-		double tot=0.0;
+		FLOAT_TYPE tot=0.0;
 		tot = tots[0] + tots[1] + tots[2] + tots[3];
 		int max1=(tots[0] > tots[1] ? 0:1);
 		int max2=(tots[2] > tots[3] ? 2:3);	
@@ -57,48 +57,48 @@ int ReadData(GeneralGamlConfig *, HKYData* data);
 int ReadData(const char* filename, HKYData* data);
 //void GetRestartParams(Parameters& params);
 int RandomInt(int lb, int ub);
-double RandomFrac();
-double RandomDouble(double lb, double ub);
-int mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *fc, double (*func)(TreeNode*, Tree*, double), TreeNode *thisnode, Tree *thistree);
-int DZbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *fc, double (*func)(TreeNode*, Tree*, double), TreeNode *thisnode, Tree *thistree);
-double brent(double ax, double bx, double cx, double (*f)(TreeNode *, Tree*, double), double tol, double *xmin, TreeNode *thisnode, Tree *thistree);
-double DZbrent(double ax, double bx, double cx, double fa, double fb, double fc, double (*f)(TreeNode *, Tree*, double), double tol, double *xmin, TreeNode *thisnode, Tree *thistree);
-void DirichletRandomVariable (double *alp, double *z, int n);
-void InferStatesFromCla(char *states, double *cla, int nchar);
-vector<InternalState *> *InferStatesFromCla(double *cla, int nchar, int nrates);
-double CalculatePDistance(const char *str1, const char *str2, int nchar);
+FLOAT_TYPE RandomFrac();
+FLOAT_TYPE RandomDouble(FLOAT_TYPE lb, FLOAT_TYPE ub);
+int mnbrak(FLOAT_TYPE *ax, FLOAT_TYPE *bx, FLOAT_TYPE *cx, FLOAT_TYPE *fa, FLOAT_TYPE *fb, FLOAT_TYPE *fc, FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE), TreeNode *thisnode, Tree *thistree);
+int DZbrak(FLOAT_TYPE *ax, FLOAT_TYPE *bx, FLOAT_TYPE *cx, FLOAT_TYPE *fa, FLOAT_TYPE *fb, FLOAT_TYPE *fc, FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE), TreeNode *thisnode, Tree *thistree);
+FLOAT_TYPE brent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree);
+FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, FLOAT_TYPE fb, FLOAT_TYPE fc, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree);
+void DirichletRandomVariable (FLOAT_TYPE *alp, FLOAT_TYPE *z, int n);
+void InferStatesFromCla(char *states, FLOAT_TYPE *cla, int nchar);
+vector<InternalState *> *InferStatesFromCla(FLOAT_TYPE *cla, int nchar, int nrates);
+FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar);
 #ifndef GANESH
-double CalculateHammingDistance(const char *str1, const char *str2, int nchar);
+FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int nchar);
 #else
-double CalculateHammingDistance(const char *str1, const char *str2, const int *col_count, int nchar)
+FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, const int *col_count, int nchar)
 #endif
-void SampleBranchLengthCurve(double (*func)(TreeNode*, Tree*, double, bool), TreeNode *thisnode, Tree *thistree);
+void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree);
 
-void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, const int nchar, const int nRateCats);
-void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats);
-void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *data2, int nchar, int nRateCats, const unsigned *ambigMap=NULL);
-void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats=4);
-void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar, int nRateCats=4);
+void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats);
+void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats);
+void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, int nchar, int nRateCats, const unsigned *ambigMap=NULL);
+void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats=4);
+void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata, int nchar, int nRateCats=4);
 
-int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOuterL, double *midL, double *bestOuterL, double (*func)(TreeNode*, Tree*, double, bool), TreeNode *thisnode, Tree *thistree);
-double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc, double (*f)(TreeNode *, Tree*, double, bool), double tol, double *xmin, TreeNode *thisnode, Tree *thistree);
+int DZbrak(FLOAT_TYPE *worstOuter, FLOAT_TYPE *mid, FLOAT_TYPE *bestOuter, FLOAT_TYPE *worstOuterL, FLOAT_TYPE *midL, FLOAT_TYPE *bestOuterL, FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree);
+FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, FLOAT_TYPE fx, FLOAT_TYPE fc, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE, bool), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree);
 /*
-void CalcFullCLAInternalInternalRateHet(double *dest, const double *LCL, const double *RCL, const double *Lpr, const double *Rpr, int nchar);
-void CalcFullCLATerminalTerminalRateHet(double *dest, const double *LCL, const double *RCL, const double *Lpr, const double *Rpr, unsigned char *Ldata, unsigned char *Rdata, int nchar);
-void CalcFullCLAInternalTerminalRateHet(double *dest, const double *CL1, const double *pr1, const double *pr2, unsigned char *data2, int nchar);
-void CalcFullCLAInternalInternal(double *dest, const double *LCL, const double *RCL, const double *Lpr, const double *Rpr, int nchar);
-void CalcFullCLATerminalTerminal(double *dest, const double *LCL, const double *RCL, const double *Lpr, const double *Rpr, unsigned char *Ldata, unsigned char *Rdata, int nchar);
-void CalcFullCLAInternalTerminal(double *dest, const double *CL1, const double *pr1, const double *pr2, unsigned char *data2, int nchar);
+void CalcFullCLAInternalInternalRateHet(FLOAT_TYPE *dest, const FLOAT_TYPE *LCL, const FLOAT_TYPE *RCL, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, int nchar);
+void CalcFullCLATerminalTerminalRateHet(FLOAT_TYPE *dest, const FLOAT_TYPE *LCL, const FLOAT_TYPE *RCL, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, unsigned char *Ldata, unsigned char *Rdata, int nchar);
+void CalcFullCLAInternalTerminalRateHet(FLOAT_TYPE *dest, const FLOAT_TYPE *CL1, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, unsigned char *data2, int nchar);
+void CalcFullCLAInternalInternal(FLOAT_TYPE *dest, const FLOAT_TYPE *LCL, const FLOAT_TYPE *RCL, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, int nchar);
+void CalcFullCLATerminalTerminal(FLOAT_TYPE *dest, const FLOAT_TYPE *LCL, const FLOAT_TYPE *RCL, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, unsigned char *Ldata, unsigned char *Rdata, int nchar);
+void CalcFullCLAInternalTerminal(FLOAT_TYPE *dest, const FLOAT_TYPE *CL1, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, unsigned char *data2, int nchar);
 */
-int gsl_min_find_bracket(double (*f)(TreeNode *, Tree*, double),double *x_minimum,double * f_minimum,double * x_lower, double * f_lower, double * x_upper, double * f_upper, size_t eval_max, TreeNode *thisnode, Tree *thistree);
+int gsl_min_find_bracket(FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE),FLOAT_TYPE *x_minimum,FLOAT_TYPE * f_minimum,FLOAT_TYPE * x_lower, FLOAT_TYPE * f_lower, FLOAT_TYPE * x_upper, FLOAT_TYPE * f_upper, size_t eval_max, TreeNode *thisnode, Tree *thistree);
 
-inline void ArrayMultiply(double *dest, const double *source, int num){
+inline void ArrayMultiply(FLOAT_TYPE *dest, const FLOAT_TYPE *source, int num){
 	//simply multiplies each element in dest by the corresponding element in source, up to num
 	for(register int i=0;i<num;i++)
 		*(dest++) *= *(source++);
 	}
 	
-inline void CalcSiteCLARateHetEquals(double *dest, const double *tCL, const double *tp){
+inline void CalcSiteCLARateHetEquals(FLOAT_TYPE *dest, const FLOAT_TYPE *tCL, const FLOAT_TYPE *tp){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	for(int i=0;i<4;i++){
@@ -111,7 +111,7 @@ inline void CalcSiteCLARateHetEquals(double *dest, const double *tCL, const doub
 		}
 	}
 
-inline void CalcSiteCLARateHetTimes(double *dest, const double *tCL, const double *tp){
+inline void CalcSiteCLARateHetTimes(FLOAT_TYPE *dest, const FLOAT_TYPE *tCL, const FLOAT_TYPE *tp){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	for(int i=0;i<4;i++){

@@ -46,7 +46,7 @@ long rng::random_long(long max)
 	long return_val = max;
 
 	while( return_val == max )
-		return_val = (long)( (double)max * uniform() );
+		return_val = (long)( (FLOAT_TYPE)max * uniform() );
 
 	return return_val;
 }
@@ -57,7 +57,7 @@ int rng::random_int(int max)
 	int return_val = max;
 
 	while( return_val == max )
-		return_val = (int)( (double)max * uniform() );
+		return_val = (int)( (FLOAT_TYPE)max * uniform() );
 
 	return return_val;
 }
@@ -68,15 +68,15 @@ float rng::random_float(float max)	{
 	float return_val = max;
 	
 	while (return_val == max)
-		return_val = (float)( (double)max * uniform() );
+		return_val = (float)( (FLOAT_TYPE)max * uniform() );
 		
 	return return_val;
 }
 
-double rng::random_double(double max)	{
+FLOAT_TYPE rng::random_FLOAT_TYPE(FLOAT_TYPE max)	{
 	if (max == 0.0)
 		return 0.0;
-	double return_val = max;
+	FLOAT_TYPE return_val = max;
 	
 	while (return_val == max)
 		return_val = max * uniform();
@@ -84,18 +84,18 @@ double rng::random_double(double max)	{
 	return return_val;
 }
 
-double rng::exponential(double lambda)
+FLOAT_TYPE rng::exponential(FLOAT_TYPE lambda)
 {
-	double x = 0.0;
+	FLOAT_TYPE x = 0.0;
 
 	while( x <= 0.0 || x > 1.0 )
-		x = 1.0 - uniform();
+		x = ONE_POINT_ZERO - uniform();
 	x = -log(x) / lambda;
 
 	return x;
 }
 
-double rng::gamln( double x )
+FLOAT_TYPE rng::gamln( FLOAT_TYPE x )
 {
     // ====================================================================== 
     // NIST Guide to Available Math Software. 
@@ -134,86 +134,86 @@ double rng::gamln( double x )
     //     ERROR CONDITIONS 
     //         IMPROPER INPUT ARGUMENT - A FATAL ERROR 
 
-    static double xlim1 = (double)8.;
-    static double xlim2 = (double)1e3;
-    static double rtwpil = (double).918938533204673;
-    static double p[5] = { (double)7.66345188e-4,(double)-5.9409561052e-4,(double)
-	    7.936431104845e-4,(double)-.00277777775657725,(double)
+    static FLOAT_TYPE xlim1 = (FLOAT_TYPE)8.;
+    static FLOAT_TYPE xlim2 = (FLOAT_TYPE)1e3;
+    static FLOAT_TYPE rtwpil = (FLOAT_TYPE).918938533204673;
+    static FLOAT_TYPE p[5] = { (FLOAT_TYPE)7.66345188e-4,(FLOAT_TYPE)-5.9409561052e-4,(FLOAT_TYPE)
+	    7.936431104845e-4,(FLOAT_TYPE)-.00277777775657725,(FLOAT_TYPE)
 	    .0833333333333169 };
-    static double q[2] = { (double)-.00277777777777778,(double).0833333333333333 }
+    static FLOAT_TYPE q[2] = { (FLOAT_TYPE)-.00277777777777778,(FLOAT_TYPE).0833333333333333 }
 	    ;
-    static double pcoe[9] = { (double).00297378664481017,(double)
-	    .0092381945590276,(double).109311595671044,(double).398067131020357,
-	    (double)2.15994312846059,(double)6.33806799938727,(double)
-	    20.7824725317921,(double)36.0367725300248,(double)62.0038380071273 }
+    static FLOAT_TYPE pcoe[9] = { (FLOAT_TYPE).00297378664481017,(FLOAT_TYPE)
+	    .0092381945590276,(FLOAT_TYPE).109311595671044,(FLOAT_TYPE).398067131020357,
+	    (FLOAT_TYPE)2.15994312846059,(FLOAT_TYPE)6.33806799938727,(FLOAT_TYPE)
+	    20.7824725317921,(FLOAT_TYPE)36.0367725300248,(FLOAT_TYPE)62.0038380071273 }
 	    ;
-    static double qcoe[4] = { (double)1.,(double)-8.90601665949746,(double)
-	    9.82252110471399,(double)62.003838007127 };
-    static double gln[100] = { (double)0.,(double)0.,(double).693147180559945,(
-	    double)1.79175946922806,(double)3.17805383034795,(double)
-	    4.78749174278205,(double)6.5792512120101,(double)8.52516136106541,(
-	    double)10.6046029027453,(double)12.8018274800815,(double)
-	    15.1044125730755,(double)17.5023078458739,(double)19.9872144956619,(
-	    double)22.5521638531234,(double)25.1912211827387,(double)
-	    27.8992713838409,(double)30.6718601060807,(double)33.5050734501369,(
-	    double)36.3954452080331,(double)39.3398841871995,(double)
-	    42.3356164607535,(double)45.3801388984769,(double)48.4711813518352,(
-	    double)51.6066755677644,(double)54.7847293981123,(double)
-	    58.0036052229805,(double)61.261701761002,(double)64.5575386270063,(
-	    double)67.8897431371815,(double)71.257038967168,(double)
-	    74.6582363488302,(double)78.0922235533153,(double)81.557959456115,(
-	    double)85.0544670175815,(double)88.5808275421977,(double)
-	    92.1361756036871,(double)95.7196945421432,(double)99.3306124547874,(
-	    double)102.968198614514,(double)106.631760260643,(double)
-	    110.320639714757,(double)114.034211781462,(double)117.771881399745,(
-	    double)121.533081515439,(double)125.317271149357,(double)
-	    129.123933639127,(double)132.952575035616,(double)136.802722637326,(
-	    double)140.673923648234,(double)144.565743946345,(double)
-	    148.477766951773,(double)152.409592584497,(double)156.360836303079,(
-	    double)160.331128216631,(double)164.320112263195,(double)
-	    168.327445448428,(double)172.352797139163,(double)176.395848406997,(
-	    double)180.456291417544,(double)184.533828861449,(double)
-	    188.628173423672,(double)192.739047287845,(double)196.86618167289,(
-	    double)201.009316399282,(double)205.168199482641,(double)
-	    209.342586752537,(double)213.532241494563,(double)217.736934113954,(
-	    double)221.95644181913,(double)226.190548323728,(double)
-	    230.439043565777,(double)234.701723442818,(double)238.978389561834,(
-	    double)243.268849002983,(double)247.572914096187,(double)
-	    251.890402209723,(double)256.22113555001,(double)260.564940971863,(
-	    double)264.921649798553,(double)269.29109765102,(double)
-	    273.673124285694,(double)278.067573440366,(double)282.47429268763,(
-	    double)286.893133295427,(double)291.32395009427,(double)
-	    295.766601350761,(double)300.220948647014,(double)304.686856765669,(
-	    double)309.164193580147,(double)313.652829949879,(double)
-	    318.152639620209,(double)322.663499126726,(double)327.185287703775,(
-	    double)331.717887196928,(double)336.261181979198,(double)
-	    340.815058870799,(double)345.379407062267,(double)349.95411804077,(
-	    double)354.539085519441,(double)359.134205369575 };
+    static FLOAT_TYPE qcoe[4] = { (FLOAT_TYPE)1.,(FLOAT_TYPE)-8.90601665949746,(FLOAT_TYPE)
+	    9.82252110471399,(FLOAT_TYPE)62.003838007127 };
+    static FLOAT_TYPE gln[100] = { (FLOAT_TYPE)0.,(FLOAT_TYPE)0.,(FLOAT_TYPE).693147180559945,(
+	    FLOAT_TYPE)1.79175946922806,(FLOAT_TYPE)3.17805383034795,(FLOAT_TYPE)
+	    4.78749174278205,(FLOAT_TYPE)6.5792512120101,(FLOAT_TYPE)8.52516136106541,(
+	    FLOAT_TYPE)10.6046029027453,(FLOAT_TYPE)12.8018274800815,(FLOAT_TYPE)
+	    15.1044125730755,(FLOAT_TYPE)17.5023078458739,(FLOAT_TYPE)19.9872144956619,(
+	    FLOAT_TYPE)22.5521638531234,(FLOAT_TYPE)25.1912211827387,(FLOAT_TYPE)
+	    27.8992713838409,(FLOAT_TYPE)30.6718601060807,(FLOAT_TYPE)33.5050734501369,(
+	    FLOAT_TYPE)36.3954452080331,(FLOAT_TYPE)39.3398841871995,(FLOAT_TYPE)
+	    42.3356164607535,(FLOAT_TYPE)45.3801388984769,(FLOAT_TYPE)48.4711813518352,(
+	    FLOAT_TYPE)51.6066755677644,(FLOAT_TYPE)54.7847293981123,(FLOAT_TYPE)
+	    58.0036052229805,(FLOAT_TYPE)61.261701761002,(FLOAT_TYPE)64.5575386270063,(
+	    FLOAT_TYPE)67.8897431371815,(FLOAT_TYPE)71.257038967168,(FLOAT_TYPE)
+	    74.6582363488302,(FLOAT_TYPE)78.0922235533153,(FLOAT_TYPE)81.557959456115,(
+	    FLOAT_TYPE)85.0544670175815,(FLOAT_TYPE)88.5808275421977,(FLOAT_TYPE)
+	    92.1361756036871,(FLOAT_TYPE)95.7196945421432,(FLOAT_TYPE)99.3306124547874,(
+	    FLOAT_TYPE)102.968198614514,(FLOAT_TYPE)106.631760260643,(FLOAT_TYPE)
+	    110.320639714757,(FLOAT_TYPE)114.034211781462,(FLOAT_TYPE)117.771881399745,(
+	    FLOAT_TYPE)121.533081515439,(FLOAT_TYPE)125.317271149357,(FLOAT_TYPE)
+	    129.123933639127,(FLOAT_TYPE)132.952575035616,(FLOAT_TYPE)136.802722637326,(
+	    FLOAT_TYPE)140.673923648234,(FLOAT_TYPE)144.565743946345,(FLOAT_TYPE)
+	    148.477766951773,(FLOAT_TYPE)152.409592584497,(FLOAT_TYPE)156.360836303079,(
+	    FLOAT_TYPE)160.331128216631,(FLOAT_TYPE)164.320112263195,(FLOAT_TYPE)
+	    168.327445448428,(FLOAT_TYPE)172.352797139163,(FLOAT_TYPE)176.395848406997,(
+	    FLOAT_TYPE)180.456291417544,(FLOAT_TYPE)184.533828861449,(FLOAT_TYPE)
+	    188.628173423672,(FLOAT_TYPE)192.739047287845,(FLOAT_TYPE)196.86618167289,(
+	    FLOAT_TYPE)201.009316399282,(FLOAT_TYPE)205.168199482641,(FLOAT_TYPE)
+	    209.342586752537,(FLOAT_TYPE)213.532241494563,(FLOAT_TYPE)217.736934113954,(
+	    FLOAT_TYPE)221.95644181913,(FLOAT_TYPE)226.190548323728,(FLOAT_TYPE)
+	    230.439043565777,(FLOAT_TYPE)234.701723442818,(FLOAT_TYPE)238.978389561834,(
+	    FLOAT_TYPE)243.268849002983,(FLOAT_TYPE)247.572914096187,(FLOAT_TYPE)
+	    251.890402209723,(FLOAT_TYPE)256.22113555001,(FLOAT_TYPE)260.564940971863,(
+	    FLOAT_TYPE)264.921649798553,(FLOAT_TYPE)269.29109765102,(FLOAT_TYPE)
+	    273.673124285694,(FLOAT_TYPE)278.067573440366,(FLOAT_TYPE)282.47429268763,(
+	    FLOAT_TYPE)286.893133295427,(FLOAT_TYPE)291.32395009427,(FLOAT_TYPE)
+	    295.766601350761,(FLOAT_TYPE)300.220948647014,(FLOAT_TYPE)304.686856765669,(
+	    FLOAT_TYPE)309.164193580147,(FLOAT_TYPE)313.652829949879,(FLOAT_TYPE)
+	    318.152639620209,(FLOAT_TYPE)322.663499126726,(FLOAT_TYPE)327.185287703775,(
+	    FLOAT_TYPE)331.717887196928,(FLOAT_TYPE)336.261181979198,(FLOAT_TYPE)
+	    340.815058870799,(FLOAT_TYPE)345.379407062267,(FLOAT_TYPE)349.95411804077,(
+	    FLOAT_TYPE)354.539085519441,(FLOAT_TYPE)359.134205369575 };
 
     /* System generated locals */
     long int i__1;
-    double ret_val=0.0;
+    FLOAT_TYPE ret_val=0.0;
 
     /* Local variables */
-    static double dgam;
+    static FLOAT_TYPE dgam;
     static long int i__;
-    static double t, dx, px, qx, rx, xx;
+    static FLOAT_TYPE t, dx, px, qx, rx, xx;
     static long int ndx, nxm;
-    static double sum, rxx;
+    static FLOAT_TYPE sum, rxx;
 
-    if ( x <= (double)0.) {
+    if ( x <= (FLOAT_TYPE)0.) {
 	goto L90;
     } else {
 	goto L5;
     }
 L5:
     ndx = (long int)x;
-    t = x - (double) ndx;
-    if (t == (double)0.) {
+    t = x - (FLOAT_TYPE) ndx;
+    if (t == (FLOAT_TYPE)0.) {
 	goto L51;
     }
     dx = xlim1 - x;
-    if (dx < (double)0.) {
+    if (dx < (FLOAT_TYPE)0.) {
 	goto L40;
     }
 
@@ -240,7 +240,7 @@ L5:
 
 /*     BACKWARD RECURSION FOR 0.LT.X.LT.2 */
 
-    dgam /= t + (double)1.;
+    dgam /= t + (FLOAT_TYPE)1.;
     if (nxm == -1) {
 	goto L25;
     }
@@ -251,12 +251,12 @@ L5:
 /*     FORWARD RECURSION FOR 3.LT.X.LT.8 */
 
 L22:
-    xx = t + (double)2.;
+    xx = t + (FLOAT_TYPE)2.;
     i__1 = nxm;
     for (i__ = 1; i__ <= i__1; ++i__) {
 	dgam *= xx;
 /* L24: */
-	xx += (double)1.;
+	xx += (FLOAT_TYPE)1.;
     }
 L25:
     ret_val = log(dgam);
@@ -265,20 +265,20 @@ L25:
 /*     X.GT.XLIM1 */
 
 L40:
-    rx = (double)1. / x;
+    rx = (FLOAT_TYPE)1. / x;
     rxx = rx * rx;
-    if (x - xlim2 < (double)0.) {
+    if (x - xlim2 < (FLOAT_TYPE)0.) {
 	goto L41;
     }
     px = q[0] * rxx + q[1];
-    ret_val = px * rx + (x - (double).5) * log(x) - x + rtwpil;
+    ret_val = px * rx + (x - (FLOAT_TYPE).5) * log(x) - x + rtwpil;
     return ret_val;
 
 /*     X.LT.XLIM2 */
 
 L41:
     px = p[0];
-    sum = (x - (double).5) * log(x) - x;
+    sum = (x - (FLOAT_TYPE).5) * log(x) - x;
     for (i__ = 2; i__ <= 5; ++i__) {
 	px = px * rxx + p[i__ - 1];
 /* L42: */
@@ -309,10 +309,10 @@ L90:
 // accurate to 10 decimal places.  Stirling's formula is used for the central
 // polynomial part of the procedure
 //
-double rng::loggamma( double x )
+FLOAT_TYPE rng::loggamma( FLOAT_TYPE x )
 {
-        double f = 0.0;
-        double z;
+        FLOAT_TYPE f = 0.0;
+        FLOAT_TYPE z;
         if( x < 7.0 ) {
                 f = 1.0;
                 for( z = x - 1.0; z < 7.0; z += 1.0 ) {
@@ -323,13 +323,13 @@ double rng::loggamma( double x )
                 f -= log(f);
         }
         z = 1.0 / (x*x);
-        double v1 = f + (x - 0.5)*log(x) - x + 0.918938533204673;
+        FLOAT_TYPE v1 = f + (x - 0.5)*log(x) - x + 0.918938533204673;
 
-        double v2 = -0.000595238095238*z;
-        double v3 = ( v2 - 0.000793650793651 )*z;
-        double v4 = ( v3 - 0.0002777777777778 )*z;
-        double v5 = ( v4 + 0.083333333333333 );
-        double v6 = v5 / x;
+        FLOAT_TYPE v2 = -0.000595238095238*z;
+        FLOAT_TYPE v3 = ( v2 - 0.000793650793651 )*z;
+        FLOAT_TYPE v4 = ( v3 - 0.0002777777777778 )*z;
+        FLOAT_TYPE v5 = ( v4 + 0.083333333333333 );
+        FLOAT_TYPE v6 = v5 / x;
 
         return (v1 + v6);
 }
@@ -347,16 +347,16 @@ double rng::loggamma( double x )
 // Uses series expansion if p > x or x <= 1, otherwise a
 // continued fraction approximation.
 //
-double rng::gamain( double x, double p, double g )
+FLOAT_TYPE rng::gamain( FLOAT_TYPE x, FLOAT_TYPE p, FLOAT_TYPE g )
 {
-	double pn[6];
+	FLOAT_TYPE pn[6];
 
 	// define accuracy and initialize
-	double acu = 1.0e-8;
-	const double oflo = 1.0e30;
-	double gin = 0.0;
-	double term;
-	double rn;
+	FLOAT_TYPE acu = (FLOAT_TYPE)1.0e-8;
+	const FLOAT_TYPE oflo = (FLOAT_TYPE)1.0e30;
+	FLOAT_TYPE gin = 0.0;
+	FLOAT_TYPE term;
+	FLOAT_TYPE rn;
 	ifault = 0;
 
         // test for admissibility of arguments
@@ -364,7 +364,7 @@ double rng::gamain( double x, double p, double g )
         if( x < 0.0 ) ifault = 2;
         if( ifault > 0 || x == 0.0 )
                 return gin;
-        double factor = exp( p * log(x) - x - g );
+        FLOAT_TYPE factor = exp( p * log(x) - x - g );
         if( x > 1.0 && x >= p )
                 goto label30;
 
@@ -383,15 +383,15 @@ double rng::gamain( double x, double p, double g )
         return gin;
 
         // calculation by continued fraction
-        double a, b, an, dif;
+        FLOAT_TYPE a, b, an, dif;
         int i;
         label30:        // <<<<<<<<<<<<<<< label 30
-        a = 1.0 - p;
-        b = a + x + 1.0;
+        a = ONE_POINT_ZERO - p;
+        b = a + x + ONE_POINT_ZERO;
         term = 0.0;
         pn[0] = 1.0;
         pn[1] = x;
-        pn[2] = x + 1.0;
+        pn[2] = x + ONE_POINT_ZERO;
         pn[3] = x*b;
         gin = pn[2] / pn[3];
 
@@ -409,7 +409,7 @@ double rng::gamain( double x, double p, double g )
         if( dif > acu )
                 goto label34;
         if( dif <= acu*rn ) {
-                gin = 1.0 - factor*gin;
+                gin = ONE_POINT_ZERO - factor*gin;
                 return gin;
         }
 
@@ -433,25 +433,42 @@ double rng::gamain( double x, double p, double g )
 //
 // gauinv finds percentage points of the normal distribution.
 //
-double rng::gauinv( double p )
+FLOAT_TYPE rng::gauinv( FLOAT_TYPE p )
 {
-	const double zero = 0.0;
-	const double one = 1.0;
-	const double half = 0.5;
-        const double alimit = 1.0e-20;
-        const double p0 = -0.322232431088;
-        const double p1 = -1.0;
-        const double p2 = -0.342242088547;
-        const double p3 = -0.0204231210245;
-        const double p4 = -0.0000453642210148;
-        const double q0 = 0.099348462606;
-        const double q1 = 0.58858157495;
-        const double q2 = 0.531103462366;
-        const double q3 = 0.10353775285;
-        const double q4 = 0.0038560700634;
+#ifdef SINGLE_PRECISION_FLOATS
+	const FLOAT_TYPE zero = 0.0f;
+	const FLOAT_TYPE one = 1.0f;
+	const FLOAT_TYPE half = 0.5f;
+	const FLOAT_TYPE alimit = 1.0e-20f;
+	const FLOAT_TYPE p0 = -0.322232431088f;
+	const FLOAT_TYPE p1 = -1.0f;
+	const FLOAT_TYPE p2 = -0.342242088547f;
+	const FLOAT_TYPE p3 = -0.0204231210245f;
+	const FLOAT_TYPE p4 = -0.0000453642210148f;
+	const FLOAT_TYPE q0 = 0.099348462606f;
+	const FLOAT_TYPE q1 = 0.58858157495f;
+	const FLOAT_TYPE q2 = 0.531103462366f;
+	const FLOAT_TYPE q3 = 0.10353775285f;
+	const FLOAT_TYPE q4 = 0.0038560700634f;
+#else
+	const FLOAT_TYPE zero = 0.0;
+	const FLOAT_TYPE one = 1.0;
+	const FLOAT_TYPE half = 0.5;
+	const FLOAT_TYPE alimit = 1.0e-20;
+	const FLOAT_TYPE p0 = -0.322232431088;
+	const FLOAT_TYPE p1 = -1.0;
+	const FLOAT_TYPE p2 = -0.342242088547;
+	const FLOAT_TYPE p3 = -0.0204231210245;
+	const FLOAT_TYPE p4 = -0.0000453642210148;
+	const FLOAT_TYPE q0 = 0.099348462606;
+	const FLOAT_TYPE q1 = 0.58858157495;
+	const FLOAT_TYPE q2 = 0.531103462366;
+	const FLOAT_TYPE q3 = 0.10353775285;
+	const FLOAT_TYPE q4 = 0.0038560700634;
+#endif
 
         ifault = 1;
-        double ps = p;
+        FLOAT_TYPE ps = p;
         if( ps > half )
                 ps = one - ps;
         if( ps < alimit )
@@ -460,8 +477,8 @@ double rng::gauinv( double p )
         ifault = 0;
         if( ps == half )
                 return zero;
-        double yi = sqrt( log( one / (ps*ps) ) );
-        double retval = yi
+        FLOAT_TYPE yi = sqrt( log( one / (ps*ps) ) );
+        FLOAT_TYPE retval = yi
                 + ((((yi*p4 + p3)*yi + p2)*yi + p1)*yi + p0)
                 / ((((yi*q4 + q3)*yi + q2)*yi + q1)*yi + q0);
         if( p < half )
@@ -474,7 +491,7 @@ double rng::gauinv( double p )
 #define		B_B16 65536L
 #define		P_P 2147483647L
 	
-double rng::uniform()
+FLOAT_TYPE rng::uniform()
 {
 	//long a, p, b15, b16, xhi, xalo, leftlo, fhi, k;
 	long xhi, xalo, leftlo, fhi, k;
@@ -491,7 +508,7 @@ double rng::uniform()
 	k = fhi / B_B15;
 	ix = (((xalo - leftlo * B_B16) - P_P) + (fhi - k * B_B15) * B_B16) + k;
 	if (ix < 0) ix += P_P;
-	return ix * 4.6566128575e-10;
+	return ix * (FLOAT_TYPE)4.6566128575e-10;
 }
 
 //
@@ -511,17 +528,23 @@ double rng::uniform()
 //      2: v was not positive
 //      3:
 //
-double rng::ppchi2( double p, double v )
+FLOAT_TYPE rng::ppchi2( FLOAT_TYPE p, FLOAT_TYPE v )
 {
-	const double e = 0.5e-6;
-	const double aa = 0.6931471805;
-	double ch, a, b, q, p1, p2, t, x;
-        double s1, s2, s3, s4, s5, s6;
+#ifdef SINGLE_PRECISION_FLOATS
+	const FLOAT_TYPE e = 0.5e-4f;
+	const FLOAT_TYPE aa = 0.69314718f;
+#else
+	const FLOAT_TYPE e = 0.5e-6;
+	const FLOAT_TYPE aa = 0.6931471805;
+#endif
+
+	FLOAT_TYPE ch, a, b, q, p1, p2, t, x;
+    FLOAT_TYPE s1, s2, s3, s4, s5, s6;
 
 #if 0
-	double g = gammln( v / 2.0 );
+	FLOAT_TYPE g = gammln( v / 2.0 );
 #else
-	double g = gamln( v / 2.0 );
+	FLOAT_TYPE g = gamln( v / (FLOAT_TYPE)2.0 );
 #endif
 
 	// after defining accuracy and ln(2), test arguments and initialize
@@ -529,16 +552,16 @@ double rng::ppchi2( double p, double v )
 	if( p < 0.000002 || p > 0.999998 ) return -1.0;
 
 	ifault = 2;
-	if( v <= 0.0 ) return -1.0;
+	if( v <= 0.0 ) return -ONE_POINT_ZERO;
 
 	ifault = 0;
-	double xx = 0.5 * v;
-	double c = xx - 1.0;
+	FLOAT_TYPE xx = (FLOAT_TYPE)0.5 * v;
+	FLOAT_TYPE c = xx - ONE_POINT_ZERO;
 
         // starting approximation for small chi-squared
         if( v >= -1.24 * log(p) )
                 goto label1;
-        ch = pow( (p * xx * exp( g + xx * aa)), (1.0 / xx) );
+        ch = pow( (p * xx * exp( g + xx * aa)), (ONE_POINT_ZERO / xx) );
         if( ch - e < 0.0 )
                 return ch;
         else
@@ -547,16 +570,16 @@ double rng::ppchi2( double p, double v )
         // starting approximation for v less than or equal to 0.32
 	label1:
         if( v > 0.32 ) goto label3;
-        ch = 0.4;
-        a = log( 1.0 - p );
+        ch = (FLOAT_TYPE)0.4;
+        a = log( ONE_POINT_ZERO - p );
 
         label2:
         q = ch;
-        p1 = 1.0 + ch * ( 4.67 + ch );
-        p2 = ch * ( 6.73 + ch * ( 6.66 + ch ));
-        t = -0.5 + ( 4.67 + 2.0*ch ) / p1 -
-                ( 6.73 + ch*( 13.32 + 3.0*ch )) / p2;
-	ch -= ( 1.0 - exp( a + g + 0.5*ch + c*aa ) * p2 / p1 ) / t;
+        p1 = ONE_POINT_ZERO + ch * ( (FLOAT_TYPE)4.67 + ch );
+        p2 = ch * ( (FLOAT_TYPE)6.73 + ch * ( (FLOAT_TYPE)6.66 + ch ));
+        t = (FLOAT_TYPE)-0.5 + ( (FLOAT_TYPE)4.67 + (FLOAT_TYPE)2.0*ch ) / p1 -
+                ( (FLOAT_TYPE)6.73 + ch*( (FLOAT_TYPE)13.32 + (FLOAT_TYPE)3.0*ch )) / p2;
+		ch -= ( ONE_POINT_ZERO - exp( a + g + (FLOAT_TYPE)0.5*ch + c*aa ) * p2 / p1 ) / t;
         if( fabs( q/ch - 1.0 ) - 0.01 <= 0.0 )
                 goto label4;
         else
@@ -567,43 +590,56 @@ double rng::ppchi2( double p, double v )
 	x = gauinv( p );
 
 	// starting approximation using Wilson and Hilferty estimate
-        p1 = 0.222222 / v;
-        ch = v * pow( x*sqrt(p1) + 1.0 - p1, 3.0 );
+        p1 = (FLOAT_TYPE) 0.222222 / v;
+        ch = v * pow( x*sqrt(p1) + ONE_POINT_ZERO - p1, 3 );
 
         // starting approximation for p tending to 1
         if( ch > 2.2 * v + 6.0 )
-                ch = -2.0 * ( log( 1.0 - p ) - c * log( 0.5 * ch ) + g );
+                ch = (FLOAT_TYPE)-2.0 * ( log( ONE_POINT_ZERO - p ) - c * log((FLOAT_TYPE) 0.5 * ch ) + g );
 
         // call to algorithm AS 32 and calculation of seven term Taylor series
 	label4:
         q = ch;
-        p1 = 0.5 * ch;
+        p1 = (FLOAT_TYPE)0.5 * ch;
 	p2 = p - gamain( p1, xx, g );
 
 	if( ifault != 0 ) {
 		ifault = 3;
-                return -1.0;
+                return -ONE_POINT_ZERO;
 	}
 
         t = p2 * exp( xx*aa + g + p1 - c * log(ch) );
         b = t / ch;
+#ifdef SINGLE_PRECISION_FLOATS
+        a = 0.5f*t - b*c;
+        s1 = ( 210.0f + a*( 140.0f + a*( 105.0f + a*(84.0f + a*( 70.0f + a*60.0f ))))) / 420.0f;
+        s2 = ( 420.0f + a*( 735.0f + a*( 966.0f + a*( 1141.0f + a*1278.0f)))) / 2520.0f;
+		s3 = ( 210.0f + a*( 462.0f + a*( 707.0f + a*932.0f))) / 2520.0f;
+        s4 = ( 252.0f + a*( 672.0f + a*1182.0f) + c*( 204.0f + a*( 889.0f + a*1740.0f))) / 5040.0f;
+        s5 = (  84.0f + a*264.0f + c*(175.0f + a*606.0f)) / 2520.0f;
+        s6 = ( 120.0f + c*( 346.0f + c*127.0f)) / 5040.0f;
+        ch += t*( 1.0f + 0.5f*t*s1 - b*c*( s1 - b*( s2 - b*( s3 - b*( s4 - b*( s5 - b*s6))))));
+#else
         a = 0.5*t - b*c;
         s1 = ( 210.0 + a*( 140.0 + a*( 105.0 + a*(84.0 + a*( 70.0 + a*60.0 ))))) / 420.0;
         s2 = ( 420.0 + a*( 735.0 + a*( 966.0 + a*( 1141.0 + a*1278.0)))) / 2520.0;
-	s3 = ( 210.0 + a*( 462.0 + a*( 707.0 + a*932.0))) / 2520.0;
+		s3 = ( 210.0 + a*( 462.0 + a*( 707.0 + a*932.0))) / 2520.0;
         s4 = ( 252.0 + a*( 672.0 + a*1182.0) + c*( 204.0 + a*( 889.0 + a*1740.0))) / 5040.0;
         s5 = (  84.0 + a*264.0 + c*(175.0 + a*606.0)) / 2520.0;
         s6 = ( 120.0 + c*( 346.0 + c*127.0)) / 5040.0;
         ch += t*( 1.0 + 0.5*t*s1 - b*c*( s1 - b*( s2 - b*( s3 - b*( s4 - b*( s5 - b*s6))))));
-        if( fabs( q/ch - 1.0 ) > e )
+#endif
+		//DEBUG
+//		cout << q << "\t" << ch  << "\t" << fabs( q/ch - ONE_POINT_ZERO ) << endl;
+        if( fabs( q/ch - ONE_POINT_ZERO ) > e )
                 goto label4;
         return ch;
 }
 
 //this is from MB
-void rng::DirichletRandomVariable (double *alp, double *z, int n){
+void rng::DirichletRandomVariable (FLOAT_TYPE *alp, FLOAT_TYPE *z, int n){
 	int		i;
-	double	sum;
+	FLOAT_TYPE	sum;
 
 	sum = 0.0;
 	for(i=0; i<n; i++)

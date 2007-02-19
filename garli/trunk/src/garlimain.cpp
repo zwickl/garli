@@ -188,16 +188,16 @@ char **argv=NULL;
 				ProfilerInit(collectDetailed, bestTimeBase, 100000, 1000);
 			#endif
 
-			if(pop.bootstrapReps == 0){
+			if(pop.conf->bootstrapReps == 0){
+				pop.GetConstraints();
 				if(conf.restart == false){
-					pop.GetConstraints();
-			
+					outman.UserMessage("Running Genetic Algorithm with initial seed=%d\n", rnd.init_seed());
 					pop.SeedPopulationWithStartingTree();
 					//DEBUG - to look at effect of prec during init opt on score
 /*					pop.InitializeOutputStreams();
 					time_t repStart;
 					ofstream res("optresults.log");
-					for(double prec=0.5;prec > 0.0001;){
+					for(FLOAT_TYPE prec=0.5;prec > 0.0001;){
 						repStart = pop.stopwatch.SplitTime();
 						for(int rep=0;rep<10;rep++){
 							pop.adap->branchOptPrecision = prec;
@@ -212,8 +212,9 @@ char **argv=NULL;
 					return 1;
 */					}
 				else{
-					pop.GetConstraints();
 					pop.ReadStateFiles();
+					outman.UserMessage("Restarting Genetic Algorithm from checkpoint");
+					outman.UserMessage("generation %d, seed %d, best lnL %.3f", pop.gen, rnd.init_seed(), pop.BestFitness());
 					pop.adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(&conf);
 					}
 				pop.InitializeOutputStreams();

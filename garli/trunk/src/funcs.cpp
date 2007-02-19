@@ -23,10 +23,10 @@
 #	include <unistd.h>
 #endif
 
+#include "defs.h"
 #include "funcs.h"
 #include "population.h"
 #include "tree.h"
-#include "defs.h"
 #include "outputman.h"
 
 extern OutputManager outman;
@@ -34,7 +34,7 @@ extern OutputManager outman;
 #undef ROOT_OPT
 #define FOURTH_ROOT
 
-#define LOG_MIN_BRLEN log(DEF_MIN_BRLEN)
+#define LOG_MIN_BRLEN log(min_brlen)
 
 //a variety of functions that don't belong to any class
 
@@ -166,11 +166,11 @@ int RandomInt(int lb, int ub)	{
 	return lb + rand() % (ub-lb+1);
 }
 
-double RandomFrac()	{
-	return (double)rand() / RAND_MAX;
+FLOAT_TYPE RandomFrac()	{
+	return (FLOAT_TYPE)rand() / RAND_MAX;
 }
 
-double RandomDouble(double lb, double ub)	{
+FLOAT_TYPE RandomDouble(FLOAT_TYPE lb, FLOAT_TYPE ub)	{
 	return lb + RandomFrac() * (ub - lb);
 }
 
@@ -190,8 +190,8 @@ double RandomDouble(double lb, double ub)	{
 #define FMAX(a,b) ((a)>(b) ? (a):(b))
 
 //This version takes a node pointer and optimizes blens
-int mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *fc, double (*func)(TreeNode*, Tree*, double), TreeNode *thisnode, Tree *thistree){
-	double ulim, u, r, q, fu;
+int mnbrak(FLOAT_TYPE *ax, FLOAT_TYPE *bx, FLOAT_TYPE *cx, FLOAT_TYPE *fa, FLOAT_TYPE *fb, FLOAT_TYPE *fc, FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE), TreeNode *thisnode, Tree *thistree){
+	FLOAT_TYPE ulim, u, r, q, fu;
 	bool limited=false;
 	
 //	ofstream brak("brakdebug.log", ios::app);
@@ -213,16 +213,16 @@ int mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *f
 		}
 
 	*cx=(*bx)+GOLD*(*bx-*ax);
-	*cx = (*cx > DEF_MIN_BRLEN ? (*cx < DEF_MAX_BRLEN ? *cx : DEF_MAX_BRLEN) : DEF_MIN_BRLEN);
+	*cx = (*cx > min_brlen ? (*cx < DEF_MAX_BRLEN ? *cx : DEF_MAX_BRLEN) : min_brlen);
 	*fc=(*func)(thisnode, thistree, *cx);
 */
 	while(*fb>*fc){
 			
 		r=(*bx-*ax)*(*fb-*fc);
 		q=(*bx-*cx)*(*fb-*fa);			
-		u=(*bx)-((*bx-*cx)*q-(*bx-*ax)*r)/(2.0*SIGN(FMAX(fabs(q-r),TINY), q-r));
-		u = (u > DEF_MIN_BRLEN ? (u < DEF_MAX_BRLEN ? u : DEF_MAX_BRLEN) : DEF_MIN_BRLEN);
-		ulim=(*bx)+GLIMIT*(*cx-*bx);
+		u=(*bx)-((*bx-*cx)*q-(*bx-*ax)*r)/(FLOAT_TYPE)(2.0*SIGN(FMAX(fabs(q-r),TINY), q-r));
+		u = (FLOAT_TYPE)(u > DEF_MIN_BRLEN ? (u < DEF_MAX_BRLEN ? u : DEF_MAX_BRLEN) : DEF_MIN_BRLEN);
+		ulim=(FLOAT_TYPE)((*bx)+GLIMIT*(*cx-*bx));
 		if((*bx-u)*(u-*cx)>0.0){
 			fu=(*func)(thisnode, thistree, u);
 			if(fu < *fc){
@@ -237,7 +237,7 @@ int mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *f
 				*fc=fu;
 				return 0;
 				}
-			u=(*cx)+GOLD*(*cx-*bx);
+			u=(FLOAT_TYPE)((*cx)+GOLD*(*cx-*bx));
 			//DZ 10/27/03 don't let this evaluate totally insane blens	
 /*			if(u>=.69){ //=ln(2)
 				if(max(*ax, max(*bx, *cx)) < .69) u=.69;
@@ -259,7 +259,7 @@ int mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *f
 				}
 	*/		fu=(*func)(thisnode, thistree, u);
 			if(fu <*fc){
-				SHFT(*bx, *cx, u, *cx+GOLD*(*cx-*bx));
+				SHFT(*bx, *cx, u, *cx+(FLOAT_TYPE)GOLD*(*cx-*bx));
 				SHFT(*fb, *fc, fu, (*func)(thisnode, thistree, u));
 				}
 			}
@@ -276,7 +276,7 @@ int mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *f
 	*/		fu=(*func)(thisnode, thistree, u);
 			}
 		else{
-			u=(*cx)+GOLD*(*cx-*bx);
+			u=(*cx)+(FLOAT_TYPE)GOLD*(*cx-*bx);
 			fu=(*func)(thisnode, thistree, u);
 			}
 		SHFT(*ax, *bx, *cx, u)
@@ -293,10 +293,10 @@ int mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *f
 
 
 //This version takes a node pointer and optimizes blens
-double brent(double ax, double bx, double cx, double (*f)(TreeNode *, Tree*, double), double tol, double *xmin, TreeNode *thisnode, Tree *thistree){
+FLOAT_TYPE brent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree){
 	 int iter;
-	 double a, b, d, etemp, fu, fv, fw, fx, p, q, r, tol1, tol2, u, v, w, x, xm;
-	 double e=0.0;
+	 FLOAT_TYPE a, b, d, etemp, fu, fv, fw, fx, p, q, r, tol1, tol2, u, v, w, x, xm;
+	 FLOAT_TYPE e=0.0;
 	 
 	 a=(ax < cx ? ax : cx); //make a the smallest of the three bracket points 
 	 b=(ax > cx ? ax : cx); //and b the largest
@@ -305,9 +305,9 @@ double brent(double ax, double bx, double cx, double (*f)(TreeNode *, Tree*, dou
 	 fw=fv=fx=(*f)(thisnode, thistree, x);
 	 
 	 for(iter=1;iter<=ITMAX;iter++){
-	 	xm=0.5*(a+b);		//xm is the midpoint of the bracket (of a and b)
+	 	xm=(FLOAT_TYPE)0.5*(a+b);		//xm is the midpoint of the bracket (of a and b)
 	 	
-	 	tol2=2.0*(tol1=tol*fabs(x)+ZEPS);	
+	 	tol2=(FLOAT_TYPE)(2.0*(tol1=(FLOAT_TYPE)(tol*fabs(x)+ZEPS)));	
 	 	
 	 	if (fabs(x-xm) <= (tol2-0.5*(b-a))){ //termination condition
 	 		*xmin=x;							//if the distance between x and bracket mean is < 
@@ -317,13 +317,13 @@ double brent(double ax, double bx, double cx, double (*f)(TreeNode *, Tree*, dou
 	 		r=(x-w)*(fx-fv);
 	 		q=(x-v)*(fx-fw);
 	 		p=(x-v)*q-(x-w)*r;
-	 		q=2.0*(q-r);
+	 		q=(FLOAT_TYPE)(2.0*(q-r));
 	 		if(q>0.0) p=-p;
 	 		q=fabs(q);
 	 		etemp=e;
 	 		e=d;
 	 		if(fabs(p) >= fabs(0.5*q*etemp)||p<=q*(a-x) || p>=q*(b-x)) //determine if the parabolic fit is good
-	 			d=CGOLD*(e=(x>=xm?a-x:b-x));  //if not
+	 			d=(FLOAT_TYPE)(CGOLD*(e=(x>=xm?a-x:b-x)));  //if not
 	 			
 	 		else{				//if so, take the parabolic step
 	 			d=p/q;
@@ -333,7 +333,7 @@ double brent(double ax, double bx, double cx, double (*f)(TreeNode *, Tree*, dou
 	 			}
 	 		}
 	 	else{
-	 		d=CGOLD*(e=(x>=xm?a-x:b-x)); //e is the distance moved in the step before last
+	 		d=(FLOAT_TYPE)(CGOLD*(e=(x>=xm?a-x:b-x))); //e is the distance moved in the step before last
 	 		}							 //d is golden section of that (.38.... times)
 	 		
 	 	u=(fabs(d) >= tol1 ? x+d : x+SIGN(tol1,d));//u is the next point to be evaluated
@@ -377,8 +377,8 @@ double brent(double ax, double bx, double cx, double (*f)(TreeNode *, Tree*, dou
 #define sweetspot 0.0016
 #define smallShift 0.0004
 #else
-#define effectiveMin DEF_MIN_BRLEN
-#define effectiveMax DEF_MAX_BRLEN
+#define effectiveMin min_brlen
+#define effectiveMax max_brlen
 #define sweetspot 0.00000256
 #define smallShift 0.00000016
 #endif
@@ -387,9 +387,9 @@ double brent(double ax, double bx, double cx, double (*f)(TreeNode *, Tree*, dou
 //My version of the bracketing fuction that can abort and stop evaluating under certain conditions
 //it assumes that the raw branch lengths are being passed in (not logs) so values are bounded
 //by the minimum branch length
-int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOuterL, double *midL, double *bestOuterL, double (*func)(TreeNode*, Tree*, double, bool), TreeNode *thisnode, Tree *thistree){
+int DZbrak(FLOAT_TYPE *worstOuter, FLOAT_TYPE *mid, FLOAT_TYPE *bestOuter, FLOAT_TYPE *worstOuterL, FLOAT_TYPE *midL, FLOAT_TYPE *bestOuterL, FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree){
 	//points are always passed in such that worstOuter < mid < bestOuter
-	double nextTry, r, q, nextTryL, dum;
+	FLOAT_TYPE nextTry, r, q, nextTryL, dum;
 	bool tryPara=true, possibleZeroMLE=false;
 	int numAttemptsWithBestAtMin=0;
 
@@ -403,19 +403,19 @@ int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOute
 		if(*worstOuter==effectiveMin){
 			SHFT(dum, *bestOuter, *worstOuter, *mid)
 			SHFT(dum, *bestOuterL, *worstOuterL, *midL)
-			*mid=(*worstOuter+*bestOuter)*0.5;
+			*mid=(FLOAT_TYPE)((*worstOuter+*bestOuter)*0.5);
 			*midL=(*func)(thisnode, thistree, *mid, true);
 			if(*bestOuterL < *midL && !(*mid > sweetspot)) return 1;
 			}
 		else if(!(*worstOuter > sweetspot)){
 			SHFT(dum, *mid, *worstOuter, dum)
 			SHFT(dum, *midL, *worstOuterL, dum)
-			*bestOuter=effectiveMin;
+			*bestOuter=(FLOAT_TYPE)effectiveMin;
 			*bestOuterL=(*func)(thisnode, thistree, *bestOuter, true);
 			if(*bestOuterL < *midL && !(*mid > sweetspot)) return 1;
 			}
 		else{
-			*bestOuter=sweetspot-.02;
+			*bestOuter=(FLOAT_TYPE)(sweetspot-.02);
 			possibleZeroMLE=true;
 			SHFT(dum, *worstOuter, *mid, dum)
 			SHFT(dum, *worstOuterL, *midL, dum)
@@ -450,7 +450,7 @@ int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOute
 		if(*midL < *worstOuterL && *midL < *bestOuterL){//case 1, got a bracket
 			if(*bestOuter==effectiveMin && (*worstOuter - *mid)> .2){
 				//nextTry=(*mid+*worstOuter)*.5;
-				nextTry=0.16;
+				nextTry=(FLOAT_TYPE)0.16;
 				nextTryL=(*func)(thisnode, thistree, nextTry, true);
 				assert(nextTryL < *worstOuterL);
 				if(nextTryL < *midL){
@@ -469,25 +469,25 @@ int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOute
 			return 0;
 			}
 		else{
-			double diffMidBestL=(*midL-*bestOuterL);
-			double diffMidBest=(*mid-*bestOuter);
-			double diffMidWorstL=(*worstOuterL-*midL);
-			double diffMidWorst=(*worstOuter-*mid);
+			FLOAT_TYPE diffMidBestL=(*midL-*bestOuterL);
+			FLOAT_TYPE diffMidBest=(*mid-*bestOuter);
+			FLOAT_TYPE diffMidWorstL=(*worstOuterL-*midL);
+			FLOAT_TYPE diffMidWorst=(*worstOuter-*mid);
 			if(*worstOuter < *bestOuter){ //case 2
 				//check the curvature
 		
-				double slopeRatio=(diffMidBestL/diffMidBest) / (diffMidWorstL/diffMidWorst);
+				FLOAT_TYPE slopeRatio=(diffMidBestL/diffMidBest) / (diffMidWorstL/diffMidWorst);
 				if(slopeRatio > 0.9){
-					nextTry=((*bestOuter)+2.0*(*bestOuter-*mid));//case 2a
+					nextTry=(FLOAT_TYPE)((*bestOuter)+2.0*(*bestOuter-*mid));//case 2a
 					}
 				else{ //case 2b and 2c
 					r=diffMidWorst*diffMidBestL;
 					q=diffMidBest*diffMidWorstL;
-					nextTry=(*mid)-(diffMidBest*q-(*mid-*worstOuter)*r)/(2.0*SIGN(FMAX(fabs(q-r),TINY), q-r));
+					nextTry=(FLOAT_TYPE)((*mid)-(diffMidBest*q-(*mid-*worstOuter)*r)/(2.0*SIGN(FMAX(fabs(q-r),TINY), q-r)));
 					if(/*nextTry > *bestOuter && */fabs(nextTry-*bestOuter) < smallShift){
 						//if the parabolic estimate is very near our current best it tends to take
 						//a while to get the bracket, so just push it a little further to the right
-						nextTry += smallShift;
+						nextTry += (FLOAT_TYPE)smallShift;
 						}
 					}
 				}
@@ -495,7 +495,7 @@ int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOute
 			else if(*worstOuter > *bestOuter){ //case 3
 				r=diffMidWorst*diffMidBestL;
 				q=diffMidBest*diffMidWorstL;
-				nextTry=(*mid)-(diffMidBest*q-diffMidWorst*r)/(2.0*SIGN(FMAX(fabs(q-r),TINY), q-r));
+				nextTry=(FLOAT_TYPE)((*mid)-(diffMidBest*q-diffMidWorst*r)/(2.0*SIGN(FMAX(fabs(q-r),TINY), q-r)));
 				if(*bestOuter==effectiveMin){
 					if(nextTry < effectiveMin || *mid < sweetspot || possibleZeroMLE) return 1; //case 3a2
 					else {//case 3a1
@@ -503,7 +503,7 @@ int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOute
 						}				
 					}
 				else {
-					if(possibleZeroMLE==true) nextTry=effectiveMin;
+					if(possibleZeroMLE==true) nextTry=(FLOAT_TYPE)effectiveMin;
 					}
 				}
 			}
@@ -545,15 +545,15 @@ int DZbrak(double *worstOuter, double *mid, double *bestOuter, double *worstOute
 	
 //I'm reworking this a bit to better use the information that has already been generated in the bracketing function
 //since we already have those function evaluations, we might as well pass them in and use them
-double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc, double (*f)(TreeNode *, Tree*, double, bool), double tol, double *xmin, TreeNode *thisnode, Tree *thistree){
+FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, FLOAT_TYPE fx, FLOAT_TYPE fc, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE, bool), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree){
 	 int iter;
- 	 double a, b, d, etemp, fu, fv, fw/*, fx*/, p, q, r, tol1, tol2, u, v, w, x, xm;
-	 double e=0.0;
+ 	 FLOAT_TYPE a, b, d, etemp, fu, fv, fw/*, fx*/, p, q, r, tol1, tol2, u, v, w, x, xm;
+	 FLOAT_TYPE e=0.0;
 	 
 	 if((fx<fa && fx<fc)==false){
 	 	//if bx isn't the current minimum, make is so
 	 	if(fa<fx){
-	 		double dummy=fa;
+	 		FLOAT_TYPE dummy=fa;
 	 		fa=fx;
 	 		fx=dummy;
 	 		dummy=ax;
@@ -561,7 +561,7 @@ double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc,
 	 		bx=dummy;
 	 		}
 	 	else if(fc<fx){
-	 		double dummy=fc;
+	 		FLOAT_TYPE dummy=fc;
 	 		fc=fx;
 	 		fx=dummy;
 	 		dummy=cx;
@@ -571,7 +571,7 @@ double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc,
 	 	}
 	 assert(fx<fa && fx<fc);
 	 
-	 double paraMinlnL, paraErr, paraErrCrit;
+	 FLOAT_TYPE paraMinlnL, paraErr, paraErrCrit;
 	 paraErrCrit=(tol<.5 ? tol*10 : 5);
 	 bool paraOK=false, para=false;
 
@@ -581,7 +581,7 @@ double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc,
 	 a=(ax < cx ? ax : cx); //make a the smallest of the three bracket points 
 	 b=(ax > cx ? ax : cx); //and b the largest
 	if(ax>cx){
-		double dummy=fa;
+		FLOAT_TYPE dummy=fa;
 		fa=fc;
 		fc=dummy;
 		}
@@ -601,9 +601,9 @@ double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc,
  		fw=fc; 		
  		}
 
-	xm=0.5*(a+b);       //xm is the midpoint of the bracket (of a and b)
+	xm=(FLOAT_TYPE)0.5*(a+b);       //xm is the midpoint of the bracket (of a and b)
 	e=(x>=xm?a-x:b-x);	//set e to the larger of the two bracket intervals
-	d=CGOLD*e;
+	d=(FLOAT_TYPE)CGOLD*e;
 
 //	assert(a<=x && x<=b);
 	 
@@ -611,9 +611,9 @@ double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc,
 	 
 	 for(iter=1;iter<=ITMAX;iter++){
 
-	 	xm=0.5*(a+b);		//xm is the midpoint of the bracket (of a and b)
+	 	xm=(FLOAT_TYPE)0.5*(a+b);		//xm is the midpoint of the bracket (of a and b)
 	 	
-	 	tol2=2.0*(tol1=tol*fabs(x)+ZEPS);	
+	 	tol2=(FLOAT_TYPE)(2.0*(tol1=(FLOAT_TYPE)(tol*fabs(x)+ZEPS)));	
 	 	
 /*	 	if (fabs(x-xm) <= (tol2-0.5*(b-a))){ //termination condition
 	 		*xmin=x;						
@@ -623,13 +623,13 @@ double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc,
 	 		r=(x-w)*(fx-fv);
 	 		q=(x-v)*(fx-fw);
 	 		p=(x-v)*q-(x-w)*r;
-	 		q=2.0*(q-r);
+	 		q=(FLOAT_TYPE)2.0*(q-r);
 	 		if(q>0.0) p=-p;
 	 		q=fabs(q);
 	 		etemp=e;
 	 		e=d;
 	 		if(fabs(p) >= fabs(0.5*q*etemp)||p<=q*(a-x) || p>=q*(b-x)){ //determine if the parabolic fit is good
-	 			d=CGOLD*(e=(x>=xm?a-x:b-x));  //if not
+	 			d=(FLOAT_TYPE)(CGOLD*(e=(x>=xm?a-x:b-x)));  //if not
 	 			u=(fabs(d) >= tol1 ? x+d : x+SIGN(tol1,d));
 	 			}
 	 			
@@ -637,14 +637,14 @@ double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc,
 	 			d=p/q;
 	 			u=x+d;
 	 			
-	 			double alph=w-u;
-				double beta=x-u; 
+	 			FLOAT_TYPE alph=w-u;
+				FLOAT_TYPE beta=x-u; 
 				paraMinlnL=(((fx) * alph*alph) - ((fw) * beta*beta)) / (alph*alph - beta*beta);
 
 	 			if(paraOK==true){
 	 				//the estimation error in the parabolic step always seems to at least half each iteration,
 	 				//hence the division by 2.0
-	 				double estlnL=paraMinlnL - paraErr/2.0;
+	 				FLOAT_TYPE estlnL=(FLOAT_TYPE)(paraMinlnL - paraErr/2.0);
 	 				if((fx - estlnL) < tol){
 	 					*xmin=x;
 	 					return fx;
@@ -751,12 +751,12 @@ double DZbrent(double ax, double bx, double cx, double fa, double fx, double fc,
 	 return fx;
 	 }
 	 
-void InferStatesFromCla(char *states, double *cla, int nchar){
+void InferStatesFromCla(char *states, FLOAT_TYPE *cla, int nchar){
 	//this function takes a cla that contains the contribution of the whole tree
 	//and calculates the most probable state at each site.  The resulting array of
 	//states is placed into *states, which should already be allocated.
 	assert(0);//need to generalize this for n rates is it ever needs to be used again
-	double stateProbs[4];
+	FLOAT_TYPE stateProbs[4];
 	
 	for(int c=0;c<nchar;c++){
 		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=0.0;
@@ -778,8 +778,8 @@ void InferStatesFromCla(char *states, double *cla, int nchar){
 		}
 	}
 
-vector<InternalState *> *InferStatesFromCla(double *cla, int nchar, int nrates){
-	double stateProbs[4];
+vector<InternalState *> *InferStatesFromCla(FLOAT_TYPE *cla, int nchar, int nrates){
+	FLOAT_TYPE stateProbs[4];
 	
 	vector<InternalState *> *stateVec = new vector<InternalState *>;
 	
@@ -801,8 +801,8 @@ vector<InternalState *> *InferStatesFromCla(double *cla, int nchar, int nrates){
 	return stateVec;
 	}
 
-double CalculatePDistance(const char *str1, const char *str2, int nchar){
-	double count=0.0;
+FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar){
+	FLOAT_TYPE count=0.0;
 	int offset1=0, offset2=0;
 	int effectiveChar=nchar;
 	bool skipChar=false;
@@ -829,12 +829,12 @@ double CalculatePDistance(const char *str1, const char *str2, int nchar){
 		else effectiveChar--;
 		skipChar=false;
 		}
-	return count/(double)effectiveChar;
+	return count/(FLOAT_TYPE)effectiveChar;
 	}
 
 #ifndef GANESH
-double CalculateHammingDistance(const char *str1, const char *str2, int nchar){
-	double count=0.0;
+FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int nchar){
+	FLOAT_TYPE count=0.0;
 	int offset=0;
 	int effectiveChar=nchar;
 	for(int i=0;i<nchar;i++){
@@ -847,12 +847,12 @@ double CalculateHammingDistance(const char *str1, const char *str2, int nchar){
 			}
 		else if(str1[i]!=str2[i+offset]) count += 1.0;
 		}
-	return count/(double)effectiveChar;
+	return count/(FLOAT_TYPE)effectiveChar;
 	}
 #else
-double CalculateHammingDistance(const char *str1, const char *str2, 
+FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, 
                                 const int *col_count, int nchar){
-	double count=0.0;
+	FLOAT_TYPE count=0.0;
 	int offset=0;
 	int effectiveChar=0;
 	for(int i=0;i<nchar;i++){
@@ -868,27 +868,27 @@ double CalculateHammingDistance(const char *str1, const char *str2,
 			}
 		else if(str1[i]!=str2[i+offset]) count += col_count[i]*1.0;
 		}
-	return count/(double)effectiveChar;
+	return count/(FLOAT_TYPE)effectiveChar;
 }
 #endif
 
-void SampleBranchLengthCurve(double (*func)(TreeNode*, Tree*, double, bool), TreeNode *thisnode, Tree *thistree){
-	for(double len=effectiveMin;len<effectiveMax;len*=2.0)
+void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree){
+	for(FLOAT_TYPE len=(FLOAT_TYPE)effectiveMin;len<(FLOAT_TYPE)effectiveMax;len*=2.0)
 		(*func)(thisnode, thistree, len, true);
 	}
 
-void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const double *Lpr, const double *Rpr, const int nchar, const int nRateCats){
+void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	const double *LCL=LCLA->arr;
-	const double *RCL=RCLA->arr;
-	double L1, L2, L3, L4, R1, R2, R3, R4;
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *LCL=LCLA->arr;
+	const FLOAT_TYPE *RCL=RCLA->arr;
+	FLOAT_TYPE L1, L2, L3, L4, R1, R2, R3, R4;
 	
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 	
 	if(nRateCats == 4){//the unrolled 4 rate version
@@ -1028,13 +1028,13 @@ void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LC
 	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
 	}
 
-void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, const double *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats){
+void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
+	FLOAT_TYPE *dest=destCLA->arr;
 	
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
 	for(int i=0;i<nchar;i++){
@@ -1123,8 +1123,8 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, cons
 				char nstates=-1 * *(Rdata++);
 				//create a temporary cla to hold the results from the ambiguity of the right, 
 				//which need to be +'s 
-				//double *tempcla=new double[4*nRateCats];
-				vector<double> tempcla(4*nRateCats);
+				//FLOAT_TYPE *tempcla=new FLOAT_TYPE[4*nRateCats];
+				vector<FLOAT_TYPE> tempcla(4*nRateCats);
 				for(int i=0;i<nstates;i++){
 					for(int r=0;r<nRateCats;r++){
 						tempcla[(r*4)]   += Rpr[(*Rdata)+16*r];
@@ -1157,18 +1157,18 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const double *Lpr, cons
 		destCLA->rescaleRank=2;
 	}
 
-void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, const double *pr2, char *dat2, const int nchar, const int nRateCats, const unsigned *ambigMap /*=NULL*/){
+void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const int nchar, const int nRateCats, const unsigned *ambigMap /*=NULL*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
-	double *des=destCLA->arr;
-	double *dest=des;
-	const double *CL=LCLA->arr;
-	const double *CL1=CL;
+	FLOAT_TYPE *des=destCLA->arr;
+	FLOAT_TYPE *dest=des;
+	const FLOAT_TYPE *CL=LCLA->arr;
+	const FLOAT_TYPE *CL1=CL;
 	const char *data2=dat2;
 
 #ifdef UNIX	
-	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);	
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);	
 #endif
 
 	if(nRateCats==4){//unrolled 4 rate version
@@ -1335,17 +1335,17 @@ void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LC
 	destCLA->rescaleRank=LCLA->rescaleRank+2;
 	} 
 
-void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const double *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats /*=4*/){
+void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats /*=4*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	double *CL1=LCLA->arr;
-	double *partial=partialCLA->arr;
+	FLOAT_TYPE *dest=destCLA->arr;
+	FLOAT_TYPE *CL1=LCLA->arr;
+	FLOAT_TYPE *partial=partialCLA->arr;
 	
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
-	madvise(partial, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise(partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
 	if(nRateCats==4){
@@ -1391,14 +1391,14 @@ void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArr
 		}
 	}
 
-void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const double *Lpr, char *Ldata, int nchar, int nRateCats /*=4*/){
+void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata, int nchar, int nRateCats /*=4*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
-	double *dest=destCLA->arr;
-	double *partial=partialCLA->arr;
+	FLOAT_TYPE *dest=destCLA->arr;
+	FLOAT_TYPE *partial=partialCLA->arr;
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(double), MADV_SEQUENTIAL);
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
 	for(int i=0;i<nchar;i++){

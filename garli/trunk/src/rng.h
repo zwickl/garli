@@ -41,11 +41,11 @@ class rng
 		int ifault;
 
 	protected:
-		//double loggamma( double x );
-		double gamln( double x );
-		double gauinv( double p );
-		double gamain( double x, double p, double g );
-		double ppchi2( double p, double v );
+		//FLOAT_TYPE loggamma( FLOAT_TYPE x );
+		FLOAT_TYPE gamln( FLOAT_TYPE x );
+		FLOAT_TYPE gauinv( FLOAT_TYPE p );
+		FLOAT_TYPE gamain( FLOAT_TYPE x, FLOAT_TYPE p, FLOAT_TYPE g );
+		FLOAT_TYPE ppchi2( FLOAT_TYPE p, FLOAT_TYPE v );
 
 	public:
 		rng();
@@ -60,35 +60,35 @@ class rng
 		int		random_int(int);
 		long	random_long(long);
 		float	random_float(float);
-		double	random_double(double);
-		double  uniform();
-		double  exponential(double);
-		double  gamma( double shape ){
-			double g=-1;
+		FLOAT_TYPE	random_FLOAT_TYPE(FLOAT_TYPE);
+		FLOAT_TYPE  uniform();
+		FLOAT_TYPE  exponential(FLOAT_TYPE);
+		FLOAT_TYPE  gamma( FLOAT_TYPE shape ){
+			FLOAT_TYPE g=-1;
 			do{
-				g = ( ppchi2( uniform(), 2.0*shape ) / (2.0*shape) );
+				g = (FLOAT_TYPE)( ppchi2( uniform(), (FLOAT_TYPE)2.0*shape ) / (FLOAT_TYPE)(2.0*shape) );
 				}while( g < 0.0);
 			assert(g > 0.0);
 			return g;
 			}
 		//DZ 11-3-02 addition
-		int random_binomial(int n, double p);
-		void DirichletRandomVariable (double *alp, double *z, int n);
+		int random_binomial(int n, FLOAT_TYPE p);
+		void DirichletRandomVariable (FLOAT_TYPE *alp, FLOAT_TYPE *z, int n);
 };
 
 //DJZ 11-3-02 Added by me.  Stolen from ProbabLib 1.0, by Antonio Larrosa
 //DJZ 3-29-04 Altering this to have the distribution mean specified, which 
 //should make picking a value for different datasets a bit easier
 
-inline int rng::random_binomial(int n, double mean){
-	double p=mean/n;
-	double t=p/(1.0-p);
-	double u=uniform();
-	double p0=pow((1.0-p),n);
-	double g=p0;
+inline int rng::random_binomial(int n, FLOAT_TYPE mean){
+	FLOAT_TYPE p=mean/n;
+	FLOAT_TYPE t=(FLOAT_TYPE) p/((FLOAT_TYPE)1.0-p);
+	FLOAT_TYPE u=uniform();
+	FLOAT_TYPE p0=pow((FLOAT_TYPE)((FLOAT_TYPE)1.0-p),n);
+	FLOAT_TYPE g=p0;
 	unsigned int k=0;
 	while (u>g){
-	    p0*=t*(n-k)/(k+1.0);
+	    p0*=t*(n-k)/(FLOAT_TYPE)(k+1.0);
 	    g+=p0;
 	    k++;
 	    }
@@ -96,11 +96,11 @@ inline int rng::random_binomial(int n, double mean){
 	}
 
 
-/*inline int rng::random_binomial(int n, double p){
-	double t=p/(1.0-p);
-	double u=uniform();
-	double p0=pow((1.0-p),n);
-	double g=p0;
+/*inline int rng::random_binomial(int n, FLOAT_TYPE p){
+	FLOAT_TYPE t=p/(1.0-p);
+	FLOAT_TYPE u=uniform();
+	FLOAT_TYPE p0=pow((1.0-p),n);
+	FLOAT_TYPE g=p0;
 	unsigned int k=0;
 	while (u>g){
 	    p0*=t*(n-k)/(k+1.0);

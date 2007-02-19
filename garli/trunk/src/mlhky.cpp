@@ -27,9 +27,9 @@
 #endif
 
 void HKYData::CalcEmpiricalFreqs(){
-	empStateFreqs=new double[4];
+	empStateFreqs=new FLOAT_TYPE[4];
 	empStateFreqs[1]=empStateFreqs[2]=empStateFreqs[3]=empStateFreqs[0]=0.0;
-	double total = 0.0;
+	FLOAT_TYPE total = 0.0;
 	for( int i = 0; i < NTax(); i++ ) {
 		for( int j = 0; j < NChar(); j++ ) {
 			char thischar=(char) Matrix( i, j );
@@ -46,13 +46,13 @@ void HKYData::CalcEmpiricalFreqs(){
 			if(nstates < 4){
 				//now divide the states up to the bases
 				if(thischar & 1)
-					empStateFreqs[0] += (double) Count(j)/nstates;
+					empStateFreqs[0] += (FLOAT_TYPE) Count(j)/nstates;
 				if(thischar & 2)
-					empStateFreqs[1] += (double) Count(j)/nstates;
+					empStateFreqs[1] += (FLOAT_TYPE) Count(j)/nstates;
 				if(thischar & 4)
-					empStateFreqs[2] += (double) Count(j)/nstates;
+					empStateFreqs[2] += (FLOAT_TYPE) Count(j)/nstates;
 				if(thischar & 8) 
-					empStateFreqs[3] += (double) Count(j)/nstates;				
+					empStateFreqs[3] += (FLOAT_TYPE) Count(j)/nstates;				
 				
 				total += Count(j);
 				}

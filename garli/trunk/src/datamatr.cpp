@@ -17,12 +17,13 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <vector>
 
 using namespace std;
 
+#include "defs.h"
 #include "datamatr.h"
 #include "rng.h"
-#include "defs.h"
 #include "stricl.h"
 #include "errorexception.h"
 #include "outputman.h"
@@ -71,23 +72,23 @@ void DataMatrix::ReplaceTaxonLabel( int i, const char* s )
 	strcpy(taxonLabel[i], s);
 }
 
-double DataMatrix::prNumStates(int n) const
+FLOAT_TYPE DataMatrix::prNumStates(int n) const
 {
 	assert( stateDistr );
 	assert( stateDistrComputed );
-	return ( n > maxNumStates ? 0.0 : stateDistr[n] );
+	return ( n > maxNumStates ? (FLOAT_TYPE)0.0 : stateDistr[n] );
 }
 
 void DataMatrix::AllocPr( DblPtrPtr& pr )
 {	int ns = maxNumStates;
-	MEM_NEW_ARRAY(pr,double*,ns);
+	MEM_NEW_ARRAY(pr,FLOAT_TYPE*,ns);
     int i;
 	
 #ifndef CONTIG_PRMAT
 	for( i = 0; i < ns; i++ )
-		MEM_NEW_ARRAY(pr[i],double,ns);
+		MEM_NEW_ARRAY(pr[i],FLOAT_TYPE,ns);
 #else
-	MEM_NEW_ARRAY(pr[0],double,ns*ns);
+	MEM_NEW_ARRAY(pr[0],FLOAT_TYPE,ns*ns);
 	for(i=1;i<ns;i++){
 		pr[i]=pr[i-1]+ns;
 		}	
@@ -236,7 +237,7 @@ void DataMatrix::Summarize()
 	
 	for( k = 0; k < nChar; k++ ) {
 		int ptFlags = PatternType(k, c, s);
-      stateDistr[numStates[k]] += (double)count[k];
+      stateDistr[numStates[k]] += (FLOAT_TYPE)count[k];
       nTotal += count[k];
 
 		if( ptFlags & PT_CONSTANT )
@@ -248,7 +249,7 @@ void DataMatrix::Summarize()
 	}
 
    for( k = 0; k <= max; k++ )
-   	stateDistr[k] /= (double)nTotal;
+   	stateDistr[k] /= (FLOAT_TYPE)nTotal;
    stateDistrComputed = 1;
    
    delete []c;
@@ -305,7 +306,7 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 		MEM_NEW_ARRAY(matrix,unsigned char*,taxa);
 		MEM_NEW_ARRAY(count,int,sites);
 		MEM_NEW_ARRAY(numStates,int,sites);
-		MEM_NEW_ARRAY(stateDistr,double,(maxNumStates+1));
+		MEM_NEW_ARRAY(stateDistr,FLOAT_TYPE,(maxNumStates+1));
 		MEM_NEW_ARRAY(number,int,sites);
 
 		for( int j = 0; j < sites; j++ ) {
@@ -397,8 +398,8 @@ void DataMatrix::Pack()
 
 	// copy distribution of the number of states
         int max = maxNumStates;
-        double* newStateDistr;
-	MEM_NEW_ARRAY(newStateDistr,double,(max+1));
+        FLOAT_TYPE* newStateDistr;
+	MEM_NEW_ARRAY(newStateDistr,FLOAT_TYPE,(max+1));
         for( i = 0; i <= max; i++ )
    	        newStateDistr[i] = stateDistr[i];
 
@@ -519,7 +520,7 @@ int DataMatrix::ComparePatterns( const int i, const int j ) const
 				for( int k = 0; k < nTax; k++ ) {
 					int same = ( Matrix( k, i ) == Matrix( k, j ) );
 					if( !same )	{
-						double diff = ( (double)Matrix( k, i ) - (double)Matrix( k, j ) );
+						FLOAT_TYPE diff = ( (FLOAT_TYPE)Matrix( k, i ) - (FLOAT_TYPE)Matrix( k, j ) );
 						cmp = ( diff < 0.0 ? -1 : 1 );
 						break;
 					}
@@ -537,7 +538,7 @@ int DataMatrix::ComparePatterns( const int i, const int j ) const
 	for( int k = 0; k < nTax; k++ ) {
 		int same = ( Matrix( k, i ) == Matrix( k, j ) );
 		if( !same )	{
-			double diff = ( (double)Matrix( k, i ) - (double)Matrix( k, j ) );
+			FLOAT_TYPE diff = ( (FLOAT_TYPE)Matrix( k, i ) - (FLOAT_TYPE)Matrix( k, j ) );
 			cmp = ( diff < 0.0 ? -1 : 1 );
 			break;
 		}
@@ -780,7 +781,7 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 		char taxon_name[ MAX_TAXON_LABEL ];
 		int ok = GetToken( inf, taxon_name, MAX_TAXON_LABEL, false);
 		if(ok == -1){
-			throw ErrorException("\nERROR: Confused by comments (i.e. [...]) in datafile.\nPlease remove comments by exporting dataset from PAUP* a similar program.\n");			
+			throw ErrorException("\nERROR: Confused by comments (i.e. [...]) in datafile.\nPlease remove comments by exporting dataset from PAUP* or a similar program.\n");			
 			}
 		if( !ok ) {
 			if( left_margin )
@@ -873,6 +874,9 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 
 	inf.close();
 	delete []left_margin;
+
+	CheckForIdenticalTaxonNames();
+
 	return 1;
 }
 
@@ -1024,7 +1028,7 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 //	CalcNucleotideFreqs computes the simple proportions of bases in a dna
 //	data matrix.  BUGBUG ambiguities treated like missing data.
 //
-void DataMatrix::CalcNucleotideFreqs(double& A, double& C, double& G, double& T)
+void DataMatrix::CalcNucleotideFreqs(FLOAT_TYPE& A, FLOAT_TYPE& C, FLOAT_TYPE& G, FLOAT_TYPE& T)
 {
 	long total = 0L;
 	long nA = 0L;
@@ -1042,10 +1046,10 @@ void DataMatrix::CalcNucleotideFreqs(double& A, double& C, double& G, double& T)
 		}
 	}
 	if( total > 0L ) {
-		A = (double)nA / (double)total;
-		C = (double)nC / (double)total;
-		G = (double)nG / (double)total;
-		T = (double)nT / (double)total;
+		A = (FLOAT_TYPE)nA / (FLOAT_TYPE)total;
+		C = (FLOAT_TYPE)nC / (FLOAT_TYPE)total;
+		G = (FLOAT_TYPE)nG / (FLOAT_TYPE)total;
+		T = (FLOAT_TYPE)nT / (FLOAT_TYPE)total;
 	}
 	else {
 		A = 0.25;
@@ -1151,7 +1155,7 @@ int DataMatrix::Serialize(char** buf_, int* size_)	{
 	// calc size of the stateDistr array
 	int stateDistr_size;
 	if (stateDistr)
-		stateDistr_size = (maxNumStates+1) * sizeof(double);
+		stateDistr_size = (maxNumStates+1) * sizeof(FLOAT_TYPE);
 	else
 		stateDistr_size = 0;
 
@@ -1385,7 +1389,7 @@ int DataMatrix::Deserialize(const char* buf, const int size_in)	{
 	p += sizeof(size);
 
 	if (size > 0)	{
-		stateDistr = new double[size];
+		stateDistr = new FLOAT_TYPE[size];
 		memcpy(stateDistr, p, size);
 		p += size;
 	}
@@ -1443,7 +1447,7 @@ bool DataMatrix::operator==(const DataMatrix& rhs) const	{
 	}
 
 	if (stateDistr != NULL && rhs.stateDistr != NULL)	{
-		if (memcmp(stateDistr, rhs.stateDistr, (maxNumStates+1) * sizeof(double)) != 0)
+		if (memcmp(stateDistr, rhs.stateDistr, (maxNumStates+1) * sizeof(FLOAT_TYPE)) != 0)
 			return false;
 	}
 
@@ -1480,9 +1484,9 @@ void DataMatrix::ExplicitDestructor()	{
 }
 
 
-void DataMatrix::Reweight(double prob){
+void DataMatrix::Reweight(FLOAT_TYPE prob){
 	for(int i=0;i<nChar;i++){
-		double r=rnd.uniform();
+		FLOAT_TYPE r=rnd.uniform();
 		if(r * 2.0 < prob) count[i]++;
 		else if(r < prob) count[i]--;
 		}
@@ -1492,12 +1496,12 @@ void DataMatrix::BootstrapReweight(){
 
 	RestoreOriginalCounts();
 	
-	double *cumProbs = new double[nChar];
+	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
 	
-	double p=0.0;
-	cumProbs[0]=(double) origCounts[0] / ((double) totalNChar);
+	FLOAT_TYPE p=0.0;
+	cumProbs[0]=(FLOAT_TYPE) origCounts[0] / ((FLOAT_TYPE) totalNChar);
 	for(int i=1;i<nChar;i++){
-		cumProbs[i] = cumProbs[i-1] + (double) origCounts[i] / ((double) totalNChar);
+		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar);
 		}
 		
 	for(int q=0;q<nChar;q++) count[q]=0;
@@ -1505,7 +1509,7 @@ void DataMatrix::BootstrapReweight(){
 //	ofstream deb("counts.log", ios::app);
 
 	for(int c=0;c<totalNChar;c++){
-		double p=rnd.uniform();
+		FLOAT_TYPE p=rnd.uniform();
 		int pat=0; 
 		while(p > cumProbs[pat]) pat++;
 		count[pat]++;
@@ -1519,4 +1523,24 @@ void DataMatrix::BootstrapReweight(){
 //	deb.close();
 	}
 
+void DataMatrix::CheckForIdenticalTaxonNames(){
+	char *name1, *name2;
+	vector< pair<int, int> > identicals;
 
+
+	for(int t1=0;t1<nTax-1;t1++){
+		for(int t2=t1+1;t2<nTax;t2++){
+			name1 = TaxonLabel(t1);
+			name2 = TaxonLabel(t2);
+			if(strcmp(name1, name2) == 0) identicals.push_back(make_pair(t1, t2));
+			}
+		}
+	
+	if(identicals.size() > 0){
+		outman.UserMessage("Error! Multiple sequences with same name encountered!:");
+		for(vector< pair<int, int> >::iterator it=identicals.begin() ; it < identicals.end() ; it++){
+			outman.UserMessage("\t%s : numbers %d and %d", TaxonLabel((*it).first), (*it).first+1, (*it).second+1);
+			}
+		throw(ErrorException("Terminating.  Please make all sequence names unique!"));
+		}
+	}

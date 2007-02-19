@@ -11,12 +11,12 @@
 
 #define RC_COMPLEX_EVAL 2	/* code that complex eigenvalue obtained */
 
-extern int  InvertMatrix (double **a, int n, double *col, int *indx, double **a_inv);
-extern int  LUDecompose (double **a, int n, double *vv, int *indx, double *pd);
-int  EigenRealGeneral (int n, double **a, double *v, double *vi, double **u, int *iwork, double *work);
+extern int  InvertMatrix (FLOAT_TYPE **a, int n, FLOAT_TYPE *col, int *indx, FLOAT_TYPE **a_inv);
+extern int  LUDecompose (FLOAT_TYPE **a, int n, FLOAT_TYPE *vv, int *indx, FLOAT_TYPE *pd);
+int  EigenRealGeneral (int n, FLOAT_TYPE **a, FLOAT_TYPE *v, FLOAT_TYPE *vi, FLOAT_TYPE **u, int *iwork, FLOAT_TYPE *work);
 
 
 //these are actually from John's MCMC.c file
-void CalcCijk (double *c_ijk, int n, const double **u,  const double **v);
-void CalcPij (const double *c_ijk, int n, const double *eigenValues, double v, double r, double **p, double *EigValexp);
+void CalcCijk (FLOAT_TYPE *c_ijk, int n, const FLOAT_TYPE **u,  const FLOAT_TYPE **v);
+void CalcPij (const FLOAT_TYPE *c_ijk, int n, const FLOAT_TYPE *eigenValues, FLOAT_TYPE v, FLOAT_TYPE r, FLOAT_TYPE **p, FLOAT_TYPE *EigValexp);
 

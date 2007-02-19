@@ -590,7 +590,7 @@ NxsString& NxsString::operator +=(const int i)
 	return *this;
 }
 
-NxsString& NxsString::operator +=(const double i)
+NxsString& NxsString::operator +=(const FLOAT_TYPE i)
 {
 	char s[40];
 	sprintf(s, "%lf", i);  

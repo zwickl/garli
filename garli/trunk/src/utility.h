@@ -32,7 +32,7 @@ template<typename T> void DeleteAlignedArray(T *a){
 }
 
 /*--------------------------------------------------------------------------------------------------------------------------
-| Allocates a three dimensional array of doubles as one contiguous block of memory
+| Allocates a three dimensional array of FLOAT_TYPEs as one contiguous block of memory
 | the dimensions are f two dimensional arrays that are s by t.  
 | the array is set up so that 
 | for(i = 0 ; i < f ; i++)
@@ -88,7 +88,7 @@ template<typename T> void Delete3DArray	(T ***temp)
 	}
 
 /*--------------------------------------------------------------------------------------------------------------------------
-| 	Allocates a two dimensional array of doubles as one contiguous block of memory
+| 	Allocates a two dimensional array of FLOAT_TYPEs as one contiguous block of memory
 | 	the dimensions are f by s.  
 | 	the array is set up so that 
 | 	

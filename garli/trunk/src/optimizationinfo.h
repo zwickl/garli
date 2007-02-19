@@ -1,7 +1,7 @@
 #ifndef OPTIMIZATION_INFO
 #define OPTIMIZATION_INFO
 
-typedef pair<double, double> pd;
+typedef pair<FLOAT_TYPE, FLOAT_TYPE> pd;
 
 bool IsEvalLess(pd lhs, pd rhs){
 	return lhs.second < rhs.second;
@@ -11,18 +11,18 @@ bool IsEvalLess(pd lhs, pd rhs){
 class OptimizationInfo{
 	
 	int node;
-	double initLen;
-	double precision;
+	FLOAT_TYPE initLen;
+	FLOAT_TYPE precision;
 	bool goodGuess;
 	
-	double initBracket[3];
+	FLOAT_TYPE initBracket[3];
 	
 	vector<pd> brakEvals;
 	vector<pd> brentEvals;
 	
 	public:
 	OptimizationInfo(){};
-	void Setup(int n, double len, double prec, bool gg, double low, double mid, double high){
+	void Setup(int n, FLOAT_TYPE len, FLOAT_TYPE prec, bool gg, FLOAT_TYPE low, FLOAT_TYPE mid, FLOAT_TYPE high){
 		
 		brakEvals.clear();
 		brentEvals.clear();
@@ -53,11 +53,11 @@ class OptimizationInfo{
 				}		
 			}
 		}
-	void BrakAdd(double val, double score){
+	void BrakAdd(FLOAT_TYPE val, FLOAT_TYPE score){
 		brakEvals.push_back(make_pair(val, score));
 		}
 
-	void BrentAdd(double val, double score){
+	void BrentAdd(FLOAT_TYPE val, FLOAT_TYPE score){
 		brentEvals.push_back(make_pair(val, score));
 		}
 	

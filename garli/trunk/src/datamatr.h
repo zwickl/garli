@@ -26,7 +26,7 @@ using namespace std;
 #include "stricl.h"
 #include "errorexception.h"
 
-typedef double** DblPtrPtr;
+typedef FLOAT_TYPE** DblPtrPtr;
 #define MAX_STATES (8*sizeof(unsigned char))
 #define FIRST_STATE	(0x01)
 #define LAST_STATE	(0x80)
@@ -63,7 +63,7 @@ class DataMatrix
 	int 	*constBases;//DJZ
 	int		nInformative;
 	int		nAutapomorphic;
-	double*         stateDistr;
+	FLOAT_TYPE*         stateDistr;
 	int		stateDistrComputed;
 	
 	protected:
@@ -115,21 +115,21 @@ class DataMatrix
 		virtual char	DatumToChar( unsigned char d )	                        = 0;
 		virtual unsigned char	FirstState()		                        = 0;
 		virtual unsigned char	LastState()		                        = 0;
-//		virtual double	Freq( unsigned char, int = 0)	                        = 0;
+//		virtual FLOAT_TYPE	Freq( unsigned char, int = 0)	                        = 0;
 /*
 #if defined( RATIO_FOR_EACH_BRANCH )
-		virtual void	CalcPrMatrix( double** pr, double brlen, double kappa )       = 0;
+		virtual void	CalcPrMatrix( FLOAT_TYPE** pr, FLOAT_TYPE brlen, FLOAT_TYPE kappa )       = 0;
 #else
-		virtual void	CalcPrMatrix( double** pr, double brlen )       = 0;
+		virtual void	CalcPrMatrix( FLOAT_TYPE** pr, FLOAT_TYPE brlen )       = 0;
 #endif
 */
 		// virtual functions - can override in derived class
-		virtual double	TransitionProb( int /*i*/, int /*j*/
-			, int /*site*/, double /*brlen*/) { return 0.0; }
+		virtual FLOAT_TYPE	TransitionProb( int /*i*/, int /*j*/
+			, int /*site*/, FLOAT_TYPE /*brlen*/) { return 0.0; }
 		virtual int NumStates(int j) const
 			{ return ( numStates && (j < nChar) ? numStates[j] : 0 ); }
 
-		double prNumStates( int n ) const;
+		FLOAT_TYPE prNumStates( int n ) const;
 
 		// functions for quizzing dmFlags
 		int InvarCharsExpected() { return !(dmFlags & allvariable); }
@@ -181,7 +181,7 @@ class DataMatrix
 			}
 		
 		void BeginNexusTreesBlock(ofstream &treeout);
-
+		
 		// added 3/20/1998 in order to implement the Muse and Gaut codon model
 //		virtual int NCodons() { return 0; }
 //		virtual unsigned char CodonState( int i, int j ) { return (unsigned char)0; }
@@ -232,7 +232,7 @@ class DataMatrix
 		int Deserialize(const char*, const int);  // cjb
 		bool operator==(const DataMatrix& rhs) const; // cjb - to test serialization
 		void ExplicitDestructor();  // cjb - totally clear the DataMatrix and revert it to its original state as if it was just constructed
-
+		void CheckForIdenticalTaxonNames();
 	public:	// exception classes
 #if defined( CPLUSPLUS_EXCEPTIONS )
 		class XBadState {
@@ -266,7 +266,7 @@ class DataMatrix
       			count[i]=origCounts[i];
       			}
       		}
-      void Reweight(double prob);
+      void Reweight(FLOAT_TYPE prob);
       void BootstrapReweight();
       
 #endif
@@ -292,11 +292,11 @@ class BinaryData : public DataMatrix
 		virtual unsigned char 	CharToDatum( char ch );
 		virtual unsigned char	FirstState() { return FIRST_STATE; }
 		virtual unsigned char	LastState() { return (FIRST_STATE<<1); }
-//		virtual double	Freq( unsigned char, int = 0) { return 0.5; }
+//		virtual FLOAT_TYPE	Freq( unsigned char, int = 0) { return 0.5; }
 #if defined( RATIO_FOR_EACH_BRANCH )
-		virtual void	CalcPrMatrix( double** pr, double brlen, double kappa );
+		virtual void	CalcPrMatrix( FLOAT_TYPE** pr, FLOAT_TYPE brlen, FLOAT_TYPE kappa );
 #else
-		virtual void	CalcPrMatrix( double** pr, double brlen );
+		virtual void	CalcPrMatrix( FLOAT_TYPE** pr, FLOAT_TYPE brlen );
 #endif
 		virtual int	NumStates(int) const { return 2; }
 };
@@ -332,14 +332,14 @@ inline char BinaryData::DatumToChar( unsigned char d )
 }
 
 #if defined( RATIO_FOR_EACH_BRANCH )
-inline void BinaryData::CalcPrMatrix( double** pr, double brlen, double /*kappa*/ )
+inline void BinaryData::CalcPrMatrix( FLOAT_TYPE** pr, FLOAT_TYPE brlen, FLOAT_TYPE /*kappa*/ )
 #else
-inline void BinaryData::CalcPrMatrix( double** pr, double brlen )
+inline void BinaryData::CalcPrMatrix( FLOAT_TYPE** pr, FLOAT_TYPE brlen )
 #endif
 {
-	double prNoChg = 0.5 + 0.5 * exp( -2.0 * brlen );
+	FLOAT_TYPE prNoChg = (FLOAT_TYPE) (0.5 + 0.5 * exp((FLOAT_TYPE) -2.0 * brlen ));
 	pr[0][0] = pr[1][1] = prNoChg;
-	double prChg = 0.5 - 0.5 * exp( -2.0 * brlen );
+	FLOAT_TYPE prChg = (FLOAT_TYPE) (0.5 - 0.5 * exp((FLOAT_TYPE) -2.0 * brlen ));
 	pr[0][1] = pr[1][0] = prChg;
 }
 
@@ -363,29 +363,29 @@ class MorphData : public DataMatrix
 		virtual unsigned char 	CharToDatum( char ch );
 		virtual unsigned char	FirstState() { return 0x01; }
 		virtual unsigned char	LastState() { return 0x08; }
-//		virtual double	Freq( unsigned char, int i = 0) { return (1.0 / (double)numStates[i]); }
+//		virtual FLOAT_TYPE	Freq( unsigned char, int i = 0) { return (1.0 / (FLOAT_TYPE)numStates[i]); }
 #if defined( RATIO_FOR_EACH_BRANCH )
-		virtual void	CalcPrMatrix( double** /*pr*/, double /*brlen*/, double /*kappa*/ ) {}
+		virtual void	CalcPrMatrix( FLOAT_TYPE** /*pr*/, FLOAT_TYPE /*brlen*/, FLOAT_TYPE /*kappa*/ ) {}
 #else
-		virtual void	CalcPrMatrix( double** /*pr*/, double /*brlen*/ ) {}
+		virtual void	CalcPrMatrix( FLOAT_TYPE** /*pr*/, FLOAT_TYPE /*brlen*/ ) {}
 #endif
 
 		// transition probability from state i to state j for character k
 		// given branch length brlen
 		// i and j range from 0, 1, 2, 3 (i.e.,they are not bits)
 		// this function called by a node only if its pr matrix does not exist
-		virtual double	TransitionProb( int i, int j, int k, double brlen );
+		virtual FLOAT_TYPE	TransitionProb( int i, int j, int k, FLOAT_TYPE brlen );
 };
 
 // prob. i --> j when there are k total states possible
-inline double MorphData::TransitionProb( int i, int j, int k, double brlen )
+inline FLOAT_TYPE MorphData::TransitionProb( int i, int j, int k, FLOAT_TYPE brlen )
 {
-	double prob = 0.0;
+	FLOAT_TYPE prob = 0.0;
 	assert( k > 1 );
-   double betat = (double)k * brlen / ( (double)k - 1.0 );
-   prob = ( 1.0 - exp( -betat ) ) / (double)k;
+   FLOAT_TYPE betat = (FLOAT_TYPE) (k * brlen / ( k - 1.0 ));
+   prob = (FLOAT_TYPE)(( 1.0 - exp( -betat ) ) / k);
    if( i == j )
-      prob = 1.0 - ( (double)k - 1.0) * prob;
+      prob = (FLOAT_TYPE)(1.0 - ( (FLOAT_TYPE)k - 1.0) * prob);
 	return prob;
 }
 

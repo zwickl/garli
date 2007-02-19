@@ -33,7 +33,7 @@ class HKYData : public DNAData
 #ifdef OPEN_MP
 		vector<unsigned*> ambigToCharMap;
 #endif
-		double *empStateFreqs;
+		FLOAT_TYPE *empStateFreqs;
 		
 		HKYData() : DNAData() {}
 		HKYData( int ntax, int nchar ) : DNAData( ntax, nchar ) {empStateFreqs=NULL;}
@@ -42,7 +42,7 @@ class HKYData : public DNAData
 				delete [](*delit);
 			}
 		void CalcEmpiricalFreqs();
-		void GetEmpiricalFreqs(double *f) const{
+		void GetEmpiricalFreqs(FLOAT_TYPE *f) const{
 			for(int i=0;i<4;i++) f[i]=empStateFreqs[i];
 			}
 	
@@ -56,7 +56,7 @@ class HKYData : public DNAData
 			}
 #endif
 		// overrides of base class's virtual fuctions
-		double Freq( unsigned char d, int = 0);
+		FLOAT_TYPE Freq( unsigned char d, int = 0);
 };
 
 
