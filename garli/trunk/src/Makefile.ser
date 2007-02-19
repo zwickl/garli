@@ -15,7 +15,7 @@ CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -fsigned-ch
 #icc: any machine type
 #CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -include defs.h
 
-EXEC     = Garli0.952.rev150
+EXEC     = Garli0.952b2
 
 OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		population.o rng.o set.o\
@@ -24,7 +24,7 @@ OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		bipartition.o model.o linalg.o adaptation.o mlhky.o\
 		optimization.o
 
-Garli0.952 : $(OBJECT_LIST) garlimain.o
+Garli0.952b2 : $(OBJECT_LIST) garlimain.o
 	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) garlimain.o
 
 garlimain.o:	mlhky.h tree.h population.h \
