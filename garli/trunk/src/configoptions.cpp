@@ -20,6 +20,7 @@
 
 using namespace std;
 
+#include "defs.h"
 #include "configoptions.h"
 #include "configreader.h"
 #include "memchk.h"
@@ -29,21 +30,87 @@ using namespace std;
 // GamlConfig::General methods //////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-GeneralGamlConfig::GeneralGamlConfig()	:bootstrapReps(0), outputMostlyUselessFiles(0), 
-		outputPhylipTree(0), treeRejectionThreshold(100.0), 
-		numPrecReductions(-1), precReductionFactor(-1.0), availableMemory(-1), 
-		significantTopoChange(0.01), numRateCats(4), uniqueSwapBias(1.0),
-		restart(false), checkpoint(false), distanceSwapBias(1.0){
-	//default values here //TODO
+GeneralGamlConfig::GeneralGamlConfig(){
+	//Default values for everything
+
+	//output related
+	ofprefix = "ofprefix";
 	logevery = 10;
 	saveevery = 100;
+	outputTreelog = false;
+	outputMostlyUselessFiles = false;
+	outputPhylipTree = false;
+
+	//starting the run
+	randseed = -1;
+	streefname = "random";
+	refineStart = true;
+
+	//general run details
 	datafname = "datafname";
-	ofprefix = "ofprefix";
 	constraintfile = "\0";
+	availableMemory = -1; 
+	megsClaMemory = 512;
+	restart = false;
+	checkpoint = false;
+	significantTopoChange = (FLOAT_TYPE)0.01;
+
+	//finishing the run
+	enforceTermConditions = true;
+	lastTopoImproveThresh = 10000;
+	improveOverStoredIntervalsThresh = (FLOAT_TYPE)0.05;
+	stopgen = UINT_MAX;
+	stoptime = UINT_MAX;
+
+	//default model is GTR+I+G
 	stateFrequencies = "estimate";
 	rateMatrix = "6rate";
 	proportionInvariant = "estimate";
 	rateHetModel = "gamma";
+	numRateCats = 4;
+
+	//general population stuff
+	nindivs = 4;
+	holdover = 1;
+	selectionIntensity = 0.5;
+	holdoverPenalty = 0.0;
+
+	startOptPrec = 0.5;
+	minOptPrec = (FLOAT_TYPE)0.01;
+	numPrecReductions = 20;
+	precReductionFactor = (FLOAT_TYPE)0.9;
+	treeRejectionThreshold = 50.0;
+
+	//parameters affecting proportion of mutations
+	topoWeight = 1.0;
+		randNNIweight = (FLOAT_TYPE)0.1;
+		randSPRweight = (FLOAT_TYPE)0.3;
+		limSPRweight = (FLOAT_TYPE)0.6;
+	modWeight = (FLOAT_TYPE)0.05;
+	brlenWeight = (FLOAT_TYPE)0.2;
+
+	intervalLength = 100;
+	intervalsToStore = 5;
+
+	//parameters affecting other details of mutations	
+	meanBrlenMuts = 5.0;
+	gammaShapeBrlen = 1000;
+	gammaShapeModel = 1000;
+	limSPRrange = 6;
+	uniqueSwapBias = (FLOAT_TYPE)0.1;
+	distanceSwapBias = 1.0;
+	
+	//optional analyses
+	inferInternalStateProbs = false;
+	bootstrapReps = 0;
+
+	sendInterval = 60.0;
+
+	//these macros are all defined in the defs.h file
+	//but could be overriden in the config
+	minBrlen = DEF_MIN_BRLEN;
+	maxBrlen = DEF_MAX_BRLEN;
+	startingBrlen = DEF_STARTING_BRLEN;
 	}
 
 int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
@@ -134,13 +201,20 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 #ifdef GANESH
 	errors += cr.GetDoubleOption("randpecrweight", randPECRweight);
 #endif
-	errors += cr.GetUnsignedOption("gammashapebrlen", gammaShapeBrlen);	
-	errors += cr.GetUnsignedOption("gammashapemodel", gammaShapeModel);
+//	errors += cr.GetUnsignedOption("gammashapebrlen", gammaShapeBrlen);	
+//	errors += cr.GetUnsignedOption("gammashapemodel", gammaShapeModel);
+	errors += cr.GetPositiveDoubleOption("gammashapebrlen", gammaShapeBrlen);	
+	errors += cr.GetPositiveDoubleOption("gammashapemodel", gammaShapeModel);
+
 
 	errors += cr.GetUnsignedOption("limsprrange", limSPRrange);
 	errors += cr.GetUnsignedOption("intervallength", intervalLength);
 	errors += cr.GetUnsignedOption("intervalstostore", intervalsToStore);
 	errors += cr.GetPositiveDoubleOption("meanbrlenmuts", meanBrlenMuts);
+
+	cr.GetPositiveDoubleOption("minbrlen", minBrlen, true);
+	cr.GetPositiveDoubleOption("maxbrlen", maxBrlen, true);
+	cr.GetPositiveDoubleOption("startingbrlen", startingBrlen, true);
 
 #ifdef INCLUDE_PERTURBATION
 	errors += cr.SetSection("perturbation");
@@ -176,7 +250,6 @@ int GeneralGamlConfig::Serialize(char** buf_, int* size_) const	{
 	size += sizeof(megsClaMemory);
 	
 	size += (int)datafname.length() + 1;
-	size += (int)method.length() + 1;
 	size += (int)ofprefix.length() + 1;
 	size += (int)streefname.length() + 1;
 	
@@ -201,9 +274,6 @@ int GeneralGamlConfig::Serialize(char** buf_, int* size_) const	{
 	
 	memcpy(p, datafname.c_str(), datafname.length()+1);
 	p += datafname.length()+1;
-	
-	memcpy(p, method.c_str(), method.length()+1);
-	p += method.length()+1;
 	
 	memcpy(p, ofprefix.c_str(), ofprefix.length()+1);
 	p += ofprefix.length()+1;
@@ -231,9 +301,6 @@ int GeneralGamlConfig::Deserialize(char* buf, int size)	{
 	p += sizeof(megsClaMemory);	
 
 	datafname = p;
-	p += strlen(p)+1;
-	
-	method = p;
 	p += strlen(p)+1;
 	
 	ofprefix = p;

@@ -27,89 +27,91 @@ using std::string;
 class GeneralGamlConfig{
 	public:
 	//these options will be the same regardless of whether a population is master or remote
+
+	//output related
+	string ofprefix;
 	unsigned logevery;
 	unsigned saveevery;
-	double megsClaMemory;
-	double availableMemory;
-	int randseed;
-
-	string datafname;
-	string method;
-	string ofprefix;
-	string streefname;
-	string constraintfile;
-	bool refineStart;
 	bool outputTreelog;
 	bool outputMostlyUselessFiles;
 	bool outputPhylipTree;
+
+	//starting the run
+	int randseed;
+	string streefname;
+	bool refineStart;
+
+	//general run details
+	string datafname;
+	string constraintfile;
+	FLOAT_TYPE megsClaMemory;
+	FLOAT_TYPE availableMemory;
 	bool restart;
 	bool checkpoint;
-
+	FLOAT_TYPE significantTopoChange;
+	
+	//finishing the run
 	bool enforceTermConditions;
 	unsigned lastTopoImproveThresh;
-	double improveOverStoredIntervalsThresh;
-	double significantTopoChange;
+	FLOAT_TYPE improveOverStoredIntervalsThresh;
+	unsigned stopgen;
+	unsigned stoptime;
 
 	//model settings
 	string stateFrequencies; //equal, estimate, emprical, fixed
 	string rateMatrix;		 //6rate, 2rate, 1rate, fixed, custom(
 	string proportionInvariant; //none, fixed, estimate
 	string rateHetModel;			//gamma, gammafixed, flex, none
-
-//	bool dontInferProportionInvariant;
-//	bool useflexrates;
 	unsigned numRateCats;	
 
 	//all of the following options can vary between master and remote
 	//general population stuff
 	unsigned nindivs;
 	unsigned holdover;
-	double selectionIntensity;
-	double holdoverPenalty;
-	unsigned stopgen;
-	//unsigned stopgen;
-	unsigned stoptime;
+	FLOAT_TYPE selectionIntensity;
+	FLOAT_TYPE holdoverPenalty;
 
-	double startOptPrec;
-	double minOptPrec;
-	double precReductionFactor;
+	FLOAT_TYPE startOptPrec;
+	FLOAT_TYPE minOptPrec;
 	int numPrecReductions;
-
-	double treeRejectionThreshold;
+	FLOAT_TYPE precReductionFactor; //deprecated
+	FLOAT_TYPE treeRejectionThreshold;
 
 	//parameters affecting proportion of mutations
-	double topoWeight;
-		double randNNIweight;
-		double randSPRweight;
-		double limSPRweight;
-        double randPECRweight;
-	double modWeight;
-	double brlenWeight;
+	FLOAT_TYPE topoWeight;
+		FLOAT_TYPE randNNIweight;
+		FLOAT_TYPE randSPRweight;
+		FLOAT_TYPE limSPRweight;
+//      FLOAT_TYPE randPECRweight;
+	FLOAT_TYPE modWeight;
+	FLOAT_TYPE brlenWeight;
 
 	unsigned intervalLength;
 	unsigned intervalsToStore;
 
+	//parameters affecting other details of mutations				
+	FLOAT_TYPE meanBrlenMuts;
+	FLOAT_TYPE gammaShapeBrlen;
+	FLOAT_TYPE gammaShapeModel;
+	unsigned limSPRrange;		
+	FLOAT_TYPE uniqueSwapBias;
+	FLOAT_TYPE distanceSwapBias;
+	
+	//optional analyses
 	unsigned bootstrapReps;
 	bool inferInternalStateProbs;
 
-	//parameters affecting other details of mutations				
-	double meanBrlenMuts;
-	unsigned gammaShapeBrlen;
-	unsigned gammaShapeModel;
-	unsigned limSPRrange;		
-	double uniqueSwapBias;
-	double distanceSwapBias;
-
+#ifdef INCLUDE_PERTURBATION
 	//perturbation parameters
 	int pertType;			
-	double pertThresh;
+	FLOAT_TYPE pertThresh;
 	int minPertInterval;
 	int maxPertsNoImprove;
 	bool restartAfterAbandon;
 	int gensBeforeRestart;
 	
-	double ratchetProportion;
-	double ratchetOffThresh;
+	FLOAT_TYPE ratchetProportion;
+	FLOAT_TYPE ratchetOffThresh;
 	int ratchetMaxGen;
 	
 	int nniTargetAccepts;
@@ -117,10 +119,16 @@ class GeneralGamlConfig{
 	
 	int numSprCycles;
 	int sprPertRange;
+#endif
 
-	//the number of seconds between remote tree sends
-	double sendInterval;
+	//the number of seconds between remote tree sends (parallel only)
+	FLOAT_TYPE sendInterval;
 	
+	//by default these come from the defs.h file, but could be overriden
+	FLOAT_TYPE minBrlen;
+	FLOAT_TYPE maxBrlen;
+	FLOAT_TYPE startingBrlen;
+
  	// methods
 	GeneralGamlConfig();
 	int Read(const char*, bool isMaster=false);
@@ -132,33 +140,33 @@ class GeneralGamlConfig{
 class MasterGamlConfig: public GeneralGamlConfig{
 	public:
 	//parallel behavior parameters-stored in pop->paraMan on master only
-	double startUpdateThresh;
-	double minUpdateThresh;
-	double updateReductionFactor;
+	FLOAT_TYPE startUpdateThresh;
+	FLOAT_TYPE minUpdateThresh;
+	FLOAT_TYPE updateReductionFactor;
 		
 	int subtreeInterval;
-	double subtreeStartThresh;
+	FLOAT_TYPE subtreeStartThresh;
 	int minSubtreeSize;
 	int targetSubtreeSize;
-	double orphanFactor;
+	FLOAT_TYPE orphanFactor;
 	
 	int maxRecomIndivs;
 /*	
 	int pertType;			
-	double pertThresh;
-	double pertAmount;
+	FLOAT_TYPE pertThresh;
+	FLOAT_TYPE pertAmount;
 	int maxPertsNoImprove;
 	
-	double ratchetProportion;
-	double ratchetOffThresh;
+	FLOAT_TYPE ratchetProportion;
+	FLOAT_TYPE ratchetOffThresh;
 	int ratchetMaxGen;
 	
-	double nniAcceptThresh;
+	FLOAT_TYPE nniAcceptThresh;
 	int numSprCycles;
 	int sprPertRange;
 */
 	int bootstrapReps;
-	double bootTermThresh;
+	FLOAT_TYPE bootTermThresh;
 
  	// methods
 	MasterGamlConfig();
