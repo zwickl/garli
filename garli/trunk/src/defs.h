@@ -36,16 +36,33 @@
 #endif
 */
 
+#undef OPT_DEBUG
+
 #define CONSTRAINTS
+#define STOCHASTIC_STARTING_BLENS
+#undef IGNORE_SMALL_TOPO_IMP
 #undef INCLUDE_PERTURBATION
 #undef SUBTREE_VERSION
+#undef SINGLE_PRECISION_FLOATS
 
-#define DEF_MIN_BRLEN 1e-8
-#define DEF_MAX_BRLEN 10.0
-#define DEF_STARTING_BRLEN		0.05
+#ifdef SINGLE_PRECISION_FLOATS
+	typedef float FLOAT_TYPE;
+	#define ONE_POINT_ZERO 1.0f
+	#define ZERO_POINT_ZERO 0.0f
+	#define DEF_MIN_BRLEN 1e-8f
+	#define DEF_MAX_BRLEN 100.0f
+	#define DEF_STARTING_BRLEN 0.05f
+#else
+	typedef double FLOAT_TYPE;
+	#define ONE_POINT_ZERO 1.0
+	#define ZERO_POINT_ZERO 0.0
+	#define DEF_MIN_BRLEN 1e-8
+	#define DEF_MAX_BRLEN 100.0
+	#define DEF_STARTING_BRLEN 0.05
+#endif
+
 #define MAXPATH   		256
 #define DEF_PRECISION	8
-#define DEF_EXTRA_PRECISION	 10
 
 #define MEM_DELETE_ARRAY(v)		{ delete [] v; v=NULL; }
 #define MEM_NEW_ARRAY(a,t,n)	{ a = new t[n]; }
