@@ -20,6 +20,7 @@
 #include <iostream>
 #include <vector>
 #include <cfloat>
+#include <cassert>
 
 using namespace std;
 
@@ -38,12 +39,12 @@ class Subtree{
 	public:
 	int nodeNum;
 	int taxa;
-	double blen;
+	FLOAT_TYPE blen;
 	int numAssigned;
 	int priority;
-	double score;
+	FLOAT_TYPE score;
 	
-	Subtree(int nn, int t, double b, double s){
+	Subtree(int nn, int t, FLOAT_TYPE b, FLOAT_TYPE s){
 		nodeNum=nn;
 		taxa=t;
 		priority=1;
@@ -68,7 +69,7 @@ class ParallelManager{
 	//variables related to subtree mode
 	int subtreeDefNumber;
 	int subtreeDefGeneration;
-	double subtreeDefScore;	//the score of the tree that the subtrees were initially calculated on
+	FLOAT_TYPE subtreeDefScore;	//the score of the tree that the subtrees were initially calculated on
 	int lastFullRecom; 		//the last time we tried a subtree based recombination
 	vector<Subtree *> subtrees;
 	bool fewNonSubtreeNodes;
@@ -79,23 +80,23 @@ class ParallelManager{
 	bool needUpdate;			//this means that the subtrees determined are no longer guaranteed to be valid for any trees in the population
 	bool beforeFirstSubtree;
 
-	double updateThresh;
-	double startUpdateThresh;
-	double minUpdateThresh;
-	double updateReductionFactor;
+	FLOAT_TYPE updateThresh;
+	FLOAT_TYPE startUpdateThresh;
+	FLOAT_TYPE minUpdateThresh;
+	FLOAT_TYPE updateReductionFactor;
 	
 	int subtreeInterval;
-	double subtreeStartThresh;
+	FLOAT_TYPE subtreeStartThresh;
 	int	minSubtreeSize;
 	int targetSubtreeSize;
-	double orphanFactor;
+	FLOAT_TYPE orphanFactor;
 	
 	int maxRecomIndivs;
 
-//	double recalcThresh;		//the score threshold for forcing a recalc of the subtrees
-//	double subtreeThresh; 	//the score threshold for sending a remote a new tree if it 
+//	FLOAT_TYPE recalcThresh;		//the score threshold for forcing a recalc of the subtrees
+//	FLOAT_TYPE subtreeThresh; 	//the score threshold for sending a remote a new tree if it 
 								//is currently working on a subtree
-//	double nonSubtreeThresh;	//the score threshold for sending a remote a new tree if subtree
+//	FLOAT_TYPE nonSubtreeThresh;	//the score threshold for sending a remote a new tree if subtree
 								//mode is off
  	
 
@@ -145,7 +146,7 @@ class ParallelManager{
 		//go from its start to min
 		//updateReductionFactor = mc->updateReductionFactor;
 		
-		updateReductionFactor=pow(minUpdateThresh/startUpdateThresh, 1.0/ (mc->numPrecReductions));
+		updateReductionFactor=pow((FLOAT_TYPE) minUpdateThresh/startUpdateThresh, (FLOAT_TYPE) 1.0/ (mc->numPrecReductions));
 
 
 //		subtreeThresh = mc->subtreeUpdateThresh;
@@ -191,34 +192,34 @@ class ParallelManager{
 	void NewPartition(TreeNode *pointer, int &orphans, vector<Subtree*> &subtreesAbove);
 	void NewPartitionDown(TreeNode *pointer, TreeNode *calledFrom, int &orphans, vector<Subtree*> &subtreesAbove);
 	void PartitionDown(TreeNode *pointer, TreeNode *calledFrom);
-	double ScorePartitioning(int nodeNum, ofstream &pscores);
+	FLOAT_TYPE ScorePartitioning(int nodeNum, ofstream &pscores);
 	void PrepareForSubtreeMode(Individual *ind, int gen);
 	int ChooseSubtree();
 			
   };
 
-
+#ifdef INCLUDE_PERTURBATION
 class PerturbManager{
 	public:
 	int lastPertGeneration;
 	bool pertAbandoned;
 	int numPertsNoImprove;
-	double prevPertScore;
-	double scoreAfterRatchet;
+	FLOAT_TYPE prevPertScore;
+	FLOAT_TYPE scoreAfterRatchet;
 
 	int pertType;
-	double pertThresh;
+	FLOAT_TYPE pertThresh;
 	int minPertInterval;
 	int maxPertsNoImprove;
 	bool restartAfterAbandon;
 	int gensBeforeRestart;
 
-	double ratchetProportion;
-	double ratchetOffThresh;
+	FLOAT_TYPE ratchetProportion;
+	FLOAT_TYPE ratchetOffThresh;
 	int ratchetMaxGen;
 	bool ratcheted;
 
-	double nniAcceptThresh;
+	FLOAT_TYPE nniAcceptThresh;
 	int nniTargetAccepts;
 	int nniMaxAttempts;
 	
@@ -260,48 +261,42 @@ class PerturbManager{
 		sprPertRange = conf->sprPertRange;
 		}
 	};
+#endif
 
-class Population
-{
+class Population{
+
 public:
-	unsigned total_size; //this will be equal to conf->nindiv, except in 
-					//the case of the parallel master
-					
-	Individual* indiv;
-	Individual* newindiv;
-	double bestFitness;
-	int rank;//denotes which processor this is.  0 if serial
-	
-	int subtreeNode;
-	int subtreeDefNumber;
-	vector<int> subtreeMemberNodes;
-	
-	PerturbManager *pertMan;
-	ParallelManager *paraMan;
-	
+	GeneralGamlConfig *conf;
 	ClaManager *claMan;
 	Adaptation *adap;
-	bool refineStart;
-	bool outputTreelog;
-	bool outputMostlyUselessFiles;
-	bool outputPhylipTree;
-	
-	bool bootstrap;
-	int bootstrapReps;
-	bool inferInternalStateProbs;
+	unsigned gen;
+	Individual* indiv;
+
+private:
+	unsigned total_size; //this will be equal to conf->nindiv, except in 
+					//the case of the parallel master
+
+	Individual* newindiv;
+	FLOAT_TYPE bestFitness;
+	int rank;//denotes which processor this is.  0 if serial
 	int bestIndiv;
 	int bestAccurateIndiv;
 
+	int subtreeNode;
+	int subtreeDefNumber;
+	vector<int> subtreeMemberNodes;
+
+#ifdef INCLUDE_PERTURBATION
+	PerturbManager *pertMan;
+#endif
+	ParallelManager *paraMan;
+	
 	//termination related variables
-	bool enforceTermConditions;
 	unsigned lastTopoImprove;
 	unsigned lastPrecisionReduction;
-	unsigned lastTopoImproveThresh;
-	double improveOverStoredIntervalsThresh;
-	double significantTopoChange;//the score difference from the current best required for 
+	FLOAT_TYPE significantTopoChange;//the score difference from the current best required for 
 								 //a new topology to really be considered "better"
 	
-private:
 	//DJZ adding these streams directly to the class so that they can be opened once and left open
 	ofstream fate;
 	ofstream log;
@@ -310,75 +305,63 @@ private:
 	ofstream bootLog;
 	ofstream bootLogPhylip;
 	ofstream swapLog;
-	char besttreefile[100];
+
+	string besttreefile;
+	char *treeString;
+	int stringSize;
 
 	unsigned ntopos;
 	bool prematureTermination;//if the user killed the run
-
-	char *treeString;
-	long stringSize;
 		
 	vector<Tree *> unusedTrees;
-	double prevBestFitness;
-	double avgfit;
+	FLOAT_TYPE prevBestFitness;
+	FLOAT_TYPE avgfit;
 	int new_best_found;
 		
 	int numgensamebest;
-	
-
-	char* logfname;
-	
-	ofstream logf;
-
-	private:
-		void QuickSort( double **scoreArray, int top, int bottom );
 
 	public:
 		enum { nomem=1, nofile, baddimen };
 		int error;
 
-		double** cumfit;
-		//allocated in setup, deleted in dest
-		TopologyList **topologies;
-			//allocated in Setup(), deleted in dest
-		unsigned gen;
-		GeneralGamlConfig *conf;
-		HKYData* data;
-		Individual *allTimeBest; //this is only used for perturbation or ratcheting
-		Individual *bestSinceRestart;
-		Stopwatch stopwatch;
-        	double starting_wtime;
-            double final_wtime;
+	FLOAT_TYPE** cumfit;//allocated in setup, deleted in dest
+		
+	TopologyList **topologies;//allocated in Setup(), deleted in dest
+			
+	HKYData* data;
+	Stopwatch stopwatch;
+    FLOAT_TYPE starting_wtime;
+    FLOAT_TYPE final_wtime;
+
+#ifdef INCLUDE_PERTURBATION
+	Individual *allTimeBest; //this is only used for perturbation or ratcheting
+	Individual *bestSinceRestart;
+#endif
 
 	public:
 		Population() : error(0), conf(NULL),
-			bestFitness(-(DBL_MAX)), bestIndiv(0),
-			prevBestFitness(-(DBL_MAX)), logfname(0),
-			indiv(NULL), newindiv(NULL),
+			bestFitness(-(FLT_MAX)), bestIndiv(0),
+			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), new_best_found(0), avgfit(0.0),
 			gen(0), starting_wtime(0.0), final_wtime(0.0),
+			paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
+			treeString(NULL), adap(NULL),
+			topologies(NULL), prematureTermination(false)
 #ifdef INCLUDE_PERTURBATION			 
-			 pertMan(NULL),
+			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
 #endif
-			 paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
-			 inferInternalStateProbs(0), bootstrapReps(0),
-			 outputMostlyUselessFiles(0), outputPhylipTree(0),
-			 significantTopoChange(0.01), allTimeBest(NULL),
-			 bestSinceRestart(NULL), treeString(NULL), adap(NULL),
-			 topologies(NULL), prematureTermination(false)
 			{
-			//allTimeBest.SetFitness(-1e100);
-			//bestSinceRestart.SetFitness(-1e100);
-			
 			lastTopoImprove = 0;
 			lastPrecisionReduction = 0;
-			lastTopoImproveThresh = 1000;
-			improveOverStoredIntervalsThresh = 0.1;
 			}
 
 		~Population();
 
-		double BestFitness() { return bestFitness; }
+		void QuickSort( FLOAT_TYPE **scoreArray, int top, int bottom );
+		FLOAT_TYPE BestFitness() {
+//			assert(bestFitness == indiv[bestIndiv].Fitness());
+			return bestFitness; 
+			}
 
 #if !defined( PARALLEL_MPI_VERSION )
 		void Run();
@@ -401,8 +384,8 @@ private:
 		void Setup(GeneralGamlConfig *conf, HKYData *, int nprocs = 1, int rank = 0);
 		int Restart(int type, int rank, int nprocs, int restart_count);
 		void SeedPopulationWithStartingTree();
-		double CalcAverageFitness();
-		void CalculateReproductionProbabilies(double **scoreArray, double selectionIntensity, int indivsInArray);
+		FLOAT_TYPE CalcAverageFitness();
+		void CalculateReproductionProbabilies(FLOAT_TYPE **scoreArray, FLOAT_TYPE selectionIntensity, int indivsInArray);
 		void NextGeneration();
 		void DetermineParentage();
 		void FindTreeStructsForNextGeneration();
@@ -415,19 +398,19 @@ private:
 		friend istream& operator >>( istream& inf, Population& p );
 		friend ostream& operator <<( ostream& outf, Population& p );
 
-		int ExtendPopulation(int, char*, double*);
-		int ShrinkPopulation(int, char**, double**);
-		int SwapIndividuals(int, const char*, double*, char**, double**);
-		int ReplaceSpecifiedIndividuals(int,  int*, const char*, double*);
-		int ReplicateSpecifiedIndividuals(int, int*, const char*, double *);
+		int ExtendPopulation(int, char*, FLOAT_TYPE*);
+		int ShrinkPopulation(int, char**, FLOAT_TYPE**);
+		int SwapIndividuals(int, const char*, FLOAT_TYPE*, char**, FLOAT_TYPE**);
+		int ReplaceSpecifiedIndividuals(int,  int*, const char*, FLOAT_TYPE*);
+		int ReplicateSpecifiedIndividuals(int, int*, const char*, FLOAT_TYPE *);
 		void FillPopWithClonesOfBest();
 		
 		int GetNRandomIndivIndices(int**, int);
 		int GetNBestIndivIndices(int**, int);
 		int GetSpecifiedTreeStrings(char**, int, int*);
-		int GetSpecifiedRates(double**, int, int*);
-		int GetSpecifiedPis(double**, int , int*);
-		int GetSpecifiedModels(double** model_string, int n, int* indiv_list);
+		int GetSpecifiedRates(FLOAT_TYPE**, int, int*);
+		int GetSpecifiedPis(FLOAT_TYPE**, int , int*);
+		int GetSpecifiedModels(FLOAT_TYPE** model_string, int n, int* indiv_list);
 		
 		void UpdateTopologyList(Individual *inds);
 		void CheckAllTrees();
@@ -436,7 +419,7 @@ private:
 		void RemoveFromTopologyList(Individual *ind);
 		void SetupTopologyList(int maxNumTopos);
 		void CheckTreesVsClaManager();
-		double IndivFitness(int i);
+		FLOAT_TYPE IndivFitness(int i);
 		
 		void NNIPerturbation(int sourceInd, int indivIndex);
 		void NNISpectrum(int sourceInd);
@@ -465,7 +448,7 @@ private:
 		
 	private:
 
-		int prResizeIndividualArray(int, char* = NULL, double* = NULL);
+		int prResizeIndividualArray(int, char* = NULL, FLOAT_TYPE* = NULL);
 		int prResizeNewIndividualArray(int);
 		int prResizeTopologyListArray(int);
 		int prResizeCumFitArray(int);
@@ -475,7 +458,7 @@ private:
 		void FinalizeOutputStreams();
 
 		void AppendTreeToTreeLog(int mutType, int indNum=-1);
-		void AppendTreeToBootstrapLog(int rep);
+		void FinishBootstrapRep(int rep);
 		void UpdateTreeModels();
 		
 		void OutputFate();
@@ -492,7 +475,7 @@ private:
 		void FinalOptimization();
 		void ResetMemLevel(int numNodesPerIndiv, int numClas);
 		void SetNewBestIndiv(int indivIndex);
-		void LogNewBestFromRemote(double, int);
+		void LogNewBestFromRemote(FLOAT_TYPE, int);
 		void CheckRemoteReplaceThresh();
 		void TurnOffRatchet();
 	};
