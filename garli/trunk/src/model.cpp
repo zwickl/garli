@@ -30,16 +30,16 @@ using namespace std;
 #undef ALIGN_MODEL
 
 extern rng rnd;
-double Model::mutationShape;
+FLOAT_TYPE Model::mutationShape;
 
-double Model::maxPropInvar;
+FLOAT_TYPE Model::maxPropInvar;
 //bool Model::useFlexRates;
 //bool Model::noPinvInModel;
 //int Model::nRateCats;
 
-double PointNormal (double prob);
-double IncompleteGamma (double x, double alpha, double LnGamma_alpha);
-double PointChi2 (double prob, double v);
+FLOAT_TYPE PointNormal (FLOAT_TYPE prob);
+FLOAT_TYPE IncompleteGamma (FLOAT_TYPE x, FLOAT_TYPE alpha, FLOAT_TYPE LnGamma_alpha);
+FLOAT_TYPE PointChi2 (FLOAT_TYPE prob, FLOAT_TYPE v);
 
 Model::~Model(){
 	if(stateFreqs.empty() == false){
@@ -101,63 +101,63 @@ Model::~Model(){
 void Model::AllocateEigenVariables(){
 #ifndef ALIGN_MODEL
 	//a bunch of allocation here for all of the qmatrix->eigenvector->pmatrix related variables
-	eigvals=new double[nstates];//eigenvalues
-	eigvalsimag=new double[nstates];
+	eigvals=new FLOAT_TYPE[nstates];//eigenvalues
+	eigvalsimag=new FLOAT_TYPE[nstates];
 	iwork=new int[nstates];
-	work=new double[nstates];
-	col=new double[nstates];
+	work=new FLOAT_TYPE[nstates];
+	col=new FLOAT_TYPE[nstates];
 	indx=new int[nstates];
-	c_ijk=new double[nstates*nstates*nstates];	
-	EigValexp=new double[nstates*NRateCats()];	
+	c_ijk=new FLOAT_TYPE[nstates*nstates*nstates];	
+	EigValexp=new FLOAT_TYPE[nstates*NRateCats()];	
 
 	//create the matrix for the eigenvectors
-	eigvecs=New2DArray<double>(nstates,nstates);
+	eigvecs=New2DArray<FLOAT_TYPE>(nstates,nstates);
 
 	//create a temporary matrix to hold the eigenvectors that will be destroyed during the invertization
-	teigvecs=New2DArray<double>(nstates,nstates);
+	teigvecs=New2DArray<FLOAT_TYPE>(nstates,nstates);
 
 	//create the matrix for the inverse eigenvectors
-	inveigvecs=New2DArray<double>(nstates,nstates);	
+	inveigvecs=New2DArray<FLOAT_TYPE>(nstates,nstates);	
 
 	//allocate the pmat
-	pmat=New3DArray<double>(NRateCats(), nstates, nstates);
+	pmat=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
 
 	//allocate qmat and tempqmat
-	qmat=New2DArray<double>(nstates,nstates);
-	tempqmat=New2DArray<double>(nstates,nstates);
+	qmat=New2DArray<FLOAT_TYPE>(nstates,nstates);
+	tempqmat=New2DArray<FLOAT_TYPE>(nstates,nstates);
 
-	deriv1=New3DArray<double>(NRateCats(), nstates, nstates);
-	deriv2=New3DArray<double>(NRateCats(), nstates, nstates);
+	deriv1=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	deriv2=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
 #else
 
 	//a bunch of allocation here for all of the qmatrix->eigenvector->pmatrix related variables
-	eigvals=new double[nstates];//eigenvalues
-	eigvalsimag=new double[nstates];
+	eigvals=new FLOAT_TYPE[nstates];//eigenvalues
+	eigvalsimag=new FLOAT_TYPE[nstates];
 	iwork=new int[nstates];
-	work=new double[nstates];
-	col=new double[nstates];
+	work=new FLOAT_TYPE[nstates];
+	col=new FLOAT_TYPE[nstates];
 	indx=new int[nstates];
-	c_ijk=new double[nstates*nstates*nstates];	
-	EigValexp=new double[nstates*NRateCats()];	
+	c_ijk=new FLOAT_TYPE[nstates*nstates*nstates];	
+	EigValexp=new FLOAT_TYPE[nstates*NRateCats()];	
 
 	//create the matrix for the eigenvectors
-	eigvecs=New2DAlignedArray<double>(nstates,nstates);
+	eigvecs=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);
 
 	//create a temporary matrix to hold the eigenvectors that will be destroyed during the invertization
-	teigvecs=New2DAlignedArray<double>(nstates,nstates);
+	teigvecs=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);
 
 	//create the matrix for the inverse eigenvectors
-	inveigvecs=New2DAlignedArray<double>(nstates,nstates);	
+	inveigvecs=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);	
 
 	//allocate the pmat
-	pmat=New3DAlignedArray<double>(NRateCats(), nstates, nstates);
+	pmat=New3DAlignedArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
 
 	//allocate qmat and tempqmat
-	qmat=New2DAlignedArray<double>(nstates,nstates);
-	tempqmat=New2DAlignedArray<double>(nstates,nstates);
+	qmat=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);
+	tempqmat=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);
 
-	deriv1=New3DAlignedArray<double>(NRateCats(), nstates, nstates);
-	deriv2=New3DAlignedArray<double>(NRateCats(), nstates, nstates);
+	deriv1=New3DAlignedArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	deriv2=New3DAlignedArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
 #endif
 	}
 
@@ -191,7 +191,7 @@ void Model::UpdateQMat(){
 		}
 		
 	//set diags to sum rows to 0
-	double sum;
+	FLOAT_TYPE sum;
 	for(int x=0;x<nstates;x++){
 		sum=0.0;
 		for(int y=0;y<nstates;y++){
@@ -205,22 +205,22 @@ void Model::CalcEigenStuff(){
 	//if rate params or basefreqs have been altered, requiring the recalculation of the eigenvectors and c_ijk
 	UpdateQMat();
 
-	memcpy(*tempqmat, *qmat, nstates*nstates*sizeof(double));
+	memcpy(*tempqmat, *qmat, nstates*nstates*sizeof(FLOAT_TYPE));
 	EigenRealGeneral(nstates, tempqmat, eigvals, eigvalsimag, eigvecs, iwork, work);
 
-	memcpy(*teigvecs, *eigvecs, nstates*nstates*sizeof(double));
+	memcpy(*teigvecs, *eigvecs, nstates*nstates*sizeof(FLOAT_TYPE));
 	InvertMatrix(teigvecs, nstates, col, indx, inveigvecs);
-	CalcCijk(c_ijk, nstates, (const double**) eigvecs, (const double**) inveigvecs);
-	blen_multiplier=(.5/((qmat[0][1]**stateFreqs[0])+(qmat[0][2]**stateFreqs[0])+(qmat[0][3]**stateFreqs[0])+(qmat[1][2]**stateFreqs[1])+(qmat[1][3]**stateFreqs[1])+(qmat[2][3]**stateFreqs[2])));
+	CalcCijk(c_ijk, nstates, (const FLOAT_TYPE**) eigvecs, (const FLOAT_TYPE**) inveigvecs);
+	blen_multiplier=((FLOAT_TYPE).5/((qmat[0][1]**stateFreqs[0])+(qmat[0][2]**stateFreqs[0])+(qmat[0][3]**stateFreqs[0])+(qmat[1][2]**stateFreqs[1])+(qmat[1][3]**stateFreqs[1])+(qmat[2][3]**stateFreqs[2])));
 	eigenDirty=false;
 	}
 
-void Model::CalcPmat(double blen, double *metaPmat, bool flip /*=false*/){
+void Model::CalcPmat(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat, bool flip /*=false*/){
 	//this will be a wacky pmat calculation that combines the pmats for all of the rates
 	//assert(blen>0.0 && blen<10);
 
 	//assuming 4 state for now
-	double tmpFreqs[4];
+	FLOAT_TYPE tmpFreqs[4];
 	for(int i=0;i<nstates;i++) tmpFreqs[i] = *stateFreqs[i];
 
 	for(int r=0;r<NRateCats();r++){
@@ -228,49 +228,49 @@ void Model::CalcPmat(double blen, double *metaPmat, bool flip /*=false*/){
 			if(eigenDirty==true)
 				CalcEigenStuff();
 
-			double tempblen;
+			FLOAT_TYPE tempblen;
 			if(NoPinvInModel()==true || modSpec.flexRates==true)//if we're using flex rates, pinv should already be included
 				//in the rate normalization, and doesn't need to be figured in here
 				tempblen=(blen * blen_multiplier * rateMults[r]);
 			else
-				tempblen=(blen * blen_multiplier * rateMults[r]) / (1.0-*propInvar);
+				tempblen=(blen * blen_multiplier * rateMults[r]) / (ONE_POINT_ZERO-*propInvar);
 			
 			CalcPij(c_ijk, nstates, eigvals, 1, tempblen, pmat[0], EigValexp);
 			}
 		else if(nst==2 || modSpec.equalStateFreqs == false){
 			//remember that relRates[1] is kappa for nst=2 models
-			double PI, A, K=*relRates[1];
-			double R=tmpFreqs[0]+tmpFreqs[2];
-			double Y=1.0 - R;
-			blen_multiplier=(.5/((R*Y)+K*((tmpFreqs[0])*((tmpFreqs[2]))+(tmpFreqs[1])*((tmpFreqs[3])))));
-			double tempblen ;
+			FLOAT_TYPE PI, A, K=*relRates[1];
+			FLOAT_TYPE R=tmpFreqs[0]+tmpFreqs[2];
+			FLOAT_TYPE Y=(FLOAT_TYPE)1.0 - R;
+			blen_multiplier=((FLOAT_TYPE).5/((R*Y)+K*((tmpFreqs[0])*((tmpFreqs[2]))+(tmpFreqs[1])*((tmpFreqs[3])))));
+			FLOAT_TYPE tempblen ;
 			if(NoPinvInModel()==true || modSpec.flexRates==true)//if we're using flex rates, pinv should already be included
 				//in the rate normalization, and doesn't need to be figured in here
 				tempblen=(blen * blen_multiplier * rateMults[r]);
 			else
-				tempblen=(blen * blen_multiplier * rateMults[r]) / (1.0-*propInvar);
-			double expblen=exp(-tempblen);
+				tempblen=(blen * blen_multiplier * rateMults[r]) / ((FLOAT_TYPE)1.0-*propInvar);
+			FLOAT_TYPE expblen=exp(-tempblen);
 
 			for(register int f=0;f<4;f++){
 				for(register int t=0;t<4;t++){	
 					if(f==t){
 						if(t==0||t==2) PI = R;
 						else PI = Y;
-						A=1.0 + PI * (K - 1.0);
-						(**pmat)[f*4+t]=(tmpFreqs[t])+(tmpFreqs[t])*((1.0/PI)-1.0)*expblen+((PI-(tmpFreqs[t]))/PI)*exp(-A*tempblen);
+						A=ONE_POINT_ZERO + PI * (K - ONE_POINT_ZERO);
+						(**pmat)[f*4+t]=(tmpFreqs[t])+(tmpFreqs[t])*((ONE_POINT_ZERO/PI)-ONE_POINT_ZERO)*expblen+((PI-(tmpFreqs[t]))/PI)*exp(-A*tempblen);
 						assert((**pmat)[f*4+t] > 0.0);
 						assert((**pmat)[f*4+t] < 1.0);
 						}
 					else if((f+t)%2){
-						(**pmat)[f*4+t]=((tmpFreqs[t]))*(1.0-expblen);//tranversion
+						(**pmat)[f*4+t]=((tmpFreqs[t]))*(ONE_POINT_ZERO-expblen);//tranversion
 						assert((**pmat)[f*4+t] > 0.0);
 						assert((**pmat)[f*4+t] < 1.0);
 						}
 					else{
 						if(t==0||t==2) PI=R;
 						else PI = Y;
-						A=1.0 + PI * (K - 1.0);
-						(**pmat)[f*4+t]=(tmpFreqs[t])+(tmpFreqs[t])*((1.0/PI)-1.0)*expblen-((tmpFreqs[t])/PI)*exp(-A*tempblen);//transition
+						A=ONE_POINT_ZERO + PI * (K - ONE_POINT_ZERO);
+						(**pmat)[f*4+t]=(tmpFreqs[t])+(tmpFreqs[t])*((ONE_POINT_ZERO/PI)-ONE_POINT_ZERO)*expblen-((tmpFreqs[t])/PI)*exp(-A*tempblen);//transition
 						assert((**pmat)[f*4+t] > 0.0);
 						assert((**pmat)[f*4+t] < 1.0);
 						}
@@ -278,21 +278,21 @@ void Model::CalcPmat(double blen, double *metaPmat, bool flip /*=false*/){
 				}
 			}
 		else if(nst==1){
-			blen_multiplier=4.0/3.0;
+			blen_multiplier=(FLOAT_TYPE)(4.0/3.0);
 			//	}
-			double tempblen ;
+			FLOAT_TYPE tempblen ;
 			if(NoPinvInModel()==true || modSpec.flexRates==true)//if we're using flex rates, pinv should already be included
 				//in the rate normalization, and doesn't need to be figured in here
 				tempblen=(blen * blen_multiplier * rateMults[r]);
 			else
-				tempblen=(blen * blen_multiplier * rateMults[r]) / (1.0-*propInvar);
-			double expblen=exp(-tempblen);			
+				tempblen=(blen * blen_multiplier * rateMults[r]) / (ONE_POINT_ZERO-*propInvar);
+			FLOAT_TYPE expblen=exp(-tempblen);			
 			for(register int f=0;f<4;f++){
 				for(register int t=0;t<4;t++){
 					if(f==t)
-						(**pmat)[f*4+t]=expblen+0.25*(1.0-expblen);
+						(**pmat)[f*4+t]=expblen+(FLOAT_TYPE) 0.25*(ONE_POINT_ZERO-expblen);
 					else 
-						(**pmat)[f*4+t]=0.25*(1.0-expblen);
+						(**pmat)[f*4+t]=(FLOAT_TYPE)0.25*((ONE_POINT_ZERO)-expblen);
 					}
 				}
 			}
@@ -314,23 +314,23 @@ void Model::CalcPmat(double blen, double *metaPmat, bool flip /*=false*/){
 	}	
 }	
 
-void Model::CalcDerivatives(double dlen, double ***&pr, double ***&one, double ***&two){
+void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&one, FLOAT_TYPE ***&two){
 
 	if(eigenDirty==true)
 		CalcEigenStuff();
 
-	double * const EigValderiv=new double[nstates*NRateCats()];
-	double * const EigValderiv2=new double[nstates*NRateCats()];
+	FLOAT_TYPE * const EigValderiv=new FLOAT_TYPE[nstates*NRateCats()];
+	FLOAT_TYPE * const EigValderiv2=new FLOAT_TYPE[nstates*NRateCats()];
 
 	for(int rate=0;rate<NRateCats();rate++){
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
-			double scaledEigVal;
+			FLOAT_TYPE scaledEigVal;
 			if(NoPinvInModel()==true || modSpec.flexRates==true)//if we're using flex rates, pinv should already be included
 				//in the rate normalization, and doesn't need to be figured in here
 				scaledEigVal = eigvals[k]*rateMults[rate]*blen_multiplier;	
 			else
-				scaledEigVal = eigvals[k]*rateMults[rate]*blen_multiplier/(1.0-*propInvar);
+				scaledEigVal = eigvals[k]*rateMults[rate]*blen_multiplier/(ONE_POINT_ZERO-*propInvar);
 
 			EigValexp[k+rateOffset] = exp(scaledEigVal * dlen);
 			EigValderiv[k+rateOffset] = scaledEigVal*EigValexp[k+rateOffset];
@@ -343,18 +343,18 @@ void Model::CalcDerivatives(double dlen, double ***&pr, double ***&one, double *
 		const unsigned rateOffset = nstates*rate;
 		for (int i = 0; i < 4; i++){
 			for (int j = 0; j < 4; j++){
-				double sum_p=0.0;
-				double sum_d1p=0.0;
-				double sum_d2p = 0.0;
+				FLOAT_TYPE sum_p=0.0;
+				FLOAT_TYPE sum_d1p=0.0;
+				FLOAT_TYPE sum_d2p = 0.0;
 				for (int k = 0; k < 4; k++){ 
-					//const double x = eigvecs[i][k]*inveigvecs[j][k];
-					const double x = eigvecs[i][k]*inveigvecs[k][j];
+					//const FLOAT_TYPE x = eigvecs[i][k]*inveigvecs[j][k];
+					const FLOAT_TYPE x = eigvecs[i][k]*inveigvecs[k][j];
 					sum_p   += x*EigValexp[k+rateOffset];
 					sum_d1p += x*EigValderiv[k+rateOffset];
 					sum_d2p += x*EigValderiv2[k+rateOffset];
 					}
 
-				pmat[rate][i][j] = (sum_p > 0.0 ? sum_p : 0.0);
+				pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
 				deriv1[rate][i][j] = sum_d1p;
 				deriv2[rate][i][j] = sum_d2p;
 				}
@@ -374,11 +374,11 @@ void Model::CalcDerivatives(double dlen, double ***&pr, double ***&one, double *
 	{
 
 	register int		nsq = n * n;
-	double				sum;
-	const double *ptr;
-	double *pMat = p[0];
-	double vr = v * r;
-	double *g = EigValexp;
+	FLOAT_TYPE				sum;
+	const FLOAT_TYPE *ptr;
+	FLOAT_TYPE *pMat = p[0];
+	FLOAT_TYPE vr = v * r;
+	FLOAT_TYPE *g = EigValexp;
 	for (int k=0; k<n; k++)
 		*g++ = exp(*eigenValues++ * vr);
 
@@ -422,7 +422,7 @@ void Model::SetDefaultModelParameters(const HKYData *data){
 	if(modSpec.numRateCats > 1) DiscreteGamma(rateMults, rateProbs, *alpha);
 
 	if(modSpec.equalStateFreqs == false){
-		double f[4];
+		FLOAT_TYPE f[4];
 		data->GetEmpiricalFreqs(f);
 		SetPis(f, false);
 		}
@@ -434,8 +434,8 @@ void Model::SetDefaultModelParameters(const HKYData *data){
 	else{
 		//if there are no constant sites, warn user that Pinv should not be used
 		if(data->NConstant() == 0) throw(ErrorException("This dataset contains no constant characters!\nInference of the proportion of invariant sites is therefore meaningless.\nPlease set invariantsites to \"none\""));
-		SetPinv(0.25 * ((double)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic())), false);
-		SetMaxPinv((double)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic()));
+		SetPinv((FLOAT_TYPE)0.25 * ((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic())), false);
+		SetMaxPinv((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic()));
 		if(modSpec.flexRates == true) NormalizeRates();
 		else AdjustRateProportions();
 		}
@@ -455,8 +455,8 @@ void Model::MutateRates(){
 
 	else{//if we alter the reference rate GT (fixed to 1.0)
 		//scale all of the other rates
-		//double scaler=exp(MODEL_CHANGE_SCALER * (params->rnd.uniform()-.5));
-		double scaler= rnd.gamma( Model::mutationShape );
+		//FLOAT_TYPE scaler=exp(MODEL_CHANGE_SCALER * (params->rnd.uniform()-.5));
+		FLOAT_TYPE scaler= rnd.gamma( Model::mutationShape );
 		for(int i=0;i<nst-1;i++){
 			rates[i] /= scaler;
 			}
@@ -478,7 +478,7 @@ void Model::MutatePis(){
 	//alternative:change one pi with a multiplier and rescale the rest
 /*	int piToChange=int(rnd.uniform()*4.0);
 	
-	double newPi=pi[piToChange] * rnd.gamma( Model::mutationShape );
+	FLOAT_TYPE newPi=pi[piToChange] * rnd.gamma( Model::mutationShape );
 	for(int b=0;b<4;b++)
 		if(b!=piToChange) pi[b] *= (1.0-newPi)/(1.0-pi[piToChange]);
 	pi[piToChange]=newPi;
@@ -486,9 +486,9 @@ void Model::MutatePis(){
 */	}
 /*
 void Model::MutateRateProbs(){
-	int ProbToChange=int(rnd.uniform()*(double) NRateCats());
+	int ProbToChange=int(rnd.uniform()*(FLOAT_TYPE) NRateCats());
 	
-	double newProb=rateProbs[ProbToChange] * rnd.gamma( Model::mutationShape / 10.0 );
+	FLOAT_TYPE newProb=rateProbs[ProbToChange] * rnd.gamma( Model::mutationShape / 10.0 );
 	for(int b=0;b<NRateCats();b++)
 		if(b!=ProbToChange) rateProbs[b] *= (1.0-newProb)/(1.0-rateProbs[ProbToChange]);
 	rateProbs[ProbToChange]=newProb;
@@ -510,7 +510,7 @@ void Model::MutateAlpha(){
 	
 void Model::MutatePropInvar(){
 //	propInvar *= exp(MODEL_CHANGE_SCALER * (params->rnd.uniform()-.5));
-	double mult=rnd.gamma( Model::mutationShape );
+	FLOAT_TYPE mult=rnd.gamma( Model::mutationShape );
 	if(*propInvar == maxPropInvar && (mult > 1.0)) mult=1.0/mult;
 	*propInvar *= mult;
 	*propInvar = (*propInvar > maxPropInvar ? maxPropInvar : *propInvar);
@@ -527,10 +527,10 @@ void Model::CopyModel(const Model *from){
 	for(int i=0;i<nstates;i++)
 		*stateFreqs[i]=*(from->stateFreqs[i]);
 
-	//memcpy(pi, from->pi, sizeof(double)*4);
+	//memcpy(pi, from->pi, sizeof(FLOAT_TYPE)*4);
 
-	memcpy(rateMults, from->rateMults, sizeof(double)*NRateCats());
-	memcpy(rateProbs, from->rateProbs, sizeof(double)*NRateCats());
+	memcpy(rateMults, from->rateMults, sizeof(FLOAT_TYPE)*NRateCats());
+	memcpy(rateProbs, from->rateProbs, sizeof(FLOAT_TYPE)*NRateCats());
 
 	if(modSpec.flexRates == false && modSpec.numRateCats > 1)
 		*alpha=*(from->alpha);
@@ -539,7 +539,7 @@ void Model::CopyModel(const Model *from){
 	eigenDirty=true;
 	}	
 
-void Model::SetModel(double *model_string){
+void Model::SetModel(FLOAT_TYPE *model_string){
 	int slot=0;
 	for(int i=0;i<nst-1;i++)
 		*relRates[i]=model_string[slot++];
@@ -555,9 +555,9 @@ void Model::SetModel(double *model_string){
 	eigenDirty=true;
 	}
 
-double Model::TRatio() const{
-	double numerator = *relRates[1] * ( *stateFreqs[0]**stateFreqs[2] + *stateFreqs[1]**stateFreqs[3] );
-	double denominator = ( *stateFreqs[0] + *stateFreqs[2] ) * ( *stateFreqs[1] + *stateFreqs[3] );
+FLOAT_TYPE Model::TRatio() const{
+	FLOAT_TYPE numerator = *relRates[1] * ( *stateFreqs[0]**stateFreqs[2] + *stateFreqs[1]**stateFreqs[3] );
+	FLOAT_TYPE denominator = ( *stateFreqs[0] + *stateFreqs[2] ) * ( *stateFreqs[1] + *stateFreqs[3] );
 	return ( numerator / denominator );
 	}
 
@@ -594,7 +594,7 @@ bool Model::IsModelEqual(const Model *other) const {
 |  category.                                                                    |
 |                                                                               |
 -------------------------------------------------------------------------------*/  
-#define POINTGAMMA(prob,alpha,beta) 		PointChi2(prob,2.0*(alpha))/(2.0*(beta))
+#define POINTGAMMA(prob,alpha,beta) 		PointChi2(prob,(FLOAT_TYPE)2.0*(alpha))/((FLOAT_TYPE)2.0*(beta))
 
 /* ------------------------------------------------------------------------------
 |                                                                               |
@@ -612,12 +612,18 @@ bool Model::IsModelEqual(const Model *other) const {
 |     points of the normal distribution.  26:118-121.                           |
 |                                                                               |
 -------------------------------------------------------------------------------*/   
-double PointNormal (double prob){
-
-	double 		a0 = -0.322232431088, a1 = -1.0, a2 = -0.342242088547, a3 = -0.0204231210245,
+FLOAT_TYPE PointNormal (FLOAT_TYPE prob){
+#ifdef SINGLE_PRECISION_FLOATS
+	FLOAT_TYPE 		a0 = -0.322232431088f, a1 = -1.0f, a2 = -0.342242088547f, a3 = -0.0204231210245f,
+ 					a4 = -0.453642210148e-4f, b0 = 0.0993484626060f, b1 = 0.588581570495f,
+ 					b2 = 0.531103462366f, b3 = 0.103537752850f, b4 = 0.0038560700634f,
+ 					y, z = 0.0f, p = prob, p1;
+#else
+	FLOAT_TYPE 		a0 = -0.322232431088, a1 = -1.0, a2 = -0.342242088547, a3 = -0.0204231210245,
  					a4 = -0.453642210148e-4, b0 = 0.0993484626060, b1 = 0.588581570495,
  					b2 = 0.531103462366, b3 = 0.103537752850, b4 = 0.0038560700634,
  					y, z = 0, p = prob, p1;
+#endif
 
 	p1 = (p<0.5 ? p : 1-p);
 	if (p1<1e-20) 
@@ -642,17 +648,24 @@ double PointNormal (double prob){
 |     Statistics, 19:285-287 (AS32)                                             |
 |                                                                               |
 -------------------------------------------------------------------------------*/   
-double IncompleteGamma (double x, double alpha, double LnGamma_alpha){
+FLOAT_TYPE IncompleteGamma (FLOAT_TYPE x, FLOAT_TYPE alpha, FLOAT_TYPE LnGamma_alpha){
 	int 			i;
-	double 		p = alpha, g = LnGamma_alpha,
+#ifdef SINGLE_PRECISION_FLOATS
+	FLOAT_TYPE 		p = alpha, g = LnGamma_alpha,
+					accurate = 1e-8f, overflow = 1e30f,
+					factor, gin = 0.0f, rn = 0.0f, a = 0.0f, b = 0.0f, an = 0.0f, 
+					dif = 0.0f, term = 0.0f, pn[6];
+#else
+	FLOAT_TYPE 		p = alpha, g = LnGamma_alpha,
 					accurate = 1e-8, overflow = 1e30,
 					factor, gin = 0.0, rn = 0.0, a = 0.0, b = 0.0, an = 0.0, 
 					dif = 0.0, term = 0.0, pn[6];
+#endif
 
 	if (x == 0.0) 
-		return (0.0);
+		return (ZERO_POINT_ZERO);
 	if (x < 0 || p <= 0) 
-		return (-1.0);
+		return (-ONE_POINT_ZERO);
 
 	factor = exp(p*log(x)-x-g);   
 	if (x>1 && x>=p) 
@@ -669,8 +682,8 @@ double IncompleteGamma (double x, double alpha, double LnGamma_alpha){
 		gin *= factor/p;
 		goto l50;
 	l30:
-		a = 1.0-p;   
-		b = a+x+1.0;  
+		a = ONE_POINT_ZERO-p;   
+		b = a+x+ONE_POINT_ZERO;  
 		term = 0.0;
 		pn[0] = 1.0;  
 		pn[1] = x;  
@@ -703,95 +716,121 @@ double IncompleteGamma (double x, double alpha, double LnGamma_alpha){
 			pn[i] /= overflow;
 		goto l32;
 	l42:
-		gin = 1.0-factor*gin;
+		gin = ONE_POINT_ZERO-factor*gin;
 	l50:
 		return (gin);
 
 }
 
-inline double LnGamma (double alp){
-/*	double cof[6];
+inline FLOAT_TYPE LnGamma (FLOAT_TYPE alp){
+/*	FLOAT_TYPE cof[6];
 	cof[0]=76.18009172947146;
     cof[1]=-86.50532032941677;
     cof[2]=24.01409824083091;
     cof[3]=-1.231739572450155;
     cof[4]=0.1208650973866179e-2;
     cof[5]=-0.5395239384953e-5;	
-	double xx=alp;
-	double yy=alp;
-	double tmp=xx + 5.5 - (xx + 0.5) * log(xx + 5.5);
-	double ser = 1.000000000190015;
+	FLOAT_TYPE xx=alp;
+	FLOAT_TYPE yy=alp;
+	FLOAT_TYPE tmp=xx + 5.5 - (xx + 0.5) * log(xx + 5.5);
+	FLOAT_TYPE ser = 1.000000000190015;
 	for(int j=0;j<5;j++){
 		ser += (cof[j] / ++yy);
 		}
 	return log(2.5066282746310005*ser/xx)-tmp;
 	}
 */
-	double x = alp, f=0.0, z;
+	FLOAT_TYPE x = alp, f=0.0, z;
 	
 	if (x < 7) 
 		{
 		f = 1.0;  
-		z = x-1.0;
+		z = x-ONE_POINT_ZERO;
 		while (++z < 7.0)  
 			f *= z;
 		x = z;   
 		f = -log(f);
 		}
-	z = 1.0/(x*x);
+	z = ONE_POINT_ZERO/(x*x);
+#ifdef SINGLE_PRECISION_FLOATS
+	return  (f + (x-0.5f)*log(x) - x + 0.918938533204673f + 
+			(((-0.000595238095238f*z+0.000793650793651f)*z-0.002777777777778f)*z +
+			0.083333333333333f)/x);
+#else
 	return  (f + (x-0.5)*log(x) - x + 0.918938533204673 + 
 			(((-0.000595238095238*z+0.000793650793651)*z-0.002777777777778)*z +
-			0.083333333333333)/x); 
+			0.083333333333333)/x);
+#endif
 	}
 
-double PointChi2 (double prob, double v){
-	double 		e = 0.5e-6, aa = 0.6931471805, p = prob, g,
+FLOAT_TYPE PointChi2 (FLOAT_TYPE prob, FLOAT_TYPE v){
+#ifdef SINGLE_PRECISION_FLOATS
+	//potential error e needs to be increased here
+	//because of lesser decimal precision of floats
+	FLOAT_TYPE 		e = 0.5e-4f, aa = 0.6931471805f, p = prob, g,
 					xx, c, ch, a = 0.0, q = 0.0, p1 = 0.0, p2 = 0.0, t = 0.0, 
 					x = 0.0, b = 0.0, s1, s2, s3, s4, s5, s6;
-
+	if (p < 0.000002 || p > 0.999998 || v <= 0.0) 
+		return (-1.0f);
+#else
+	FLOAT_TYPE 		e = 0.5e-6, aa = 0.6931471805, p = prob, g,
+					xx, c, ch, a = 0.0, q = 0.0, p1 = 0.0, p2 = 0.0, t = 0.0, 
+					x = 0.0, b = 0.0, s1, s2, s3, s4, s5, s6;
 	if (p < 0.000002 || p > 0.999998 || v <= 0.0) 
 		return (-1.0);
-	g = LnGamma (v/2.0);
-	xx = v/2.0;   
-	c = xx - 1.0;
+#endif
+
+	g = LnGamma (v/(FLOAT_TYPE)2.0);
+	xx = v/(FLOAT_TYPE)2.0;   
+	c = xx - ONE_POINT_ZERO;
 	if (v >= -1.24*log(p)) 
 		goto l1;
-	ch = pow((p*xx*exp(g+xx*aa)), 1.0/xx);
+	ch = pow((p*xx*exp(g+xx*aa)), ONE_POINT_ZERO/xx);
 	if (ch-e<0) 
 		return (ch);
 	goto l4;
 	l1:
 		if (v > 0.32) 
 			goto l3;
-		ch = 0.4;   
-		a = log(1.0-p);
+		ch = (FLOAT_TYPE)0.4;
+		a = log(ONE_POINT_ZERO-p);
 	l2:
 		q = ch;  
-		p1 = 1.0+ch*(4.67+ch);  
-		p2 = ch*(6.73+ch*(6.66+ch));
-		t = -0.5+(4.67+2.0*ch)/p1 - (6.73+ch*(13.32+3.0*ch))/p2;
-		ch -= (1.0-exp(a+g+0.5*ch+c*aa)*p2/p1)/t;
-		if (fabs(q/ch-1.0)-0.01 <= 0.0) 
+		p1 = ONE_POINT_ZERO+ch*((FLOAT_TYPE)4.67+ch);  
+		p2 = ch*((FLOAT_TYPE)6.73+ch*((FLOAT_TYPE)6.66+ch));
+		t = (FLOAT_TYPE)-0.5+((FLOAT_TYPE)4.67+(FLOAT_TYPE)2.0*ch)/p1 - ((FLOAT_TYPE)6.73+ch*((FLOAT_TYPE)13.32+(FLOAT_TYPE)3.0*ch))/p2;
+		ch -= (ONE_POINT_ZERO-exp(a+g+(FLOAT_TYPE)0.5*ch+c*aa)*p2/p1)/t;
+		if (fabs(q/ch-ONE_POINT_ZERO)-0.01 <= 0.0) 
 			goto l4;
 		else                       
 			goto l2;
 	l3: 
 		x = PointNormal (p);
-		p1 = 0.222222/v;   
-		ch = v*pow((x*sqrt(p1)+1.0-p1), 3.0);
+		p1 = (FLOAT_TYPE) 0.222222/v;   
+		ch = v*pow((x*sqrt(p1)+ONE_POINT_ZERO-p1), (FLOAT_TYPE)3.0);
 		if (ch > 2.2*v+6.0)  
-			ch = -2.0*(log(1.0-p)-c*log(0.5*ch)+g);
+			ch = (FLOAT_TYPE) -2.0*(log(ONE_POINT_ZERO-p)-c*log((FLOAT_TYPE)0.5*ch)+g);
 	l4:
-		q = ch;   
-		p1 = 0.5*ch;
+		q = ch;
+		p1 = (FLOAT_TYPE)0.5*ch;
 		if ((t = IncompleteGamma (p1, xx, g)) < 0.0) 
 			{
 			printf ("\nerr IncompleteGamma");
-			return (-1.0);
+			return (-ONE_POINT_ZERO);
 			}
 		p2 = p-t;
 		t = p2*exp(xx*aa+g+p1-c*log(ch));   
-		b = t/ch;  
+		b = t/ch;
+#ifdef SINGLE_PRECISION_FLOATS
+		a = 0.5f*t-b*c;
+		s1 = (210.0f+a*(140.0f+a*(105.0f+a*(84.0f+a*(70.0f+60.0f*a))))) / 420.0f;
+		s2 = (420.0f+a*(735.0f+a*(966.0f+a*(1141.0f+1278.0f*a))))/2520.0f;
+		s3 = (210.0f+a*(462.0f+a*(707.0f+932.0f*a)))/2520.0f;
+		s4 = (252.0f+a*(672.0f+1182.0f*a)+c*(294.0f+a*(889.0f+1740.0f*a)))/5040.0f;
+		s5 = (84.0f+264.0f*a+c*(175.0f+606.0f*a))/2520.0f;
+		s6 = (120.0f+c*(346.0f+127.0f*c))/5040.0f;
+		ch += t*(1+0.5f*t*s1-b*c*(s1-b*(s2-b*(s3-b*(s4-b*(s5-b*s6))))));
+#else
 		a = 0.5*t-b*c;
 		s1 = (210.0+a*(140.0+a*(105.0+a*(84.0+a*(70.0+60.0*a))))) / 420.0;
 		s2 = (420.0+a*(735.0+a*(966.0+a*(1141.0+1278.0*a))))/2520.0;
@@ -800,21 +839,22 @@ double PointChi2 (double prob, double v){
 		s5 = (84.0+264.0*a+c*(175.0+606.0*a))/2520.0;
 		s6 = (120.0+c*(346.0+127.0*c))/5040.0;
 		ch += t*(1+0.5*t*s1-b*c*(s1-b*(s2-b*(s3-b*(s4-b*(s5-b*s6))))));
-		if (fabs(q/ch-1.0) > e) 
+#endif
+		if (fabs(q/ch-ONE_POINT_ZERO) > e) 
 			goto l4;
 		return (ch);
 
 }
 
 //function taken from MB and hard wired for use here	
-void Model::DiscreteGamma(double *rates, double *props, double shape){
+void Model::DiscreteGamma(FLOAT_TYPE *rates, FLOAT_TYPE *props, FLOAT_TYPE shape){
 	bool median=false;
 	int 	i;
-	double 	gap05 = 1.0/(2.0*NRateCats()), t, factor = shape/shape*NRateCats(), lnga1;
+	FLOAT_TYPE 	gap05 = ONE_POINT_ZERO/((FLOAT_TYPE)2.0*NRateCats()), t, factor = shape/shape*NRateCats(), lnga1;
 
 	if (median){
 		for (i=0; i<NRateCats(); i++) 
-			rates[i] = POINTGAMMA((i*2.0+1)*gap05, shape, shape);
+			rates[i] = POINTGAMMA((i*(FLOAT_TYPE)2.0+ONE_POINT_ZERO)*gap05, shape, shape);
 		for (i=0,t=0; i<NRateCats(); i++) 
 			t += rates[i];
 		for (i=0; i<NRateCats(); i++)     
@@ -826,7 +866,7 @@ void Model::DiscreteGamma(double *rates, double *props, double shape){
 		//DZ HACK
 		//I don't think that these lines are needed, since the frequencies are fixed at .25 anyway.
 		for (i=0; i<NRateCats()-1; i++) 
-			props[i] = POINTGAMMA((i+1.0)/NRateCats(), shape, shape);
+			props[i] = POINTGAMMA((i+ONE_POINT_ZERO)/NRateCats(), shape, shape);
 		for (i=0; i<NRateCats()-1; i++) 
 			props[i] = IncompleteGamma(props[i]*shape, shape+1, lnga1);
 		
@@ -837,7 +877,7 @@ void Model::DiscreteGamma(double *rates, double *props, double shape){
 			rates[i] = (props[i]-props[i-1])*factor;
 		}
 	for (i=0; i<NRateCats(); i++) 
-		props[i]=(1.0-*propInvar)/NRateCats();
+		props[i]=(ONE_POINT_ZERO-*propInvar)/NRateCats();
 	}	
 	
 void Model::OutputPaupBlockForModel(ofstream &outf, const char *treefname) const{
@@ -893,7 +933,7 @@ void Model::ReadModelFromFile(NexusToken &token){
 	do{
 		if(token.Equals("r")){//rate parameters
 			token.GetNextToken();
-			double r[5];
+			FLOAT_TYPE r[5];
 			for(int i=0;i<5;i++){
 				r[i]=atof(token.GetToken().c_str());
 				token.GetNextToken();
@@ -903,7 +943,7 @@ void Model::ReadModelFromFile(NexusToken &token){
 			}
 		else if(token.Equals("b")){
 			token.GetNextToken();
-			double b[3];
+			FLOAT_TYPE b[3];
 			for(int i=0;i<3;i++){
 				b[i]=atof(token.GetToken().c_str());
 				token.GetNextToken();
@@ -935,11 +975,11 @@ void Model::CreateModelFromSpecification(){
 	nst = modSpec.nst;
 
 	//deal with rate het models
-	propInvar = new double;
+	propInvar = new FLOAT_TYPE;
 	if(modSpec.includeInvariantSites){
-		*propInvar=0.2;
+		*propInvar=(FLOAT_TYPE)0.2;
 		if(modSpec.fixInvariantSites == false){
-			ProportionInvariant *pi = new ProportionInvariant("proportion invariant", (double **) &propInvar);
+			ProportionInvariant *pi = new ProportionInvariant("proportion invariant", (FLOAT_TYPE **) &propInvar);
 			pi->SetWeight(1);
 			paramsToMutate.push_back(pi);
 			}			
@@ -947,7 +987,7 @@ void Model::CreateModelFromSpecification(){
 	else *propInvar=0.0;
 
 	if(NRateCats() > 1){
-		alpha = new double;
+		alpha = new FLOAT_TYPE;
 		*alpha = 0.5;
 		
 		if(modSpec.flexRates == false){
@@ -964,20 +1004,20 @@ void Model::CreateModelFromSpecification(){
 			DiscreteGamma(rateMults, rateProbs, 0.5);
 			if(modSpec.includeInvariantSites == true) NormalizeRates();
 
-			vector<double*> dummy;
+			vector<FLOAT_TYPE*> dummy;
 			dummy.reserve(NRateCats());
 			
 			for(int i=0;i<NRateCats();i++)
 				dummy.push_back(&rateProbs[i]);
 			RateProportions *rateP=new RateProportions(&dummy[0], NRateCats());
-			rateP->SetWeight(NRateCats());
+			rateP->SetWeight((FLOAT_TYPE)NRateCats());
 			paramsToMutate.push_back(rateP);
 
 			dummy.clear();
 			for(int i=0;i<NRateCats();i++)
 				dummy.push_back(&rateMults[i]);
 			RateMultipliers *rateM=new RateMultipliers(&dummy[0], NRateCats());
-			rateM->SetWeight(NRateCats());
+			rateM->SetWeight((FLOAT_TYPE)NRateCats());
 			paramsToMutate.push_back(rateM);
 			}
 		}
@@ -989,8 +1029,8 @@ void Model::CreateModelFromSpecification(){
 
 	//deal with the state frequencies
 	for(int i=0;i<nstates;i++){
-		double *f=new double;
-		*f=(1.0/(double) nstates);
+		FLOAT_TYPE *f=new FLOAT_TYPE;
+		*f=(ONE_POINT_ZERO/(FLOAT_TYPE) nstates);
 		stateFreqs.push_back(f);
 		}
 	if(modSpec.fixStateFreqs == false){
@@ -1005,7 +1045,7 @@ void Model::CreateModelFromSpecification(){
 		if(modSpec.nst==6){
 			//make the transitions higher to begin with
 			for(int i=0;i<6;i++){
-				double *d=new double;
+				FLOAT_TYPE *d=new FLOAT_TYPE;
 				relRates.push_back(d);
 				}
 			*relRates[0]=*relRates[2]=*relRates[3]=*relRates[5] = 1.0;
@@ -1017,8 +1057,8 @@ void Model::CreateModelFromSpecification(){
 				}
 			}
 		else if(modSpec.nst==2){
-			double *a=new double;
-			double *b=new double;
+			FLOAT_TYPE *a=new FLOAT_TYPE;
+			FLOAT_TYPE *b=new FLOAT_TYPE;
 			*a=1.0;
 			*b=4.0;
 			relRates.push_back(a);
@@ -1034,7 +1074,7 @@ void Model::CreateModelFromSpecification(){
 				}
 			}
 		else if(modSpec.nst==1){
-			double *a=new double;
+			FLOAT_TYPE *a=new FLOAT_TYPE;
 			*a=1.0;
 			for(int i=0;i<6;i++)
 				relRates.push_back(a);
@@ -1092,7 +1132,7 @@ int Model::PerformModelMutation(){
 BaseParameter *Model::SelectModelMutation(){
 	CalcMutationProbsFromWeights();
 	if(paramsToMutate.empty() == true) return NULL;
-	double r=rnd.uniform();
+	FLOAT_TYPE r=rnd.uniform();
 	vector<BaseParameter*>::iterator it;
 	for(it=paramsToMutate.begin();it!=paramsToMutate.end();it++){
 		if((*it)->GetProb() > r) return *it;
@@ -1102,7 +1142,7 @@ BaseParameter *Model::SelectModelMutation(){
 	}
 
 void Model::CalcMutationProbsFromWeights(){
-	double tot=0.0, running=0.0;
+	FLOAT_TYPE tot=0.0, running=0.0;
 	for(vector<BaseParameter*>::iterator it=paramsToMutate.begin();it!=paramsToMutate.end();it++){
 		tot += (*it)->GetWeight();
 		}

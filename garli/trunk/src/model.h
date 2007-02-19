@@ -48,12 +48,12 @@ protected:
 	int type;
 	int numElements;
 	bool fixed;
-	double maxv,minv;
-	double mutationWeight;
-	double mutationProb;
-	vector<double*> vals; //this will be aliased to the actual 
+	FLOAT_TYPE maxv,minv;
+	FLOAT_TYPE mutationWeight;
+	FLOAT_TYPE mutationProb;
+	vector<FLOAT_TYPE*> vals; //this will be aliased to the actual 
 						//parameter value within the model class (sneaky!)
-	vector<double> default_vals;
+	vector<FLOAT_TYPE> default_vals;
 
 public:
 	BaseParameter()	{
@@ -61,7 +61,7 @@ public:
 		maxv=minv=0.0;
 		}
 
-	BaseParameter(const char *n, double **dv, int t, int numE, double mn, double mx) {
+	BaseParameter(const char *n, FLOAT_TYPE **dv, int t, int numE, FLOAT_TYPE mn, FLOAT_TYPE mx) {
 		vals.reserve(6);
 		default_vals.reserve(6);
 		name=n;
@@ -90,11 +90,11 @@ public:
 	void SetFixed(bool tf) {fixed=tf;}
 	bool IsFixed() const {return fixed;}
 	int Type() const {return type;}
-	void SetWeight(double w){mutationWeight=w;}
-	double GetWeight(){return mutationWeight;}
-	void SetProb(double p){mutationProb=p;}
-	double GetProb(){return mutationProb;}
-	virtual void Mutator(double) = 0;
+	void SetWeight(FLOAT_TYPE w){mutationWeight=w;}
+	FLOAT_TYPE GetWeight(){return mutationWeight;}
+	void SetProb(FLOAT_TYPE p){mutationProb=p;}
+	FLOAT_TYPE GetProb(){return mutationProb;}
+	virtual void Mutator(FLOAT_TYPE) = 0;
 	void SetToDefaultValues(){
 		for(int e=0;e<numElements;e++) *vals[e] = default_vals[e];
 		}
@@ -103,22 +103,22 @@ public:
 class StateFrequencies:public BaseParameter{
 
 public:
-	StateFrequencies(double **dv, int numE):BaseParameter("Base frequencies", dv, STATEFREQS, numE, 0.0, 1.0){};
+	StateFrequencies(FLOAT_TYPE **dv, int numE):BaseParameter("Base frequencies", dv, STATEFREQS, numE, 0.0, 1.0){};
 
-	void Mutator(double mutationShape){
+	void Mutator(FLOAT_TYPE mutationShape){
 		int freqToChange=int(rnd.uniform()*numElements);
-		double newFreq=*vals[freqToChange] * rnd.gamma( mutationShape );
+		FLOAT_TYPE newFreq=*vals[freqToChange] * rnd.gamma( mutationShape );
 		for(int b=0;b<numElements;b++)
-			if(b!=freqToChange) *vals[b] *= (1.0-newFreq)/(1.0-*vals[freqToChange]);
+			if(b!=freqToChange) *vals[b] *= (FLOAT_TYPE)((1.0-newFreq)/(1.0-*vals[freqToChange]));
 		*vals[freqToChange]=newFreq;
 		}
 	};
 
 class RelativeRates:public BaseParameter{
 public:
-	RelativeRates(const char *c, double **dv, int numE):BaseParameter(c, dv, RELATIVERATES, numE, 0.0, 999.9){};
+	RelativeRates(const char *c, FLOAT_TYPE **dv, int numE):BaseParameter(c, dv, RELATIVERATES, numE, (FLOAT_TYPE)0.0, (FLOAT_TYPE)999.9){};
 
-	void Mutator(double mutationShape){
+	void Mutator(FLOAT_TYPE mutationShape){
 		if(numElements > 1){
 			int rateToChange=int(rnd.uniform()*(numElements));
 			
@@ -130,7 +130,7 @@ public:
 			else{//if we alter the reference rate, which we are assuming
 				//is the last one (GT for DNA models, fixed to 1.0)
 				//scale all of the other rates
-				double scaler= rnd.gamma( mutationShape );
+				FLOAT_TYPE scaler= rnd.gamma( mutationShape );
 				for(int i=0;i<numElements-1;i++){
 					*vals[i] /= scaler;
 					}
@@ -145,8 +145,8 @@ public:
 
 class RateProportions:public BaseParameter{
 public:
-	RateProportions(double **dv, int numE):BaseParameter("Rate props", dv, RATEPROPS, numE, 0.0, 1.0){};
-	void Mutator(double mutationShape){
+	RateProportions(FLOAT_TYPE **dv, int numE):BaseParameter("Rate props", dv, RATEPROPS, numE, 0.0, 1.0){};
+	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
 		if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;		
@@ -155,8 +155,8 @@ public:
 
 class RateMultipliers:public BaseParameter{
 public:
-	RateMultipliers(double **dv, int numE):BaseParameter("Rate mults", dv, RATEMULTS, numE, 0.0, 999.9){};
-	void Mutator(double mutationShape){
+	RateMultipliers(FLOAT_TYPE **dv, int numE):BaseParameter("Rate mults", dv, RATEMULTS, numE, (FLOAT_TYPE)0.0, (FLOAT_TYPE)999.9){};
+	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
 		if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;
@@ -165,16 +165,16 @@ public:
 
 class AlphaShape:public BaseParameter{
 public:
-	AlphaShape(const char *c, double **dv):BaseParameter(c, dv, ALPHASHAPE, 1, 0.0, 999.9){};
-	void Mutator(double mutationShape){
+	AlphaShape(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, ALPHASHAPE, 1, (FLOAT_TYPE)0.0, (FLOAT_TYPE)999.9){};
+	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
 		}
 	};
 
 class ProportionInvariant:public BaseParameter{
 public:
-	ProportionInvariant(const char *c, double **dv):BaseParameter(c, dv, PROPORTIONINVARIANT, 1, 0.0, 999.9){};
-	void Mutator(double mutationShape){
+	ProportionInvariant(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0, (FLOAT_TYPE)999.9){};
+	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
 		}
 	};
@@ -358,34 +358,34 @@ public:
 class Model{
 	int nst;
 	int nstates;
-//	double pi[4];
-	vector<double*> stateFreqs;
-	vector<double*> relRates;
+//	FLOAT_TYPE pi[4];
+	vector<FLOAT_TYPE*> stateFreqs;
+	vector<FLOAT_TYPE*> relRates;
 
 	bool eigenDirty;
-	double blen_multiplier;
+	FLOAT_TYPE blen_multiplier;
 	
-	double rateMults[20];
-	double rateProbs[20];
+	FLOAT_TYPE rateMults[20];
+	FLOAT_TYPE rateProbs[20];
 	
-	double *alpha;
-	double *propInvar;
+	FLOAT_TYPE *alpha;
+	FLOAT_TYPE *propInvar;
 
 	//variables used for the eigen process if nst=6
 	int *iwork, *indx;
-	double *eigvals, *eigvalsimag, **eigvecs, **inveigvecs, **teigvecs, *work, *temp, *col, *c_ijk, *EigValexp;//, **p;
-	double **qmat, ***pmat;
-	double **tempqmat;
+	FLOAT_TYPE *eigvals, *eigvalsimag, **eigvecs, **inveigvecs, **teigvecs, *work, *temp, *col, *c_ijk, *EigValexp;//, **p;
+	FLOAT_TYPE **qmat, ***pmat;
+	FLOAT_TYPE **tempqmat;
 	
 	//Newton Raphson crap
-	double ***deriv1, ***deriv2;
+	FLOAT_TYPE ***deriv1, ***deriv2;
 
 	public:
 //	static bool noPinvInModel;
 //	static bool useFlexRates;
 //	static int nRateCats;
-	static double mutationShape;
-	static double maxPropInvar;
+	static FLOAT_TYPE mutationShape;
+	static FLOAT_TYPE maxPropInvar;
 
 	vector<BaseParameter*> paramsToMutate;
 
@@ -408,13 +408,13 @@ class Model{
 	void CalcEigenStuff();
 
 	public:
-	void CalcPmat(double blen, double *metaPmat, bool flip =false);
-	void CalcDerivatives(double, double ***&, double ***&, double ***&);
+	void CalcPmat(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat, bool flip =false);
+	void CalcDerivatives(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
 	void UpdateQMat();
-	void DiscreteGamma(double *, double *, double);
+	void DiscreteGamma(FLOAT_TYPE *, FLOAT_TYPE *, FLOAT_TYPE);
 	bool IsModelEqual(const Model *other) const ;	
 	void CopyModel(const Model *from);
-	void SetModel(double *model_string);
+	void SetModel(FLOAT_TYPE *model_string);
 	void OutputPaupBlockForModel(ofstream &outf, const char *treefname) const;
 	void OutputGarliFormattedModel(ostream &outf) const;
 
@@ -427,22 +427,22 @@ class Model{
 	void MutateRateMults();
 	
 	//Accessor functions
-	double StateFreq(int p) const{ return *stateFreqs[p];}
-	double TRatio() const;
+	FLOAT_TYPE StateFreq(int p) const{ return *stateFreqs[p];}
+	FLOAT_TYPE TRatio() const;
 	int Nst() const {return nst;}
-	double Rates(int r) const { return *relRates[r];}
+	FLOAT_TYPE Rates(int r) const { return *relRates[r];}
 	int NRateCats() const {return modSpec.numRateCats;}
-	double *GetRateMults() {return rateMults;}
-	double Alpha() const {return *alpha;}
-	double PropInvar() const { return *propInvar;}
+	FLOAT_TYPE *GetRateMults() {return rateMults;}
+	FLOAT_TYPE Alpha() const {return *alpha;}
+	FLOAT_TYPE PropInvar() const { return *propInvar;}
 	bool NoPinvInModel() const { return ! (modSpec.includeInvariantSites);}
-	double MaxPinv() const{return maxPropInvar;}
+	FLOAT_TYPE MaxPinv() const{return maxPropInvar;}
 	int NStates() const {return nstates;}
 	int NumMutatableParams() const {return (int) paramsToMutate.size();}
 
 	//Setting things
 	void SetDefaultModelParameters(const HKYData *data);
-	void SetRmat(double *r, bool checkValidity){
+	void SetRmat(FLOAT_TYPE *r, bool checkValidity){
 		if(checkValidity == true){
 			if(nst==1){
 				if((r[0]==r[1] && r[1]==r[2] &&
@@ -458,24 +458,24 @@ class Model{
 		*relRates[5]=1.0;
 		eigenDirty=true;
 		}
-	void SetPis(double *b, bool checkValidity){
+	void SetPis(FLOAT_TYPE *b, bool checkValidity){
 		if(checkValidity == true){
 			if(modSpec.equalStateFreqs==true && (b[0]==b[1] && b[1]==b[2]) == false) throw(ErrorException("Config file specifies equal statefrequencies,\nbut starting model has nonequal frequencies!\n"));
 			if(modSpec.empiricalStateFreqs==true) throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model specifies frequencies!\n"));
 			}
 		for(int i=0;i<3;i++) *stateFreqs[i]=b[i];
-		*stateFreqs[3]=1.0 - *stateFreqs[0] - *stateFreqs[1] - *stateFreqs[2];
+		*stateFreqs[3]=(FLOAT_TYPE)1.0 - *stateFreqs[0] - *stateFreqs[1] - *stateFreqs[2];
 		eigenDirty=true;
 		}
 
-	void SetFlexRates(double *rates, double *probs){
+	void SetFlexRates(FLOAT_TYPE *rates, FLOAT_TYPE *probs){
 		if(modSpec.flexRates == false) throw ErrorException("Error: Flex rate values specified in start file,\nbut ratehetmodel is = flex in conf file.");
 		for(int r=0;r<NRateCats();r++){
 			rateMults[r]=rates[r];
 			rateProbs[r]=probs[r];
 			}		
 		}
-	void SetAlpha(double a, bool checkValidity){
+	void SetAlpha(FLOAT_TYPE a, bool checkValidity){
 		if(checkValidity == true)
 			if(modSpec.numRateCats==1) throw(ErrorException("Config file specifies ratehetmodel = none, but starting model contains alpha!\n"));
 		*alpha=a;
@@ -484,16 +484,16 @@ class Model{
 		//flex.  Flex expects that the rates will be normalized including pinv elsewhere
 		if(modSpec.flexRates == true) NormalizeRates();
 		}
-	void SetPinv(double p, bool checkValidity){
+	void SetPinv(FLOAT_TYPE p, bool checkValidity){
 		if(checkValidity == true)
 			if(modSpec.includeInvariantSites==false && p!=0.0) throw(ErrorException("Config file specifies invariantsites = none, but starting model contains it!\n"));
 		*propInvar=p;
 		//change the proportion of rates in each gamma cat
 		for(int i=0;i<NRateCats();i++){
-			rateProbs[i]=(1.0-*propInvar)/NRateCats();
+			rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
 			}
 		}
-	void SetMaxPinv(double p){
+	void SetMaxPinv(FLOAT_TYPE p){
 		Model::maxPropInvar=p;
 		}
 	void SetDirty(bool tf){
@@ -503,9 +503,9 @@ class Model{
 
 	void AdjustRateProportions(){
 		//this will change the gamma class probs when pinv changes
-		for(int i=0;i<NRateCats();i++) rateProbs[i]=(1.0-*propInvar)/NRateCats();
+		for(int i=0;i<NRateCats();i++) rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
 #ifndef NDEBUG
-		double sum=0.0;
+		FLOAT_TYPE sum=0.0;
 		for(int i=0;i<NRateCats();i++){
 			sum += rateProbs[i];
 			}		
@@ -517,7 +517,7 @@ class Model{
 	void NormalizeRates(){
 		assert(modSpec.flexRates == true);
 
-		double sum=0.0;
+		FLOAT_TYPE sum=0.0;
 
 		for(int i=0;i<NRateCats();i++){
 			sum += rateProbs[i];
@@ -525,7 +525,7 @@ class Model{
 
 		//pinv is figured into the normalization here, but it won't be changed itself.
 		if(NoPinvInModel()==false){
-			sum = sum / (1.0-*propInvar);
+			sum = sum / (FLOAT_TYPE)(1.0-*propInvar);
 			}	
 
 
@@ -557,9 +557,9 @@ class Model{
 #endif
 		}
 
-	const double *GetRateProbs() {
+	const FLOAT_TYPE *GetRateProbs() {
 		
-/*		double sum=0.0;
+/*		FLOAT_TYPE sum=0.0;
 		for(int i=0;i<NRateCats();i++){
 			sum += rateProbs[i];
 			}
