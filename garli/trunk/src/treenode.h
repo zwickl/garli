@@ -38,7 +38,7 @@ class TreeNode{
  		int claIndexDown;
  		int claIndexUL;
  		int claIndexUR;
- 		double dlen;
+ 		FLOAT_TYPE dlen;
 		bool attached;
 		bool alreadyOptimized;
 		Bipartition *bipart;
@@ -70,12 +70,24 @@ class TreeNode{
 		void AddNodesToList(vector<int> &list);
 		void FlipBlensToRoot(TreeNode *from);
 		void FlipBlensToNode(TreeNode *from, TreeNode *stopNode);
-		
+		void RecursivelyAddOrRemoveSubtreeFromBipartitions(Bipartition *);
 
 		//misc functions
 		char *MakeNewick(char *s, bool internalNodes, bool branchLengths, bool highPrec=false) const;
 		void MakeNewickForSubtree(char *s) const;
 		bool IsGood();
+		bool IsTerminal() const{
+			return left == NULL;
+			}
+		bool IsInternal() const{
+			return left != NULL;
+			}
+		bool IsRoot() const{
+			return anc==NULL;
+			}
+		bool IsNotRoot() const{
+			return anc!=NULL;
+			}
 		void CalcDepth(int &dep);
 		void CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, int dir);
 		Bipartition* CalcBipartition();

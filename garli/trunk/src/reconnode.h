@@ -35,7 +35,7 @@ class ReconNode{
 	unsigned short nodeNum;
 	unsigned short reconDist;
 	float pathlength;
-	double weight;
+	FLOAT_TYPE weight;
 	float chooseProb;
 	bool withinCutSubtree;
 	
@@ -104,7 +104,7 @@ class ReconList{
 
 	void CalcProbsFromWeights(){
 		//this just fills the chooseProb field by dividing the prob between the nodes in proportion to their weight
-		double weightSum = 0.0, running = 0.0;
+		FLOAT_TYPE weightSum = 0.0, running = 0.0;
 		for(listIt it=l.begin();it!=l.end();it++){
 			weightSum += (*it).weight;
 			}
@@ -161,7 +161,7 @@ class ReconList{
 		}
 		
 	ReconNode *ChooseNodeByWeight(){
-		double prob = rnd.uniform();
+		FLOAT_TYPE prob = rnd.uniform();
 		 listIt it=l.begin();
 		 for(;it!=l.end();it++){
 			if(prob < (*it).chooseProb) return &(*it);
@@ -311,7 +311,7 @@ public:
 
 	void IndexSwaps(){
 		indeces.clear();
-		int increment=(int) sqrt((double)unique);
+		int increment=(int) sqrt((FLOAT_TYPE)unique);
 		int count=0;
 		for(list<Swap>::iterator it=swaps.begin();it != swaps.end(); it++){
 			if(count % increment == 0) indeces.push_back(it);

@@ -13,6 +13,7 @@
 //  email: zwickl@nescent.org
 //
 
+#include "defs.h"
 #include "bipartition.h"
 #include "reconnode.h"
 
@@ -41,3 +42,23 @@ bool BipartitionLessThan(const Bipartition &lhs, const Bipartition &rhs){
 	else return true;
 	}
 
+void Bipartition::SetBipartitionStatics(int nt){
+	Bipartition::blockBits=sizeof(int)*8;
+	Bipartition::ntax=nt;
+	Bipartition::nBlocks=(int)ceil((FLOAT_TYPE)nt/(FLOAT_TYPE)Bipartition::blockBits);
+	Bipartition::largestBlockDigit=1<<(Bipartition::blockBits-1);
+	Bipartition::allBitsOn=(unsigned int)(pow(2.0, Bipartition::blockBits)-1);
+	Bipartition::str=new char[nt+1];
+	Bipartition::str[nt] = '\0';
+	Bipartition::SetPartialBlockMask();	
+	}
+
+void Bipartition::SetPartialBlockMask(){
+		partialBlockMask=0;
+		unsigned int bit=largestBlockDigit;
+		for(int b=0;b<ntax%blockBits;b++){
+			partialBlockMask += bit;
+			bit = bit >> 1;
+			}
+		if(ntax%blockBits == 0) partialBlockMask=allBitsOn;
+		}

@@ -29,7 +29,7 @@ class Adaptation;
 
 class Individual
 {
-	double fitness;
+	FLOAT_TYPE fitness;
 	bool dirty;      // individual becomes dirty if mutated in any way
 
 	public:
@@ -89,26 +89,26 @@ class Individual
 		Individual();
 		~Individual();
 
-		double Fitness() const { return fitness; }
+		FLOAT_TYPE Fitness() const { return fitness; }
 		void SetDirty() { dirty = true; }
 		bool IsDirty() const { return dirty; }
 
-		void SetFitness( double f ) {
+		void SetFitness( FLOAT_TYPE f ) {
 			fitness = f;
 			dirty=false;
 			}
 		void GetStartingConditionsFromFile(const char *fname, int rank, int nTax, bool restart=false);
-		void RefineStartingConditions(bool optModel, double branchPrec);
+		void RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec);
 		void CalcFitness(int subtreeNode);
 		void ReadTreeFromFile(istream & inf);
 
 		
-//		void Mutate(int, double);
-		void Mutate(double optPrecision, Adaptation *adap);
-//		void SubtreeMutate(int subdomain, double optPrecision, vector<int> const &subtreeList, Adaptation *adap);
-//		void NonSubtreeMutate(const ParallelManager *, double optPrecision, Adaptation *adap);
+//		void Mutate(int, FLOAT_TYPE);
+		void Mutate(FLOAT_TYPE optPrecision, Adaptation *adap);
+//		void SubtreeMutate(int subdomain, FLOAT_TYPE optPrecision, vector<int> const &subtreeList, Adaptation *adap);
+//		void NonSubtreeMutate(const ParallelManager *, FLOAT_TYPE optPrecision, Adaptation *adap);
 		
-		void CrossOverWith( Individual& so, double optPrecision);
+		void CrossOverWith( Individual& so, FLOAT_TYPE optPrecision);
 		
 		void CopyNonTreeFields(const Individual* ind );
 		void CopyByStealingTree(Individual* ind );
@@ -132,7 +132,7 @@ inline void Individual::ResetIndiv(){
 
 #define BIPART_BASED_RECOM
 
-inline void Individual::CrossOverWith( Individual& so , double optPrecision){
+inline void Individual::CrossOverWith( Individual& so , FLOAT_TYPE optPrecision){
 	//check if the models are the same, which will allow the replicated parts of the trees
 	//to use the same clas
 	#ifdef BIPART_BASED_RECOM

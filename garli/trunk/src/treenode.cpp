@@ -481,7 +481,7 @@ void TreeNode::CheckTreeFormation()	{
 
 void TreeNode::CheckforPolytomies(){
 	
-	if(left!=NULL){
+	if(IsInternal()){
 		left->CheckforPolytomies();
 		}
 
@@ -502,7 +502,7 @@ void TreeNode::CheckforPolytomies(){
 	}
 
 Bipartition* TreeNode::CalcBipartition(){	
-	if(left != NULL){//not terminal
+	if(IsInternal()){//not terminal
 		TreeNode *nd=left;
 		*bipart = nd->CalcBipartition();
 		nd=nd->next;
@@ -512,7 +512,7 @@ Bipartition* TreeNode::CalcBipartition(){
 			}while(nd != NULL);
 		return bipart;
 		}
-	else if(anc != NULL){//terminal
+	else if(IsNotRoot()){//terminal
 		bipart=bipart->TerminalBipart(nodeNum);	
 		return bipart;
 		}
@@ -520,7 +520,7 @@ Bipartition* TreeNode::CalcBipartition(){
 	}
 
 void TreeNode::StandardizeBipartition(){
-	if(left != NULL){//not terminal
+	if(IsInternal()){//not terminal
 		TreeNode *nd=left;
 		do{
 			nd->StandardizeBipartition();
@@ -531,13 +531,13 @@ void TreeNode::StandardizeBipartition(){
 	}
 
 void TreeNode::GatherConstrainedBiparitions(vector<Bipartition> &biparts) {
-	if(left != NULL){
+	if(IsInternal()){
 		TreeNode *nd=left;
 		do{
 			nd->GatherConstrainedBiparitions(biparts);
 			nd=nd->next;
 			}while(nd != NULL);
-		if(anc != NULL){
+		if(IsNotRoot()){
 			Bipartition b(*bipart);
 			biparts.push_back(b);
 			}
@@ -570,7 +570,7 @@ void TreeNode::RotateDescendents(){
 
 void TreeNode::AddNodesToList(vector<int> &list){
 	list.push_back(nodeNum);
-	if(left!=NULL) left->AddNodesToList(list);
+	if(IsInternal()) left->AddNodesToList(list);
 	if(next!=NULL) next->AddNodesToList(list);
 	}
 	
@@ -584,7 +584,7 @@ void TreeNode::FlipBlensToNode(TreeNode *from, TreeNode *stopNode){
 	//for rerooting a subtree
 	//each node gets the get blen of the previous node (one of
 	//its des)
-	assert(anc != NULL);
+	assert(IsNotRoot());
 	assert(from != NULL);
 	assert(stopNode != NULL);
 	if(anc != stopNode) 
@@ -593,7 +593,7 @@ void TreeNode::FlipBlensToNode(TreeNode *from, TreeNode *stopNode){
 	}
 
 void TreeNode::PrintSubtreeMembers(ofstream &out){
-	if(left==NULL) out << nodeNum << "\t"; 
+	if(IsTerminal()) out << nodeNum << "\t"; 
 	else left->PrintSubtreeMembers(out);
 	if(next!=NULL) next->PrintSubtreeMembers(out);
 	}
@@ -610,3 +610,12 @@ void TreeNode::AdjustClasForReroot(int dir){
 		}
 	else assert(0);
 	}	
+
+void TreeNode::RecursivelyAddOrRemoveSubtreeFromBipartitions(Bipartition *subtree){
+	//this function just tricks nodes down to the root into thinking
+	//that a taxon is in their subtree by flipping its bit in the bipartition
+	//this obviously needs to be undone by calcing the biparts if the true
+	//tree bipartitions are needed
+	bipart->FlipBits(subtree);
+	if(anc->IsNotRoot()) anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(subtree);
+	}

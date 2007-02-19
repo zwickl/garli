@@ -69,15 +69,8 @@ class Bipartition{
 			rep[i]=0;
 		}
 
-	void SetPartialBlockMask(){
-		partialBlockMask=0;
-		unsigned int bit=largestBlockDigit;
-		for(int b=0;b<ntax%blockBits;b++){
-			partialBlockMask += bit;
-			bit = bit >> 1;
-			}
-		if(ntax%blockBits == 0) partialBlockMask=allBitsOn;
-		}
+	static void SetBipartitionStatics(int);
+	static void SetPartialBlockMask();
 	
 	void operator+=(const Bipartition *rhs){
 		for(int i=0;i<nBlocks;i++){
@@ -103,6 +96,15 @@ class Bipartition{
 		memcpy(rep, rhs->rep, nBlocks*sizeof(int));
 		}
 
+	void operator=(const Bipartition &rhs){
+		memcpy(rep, rhs.rep, nBlocks*sizeof(int));
+		}
+
+	void FlipBits(Bipartition *flip){
+		//this just flips the bits in the passed in bipartition
+		EqualsXORComplement(flip);
+		}
+
 	bool EqualsEquals(const Bipartition *rhs){
 		assert(this->ContainsTaxon(1));
 		assert(rhs->ContainsTaxon(1));
@@ -112,6 +114,23 @@ class Bipartition{
 			}
 		if((rep[i]&partialBlockMask)!=((rhs->rep[i])&partialBlockMask)) return false;
 		return true;
+		}
+
+	bool MaskedEqualsEquals(const Bipartition *rhs, const Bipartition *mask){
+		//assert(this->ContainsTaxon(1));
+		//assert(rhs->ContainsTaxon(1));
+		int i;
+		for(i=0;i<nBlocks-1;i++){
+			if((rep[i] & mask->rep[i]) != (rhs->rep[i] & mask->rep[i])) return false;
+			}
+		if((rep[i] & partialBlockMask & mask->rep[i]) != ((rhs->rep[i]) & partialBlockMask & mask->rep[i])) return false;
+		return true;
+		}
+
+	void Complement(){
+		for(int i=0;i<nBlocks;i++){
+			rep[i] = ~rep[i];
+			}
 		}
 
 	bool ComplementEqualsEquals(const Bipartition *rhs){
@@ -171,7 +190,20 @@ class Bipartition{
 			rep[i] = lhs->rep[i] ^ (~rhs->rep[i]);
 			}
 		}
-	
+
+	void EqualsXORComplement(const Bipartition *rhs){
+		for(int i=0;i<nBlocks;i++){
+			rep[i] = rep[i] ^ (~rhs->rep[i]);
+			}
+		}
+
+	void AndEquals(const Bipartition *rhs){
+		//sets the calling bipart to be the bitwise AND of it and the argument
+		for(int i=0;i<nBlocks;i++){
+			rep[i] = rep[i] & rhs->rep[i];
+			}
+		}
+
 	bool IsCompatibleWithBipartition(const Bipartition *constr){
 		//using buneman's 4 point condition.  At least one of the four intersections must be empty
 		bool compat=true;
@@ -233,6 +265,47 @@ class Bipartition{
 
 		//A & B
 		for(i=0;i<nBlocks-1;i++){
+			if(((rep[i] & bip->rep[i]) & mask->rep[i]) == 0) continue;
+			else{
+				compat=false;
+				break;
+				}
+			}
+		if(compat==true && ((((rep[i] & bip->rep[i]) & mask->rep[i]) & partialBlockMask) == 0)) return true;
+		//A & ~B
+		compat=true;
+		for(i=0;i<nBlocks-1;i++){
+			if(((rep[i] & ~bip->rep[i]) & mask->rep[i]) == 0) continue;
+			else{
+				compat=false;
+				break;
+				}
+			}
+		if(compat==true && ((((rep[i] & ~bip->rep[i]) & mask->rep[i]) & partialBlockMask) == 0)) return true;
+		//~A & B
+		compat=true;
+		for(i=0;i<nBlocks-1;i++){
+			if(((~rep[i] & bip->rep[i]) & mask->rep[i]) == 0) continue;
+			else{
+				compat=false;
+				break;
+				}
+			}
+		if(compat==true && ((((~rep[i] & bip->rep[i]) & mask->rep[i]) & partialBlockMask) == 0)) return true;
+		//~A & ~B
+		compat=true;
+		for(i=0;i<nBlocks-1;i++){
+			if(((~rep[i] & ~bip->rep[i]) & mask->rep[i]) == 0) continue;
+			else{
+				compat=false;
+				break;
+				}
+			}
+		if(compat==true && ((((~rep[i] & ~bip->rep[i]) & mask->rep[i]) & partialBlockMask) == 0)) return true;
+		return false;
+/*
+		//A & B
+		for(i=0;i<nBlocks-1;i++){
 			if(((rep[i] & mask->rep[i]) & (bip->rep[i] & mask->rep[i])) == 0) continue;
 			else{
 				compat=false;
@@ -271,6 +344,7 @@ class Bipartition{
 			}
 		if(compat==true && ((((~rep[i] & mask->rep[i]) & (~bip->rep[i] & mask->rep[i])) & partialBlockMask) == 0)) return true;
 		return false;
+*/
 		}
 
 	bool IsIncompatibleWithBipartitionWithMask(const Bipartition *bip, const Bipartition *mask) const{
@@ -354,6 +428,16 @@ class Bipartition{
 		return true;
 		}
 
+	bool MaskedIsASubsetOf(const Bipartition *target, const Bipartition *mask) const{
+		//returns true if this is a subset of target
+		int i;
+		for(i=0;i<nBlocks-1;i++){
+			if(((target->rep[i] | rep[i]) & mask->rep[i]) != (target->rep[i] & mask->rep[i])) return false;
+			}
+		if(((target->rep[i] | rep[i]) & partialBlockMask & mask->rep[i]) != (target->rep[i] & partialBlockMask & mask->rep[i])) return false;
+		return true;
+		}
+
 	bool ComplementIsASubsetOf(const Bipartition *target) const{
 		//returns true if this is NOT a subset of target's complement
 		int i;
@@ -399,16 +483,34 @@ class Constraint{
 	//it is a negative or positive constraint
 	Bipartition con;
 	bool positive;
+
+	//now adding the potential for a backbone constraint
+	//BACKBONE
+	bool backbone;
+	Bipartition backboneMask;
+
 public:
 	Constraint() {};
 	Constraint(const Bipartition *b, bool pos){
 		positive=pos;
 		con=b;
+		backbone=false;
 		}
-	
+
+	Constraint(const Bipartition *b, const Bipartition *m, bool pos){
+		positive=pos;
+		con=b;
+		backbone=true;
+		backboneMask = m;
+		}
+
 	const bool IsPositive() {return positive;}
 
+	const bool IsBackbone() {return backbone;}
+
 	const Bipartition *GetBipartition(){return &con;}
+
+	const Bipartition *GetBackboneMask(){return &backboneMask;}
 
 	void ReadDotStarConstraint(const char *c){
 		Bipartition b;
@@ -433,8 +535,11 @@ public:
 		return false;
 		}
 	bool IsCompatibleWithConstraint(const Bipartition *other){
-		if(positive == true)
-			return con.IsCompatibleWithBipartition(other);		
+		if(positive == true){
+			//BACKBONE
+			if(backbone == true) return con.IsCompatibleWithBipartitionWithMask(other, &backboneMask);		
+			else return con.IsCompatibleWithBipartition(other);		
+			}
 		else return con.IsCompatibleWithNegativeBipartition(other);
 		return false;
 		}

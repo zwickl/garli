@@ -84,12 +84,12 @@ void Individual::CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const 
 	treeStruct->mod=mod;
 }
 
-void Individual::Mutate(double optPrecision, Adaptation *adap){
+void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 	//this is the original version of mutate, and will be called by both 
 	//master and remote when they are mutating a tree that does not have
 	//its subtrees properly defined.
 
-	double r = rnd.uniform();
+	FLOAT_TYPE r = rnd.uniform();
 	//DJZ 1-5-05 Moving branch length mutation to be before topo, so that if both are performed
 	//the upward sweep needed for blen optimization in the topo mutation will automatically recalc
 	//nodes that were dirtied by the blen mutation, and the score of the tree can be finalized at
@@ -206,12 +206,26 @@ void Individual::MakeRandomTree(int nTax){
 			taxset -= k;
 			}
 #ifndef NDEBUG
+		//DEBUG
+		char tmp[10000];
+		ofstream out("tree.tre");
+		treeStruct->root->MakeNewick(tmp, false, true);
+		out << tmp << endl;
+		out.close();
+
 		treeStruct->CalcBipartitions();
 		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
-			if((*conit).IsPositive() == true)
-				assert(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL);
-			else 
-				assert(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL);
+			//BACKBONE
+			if((*conit).IsBackbone()){
+				assert((*conit).IsPositive());
+				assert(treeStruct->ContainsMaskedBipartitionOrComplement((*conit).GetBipartition(), (*conit).GetBackboneMask()) != NULL);
+				}
+			else{
+				if((*conit).IsPositive() == true)
+					assert(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL);
+				else 
+					assert(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL);
+				}
 			}
 #endif
 		}
@@ -268,7 +282,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		//we want to skip the first line, which had non-tree info on it
 		foundModel=foundTree=numericalTaxa=true;
 		rank++;
-		strlen = (int)((nTax*2)*(10+DEF_PRECISION)+ (double) log10((double) ((double)nTax)*nTax*2));
+		strlen = (int)((nTax*2)*(10+DEF_PRECISION)+ (FLOAT_TYPE) log10((FLOAT_TYPE) ((FLOAT_TYPE)nTax)*nTax*2));
 		}
 
 	//we know what we need to, now reopen the file
@@ -302,11 +316,11 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		c=stf.get();
 		do{
 			if(c == 'R' || c == 'r'){//rate parameters
-				double r[5];
+				FLOAT_TYPE r[5];
 				for(int i=0;i<5;i++){
 					stf >> temp;
 					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading rate matrix parameters in file %s!\nExamine file and check manual for format.\n", fname));
-					r[i]=atof(temp);
+					r[i]=(FLOAT_TYPE)atof(temp);
 					}
 				mod->SetRmat(r, restart==false);
 				do{c=stf.get();}while(c==' ');
@@ -317,11 +331,11 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				modSpec.gotRmatFromFile=true;
 				}
 			else if(c == 'B' || c == 'b'){//base freqs
-				double b[3];
+				FLOAT_TYPE b[3];
 				for(int i=0;i<3;i++){
 					stf >> temp;
 					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading base frequency parameters in file %s!\nExamine file and check manual for format.\n", fname));
-					b[i]=atof(temp);
+					b[i]=(FLOAT_TYPE)atof(temp);
 					}
 				mod->SetPis(b, restart==false);
 				do{c=stf.get();}while(c==' ');
@@ -335,28 +349,28 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				if(modSpec.flexRates==true) throw(ErrorException("Config file specifies ratehetmodel = flex, but starting model contains alpha!\n"));
 				stf >> temp;
 				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading alpha parameter in file %s!\nExamine file and check manual for format.\n", fname));
-				mod->SetAlpha(atof(temp), restart==false);
+				mod->SetAlpha((FLOAT_TYPE)atof(temp), restart==false);
 				c=stf.get();
 				modSpec.gotAlphaFromFile=true;
 				}				
 			else if(c == 'P' || c == 'p'){//proportion invariant
 				stf >> temp;
 				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading proportion of invariant sites parameter in file %s!\nExamine file and check manual for format.\n", fname));
-				double p=atof(temp);
+				FLOAT_TYPE p=(FLOAT_TYPE)atof(temp);
 				mod->SetPinv(p, restart==false);
 				c=stf.get();
 				modSpec.gotPinvFromFile=true;
 				}
 			else if(c == 'F' || c == 'f'){//flex rates
-				double rates[20];
-				double probs[20];
+				FLOAT_TYPE rates[20];
+				FLOAT_TYPE probs[20];
 				for(int i=0;i<mod->NRateCats();i++){
 					stf >> temp;
 					if(isalpha(temp[0])) throw ErrorException("Problem with flex rates specification in starting condition file");
-					rates[i]=atof(temp);
+					rates[i]=(FLOAT_TYPE)atof(temp);
 					stf >> temp;
 					if(isalpha(temp[0])) throw ErrorException("Problem with flex rates specification in starting condition file");
-					probs[i]=atof(temp);
+					probs[i]=(FLOAT_TYPE)atof(temp);
 					}		
 				mod->SetFlexRates(rates, probs);					
 				c=stf.get();
@@ -418,23 +432,23 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	delete []temp;
 	}
 
-void Individual::RefineStartingConditions(bool optModel, double branchPrec){
+void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	if(optModel && mod->NRateCats() > 1 && modSpec.gotFlexFromFile == false) outman.UserMessage("optimizing starting branch lengths and rate heterogeneity parameters...");
 	else outman.UserMessage("optimizing starting branch lengths...");
-	double improve=999.9;
+	FLOAT_TYPE improve=(FLOAT_TYPE)999.9;
 	CalcFitness(0);
 
 	for(int i=1;improve > branchPrec;i++){
-		double alphaImprove=0.0, optImprove=0.0, scaleImprove=0.0;
+		FLOAT_TYPE alphaImprove=0.0, optImprove=0.0, scaleImprove=0.0;
 		
 		CalcFitness(0);
-		double passStart=Fitness();
+		FLOAT_TYPE passStart=Fitness();
 		
 		optImprove=treeStruct->OptimizeAllBranches(branchPrec);
 
 		SetDirty();
 		CalcFitness(0);
-		double trueImprove= Fitness() - passStart;
+		FLOAT_TYPE trueImprove= Fitness() - passStart;
 //		assert(trueImprove >= -1.0);
 		if(trueImprove < 0.0) trueImprove = 0.0;
 		scaleImprove=treeStruct->OptimizeTreeScale(branchPrec);
@@ -492,15 +506,15 @@ void Individual::CopyNonTreeFields(const Individual* ind ){
 
 
 /* 7/21/06 needs to be fixed to correspond to changes in tree for constraints
-void Individual::SubtreeMutate(int subdomain, double optPrecision, vector<int> const &subtreeMemberNodes, Adaptation *adap){
+void Individual::SubtreeMutate(int subdomain, FLOAT_TYPE optPrecision, vector<int> const &subtreeMemberNodes, Adaptation *adap){
   //this version is used only by remotes when they have had a subtree defined for them
   //it will mutate only within that subtree, and because we know that the next mutation
   //will also be within that subtree we can get away without recalculating some likelihood
   //arrays
 
 	//because we don't do model mutations during subtree mode, factor the modelMutateProb out
-  	double effectiveTopoProb=adap->topoMutateProb / (1.0/(1.0-adap->modelMutateProb));
-	double r = rnd.uniform();
+  	FLOAT_TYPE effectiveTopoProb=adap->topoMutateProb / (1.0/(1.0-adap->modelMutateProb));
+	FLOAT_TYPE r = rnd.uniform();
 #ifndef MUTUALLY_EXCLUSIVE_MUTS
 	if(adap->branchOptPrecision != adap->minOptPrecision || r > effectiveTopoProb){
 #else
@@ -578,7 +592,7 @@ void Individual::SubtreeMutate(int subdomain, double optPrecision, vector<int> c
 /*  
   else{
     assert(TaxonSwapList.size>0);
-    double s2, s1 = params->rnd.uniform();
+    FLOAT_TYPE s2, s1 = params->rnd.uniform();
     int randint2, randint1 = TaxonSwapList.size * s1 + 1;
     if(randint1>TaxonSwapList.size) randint1 = TaxonSwapList.size;
     do{
@@ -599,14 +613,14 @@ void Individual::SubtreeMutate(int subdomain, double optPrecision, vector<int> c
 */
 
 /*7/21/06 needs to be fixed to correspond to changes in tree for constraints
-void Individual::NonSubtreeMutate(const ParallelManager *pMan, double optPrecision, Adaptation *adap)
+void Individual::NonSubtreeMutate(const ParallelManager *pMan, FLOAT_TYPE optPrecision, Adaptation *adap)
 {//this version is used only by the master when subtree mode is active
 //it will make a mutation on one of the nodes that are not contained within
 //a subtree, which are in a vector that is passed in
 
 	//because we don't do model mutations during subtree mode, factor the modelMutateProb out
-  	double effectiveTopoProb=adap->topoMutateProb / (1.0/(1.0-adap->modelMutateProb));
-	double r = rnd.uniform();
+  	FLOAT_TYPE effectiveTopoProb=adap->topoMutateProb / (1.0/(1.0-adap->modelMutateProb));
+	FLOAT_TYPE r = rnd.uniform();
 
 #ifndef MUTUALLY_EXCLUSIVE_MUTS
 	if(adap->branchOptPrecision != adap->minOptPrecision || r >= effectiveTopoProb){
@@ -621,7 +635,7 @@ void Individual::NonSubtreeMutate(const ParallelManager *pMan, double optPrecisi
 		}
 
   if(r < effectiveTopoProb){
-	  double r = rnd.uniform();
+	  FLOAT_TYPE r = rnd.uniform();
 	  if(r<(adap->randNNIprob/(1.0-adap->randSPRprob)) && (pMan->nonSubtreeNodesforNNI.size() > 0)){
 	    int randint1;
 	    do{
@@ -672,7 +686,7 @@ void Individual::NonSubtreeMutate(const ParallelManager *pMan, double optPrecisi
 */ /*  
   else{
     assert(TaxonSwapList.size>0);
-    double s2, s1 = params->rnd.uniform();
+    FLOAT_TYPE s2, s1 = params->rnd.uniform();
     int randint2, randint1 = TaxonSwapList.size * s1 + 1;
     if(randint1>TaxonSwapList.size) randint1 = TaxonSwapList.size;
     do{
