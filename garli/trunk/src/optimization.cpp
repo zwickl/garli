@@ -1780,7 +1780,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
 #endif
 			assert(d2Tot == d2Tot);
-			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
+			//assert(tot1 < 1.0e10 && tot2 < 1.0e10);
 			}
 #ifndef OMP_INTDERIV
 		else{
