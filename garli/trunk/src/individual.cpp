@@ -206,13 +206,13 @@ void Individual::MakeRandomTree(int nTax){
 			taxset -= k;
 			}
 #ifndef NDEBUG
-		//DEBUG
-		char tmp[10000];
+		
+/*		char tmp[10000];
 		ofstream out("tree.tre");
 		treeStruct->root->MakeNewick(tmp, false, true);
 		out << tmp << endl;
 		out.close();
-
+*/
 		treeStruct->CalcBipartitions();
 		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
 			//BACKBONE

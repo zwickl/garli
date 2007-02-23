@@ -177,6 +177,8 @@ class ClaManager{
 		//2. Cla is being made dirty, and multiple nodes point to it
 		//	->remove this node from the holder (decrement) and assign a new one	
 	
+		assert(index != -1);
+
 		if(holders[index].numAssigned==1){
 			if(holders[index].theArray != NULL){
 				holders[index].SetReclaimLevel(0);

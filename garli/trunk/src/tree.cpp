@@ -2485,6 +2485,12 @@ void Tree::TraceDirtynessToRoot(TreeNode *nd){
 void Tree::SweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 	lnL=-1;
 
+	//this will be the case if we are simply making the tree structure but
+	//never intend to score it
+	if(nd->IsInternal() && nd->claIndexDown == -1){
+		return;
+		}
+
 	if(from==NULL){
 		//if this is the branch where the dirtyness starts
 		if(nd->IsInternal()){
