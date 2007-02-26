@@ -36,6 +36,34 @@ extern OutputManager outman;
 
 #define LOG_MIN_BRLEN log(min_brlen)
 
+#ifdef BROOK_GPU
+#include <brook/brook.hpp>
+//#include <brook/profiler.hpp>
+//using namespace brook::internal;
+
+void  BranchLike2 (::brook::stream des,
+		::brook::stream res,
+		::brook::stream pmat);
+
+void  SecondBranchLike (::brook::stream des,
+		::brook::stream part,
+		::brook::stream res,
+		::brook::stream pmat);
+
+void  Product4 (::brook::stream des1,
+		::brook::stream des2,
+		::brook::stream res);
+
+		brook::stream LCLstream(brook::getStreamType(( float4  *)0), 890, -1);
+		brook::stream RCLstream(brook::getStreamType(( float4  *)0), 890, -1);
+		brook::stream deststream(brook::getStreamType(( float4  *)0), 890, -1);
+//		brook::stream tempstream(brook::getStreamType(( float4  *)0), 890, -1);
+//		brook::stream tempstream2(brook::getStreamType(( float4  *)0), 890, -1);
+		brook::stream Lprstream(brook::getStreamType(( float  *)0), 16, -1);
+		brook::stream Rprstream(brook::getStreamType(( float  *)0), 16, -1);
+#endif
+
+
 //a variety of functions that don't belong to any class
 
 int FileExists( const char* s )
@@ -167,7 +195,7 @@ int RandomInt(int lb, int ub)	{
 }
 
 FLOAT_TYPE RandomFrac()	{
-	return (FLOAT_TYPE)rand() / RAND_MAX;
+	return (FLOAT_TYPE) (rand() / RAND_MAX);
 }
 
 FLOAT_TYPE RandomDouble(FLOAT_TYPE lb, FLOAT_TYPE ub)	{
@@ -186,7 +214,7 @@ FLOAT_TYPE RandomDouble(FLOAT_TYPE lb, FLOAT_TYPE ub)	{
 #define ITMAX 50
 #define TINY 1.0e-20
 #define SHFT(a,b,c,d) a=b;b=c;c=d;
-#define SIGN(a,b) ((b)>0.0 ? fabs(a) : -fabs(a))
+#define SIGN(a,b) ((b)>ZERO_POINT_ZERO ? fabs(a) : -fabs(a))
 #define FMAX(a,b) ((a)>(b) ? (a):(b))
 
 //This version takes a node pointer and optimizes blens
@@ -223,7 +251,7 @@ int mnbrak(FLOAT_TYPE *ax, FLOAT_TYPE *bx, FLOAT_TYPE *cx, FLOAT_TYPE *fa, FLOAT
 		u=(*bx)-((*bx-*cx)*q-(*bx-*ax)*r)/(FLOAT_TYPE)(2.0*SIGN(FMAX(fabs(q-r),TINY), q-r));
 		u = (FLOAT_TYPE)(u > DEF_MIN_BRLEN ? (u < DEF_MAX_BRLEN ? u : DEF_MAX_BRLEN) : DEF_MIN_BRLEN);
 		ulim=(FLOAT_TYPE)((*bx)+GLIMIT*(*cx-*bx));
-		if((*bx-u)*(u-*cx)>0.0){
+		if((*bx-u)*(u-*cx)>ZERO_POINT_ZERO){
 			fu=(*func)(thisnode, thistree, u);
 			if(fu < *fc){
 				*ax=*bx;
@@ -248,7 +276,7 @@ int mnbrak(FLOAT_TYPE *ax, FLOAT_TYPE *bx, FLOAT_TYPE *cx, FLOAT_TYPE *fa, FLOAT
 				}
 */			fu=(*func)(thisnode, thistree, u);
 			}
-		else if((*cx-u)*(u-ulim)>0.0){
+		else if((*cx-u)*(u-ulim)>ZERO_POINT_ZERO){
 			//DZ 10/27/03 don't let this evaluate totally insane blens	
 	/*		if(u>=.69){ //=ln(2)
 				if(max(*ax, max(*bx, *cx)) < .69) u=.69;
@@ -263,7 +291,7 @@ int mnbrak(FLOAT_TYPE *ax, FLOAT_TYPE *bx, FLOAT_TYPE *cx, FLOAT_TYPE *fa, FLOAT
 				SHFT(*fb, *fc, fu, (*func)(thisnode, thistree, u));
 				}
 			}
-		else if((u-ulim)*(ulim-*cx) >0.0){
+		else if((u-ulim)*(ulim-*cx) >ZERO_POINT_ZERO){
 			u=ulim;
 			//DZ 10/27/03 don't let this evaluate totally insane blens	
 	/*		if(u>=.69){ //=ln(2)
@@ -296,7 +324,7 @@ int mnbrak(FLOAT_TYPE *ax, FLOAT_TYPE *bx, FLOAT_TYPE *cx, FLOAT_TYPE *fa, FLOAT
 FLOAT_TYPE brent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree){
 	 int iter;
 	 FLOAT_TYPE a, b, d, etemp, fu, fv, fw, fx, p, q, r, tol1, tol2, u, v, w, x, xm;
-	 FLOAT_TYPE e=0.0;
+	 FLOAT_TYPE e=ZERO_POINT_ZERO;
 	 
 	 a=(ax < cx ? ax : cx); //make a the smallest of the three bracket points 
 	 b=(ax > cx ? ax : cx); //and b the largest
@@ -305,11 +333,11 @@ FLOAT_TYPE brent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE (*f)(Tr
 	 fw=fv=fx=(*f)(thisnode, thistree, x);
 	 
 	 for(iter=1;iter<=ITMAX;iter++){
-	 	xm=(FLOAT_TYPE)0.5*(a+b);		//xm is the midpoint of the bracket (of a and b)
+	 	xm=ZERO_POINT_FIVE*(a+b);		//xm is the midpoint of the bracket (of a and b)
 	 	
 	 	tol2=(FLOAT_TYPE)(2.0*(tol1=(FLOAT_TYPE)(tol*fabs(x)+ZEPS)));	
 	 	
-	 	if (fabs(x-xm) <= (tol2-0.5*(b-a))){ //termination condition
+	 	if (fabs(x-xm) <= (tol2-ZERO_POINT_FIVE*(b-a))){ //termination condition
 	 		*xmin=x;							//if the distance between x and bracket mean is < 
 	 		return fx;
 	 		}
@@ -318,11 +346,11 @@ FLOAT_TYPE brent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE (*f)(Tr
 	 		q=(x-v)*(fx-fw);
 	 		p=(x-v)*q-(x-w)*r;
 	 		q=(FLOAT_TYPE)(2.0*(q-r));
-	 		if(q>0.0) p=-p;
+	 		if(q>ZERO_POINT_ZERO) p=-p;
 	 		q=fabs(q);
 	 		etemp=e;
 	 		e=d;
-	 		if(fabs(p) >= fabs(0.5*q*etemp)||p<=q*(a-x) || p>=q*(b-x)) //determine if the parabolic fit is good
+	 		if(fabs(p) >= fabs(ZERO_POINT_FIVE*q*etemp)||p<=q*(a-x) || p>=q*(b-x)) //determine if the parabolic fit is good
 	 			d=(FLOAT_TYPE)(CGOLD*(e=(x>=xm?a-x:b-x)));  //if not
 	 			
 	 		else{				//if so, take the parabolic step
@@ -403,7 +431,7 @@ int DZbrak(FLOAT_TYPE *worstOuter, FLOAT_TYPE *mid, FLOAT_TYPE *bestOuter, FLOAT
 		if(*worstOuter==effectiveMin){
 			SHFT(dum, *bestOuter, *worstOuter, *mid)
 			SHFT(dum, *bestOuterL, *worstOuterL, *midL)
-			*mid=(FLOAT_TYPE)((*worstOuter+*bestOuter)*0.5);
+			*mid=(FLOAT_TYPE)((*worstOuter+*bestOuter)*ZERO_POINT_FIVE);
 			*midL=(*func)(thisnode, thistree, *mid, true);
 			if(*bestOuterL < *midL && !(*mid > sweetspot)) return 1;
 			}
@@ -510,7 +538,7 @@ int DZbrak(FLOAT_TYPE *worstOuter, FLOAT_TYPE *mid, FLOAT_TYPE *bestOuter, FLOAT
 		assert(nextTry >= effectiveMin);
 		nextTryL=(*func)(thisnode, thistree, nextTry, true);
 		if(nextTryL < *bestOuterL){
-			if((*mid-nextTry) * (nextTry-*bestOuter)>0.0){//if the proposed point is between mid and bestOuter
+			if((*mid-nextTry) * (nextTry-*bestOuter)>ZERO_POINT_ZERO){//if the proposed point is between mid and bestOuter
 				SHFT(dum, *worstOuter, *mid, nextTry);
 				SHFT(dum, *worstOuterL, *midL, nextTryL);
 				}
@@ -520,7 +548,7 @@ int DZbrak(FLOAT_TYPE *worstOuter, FLOAT_TYPE *mid, FLOAT_TYPE *bestOuter, FLOAT
 				}
 			}
 		else{
-			if((*mid-nextTry)*(nextTry-*bestOuter)>0.0){//if the proposed point is between mid and bestOuter
+			if((*mid-nextTry)*(nextTry-*bestOuter)>ZERO_POINT_ZERO){//if the proposed point is between mid and bestOuter
 				assert(nextTryL < *midL);//if this isn't the case there are multiple optima
 				SHFT(dum, *worstOuter, *mid, nextTry);
 				SHFT(dum, *worstOuterL, *midL, nextTryL);		
@@ -548,7 +576,7 @@ int DZbrak(FLOAT_TYPE *worstOuter, FLOAT_TYPE *mid, FLOAT_TYPE *bestOuter, FLOAT
 FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, FLOAT_TYPE fx, FLOAT_TYPE fc, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE, bool), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree){
 	 int iter;
  	 FLOAT_TYPE a, b, d, etemp, fu, fv, fw/*, fx*/, p, q, r, tol1, tol2, u, v, w, x, xm;
-	 FLOAT_TYPE e=0.0;
+	 FLOAT_TYPE e=ZERO_POINT_ZERO;
 	 
 	 if((fx<fa && fx<fc)==false){
 	 	//if bx isn't the current minimum, make is so
@@ -601,7 +629,7 @@ FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, F
  		fw=fc; 		
  		}
 
-	xm=(FLOAT_TYPE)0.5*(a+b);       //xm is the midpoint of the bracket (of a and b)
+	xm=(FLOAT_TYPE)ZERO_POINT_FIVE*(a+b);       //xm is the midpoint of the bracket (of a and b)
 	e=(x>=xm?a-x:b-x);	//set e to the larger of the two bracket intervals
 	d=(FLOAT_TYPE)CGOLD*e;
 
@@ -611,11 +639,11 @@ FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, F
 	 
 	 for(iter=1;iter<=ITMAX;iter++){
 
-	 	xm=(FLOAT_TYPE)0.5*(a+b);		//xm is the midpoint of the bracket (of a and b)
+	 	xm=(FLOAT_TYPE)ZERO_POINT_FIVE*(a+b);		//xm is the midpoint of the bracket (of a and b)
 	 	
 	 	tol2=(FLOAT_TYPE)(2.0*(tol1=(FLOAT_TYPE)(tol*fabs(x)+ZEPS)));	
 	 	
-/*	 	if (fabs(x-xm) <= (tol2-0.5*(b-a))){ //termination condition
+/*	 	if (fabs(x-xm) <= (tol2-ZERO_POINT_FIVE*(b-a))){ //termination condition
 	 		*xmin=x;						
 	 		return fx;
 	 		}
@@ -624,11 +652,11 @@ FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, F
 	 		q=(x-v)*(fx-fw);
 	 		p=(x-v)*q-(x-w)*r;
 	 		q=(FLOAT_TYPE)2.0*(q-r);
-	 		if(q>0.0) p=-p;
+	 		if(q>ZERO_POINT_ZERO) p=-p;
 	 		q=fabs(q);
 	 		etemp=e;
 	 		e=d;
-	 		if(fabs(p) >= fabs(0.5*q*etemp)||p<=q*(a-x) || p>=q*(b-x)){ //determine if the parabolic fit is good
+	 		if(fabs(p) >= fabs(ZERO_POINT_FIVE*q*etemp)||p<=q*(a-x) || p>=q*(b-x)){ //determine if the parabolic fit is good
 	 			d=(FLOAT_TYPE)(CGOLD*(e=(x>=xm?a-x:b-x)));  //if not
 	 			u=(fabs(d) >= tol1 ? x+d : x+SIGN(tol1,d));
 	 			}
@@ -644,7 +672,7 @@ FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, F
 	 			if(paraOK==true){
 	 				//the estimation error in the parabolic step always seems to at least half each iteration,
 	 				//hence the division by 2.0
-	 				FLOAT_TYPE estlnL=(FLOAT_TYPE)(paraMinlnL - paraErr/2.0);
+	 				FLOAT_TYPE estlnL=(FLOAT_TYPE)(paraMinlnL - paraErr*ZERO_POINT_FIVE);
 	 				if((fx - estlnL) < tol){
 	 					*xmin=x;
 	 					return fx;
@@ -759,7 +787,7 @@ void InferStatesFromCla(char *states, FLOAT_TYPE *cla, int nchar){
 	FLOAT_TYPE stateProbs[4];
 	
 	for(int c=0;c<nchar;c++){
-		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=0.0;
+		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=ZERO_POINT_ZERO;
 		for(int i=0;i<4;i++){
 			for(int j=0;j<4;j++){
 				stateProbs[j] += *cla++;
@@ -784,7 +812,7 @@ vector<InternalState *> *InferStatesFromCla(FLOAT_TYPE *cla, int nchar, int nrat
 	vector<InternalState *> *stateVec = new vector<InternalState *>;
 	
 	for(int c=0;c<nchar;c++){
-		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=0.0;
+		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=ZERO_POINT_ZERO;
 		for(int i=0;i<nrates;i++){	
 			for(int j=0;j<4;j++){
 				stateProbs[j] += *cla++;
@@ -802,7 +830,7 @@ vector<InternalState *> *InferStatesFromCla(FLOAT_TYPE *cla, int nchar, int nrat
 	}
 
 FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar){
-	FLOAT_TYPE count=0.0;
+	FLOAT_TYPE count=ZERO_POINT_ZERO;
 	int offset1=0, offset2=0;
 	int effectiveChar=nchar;
 	bool skipChar=false;
@@ -823,7 +851,7 @@ FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar){
 			}
 		if(skipChar==false){
 			if(str1[i+offset1]!=str2[i+offset2]){
-				count += 1.0;
+				count += ONE_POINT_ZERO;
 				}
 			}
 		else effectiveChar--;
@@ -834,7 +862,7 @@ FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar){
 
 #ifndef GANESH
 FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int nchar){
-	FLOAT_TYPE count=0.0;
+	FLOAT_TYPE count=ZERO_POINT_ZERO;
 	int offset=0;
 	int effectiveChar=nchar;
 	for(int i=0;i<nchar;i++){
@@ -845,7 +873,7 @@ FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int ncha
 				for(int i=0;i<s;i++) offset++;
 				}
 			}
-		else if(str1[i]!=str2[i+offset]) count += 1.0;
+		else if(str1[i]!=str2[i+offset]) count += ONE_POINT_ZERO;
 		}
 	return count/(FLOAT_TYPE)effectiveChar;
 	}
@@ -866,7 +894,7 @@ FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2,
 	    			for(int i=0;i<s;i++) offset++;
 				}
 			}
-		else if(str1[i]!=str2[i+offset]) count += col_count[i]*1.0;
+		else if(str1[i]!=str2[i+offset]) count += col_count[i]*ONE_POINT_ZERO;
 		}
 	return count/(FLOAT_TYPE)effectiveChar;
 }
@@ -992,9 +1020,167 @@ void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LC
 			LCL = &(LCLA->arr[index]); 
 			RCL= &(RCLA->arr[index]);
 #else			
-		for(int i=0;i<nchar;i++) {
+
 #endif
+
+#undef BROOK_GPU
+#define BETTER_WAY
+
+#ifdef BROOK_GPU
+
+
+//		brook::internal::Profiler *prof;// = brook::internal::Profiler::getInstance();
+//		*prof = brook::internal::Profiler::getInstance();
+//		ProfilerNode node("here");
+//		node.enter();
+
+
+		float Lp[16], Rp[16];
+		//float p[32];
+		for(int i=0;i<16;i++){
+			Lp[i] = Lpr[i];
+			Rp[i] = Rpr[i];
+			//p[i] = Lpr[i];
+			//p[i+16] = Rpr[i];
+			}
+
+#ifdef BETTER_WAY
+/*		brook::stream LCLstream(brook::getStreamType(( float4  *)0), 890, -1);
+		brook::stream RCLstream(brook::getStreamType(( float4  *)0), 890, -1);
+		brook::stream deststream(brook::getStreamType(( float4  *)0), 890, -1);
+//		brook::stream tempstream(brook::getStreamType(( float4  *)0), 890, -1);
+//		brook::stream tempstream2(brook::getStreamType(( float4  *)0), 890, -1);
+		brook::stream Lprstream(brook::getStreamType(( float  *)0), 16, -1);
+		brook::stream Rprstream(brook::getStreamType(( float  *)0), 16, -1);
+*/
+
+		streamRead(LCLstream, (void*) LCL);
+		streamRead(Lprstream, Lp);
+		//streamRead(Lprstream, p);
+		streamRead(RCLstream, (void*) RCL);
+		streamRead(Rprstream, Rp);
+
+//		SingleLikeKernel(LCLstream, RCLstream, LCLstream, Lprstream);
+
+		//BranchLike2(LCLstream, tempstream, Lprstream);
+		BranchLike2(LCLstream, deststream, Lprstream);
+		//BranchLike2(LCLstream, LCLstream, Lprstream);
+
+		//method 1
+		SecondBranchLike(RCLstream, deststream, deststream, Rprstream);
+		//SecondBranchLike(RCLstream, LCLstream, LCLstream, Rprstream);
+
+		//method 2
+//		BranchLike2(RCLstream, tempstream2, Rprstream);
+//		streamWrite(tempstream2,dest);
+//		Product4(tempstream, tempstream2, deststream);
+
+		streamWrite(deststream,dest);
+		//streamWrite(LCLstream, dest);
+//		node.exit();
+//		node.dump(cout);
+
+/*		for(int i=0;i<nchar;i++) {
 			for(r=0;r<nRateCats;r++){
+				//DEBUG
+				debSum += dest[0];
+				dest+=4;
+				}
+			}
+*/
+		//older way
+#else
+		for(int i=0;i<nchar;i++) {
+			for(r=0;r<nRateCats;r++){
+				float L[4];
+				float Lnorm[4];
+				float R[4];
+				float D[4];
+				float Ldes[4];
+				
+				for(int i=0;i<4;i++) Ldes[i] = (float) LCL[i];
+
+/*				Lnorm[0]=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
+				Lnorm[1]=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
+				Lnorm[2]=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
+				Lnorm[3]=( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]);
+*/
+				DoOneBranchLike(Ldes, L, Lp, 4);
+
+				//assert(fabs(Lnorm[0] - L[0]) < .001);
+/*				if(fabs(Lnorm[0] - L[0]) > .001){
+					int poo=2;
+					}
+				if(fabs(Lnorm[1] - L[1]) > .001){
+					int poo=2;
+					}
+				if(fabs(Lnorm[2] - L[2]) > .001){
+					int poo=2;
+					}
+				if(fabs(Lnorm[3] - L[3]) > .001){
+					int poo=2;
+					}
+*/
+				R[0]=(Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
+				R[1]=(Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
+				R[2]=(Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);			
+				R[3]=(Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
+					
+				DoGPUProduct(L, R, D, 4);
+				dest[0] = D[0];
+				dest[1] = D[1];
+				dest[2] = D[2];
+				dest[3] = D[3];
+
+				/*
+				assert(dest[0] > 1e-25);
+				assert(dest[1] > 1e-25);
+				assert(dest[2] > 1e-25);
+				assert(dest[3] > 1e-25);
+*/
+				//DEBUG
+				debSum += dest[0];
+				dest+=4;
+				LCL+=4;
+				RCL+=4;
+				}
+			}
+#endif
+
+#else
+
+//#define ALT
+//#define ALT2
+#define NORM
+
+	for(int i=0;i<nchar;i++) {
+			for(r=0;r<nRateCats;r++){
+#ifdef ALT
+				//alt
+				dest[0] = ( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]) * (Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
+				dest[1] = ( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]) * (Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
+				dest[2] = ( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]) * (Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);
+				dest[3] = ( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]) * (Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
+#endif
+				/*
+				dest[0] = ( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]) * (Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
+				dest[1] = ( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]) * (Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
+				dest[2] = ( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]) * (Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);
+				dest[3] = ( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]) * (Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
+*/
+#ifdef ALT2
+				//alt2
+				dest[0]=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
+				dest[1]=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
+				dest[2]=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
+				dest[3]=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
+
+				dest[0]*=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
+				dest[1]*=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
+				dest[2]*=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
+				dest[3]*=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
+#endif
+#ifdef NORM
 				L1=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
 				L2=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
 				L3=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
@@ -1009,14 +1195,19 @@ void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LC
 				dest[1] = L2 * R2;
 				dest[2] = L3 * R3;
 				dest[3] = L4 * R4;
-#ifndef OMP_INTINTCLA
+
+	//			assert(dest[0] == dest[0] && dest[0] > 0.0f && dest[0] < 1.0e20);
+#endif
+#ifndef _OMP_INTINTCLA
 				dest+=4;
 				LCL+=4;
 				RCL+=4;
-#endif
 				}
 			}
+#endif
+#endif
 		}
+
 
 	const int *left_mult=LCLA->underflow_mult;
 	const int *right_mult=RCLA->underflow_mult;
@@ -1052,7 +1243,7 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, 
 		else if((*Ldata == -4 && *Rdata == -4) || (*Ldata == -4 && *Rdata > -1) || (*Rdata == -4 && *Ldata > -1)){//total ambiguity of left, right or both
 			
 			if(*Ldata == -4 && *Rdata == -4) //total ambiguity of both
-				for(int i=0;i< (4*nRateCats);i++) *(dest++) = 1.0;
+				for(int i=0;i< (4*nRateCats);i++) *(dest++) = ONE_POINT_ZERO;
 			
 			else if(*Ldata == -4){//total ambiguity of left
 				for(int i=0;i<nRateCats;i++){
@@ -1060,7 +1251,7 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, 
 					*(dest++) = Rpr[(*Rdata+4)+16*i];
 					*(dest++) = Rpr[(*Rdata+8)+16*i];
 					*(dest++) = Rpr[(*Rdata+12)+16*i];
-					assert(*(dest-4)>=0.0);
+					assert(*(dest-4)>=ZERO_POINT_ZERO);
 					}
 				}
 			else{//total ambiguity of right
@@ -1069,7 +1260,7 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, 
 					*(dest++) = Lpr[(*Ldata+4)+16*i];
 					*(dest++) = Lpr[(*Ldata+8)+16*i];
 					*(dest++) = Lpr[(*Ldata+12)+16*i];
-					assert(*(dest-4)>=0.0);
+					assert(*(dest-4)>=ZERO_POINT_ZERO);
 					}
 				}
 			Ldata++;
@@ -1082,14 +1273,14 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, 
 					*(dest+(i*4)+1) = Lpr[(*Ldata+4)+16*i];
 					*(dest+(i*4)+2) = Lpr[(*Ldata+8)+16*i];
 					*(dest+(i*4)+3) = Lpr[(*Ldata+12)+16*i];
-					assert(*(dest)>=0.0);
+					assert(*(dest)>=ZERO_POINT_ZERO);
 					}
 				Ldata++;
 				}
 			else{
 				if(*Ldata==-4){//fully ambiguous left
 					for(int i=0;i< (4*nRateCats);i++){
-						*(dest+i)=1.0;
+						*(dest+i)=ONE_POINT_ZERO;
 						}
 					Ldata++;
 					}
@@ -1103,7 +1294,7 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, 
 							*(dest+(r*4)+1) += Lpr[(*Ldata+4)+16*r];
 							*(dest+(r*4)+2) += Lpr[(*Ldata+8)+16*r];
 							*(dest+(r*4)+3) += Lpr[(*Ldata+12)+16*r];
-//							assert(*(dest-1)>0.0);
+//							assert(*(dest-1)>ZERO_POINT_ZERO);
 							}
 						Ldata++;
 						}
@@ -1115,7 +1306,7 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, 
 					*(dest++) *= Rpr[(*Rdata+4)+16*i];
 					*(dest++) *= Rpr[(*Rdata+8)+16*i];
 					*(dest++) *= Rpr[(*Rdata+12)+16*i];
-//					assert(*(dest-1)>0.0);
+//					assert(*(dest-1)>ZERO_POINT_ZERO);
 					}
 				Rdata++;		
 				}
@@ -1131,7 +1322,7 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, 
 						tempcla[(r*4)+1] += Rpr[(*Rdata+4)+16*r];
 						tempcla[(r*4)+2] += Rpr[(*Rdata+8)+16*r];
 						tempcla[(r*4)+3] += Rpr[(*Rdata+12)+16*r];
-//						assert(*(dest-1)>0.0);
+//						assert(*(dest-1)>ZERO_POINT_ZERO);
 						}
 					Rdata++;
 					}
@@ -1141,7 +1332,7 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, 
 					*(dest++) *= tempcla[(i*4)+1];
 					*(dest++) *= tempcla[(i*4)+2];
 					*(dest++) *= tempcla[(i*4)+3];
-//					assert(*(dest-1)>0.0);
+//					assert(*(dest-1)>ZERO_POINT_ZERO);
 					}
 				}
 			else{//fully ambiguous right
@@ -1234,7 +1425,7 @@ void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LC
 			else {//partial ambiguity
 				//first figure in the ambiguous terminal
 				int nstates=-1 * *(data2++);
-				for(int j=0;j<16;j++) dest[j]=0.0;
+				for(int j=0;j<16;j++) dest[j]=ZERO_POINT_ZERO;
 				for(int s=0;s<nstates;s++){
 					for(int r=0;r<4;r++){
 						*(dest+(r*4)) += pr2[(*data2)+16*r];
@@ -1370,7 +1561,7 @@ void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArr
 			*(dest++) = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * *(partial++);
 			*(dest++) = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * *(partial++);
 			CL1+=16;
-			assert(*(dest-1)>0.0);
+			assert(*(dest-1)>ZERO_POINT_ZERO);
 			}
 		}
 	else{
@@ -1381,7 +1572,7 @@ void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArr
 				*(dest++) = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * *(partial++);
 				*(dest++) = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * *(partial++);
 				CL1+=4;
-				assert(*(dest-1)>0.0);
+				assert(*(dest-1)>ZERO_POINT_ZERO);
 				}
 			}
 		}
@@ -1408,7 +1599,7 @@ void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArr
 				*(dest++) = Lpr[(*Ldata+4)+16*i] * *(partial++);
 				*(dest++) = Lpr[(*Ldata+8)+16*i] * *(partial++);
 				*(dest++) = Lpr[(*Ldata+12)+16*i] * *(partial++);
-//				assert(*(dest-1)>0.0);
+//				assert(*(dest-1)>ZERO_POINT_ZERO);
 				}
 			Ldata++;
 			}
@@ -1427,7 +1618,7 @@ void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArr
 					*(dest+(i*4)+1) += Lpr[(*Ldata+4)+16*i];
 					*(dest+(i*4)+2) += Lpr[(*Ldata+8)+16*i];
 					*(dest+(i*4)+3) += Lpr[(*Ldata+12)+16*i];
-//					assert(*(dest-1)>0.0);
+//					assert(*(dest-1)>ZERO_POINT_ZERO);
 					}
 				Ldata++;
 				}

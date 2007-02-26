@@ -114,7 +114,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 		if(reconDist == 1 || reconDist == -1) mutation_type |= randNNI;
 	    else if(reconDist < 0) mutation_type |= limSPRCon;
 		else  mutation_type |= limSPR;
-	    if(treeStruct->lnL !=-1.0){
+	    if(treeStruct->lnL !=-ONE_POINT_ZERO){
 		    fitness=treeStruct->lnL;
 		    dirty=false;
 		    }
@@ -132,7 +132,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 			else if(reconDist >  (int) adap->limSPRrange) mutation_type |= randSPR;
 			else mutation_type |= limSPR;
 			}
-	    if(treeStruct->lnL !=-1.0){
+	    if(treeStruct->lnL !=-ONE_POINT_ZERO){
 		    fitness=treeStruct->lnL;
 		    dirty=false;
 		    }
@@ -141,7 +141,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 	  else {
 		treeStruct->TopologyMutator(optPrecision, 1, 0);
 		mutation_type |= randNNI;
-   	    if(treeStruct->lnL !=-1.0){
+   	    if(treeStruct->lnL !=-ONE_POINT_ZERO){
 		    fitness=treeStruct->lnL;
 		    dirty=false;
 		    }
@@ -206,13 +206,6 @@ void Individual::MakeRandomTree(int nTax){
 			taxset -= k;
 			}
 #ifndef NDEBUG
-		
-/*		char tmp[10000];
-		ofstream out("tree.tre");
-		treeStruct->root->MakeNewick(tmp, false, true);
-		out << tmp << endl;
-		out.close();
-*/
 		treeStruct->CalcBipartitions();
 		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
 			//BACKBONE
@@ -450,7 +443,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		CalcFitness(0);
 		FLOAT_TYPE trueImprove= Fitness() - passStart;
 //		assert(trueImprove >= -1.0);
-		if(trueImprove < 0.0) trueImprove = 0.0;
+		if(trueImprove < ZERO_POINT_ZERO) trueImprove = ZERO_POINT_ZERO;
 		scaleImprove=treeStruct->OptimizeTreeScale(branchPrec);
 		SetDirty();
 		if(optModel==true && mod->NRateCats() > 1 && modSpec.fixAlpha == false && modSpec.gotFlexFromFile == false){

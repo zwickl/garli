@@ -36,6 +36,18 @@ using namespace std;
 
 #include "memchk.h"
 
+#include "utility.h"
+Profiler ProfIntInt   ("ClaIntInt     ");
+Profiler ProfIntTerm  ("ClaIntTerm    ");
+Profiler ProfTermTerm ("ClaTermTerm   ");
+Profiler ProfRescale  ("Rescale       ");
+Profiler ProfScoreInt ("ScoreInt      ");
+Profiler ProfScoreTerm("ScoreTerm     ");
+
+FLOAT_TYPE precalcThresh[30];
+FLOAT_TYPE precalcMult[30];
+int precalcIncr[30] = {1, 3, 5, 7, 10, 12, 14, 17, 19, 21, 24, 26, 28, 30, 33, 35, 37, 40, 42, 44, 47, 49, 51, 53, 56, 58, 60, 63, 65, 67};
+
 extern rng rnd;
 extern bool output_tree;
 #undef OUTPUT_UNIQUE_TREES
@@ -81,7 +93,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const HKYData *data, const General
 	Tree::claMan=claMan;
 	Tree::data=data;
 #ifdef SINGLE_PRECISION_FLOATS
-	Tree::rescaleEvery=4;
+	Tree::rescaleEvery=6;
 #else
 	Tree::rescaleEvery=16;
 #endif
@@ -102,6 +114,12 @@ void Tree::SetTreeStatics(ClaManager *claMan, const HKYData *data, const General
 	Tree::min_brlen = conf->minBrlen;
 	Tree::max_brlen = conf->maxBrlen;
 	Tree::exp_starting_brlen = conf->startingBrlen;
+#ifdef SINGLE_PRECISION_FLOATS
+	for(int i=0;i<30;i++){
+		precalcThresh[i] = exp((FLOAT_TYPE)(-precalcIncr[i] - 1));
+		precalcMult[i] =  exp((FLOAT_TYPE)(precalcIncr[i]));
+		}
+#endif
 	}
 
 //DJZ 4-28-04
@@ -689,7 +707,7 @@ void Tree::RecombineWith( Tree *t, bool sameModel, FLOAT_TYPE optPrecision ){
 	MimicTopo(cop, 1, sameModel);
 
 	//place connector midway along the broken branch
-	connector->dlen=broken->dlen*(FLOAT_TYPE)0.5;
+	connector->dlen=broken->dlen*ZERO_POINT_FIVE;
 	broken->dlen-=connector->dlen;
 
 	TraceDirtynessToRoot(connector);
@@ -1342,7 +1360,7 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, int s
 	connector->AddDes(broken);
 	assert(connector->right == broken);
 
-	SetBranchLength(connector, max(min_brlen, broken->dlen*(FLOAT_TYPE)0.5));
+	SetBranchLength(connector, max(min_brlen, broken->dlen*ZERO_POINT_FIVE));
 	SetBranchLength(broken, connector->dlen);
 
 	if(createTopologyOnly == false){
@@ -1421,7 +1439,7 @@ void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, FLOAT_TYPE optP
 
 	//these are the only blens that need to be dealt with specially
 	FLOAT_TYPE fusedBlen = min(max_brlen, oldroot->left->dlen + oldroot->right->dlen);
-	FLOAT_TYPE dividedBlen = max((FLOAT_TYPE)0.5 * newroot->dlen, min_brlen);
+	FLOAT_TYPE dividedBlen = max(ZERO_POINT_FIVE * newroot->dlen, min_brlen);
 
 	//first detatch the subtree and make it free floating.  This will
 	//leave oroot in its place and fuse two branches in the subtree
@@ -1683,16 +1701,16 @@ bool Tree::AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *bro
 				connector->left=connector->right=tcut;
 				connector->next=connector->prev=connector->anc=tcut->next=tcut->prev=NULL;
 
-				TreeNode *tbroken;
-				tbroken=propTree.allNodes[broken->nodeNum];
-				
-				tbroken->SubstituteNodeWithRespectToAnc(connector);
-				connector->AddDes(tbroken);
-	*/
-				propTree.CalcBipartitions();
+			TreeNode *tbroken;
+			tbroken=propTree.allNodes[broken->nodeNum];
+			
+			tbroken->SubstituteNodeWithRespectToAnc(connector);
+			connector->AddDes(tbroken);
+*/
+			propTree.CalcBipartitions();
 
-				bool containsBip = (propTree.ContainsBipartitionOrComplement(constr->GetBipartition()) != NULL);
-				return (containsBip == false);
+			bool containsBip = (propTree.ContainsBipartitionOrComplement(constr->GetBipartition()) != NULL);
+			return (containsBip == false);
 
 				}
 			}
@@ -1864,8 +1882,8 @@ void Tree::SPRMutate(int cutnum, int broknum, FLOAT_TYPE optPrecision, const vec
 	broken->SubstituteNodeWithRespectToAnc(connector);
 	connector->AddDes(broken);
 
-	if(broken->dlen*.5 > min_brlen){
-		connector->dlen=broken->dlen*(FLOAT_TYPE)0.5;
+	if(broken->dlen*ZERO_POINT_FIVE > min_brlen){
+		connector->dlen=broken->dlen*ZERO_POINT_FIVE;
 		broken->dlen-=connector->dlen;
 		}
 	else connector->dlen=broken->dlen=min_brlen;
@@ -1998,9 +2016,10 @@ void Tree::DirtyNodesInSubtree(TreeNode *nd){
 
 bool RescaleRateHet(CondLikeArray *destCLA, int nsites, int nRateCats){
 
+
 		FLOAT_TYPE *destination=destCLA->arr;
 		int *underflow_mult=destCLA->underflow_mult;
-		destCLA->rescaleRank=0;
+
 		//check if any clas are getting close to underflow
 #ifdef UNIX
 		madvise(destination, sizeof(FLOAT_TYPE)*4*nRateCats*nsites, MADV_SEQUENTIAL);
@@ -2073,13 +2092,20 @@ bool RescaleRateHet(CondLikeArray *destCLA, int nsites, int nRateCats){
 				}			
 #endif
 #ifdef SINGLE_PRECISION_FLOATS
-			if(large1< 1.0){
-				if(large1 < 1e-30){
+			if(large1< 1.0f){
+				//DEBUG
+				if(large1 < 1e-30f){
 					throw(1);
 					}
-				int incr=((int) -log(large1));
+				int index=0;
+				while(precalcThresh[index] > large1){
+					index++;
+					}
+				int incr = precalcIncr[index];
+				int incr2=((int) -log(large1));
 				underflow_mult[i]+=incr;
-				FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
+				FLOAT_TYPE mult=precalcMult[index];
+				//FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
 				for(int r=0;r<nRateCats;r++){
 					for(int q=0;q<4;q++){
 						destination[r*4 + q]*=mult;
@@ -2107,6 +2133,8 @@ bool RescaleRateHet(CondLikeArray *destCLA, int nsites, int nRateCats){
 #endif
 			destination+= 4*nRateCats;
 			}
+
+		destCLA->rescaleRank=0;
 		return reduceRescale;
 		}
 
@@ -2184,22 +2212,27 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			mod->CalcPmat(Rchild->dlen, &Rprmat[0], false);
 			}
 
-
 		if(direction==DOWN) destCLA=GetClaDown(nd, false);
 		else if(direction==UPRIGHT) destCLA=GetClaUpRight(nd, false);
 		else if(direction==UPLEFT) destCLA=GetClaUpLeft(nd, false);
-	
-		if(LCLA!=NULL && RCLA!=NULL)
+
+		if(LCLA!=NULL && RCLA!=NULL){
 			//two internal children
+			ProfIntInt.Start();
 			CalcFullCLAInternalInternal(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats());
+			ProfIntInt.Stop();
+			}
 
 		else if(LCLA==NULL && RCLA==NULL){
 			//two terminal children
+			ProfTermTerm.Start();
 			CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData, nsites,  mod->NRateCats());
+			ProfTermTerm.Stop();
 			}
 
 		else{
 			//one terminal, one internal
+			ProfIntTerm.Start();
 #ifdef OPEN_MP
 			if(LCLA==NULL)
 				CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats(), Lchild->ambigMap);
@@ -2211,6 +2244,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			else 
 				CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats());
 #endif
+			ProfIntTerm.Stop();
 			}
 		}
 	
@@ -2271,11 +2305,16 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			}	
 		
 		if(fillFinalCLA==false){
-			if(childCLA!=NULL)//if child is internal
+			if(childCLA!=NULL){//if child is internal
+				ProfScoreInt.Start();
 				lnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &prmat[0]);
-			
-			else
+				ProfScoreInt.Stop();
+				}	
+			else{
+				ProfScoreTerm.Start();
 				lnL = GetScorePartialTerminalRateHet(partialCLA, &prmat[0], child->tipData);
+				ProfScoreTerm.Stop();
+				}
 			}
 		
 		else{
@@ -2286,16 +2325,19 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			claMan->ReserveCla(wholeTreeIndex);
 			if(childCLA!=NULL)//if child is internal
 				CalcFullCLAPartialInternalRateHet(claMan->GetCla(wholeTreeIndex), childCLA, &prmat[0], partialCLA, nsites,  mod->NRateCats());
-			
 			else
 				CalcFullCLAPartialTerminalRateHet(claMan->GetCla(wholeTreeIndex), partialCLA, &prmat[0], child->tipData, nsites,  mod->NRateCats());
+				
 			return wholeTreeIndex;
 			}
 		}
 
 	if(direction != ROOT)
-		if(destCLA->rescaleRank >= rescaleEvery)
+		if(destCLA->rescaleRank >= rescaleEvery){
+			ProfRescale.Start();
 			RescaleRateHet(destCLA, nsites, mod->NRateCats());
+			ProfRescale.Stop();
+			}
 	return -1;
 	}
 

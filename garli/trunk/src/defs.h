@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.951 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -43,11 +43,13 @@
 #undef IGNORE_SMALL_TOPO_IMP
 #undef INCLUDE_PERTURBATION
 #undef SUBTREE_VERSION
+#undef ENABLE_CUSTOM_PROFILER
 #undef SINGLE_PRECISION_FLOATS
 
 #ifdef SINGLE_PRECISION_FLOATS
 	typedef float FLOAT_TYPE;
 	#define ONE_POINT_ZERO 1.0f
+	#define ZERO_POINT_FIVE 0.5f
 	#define ZERO_POINT_ZERO 0.0f
 	#define DEF_MIN_BRLEN 1e-8f
 	#define DEF_MAX_BRLEN 100.0f
@@ -55,6 +57,7 @@
 #else
 	typedef double FLOAT_TYPE;
 	#define ONE_POINT_ZERO 1.0
+	#define ZERO_POINT_FIVE 0.5
 	#define ZERO_POINT_ZERO 0.0
 	#define DEF_MIN_BRLEN 1e-8
 	#define DEF_MAX_BRLEN 100.0

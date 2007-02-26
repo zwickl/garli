@@ -5,6 +5,17 @@
 #include "memchk.h"
 #include <stdlib.h>
 #include <cassert>
+#include <ostream>
+#include <iostream>
+#include <iomanip>
+
+#ifdef _MSC_VER
+#include <windows.h>
+#else
+#include <sys/time.h>
+#endif
+
+using namespace std;
 
 #define DBL_ALIGN 32
 
@@ -197,5 +208,88 @@ template<typename T> inline void Delete2DAlignedArray	(T **temp)
 	}
 
 
+
+class Profiler{
+#ifdef _MSC_VER
+	LONGLONG totalTics;
+	int numCalls;
+	string name;
+	bool inuse;
+	LARGE_INTEGER start;
+	LARGE_INTEGER end;
+	LARGE_INTEGER ticsPerSec;
+#else
+	unsigned totalTics;
+	int numCalls;
+	string name;
+	bool inuse;
+	timeval start;
+	timeval end;
+	struct timezone tz;
+	int ticsPerSec;
+#endif
+
+public:
+	Profiler(char *n){
+		name = n;
+		totalTics = 0;
+		numCalls = 0;
+		inuse=false;
+#ifdef _MSC_VER
+		QueryPerformanceFrequency(&ticsPerSec);
+#else
+		ticsPerSec = 1000000;
+#endif
+		}
+	void Start(){
+#ifdef ENABLE_CUSTOM_PROFILER
+		if(inuse){
+			cout << "Error! Don't use this on recursive functions!" << endl;
+			exit(1);
+			}
+		inuse=true;
+		numCalls++;
+	#ifdef _MSC_VER
+		QueryPerformanceCounter(&start);
+	#else
+		gettimeofday(&start, &tz);
+	#endif
+#endif
+		}
+	void Stop(){
+#ifdef ENABLE_CUSTOM_PROFILER
+		if(!inuse){
+			cout << "Error! Profiler was not started!" << endl;
+			exit(1);
+			}
+	#ifdef _MSC_VER
+		QueryPerformanceCounter(&end);
+		totalTics += end.QuadPart - start.QuadPart;
+	#else
+		gettimeofday(&end, &tz);
+		totalTics += end.tv_usec - start.tv_usec  + (end.tv_sec - start.tv_sec)*1000000;
+		//DEBUG
+//		cout <<  end.tv_usec - start.tv_usec  + (end.tv_usec - start.tv_usec)*100000 << endl;
+	#endif
+		inuse=false;
+#endif
+		}
+	void Report(ostream &out, int progTime){
+#ifdef ENABLE_CUSTOM_PROFILER
+	#ifdef _MSC_VER
+		FLOAT_TYPE seconds = totalTics/(FLOAT_TYPE)ticsPerSec.QuadPart;
+	#else
+		FLOAT_TYPE seconds = totalTics/(FLOAT_TYPE)ticsPerSec;
+	#endif
+		out << setw( 10 ) << name.c_str() << "\t" << setw( 10 )<< numCalls << "\t";
+		out.precision(4);
+		out << setw( 10 ) << seconds << "\t" << setw( 10 ) << seconds/(FLOAT_TYPE)numCalls << "\t" << setw( 10 ) << seconds*100/(FLOAT_TYPE)progTime << endl;
+
+#endif
+		}
+	};
+
 #endif //
+
+
 
