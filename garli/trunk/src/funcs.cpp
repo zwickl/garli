@@ -1198,7 +1198,7 @@ void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LC
 
 	//			assert(dest[0] == dest[0] && dest[0] > 0.0f && dest[0] < 1.0e20);
 #endif
-#ifndef _OMP_INTINTCLA
+#ifndef OMP_INTINTCLA
 				dest+=4;
 				LCL+=4;
 				RCL+=4;
