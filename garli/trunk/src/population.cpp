@@ -2069,8 +2069,10 @@ void Population::OutputLog()	{
 		[pool release];
 #endif		
 	}
-	else
+	else{
+		CalcAverageFitness();
 		log << "Final\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
+		}
 	}
 
 int Population::ReplicateSpecifiedIndividuals(int count, int* which, const char* tree_string, FLOAT_TYPE *model_string){
