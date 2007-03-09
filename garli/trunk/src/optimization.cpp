@@ -1711,7 +1711,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
 #endif
-			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
+//			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
 			}
 #ifndef OMP_TERMDERIV
 		else{
@@ -1816,7 +1816,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
 #endif
 			assert(d2Tot == d2Tot);
-			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
+//			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
 			}
 #ifndef OMP_INTDERIV
 		else{
