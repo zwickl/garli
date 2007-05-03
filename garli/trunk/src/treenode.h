@@ -29,7 +29,7 @@ using namespace std;
 /* GANESH included the following #includes */
 #include "hashdefines.h"
 
-class HKYdata;
+class HKYData;
 
 class TreeNode{
 	public:
@@ -100,6 +100,7 @@ class TreeNode{
 			if(left) left->SetUnoptimized();
 			if(right) right->SetUnoptimized();
 			}
+		void SetEquivalentConditionalVectors(const HKYData *data);
 
 		//debugging functions for checking tree formation
 		void CheckforPolytomies();

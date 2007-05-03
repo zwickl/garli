@@ -106,8 +106,8 @@ class Bipartition{
 		}
 
 	bool EqualsEquals(const Bipartition *rhs){
-		assert(this->ContainsTaxon(1));
-		assert(rhs->ContainsTaxon(1));
+		//assert(this->ContainsTaxon(1));
+		//assert(rhs->ContainsTaxon(1));
 		int i;
 		for(i=0;i<nBlocks-1;i++){
 			if(rep[i]!=rhs->rep[i]) return false;

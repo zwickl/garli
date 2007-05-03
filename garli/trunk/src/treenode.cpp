@@ -25,6 +25,7 @@ using namespace std;
 #include "bipartition.h"
 #include "errorexception.h"
 #include "outputman.h"
+#include "mlhky.h"
 
 extern OutputManager outman;
 
@@ -618,4 +619,81 @@ void TreeNode::RecursivelyAddOrRemoveSubtreeFromBipartitions(Bipartition *subtre
 	//tree bipartitions are needed
 	bipart->FlipBits(subtree);
 	if(anc->IsNotRoot()) anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(subtree);
+	}
+
+//unsigned MATCH_II=0, MATCH_TT=0, MATCH_IT=0, TOT_II=0, TOT_IT=0, TOT_TT=0;
+
+void TreeNode::SetEquivalentConditionalVectors(const HKYData *data){
+	if(nodeNum == 0){
+		if(left->IsInternal()) left->SetEquivalentConditionalVectors(data);
+		if(left->next->IsInternal()) left->next->SetEquivalentConditionalVectors(data);
+		if(right->IsInternal()) right->SetEquivalentConditionalVectors(data);
+		return;
+		}
+
+	if(left->IsTerminal() && right->IsTerminal()){
+		unsigned char *leftSeq = data->GetRow(left->nodeNum-1);
+		unsigned char *rightSeq = data->GetRow(right->nodeNum-1);
+		char lastLeft, lastRight;
+		lastLeft = leftSeq[0];
+		lastRight = rightSeq[0];
+		tipData[0] = 0;
+		for(int i=1;i<data->NChar();i++){
+			bool match=true;
+			if(leftSeq[i] != lastLeft){
+				lastLeft = leftSeq[i];
+				match=false;
+				}
+			if(rightSeq[i] != lastRight){
+				lastRight = rightSeq[i];
+				match=false;
+				}
+//			MATCH_TT += match;
+//			TOT_TT++;
+			tipData[i] = match;
+			}
+		}
+	else if(left->IsInternal() && right->IsInternal()){
+		left->SetEquivalentConditionalVectors(data);
+		right->SetEquivalentConditionalVectors(data);
+		for(int i=0;i<data->NChar();i++){
+			tipData[i] = left->tipData[i] && right->tipData[i];
+//			MATCH_II += tipData[i];
+//			TOT_II++;
+			}
+		}
+	else if(left->IsTerminal()){
+		right->SetEquivalentConditionalVectors(data);
+		unsigned char *leftSeq = data->GetRow(left->nodeNum-1);
+		char lastLeft;
+		lastLeft = leftSeq[0];
+		tipData[0] = 0;
+		for(int i=1;i<data->NChar();i++){
+			bool match=true;
+			if(leftSeq[i] != lastLeft){
+				lastLeft = leftSeq[i];
+				match=false;
+				}
+//			MATCH_IT += right->tipData[i] && match;
+//			TOT_IT++;
+			tipData[i] = right->tipData[i] && match;
+			}
+		}
+	else {
+		left->SetEquivalentConditionalVectors(data);
+		unsigned char *rightSeq = data->GetRow(right->nodeNum-1);
+		char lastRight;
+		lastRight = rightSeq[0];
+		tipData[0] = 0;
+		for(int i=1;i<data->NChar();i++){
+			bool match=true;
+			if(rightSeq[i] != lastRight){
+				lastRight = rightSeq[i];
+				match=false;
+				}
+//			MATCH_IT += right->tipData[i] && match;
+//			TOT_IT++;
+			tipData[i] = left->tipData[i] && match;
+			}
+		}
 	}

@@ -268,7 +268,7 @@ public:
 	#else
 		gettimeofday(&end, &tz);
 		totalTics += end.tv_usec - start.tv_usec  + (end.tv_sec - start.tv_sec)*1000000;
-		//DEBUG
+		
 //		cout <<  end.tv_usec - start.tv_usec  + (end.tv_usec - start.tv_usec)*100000 << endl;
 	#endif
 		inuse=false;

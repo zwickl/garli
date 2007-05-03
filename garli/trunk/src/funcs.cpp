@@ -905,6 +905,66 @@ void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bo
 		(*func)(thisnode, thistree, len, true);
 	}
 
+void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats, const char *leftEQ, const char *rightEQ){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *LCL=LCLA->arr;
+	const FLOAT_TYPE *RCL=RCLA->arr;
+	FLOAT_TYPE L1, L2, L3, L4, R1, R2, R3, R4;
+
+	assert(nRateCats == 1);
+	
+#ifdef UNIX
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+	
+	for(int i=0;i<nchar;i++) {
+		if(leftEQ[i] == false){
+		//if(1){
+			L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
+			L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
+			L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
+			L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
+			}
+
+		if(rightEQ[i] == false){
+		//if(1){
+			R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
+			R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
+			R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
+			R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
+			}
+
+		dest[0] = L1 * R1;
+		dest[1] = L2 * R2;
+		dest[2] = L3 * R3;
+		dest[3] = L4 * R4;
+
+		assert(dest[0] == dest[0]);
+
+#ifndef OMP_INTINTCLA
+		dest+=4;
+		LCL+=4;
+		RCL+=4;
+			
+		}
+#endif
+
+	const int *left_mult=LCLA->underflow_mult;
+	const int *right_mult=RCLA->underflow_mult;
+	int *undermult=destCLA->underflow_mult;
+	
+	for(int i=0;i<nchar;i++){
+		undermult[i] = left_mult[i] + right_mult[i];
+		}
+	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
+	}
+
+
+
 void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
@@ -1190,7 +1250,7 @@ void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LC
 				R2=(Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
 				R3=(Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);			
 				R4=(Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
-					
+
 				dest[0] = L1 * R1;
 				dest[1] = L2 * R2;
 				dest[2] = L3 * R3;

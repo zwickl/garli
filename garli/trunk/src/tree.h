@@ -59,6 +59,9 @@ class Tree{
 		TreeNode **allNodes;
 		ReconList sprRang;
 
+#ifdef EQUIV_CALCS
+		bool dirtyEQ;
+#endif
 		//a bunch of statics
 		static FLOAT_TYPE meanBrlenMuts;
 		static FLOAT_TYPE alpha; //alpha shape of blen mutation, not gamma rate het
@@ -152,7 +155,7 @@ class Tree{
 		bool AllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
 		bool RecursiveAllowedByPositiveConstraintWithMask(Constraint *constr, const Bipartition *mask, TreeNode *nd);
 		bool RecursiveAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
-		void CalcBipartitions();
+		void CalcBipartitions(bool standardize=true);
 		void OutputBipartitions();
 		TreeNode *ContainsBipartition(const Bipartition *bip);
 		TreeNode *ContainsBipartitionOrComplement(const Bipartition *bip);
@@ -173,6 +176,7 @@ class Tree{
 #endif
 		void GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, const unsigned *ambigMap =NULL);
 		void GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2);
+		void GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, char *equiv);
 		FLOAT_TYPE OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, bool goodGuess);
 		FLOAT_TYPE OptimizeAllBranches(FLOAT_TYPE optPrecision);
 		void OptimizeBranchesAroundNode(TreeNode *nd, FLOAT_TYPE optPrecision, int subtreeNode);
@@ -291,6 +295,16 @@ inline void Tree::CopyClaIndeces(const Tree *from, bool remove){
 	allNodes[0]->claIndexDown=from->allNodes[0]->claIndexDown;
 	if(allNodes[0]->claIndexDown != -1) claMan->IncrementCla(allNodes[0]->claIndexDown);
 	
+#ifdef EQUIV_CALCS
+	if(from->dirtyEQ == false){
+		memcpy(allNodes[0]->tipData, from->allNodes[0]->tipData, data->NChar()*sizeof(char));
+		for(int i=numTipsTotal+1;i<numNodesTotal;i++)
+			memcpy(allNodes[i]->tipData, from->allNodes[i]->tipData, data->NChar()*sizeof(char));
+		dirtyEQ = false;
+		}
+	else dirtyEQ = true;
+#endif
+
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		if(remove) claMan->DecrementCla(allNodes[i]->claIndexDown);
 		allNodes[i]->claIndexDown=from->allNodes[i]->claIndexDown;

@@ -26,6 +26,7 @@ Profiler ProfIntDeriv ("IntDeriv      ");
 Profiler ProfTermDeriv("TermDeriv     ");
 Profiler ProfModDeriv ("ModDeriv      ");
 Profiler ProfNewton   ("Newton-Raphson");
+extern Profiler ProfEQVectors;
 				   
 
 extern FLOAT_TYPE globalBest;
@@ -383,6 +384,7 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 	//improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, goodGuess);
 	//abandoning use of goodGuess.  Doesn't seem to be reducing opt passes, which
 	//was the point.
+	optCalcs++;
 	ProfNewton.Start();
 	improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, true);
 	ProfNewton.Stop();
@@ -413,6 +415,15 @@ void Tree::SetNodesUnoptimized(){
 void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, int subtreeNode, TreeNode *prune){
 	nodeOptVector.clear();
 	SetNodesUnoptimized();
+
+#ifdef EQUIV_CALCS
+	if(dirtyEQ){
+		ProfEQVectors.Start();
+		root->SetEquivalentConditionalVectors(data);
+		ProfEQVectors.Stop();
+		dirtyEQ=false;
+		}
+#endif
 
 	FLOAT_TYPE totalIncrease=ZERO_POINT_ZERO, prunePointIncrease=ZERO_POINT_ZERO, thisIncr, pruneRadIncrease=ZERO_POINT_ZERO;
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->left, false);
@@ -648,7 +659,11 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 		}
 	else {
 		ProfIntDeriv.Start();
+#ifdef EQUIV_CALCS
+		GetDerivsPartialInternalEQUIV(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, nd2->tipData);
+#else
 		GetDerivsPartialInternal(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2);
+#endif
 		ProfIntDeriv.Stop();
 		}
 
@@ -1829,3 +1844,121 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	d2Tot = tot2;
 	}
 
+void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, char *equiv){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *CL1=childCLA->arr;
+	FLOAT_TYPE *partial=partialCLA->arr;
+
+	const int nchar=data->NChar();
+
+#ifdef UNIX
+	madvise(partial, nchar*16*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise(CL1, nchar*16*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE siteL;
+	FLOAT_TYPE La, Lc, Lg, Lt;
+	FLOAT_TYPE D1a, D1c, D1g, D1t;
+	FLOAT_TYPE D2a, D2c, D2g, D2t;
+
+	FLOAT_TYPE eLa, eLc, eLg, eLt;
+	FLOAT_TYPE eD1a, eD1c, eD1g, eD1t;
+	FLOAT_TYPE eD2a, eD2c, eD2g, eD2t;
+
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	
+	const int *countit=data->GetCounts();
+	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+	const int nRateCats=mod->NRateCats();
+	assert(nRateCats  == 1);
+
+	const int lastConst=data->LastConstant();
+	const int *conBases=data->GetConstBases();
+	const FLOAT_TYPE prI=mod->PropInvar();	
+
+	FLOAT_TYPE freqs[4];
+	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+
+#ifdef OMP_INTDERIV
+#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, CL1, siteL) reduction(+ : tot1, tot2)
+	for(int i=0;i<nchar;i++){
+		partial = &(partialCLA->arr[4*i*nRateCats]);
+		CL1		= &(childCLA->arr[4*i*nRateCats]);
+#else
+	int rOff =0;
+	for(int i=0;i<nchar;i++){
+#endif
+		if((countit[i]) != 0){
+			if(equiv[i] == false){
+				eLa = ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3])  * rateProb[0];
+				eLc = ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3])  * rateProb[0];
+				eLg = ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3])  * rateProb[0];
+				eLt = ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3])  * rateProb[0];
+				
+				eD1a = ( d1mat[rOff ]*CL1[0]+d1mat[rOff + 1]*CL1[1]+d1mat[rOff + 2]*CL1[2]+d1mat[rOff + 3]*CL1[3])  * rateProb[0];
+				eD1c = ( d1mat[rOff + 4]*CL1[0]+d1mat[rOff + 5]*CL1[1]+d1mat[rOff + 6]*CL1[2]+d1mat[rOff + 7]*CL1[3])  * rateProb[0];
+				eD1g = ( d1mat[rOff + 8]*CL1[0]+d1mat[rOff + 9]*CL1[1]+d1mat[rOff + 10]*CL1[2]+d1mat[rOff + 11]*CL1[3])  * rateProb[0];
+				eD1t = ( d1mat[rOff + 12]*CL1[0]+d1mat[rOff + 13]*CL1[1]+d1mat[rOff + 14]*CL1[2]+d1mat[rOff + 15]*CL1[3])  * rateProb[0];		
+
+				eD2a = ( d2mat[rOff ]*CL1[0]+d2mat[rOff + 1]*CL1[1]+d2mat[rOff + 2]*CL1[2]+d2mat[rOff + 3]*CL1[3])  * rateProb[0];
+				eD2c = ( d2mat[rOff + 4]*CL1[0]+d2mat[rOff + 5]*CL1[1]+d2mat[rOff + 6]*CL1[2]+d2mat[rOff + 7]*CL1[3])  * rateProb[0];
+				eD2g = ( d2mat[rOff + 8]*CL1[0]+d2mat[rOff + 9]*CL1[1]+d2mat[rOff + 10]*CL1[2]+d2mat[rOff + 11]*CL1[3])  * rateProb[0];
+				eD2t = ( d2mat[rOff + 12]*CL1[0]+d2mat[rOff + 13]*CL1[1]+d2mat[rOff + 14]*CL1[2]+d2mat[rOff + 15]*CL1[3])  * rateProb[0];
+				}
+			La = eLa * partial[0];
+			Lc = eLc * partial[1];
+			Lg = eLg * partial[2];
+			Lt = eLt * partial[3];
+
+			D1a = eD1a * partial[0];
+			D1c = eD1c * partial[1];
+			D1g = eD1g * partial[2];
+			D1t = eD1t * partial[3];
+
+			D2a = eD2a * partial[0];
+			D2c = eD2c * partial[1];
+			D2g = eD2g * partial[2];
+			D2t = eD2t * partial[3];
+
+			partial+=4;
+			CL1+=4;
+			
+			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+				FLOAT_TYPE	btot=ZERO_POINT_ZERO;
+				if(conBases[i]&1) btot+=freqs[0];
+				if(conBases[i]&2) btot+=freqs[1];
+				if(conBases[i]&4) btot+=freqs[2];
+				if(conBases[i]&8) btot+=freqs[3];
+				//6-27-05 fixed this to calc derivs correctly if constant site has been rescaled
+				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot)*exp((FLOAT_TYPE)childCLA->underflow_mult[i]+partialCLA->underflow_mult[i]));
+				}
+			else
+				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
+			FLOAT_TYPE tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
+#ifdef SINGLE_PRECISION_FLOATS
+			if(fabs(tempD1) < 1.0e8f){
+				assert(d1Tot == d1Tot);
+				FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
+				tot1 += countit[i] * tempD1;
+				tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
+				}
+#else
+			assert(d1Tot == d1Tot);
+			FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
+			tot1 += countit[i] * tempD1;
+			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
+#endif
+			assert(d2Tot == d2Tot);
+//			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
+			}
+#ifndef OMP_INTDERIV
+		else{
+			partial+=4*nRateCats;
+			CL1+=4*nRateCats;			
+			}
+#endif
+		}
+	d1Tot = tot1;
+	d2Tot = tot2;
+	}

@@ -68,6 +68,7 @@ extern Profiler ProfTermDeriv;
 extern Profiler ProfCalcPmat;
 extern Profiler ProfModDeriv;
 extern Profiler ProfNewton;
+extern Profiler ProfEQVectors;
 #endif
 
 extern char programName[81];
@@ -314,6 +315,10 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 	if(rank == 0) total_size = conf->nindivs + nprocs-1;
 	else total_size = conf->nindivs;
 
+#ifdef INPUT_RECOMBINATION
+	total_size = conf->nindivs + NUM_INPUT;
+#endif
+
 	//setup the model specification
 	modSpec.SetStateFrequencies(conf->stateFrequencies.c_str());
 	modSpec.SetRateMatrix(conf->rateMatrix.c_str());
@@ -484,7 +489,11 @@ void Population::SeedPopulationWithStartingTree(){
 	//if starting from a treefile, use the treestring
 	//to create the first indiv, and then copy the tree and clas
 	indiv[0].mod->SetDefaultModelParameters(data);
+#ifdef INPUT_RECOMBINATION
+	if(0){
+#else
 	if(strcmp(conf->streefname.c_str(), "random") != 0){
+#endif
 		outman.UserMessage("Obtaining starting conditions from file %s", conf->streefname.c_str());
 		indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank, data->NTax());
 		}
@@ -541,11 +550,29 @@ void Population::SeedPopulationWithStartingTree(){
 		}	
 
 	globalBest=bestFitness=prevBestFitness=indiv[0].Fitness();
+
+#ifndef INPUT_RECOMBINATION
 	for(unsigned i=1;i<total_size;i++){
 		if(indiv[i].treeStruct==NULL) indiv[i].treeStruct=new Tree();
 		indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
 		indiv[i].treeStruct->mod=indiv[i].mod;
 		}
+#else
+	for(unsigned i=1;i<conf->nindivs;i++){
+		if(indiv[i].treeStruct==NULL) indiv[i].treeStruct=new Tree();
+		indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
+		indiv[i].treeStruct->mod=indiv[i].mod;
+		}
+	
+	//string inputs="sphinx.input6000.goodmod.tre";
+	for(unsigned i=conf->nindivs;i<total_size;i++){
+		indiv[i].GetStartingConditionsFromFile(conf->streefname.c_str(), i-conf->nindivs, data->NTax());
+		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].SetDirty();
+		//indiv[i].RefineStartingConditions((adap->modWeight == ZERO_POINT_ZERO || modSpec.fixAlpha == true) == false, adap->branchOptPrecision);
+		indiv[i].CalcFitness(0);
+		}
+#endif
 
 	UpdateTopologyList(indiv);
 	CalcAverageFitness();
@@ -687,6 +714,10 @@ void Population::ReadPopulationCheckpoint(){
 void Population::Run(){
 	calcCount=0;
 	optCalcs=0;
+
+#ifdef VARIABLE_OPTIMIZATION
+	var << "type\tdist\tinitlnL\tnoBail.01\tnoBail.5\t3B.01\t3B.5\tdef.01\tdefdef\n";
+#endif
 
 /*	if(conf->restart == false){
 		if(conf->bootstrapReps == 0) outman.UserMessage("Running Genetic Algorithm with initial seed=%d", rnd.init_seed());
@@ -910,6 +941,10 @@ void Population::FinalOptimization(){
 
 #ifdef ENABLE_CUSTOM_PROFILER
 	ofstream prof("profileresults.log");
+	prof << "dataset: " << conf->datafname << "\t" << "start: " << conf->streefname << endl;
+	prof << "seed: " << conf->randseed << "\t" << "refine: " << (conf->refineStart == true) << endl;
+	prof << "start prec: " << conf->startOptPrec << "\t" << "final prec: " << adap->branchOptPrecision << endl;
+
 #ifdef SINGLE_PRECISION_FLOATS
 	prof << "Single precision\n";
 #else
@@ -931,6 +966,7 @@ void Population::FinalOptimization(){
 	ProfCalcPmat.Report(prof, s);
 	ProfModDeriv.Report(prof, s);
 	ProfNewton.Report(prof, s);
+	ProfEQVectors.Report(prof, s);
 	prof.close();
 	outman.SetOutputStream(cout);
 #endif
@@ -1179,7 +1215,10 @@ void Population::DetermineParentage(){
 	//determine each individual's parentage
 	unsigned parent;
 	FLOAT_TYPE r;
+
 	for(unsigned i = 0; i < conf->nindivs; i++ ){
+
+#ifndef NO_EVOLUTION
 		if( i < conf->holdover ){// copy best individual's genotype to next generation
 			if(rank==0){
 				if(paraMan->subtreeModeActive==true) parent=bestAccurateIndiv;
@@ -1199,6 +1238,59 @@ void Population::DetermineParentage(){
 					if( r < cumfit[parent][1] ) break;
 					}
 				parent = (int)cumfit[parent][0];
+
+#ifdef INPUT_RECOMBINATION
+			
+			paraMan->maxRecomIndivs = 3;
+			paraMan->nremotes = NUM_INPUT;
+
+			if(rank==0 && paraMan->subtreeModeActive==false && i>= (conf->nindivs - paraMan->maxRecomIndivs)){
+/*				int *mates=new int[paraMan->nremotes];
+				for(int j=0;j<paraMan->nremotes;j++) mates[j]=conf->nindivs+j;
+				ScrambleArray(paraMan->nremotes, mates);
+*/
+				int foo=2;
+				FLOAT_TYPE **recomSelect=new FLOAT_TYPE *[paraMan->nremotes];
+				for(int q=0;q<paraMan->nremotes;q++)
+					recomSelect[q]=new FLOAT_TYPE[2];
+					
+				int potentialPartners=0;
+				for(int r=0;r<paraMan->nremotes;r++){
+					int ind=conf->nindivs+r;
+					recomSelect[r][0]=(FLOAT_TYPE)(ind);
+					if(ind==parent //don't recombine with your parent
+						|| (indiv[parent].topo == indiv[ind].topo) //don't recombine with another of the same topo	
+						|| (indiv[ind].willrecombine == true))//don't recombine with someone who is already doing so		
+						recomSelect[r][1]=-1e100;	
+					else{
+						recomSelect[r][1]=indiv[ind].Fitness();
+						potentialPartners++;
+						}
+					}
+				if(potentialPartners > 0){
+					QuickSort(recomSelect, 0, paraMan->nremotes-1);
+					CalculateReproductionProbabilies(recomSelect, 0.001, paraMan->nremotes);			
+									
+					int mateIndex;
+					int curMate;
+					// find someone else to recombine with
+
+					FLOAT_TYPE r=rnd.uniform();
+					for( mateIndex=0;mateIndex < paraMan->nremotes;mateIndex++)
+						if( r < recomSelect[mateIndex][1]) break;
+					curMate=recomSelect[mateIndex][0];
+
+
+					newindiv[i].recombinewith=curMate;
+					indiv[curMate].willrecombine=true;
+					//this will be a new topology, so mark it as topo -1.  This will be dealt with when we update the topolist
+					newindiv[i].topo=-1;
+					}
+				for(int q=0;q<paraMan->nremotes;q++)
+					delete []recomSelect[q];
+				delete []recomSelect;
+				}
+#endif
 
 #ifdef MPI_VERSION
 //new bipart recom conditions, 9-25-05
@@ -1252,12 +1344,11 @@ void Population::DetermineParentage(){
 				delete []recomSelect;
 				}
 #endif
-			}
-
-#ifdef NO_EVOLUTION
+		}
+#else //ifdef NO_EVOLUTION
 		parent = 0;
 #endif
-
+		
 		newindiv[i].parent=parent;
 		if(newindiv[i].mutation_type==Individual::subtreeRecom) newindiv[i].topo=-1; //VERIFY
 		else newindiv[i].topo=indiv[parent].topo;
@@ -1343,8 +1434,9 @@ void Population::PerformMutation(int indNum){
 		default:
 			if(ind->recombinewith>-1){// perform recombination
 				Individual *recompar=&indiv[ind->recombinewith];
-				ind->treeStruct->CalcBipartitions();
-				recompar->treeStruct->CalcBipartitions();
+				//don't want to standardize biparts anymore
+				ind->treeStruct->CalcBipartitions(false);
+				recompar->treeStruct->CalcBipartitions(false);
 				ind->CrossOverWith( *recompar, adap->branchOptPrecision);
 				ind->accurateSubtrees=false;
 				ind->treeStruct->calcs=calcCount;
@@ -1494,6 +1586,7 @@ void Population::OutputFate(){
 
 	for(unsigned i=0;i<total_size;i++){
 		fate << 	gen << "\t" << i << "\t" << indiv[i].parent << "\t";
+
 #ifdef MPI_VERSION
 		fate << indiv[i].recombinewith << "\t";	
 #endif

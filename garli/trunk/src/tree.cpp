@@ -43,6 +43,7 @@ Profiler ProfTermTerm ("ClaTermTerm   ");
 Profiler ProfRescale  ("Rescale       ");
 Profiler ProfScoreInt ("ScoreInt      ");
 Profiler ProfScoreTerm("ScoreTerm     ");
+Profiler ProfEQVectors("EQVectors     ");
 
 FLOAT_TYPE precalcThresh[30];
 FLOAT_TYPE precalcMult[30];
@@ -50,8 +51,11 @@ int precalcIncr[30] = {1, 3, 5, 7, 10, 12, 14, 17, 19, 21, 24, 26, 28, 30, 33, 3
 
 extern rng rnd;
 extern bool output_tree;
-#undef OUTPUT_UNIQUE_TREES
-#undef VARIABLE_OPTIMIZATION
+
+#ifdef VARIABLE_OPTIMIZATION
+ofstream var("variable.log");
+ofstream uni("unique.log");
+#endif
 
 //external global variables
 extern int calcCount;
@@ -326,6 +330,15 @@ Tree::Tree(){
 	calcs=0;
 	numBranchesAdded=0;
 	taxtags=new int[numTipsTotal+1];
+
+#ifdef EQUIV_CALCS
+	//need to do the root too, since that node is sometimes stolen
+	allNodes[0]->tipData = new char[data->NChar()];
+	for(int i=data->NTax()+1;i<numNodesTotal;i++){
+		allNodes[i]->tipData = new char[data->NChar()];
+		}
+	dirtyEQ=true;
+#endif
 	}
 
 void Tree::AllocateTree(){
@@ -717,11 +730,14 @@ void Tree::RecombineWith( Tree *t, bool sameModel, FLOAT_TYPE optPrecision ){
 TreeNode *Tree::ContainsBipartition(const Bipartition *bip){
 	//note that this doesn't work for terminals (but there's no reason to call for them anyway)
 	//find a taxon that appears "on" in the bipartition
-//	int tax=bip->FirstPresentTaxon();
+
+	//turning this back on
+	int tax=bip->FirstPresentTaxon();
 	
 	//now start moving down the tree from taxon 1 until a bipart that
 	//conflicts or a match is found
-	TreeNode *nd=allNodes[1]->anc;
+	//TreeNode *nd=allNodes[1]->anc;
+	TreeNode *nd=allNodes[tax]->anc;
 	while(nd->anc){
 		if(nd->bipart->IsASubsetOf(bip) == false) return NULL;
 		else if(nd->bipart->EqualsEquals(bip)) return nd;
@@ -904,8 +920,11 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 	while(!found && (++tries<50)){
 		int i;
 		do{
-			i=t->GetRandomInternalNode();
-			}while((t->allNodes[i]->left->IsTerminal() && t->allNodes[i]->right->IsTerminal()));
+			i=GetRandomInternalNode();
+			//WTF!!!  How did this work?
+			}while((allNodes[i]->left->IsTerminal() && allNodes[i]->right->IsTerminal()));
+			//}while((t->allNodes[i]->left->IsTerminal() && t->allNodes[i]->right->IsTerminal()));
+		//fromnode=t->ContainsBipartition(allNodes[i]->bipart);
 		fromnode=t->ContainsBipartition(allNodes[i]->bipart);
 		if(fromnode != NULL){
 			//OK the biparts match, but see if they share the same clas!!!!
@@ -946,6 +965,7 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 			tonode=tempanc->right;			
 			}
 		else{
+
 			tempanc->left->next=allNodes[fromnode->nodeNum];
 			tonode=tempanc->left->next;				
 			}
@@ -978,6 +998,10 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 	//of random SPR's
 	TreeNode *cut;
 	ReconNode *broken;
+
+#ifdef EQUIV_CALCS
+	dirtyEQ = true;
+#endif
 	
 	int err=0;
 	int ret=0;
@@ -1009,9 +1033,9 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 			#endif
 			#ifdef VARIABLE_OPTIMIZATION
 				if(unique == true) ReorientSubtreeSPRMutateDummy(cut->nodeNum, broken, optPrecision);
-				else
+				else return broken->reconDist * -1;
 			#endif
-			ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
+			ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);	
 			ret=broken->reconDist * -1;
 			}
 		else{
@@ -1020,7 +1044,7 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 			#endif
 			#ifdef VARIABLE_OPTIMIZATION
 				if(unique == true) err=SPRMutateDummy(cut->nodeNum, broken, optPrecision, subtreeNode);
-				else
+				else return broken->reconDist;
 			#endif
 			err=SPRMutate(cut->nodeNum, broken, optPrecision, subtreeNode);
 			ret=broken->reconDist;
@@ -1028,11 +1052,9 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 		#ifdef OUTPUT_UNIQUE_TREES
 		if(unique == true){
 			output_tree = true;
-			ofstream out("unique.log", ios::app);
-			out.precision(9);
-			if(broken->withinCutSubtree == false) out << "SPR" << "\t" << broken->reconDist << "\t" << lnL << "\n";
-			else out << "reSPR" << "\t" << broken->reconDist << "\t" << lnL << "\n";
-			out.close();
+			//uni.precision(9);
+			if(broken->withinCutSubtree == false) uni << "SPR" << "\t" << broken->reconDist << "\t" << lnL << "\t" << cut->nodeNum << "\t" << broken->nodeNum << "\n";
+			else uni << "reSPR" << "\t" << broken->reconDist << "\t" << lnL << "\t" << cut->nodeNum << "\t" << broken->nodeNum << "\n";
 			}
 		#endif
 		}while(err<0);
@@ -1204,6 +1226,10 @@ int Tree::SPRMutateDummy(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, 
 	//this is just a spoof version of SPRMutate that will perform the same mutation
 	//several times with different optimiation settings, but will otherwise 
 	//maintain exactly the same program flow because it resets the seed
+
+#ifndef VARIABLE_OPTIMIZATION
+	assert(0);
+#else
 	Individual tempIndiv;
 	tempIndiv.treeStruct=new Tree();
 	
@@ -1213,38 +1239,56 @@ int Tree::SPRMutateDummy(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, 
 		
 	int savedSeed;
 	
-	ofstream out("variable.log", ios::app);
-	out.precision(9);
-	out << "SPR" << "\t" << broke->reconDist << "\t" << lnL << "\t";
+	var.precision(10);
+	var << "SPR" << "\t" << broke->reconDist << "\t" << lnL << "\t";
 	
 	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv);
-	
+//	FLOAT_TYPE prec[5]={(FLOAT_TYPE).01, (FLOAT_TYPE).5, (FLOAT_TYPE).01, (FLOAT_TYPE).01, (FLOAT_TYPE).01};
 	FLOAT_TYPE origThresh = treeRejectionThreshold;
+/*	
 	treeRejectionThreshold = 10000;
-	FLOAT_TYPE prec[5]={(FLOAT_TYPE).01, (FLOAT_TYPE).01, (FLOAT_TYPE).01, (FLOAT_TYPE).01, (FLOAT_TYPE).01};
 	for(int i=0;i<1;i++){
 		savedSeed = rnd.seed();
-		tempIndiv.treeStruct->SPRMutate(cutnum, broke, prec[i], 0);
-		out << tempIndiv.treeStruct->lnL << "\t";
+		optCalcs = 0;
+		tempIndiv.treeStruct->SPRMutate(cutnum, broke, optPrecision, 0);
+		var << tempIndiv.treeStruct->lnL << "\t" << optCalcs << "\t";
+		optCalcs = 0;
 		rnd.set_seed(savedSeed);
 		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
 		}
-	out << "\n";
-
+	treeRejectionThreshold = -10000;
+	for(int i=0;i<1;i++){
+		savedSeed = rnd.seed();
+		optCalcs = 0;
+		tempIndiv.treeStruct->SPRMutate(cutnum, broke, optPrecision, 0);
+		var << tempIndiv.treeStruct->lnL << "\t" << optCalcs << "\t";
+		optCalcs = 0;
+		rnd.set_seed(savedSeed);
+		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
+		}
+*/
+/*	for(int i=0;i<1;i++){
+		treeRejectionThreshold = origThresh;
+		savedSeed = rnd.seed();
+		optCalcs = 0;
+		tempIndiv.treeStruct->SPRMutate(cutnum, broke, optPrecision, 0);
+		var << tempIndiv.treeStruct->lnL << "\t" << optCalcs << "\t";
+		optCalcs = 0;
+		rnd.set_seed(savedSeed);
+		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
+		}
+*/
 	treeRejectionThreshold = origThresh;
-
 	tempIndiv.treeStruct->RemoveTreeFromAllClas();
 	delete tempIndiv.treeStruct;
 	tempIndiv.treeStruct=NULL;
 	sourceIndiv.treeStruct=NULL;
-
+	optCalcs = 0;
 	SPRMutate(cutnum, broke, optPrecision, 0);
-	out << lnL << "\n";
-	out.close();
-/*	ofstream poo("3branchScores.log", ios::app);
-	poo << endl;
-	poo.close();
-*/	return 1;
+	var << lnL << "\t" << optCalcs << "\n";
+	optCalcs = 0;
+#endif
+	return 1;
 	}
 
 
@@ -1377,6 +1421,9 @@ void Tree::ReorientSubtreeSPRMutateDummy(int oroot, ReconNode *nroot, FLOAT_TYPE
 	//this is just a spoof version of SPRMutate that will perform the same mutation
 	//several times with different optimiation settings, but will otherwise 
 	//maintain exactly the same program flow because it resets the seed
+#ifndef VARIABLE_OPTIMIZATION
+	assert(0);
+#else
 	Individual tempIndiv;
 	tempIndiv.treeStruct=new Tree();
 	
@@ -1385,39 +1432,56 @@ void Tree::ReorientSubtreeSPRMutateDummy(int oroot, ReconNode *nroot, FLOAT_TYPE
 	sourceIndiv.mod->CopyModel(this->mod);
 		
 	int savedSeed;
-	
-	ofstream out("variable.log", ios::app);
-	out.precision(9);
-	out << "reSPR" << "\t" << nroot->reconDist << "\t" << lnL << "\t";
+	var.precision(10);
+	var << "reSPR" << "\t" << nroot->reconDist << "\t" << lnL << "\t";
+	//FLOAT_TYPE prec[5]={(FLOAT_TYPE).01, (FLOAT_TYPE).5, (FLOAT_TYPE).01, (FLOAT_TYPE).01, (FLOAT_TYPE).01};
 	
 	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv);
-	
 	FLOAT_TYPE origThresh = treeRejectionThreshold;
+/*		
 	treeRejectionThreshold = 10000;
 
-	FLOAT_TYPE prec[5]={(FLOAT_TYPE).01, (FLOAT_TYPE).01, (FLOAT_TYPE).01, (FLOAT_TYPE).01, (FLOAT_TYPE).01};
 	for(int i=0;i<1;i++){
 		savedSeed = rnd.seed();
-		tempIndiv.treeStruct->ReorientSubtreeSPRMutate(oroot, nroot, prec[i]);
-		out << tempIndiv.treeStruct->lnL << "\t";
+		optCalcs = 0;
+		tempIndiv.treeStruct->ReorientSubtreeSPRMutate(oroot, nroot, optPrecision);
+		var << tempIndiv.treeStruct->lnL << "\t" << optCalcs << "\t";
+		optCalcs = 0;
 		rnd.set_seed(savedSeed);
 		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
 		}
-	out << "\n";
+	treeRejectionThreshold = -10000;
+	for(int i=0;i<1;i++){
+		savedSeed = rnd.seed();
+		optCalcs = 0;
+		tempIndiv.treeStruct->ReorientSubtreeSPRMutate(oroot, nroot, optPrecision);
+		var << tempIndiv.treeStruct->lnL << "\t" << optCalcs << "\t";
+		optCalcs = 0;
+		rnd.set_seed(savedSeed);
+		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
+		}
+*/
+		/*	for(int i=0;i<1;i++){
+		treeRejectionThreshold = origThresh;
+		savedSeed = rnd.seed();
+		optCalcs = 0;
+		tempIndiv.treeStruct->ReorientSubtreeSPRMutate(oroot, nroot, optPrecision);
+		var << tempIndiv.treeStruct->lnL << "\t" << optCalcs << "\t";
+		optCalcs = 0;
+		rnd.set_seed(savedSeed);
+		tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &sourceIndiv, true);
+		}
+*/
 	treeRejectionThreshold = origThresh;
-
 	tempIndiv.treeStruct->RemoveTreeFromAllClas();
 	delete tempIndiv.treeStruct;
 	tempIndiv.treeStruct=NULL;
 	sourceIndiv.treeStruct=NULL;
-
+	optCalcs = 0;
 	ReorientSubtreeSPRMutate(oroot, nroot, optPrecision);
-	out << lnL << "\n";
-	out.close();
-/*	ofstream poo("3branchScores.log", ios::app);
-	poo << endl;
-	poo.close();
-*/	
+	var << lnL << "\t" << optCalcs << "\n";
+	optCalcs = 0;
+#endif
 	}
 
 void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, FLOAT_TYPE optPrecision){
@@ -2093,7 +2157,6 @@ bool RescaleRateHet(CondLikeArray *destCLA, int nsites, int nRateCats){
 #endif
 #ifdef SINGLE_PRECISION_FLOATS
 			if(large1< 1.0f){
-				//DEBUG
 				if(large1 < 1e-30f){
 					throw(1);
 					}
@@ -2219,7 +2282,13 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		if(LCLA!=NULL && RCLA!=NULL){
 			//two internal children
 			ProfIntInt.Start();
-			CalcFullCLAInternalInternal(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats());
+#ifdef EQUIV_CALCS
+			if(direction==DOWN){
+				CalcFullCLAInternalInternalEQUIV(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats(), nd->left->tipData, nd->right->tipData);
+				}
+			else 
+#endif
+				CalcFullCLAInternalInternal(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats());
 			ProfIntInt.Stop();
 			}
 
@@ -2344,6 +2413,15 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 int Tree::Score(int rootNodeNum /*=0*/){
 
 	TreeNode *rootNode=allNodes[rootNodeNum];
+
+#ifdef EQUIV_CALCS
+	if(dirtyEQ){
+		ProfEQVectors.Start();
+		root->SetEquivalentConditionalVectors(data);
+		ProfEQVectors.Stop();
+		dirtyEQ=false;
+		}
+#endif
 
 	bool scoreOK=true;
 	do{
@@ -2821,9 +2899,10 @@ void Tree::SwapAndFreeNodes(TreeNode *cop){
 	if(cop->right->left) SwapAndFreeNodes(cop->right);	
 	}
 
-void Tree::CalcBipartitions(){
+void Tree::CalcBipartitions(bool standardize /*=true*/){
 	root->CalcBipartition();
-	root->StandardizeBipartition();
+	if(standardize)
+		root->StandardizeBipartition();
 	}
 	
 void Tree::OutputBipartitions(){
@@ -3621,7 +3700,11 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
-//	ofstream sit("sitelikes.log");
+#undef OUTPUT_SITELIKES
+
+#ifdef OUTPUT_SITELIKES
+	ofstream sit("sitelikes.log");
+#endif
 
 	for(int i=0;i<nchar;i++){
 		La=Lc=Lg=Lt=0.0;
@@ -3649,10 +3732,13 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 			siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));	
 		
 		totallnL += (*countit++ * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
-
-//		sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
+#ifndef OUTPUT_SITELIKES
 		}
-//	sit.close();
+#else
+		sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
+		}
+	sit.close();
+#endif
 	return totallnL;
 	}
 
