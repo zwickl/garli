@@ -427,10 +427,12 @@ void Adaptation::UpdateProbs(){
 #ifdef GANESH
 	if(totNumRandPECR==0) totNumRandPECR=1;
 #endif
-		
-	FLOAT_TYPE perRandNNI=totRandNNI/totNumRandNNI + randNNIweight;
-	FLOAT_TYPE perLimSPR=totLimSPR/totNumLimSPR + limSPRweight;
-	FLOAT_TYPE perRandSPR=totRandSPR/totNumRandSPR + randSPRweight;
+	//Because NNI's chosen by an SPR mutator are marked as NNI's, this needs to be done to keep from 
+	//giving NNI's some prob even when the weight was 0.0
+	FLOAT_TYPE perRandNNI= (randNNIweight == ZERO_POINT_ZERO ? ZERO_POINT_ZERO : totRandNNI/totNumRandNNI + randNNIweight);
+	FLOAT_TYPE perLimSPR=  (limSPRweight  == ZERO_POINT_ZERO ? ZERO_POINT_ZERO : totLimSPR/totNumLimSPR + limSPRweight);
+	FLOAT_TYPE perRandSPR= (limSPRweight  == ZERO_POINT_ZERO ? ZERO_POINT_ZERO : totRandSPR/totNumRandSPR + randSPRweight);
+	
 #ifdef GANESH
 	FLOAT_TYPE perRandPECR=totRandPECR/totNumRandPECR + randPECRweight;
 	tot=perRandNNI+perLimSPR+perRandSPR+perRandPECR;
@@ -439,9 +441,12 @@ void Adaptation::UpdateProbs(){
 	limSPRprob=perLimSPR/tot;
 	randPECRprob=perRandPECR/tot;
 #else
+
 	tot=perRandNNI+perLimSPR+perRandSPR;
-	randNNIprob=perRandNNI/tot;
-	randSPRprob=perRandSPR/tot;
-	limSPRprob=perLimSPR/tot;
+	if(tot > ZERO_POINT_ZERO){
+		randNNIprob=perRandNNI/tot;
+		randSPRprob=perRandSPR/tot;
+		limSPRprob=perLimSPR/tot;
+		}
 #endif
 	}
