@@ -709,6 +709,7 @@ void Population::ReadPopulationCheckpoint(){
 		indiv[i].SetDirty();
 		indiv[i].CalcFitness(0);
 		}
+	CalcAverageFitness();
 	}
 
 void Population::Run(){
@@ -2756,7 +2757,7 @@ void Population::keepTrack(){
 						//clearing of the swaps records needs to be done for _any_ new best topo, not
 						//just ones that are significantly better
 						if(i == bestIndiv) indiv[0].treeStruct->attemptedSwaps.ClearAttemptedSwaps();
-						if(scoreDif > significantTopoChange){
+						if(scoreDif > conf->significantTopoChange){
 							indiv[0].treeStruct->CalcBipartitions();
 							indiv[i].treeStruct->CalcBipartitions();
 							if(indiv[0].treeStruct->IdenticalTopology(indiv[i].treeStruct->root)==false){

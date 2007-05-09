@@ -294,8 +294,6 @@ private:
 	//termination related variables
 	unsigned lastTopoImprove;
 	unsigned lastPrecisionReduction;
-	FLOAT_TYPE significantTopoChange;//the score difference from the current best required for 
-								 //a new topology to really be considered "better"
 	
 	//DJZ adding these streams directly to the class so that they can be opened once and left open
 	ofstream fate;
