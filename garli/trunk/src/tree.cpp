@@ -3389,22 +3389,30 @@ void Tree::MarkClasNearTipsToReclaim(int subtreeNode){
 		}
 	}
 
-void Tree::OutputFirstClaAcrossTree(ofstream &deb, TreeNode *nd){
-	int site=0;
+void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site){
+	//int site=0;
 	int index=16*site;
-
 	
-	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexDown) == false)
-		deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t" << claMan->GetCla(nd->claIndexDown)->arr[index] << "\t" << claMan->GetCla(nd->claIndexDown)->underflow_mult[site] <<"\n";
-	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexUL) == false)
-		deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t" << claMan->GetCla(nd->claIndexUL)->arr[index] << "\t" << claMan->GetCla(nd->claIndexUL)->underflow_mult[site] <<"\n";
-	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexUR) == false)
-		deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t" << claMan->GetCla(nd->claIndexUR)->arr[index] << "\t" << claMan->GetCla(nd->claIndexUR)->underflow_mult[site] <<"\n";
-				
+	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexDown) == false){
+		deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
+		for(int i=0;i<16;i++) deb << claMan->GetCla(nd->claIndexDown)->arr[index+i] << "\t";
+		deb << claMan->GetCla(nd->claIndexDown)->underflow_mult[site] <<"\n";
+		}
+	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexUL) == false){
+		deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
+		for(int i=0;i<16;i++) deb << claMan->GetCla(nd->claIndexUL)->arr[index+i] << "\t";
+		deb << claMan->GetCla(nd->claIndexUL)->underflow_mult[site] <<"\n";
+		}
+	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexUR) == false){
+		deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
+		for(int i=0;i<16;i++) deb << claMan->GetCla(nd->claIndexUR)->arr[index+i] << "\t";
+		deb << claMan->GetCla(nd->claIndexUR)->underflow_mult[site] <<"\n";
+		}
+
 	if(nd->IsInternal())
-		OutputFirstClaAcrossTree(deb, nd->left);
+		OutputNthClaAcrossTree(deb, nd->left, site);
 	if(nd->next!=NULL)
-		OutputFirstClaAcrossTree(deb, nd->next);
+		OutputNthClaAcrossTree(deb, nd->next, site);
 	}
 
 void Tree::CountNumReservedClas(int &clean, int &tempRes, int&res){

@@ -201,7 +201,7 @@ class Tree{
 		inline CondLikeArray *GetClaUpLeft(TreeNode *nd, bool calc=true);
 		inline CondLikeArray *GetClaUpRight(TreeNode *nd, bool calc=true);
 		void OutputValidClaIndeces();
-		void OutputFirstClaAcrossTree(ofstream &deb, TreeNode *nd);
+		void OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site);
 		void ClaReport(ofstream &cla);
 		FLOAT_TYPE CountClasInUse();
 		void CountNumReservedClas(int &, int &, int&);

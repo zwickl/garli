@@ -116,7 +116,8 @@ public:
 
 class RelativeRates:public BaseParameter{
 public:
-	RelativeRates(const char *c, FLOAT_TYPE **dv, int numE):BaseParameter(c, dv, RELATIVERATES, numE, (FLOAT_TYPE)0.0, (FLOAT_TYPE)999.9){};
+	// 5/9/06 now enforcing non-zero minimum relative rate to avoid problems in the linear algebra functions
+	RelativeRates(const char *c, FLOAT_TYPE **dv, int numE):BaseParameter(c, dv, RELATIVERATES, numE, (FLOAT_TYPE)1.0e-6, (FLOAT_TYPE)999.9){};
 
 	void Mutator(FLOAT_TYPE mutationShape){
 		if(numElements > 1){
@@ -125,6 +126,7 @@ public:
 			if(rateToChange<numElements-1){
 				*vals[rateToChange] *= rnd.gamma( mutationShape );
 				if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;
+				if(*vals[rateToChange]<minv) *vals[rateToChange]=minv;
 				}
 
 			else{//if we alter the reference rate, which we are assuming
@@ -133,12 +135,15 @@ public:
 				FLOAT_TYPE scaler= rnd.gamma( mutationShape );
 				for(int i=0;i<numElements-1;i++){
 					*vals[i] /= scaler;
+					if(*vals[i]>maxv) *vals[i]=maxv;
+					if(*vals[i]<minv) *vals[i]=minv;
 					}
 				}
 			}
 		else {
 			*vals[0] *= rnd.gamma( mutationShape );
-			if(*vals[0]>maxv) *vals[0]=maxv;			
+			if(*vals[0]>maxv) *vals[0]=maxv;
+			if(*vals[0]<minv) *vals[0]=minv;
 			}
 		}
 	};
@@ -173,7 +178,7 @@ public:
 
 class ProportionInvariant:public BaseParameter{
 public:
-	ProportionInvariant(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0, (FLOAT_TYPE)999.9){};
+	ProportionInvariant(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0, (FLOAT_TYPE)1.0){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
 		}

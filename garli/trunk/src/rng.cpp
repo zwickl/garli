@@ -629,7 +629,7 @@ FLOAT_TYPE rng::ppchi2( FLOAT_TYPE p, FLOAT_TYPE v )
         s6 = ( 120.0 + c*( 346.0 + c*127.0)) / 5040.0;
         ch += t*( 1.0 + 0.5*t*s1 - b*c*( s1 - b*( s2 - b*( s3 - b*( s4 - b*( s5 - b*s6))))));
 #endif
-		//DEBUG
+		
 //		cout << q << "\t" << ch  << "\t" << fabs( q/ch - ONE_POINT_ZERO ) << endl;
         if( fabs( q/ch - ONE_POINT_ZERO ) > e )
                 goto label4;
