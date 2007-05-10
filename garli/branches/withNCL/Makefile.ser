@@ -12,28 +12,32 @@ CC	  = g++  #gnu compiler   (gcc)
 #gcc: linux or OSX binary that will work on the machine type that it is compiled on
 CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h
 
+#CC_FLAGS = -g -DUNIX -include defs.h
+
 #icc: any machine type
 #CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -include defs.h
 
 EXEC     = Garli0.951
+
+NCL_DIR = /Users/zwickl/Desktop/ncl-2.0.01/build
 
 OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		population.o rng.o set.o\
 		stricl.o topologylist.o translatetable.o tree.o treenode.o\
 		funcs.o	configreader.o configoptions.o\
 		bipartition.o model.o linalg.o adaptation.o mlhky.o\
-		optimization.o
+		optimization.o garlireader.o
 
 Garli0.951: $(OBJECT_LIST) garlimain.o
-	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) garlimain.o
+	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) -L$(NCL_DIR)/lib/ncl -lncl garlimain.o
 
 garlimain.o:	mlhky.h tree.h population.h \
 		individual.h mlhky.h garlimain.cpp adaptation.h \
 		hashdefines.h defs.h
-	$(CC) $(CC_FLAGS) -c -I. garlimain.cpp
+	$(CC) $(CC_FLAGS) -c -I. -I$(NCL_DIR)/include/ncl garlimain.cpp
 
 .cpp.o: 
-	$(CC) -c $(CC_FLAGS)  -I.  $*.cpp
+	$(CC) -c $(CC_FLAGS)  -I$(NCL_DIR)/include/ncl  -I.  $*.cpp
 
 condlike.o:      condlike.h
 configreader.o:  configreader.h  

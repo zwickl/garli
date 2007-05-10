@@ -26,6 +26,8 @@ using namespace std;
 #include "stricl.h"
 #include "errorexception.h"
 #include "outputman.h"
+#include "ncl.h"
+#include "garlireader.h"
 
 #define MAX_TAXON_LABEL		80
 
@@ -488,7 +490,7 @@ void DataMatrix::BeginNexusTreesBlock(ofstream &treeout){
 	treeout << "#NEXUS\n\nbegin trees;\ntranslate\n";
 	for(int k=0;k<nTax;k++){
 		treeout << "  " << (k+1);
-		NxsString tnstr = TaxonLabel(k);
+		NxsMyString tnstr = TaxonLabel(k);
 		tnstr.blanks_to_underscores();
 		treeout << "  " << tnstr.c_str();
 		if( k == nTax-1 )
@@ -875,6 +877,48 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 	delete []left_margin;
 	return 1;
 }
+
+
+void DataMatrix::CreateMatrixFromNCL(GarliReader &reader){
+	
+	NxsCharactersBlock *charblock = reader.GetCharactersBlock();
+//	vector<unsigned> reducedToOrigCharMap = charblock->GetOrigIndexVector();
+	NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
+	
+	int numOrigTaxa = charblock->GetNTax();
+	int numActiveTaxa = charblock->GetNumActiveTaxa();
+	int numOrigChar = charblock->GetNChar();
+	int numActiveChar = charblock->GetNumActiveChar();
+	//int num_chars = reducedToOrigCharMap.size();
+	//cout << num_chars << endl;
+
+	NewMatrix( numActiveTaxa, numActiveChar );
+
+	// read in the data, including taxon names
+	int i=0;
+	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+		if(charblock->IsActiveTaxon(origTaxIndex)){
+			SetTaxonLabel( i, taxablock->GetTaxonLabel(origTaxIndex).c_str());
+			
+			int j = 0;
+			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
+				if(charblock->IsActiveChar(origIndex)){	
+					unsigned char datum = '\0';
+					if(charblock->IsGapState(origTaxIndex, origIndex) == true) datum = 15;
+					else if(charblock->IsMissingState(origTaxIndex, origIndex) == true) datum = 15;
+					else{
+						int nstates = charblock->GetNumStates(origTaxIndex, origIndex);
+						for(int s=0;s<nstates;s++){
+							datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, origIndex, s));
+							}
+						}
+					SetMatrix( i, j++, datum );
+					}
+				}
+			i++;
+			}
+		}
+	}
 
 void DataMatrix::DumpCounts( const char* s )
 {

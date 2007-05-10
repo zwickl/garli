@@ -28,8 +28,8 @@ class Adaptation{
 	public:
 	//here are all of the scalars:
 	//4 ints, 1 bool, 23 doubles
-	int intervalLength; 
-	int intervalsToStore;
+	unsigned intervalLength; 
+	unsigned intervalsToStore;
 	double lastgenscore;
 	double laststepscore;
 
@@ -63,7 +63,7 @@ class Adaptation{
 	
 	double modelMutateProb;
 
-	int limSPRrange;
+	unsigned limSPRrange;
 
 	//the arrays. All will be of length intervalsToStore
 	double *improvetotal;

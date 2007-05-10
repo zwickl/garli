@@ -27,8 +27,8 @@ using std::string;
 class GeneralGamlConfig{
 	public:
 	//these options will be the same regardless of whether a population is master or remote
-	int logevery;
-	int saveevery;
+	unsigned logevery;
+	unsigned saveevery;
 	double megsClaMemory;
 	double availableMemory;
 	int randseed;
@@ -46,7 +46,7 @@ class GeneralGamlConfig{
 	bool checkpoint;
 
 	bool enforceTermConditions;
-	int lastTopoImproveThresh;
+	unsigned lastTopoImproveThresh;
 	double improveOverStoredIntervalsThresh;
 	double significantTopoChange;
 
@@ -58,16 +58,17 @@ class GeneralGamlConfig{
 
 //	bool dontInferProportionInvariant;
 //	bool useflexrates;
-	int numRateCats;	
+	unsigned numRateCats;	
 
 	//all of the following options can vary between master and remote
 	//general population stuff
-	int nindivs;
-	int holdover;
+	unsigned nindivs;
+	unsigned holdover;
 	double selectionIntensity;
 	double holdoverPenalty;
-	int stopgen;
-	int stoptime;
+	unsigned stopgen;
+	//unsigned stopgen;
+	unsigned stoptime;
 
 	double startOptPrec;
 	double minOptPrec;
@@ -85,17 +86,18 @@ class GeneralGamlConfig{
 	double modWeight;
 	double brlenWeight;
 
-	int intervalLength;
-	int intervalsToStore;
+	unsigned intervalLength;
+	unsigned intervalsToStore;
 
-	int bootstrapReps;
+	unsigned searchReps;
+	unsigned bootstrapReps;
 	bool inferInternalStateProbs;
 
 	//parameters affecting other details of mutations				
 	double meanBrlenMuts;
-	int gammaShapeBrlen;
-	int gammaShapeModel;
-	int limSPRrange;		
+	unsigned gammaShapeBrlen;
+	unsigned gammaShapeModel;
+	unsigned limSPRrange;		
 	double uniqueSwapBias;
 	double distanceSwapBias;
 

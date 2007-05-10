@@ -33,10 +33,10 @@ using namespace std;
 #include "stricl.h"
 #include "defs.h"
 
-unsigned Stri::flags = 0;
-unsigned NxsString::tokenpos = 0;
+unsigned MyStri::flags = 0;
+unsigned NxsMyString::tokenpos = 0;
 
-Stri::Stri()
+MyStri::MyStri()
 {
 	 len = 0;
 	 maxSize = DEF_STRI_SIZE;
@@ -50,7 +50,7 @@ Stri::Stri()
 	 sizeIncr = DEF_STRI_INCR;
 }
 
-Stri::Stri(const unsigned size, const unsigned sizeIncrement)
+MyStri::MyStri(const unsigned size, const unsigned sizeIncrement)
 {
 	 len = 0;
 	 maxSize = (size < 2) ? 2 : size;
@@ -64,7 +64,7 @@ Stri::Stri(const unsigned size, const unsigned sizeIncrement)
 	 sizeIncr = (sizeIncrement == 0) ? 1 : sizeIncrement;
 }
 
-Stri::Stri(const char* s, const unsigned sizeIncrement)
+MyStri::MyStri(const char* s, const unsigned sizeIncrement)
 {
 	 if (s != NULL && s[0] != '\0') {
 		 len = (int)strlen(s);
@@ -90,7 +90,7 @@ Stri::Stri(const char* s, const unsigned sizeIncrement)
 	 sizeIncr = (sizeIncrement == 0) ? 1 : sizeIncrement;
 }
 
-Stri::Stri(const Stri &s, const unsigned sizeIncrement)
+MyStri::MyStri(const MyStri &s, const unsigned sizeIncrement)
 {
 	if( s.len > 0 ) {
 		len = s.len;
@@ -117,7 +117,7 @@ Stri::Stri(const Stri &s, const unsigned sizeIncrement)
   sizeIncr = (sizeIncrement == 0) ? 1 : sizeIncrement;
 }
 
-Stri::~Stri(void)
+MyStri::~MyStri(void)
 {
 	len = 0;
 	assert( str );
@@ -129,7 +129,7 @@ Stri::~Stri(void)
 	sizeIncr = 0;
 }
 
-void Stri::ToUpper()
+void MyStri::ToUpper()
 {
 	char* s = str;
 	while(*s) {
@@ -138,7 +138,7 @@ void Stri::ToUpper()
 	}
 }
 
-unsigned Stri::hash1(unsigned modulo) const
+unsigned MyStri::hash1(unsigned modulo) const
 // return hashing function for a given table size
 {
    unsigned y = 0;
@@ -149,7 +149,7 @@ unsigned Stri::hash1(unsigned modulo) const
    return y;
 }
 
-void Stri::reallocate()
+void MyStri::reallocate()
 {
 	 len = 0;
 	 maxSize = DEF_STRI_SIZE;
@@ -163,7 +163,7 @@ void Stri::reallocate()
 	 sizeIncr = DEF_STRI_INCR;
 }
 
-Stri& Stri::resize(unsigned new_size)
+MyStri& MyStri::resize(unsigned new_size)
 // resize the string object to new_size+1 bytes
 {
    char* strcopy;
@@ -198,13 +198,13 @@ Stri& Stri::resize(unsigned new_size)
 	 return *this;
 }
 
-Stri& Stri::stringupr()
+MyStri& MyStri::stringupr()
 {
 	ToUpper();
 	return *this;
 }
 
-Stri& Stri::operator =(const Stri &s)
+MyStri& MyStri::operator =(const MyStri &s)
 {
 	 len = s.len;
 	 if ((len+1) > maxSize)
@@ -214,7 +214,7 @@ Stri& Stri::operator =(const Stri &s)
 	 return *this;
 }
 
-Stri& Stri::operator =(const char* s)
+MyStri& MyStri::operator =(const char* s)
 {
 	len = (s ? (int)strlen(s) : 0);
 	if ((len+1) > maxSize)
@@ -224,7 +224,7 @@ Stri& Stri::operator =(const char* s)
 	return *this;
 }
 
-Stri& Stri::operator =(const char c)
+MyStri& MyStri::operator =(const char c)
 {
   len = 1;
   *str = c;
@@ -232,7 +232,7 @@ Stri& Stri::operator =(const char c)
   return *this;
 }
 
-char& Stri::operator [](const unsigned i)
+char& MyStri::operator [](const unsigned i)
 {
 	if (checkBounds(i)) {
 		return *(str + i);
@@ -243,7 +243,7 @@ char& Stri::operator [](const unsigned i)
 	}
 }
 
-char Stri::operator [](const unsigned i) const
+char MyStri::operator [](const unsigned i) const
 {
 	if (checkBounds(i)) {
 		return *(str + i);
@@ -252,7 +252,7 @@ char Stri::operator [](const unsigned i) const
 	return '\0';
 }
 
-int Stri::operator >(const Stri& s) const
+int MyStri::operator >(const MyStri& s) const
 {
 	if( flags & IGNORECASE ) {
 	  flags ^= IGNORECASE;
@@ -266,7 +266,7 @@ int Stri::operator >(const Stri& s) const
 		 return strcmp(str,s.str) > 0;
 }
 
-int Stri::operator >=(const Stri& s) const
+int MyStri::operator >=(const MyStri& s) const
 {
 	 if( flags & IGNORECASE ) {
 		 flags ^= IGNORECASE;
@@ -280,7 +280,7 @@ int Stri::operator >=(const Stri& s) const
 		 return strcmp(str,s.str) >= 0;
 }
 
-int Stri::operator ==(const Stri& s) const
+int MyStri::operator ==(const MyStri& s) const
 {
 	 if( flags & IGNORECASE ) {
 		 flags ^= IGNORECASE;
@@ -294,7 +294,7 @@ int Stri::operator ==(const Stri& s) const
 		 return strcmp(str,s.str) == 0;
 }
 
-int Stri::operator <(const Stri& s) const
+int MyStri::operator <(const MyStri& s) const
 {
 	 if( flags & IGNORECASE ) {
 		 flags ^= IGNORECASE;
@@ -308,7 +308,7 @@ int Stri::operator <(const Stri& s) const
 		 return strcmp(str,s.str) < 0;
 }
 
-int Stri::operator <=(const Stri& s) const
+int MyStri::operator <=(const MyStri& s) const
 {
    if( flags & IGNORECASE ) {
      flags ^= IGNORECASE;
@@ -322,7 +322,7 @@ int Stri::operator <=(const Stri& s) const
      return strcmp(str,s.str) <= 0;
 }
 
-int Stri::operator !=(const Stri& s) const
+int MyStri::operator !=(const MyStri& s) const
 {
    if( flags & IGNORECASE ) {
      flags ^= IGNORECASE;
@@ -336,7 +336,7 @@ int Stri::operator !=(const Stri& s) const
      return strcmp(str,s.str) != 0;
 }
 
-int Stri::operator >(const char* s) const
+int MyStri::operator >(const char* s) const
 {
    if( flags & IGNORECASE ) {
      flags ^= IGNORECASE;
@@ -350,7 +350,7 @@ int Stri::operator >(const char* s) const
      return strcmp(str,s) > 0;
 }
 
-int Stri::operator >=(const char* s) const
+int MyStri::operator >=(const char* s) const
 {
    if( flags & IGNORECASE ) {
      flags ^= IGNORECASE;
@@ -364,7 +364,7 @@ int Stri::operator >=(const char* s) const
      return strcmp(str,s) >= 0;
 }
 
-int Stri::operator ==(const char* s) const
+int MyStri::operator ==(const char* s) const
 {
    if( flags & IGNORECASE ) {
      flags ^= IGNORECASE;
@@ -378,7 +378,7 @@ int Stri::operator ==(const char* s) const
      return strcmp(str,s) == 0;
 }
 
-int Stri::operator <(const char* s) const
+int MyStri::operator <(const char* s) const
 {
    if( flags & IGNORECASE ) {
      flags ^= IGNORECASE;
@@ -392,7 +392,7 @@ int Stri::operator <(const char* s) const
      return strcmp(str,s) < 0;
 }
 
-int Stri::operator <=(const char* s) const
+int MyStri::operator <=(const char* s) const
 {
    if( flags & IGNORECASE ) {
      flags ^= IGNORECASE;
@@ -406,7 +406,7 @@ int Stri::operator <=(const char* s) const
      return strcmp(str,s) <= 0;
 }
 
-int Stri::operator !=(const char* s) const
+int MyStri::operator !=(const char* s) const
 {
    if( flags & IGNORECASE ) {
      flags ^= IGNORECASE;
@@ -420,9 +420,9 @@ int Stri::operator !=(const char* s) const
      return strcmp(str,s) != 0;
 }
 
-Stri operator +(Stri &s1, Stri &s2)
+MyStri operator +(MyStri &s1, MyStri &s2)
 {
-	 Stri result(s1.len + s2.len + 1);
+	 MyStri result(s1.len + s2.len + 1);
 
 	 if( s1.str ) strcpy(result.str, s1.str);
 	 if( s2.str ) strcat(result.str, s2.str);
@@ -431,9 +431,9 @@ Stri operator +(Stri &s1, Stri &s2)
 	 return result;
 }
 
-Stri operator +(Stri &s1, char* s2)
+MyStri operator +(MyStri &s1, char* s2)
 {
-	 Stri result(s1.len + strlen(s2) + 1);
+	 MyStri result(s1.len + strlen(s2) + 1);
 	 unsigned length = (unsigned) strlen(s2);
 
 	 if( s1.str ) strcpy(result.str, s1.str);
@@ -442,9 +442,9 @@ Stri operator +(Stri &s1, char* s2)
    return result;
 }
 
-Stri operator +(char* s1, Stri &s2)
+MyStri operator +(char* s1, MyStri &s2)
 {
-   Stri result((unsigned) strlen(s1) + s2.len + 1);
+   MyStri result((unsigned) strlen(s1) + s2.len + 1);
    unsigned length = (unsigned) strlen(s1);
 
    if( s1 ) strcpy(result.str, s1) ;
@@ -453,9 +453,9 @@ Stri operator +(char* s1, Stri &s2)
    return result;
 }
 
-Stri operator +(Stri &s, char c)
+MyStri operator +(MyStri &s, char c)
 {
-   Stri result(s.len + 2);
+   MyStri result(s.len + 2);
 
    if( s.str ) strcpy(result.str,s.str);
    result.len = s.len;
@@ -465,9 +465,9 @@ Stri operator +(Stri &s, char c)
    return result;
 }
 
-Stri operator +(char c, Stri &s)
+MyStri operator +(char c, MyStri &s)
 {
-   Stri result(2 + s.len) ;
+   MyStri result(2 + s.len) ;
 
    *(result.str+1) = '\0';
    *(result.str) = c;
@@ -476,7 +476,7 @@ Stri operator +(char c, Stri &s)
    return result;
 }
 
-Stri& Stri::operator +=(const Stri &s)
+MyStri& MyStri::operator +=(const MyStri &s)
 {
 	 unsigned newlen = len + s.len;
 
@@ -488,7 +488,7 @@ Stri& Stri::operator +=(const Stri &s)
 	 return *this;
 }
 
-Stri& Stri::operator +=(const char* s)
+MyStri& MyStri::operator +=(const char* s)
 {
 	 unsigned newlen = len + strlen(s);
 
@@ -499,7 +499,7 @@ Stri& Stri::operator +=(const char* s)
 	 return *this;
 }
 
-Stri& Stri::operator +=(const char c)
+MyStri& MyStri::operator +=(const char c)
 {
 	 unsigned newlen = len + 1;
 
@@ -511,13 +511,13 @@ Stri& Stri::operator +=(const char c)
 	 return *this;
 }
 
-ostream& operator <<(ostream& os, Stri& s)
+ostream& operator <<(ostream& os, MyStri& s)
 {
 		os << s.str;
 		return os;
 }
 
-istream& operator >>(istream& is, Stri& s)
+istream& operator >>(istream& is, MyStri& s)
 {
 		if (s.str) {
 			//delete [] s.str; // delete current string
@@ -536,8 +536,8 @@ istream& operator >>(istream& is, Stri& s)
 		return is;
 }
 
-NxsString::NxsString(const NxsString &s, const unsigned sizeIncrement)
-		: Stri (s.str, sizeIncrement)
+NxsMyString::NxsMyString(const NxsMyString &s, const unsigned sizeIncrement)
+		: MyStri (s.str, sizeIncrement)
 {
 	//len = s.len;
 	//maxSize = len+1;
@@ -548,7 +548,7 @@ NxsString::NxsString(const NxsString &s, const unsigned sizeIncrement)
 	//badindex = -1;
 }
 
-NxsString& NxsString::operator -=(const char c)
+NxsMyString& NxsMyString::operator -=(const char c)
 {
 	 if(str[len-1] == c)
 		 str[--len] = '\0';
@@ -556,13 +556,13 @@ NxsString& NxsString::operator -=(const char c)
 	 return *this;
 }
 
-NxsString& NxsString::operator =(const int i)
+NxsMyString& NxsMyString::operator =(const int i)
 {	
 	char s[6];
 	//itoa(i, s, 10);
 //	sprintf(s, "%d", i);
 	*s=i;
-	// below modified from Stri::operator =(const char*)
+	// below modified from MyStri::operator =(const char*)
 	len = 1;
 //	if ( ( len + 1 ) > maxSize )
 //		resize( len + 1 );
@@ -572,12 +572,12 @@ NxsString& NxsString::operator =(const int i)
 	return *this;
 }
 
-NxsString& NxsString::operator +=(const int i)
+NxsMyString& NxsMyString::operator +=(const int i)
 {
 	char s[6];
 	sprintf(s, "%d", i);  
 
-	// below modified from Stri::operator +=(const Stri&)
+	// below modified from MyStri::operator +=(const MyStri&)
 	int slen = (int)strlen(s);
 	unsigned newlen = len + slen;
 
@@ -590,12 +590,12 @@ NxsString& NxsString::operator +=(const int i)
 	return *this;
 }
 
-NxsString& NxsString::operator +=(const double i)
+NxsMyString& NxsMyString::operator +=(const double i)
 {
 	char s[40];
 	sprintf(s, "%lf", i);  
 
-	// below modified from Stri::operator +=(const Stri&)
+	// below modified from MyStri::operator +=(const MyStri&)
 	int slen = (int)strlen(s);
 	unsigned newlen = len + slen;
 
@@ -608,9 +608,9 @@ NxsString& NxsString::operator +=(const double i)
 	return *this;
 }
 
-NxsString& NxsString::operator +=( const NxsString& s )
+NxsMyString& NxsMyString::operator +=( const NxsMyString& s )
 {
-	// borrowed from Stri::operator +=(const Stri&)
+	// borrowed from MyStri::operator +=(const MyStri&)
 	unsigned newlen = len + s.len;
 
 	if ((newlen+1) > maxSize)
@@ -621,11 +621,11 @@ NxsString& NxsString::operator +=( const NxsString& s )
 	return *this;
 }
 
-NxsString& NxsString::operator +=( const char* s )
+NxsMyString& NxsMyString::operator +=( const char* s )
 {
 	if( !s || s[0] == '\0' ) return *this;
 
-	// borrowed from Stri::operator +=(const char*)
+	// borrowed from MyStri::operator +=(const char*)
 	int slen = (int)strlen(s);
 	unsigned newlen = len + slen;
 
@@ -637,9 +637,9 @@ NxsString& NxsString::operator +=( const char* s )
 	return *this;
 }
 
-NxsString& NxsString::operator +=( const char ch )
+NxsMyString& NxsMyString::operator +=( const char ch )
 {
-	// borrowed from Stri::operator +=(const char)
+	// borrowed from MyStri::operator +=(const char)
 	unsigned newlen = len + 1;
 
 	if( ( newlen + 1 ) > maxSize )
@@ -650,7 +650,7 @@ NxsString& NxsString::operator +=( const char ch )
 	return *this;
 }
 
-char* NxsString::cut_trash(char* trashSet)
+char* NxsMyString::cut_trash(char* trashSet)
 {
 	if( !str || !trashSet)
 		return NULL;
@@ -664,7 +664,7 @@ char* NxsString::cut_trash(char* trashSet)
 	return str;
 }
 
-void NxsString::trim()
+void NxsMyString::trim()
 {
 	for(;;) {
 		char ch = str[len-1];
@@ -682,7 +682,7 @@ void NxsString::trim()
 	}
 }
 
-void NxsString::underscores_to_blanks()
+void NxsMyString::underscores_to_blanks()
 {
 	char* p;
 	for( p = str; *p; p++) {
@@ -690,7 +690,7 @@ void NxsString::underscores_to_blanks()
 	}
 }
 
-void NxsString::blanks_to_underscores()
+void NxsMyString::blanks_to_underscores()
 {
 	char* p;
 	for( p = str; *p; p++) {
@@ -701,7 +701,7 @@ void NxsString::blanks_to_underscores()
 //
 // cf. strtok(str, delim)
 //
-char* FirstToken(NxsString& Str, const char* delims, int ignoreLeadingWS /* = 1 */)
+char* FirstToken(NxsMyString& Str, const char* delims, int ignoreLeadingWS /* = 1 */)
 {
 	Str.tokenpos = 0;
 	char* start = Str.str;
@@ -730,7 +730,7 @@ char* FirstToken(NxsString& Str, const char* delims, int ignoreLeadingWS /* = 1 
 //
 // cf. strtok(0, delim)
 //
-char* NextToken(NxsString& Str, const char* delims, int ignoreLeadingWS /* = 1 */)
+char* NextToken(NxsMyString& Str, const char* delims, int ignoreLeadingWS /* = 1 */)
 {
 	if( Str.tokenpos > Str.len ) {
 		Str.tokenpos = Str.len;
@@ -764,7 +764,7 @@ char* NextToken(NxsString& Str, const char* delims, int ignoreLeadingWS /* = 1 *
 // if not found, returns NULL
 // if ignoreCase = 1, comparison is case insensitive
 //
-char* Strstr( const NxsString& Str, const char* substr, int ignoreCase /* = 0 */)
+char* Strstr( const NxsMyString& Str, const char* substr, int ignoreCase /* = 0 */)
 {
 	if( !substr ) return NULL;
 
@@ -772,8 +772,8 @@ char* Strstr( const NxsString& Str, const char* substr, int ignoreCase /* = 0 */
 		return ::strstr(Str.str, substr);
 
 	// make copies of Str.str and substr
-	NxsString Str_tmp = Str;
-	NxsString substr_tmp = substr;
+	NxsMyString Str_tmp = Str;
+	NxsMyString substr_tmp = substr;
 
 	// convert both to all upper case
 	Str_tmp.to_upper();
@@ -782,12 +782,12 @@ char* Strstr( const NxsString& Str, const char* substr, int ignoreCase /* = 0 */
 	return ::strstr(Str_tmp.str, substr_tmp.str);
 }
 
-char* Strstr( const NxsString& Str, const NxsString& substr, int ignoreCase /* = 0 */)
+char* Strstr( const NxsMyString& Str, const NxsMyString& substr, int ignoreCase /* = 0 */)
 {
 	return Strstr(Str, substr.str, ignoreCase);
 }
 
-unsigned NxsString::HashValue() const
+unsigned NxsMyString::HashValue() const
 {
 	 unsigned y = 0;
 	 char* p = str;

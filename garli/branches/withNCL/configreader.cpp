@@ -18,6 +18,8 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <iostream>
+#include <limits.h>
+#include <math.h>
 
 using namespace std;
 
@@ -50,7 +52,7 @@ int ConfigReader::Load(const char* filename)	{
 
 	file = fopen(filename, "r");
 
-	if (file == NULL) throw ErrorException("error opening file \"%s\".", filename);
+	if (file == NULL) throw ErrorException("could not open file \"%s\".", filename);
 
 	int type;
 	string sectionName, name, val;
@@ -269,21 +271,24 @@ int ConfigReader::GetBoolOption(const char* option, bool& val, bool optional /*=
 		// lower case it
 		for (int i = 0; i < (int)str.length(); ++i)
 			str[i] = tolower(str[i]);
-
+ 
 		if (str == "true")
 			val = true;
 		else if (str == "false")
 			val = false;
-		else if (atoi(str.c_str()) != 0)
-			val = true;
-		else
-			val = false;
+		else if(isdigit(str[0]) != 0){
+			if (atoi(str.c_str()) != 0)
+				val = true;
+			else val = false;
+			}
+		else 
+			throw ErrorException("expecting boolean (0 or 1) for entry \"%s\", found %s", option, str.c_str());
 
 		rv = 0;
 	}
 	else{
 		rv = -1;
-		if(!optional) throw ErrorException("error: could not find boolean configuration entry \"%s\"", option);
+		if(!optional) throw ErrorException("could not find boolean configuration entry \"%s\"", option);
 		}
 		
 	return rv;
@@ -295,13 +300,40 @@ int ConfigReader::GetBoolOption(const char* option, bool& val, bool optional /*=
 int ConfigReader::GetIntOption(const char* option, int& val, bool optional /*=false*/)	{
 	int rv;
 	string str;
+	double dummy;//read into a double first to check bounds
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		val = atoi(str.c_str());
+		dummy = atof(str.c_str());
+		if(dummy > (INT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (INT_MAX-1));
+		if(fabs(dummy - (unsigned)dummy) > 0.0) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
+		val = (int) dummy;
 		rv = 0;
 	}
 	else{
 		rv = -1;
-		if(!optional) throw ErrorException("error: could not find integer configuration entry \"%s\"", option);
+		if(!optional) throw ErrorException("could not find integer configuration entry \"%s\"", option);
+		}
+
+	return rv;
+}
+
+/****************************************************************************************/
+/*** GetUnsignedOption() ***/
+/****************************************************************************************/
+int ConfigReader::GetUnsignedOption(const char* option, unsigned& val, bool optional /*=false*/)	{
+	int rv;
+	string str;
+	double dummy;//read into a double first to check sign and bounds
+	if (GetStringOption(option, str, optional) == 0)	{  // option exists
+		dummy = atof(str.c_str());
+		if(dummy < 0.0) throw ErrorException("entry for option \"%s\" must be >=0", option);
+		if(dummy > (UINT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (UINT_MAX-1));
+		if(fabs(dummy - (unsigned)dummy) > 0.0) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
+		val = (unsigned) dummy;
+		rv = 0;
+	}
+	else{
+		rv = -1;
+		if(!optional) throw ErrorException("could not find unsigned integer configuration entry \"%s\"", option);
 		}
 
 	return rv;
@@ -328,7 +360,7 @@ int ConfigReader::GetIntRangeOption(const char* option, int& val1, int& val2)	{
 	}
 	else{
 		rv = -1;
-		throw ErrorException("error: could not find integer range configuration entry \"%s\"", option);
+		throw ErrorException("could not find integer range configuration entry \"%s\"", option);
 		}
 
 	return rv;
@@ -394,6 +426,26 @@ int ConfigReader::GetDoubleOption(const char* option, double& val, bool optional
 }
 
 /****************************************************************************************/
+/*** GetPositiveDoubleOption() ***/
+/****************************************************************************************/
+//this is just a version of GetDoubleOption that checks that the value is non-negative
+int ConfigReader::GetPositiveDoubleOption(const char* option, double& val, bool optional /*=false*/)	{
+	int rv;
+	string str;
+	if (GetStringOption(option, str, optional) == 0)	{  // option exists
+		val = atof(str.c_str());
+		if(val < 0.0) throw ErrorException("configuration entry \"%s\" cannot be negative", option);
+		rv = 0;
+	}
+	else{
+		rv = -1;
+		if(!optional) throw ErrorException("could not find float configuration entry \"%s\"", option);
+		}
+
+	return rv;
+}
+
+/****************************************************************************************/
 /*** GetDoubleRangeOption() ***/
 /****************************************************************************************/
 int ConfigReader::GetDoubleRangeOption(const char* option, double& val1, double& val2)	{
@@ -414,7 +466,7 @@ int ConfigReader::GetDoubleRangeOption(const char* option, double& val1, double&
 	}
 	else{
 		rv = -1;
-		throw ErrorException("error: could not find float range configuration entry \"%s\"", option);
+		throw ErrorException("could not find float range configuration entry \"%s\"", option);
 		}
 
 	return rv;

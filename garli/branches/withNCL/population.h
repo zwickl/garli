@@ -264,7 +264,7 @@ class PerturbManager{
 class Population
 {
 public:
-	int total_size; //this will be equal to conf->nindiv, except in 
+	unsigned total_size; //this will be equal to conf->nindiv, except in 
 					//the case of the parallel master
 					
 	Individual* indiv;
@@ -286,20 +286,26 @@ public:
 	bool outputMostlyUselessFiles;
 	bool outputPhylipTree;
 	
-	bool bootstrap;
-	int bootstrapReps;
+//	bool bootstrap;
+	unsigned bootstrapReps;
+	unsigned currentBootstrapRep;
+	unsigned searchReps;
+	unsigned currentSearchRep;
 	bool inferInternalStateProbs;
-	int bestIndiv;
-	int bestAccurateIndiv;
+	unsigned bestIndiv;
+	unsigned bestAccurateIndiv;
 
 	//termination related variables
 	bool enforceTermConditions;
-	int lastTopoImprove;
-	int lastPrecisionReduction;
-	int lastTopoImproveThresh;
+	unsigned lastTopoImprove;
+	unsigned lastPrecisionReduction;
+	unsigned lastTopoImproveThresh;
 	double improveOverStoredIntervalsThresh;
 	double significantTopoChange;//the score difference from the current best required for 
 								 //a new topology to really be considered "better"
+
+	bool prematureTermination;//if the user killed the run
+	bool finishedRep;//when a single search replicate is finished (not a bootstrap rep)
 	
 private:
 	//DJZ adding these streams directly to the class so that they can be opened once and left open
@@ -308,22 +314,20 @@ private:
 	ofstream treeLog;
 	ofstream probLog;
 	ofstream bootLog;
+	ofstream bootLogPhylip;
 	ofstream swapLog;
 	char besttreefile[100];
 
-	int ntopos;
-	bool prematureTermination;//if the user killed the run
+	unsigned ntopos;
 
 	char *treeString;
 	long stringSize;
 		
 	vector<Tree *> unusedTrees;
+	//trees that are being stored for some reason, for example the
+	//best from a number of reps
+	vector<Individual *> storedTrees;
 	double prevBestFitness;
-	double avgfit;
-	int new_best_found;
-		
-	int numgensamebest;
-	
 
 	char* logfname;
 	
@@ -340,31 +344,29 @@ private:
 		//allocated in setup, deleted in dest
 		TopologyList **topologies;
 			//allocated in Setup(), deleted in dest
-		long gen;
+		unsigned gen;
 		GeneralGamlConfig *conf;
 		HKYData* data;
 		Individual *allTimeBest; //this is only used for perturbation or ratcheting
 		Individual *bestSinceRestart;
 		Stopwatch stopwatch;
-        	double starting_wtime;
-            double final_wtime;
 
 	public:
 		Population() : error(0), conf(NULL),
 			bestFitness(-(DBL_MAX)), bestIndiv(0),
 			prevBestFitness(-(DBL_MAX)), logfname(0),
 			indiv(NULL), newindiv(NULL),
-			cumfit(NULL), new_best_found(0), avgfit(0.0),
-			gen(0), starting_wtime(0.0), final_wtime(0.0),
+			cumfit(NULL), gen(0), 
 #ifdef INCLUDE_PERTURBATION			 
 			 pertMan(NULL),
 #endif
 			 paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
-			 inferInternalStateProbs(0), bootstrapReps(0),
+			 inferInternalStateProbs(false), bootstrapReps(0), currentBootstrapRep(0),
 			 outputMostlyUselessFiles(0), outputPhylipTree(0),
 			 significantTopoChange(0.01), allTimeBest(NULL),
 			 bestSinceRestart(NULL), treeString(NULL), adap(NULL),
-			 topologies(NULL), prematureTermination(false)
+			 topologies(NULL), prematureTermination(false), currentSearchRep(1), 
+			 searchReps(1), finishedRep(false)
 			{
 			//allTimeBest.SetFitness(-1e100);
 			//bestSinceRestart.SetFitness(-1e100);
@@ -384,9 +386,7 @@ private:
 #endif
 
 		int TimeToQuit();
-		void CatchInterrupt();
 		
-		char *TreeStructToNewick(int i);
 		char *MakeNewick(int, bool);
 		void CreateGnuPlotFile();
 		void WritePopulationCheckpoint(ofstream &out);
@@ -395,16 +395,23 @@ private:
 		void ReadStateFiles();
 		void GetConstraints();
 		void WriteTreeFile( const char* treefname, int fst = -1, int lst = -1 );
+		void WriteStoredTrees( const char* treefname );
+		void WritePhylipTree(ofstream &phytree);
+		void OutputRepNums(ofstream &out);
+		void GetRepNums(string &s);
 
 		void Setup(GeneralGamlConfig *conf, HKYData *, int nprocs = 1, int rank = 0);
-		int Restart(int type, int rank, int nprocs, int restart_count);
-		void SeedPopulationWithStartingTree();
+		void Reset();
+		void SeedPopulationWithStartingTree(int rep);
 		double CalcAverageFitness();
 		void CalculateReproductionProbabilies(double **scoreArray, double selectionIntensity, int indivsInArray);
 		void NextGeneration();
 		void DetermineParentage();
 		void FindTreeStructsForNextGeneration();
 		void PerformMutation(int indNum);
+		void PerformSearch();
+		int EvaluateStoredTrees(bool report);
+		void ClearStoredTrees();
 
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );
@@ -432,7 +439,6 @@ private:
 		void CheckIndividuals();
 		void TopologyReport();
 		void RemoveFromTopologyList(Individual *ind);
-		void SetupTopologyList(int maxNumTopos);
 		void CheckTreesVsClaManager();
 		double IndivFitness(int i);
 		
@@ -441,10 +447,10 @@ private:
 
 		void NNIoptimization();
 //		void SPRoptimization(int indivIndex);
-		bool NNIoptimization(int IndivIndex, int steps);
+		bool NNIoptimization(unsigned IndivIndex, int steps);
 //		bool SPRoptimization(int indivIndex, int range, int cutnum );
 		void SPRPerturbation(int sourceInd, int indivIndex);
-		void keepTrack();
+		void KeepTrackOfMutations();
 		void DetermineSubsets(int);
 		void Partition(TreeNode *pointer);
 		void PartitionDown(TreeNode *pointer, TreeNode *calledFrom);
@@ -469,11 +475,11 @@ private:
 		int prResizeCumFitArray(int);
 				
 	public:
-		void InitializeOutputStreams();
+		void InitializeOutputStreams(int rep);
 		void FinalizeOutputStreams();
 
 		void AppendTreeToTreeLog(int mutType, int indNum=-1);
-		void AppendTreeToBootstrapLog(int rep);
+		void AppendTreeToBootstrapLog(const Individual *ind, int rep);
 		void UpdateTreeModels();
 		
 		void OutputFate();

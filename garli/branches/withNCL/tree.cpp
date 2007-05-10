@@ -109,7 +109,7 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 			while(*s && !isgraph(*s))
 				s++;
 			if(*s==':')
-				{NxsString info = "";
+				{NxsMyString info = "";
 				while( *(s+1)!=')'&& *(s+1)!=','){
 						info+=*(s+1);
 						s++;
@@ -156,7 +156,7 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 				if(*(s+i) == '(') term=false;
 				
 				if(term == false){//add an internal node with the nodenum specified in the string
-					NxsString num;
+					NxsMyString num;
 					num = *s;
 					while(isdigit(*(s+1))){
 						assert(*s);
@@ -169,7 +169,7 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 					}
 				else{//add a terminal node
 					// read taxon name
-	                 NxsString name;
+	                 NxsMyString name;
 	                 name = *s;
 	                 int taxonnodeNum;
 					if(numericalTaxa==true){
@@ -200,7 +200,7 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 						}
 						
 	                if(*s==':'){
-						NxsString info = "";
+						NxsMyString info = "";
 						while( *(s+1)!=')'&& *(s+1)!=','){
 							info+=*(s+1);
 							s++;
@@ -3192,7 +3192,7 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 		nd->MakeNewickForSubtree(subtreeString);		
 		out << "node " << nd->nodeNum << "\t" << subtreeString << "\t";
 		char *loc=subtreeString;
-		NxsString temp;
+		NxsMyString temp;
 		
 		while(*loc){
 			if(isdigit(*loc) == false) out << *loc++;

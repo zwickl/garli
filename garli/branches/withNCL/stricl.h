@@ -1,6 +1,6 @@
 // stricl.h
-// Copyright © 1995 by Dmitri Zaykin (class Stri)
-// and Paul O. Lewis (class NxsString)
+// Copyright © 1995 by Dmitri Zaykin (class MyStri)
+// and Paul O. Lewis (class NxsMyString)
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
@@ -36,7 +36,7 @@ using namespace std;
 const unsigned DEF_STRI_SIZE = 128;
 const unsigned DEF_STRI_INCR = 10;
 
-class Stri
+class MyStri
 {
 	public:
 		enum stringErrors { NO_ERR, NULL_STRING, BAD_INDEX };
@@ -45,11 +45,11 @@ class Stri
 		enum {
 			IGNORECASE = 0x01
 		};
-		Stri& replaceOneChar(char finchar,
+		MyStri& replaceOneChar(char finchar,
 		char replacechar,
 		unsigned start = 0);
 
-		int badindex;     // POL was private, but I needed it for NxsString
+		int badindex;     // POL was private, but I needed it for NxsMyString
 		char *str;         // pointer to characters
 		unsigned maxSize;  // total number of bytes allocated
 		unsigned len;      // current string size
@@ -66,90 +66,90 @@ class Stri
 		static void respect_case() { if( flags & IGNORECASE ) flags ^= IGNORECASE; }
 
 	public:
-		Stri();
-		Stri(const unsigned size,
+		MyStri();
+		MyStri(const unsigned size,
 			const unsigned sizeIncrement = DEF_STRI_INCR);
-		Stri(const char* s,
+		MyStri(const char* s,
 			const unsigned sizeIncrement = DEF_STRI_INCR);
-		Stri(const Stri &,
+		MyStri(const MyStri &,
 			const unsigned sizeIncrement = DEF_STRI_INCR);
-		virtual ~Stri(void);
+		virtual ~MyStri(void);
 		int				checkBounds(unsigned i) const { return (i < len) ? 1 : 0; }
 		void			reallocate();	// cjb - NEVER call this function, its a cheap hack for Parameter serialization
-		Stri&			resize(unsigned new_size);
+		MyStri&			resize(unsigned new_size);
 		void			clear(void) { badindex = -1; }
 		char*			getstr(void) const { return str; }
 		unsigned	hash1(unsigned modulo) const;
 		unsigned	stringlen(void) const { return len; }
-		Stri&			stringupr();
+		MyStri&			stringupr();
 		void			ToUpper();
 		stringErrors getError(void)
 			{ stringErrors temp = strErr; strErr = NO_ERR; return temp; }
-		friend unsigned hash2(Stri& s, unsigned modulo)
+		friend unsigned hash2(MyStri& s, unsigned modulo)
 			{ return s.hash1(modulo); }
-		Stri& operator =(const Stri &);
-		Stri& operator =(const char*);
-		Stri& operator =(const char);
+		MyStri& operator =(const MyStri &);
+		MyStri& operator =(const char*);
+		MyStri& operator =(const char);
 		char& operator[](const unsigned);
 		char operator[](const unsigned) const;
-		int operator >(const Stri&) const;
-		int operator >=(const Stri&) const;
-		int operator ==(const Stri&) const;
-		int operator <(const Stri&) const;
-		int operator <=(const Stri&) const;
-		int operator !=(const Stri&) const;
+		int operator >(const MyStri&) const;
+		int operator >=(const MyStri&) const;
+		int operator ==(const MyStri&) const;
+		int operator <(const MyStri&) const;
+		int operator <=(const MyStri&) const;
+		int operator !=(const MyStri&) const;
 		int operator >(const char*) const;
 		int operator >=(const char*) const;
 		int operator ==(const char*) const;
 		int operator <(const char*) const;
 		int operator <=(const char*) const;
 		int operator !=(const char*) const;
-		friend Stri operator +(Stri&, Stri&);
-		friend Stri operator +(Stri&, char*);
-		friend Stri operator +(char*, Stri&);
-		friend Stri operator +(Stri&, char);
-		friend Stri operator +(char, Stri&);
-		Stri& operator +=(const Stri&);
-		Stri& operator +=(const char*);
-		Stri& operator +=(const char);
-		friend ostream& operator <<(ostream& os, Stri& s);
-		friend istream& operator >>(istream& is, Stri& s);
+		friend MyStri operator +(MyStri&, MyStri&);
+		friend MyStri operator +(MyStri&, char*);
+		friend MyStri operator +(char*, MyStri&);
+		friend MyStri operator +(MyStri&, char);
+		friend MyStri operator +(char, MyStri&);
+		MyStri& operator +=(const MyStri&);
+		MyStri& operator +=(const char*);
+		MyStri& operator +=(const char);
+		friend ostream& operator <<(ostream& os, MyStri& s);
+		friend istream& operator >>(istream& is, MyStri& s);
 };
 
-class NxsString : public Stri
+class NxsMyString : public MyStri
 {
 	protected:
 		static unsigned tokenpos;
 	public:
-		NxsString() : Stri() {}
-		NxsString(const unsigned size
+		NxsMyString() : MyStri() {}
+		NxsMyString(const unsigned size
 			, const unsigned sizeIncrement = DEF_STRI_INCR)
-			: Stri(size, sizeIncrement) {}
-		NxsString(const char* s
+			: MyStri(size, sizeIncrement) {}
+		NxsMyString(const char* s
 			, const unsigned sizeIncrement = DEF_STRI_INCR)
-			: Stri(s, sizeIncrement) {}
-		NxsString(const NxsString&
+			: MyStri(s, sizeIncrement) {}
+		NxsMyString(const NxsMyString&
 			, const unsigned = DEF_STRI_INCR);
 
 		// removes last char from str iff that char same as cf
-		NxsString& operator -=(const char);
+		NxsMyString& operator -=(const char);
 
 		// makes a string out of an integer (i.e.,
-		//		NxsString s = 56;
+		//		NxsMyString s = 56;
 		// results in s.str being "56"
-		NxsString& operator =(const int);
+		NxsMyString& operator =(const int);
 
 		// adds a string made from an integer to *this (i.e.,
-		//		NxsString s = "Locus-";
+		//		NxsMyString s = "Locus-";
 		//		s += 4;
 		// results in s.str being "Locus-4"
-		NxsString& operator +=(const int);
-		NxsString& operator +=(const double i);
+		NxsMyString& operator +=(const int);
+		NxsMyString& operator +=(const double i);
 
 		// must override the other += operators since we overrode the one above
-		NxsString& operator +=( const char );
-		NxsString& operator +=( const char* );
-		NxsString& operator +=( const NxsString& );
+		NxsMyString& operator +=( const char );
+		NxsMyString& operator +=( const char* );
+		NxsMyString& operator +=( const NxsMyString& );
 
 		// removes chars from str that are in trash_set
 		char*    cut_trash(char* /*trash_set*/);
@@ -170,35 +170,35 @@ class NxsString : public Stri
 		unsigned HashValue() const;
 
 		// for emulation of functions in "string.h" and "iostream.h"
-		friend char* Strstr( const NxsString&, const char*, int );
-		friend char* Strstr( const NxsString&, const NxsString&, int );
-		friend char* Stristr( const NxsString&, const char* );
-		friend char* Stristr( const NxsString&, const NxsString& );
-		friend int Strcmp( const NxsString&, const char* );
-		friend int Strcmp( const NxsString&, const NxsString& );
-		friend int Stricmp( const NxsString&, const char* );
-		friend int Stricmp( const NxsString&, const NxsString& );
-		friend char* FirstToken( NxsString&, const char*, int);
-		friend char* NextToken( NxsString&, const char*, int);
+		friend char* Strstr( const NxsMyString&, const char*, int );
+		friend char* Strstr( const NxsMyString&, const NxsMyString&, int );
+		friend char* MyStristr( const NxsMyString&, const char* );
+		friend char* MyStristr( const NxsMyString&, const NxsMyString& );
+		friend int Strcmp( const NxsMyString&, const char* );
+		friend int Strcmp( const NxsMyString&, const NxsMyString& );
+		friend int MyStricmp( const NxsMyString&, const char* );
+		friend int MyStricmp( const NxsMyString&, const NxsMyString& );
+		friend char* FirstToken( NxsMyString&, const char*, int);
+		friend char* NextToken( NxsMyString&, const char*, int);
 };
 
-// functions emulating strstr (use Stristr for case insensitive comparison)
-char* Strstr( const NxsString& /*str*/, const char* /*substr*/, int /*ignoreCase*/ = 0 );
-char* Strstr( const NxsString& /*str*/, const NxsString& /*substr*/, int /*ignoreCase*/ = 0 );
-inline char* Stristr( const NxsString& s, const char* ss ) { return Strstr(s, ss, 1); }
-inline char* Stristr( const NxsString& s, const NxsString& ss ) { return Strstr(s, ss, 1); }
+// functions emulating strstr (use MyStristr for case insensitive comparison)
+char* Strstr( const NxsMyString& /*str*/, const char* /*substr*/, int /*ignoreCase*/ = 0 );
+char* Strstr( const NxsMyString& /*str*/, const NxsMyString& /*substr*/, int /*ignoreCase*/ = 0 );
+inline char* MyStristr( const NxsMyString& s, const char* ss ) { return Strstr(s, ss, 1); }
+inline char* MyStristr( const NxsMyString& s, const NxsMyString& ss ) { return Strstr(s, ss, 1); }
 
 // functions emulating strcmp and stricmp
-inline int Strcmp( const NxsString& s, const char* ss) { return strcmp(s.str, ss); }
-inline int Strcmp( const NxsString& s, const NxsString& ss) { return strcmp(s.str, ss.str); }
-inline int Stricmp( const NxsString& s, const char* ss) { 
+inline int Strcmp( const NxsMyString& s, const char* ss) { return strcmp(s.str, ss); }
+inline int Strcmp( const NxsMyString& s, const NxsMyString& ss) { return strcmp(s.str, ss.str); }
+inline int MyStricmp( const NxsMyString& s, const char* ss) { 
 #if defined( USING_UNISTD_H )
 	return strcasecmp(s.str, ss); 
 #else
 	return strcmp(s.str, ss); 
 #endif
 }
-inline int Stricmp( const NxsString& s, const NxsString& ss) {
+inline int MyStricmp( const NxsMyString& s, const NxsMyString& ss) {
 #if defined( USING_UNISTD_H )
 	return strcasecmp(s.str, ss.str); 
 #else
@@ -208,8 +208,8 @@ inline int Stricmp( const NxsString& s, const NxsString& ss) {
 
 // functions emulating strtok but with the option to ignore leading
 // white space (using isspace) before looking for the delimiters
-char* FirstToken(NxsString&, const char* /*delims*/, int = 1); // cf. strtok(str, delim)
-char* NextToken(NxsString&, const char* /*delims*/, int = 1);  // cf. strtok(0, delim)
+char* FirstToken(NxsMyString&, const char* /*delims*/, int = 1); // cf. strtok(str, delim)
+char* NextToken(NxsMyString&, const char* /*delims*/, int = 1);  // cf. strtok(0, delim)
 
 #endif
 

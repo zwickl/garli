@@ -15,6 +15,7 @@
 
 
 #include <iostream>
+#include <string>
 
 using namespace std;
 
@@ -864,6 +865,30 @@ void Model::OutputPaupBlockForModel(ofstream &outf, const char *treefname) const
 		outf << "];\nend;\n";
 		outf << "[!THIS TREE INFERRED UNDER FLEX RATE MODEL WITH GARLI.\nNO COMPARABLE MODEL IS AVAILABLE IN PAUP!]" << endl;
 		}
+	}
+
+//this should ONLY be used for screen output, since the precision is pretty low
+void Model::CreateGarliFormattedModel(string &s) const{
+	char buf[200];
+	sprintf(buf, " r %.2f %.2f %.2f %.2f %.2f b %.2f %.2f %.2f %.2f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), StateFreq(0), StateFreq(1), StateFreq(2), StateFreq(3));
+	s += buf;
+	
+	if(modSpec.flexRates==true){
+		s += " f ";
+		for(int i=0;i<NRateCats();i++){
+			sprintf(buf, " %.2f %.2f", rateMults[i], rateProbs[i]);
+			s += buf;
+			}
+		}
+	else if(NRateCats()>1){
+		sprintf(buf, " a %.2f", Alpha());
+		s += buf;
+		}
+	if(PropInvar()!=0.0){
+		sprintf(buf, " p %.2f", PropInvar());
+		s += buf;		
+		}
+	s += " ";
 	}
 
 void Model::OutputGarliFormattedModel(ostream &outf) const{

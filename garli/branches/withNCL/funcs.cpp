@@ -28,6 +28,7 @@
 #include "tree.h"
 #include "defs.h"
 #include "outputman.h"
+#include "garlireader.h"
 
 extern OutputManager outman;
 
@@ -86,7 +87,10 @@ int ReadData(const char* filename, HKYData* data)	{
 
 	outman.UserMessage("Reading data file: %s...", filename);
 
-	data->Read( filename );
+//	data->Read( filename );
+	GarliReader &reader = GarliReader::GetInstance();
+	data->CreateMatrixFromNCL(reader);
+	
 	if((data->NChar() > 0) == false) throw ErrorException("problem reading data!");
 
 	// report summary statistics about data

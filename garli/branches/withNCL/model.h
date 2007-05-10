@@ -44,7 +44,7 @@ extern ModelSpecification modSpec;
 
 class BaseParameter {
 protected:
-	NxsString name;
+	NxsMyString name;
 	int type;
 	int numElements;
 	bool fixed;
@@ -417,6 +417,7 @@ class Model{
 	void SetModel(double *model_string);
 	void OutputPaupBlockForModel(ofstream &outf, const char *treefname) const;
 	void OutputGarliFormattedModel(ostream &outf) const;
+	void CreateGarliFormattedModel(string &s) const;
 
 	//model mutations
 	void MutateRates();

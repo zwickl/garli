@@ -38,6 +38,8 @@ typedef double** DblPtrPtr;
 #  define THROW_BADSTATE(a) BadState(a)
 #endif
 
+class GarliReader;
+
 // Note: the class below has pure virtual member functions
 class DataMatrix
 {
@@ -141,6 +143,8 @@ class DataMatrix
 		int Read( const char* filename, char* left_margin = 0 );
 		int Save( const char* filename, char* newfname = 0, char* nxsfname = 0 );
 
+		void CreateMatrixFromNCL(GarliReader &reader);
+
 		char*	DataType() { return info; }
 		int     unsigned charToInt( unsigned char d ) { return (int)d; }
 
@@ -173,7 +177,7 @@ class DataMatrix
 			}
 		void SetTaxonLabel(int i, const char* s);
 		
-		int TaxonNameToNumber(const NxsString &name) const{
+		int TaxonNameToNumber(const NxsMyString &name) const{
 			for(int i=0;i<nTax;i++){
 				if(Strcmp(name, TaxonLabel(i)) == 0) return i+1;//indeces run 0->ntax-1, taxon numbers 1->ntax
 				}

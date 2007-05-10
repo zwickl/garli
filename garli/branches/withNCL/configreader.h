@@ -47,10 +47,12 @@ public:
 	int GetBoolOption(const char*, bool&, bool optional=false);
 	int GetIntOption(const char*, int&, bool optional=false);
 	int GetIntRangeOption(const char*, int&, int&);
+	int GetUnsignedOption(const char* option, unsigned& val, bool optional=false);
 	int GetFloatOption(const char*, float&);
 	int GetFloatRangeOption(const char*, float&, float&);
 	int GetDoubleOption(const char*, double&, bool optional=false);
 	int GetDoubleRangeOption(const char*, double&, double&);
+	int GetPositiveDoubleOption(const char*, double&, bool optional=false);
 
 	Sections::const_iterator BeginSection() const	{
 		return sections.begin();

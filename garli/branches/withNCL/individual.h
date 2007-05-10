@@ -26,6 +26,7 @@ class CondLikeArray;
 class Tree;
 class ParallelManager;
 class Adaptation;
+class NxsTreesBlock;
 
 class Individual
 {
@@ -87,6 +88,7 @@ class Individual
 		int recombinewith;
 		int parent,topo;
 		Individual();
+		Individual(const Individual *other);
 		~Individual();
 
 		double Fitness() const { return fitness; }
@@ -98,6 +100,7 @@ class Individual
 			dirty=false;
 			}
 		void GetStartingConditionsFromFile(const char *fname, int rank, int nTax, bool restart=false);
+		void GetStartingConditionsFromNCL(NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false);
 		void RefineStartingConditions(bool optModel, double branchPrec);
 		void CalcFitness(int subtreeNode);
 		void ReadTreeFromFile(istream & inf);

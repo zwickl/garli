@@ -32,6 +32,7 @@ using namespace std;
 #include "funcs.h"
 #include "errorexception.h"
 #include "outputman.h"
+#include "ncl.h"
 
 extern int memLevel;
 extern int calcCount;
@@ -53,6 +54,23 @@ Individual::Individual() : dirty(1), fitness(0.0),
 	 
  	treeStruct=NULL;
 	mod=new Model();
+	}
+
+Individual::Individual(const Individual *other) : 
+	dirty(1), fitness(0.0), 
+	reproduced(false), willreproduce(false), parent(-1),
+	willrecombine(false), recombinewith(-1), topo(-1), mutated_brlen(0), 
+	mutation_type(0), accurateSubtrees(0){
+
+	mod=new Model();
+	treeStruct=new Tree();
+
+	CopyNonTreeFields(other);
+	
+	treeStruct->MimicTopo(other->treeStruct);
+	dirty=false;
+	treeStruct->lnL=other->fitness;
+	treeStruct->mod=mod;
 	}
 
 Individual::~Individual(){
@@ -124,12 +142,12 @@ void Individual::Mutate(double optPrecision, Adaptation *adap){
 	    int reconDist = treeStruct->TopologyMutator(optPrecision, -1, 0);
 		if(reconDist < 0){
 			if(reconDist == -1) mutation_type |= randNNI;
-			else if(reconDist <  -adap->limSPRrange) mutation_type |= randSPRCon;
+			else if(reconDist < -1 * (int)adap->limSPRrange) mutation_type |= randSPRCon;
 			else mutation_type |= limSPRCon;
 			}
 		else {
 			if(reconDist == 1) mutation_type |= randNNI;
-			else if(reconDist >  adap->limSPRrange) mutation_type |= randSPR;
+			else if(reconDist >  (int) adap->limSPRrange) mutation_type |= randSPR;
 			else mutation_type |= limSPR;
 			}
 	    if(treeStruct->lnL !=-1.0){
@@ -178,6 +196,7 @@ void Individual::CalcFitness(int subtreeNode){
 	}
 
 void Individual::MakeRandomTree(int nTax){
+	assert(treeStruct == NULL);
 	treeStruct=new Tree();
 
 	int n = nTax;
@@ -223,6 +242,8 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	//12-28-05 This part used to check whether a tree had previously been read in before going into
 	//this loop. Now it goes in regardlesss, since it needs to for bootstrapping from a starting tree
 	
+	assert(treeStruct == NULL);
+
 	if (!FileExists(fname))	
 		throw ErrorException("starting model/tree file \"%s\" does not exist!", fname);
 	ifstream stf( fname, ios::in );
@@ -401,7 +422,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 
 	if(restart == false){
 		if(foundTree==true)
-			outman.UserMessage("Obtained starting tree from file %s", fname);
+			outman.UserMessage("Got starting tree from file %s (used tree #%d in file)", fname, effectiveRank+1);
 		else 
 			outman.UserMessage("No starting tree found in file %s, creating random tree", fname);
 
@@ -409,13 +430,64 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				
 		else outman.UserMessage("No starting model found in %s\nUsing default parameter values:", fname);
 			
-		mod->OutputGarliFormattedModel(cout);
-		outman.UserMessage("\n");
+//		mod->OutputGarliFormattedModel(cout);
+
+		string modStr;
+		mod->CreateGarliFormattedModel(modStr);
+		outman.UserMessage(modStr.c_str());
 		}
 
 	mod->UpdateQMat();
 	stf.close();
 	delete []temp;
+	}
+
+void Individual::GetStartingConditionsFromNCL(NxsTreesBlock *treesblock, int rank, int nTax, bool restart /*=false*/){
+	assert(treeStruct == NULL);
+
+	bool foundModel, foundTree;
+	int strlen;
+
+	int totalTrees = treesblock->GetNumTrees();
+	if(totalTrees > 0) foundTree = true;
+	int effectiveRank = rank % totalTrees;
+
+	if(foundTree==true){
+		treeStruct=new Tree(treesblock->GetTreeDescription(effectiveRank).c_str(), true);
+
+		//check that any defined constraints are present in the starting tree
+		treeStruct->CalcBipartitions();
+		int conNum=1;
+		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
+			if((*conit).IsPositive()){
+				if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
+			}
+			else if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
+			conNum++;
+			}
+		treeStruct->AssignCLAsFromMaster();
+		}
+
+	else MakeRandomTree(nTax);
+
+	if(restart == false){
+		if(foundTree==true)
+			outman.UserMessage("Got starting tree %d from NCL)", effectiveRank+1);
+		else 
+			outman.UserMessage("No starting tree found, creating random tree");
+
+//		if(foundModel==true) outman.UserMessage("Obtained starting model from file %s:", fname);
+				
+//		else outman.UserMessage("No starting model found in %s\nUsing default parameter values:", fname);
+			
+//		mod->OutputGarliFormattedModel(cout);
+
+//		string modStr;
+//	mod->CreateGarliFormattedModel(modStr);
+//		outman.UserMessage(modStr.c_str());
+		}
+
+	mod->UpdateQMat();
 	}
 
 void Individual::RefineStartingConditions(bool optModel, double branchPrec){
@@ -440,7 +512,7 @@ void Individual::RefineStartingConditions(bool optModel, double branchPrec){
 		scaleImprove=treeStruct->OptimizeTreeScale(branchPrec);
 		SetDirty();
 		if(optModel==true && mod->NRateCats() > 1 && modSpec.fixAlpha == false && modSpec.gotFlexFromFile == false){
-			alphaImprove=treeStruct->OptimizeAlpha();
+			alphaImprove=treeStruct->OptimizeAlpha(branchPrec);
 			SetDirty();
 			}
 		improve=scaleImprove + trueImprove + alphaImprove;
@@ -463,7 +535,7 @@ void Individual::RefineStartingConditions(bool optModel, double branchPrec){
 void Individual::ReadTreeFromFile(istream & inf)
 {	char tmp[256];
 	char ch = ' ';
-	NxsString s;
+	NxsMyString s;
 
 	while( inf )
 	{

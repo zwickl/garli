@@ -397,7 +397,11 @@ public:
 		return swaps.end();
 		}
 	
-	void SwapReport(ofstream &swapLog){
+	void SwapReport(ofstream &swapLog, int gen){
+		swapLog << gen << "\t" << GetUnique() << "\t" << GetTotal();
+#ifndef DETAILED_SWAP_REPORT
+		swapLog << "\n";
+#else
 		unsigned int distTotCounts[200];
 		unsigned int distUniqueCounts[200];
 		for(int i=0;i<200;i++){
@@ -407,14 +411,13 @@ public:
 			distUniqueCounts[(*it).ReconDist() - 1]++;
 			distTotCounts[(*it).ReconDist() - 1] += (*it).Count();
 			}
-
-		swapLog << "\t" << GetUnique() << "\t" << GetTotal() << "\t" ;
 		
 		for(int i=0;i<200;i++){
 			if(i > 5 && distUniqueCounts[i] == 0) break;
 			swapLog << distUniqueCounts[i] << "\t" << distTotCounts[i] << "\t";
 			}
 		swapLog << endl;
+#endif
 		}
 
 };

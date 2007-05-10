@@ -40,6 +40,8 @@
 #include "errorexception.h"
 #include "outputman.h"
 
+#include "garlireader.h"
+
 //include Sioux console manipulators
 #ifdef MAC
 	#include "sioux.h"
@@ -74,7 +76,7 @@ int CheckRestartNumber(const string str){
 	}
 
 #ifndef SUBROUTINE_GARLI
-int main( int argc, char* argv[] )	{
+int GARLI_main( int argc, char* argv[] )	{
 #else
 int SubGarliMain(int rank)	{
 int argc=1;
@@ -176,8 +178,10 @@ char **argv=NULL;
 
 			// Create the data object
 			HKYData data;
+			//GarliReader & reader = GarliReader::GetInstance();
 			int err=ReadData(conf.datafname.c_str(), &data);
-			if(err==-1) return 0;
+			//data.CreateMatrixFromNCL(reader);
+			//if(err==-1) return 0;
 			
 			//create the population object
 			Population pop;
@@ -188,11 +192,11 @@ char **argv=NULL;
 				ProfilerInit(collectDetailed, bestTimeBase, 100000, 1000);
 			#endif
 
-			if(pop.bootstrapReps == 0){
-				if(conf.restart == false){
-					pop.GetConstraints();
-			
-					pop.SeedPopulationWithStartingTree();
+			if(pop.bootstrapReps == 0){//NOT bootstrapping
+				pop.PerformSearch();
+
+//				if(conf.restart == false){//NOT restarting
+//					pop.SeedPopulationWithStartingTree(1);
 					//DEBUG - to look at effect of prec during init opt on score
 /*					pop.InitializeOutputStreams();
 					time_t repStart;
@@ -210,18 +214,28 @@ char **argv=NULL;
 						else prec -= 0.01;
 						}
 					return 1;
-*/					}
-				else{
-					pop.GetConstraints();
+*/ /*					}
+				else{//restarting
 					pop.ReadStateFiles();
 					pop.adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(&conf);
 					}
-				pop.InitializeOutputStreams();
-				pop.AppendTreeToTreeLog(-1, -1);
-				pop.Run();
-				}
-			else{
-				pop.InitializeOutputStreams();
+				//whether restarting or not
+				pop.InitializeOutputStreams(pop.currentSearchRep);
+				pop.AppendTreeToTreeLog(-1, -1);	
+				pop.Run();//when this returns, one rep has been completed
+				for(pop.currentSearchRep++;pop.currentSearchRep <= pop.searchReps;pop.currentSearchRep++){//if doing multiple reps, loop here
+					cout << "Replicate search " << pop.currentSearchRep << endl;
+					pop.Reset();
+					pop.SeedPopulationWithStartingTree(pop.currentSearchRep);
+					pop.InitializeOutputStreams(pop.currentSearchRep);
+					pop.AppendTreeToTreeLog(-1, -1);
+					pop.Run();
+					if(pop.prematureTermination==true) break;
+					}
+*/				}
+			else{//bootstrapping
+				pop.Bootstrap();
+/*				pop.InitializeOutputStreams(1);
 				if(conf.restart == true) throw(ErrorException("Restarting of bootstrap runs is not supported.\nYou should simply start a new bootstrap run and\ncombine all trees obtained into one bootstrap sample."));
 				if(conf.inferInternalStateProbs == true) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
 				pop.OutputModelReport();
@@ -231,9 +245,8 @@ char **argv=NULL;
 					pop.adap->modelMutateProb=0.0;
 					pop.adap->UpdateProbs();
 					}
-				pop.GetConstraints();
 				pop.Bootstrap();
-				}
+*/				}
 			}catch(ErrorException err){
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
 #ifdef MAC_FRONTEND

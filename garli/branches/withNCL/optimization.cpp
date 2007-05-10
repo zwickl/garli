@@ -168,7 +168,7 @@ double Tree::OptimizeTreeScale(double optPrecision){
 	return -1;
 	}
 
-double Tree::OptimizeAlpha(){
+double Tree::OptimizeAlpha(double optPrecision){
 
 /*
 	double initVal=mod->Alpha();
@@ -176,14 +176,14 @@ double Tree::OptimizeAlpha(){
 	ofstream deb("debug.log");
 	deb.precision(20);
 	for(int s=0;s<30;s++){
-		double scale=.45 + s*.01;
-		mod->SetAlpha(scale);
+		double scale=.01 + s*.01;
+		mod->SetAlpha(scale, false);
 		MakeAllNodesDirty();
 		Score();
 		deb << scale << "\t" << lnL << endl;
 		}
 	deb.close();
-	mod->SetAlpha(initVal);
+	mod->SetAlpha(initVal, false);
 	MakeAllNodesDirty();
 	Score();	
 */	
@@ -193,6 +193,7 @@ double Tree::OptimizeAlpha(){
 	double prev=lnL;
 	double cur;
 	double prevVal=mod->Alpha();
+	double lastChange=9999.9;
 	
 	while(1){
 		double incr=0.001;
@@ -214,7 +215,8 @@ double Tree::OptimizeAlpha(){
 		
 		double est=-d1/d2;
 		
-		if((abs(est) < 0.001 && d2 < 0.0) || (abs(d1) < 50.0)){
+		if((abs(est) < 0.001 || (lastChange < optPrecision && lastChange > 0.0)) && d2 < 0.0){
+		//if((abs(est) < 0.001 && d2 < 0.0) || (abs(d1) < 50.0)){
 			mod->SetAlpha(prevVal, false);
 			MakeAllNodesDirty();			
 			return prev-start;
@@ -225,7 +227,9 @@ double Tree::OptimizeAlpha(){
 			//don't move too much in any one step, or it tends to way overshoot
 			if(abs(est) > 0.1) est *= 0.5;
 			t=prevVal+est;
-			if(t < 0.05) t=prevVal*.5;
+			if((t < 0.05) && (d1 < 0) && (prevVal*0.5 > t)){
+				t=prevVal*.5;
+				}
 			}
 		else{
 			if(d1 > 0.0) t=prevVal*1.1;
@@ -236,6 +240,7 @@ double Tree::OptimizeAlpha(){
 		assert((prevVal==0.05 && mod->Alpha()==0.05)==false);
 		MakeAllNodesDirty();			
 		Score();
+		lastChange = lnL - prev;
 		prev=lnL;
 		prevVal=t;
 		}
