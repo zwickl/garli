@@ -27,9 +27,17 @@
 #endif
 
 void HKYData::CalcEmpiricalFreqs(){
-	empStateFreqs=new FLOAT_TYPE[4];
-	empStateFreqs[1]=empStateFreqs[2]=empStateFreqs[3]=empStateFreqs[0]=0.0;
-	FLOAT_TYPE total = 0.0;
+	empStateFreqs=new FLOAT_TYPE[4];//this is a member of the class, and where the final freqs will be stored
+	empStateFreqs[0]=empStateFreqs[1]=empStateFreqs[2]=empStateFreqs[3]=0.0;
+	
+	//these are all temporary and local
+	FLOAT_TYPE freqSumNoAmbig[4] = {0.0, 0.0, 0.0, 0.0};
+	FLOAT_TYPE freqSumAmbig[4]  = {0.0, 0.0, 0.0, 0.0};
+	FLOAT_TYPE nonAmbigTotal = 0.0;
+	FLOAT_TYPE ambigTotal = 0.0;
+
+	vector<char> ambigStates;
+	vector<int> ambigCounts;
 	for( int i = 0; i < NTax(); i++ ) {
 		for( int j = 0; j < NChar(); j++ ) {
 			char thischar=(char) Matrix( i, j );
@@ -38,32 +46,83 @@ void HKYData::CalcEmpiricalFreqs(){
 			if(thischar & 1) nstates++;
 			if(thischar & 2) nstates++;
 			if(thischar & 4) nstates++;
-			if(thischar & 8) nstates++;
-			
-			if(nstates >1){
-				nstates=nstates +1 -1;
-				}
-			if(nstates < 4){
-				//now divide the states up to the bases
+			if(thischar & 8) nstates++;			
+
+			if(nstates==1){
 				if(thischar & 1)
-					empStateFreqs[0] += (FLOAT_TYPE) Count(j)/nstates;
+					freqSumNoAmbig[0] += (FLOAT_TYPE) Count(j);
 				if(thischar & 2)
-					empStateFreqs[1] += (FLOAT_TYPE) Count(j)/nstates;
+					freqSumNoAmbig[1] += (FLOAT_TYPE) Count(j);
 				if(thischar & 4)
-					empStateFreqs[2] += (FLOAT_TYPE) Count(j)/nstates;
+					freqSumNoAmbig[2] += (FLOAT_TYPE) Count(j);
 				if(thischar & 8) 
-					empStateFreqs[3] += (FLOAT_TYPE) Count(j)/nstates;				
-				
-				total += Count(j);
+					freqSumNoAmbig[3] += (FLOAT_TYPE) Count(j);	
+				nonAmbigTotal += Count(j);
+				}
+			else if(nstates < 4){
+				//now divide the states up to the bases
+				//division will be equal for this pass, and refined below
+				if(thischar & 1)
+					freqSumAmbig[0] += (FLOAT_TYPE) Count(j)/nstates;
+				if(thischar & 2)
+					freqSumAmbig[1] += (FLOAT_TYPE) Count(j)/nstates;
+				if(thischar & 4)
+					freqSumAmbig[2] += (FLOAT_TYPE) Count(j)/nstates;
+				if(thischar & 8) 
+					freqSumAmbig[3] += (FLOAT_TYPE) Count(j)/nstates;
+				ambigTotal += Count(j);
+
+				//these will store a list of the ambiguous characters so that iterations
+				//below don't require going through the whole dataset again
+				ambigStates.push_back(thischar);
+				ambigCounts.push_back(Count(j));					
 				}
 			}
 		}
-	assert( total > 0.0 );
+	
+	for(int j=0;j<4;j++)
+		empStateFreqs[j] = (freqSumNoAmbig[j] + freqSumAmbig[j]) / (nonAmbigTotal + ambigTotal);
 
-	empStateFreqs[0] /= total;
-	empStateFreqs[1] /= total;
-	empStateFreqs[2] /= total;
-	empStateFreqs[3] /= total;
+	//now iterate to refine the emp freqs to account for partial ambiguity
+	if(ambigStates.size() > 0){
+		bool continueIterations;
+		do{
+			continueIterations = false;
+			freqSumAmbig[0]=freqSumAmbig[1]=freqSumAmbig[2]=freqSumAmbig[3]=0.0;
+			for(unsigned i=0;i<ambigStates.size();i++){
+				FLOAT_TYPE fracSum = 0.0;
+				int nstates = 0;
+				char thischar = ambigStates[i];
+				
+				if(thischar & 1)
+					fracSum += empStateFreqs[0];
+				if(thischar & 2)
+					fracSum += empStateFreqs[1];
+				if(thischar & 4)
+					fracSum += empStateFreqs[2];
+				if(thischar & 8)
+					fracSum += empStateFreqs[3];
+				
+				//this time they are allocated to the bases in proportion to the total
+				//frequencies from the last iteration
+				if(thischar & 1)
+					freqSumAmbig[0] += (FLOAT_TYPE) ambigCounts[i] * (empStateFreqs[0]/fracSum);
+				if(thischar & 2)
+					freqSumAmbig[1] += (FLOAT_TYPE) ambigCounts[i] * (empStateFreqs[1]/fracSum);
+				if(thischar & 4)
+					freqSumAmbig[2] += (FLOAT_TYPE) ambigCounts[i] * (empStateFreqs[2]/fracSum);
+				if(thischar & 8) 
+					freqSumAmbig[3] += (FLOAT_TYPE) ambigCounts[i] * (empStateFreqs[3]/fracSum);
+				}
+			FLOAT_TYPE tempFreqs[4] = {0.0, 0.0, 0.0, 0.0};
+			for(int j=0;j<4;j++){
+				tempFreqs[j] = (freqSumNoAmbig[j] + freqSumAmbig[j]) / (nonAmbigTotal + ambigTotal);
+				if(fabs(tempFreqs[j] - empStateFreqs[j]) > 1.0e-8) continueIterations = true;
+				empStateFreqs[j] = tempFreqs[j];
+				}
+			}while(continueIterations);
+		}	
+	
 
 #if defined( DEBUG_CALCFREQ )
 	cerr << endl << "Frequency of A: " << p[0] << endl;
