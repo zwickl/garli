@@ -58,6 +58,15 @@
 #include "mpi.h"
 #endif
 
+#ifdef BOINC
+	#include "boinc_api.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#endif
+
 char programName[81];
 
 OutputManager outman;
@@ -90,6 +99,12 @@ char **argv=NULL;
 	SIOUXSetTitle("\pGARLI 0.94");
 	#endif
 	
+#ifdef BOINC
+	int retval = boinc_init();
+	assert(!retval);
+	outman.SetNoOutput(true);
+#endif
+
 	bool poo=true;
 //	while(poo);
 
@@ -109,7 +124,7 @@ char **argv=NULL;
 	conf_name = temp;
 #endif
 
-#ifdef UNIX
+#if defined(UNIX) || defined(BOINC)
 	bool interactive=false;
 #else
 	bool interactive=true;
@@ -169,8 +184,24 @@ char **argv=NULL;
 				}
 			else sprintf(temp_buf, "ERROR.log");
 			outman.SetLogFile(temp_buf);
-			
+
+#ifndef BOINC
 			outman.UserMessage("Running serial GARLI, version 0.952Beta2 (Feb 2007)\n(->Backbone constraint testing version<-)\n");
+#else
+			outman.UserMessage("Running BOINC GARLI, version 0.952Beta2 (July 2007)\n(->BOINC testing version<-)\n");
+			//check for the presence of BOINC checkpoint files
+			conf.restart = true;
+			sprintf(temp_buf, "%s.adap.check", conf.ofprefix.c_str());
+			if(FileExists(temp_buf) == false) conf.restart = false;
+			sprintf(temp_buf, "%s.pop.check", conf.ofprefix.c_str());
+			if(FileExists(temp_buf) == false) conf.restart = false;
+			if(conf.uniqueSwapBias != ONE_POINT_ZERO){
+				sprintf(temp_buf, "%s.swaps.check", conf.ofprefix.c_str());
+				if(FileExists(temp_buf) == false) conf.restart = false;
+				}
+			if(conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
+		
+#endif
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
@@ -214,7 +245,7 @@ char **argv=NULL;
 				else{
 					pop.ReadStateFiles();
 					outman.UserMessage("Restarting Genetic Algorithm from checkpoint");
-					outman.UserMessage("generation %d, seed %d, best lnL %.3f", pop.gen, rnd.init_seed(), pop.BestFitness());
+					outman.UserMessage("generation %d, seed %d, best lnL %.3f", pop.Gen(), rnd.init_seed(), pop.BestFitness());
 					pop.adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(&conf);
 					}
 				pop.InitializeOutputStreams();
@@ -237,6 +268,10 @@ char **argv=NULL;
 				}
 			}catch(ErrorException err){
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
+#ifdef BOINC
+				boinc_finish(1);
+#endif
+
 #ifdef MAC_FRONTEND
 				NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 				NSString *messageForInterface = [NSString stringWithUTF8String:err.message];
@@ -254,6 +289,9 @@ char **argv=NULL;
 		}
 	
 	outman.CloseLogFile();
+#ifdef BOINC
+	boinc_finish(0);
+#endif
 
 #endif
 	}
@@ -278,6 +316,10 @@ char **argv=NULL;
 	ProfilerDump("\phalfnewrescale.prof");
 	ProfilerTerm();
 	#endif
+
+#ifdef BOINC
+	boinc_finish(0);
+#endif
 
 	return 0;
 };

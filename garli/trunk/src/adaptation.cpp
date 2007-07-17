@@ -28,6 +28,16 @@ using namespace std;
 #include "configoptions.h"
 #include "individual.h"
 
+#ifdef BOINC
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#endif
+
 Adaptation::Adaptation(const GeneralGamlConfig *gc){
 
 	intervalsToStore=gc->intervalsToStore;
@@ -159,14 +169,64 @@ void Adaptation::SetChangeableVariablesFromConfAfterReadingCheckpoint(const Gene
 	limSPRrange = gc->limSPRrange;
 	}
 
-void Adaptation::WriteToCheckpoint(ofstream &out){
+#ifdef BOINC
+void Adaptation::WriteToCheckpointBOINC(MFILE &out) const{
+	//this function assumes that it has been passed an MFILE that is already open for 
+	//binary writing
+
+	//7/13/07 changing this to calculate the actual size of the chunk of scalars
+	//(the number of bytes between the start of the object and the first nonscalar
+	//data member) rather than counting the number of each type and adding it up 
+	//manually.  This should make it work irrespective of things like memory padding
+	//for data member alignment, which could vary between platforms and compilers
+	intptr_t scalarSize = (intptr_t) &improvetotal - (intptr_t) this;
+	out.write(this, 1, scalarSize);
+
+	//now the arrays, which should be of length intervalsToStore
+	out.write((char *) improvetotal, sizeof(FLOAT_TYPE), intervalsToStore);
+
+	out.write((char *) randNNI, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.write((char *) randNNInum, sizeof(int), intervalsToStore);
+	
+	out.write((char *) exNNI, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.write((char *) exNNInum, sizeof(int), intervalsToStore);
+
+	out.write((char *) randSPR, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.write((char *) randSPRnum, sizeof(int), intervalsToStore);
+	
+	out.write((char *) limSPR, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.write((char *) limSPRnum, sizeof(int), intervalsToStore);
+
+	out.write((char *) exlimSPR, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.write((char *) exlimSPRnum, sizeof(int), intervalsToStore);
+
+	out.write((char *) randRecom, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.write((char *) randRecomnum, sizeof(int), intervalsToStore);
+	
+	out.write((char *) bipartRecom, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.write((char *) bipartRecomnum, sizeof(int), intervalsToStore);
+
+	out.write((char *) onlyBrlen, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.write((char *) onlyBrlennum, sizeof(int), intervalsToStore);
+
+	out.write((char *) anyModel, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.write((char *) anyModelnum, sizeof(int), intervalsToStore);
+	}
+#endif
+
+void Adaptation::WriteToCheckpoint(ofstream &out) const{
 	//this function assumes that it has been passed a stream that is already open for 
 	//binary writing
 	assert(out.good());
 
-	//first take care of the scalars, which all come first in the class
-	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(FLOAT_TYPE)*22;
-	out.write((char *) this, scalarSize);
+	//7/13/07 changing this to calculate the actual size of the chunk of scalars
+	//(the number of bytes between the start of the object and the first nonscalar
+	//data member) rather than counting the number of each type and adding it up 
+	//manually.  This should make it work irrespective of things like memory padding
+	//for data member alignment, which could vary between platforms and compilers
+	intptr_t scalarSize = (intptr_t) &improvetotal - (intptr_t) this;
+
+	out.write((char *) this, (streamsize) scalarSize);
 
 	//now the arrays, which should be of length intervalsToStore
 	out.write((char *) improvetotal, sizeof(FLOAT_TYPE)*intervalsToStore);
@@ -199,44 +259,51 @@ void Adaptation::WriteToCheckpoint(ofstream &out){
 	out.write((char *) anyModelnum, sizeof(int)*intervalsToStore);
 	}
 
-void Adaptation::ReadFromCheckpoint(ifstream &in){
-	//this function assumes that it has been passed a stream that is already open for 
-	//binary reading
-	assert(in.good());
-	int scalarSize = sizeof(int)*4 + sizeof(bool) + sizeof(FLOAT_TYPE)*22;
 
-	in.read((char *) this, scalarSize);
+void Adaptation::ReadFromCheckpoint(FILE *in){
+	//this function assumes that it has been passed a FILE* that is already open for 
+	//binary reading
+
+	//7/13/07 changing this to calculate the actual size of the chunk of scalars
+	//(the number of bytes between the start of the object and the first nonscalar
+	//data member) rather than counting the number of each type and adding it up 
+	//manually.  This should make it work irrespective of things like memory padding
+	//for data member alignment, which could vary between platforms and compilers
+	intptr_t scalarSize = (intptr_t) &improvetotal - (intptr_t) this;
+
+	fread((char *) this, 1, scalarSize, in);
 
 	//now the arrays, which should be of length intervalsToStore
-	in.read((char *) improvetotal, sizeof(FLOAT_TYPE)*intervalsToStore);
+	fread((char *) improvetotal, sizeof(FLOAT_TYPE), intervalsToStore, in);
 
-	in.read((char *) randNNI, sizeof(FLOAT_TYPE)*intervalsToStore);
-	in.read((char *) randNNInum, sizeof(int)*intervalsToStore);
+	fread((char *) randNNI, sizeof(FLOAT_TYPE), intervalsToStore, in);
+	fread((char *) randNNInum, sizeof(int), intervalsToStore, in);
 	
-	in.read((char *) exNNI, sizeof(FLOAT_TYPE)*intervalsToStore);
-	in.read((char *) exNNInum, sizeof(int)*intervalsToStore);
+	fread((char *) exNNI, sizeof(FLOAT_TYPE), intervalsToStore, in);
+	fread((char *) exNNInum, sizeof(int), intervalsToStore, in);
 
-	in.read((char *) randSPR, sizeof(FLOAT_TYPE)*intervalsToStore);
-	in.read((char *) randSPRnum, sizeof(int)*intervalsToStore);
+	fread((char *) randSPR, sizeof(FLOAT_TYPE), intervalsToStore, in);
+	fread((char *) randSPRnum, sizeof(int), intervalsToStore, in);
 	
-	in.read((char *) limSPR, sizeof(FLOAT_TYPE)*intervalsToStore);
-	in.read((char *) limSPRnum, sizeof(int)*intervalsToStore);
+	fread((char *) limSPR, sizeof(FLOAT_TYPE), intervalsToStore, in);
+	fread((char *) limSPRnum, sizeof(int), intervalsToStore, in);
 
-	in.read((char *) exlimSPR, sizeof(FLOAT_TYPE)*intervalsToStore);
-	in.read((char *) exlimSPRnum, sizeof(int)*intervalsToStore);
+	fread((char *) exlimSPR, sizeof(FLOAT_TYPE), intervalsToStore, in);
+	fread((char *) exlimSPRnum, sizeof(int), intervalsToStore, in);
 
-	in.read((char *) randRecom, sizeof(FLOAT_TYPE)*intervalsToStore);
-	in.read((char *) randRecomnum, sizeof(int)*intervalsToStore);
+	fread((char *) randRecom, sizeof(FLOAT_TYPE), intervalsToStore, in);
+	fread((char *) randRecomnum, sizeof(int), intervalsToStore, in);
 	
-	in.read((char *) bipartRecom, sizeof(FLOAT_TYPE)*intervalsToStore);
-	in.read((char *) bipartRecomnum, sizeof(int)*intervalsToStore);
+	fread((char *) bipartRecom, sizeof(FLOAT_TYPE), intervalsToStore, in);
+	fread((char *) bipartRecomnum, sizeof(int), intervalsToStore, in);
 
-	in.read((char *) onlyBrlen, sizeof(FLOAT_TYPE)*intervalsToStore);
-	in.read((char *) onlyBrlennum, sizeof(int)*intervalsToStore);
+	fread((char *) onlyBrlen, sizeof(FLOAT_TYPE), intervalsToStore, in);
+	fread((char *) onlyBrlennum, sizeof(int), intervalsToStore, in);
 
-	in.read((char *) anyModel, sizeof(FLOAT_TYPE)*intervalsToStore);
-	in.read((char *) anyModelnum, sizeof(int)*intervalsToStore);
+	fread((char *) anyModel, sizeof(FLOAT_TYPE), intervalsToStore, in);
+	fread((char *) anyModelnum, sizeof(int), intervalsToStore, in);
 	}
+
 
 void Adaptation::PrepareForNextInterval(){
  //if we're on the first generation of a new recording period, shift everything over

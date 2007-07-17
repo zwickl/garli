@@ -30,6 +30,7 @@ using namespace std;
 #include "hashdefines.h"
 
 class HKYData;
+class MFILE;
 
 class TreeNode{
 	public:
@@ -101,7 +102,9 @@ class TreeNode{
 			if(right) right->SetUnoptimized();
 			}
 		void SetEquivalentConditionalVectors(const HKYData *data);
-
+		void OutputBinaryNodeInfo(ofstream &out) const;
+		void OutputBinaryNodeInfoBOINC(MFILE &out) const;
+		     
 		//debugging functions for checking tree formation
 		void CheckforPolytomies();
 		void CheckforLeftandRight();

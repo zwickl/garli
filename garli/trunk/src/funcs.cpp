@@ -114,8 +114,14 @@ int ReadData(const char* filename, HKYData* data)	{
 
 	outman.UserMessage("Reading data file: %s...", filename);
 
+#ifndef BOINC
 	data->Read( filename );
 	if((data->NChar() > 0) == false) throw ErrorException("problem reading data!");
+#else
+	data->ReadBOINC( filename );
+	if((data->NChar() > 0) == false) throw ErrorException("BOINC version of GARLI requires \"compressed\" input datafile");
+#endif
+
 
 	// report summary statistics about data
 	data->Summarize();

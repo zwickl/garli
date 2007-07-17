@@ -26,6 +26,16 @@ using namespace std;
 
 #include "errorexception.h"
 
+#ifdef BOINC
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#endif
+
 class Bipartition{
 	public:	
 	unsigned int *rep;
@@ -468,7 +478,24 @@ class Bipartition{
 			}
 		return str;
 		}
-		
+
+	void BinaryOutput(ofstream &out){
+		int size = nBlocks * sizeof(unsigned int);
+		out.write((char*) rep, nBlocks);
+		}
+
+#ifdef BOINC
+	void BinaryOutputBOINC(MFILE &out){
+		int size = nBlocks * sizeof(unsigned int);
+		out.write((char*) rep, nBlocks, 1);
+		}
+#endif
+
+	void BinaryInput(FILE* &in){
+		int size = nBlocks * sizeof(unsigned int);
+		fread((char*) rep, nBlocks, 1, in);
+		}
+
 	vector<int> NodenumsFromBipart(){
 		vector<int> nodes;
 		for(int i=1;i<=ntax;i++) if(ContainsTaxon(i)) nodes.push_back(i);

@@ -24,6 +24,8 @@ using namespace std;
 #include "configoptions.h"
 #include "hashdefines.h"
 
+class MFILE;
+
 class Adaptation{
 	public:
 	//here are all of the scalars:
@@ -121,9 +123,12 @@ class Adaptation{
 			}
 		else return false;
 		}
-	void WriteToCheckpoint(ofstream &out);
-	void ReadFromCheckpoint(ifstream &in);
-	
+#ifdef BOINC
+	void WriteToCheckpointBOINC(MFILE &) const;
+#endif
+	void WriteToCheckpoint(ofstream &) const;
+	void ReadFromCheckpoint(FILE *);
+
 };
 
 #endif

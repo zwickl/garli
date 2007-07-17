@@ -116,6 +116,9 @@ class Tree{
 		void SwapNodeDataForReroot(TreeNode *nroot);
 		void CheckBalance();
 		void SwapAndFreeNodes(TreeNode *cop);
+		void OutputBinaryFormattedTree(ofstream &) const;
+		void OutputBinaryFormattedTreeBOINC(MFILE &) const;
+		void ReadBinaryFormattedTree(FILE *);
 
 		//functions for copying trees
 		void MimicTopologyButNotInternNodeNums(TreeNode *copySource,TreeNode *replicate,int &placeInAllNodes);

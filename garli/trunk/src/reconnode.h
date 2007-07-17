@@ -26,6 +26,16 @@ extern rng rnd;
 
 using namespace std;
 
+#ifdef BOINC
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#endif
+
 class ReconNode;
 
 typedef list<ReconNode>::iterator listIt;
@@ -188,11 +198,6 @@ class Swap{
 	unsigned short brokenum;
 	unsigned short reconDist;
 
-/*	int count;
-	int cutnum;
-	int brokenum;
-	int reconDist;
-*/
 public:
 	Swap(Bipartition &swap, int cut, int broke, int dist){
 		b=&swap;
@@ -201,6 +206,12 @@ public:
 		brokenum=broke;
 		reconDist=dist;
 		}
+	Swap(FILE* &in){
+		b.BinaryInput(in);
+		intptr_t scalarSize = (intptr_t) &(reconDist) - (intptr_t) &(count) + sizeof(reconDist);
+		fread(&count, scalarSize, 1, in);
+		}
+
 	void Increment(){
 		count++;	
 		}
@@ -220,6 +231,20 @@ public:
 	void Output(ofstream &out){
 		out << b.Output() << "\t" << count << "\t" << cutnum << "\t" << brokenum << "\t" << reconDist << "\n";
 		}
+
+	void BinaryOutput(ofstream &out){
+		b.BinaryOutput(out);
+		intptr_t scalarSize = (intptr_t) &reconDist - (intptr_t) &count + sizeof(reconDist);
+		out.write((char*)&count, (streamsize) scalarSize);
+		}
+
+#ifdef BOINC
+	void BinaryOutputBOINC(MFILE &out){
+		b.BinaryOutputBOINC(out);
+		intptr_t scalarSize = (intptr_t) &reconDist - (intptr_t) &count + sizeof(reconDist);
+		out.write((char*)&count, (streamsize) scalarSize, 1);
+		}
+#endif
 
 	unsigned BipartitionBlock(int block) const{
 		return b.rep[block];	
@@ -281,9 +306,39 @@ public:
 		}
 
 	void WriteSwapCheckpoint(ofstream &out){
+		intptr_t scalarSize = (intptr_t) &total - (intptr_t) &unique + sizeof(total);
+		out.write((char*) &unique, (streamsize) scalarSize);
 		for(list<Swap>::iterator it=swaps.begin();it != swaps.end(); it++){
-			(*it).Output(out);
+			(*it).BinaryOutput(out);
 			}
+		}
+
+#ifdef BOINC
+	void WriteSwapCheckpointBOINC(MFILE &out){
+		intptr_t scalarSize = (intptr_t) &total - (intptr_t) &unique + sizeof(total);
+		out.write((char*) &unique, scalarSize, 1);
+		for(list<Swap>::iterator it=swaps.begin();it != swaps.end(); it++){
+			(*it).BinaryOutputBOINC(out);
+			}
+		}
+#endif
+
+	void ReadBinarySwapCheckpoint(FILE* &in){
+		assert(ferror(in) == false);
+		intptr_t scalarSize = (intptr_t) &total - (intptr_t) &unique + sizeof(total);
+		fread(&unique, scalarSize, 1, in);
+
+		for(unsigned i=0;i<unique;i++){
+			Swap s(in);
+			swaps.push_back(s);
+			}
+		IndexSwaps();
+
+		assert(swaps.size() == unique);
+		//DEBUG
+		int tot=0;
+		for(list<Swap>::iterator it=swaps.begin();it != swaps.end(); it++) tot += (*it).Count();
+		assert(tot == total);
 		}
 
 	void ReadSwapCheckpoint(ifstream &in, int ntax){

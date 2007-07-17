@@ -27,6 +27,16 @@ using namespace std;
 #include "outputman.h"
 #include "mlhky.h"
 
+#ifdef BOINC
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#endif
+
 extern OutputManager outman;
 
 #undef DEBUG_RECOMBINEWITH
@@ -697,3 +707,43 @@ void TreeNode::SetEquivalentConditionalVectors(const HKYData *data){
 			}
 		}
 	}
+
+void TreeNode::OutputBinaryNodeInfo(ofstream &out) const{
+	int zero = 0;
+
+	if(this->IsInternal()){
+		out.write((char*) &(left->nodeNum), sizeof(int));
+		out.write((char*) &(right->nodeNum), sizeof(int));
+		}
+	if(prev == NULL) out.write((char*) &zero, sizeof(int));
+	else out.write((char*) &(prev->nodeNum), sizeof(int));
+
+	if(next == NULL) out.write((char*) &zero, sizeof(int));
+	else out.write((char*) &(next->nodeNum), sizeof(int));
+	
+	if(anc == NULL) out.write((char*) &zero, sizeof(int));
+	else out.write((char*) &(anc->nodeNum), sizeof(int));
+	
+	out.write((char*) &dlen, sizeof(FLOAT_TYPE));
+	}
+
+#ifdef BOINC
+void TreeNode::OutputBinaryNodeInfoBOINC(MFILE &out) const{
+	int zero = 0;
+
+	if(this->IsInternal()){
+		out.write((char*) &(left->nodeNum), sizeof(int), 1);
+		out.write((char*) &(right->nodeNum), sizeof(int), 1);
+		}
+	if(prev == NULL) out.write((char*) &zero, sizeof(int), 1);
+	else out.write((char*) &(prev->nodeNum), sizeof(int), 1);
+
+	if(next == NULL) out.write((char*) &zero, sizeof(int), 1);
+	else out.write((char*) &(next->nodeNum), sizeof(int), 1);
+	
+	if(anc == NULL) out.write((char*) &zero, sizeof(int), 1);
+	else out.write((char*) &(anc->nodeNum), sizeof(int), 1);
+	
+	out.write((char*) &dlen, sizeof(FLOAT_TYPE), 1);
+	}
+#endif

@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
+#include <fstream>
 
 #ifdef WIN32
 #include <conio.h>
@@ -35,6 +36,16 @@
 #ifdef MAC_FRONTEND
 #import <Foundation/Foundation.h>
 #import "MFEInterfaceClient.h"
+#endif
+
+#ifdef BOINC
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
 #endif
 
 using namespace std;
@@ -623,7 +634,7 @@ void Population::OutputModelReport(){
 		}
 	outman.UserMessage("\n");
 	}
-
+/*
 void Population::WriteStateFiles(){
 	char str[100];
 
@@ -649,41 +660,134 @@ void Population::WriteStateFiles(){
 		sout.close();
 		}	
 	}
+*/
+void Population::WriteStateFiles(){
+	char name[100];
+
+	//write the adaptation info checkpoint in binary format
+	sprintf(name, "%s.adap.check", conf->ofprefix.c_str());
+#ifdef BOINC
+	char physical_name[100];
+	boinc_resolve_filename(name, physical_name, sizeof(physical_name));
+	MFILE out;
+	out.open(physical_name, "wb");
+	adap->WriteToCheckpointBOINC(out);
+#else
+	ofstream out(name, ios::out | ios::binary);
+	adap->WriteToCheckpoint(out);
+#endif
+	out.close();
+
+	//write the state of the population, including the seed, generation, elapsed time,
+	//lastTopoImprove and specifications of the current individuals
+	sprintf(name, "%s.pop.check", conf->ofprefix.c_str());
+#ifdef BOINC
+	MFILE pout;
+	boinc_resolve_filename(name, physical_name, sizeof(physical_name));
+	pout.open(physical_name, "wb");
+	WritePopulationCheckpointBOINC(pout);
+#else
+	ofstream pout(name, ios::out | ios::binary);
+	WritePopulationCheckpoint(pout);
+#endif
+	pout.close();
+
+	//if we are keeping track of swaps, write a checkpoint for that
+	if(conf->uniqueSwapBias != ONE_POINT_ZERO){
+		sprintf(name, "%s.swaps.check", conf->ofprefix.c_str());
+#ifdef BOINC
+		MFILE sout;
+		boinc_resolve_filename(name, physical_name, sizeof(physical_name));
+		sout.open(physical_name, "wb");
+		Tree::attemptedSwaps.WriteSwapCheckpointBOINC(sout);
+#else
+		ofstream sout(name, ios::out | ios::binary);
+		Tree::attemptedSwaps.WriteSwapCheckpoint(sout);
+#endif
+		sout.close();
+		}
+	}
 
 void Population::ReadStateFiles(){
-	char str[100];
+	char name[100];
 	outman.UserMessage("Reading checkpoint from previous run....\n");
 
 	//read the adaptation binary checkpoint
-	sprintf(str, "%s.adap.check", conf->ofprefix.c_str());
-	if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
-	ifstream in(str, ios::binary | ios::in);
+	sprintf(name, "%s.adap.check", conf->ofprefix.c_str());
+	FILE *in;
+#ifdef BOINC
+	char physical_name[100];
+	boinc_resolve_filename(name, physical_name, sizeof(physical_name));
+	in = boinc_fopen(physical_name, "rb");
+
+#else
+	if(FileExists(name) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", name));
+	in = fopen(name, "rb");
+#endif
 	adap->ReadFromCheckpoint(in);
+	fclose(in);
 
 	//Read the population checkpoint
 	ReadPopulationCheckpoint();
 
 	//Read the swap checkpoint, if necessary
 	if(conf->uniqueSwapBias != ONE_POINT_ZERO){
-		sprintf(str, "%s.swaps.check", conf->ofprefix.c_str());
-		if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
-		ifstream sin(str);
-		Tree::attemptedSwaps.ReadSwapCheckpoint(sin, data->NTax());
-		sin.close();
+		sprintf(name, "%s.swaps.check", conf->ofprefix.c_str());
+		FILE *sin;
+#ifdef BOINC
+		boinc_resolve_filename(name, physical_name, sizeof(physical_name));
+		sin = boinc_fopen(physical_name, "rb");
+#else
+		if(FileExists(name) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", name));
+		sin = fopen(name, "rb");
+#endif
+		Tree::attemptedSwaps.ReadBinarySwapCheckpoint(sin);
+		fclose(sin);
 		}	
 	}
 
-void Population::WritePopulationCheckpoint(ofstream &out){
-	//we'll just have a single line for each indiv, with the 
-	//model followed by the parenthetical tree
-	out << rnd.seed() << "\t" << gen << "\t" << stopwatch.SplitTime() << "\t" << lastTopoImprove << "\t" << lastPrecisionReduction << "\n";
+void Population::WritePopulationCheckpoint(ofstream &out) {
+	long currentSeed = rnd.seed();
+	out.write((char*) &currentSeed, sizeof(currentSeed));
+	long currentTime = stopwatch.SplitTime();
+	out.write((char*) &currentTime, sizeof(currentTime));
 
+	//7/13/07 changing this to calculate the actual size of the chunk of scalars
+	//(the number of bytes between the start of the object and the first nonscalar
+	//data member) rather than counting the number of each type and adding it up 
+	//manually.  This should make it work irrespective of things like memory padding
+	//for data member alignment, which could vary between platforms and compilers
+	intptr_t scalarSize = (intptr_t) &fraction_done - (intptr_t) this  + sizeof(fraction_done);
+	out.write((char*) this, (streamsize) scalarSize);
+		
 	for(unsigned i=0;i<total_size;i++){
-		indiv[i].mod->OutputGarliFormattedModel(out);
-		indiv[i].treeStruct->root->MakeNewick(treeString, true, true, true);
-		out << treeString << ";" << endl;
+		assert(out.good());
+		indiv[i].mod->OutputBinaryFormattedModel(out);
+		indiv[i].treeStruct->OutputBinaryFormattedTree(out);
 		}
 	}
+
+#ifdef BOINC
+void Population::WritePopulationCheckpointBOINC(MFILE &out) {
+	long currentSeed = rnd.seed();
+	out.write((char*) &currentSeed, sizeof(currentSeed), 1);
+	long currentTime = stopwatch.SplitTime();
+	out.write((char*) &currentTime, sizeof(currentTime), 1);
+
+	//7/13/07 changing this to calculate the actual size of the chunk of scalars
+	//(the number of bytes between the start of the object and the first nonscalar
+	//data member) rather than counting the number of each type and adding it up 
+	//manually.  This should make it work irrespective of things like memory padding
+	//for data member alignment, which could vary between platforms and compilers
+	intptr_t scalarSize = (intptr_t) &fraction_done - (intptr_t) this + sizeof(fraction_done);
+	out.write((char*) this, (streamsize) scalarSize, 1);
+
+	for(unsigned i=0;i<total_size;i++){
+		indiv[i].mod->OutputBinaryFormattedModelBOINC(out);
+		indiv[i].treeStruct->OutputBinaryFormattedTreeBOINC(out);
+		}
+	}
+#endif
 
 void Population::ReadPopulationCheckpoint(){
 	//we'll just have a single line for each indiv, with the 
@@ -691,24 +795,44 @@ void Population::ReadPopulationCheckpoint(){
 	char str[100];
 	sprintf(str, "%s.pop.check", conf->ofprefix.c_str());
 	if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
-	ifstream pin(str);
+
+#ifdef BOINC
+	char physical_name[100];
+	boinc_resolve_filename(str, physical_name, sizeof(physical_name));
+	FILE *pin = boinc_fopen(physical_name, "rb");
+
+#else
+	FILE *pin = fopen(str, "rb");
+#endif
+
 	int tmp;
-	pin >> tmp;
+	fread((char *) &tmp, sizeof(int), 1, pin);
 	rnd.set_seed(tmp);
-	pin >> gen;
-	pin >> tmp;
+
+	fread((char *) &tmp, sizeof(int), 1, pin);
 	stopwatch.AddPreviousTime(tmp);
-	pin >> lastTopoImprove;
-	pin >> lastPrecisionReduction;
-	pin.close();
+
+	//7/13/07 changing this to calculate the actual size of the chunk of scalars
+	//(the number of bytes between the start of the object and the first nonscalar
+	//data member) rather than counting the number of each type and adding it up 
+	//manually.  This should make it work irrespective of things like memory padding
+	//for data member alignment, which could vary between platforms and compilers
+	intptr_t scalarSize = (intptr_t) &fraction_done - (intptr_t) this + sizeof(fraction_done);
+	fread(this, scalarSize, 1, pin);
 
 	for(unsigned i=0;i<total_size;i++){
 		indiv[i].mod->SetDefaultModelParameters(data);
-		indiv[i].GetStartingConditionsFromFile(str, i, data->NTax(), true);
+		indiv[i].mod->ReadBinaryFormattedModel(pin);
+		indiv[i].treeStruct = new Tree();
+		indiv[i].treeStruct->ReadBinaryFormattedTree(pin);
+		indiv[i].treeStruct->AssignCLAsFromMaster();
 		indiv[i].treeStruct->mod=indiv[i].mod;
 		indiv[i].SetDirty();
+		indiv[i].treeStruct->root->CheckTreeFormation();
 		indiv[i].CalcFitness(0);
 		}
+	//as far as the TopologyList is concerned, each individual will be considered different
+	ntopos = total_size;
 	CalcAverageFitness();
 	}
 
@@ -734,7 +858,7 @@ void Population::Run(){
 	[pool release];
 #endif	
 	
-	avgfit = CalcAverageFitness();
+	CalcAverageFitness();
 
 	outman.precision(6);
 	outman.UserMessage("\t%-10s%-15s%-10s%-10s", "gen", "current_lnL", "precision", "last_tree_improvement");
@@ -752,7 +876,9 @@ void Population::Run(){
 		if(conf->outputMostlyUselessFiles) OutputFate();		 
 		if(!(gen % conf->logevery)) OutputLog();
 		if(!(gen % conf->saveevery)){
+#ifndef BOINC
 			if(conf->bootstrapReps==0) WriteTreeFile( besttreefile.c_str() );
+#endif
 			outman.UserMessage("\t%-10d%-15.4f%-10.3f\t%-10d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
 			
 			if(conf->outputMostlyUselessFiles){
@@ -809,9 +935,18 @@ void Population::Run(){
 		if(gen % 1000 == 0 || gen==1)
 			NNISpectrum(bestIndiv);
 #endif
-		if(!(gen%adap->intervalLength)){
 
+#ifdef BOINC
+		if(boinc_time_to_checkpoint()){
+			WriteStateFiles();
+			boinc_checkpoint_completed();
+			}
+#endif
+
+		if(!(gen%adap->intervalLength)){
+#ifndef BOINC
 			if(conf->checkpoint==true && (gen%(adap->intervalLength*adap->intervalsToStore)) == 0) WriteStateFiles();
+#endif
 
 			outman.precision(10);
 			bool reduced=false;
@@ -829,6 +964,9 @@ void Population::Run(){
 				CalcAverageFitness();
 				outman.UserMessage("opt. precision reduced, optimizing branchlengths:%.4f -> %.4f", before, bestFitness);
 				}
+
+			UpdateFractionDone();
+
 /*			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
 				FLOAT_TYPE before=bestFitness;
 				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
@@ -869,6 +1007,10 @@ void Population::Run(){
 #endif
 		}
 
+#ifdef BOINC
+	boinc_fraction_done(0.99);
+#endif
+
 	FinalOptimization();
 	gen = UINT_MAX;
 	OutputLog();
@@ -884,6 +1026,55 @@ void Population::Run(){
 	if(conf->bootstrapReps==0) outman.UserMessage("finished");
 		
 //	log << calcCount << " cla calcs, " << optCalcs << " branch like calls\n";
+#ifdef BOINC
+	boinc_fraction_done(1.0);
+#endif
+	}
+
+void Population::UpdateFractionDone(){
+	//update the proportion done.  This is mainly for BOINC, but might be used elsewhere.  
+	//The algorithm used to determine the progress is fairly arbitrary
+	FLOAT_TYPE fract = 0.0;
+	FLOAT_TYPE current_fract = fraction_done;
+
+	if(conf->enforceTermConditions){
+		if(adap->branchOptPrecision == adap->startOptPrecision){
+			//we've done a decent number of gen, but haven't yet reduced the prec
+			fract = min(0.01 + 0.01 * (double) (gen / 2000), 0.1);
+			}
+
+		else if(adap->branchOptPrecision < adap->startOptPrecision){
+			//divide the rest of the way up to 70% evenly among the precision reductions
+			FLOAT_TYPE reduction_number = (adap->startOptPrecision - adap->branchOptPrecision) / adap->precReductionFactor;
+			fract = 0.1 + ((reduction_number - 1) / (FLOAT_TYPE) (adap->numPrecReductions - 1)) * 0.6;
+			}
+
+		else if(adap->branchOptPrecision == adap->minOptPrecision){
+			//we've entered the home stretch.  But, it's hard to judge progress here because a new tree can always be found
+			//that would reset the number of generations left to go.  So, be conservative, because we aren't allowed to reduce
+			//the percentage
+			unsigned genSinceImprove = gen-max(lastTopoImprove, lastPrecisionReduction);
+			unsigned num_chunks = 5;
+			unsigned chunk_length = (unsigned) (conf->lastTopoImproveThresh / num_chunks);
+			FLOAT_TYPE chunkFracSize = 0.29 / (FLOAT_TYPE) num_chunks;
+			unsigned currentChunkNum = (unsigned) (genSinceImprove / chunk_length);
+			if(currentChunkNum > 0){//if we're above the first chunk boundary
+				if(genSinceImprove % chunk_length <= adap->intervalLength){//if we've just entered this chunk						
+					FLOAT_TYPE baseChunkFrac = 0.70 + currentChunkNum * chunkFracSize;
+					FLOAT_TYPE maxAllowedFrac = baseChunkFrac + chunkFracSize;
+					if(current_fract - maxAllowedFrac < -1.0e-3){//this is effectively maxAllowedFrac > currentBoincFrac 
+						fract = min(max(current_fract + 0.01, baseChunkFrac), maxAllowedFrac);
+						}
+					}
+				}
+			}
+		}
+	if(fract != current_fract){
+		fraction_done = fract;
+		}
+#ifdef BOINC
+	boinc_fraction_done(fraction_done);
+#endif
 	}
 
 void Population::FinalOptimization(){
@@ -1088,19 +1279,13 @@ FLOAT_TYPE Population::CalcAverageFitness(){
 	if( indiv[bestIndiv].Fitness() > prevBestFitness ){
 		prevBestFitness = bestFitness;
 		globalBest = bestFitness = indiv[bestIndiv].Fitness();
-		new_best_found = 1;
-		numgensamebest=0;
 		}
-	else numgensamebest++;
-
-//	allTimeBest = &indiv[bestIndiv];
 
 	if(memLevel>0){
 		//if we are at some level of memory restriction, mark the clas of the old best
 		//for reclamation, and protect those of the new best
 		SetNewBestIndiv(bestIndiv);
 		}
-
 
 	CalculateReproductionProbabilies(cumfit, conf->selectionIntensity, total_size);
 	return avg;
@@ -1517,8 +1702,6 @@ void Population::AssignNewTopology(Individual *indArray, int indNum){
 
 void Population::NextGeneration(){
 
-	new_best_found = 0;
-
 	DetermineParentage();
 
 	for(unsigned i=0;i<ntopos;i++)
@@ -1574,7 +1757,7 @@ void Population::NextGeneration(){
 	newindiv = indiv;
 	indiv = tmp;
 
-	avgfit = CalcAverageFitness(); //score individuals that need it
+	CalcAverageFitness(); //score individuals that need it
 		
 	#ifdef DEBUG_SCORES
 	if(rank==0)	OutputFilesForScoreDebugging();
@@ -1759,7 +1942,6 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 	assert( last <= (int)conf->nindivs );
 
 	assert( treefname );
-	ofstream outf;
 
 	Individual *best=&indiv[bestIndiv];
 
@@ -1769,37 +1951,74 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 		}
 #endif
 
+#ifdef BOINC
+	char physical_name[100];
+	boinc_resolve_filename(treefname, physical_name, sizeof(physical_name));
+	MFILE outf;
+	outf.open(physical_name, "w");
+#else
+	ofstream outf;
 	outf.open( treefname );
 	outf.precision(8);
+#endif
 
-	outf << "#nexus" << endl << endl;
+	string str;
+	char temp[50];
+	str = "#nexus\n\n";
 
 	int ntaxa = data->NTax();
-	outf << "begin trees;\ntranslate\n";
+	str += "begin trees;\ntranslate\n";
 	for(k=0;k<ntaxa;k++){
-		outf << "  " << (k+1);
 		NxsString tnstr = data->TaxonLabel(k);
 		tnstr.blanks_to_underscores();
-		outf << "  " << tnstr.c_str();
+		sprintf(temp, " %d %s", k+1, tnstr.c_str());
+		str += temp;
 		if(k < ntaxa-1) 
-			outf << ",\n";
+			str += ",\n";
 		}		
 
-	outf << ";\n";
-	if(prematureTermination == true) outf << "[NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!]" << endl;
-	outf << "tree best = [&U][" << best->Fitness() << "][";
-	best->mod->OutputGarliFormattedModel(outf);
-	outf << "]";
+	str += ";\n";
+	if(prematureTermination == true) str += "[NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!]\n";
+	sprintf(temp, "tree best = [&U][%f][", best->Fitness()); 
+	str += temp;
+	string modstr;
+	best->mod->FillGarliFormattedModelString(modstr);
+	str += modstr;
+	str += "]";
 
+#ifdef BOINC
+	const char *s = str.c_str();
+	outf.write(s, sizeof(char), str.length());
+	best->treeStruct->root->MakeNewick(treeString, false, true);
+	size_t len = strlen(treeString);
+	outf.write(treeString, sizeof(char), len);
+	str = ";\nend;\n";
+	s = str.c_str();
+	outf.write(s, sizeof(char), str.length());
+#else
+	outf << str;
 	outf.setf( ios::floatfield, ios::fixed );
 	outf.setf( ios::showpoint );
 	best->treeStruct->root->MakeNewick(treeString, false, true);
 	outf << treeString << ";\n";
 	outf << "end;\n";
-	
+#endif	
 	//add a paup block setting the model params
-	best->mod->OutputPaupBlockForModel(outf, treefname);
+	str = "";
+	best->mod->FillPaupBlockStringForModel(str, treefname);
+#ifdef BOINC
+	s = str.c_str();
+	outf.write(s, sizeof(char), str.length());
+	if(prematureTermination == true){
+		str = "[! ****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****\n]";
+		s = str.c_str();
+		outf.write(s, sizeof(char), str.length());
+		}
+#else
+	outf << str; 
 	if(prematureTermination == true) outf << "[! ****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****]" << endl;
+#endif
+		
 	outf.close();
 	
 	if(conf->outputPhylipTree){//output a phylip formatted tree if desired
@@ -3798,6 +4017,7 @@ void Population::InitializeOutputStreams(){
 			}
 		}
 
+#ifndef BOINC
 	//initialize the log file
 	if (rank > 9)
 		sprintf(temp_buf, "%s%s.log%d.log", conf->ofprefix.c_str(), restart, rank);
@@ -3810,6 +4030,7 @@ void Population::InitializeOutputStreams(){
 	else log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << BestFitness() << endl;
 
 	log << "gen\tbest_like\ttime\toptPrecision\n";
+#endif
 
 	//initialize the treelog
 	if(conf->outputTreelog){

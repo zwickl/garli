@@ -324,18 +324,23 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				modSpec.gotRmatFromFile=true;
 				}
 			else if(c == 'B' || c == 'b'){//base freqs
-				FLOAT_TYPE b[3];
+				//7/12/07 changing this to pay attention to the 4th state, if specified
+				//although it should be calcuable from the other three, having exact restartability
+				//sometimes requires that it is taken as is
+				FLOAT_TYPE b[4];
 				for(int i=0;i<3;i++){
 					stf >> temp;
 					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading base frequency parameters in file %s!\nExamine file and check manual for format.\n", fname));
 					b[i]=(FLOAT_TYPE)atof(temp);
 					}
-				mod->SetPis(b, restart==false);
 				do{c=stf.get();}while(c==' ');
 				if(isdigit(c) || c=='.'){
 					stf >> temp;
-					c=stf.get();							
+					b[3]=(FLOAT_TYPE)atof(temp);
+					do{c=stf.get();}while(c==' ');				
 					}
+				else b[3] = ONE_POINT_ZERO - b[0] - b[1] - b[2];
+				mod->SetPis(b, restart==false);
 				modSpec.gotStateFreqsFromFile=true;
 				}
 			else if(c == 'A' || c == 'a'){//alpha shape

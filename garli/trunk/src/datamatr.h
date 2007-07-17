@@ -138,7 +138,9 @@ class DataMatrix
 
 		// functions for getting the data in and out
 		int GetToken( istream& in, char* tokenbuf, int maxlen, bool acceptComments=true );
+		int GetTokenBOINC( FILE *in, char* tokenbuf, int maxlen);
 		int Read( const char* filename, char* left_margin = 0 );
+		int ReadBOINC(const char* filename);
 		int Save( const char* filename, char* newfname = 0, char* nxsfname = 0 );
 
 		char*	DataType() { return info; }

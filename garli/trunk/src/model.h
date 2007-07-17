@@ -29,6 +29,7 @@
 
 
 class ModelSpecification;
+class MFILE;
 
 extern rng rnd;
 extern ModelSpecification modSpec;
@@ -420,8 +421,13 @@ class Model{
 	bool IsModelEqual(const Model *other) const ;	
 	void CopyModel(const Model *from);
 	void SetModel(FLOAT_TYPE *model_string);
-	void OutputPaupBlockForModel(ofstream &outf, const char *treefname) const;
-	void OutputGarliFormattedModel(ostream &outf) const;
+	void OutputPaupBlockForModel(ofstream &, const char *) const;
+	void FillPaupBlockStringForModel(string &str, const char *treefname) const;
+	void OutputGarliFormattedModel(ostream &) const;
+	void FillGarliFormattedModelString(string &s) const;
+	void OutputBinaryFormattedModel(ofstream &) const;
+	void OutputBinaryFormattedModelBOINC(MFILE &out) const;
+	void ReadBinaryFormattedModel(FILE *);
 
 	//model mutations
 	void MutateRates();
@@ -464,12 +470,17 @@ class Model{
 		eigenDirty=true;
 		}
 	void SetPis(FLOAT_TYPE *b, bool checkValidity){
+		//7/12/07 we'll now assume that all freqs have been passed in, rather than calcing the last
+		//from the others
 		if(checkValidity == true){
-			if(modSpec.equalStateFreqs==true && (b[0]==b[1] && b[1]==b[2]) == false) throw(ErrorException("Config file specifies equal statefrequencies,\nbut starting model has nonequal frequencies!\n"));
-			if(modSpec.empiricalStateFreqs==true) throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model specifies frequencies!\n"));
+			if(modSpec.equalStateFreqs==true && (b[0]==b[1] && b[1]==b[2]) == false) 
+				throw(ErrorException("Config file specifies equal statefrequencies,\nbut starting model has nonequal frequencies!\n"));
+			if(modSpec.empiricalStateFreqs==true) 
+				throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model specifies frequencies!\n"));
 			}
-		for(int i=0;i<3;i++) *stateFreqs[i]=b[i];
-		*stateFreqs[3]=(FLOAT_TYPE)1.0 - *stateFreqs[0] - *stateFreqs[1] - *stateFreqs[2];
+		for(int i=0;i<4;i++) *stateFreqs[i]=b[i];
+		if(fabs(ONE_POINT_ZERO - (*stateFreqs[0] + *stateFreqs[1] + *stateFreqs[2] + *stateFreqs[3])) > (FLOAT_TYPE) 1.0e-6)
+			throw(ErrorException("State frequencies do not appear to add up to 1.0!\n"));
 		eigenDirty=true;
 		}
 

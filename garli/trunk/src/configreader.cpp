@@ -27,6 +27,16 @@ using namespace std;
 #include "configreader.h"
 #include "errorexception.h"
 
+#ifdef BOINC
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#endif
+
 using std::pair;
 
 int ConfigReader::UNKNOWN=0;
@@ -51,7 +61,13 @@ int ConfigReader::Load(const char* filename)	{
 	// clear all currently loaded sections
 	sections.clear();
 
+#ifndef BOINC
 	file = fopen(filename, "r");
+#else
+	char input_path[512];
+    boinc_resolve_filename("garli.conf", input_path, sizeof(input_path));
+    file = boinc_fopen(input_path, "r");
+#endif
 
 	if (file == NULL) throw ErrorException("could not open file \"%s\".", filename);
 

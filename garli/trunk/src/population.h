@@ -265,36 +265,43 @@ class PerturbManager{
 
 class Population{
 
+private: 
+	int rank;//denotes which processor this is.  0 if serial
+	int bestIndiv;
+	int bestAccurateIndiv;
+	int subtreeNode;
+	int subtreeDefNumber;
+
+	unsigned gen;
+	//termination related variables
+	unsigned lastTopoImprove;
+	unsigned lastPrecisionReduction;
+	
+	unsigned total_size; //this will be equal to conf->nindiv, except in 
+					//the case of the parallel master
+	unsigned ntopos;
+
+	FLOAT_TYPE bestFitness;
+	FLOAT_TYPE prevBestFitness;
+	FLOAT_TYPE fraction_done;//make sure this remains the last scalar in the class for checkpointing to work
+
 public:
 	GeneralGamlConfig *conf;
 	ClaManager *claMan;
 	Adaptation *adap;
-	unsigned gen;
 	Individual* indiv;
 
 private:
-	unsigned total_size; //this will be equal to conf->nindiv, except in 
-					//the case of the parallel master
 
 	Individual* newindiv;
-	FLOAT_TYPE bestFitness;
-	int rank;//denotes which processor this is.  0 if serial
-	int bestIndiv;
-	int bestAccurateIndiv;
 
-	int subtreeNode;
-	int subtreeDefNumber;
 	vector<int> subtreeMemberNodes;
 
 #ifdef INCLUDE_PERTURBATION
 	PerturbManager *pertMan;
 #endif
 	ParallelManager *paraMan;
-	
-	//termination related variables
-	unsigned lastTopoImprove;
-	unsigned lastPrecisionReduction;
-	
+		
 	//DJZ adding these streams directly to the class so that they can be opened once and left open
 	ofstream fate;
 	ofstream log;
@@ -308,15 +315,9 @@ private:
 	char *treeString;
 	int stringSize;
 
-	unsigned ntopos;
 	bool prematureTermination;//if the user killed the run
 		
 	vector<Tree *> unusedTrees;
-	FLOAT_TYPE prevBestFitness;
-	FLOAT_TYPE avgfit;
-	int new_best_found;
-		
-	int numgensamebest;
 
 	public:
 		enum { nomem=1, nofile, baddimen };
@@ -328,8 +329,6 @@ private:
 			
 	HKYData* data;
 	Stopwatch stopwatch;
-    FLOAT_TYPE starting_wtime;
-    FLOAT_TYPE final_wtime;
 
 #ifdef INCLUDE_PERTURBATION
 	Individual *allTimeBest; //this is only used for perturbation or ratcheting
@@ -340,10 +339,8 @@ private:
 		Population() : error(0), conf(NULL),
 			bestFitness(-(FLT_MAX)), bestIndiv(0),
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
-			cumfit(NULL), new_best_found(0), avgfit(0.0),
-			gen(0), starting_wtime(0.0), final_wtime(0.0),
-			paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
-			treeString(NULL), adap(NULL),
+			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
+			treeString(NULL), adap(NULL), fraction_done(ZERO_POINT_ZERO),
 			topologies(NULL), prematureTermination(false)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
@@ -371,9 +368,11 @@ private:
 		char *TreeStructToNewick(int i);
 		char *MakeNewick(int, bool);
 		void CreateGnuPlotFile();
-		void WritePopulationCheckpoint(ofstream &out);
+		void WritePopulationCheckpoint(ofstream &out) ;
+		void WritePopulationCheckpointBOINC(MFILE &out) ;
 		void ReadPopulationCheckpoint();
 		void WriteStateFiles();
+		void WriteStateFilesBOINC();
 		void ReadStateFiles();
 		void GetConstraints();
 		void WriteTreeFile( const char* treefname, int fst = -1, int lst = -1 );
@@ -388,6 +387,7 @@ private:
 		void DetermineParentage();
 		void FindTreeStructsForNextGeneration();
 		void PerformMutation(int indNum);
+		void UpdateFractionDone();
 
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );
@@ -476,5 +476,6 @@ private:
 		void LogNewBestFromRemote(FLOAT_TYPE, int);
 		void CheckRemoteReplaceThresh();
 		void TurnOffRatchet();
+		unsigned Gen()const {return gen;}
 	};
 #endif

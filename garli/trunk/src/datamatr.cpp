@@ -28,6 +28,16 @@ using namespace std;
 #include "errorexception.h"
 #include "outputman.h"
 
+#ifdef BOINC
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#endif
+
 #define MAX_TAXON_LABEL		80
 
 extern rng rnd;
@@ -698,6 +708,35 @@ int DataMatrix::GetToken( istream& in, char* tokenbuf, int maxlen, bool acceptCo
 	return ok;
 }
 
+int DataMatrix::GetTokenBOINC( FILE *in, char* tokenbuf, int maxlen){
+	int ok = 1;
+
+	int i;
+	char ch = ' ';
+
+	// skip leading whitespace
+	while( in && ( isspace(ch) || ch == '[' ) ){
+		ch = getc(in);
+		}
+	if( !in ) return 0;
+
+	tokenbuf[0] = ch;
+	tokenbuf[1] = '\0';
+	tokenbuf[maxlen-1] = '\0';
+		
+	for( i = 1; i < maxlen-1; i++ ) {
+		ch = getc(in);
+		if( isspace(ch) || ch == ']' )
+			break;
+		tokenbuf[i] = ch;
+		tokenbuf[i+1] = '\0';
+	}
+
+	if( i >= maxlen-1 )
+		ok = 0;
+
+	return ok;
+}
 //
 // Read reads in data from a file
 
@@ -879,6 +918,102 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 
 	return 1;
 }
+
+#ifdef BOINC
+int DataMatrix::ReadBOINC( const char* infname){
+	char ch;
+	FILE *inf;
+	char input_path[512];
+	char buf[100];
+
+    boinc_resolve_filename(infname, input_path, sizeof(input_path));
+    inf = boinc_fopen(input_path, "r");
+	assert(inf);
+
+	// get the dimensions of the data file
+	int num_taxa=0, num_chars=0;
+	
+	fscanf(inf, "%d  %d", &num_taxa, &num_chars);
+	if(ferror(inf)){
+		throw ErrorException("BOINC version of GARLI requires \"compressed\" input datafile");
+		}
+
+	NewMatrix( num_taxa, num_chars );
+
+	// read in the data, including taxon names
+	for( int i = 0; i < num_taxa; i++ ) {
+
+		// get name for taxon i
+		char taxon_name[ MAX_TAXON_LABEL ];
+		int ok = GetTokenBOINC( inf, taxon_name, MAX_TAXON_LABEL);
+		if( !ok ) {
+			cout << "Error reading data (BOINC): label for taxon " << (i+1) << " too long" << endl;
+			return 0;
+		}
+		SetTaxonLabel( i, taxon_name );
+
+		// get data for taxon i
+		for( int j = 0; j < num_chars; j++ ) {
+			do{
+				ch = getc(inf);
+				}while(ch == ' ');
+			unsigned char datum;
+			if( ch == '.' ) 
+	    		datum = Matrix( 0, j );
+	 		else 
+				datum = CharToBitwiseRepresentation(ch);
+				
+			SetMatrix( i, j, datum );
+			}
+		}
+
+	// read in the line containing the counts
+	if( ferror(inf) == false ) {
+		int i;
+
+		for( i = 0; i < num_chars; i++ ) {
+			int ok = GetTokenBOINC( inf, buf, 10);
+			assert(ok);
+			int cnt = atoi(buf);			
+
+			if( !inf ) break;
+			SetCount( i, cnt );
+		}
+		assert(i == num_chars);
+
+		//DJZ 9-13-06
+		//It is very important to properly set the totalNChar variable now
+		//to be the sum of the counts, otherwise bootstrapping after reading
+		//a .cond file will give wrong resampling!!!!!
+		totalNChar=0;
+		for(int i=0;i<num_chars;i++){
+			totalNChar += count[i];
+			}
+		}
+	else{
+		throw ErrorException("BOINC version of GARLI requires \"compressed\" input datafile");
+		}
+
+	// read in the line containing the number of states for each character
+	if( ferror(inf) == false ) {
+		int i;
+		for( i = 0; i < num_chars; i++ ) {
+			int nstates;
+			GetTokenBOINC(inf, buf, 10);
+			if( !inf ) break;
+			nstates = atoi(buf);
+			SetNumStates( i, nstates );
+		}
+	}
+	else{
+		throw ErrorException("BOINC version of GARLI requires \"compressed\" input datafile");
+		}
+	dense = 1;
+
+	fclose(inf);
+	return 1;
+}
+#endif
 
 void DataMatrix::DumpCounts( const char* s )
 {

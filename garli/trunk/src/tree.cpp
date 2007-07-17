@@ -34,6 +34,16 @@ using namespace std;
 #include "datamatr.h"
 #include "reconnode.h"
 
+#ifdef BOINC
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#endif
+
 #include "memchk.h"
 
 #include "utility.h"
@@ -4124,4 +4134,105 @@ void Tree::NNIMutate(int node, int branch, FLOAT_TYPE optPrecision, int subtreeN
 #endif
 
 	OptimizeBranchesWithinRadius(connector, optPrecision, subtreeNode, NULL);
+	}
+
+
+void Tree::OutputBinaryFormattedTree(ofstream &out) const{
+	
+	for(int i=0;i<numNodesTotal;i++){
+		allNodes[i]->OutputBinaryNodeInfo(out);
+		}
+	out.write((char*) &lnL, sizeof(FLOAT_TYPE));
+	out.write((char*) &numTipsTotal, sizeof(numTipsTotal));
+	out.write((char*) &numTipsAdded, sizeof(numTipsAdded));
+	out.write((char*) &numNodesAdded, sizeof(numNodesAdded));
+	out.write((char*) &numBranchesAdded, sizeof(numBranchesAdded));
+	out.write((char*) &numNodesTotal, sizeof(numNodesTotal));
+	}
+
+#ifdef BOINC
+void Tree::OutputBinaryFormattedTreeBOINC(MFILE &out) const{
+	
+	for(int i=0;i<numNodesTotal;i++){
+		allNodes[i]->OutputBinaryNodeInfoBOINC(out);
+		}
+	out.write((char*) &lnL, sizeof(FLOAT_TYPE), 1);
+	out.write((char*) &numTipsTotal, sizeof(numTipsTotal), 1);
+	out.write((char*) &numTipsAdded, sizeof(numTipsAdded), 1);
+	out.write((char*) &numNodesAdded, sizeof(numNodesAdded), 1);
+	out.write((char*) &numBranchesAdded, sizeof(numBranchesAdded), 1);
+	out.write((char*) &numNodesTotal, sizeof(numNodesTotal), 1);
+	}
+#endif
+
+void Tree::ReadBinaryFormattedTree(FILE *in){
+	int dum;
+
+	fread((char*) &dum, sizeof(dum), 1, in);
+	allNodes[0]->left = allNodes[dum];
+
+	fread((char*) &dum, sizeof(dum), 1, in);
+	allNodes[0]->right = allNodes[dum];
+
+	fread((char*) &dum, sizeof(dum), 1, in);
+	if(dum == 0) allNodes[0]->prev = NULL;
+	else allNodes[0]->prev = allNodes[dum];
+	
+	fread((char*) &dum, sizeof(dum), 1, in);
+	if(dum == 0) allNodes[0]->next = NULL;
+	else allNodes[0]->next = allNodes[dum];
+	
+	fread((char*) &dum, sizeof(dum), 1, in);
+	if(dum == 0) allNodes[0]->anc = NULL;
+	else allNodes[0]->anc = allNodes[dum];
+	
+	fread((char*) &allNodes[0]->dlen, sizeof(FLOAT_TYPE), 1, in);
+
+//	double d;
+	for(int i=1;i<=numTipsTotal;i++){
+		fread(&dum, sizeof(dum), 1, in);
+		if(dum == 0) allNodes[i]->prev = NULL;
+		else allNodes[i]->prev = allNodes[dum];
+
+		fread(&dum, sizeof(dum), 1, in);
+		if(dum == 0) allNodes[i]->next = NULL;
+		else allNodes[i]->next = allNodes[dum];
+
+		//all non-root nodes will have an anc, which might be nodenum 0 (the root)
+		//so, don't test for zero here
+		fread(&dum, sizeof(dum), 1, in);
+		allNodes[i]->anc = allNodes[dum];
+
+		fread(&(allNodes[i]->dlen), sizeof(FLOAT_TYPE), 1, in);
+		}
+
+	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		fread((char*) &dum, sizeof(dum), 1, in);
+		allNodes[i]->left = allNodes[dum];
+		
+		fread((char*) &dum, sizeof(dum), 1, in);
+		allNodes[i]->right = allNodes[dum];
+		
+		fread((char*) &dum, sizeof(dum), 1, in);
+		if(dum == 0) allNodes[i]->prev = NULL;
+		else allNodes[i]->prev = allNodes[dum];
+		
+		fread((char*) &dum, sizeof(dum), 1, in);
+		if(dum == 0) allNodes[i]->next = NULL;
+		else allNodes[i]->next = allNodes[dum];
+		
+		//all non-root nodes will have an anc, which might be nodenum 0 (the root)
+		//so, don't test for zero here
+		fread((char*) &dum, sizeof(dum), 1, in);
+		allNodes[i]->anc = allNodes[dum];
+		
+		fread((char*) &allNodes[i]->dlen, sizeof(FLOAT_TYPE), 1, in);
+		}
+
+	fread((char*) &lnL, sizeof(FLOAT_TYPE), 1, in);
+	fread((char*) &numTipsTotal, sizeof(numTipsTotal), 1, in);
+	fread((char*) &numTipsAdded, sizeof(numTipsAdded), 1, in);
+	fread((char*) &numNodesAdded, sizeof(numNodesAdded), 1, in);
+	fread((char*) &numBranchesAdded, sizeof(numBranchesAdded), 1, in);
+	fread((char*) &numNodesTotal, sizeof(numNodesTotal), 1, in);
 	}

@@ -27,6 +27,16 @@ using namespace std;
 #include "mlhky.h"
 #include "rng.h"
 
+#ifdef BOINC
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#endif
+
 #undef ALIGN_MODEL
 
 Profiler ProfCalcPmat("CalcPmat      ");
@@ -943,10 +953,49 @@ void Model::OutputPaupBlockForModel(ofstream &outf, const char *treefname) const
 		}
 	}
 
+void Model::FillPaupBlockStringForModel(string &str, const char *treefname) const{
+	char temp[200];
+	sprintf(temp, "begin paup;\nclear;\ngett file=%s storebr;\nlset userbr ", treefname);
+	str += temp;
+	if(Nst() == 2){
+		sprintf(temp, "st=2 trat=%f ", TRatio());
+		str += temp;
+		}
+	else if(Nst() == 1) str += "nst=1 ";
+	else{
+		sprintf(temp,"nst=6 rmat=(%f %f %f %f %f)", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4));
+		str += temp;
+		}
+	if(modSpec.equalStateFreqs == true) str +=" base=eq ";
+	else if(modSpec.empiricalStateFreqs == true) str += " base=emp ";
+	else{
+		sprintf(temp," base=( %f %f %f)", StateFreq(0), StateFreq(1), StateFreq(2));
+		str += temp;
+		}
+
+	if(modSpec.flexRates==false){
+		if(NRateCats()>1){
+			sprintf(temp, " rates=gamma shape=%f ncat=%d", Alpha(), NRateCats());
+			str += temp;
+			}
+		else str += " rates=equal";
+		sprintf(temp, " pinv=%f;\nend;\n", PropInvar());;
+		str += temp;
+		}
+	else{
+		sprintf(temp, " pinv=%f  [FLEX RATES:\t", PropInvar());
+		str += temp;
+		for(int i=0;i<NRateCats();i++){
+			sprintf(temp, "%f\t%f\t", rateMults[i], rateProbs[i]);
+			str += temp;
+			}
+		str += "];\nend;\n[!THIS TREE INFERRED UNDER FLEX RATE MODEL WITH GARLI.\nNO COMPARABLE MODEL IS AVAILABLE IN PAUP!]\n";
+		}
+	}
+
 void Model::OutputGarliFormattedModel(ostream &outf) const{
 	outf << " r " << Rates(0) << " " << Rates(1) << " " << Rates(2) << " " << Rates(3) << " " << Rates(4);
 	outf << " b " << StateFreq(0) << " " << StateFreq(1) << " " << StateFreq(2) << " " << StateFreq(3);
-
 	
 	if(modSpec.flexRates==true){
 		outf << " f ";
@@ -961,6 +1010,34 @@ void Model::OutputGarliFormattedModel(ostream &outf) const{
 	if(PropInvar()!=ZERO_POINT_ZERO) outf << " p " << PropInvar();
 	outf << " ";
 	}
+
+void Model::FillGarliFormattedModelString(string &s) const{
+	char temp[50];
+	sprintf(temp," r %f %f %f %f %f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4));
+	s += temp;
+	sprintf(temp," b %f %f %f %f", StateFreq(0), StateFreq(1), StateFreq(2), StateFreq(3));
+	s += temp;
+
+	if(modSpec.flexRates==true){
+		s += " f ";
+		for(int i=0;i<NRateCats();i++){
+			sprintf(temp, " %f %f ", rateMults[i], rateProbs[i]);
+			s += temp;
+			}
+		}
+	else{
+		if(NRateCats()>1){
+			sprintf(temp, " a %f", Alpha());
+			s += temp;
+			}
+		}
+	if(PropInvar()!=ZERO_POINT_ZERO){
+		sprintf(temp, " p %f", PropInvar());
+		s += temp;
+		}
+	s += " ";
+	}
+
 /*	
 void Model::ReadModelFromFile(NexusToken &token){
 	token.GetNextToken();
@@ -1184,5 +1261,100 @@ void Model::CalcMutationProbsFromWeights(){
 	for(vector<BaseParameter*>::iterator it=paramsToMutate.begin();it!=paramsToMutate.end();it++){
 		running += (*it)->GetWeight() / tot;
 		(*it)->SetProb(running);
+		}
+	}
+
+void Model::OutputBinaryFormattedModel(ofstream &out) const{
+	FLOAT_TYPE *r = new FLOAT_TYPE;
+	for(int i=0;i<5;i++){
+		*r = Rates(i);
+		out.write((char *) r, sizeof(FLOAT_TYPE));
+		}
+	for(int i=0;i<NStates();i++){
+		*r = StateFreq(i);
+		out.write((char *) r, sizeof(FLOAT_TYPE));
+		}
+	
+	if(modSpec.flexRates==true){
+		for(int i=0;i<NRateCats();i++){
+			out.write((char *) &rateMults[i], sizeof(FLOAT_TYPE));
+			out.write((char *) &rateProbs[i], sizeof(FLOAT_TYPE));
+			}
+		}
+	else{
+		if(NRateCats()>1){
+			*r = Alpha();
+			out.write((char *) r, sizeof(FLOAT_TYPE));
+			}
+		}
+	if(PropInvar()!=ZERO_POINT_ZERO){
+		*r = PropInvar();
+		out.write((char *) r, sizeof(FLOAT_TYPE));
+		}
+	delete r;
+	}
+
+#ifdef BOINC
+void Model::OutputBinaryFormattedModelBOINC(MFILE &out) const{
+	FLOAT_TYPE *r = new FLOAT_TYPE;
+	for(int i=0;i<5;i++){
+		*r = Rates(i);
+		out.write((char *) r, sizeof(FLOAT_TYPE), 1);
+		}
+	for(int i=0;i<NStates();i++){
+		*r = StateFreq(i);
+		out.write((char *) r, sizeof(FLOAT_TYPE), 1);
+		}
+	
+	if(modSpec.flexRates==true){
+		for(int i=0;i<NRateCats();i++){
+			out.write((char *) &rateMults[i], sizeof(FLOAT_TYPE), 1);
+			out.write((char *) &rateProbs[i], sizeof(FLOAT_TYPE), 1);
+			}
+		}
+	else{
+		if(NRateCats()>1){
+			*r = Alpha();
+			out.write((char *) r, sizeof(FLOAT_TYPE), 1);
+			}
+		}
+	if(PropInvar()!=ZERO_POINT_ZERO){
+		*r = PropInvar();
+		out.write((char *) r, sizeof(FLOAT_TYPE), 1);
+		}
+	delete r;
+	}
+#endif
+
+void Model::ReadBinaryFormattedModel(FILE *in){
+	FLOAT_TYPE r[5];
+	for(int i=0;i<5;i++){
+		assert(ferror(in) == false);
+		fread(r+i, sizeof(FLOAT_TYPE), 1, in);
+		}
+	SetRmat(r, false);
+	FLOAT_TYPE b[4];
+	for(int i=0;i<NStates();i++){
+		fread((char*) &(b[i]), sizeof(FLOAT_TYPE), 1, in);
+		}
+	SetPis(b, false);
+	if(modSpec.flexRates==true){
+		for(int i=0;i<NRateCats();i++){
+			fread((char*) &(rateMults[i]), sizeof(FLOAT_TYPE), 1, in);
+			fread((char*) &(rateProbs[i]), sizeof(FLOAT_TYPE), 1, in);
+			}
+		}
+	else{
+		if(NRateCats()>1){
+			FLOAT_TYPE a;
+			assert(ferror(in) == false);
+			fread((char*) &a, sizeof(FLOAT_TYPE), 1, in);
+			SetAlpha(a, false);
+			}
+		}
+	if(PropInvar()!=ZERO_POINT_ZERO){
+		FLOAT_TYPE p;
+		fread((char*) &p, sizeof(FLOAT_TYPE), 1, in);
+		SetPinv(p, false);
 		}
 	}
