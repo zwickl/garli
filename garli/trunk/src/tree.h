@@ -81,6 +81,8 @@ class Tree{
 		static float uniqueSwapPrecalc[500];
 		static float distanceSwapPrecalc[1000];
 
+		static Bipartition *outgroup;
+
 		int calcs;
 
 	enum{//the directions for sweeping of CLAs
@@ -151,7 +153,7 @@ class Tree{
 		void RecombineWith( Tree *t, bool sameModel , FLOAT_TYPE optPrecision );
 
 		//functions for dealing with constraints and bipartitions
-		void LoadConstraints(ifstream &con, int nTaxa);
+		static void LoadConstraints(ifstream &con, int nTaxa);
 		bool AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *broken, Bipartition &proposed) ;
 		bool AllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
 		bool AllowedByPositiveBackboneConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);

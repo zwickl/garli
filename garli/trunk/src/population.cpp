@@ -482,10 +482,7 @@ void Population::GetConstraints(){
 		if(con.good() == false) throw ErrorException("Could not open constraint file %s!", conf->constraintfile.c_str());
 		if(con.good()){
 			outman.UserMessage("Loading constraints from file %s", conf->constraintfile.c_str());
-			//this temporary tree is just a very hacky way to get at the tree statics in LoadConstraints
-			//DO NOT use a tree from the population, since they haven't been alocated yet
-			Tree temp;
-			temp.LoadConstraints(con, data->NTax());
+			Tree::LoadConstraints(con, data->NTax());
 			}
 		}
 	}
@@ -1900,6 +1897,8 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	if(indNum==-1) ind=&indiv[bestIndiv];
 	else ind=&indiv[indNum];
 
+	if(Tree::outgroup != NULL) OutgroupRoot(indNum > 0 ? indNum : bestIndiv);
+
 	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
 	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
 	ind->mod->OutputGarliFormattedModel(treeLog);
@@ -1914,18 +1913,12 @@ void Population::FinishBootstrapRep(int rep){
 
 	Individual *ind = &indiv[bestIndiv];
 
+	if(Tree::outgroup != NULL) OutgroupRoot(bestIndiv);
+
 	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << ind->Fitness() << " ";
 	
 	ind->mod->OutputGarliFormattedModel(bootLog);
-/*	
-	const Model *m=ind->mod;
-	if(m->Nst() == 2) bootLog << "nst=2 k=" << m->Rates(0) << "\t";
-	else bootLog << "nst=6 rmat=(" << m->Rates(0) << " " << m->Rates(1) << " " << m->Rates(2) << " " << m->Rates(3) << "  " << m->Rates(4)  << ") ";
-	bootLog << "base=(" << m->Pi(0) << " " << m->Pi(1) << " " << m->Pi(2) << ") ";
 
-	if(m->NRateCats()>1) bootLog << "rates=g shape=" << m->Alpha() << " ";
-	if(m->PropInvar()!=0.0) bootLog << "pinv=" << m->PropInvar();
-*/	
 	ind->treeStruct->root->MakeNewick(treeString, false, true);
 	bootLog << "] " << treeString << ";" << endl;
 
@@ -1934,6 +1927,32 @@ void Population::FinishBootstrapRep(int rep){
 		}
 	}
 
+bool Population::OutgroupRoot(int indnum){
+	Individual *ind=&indiv[indnum];
+	ind->treeStruct->CalcBipartitions(true);
+	Bipartition b = *(Tree::outgroup);
+	b.Standardize();
+	TreeNode *r = ind->treeStruct->ContainsBipartitionOrComplement(&b);
+	
+	if(r == NULL){
+		//this means that there isn't a bipartition separating the outgroup and ingroup
+		//so outgroup rooting is not possible
+		return false;
+		}
+	
+	TreeNode *temp = r;
+	while(temp->IsTerminal() == false) temp=temp->left;
+	if(Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal()) r = r->anc;
+	if(r->IsNotRoot()){
+		ind->treeStruct->RerootHere(r->nodeNum);
+		topologies[ind->topo]->RemoveInd(indnum);
+		ind->topo = -1;
+		ntopos--;
+		UpdateTopologyList(indiv);
+		return true;
+		}
+	else return false;
+	}
 
 void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int lst /* = -1 */ ){
 	int k;
@@ -1944,6 +1963,8 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 	assert( treefname );
 
 	Individual *best=&indiv[bestIndiv];
+	
+	if(Tree::outgroup != NULL) OutgroupRoot(bestIndiv);
 
 #ifdef INCLUDE_PERTURBATION
 	if(allTimeBest != NULL){

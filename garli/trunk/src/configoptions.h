@@ -49,6 +49,7 @@ class GeneralGamlConfig{
 	bool restart;
 	bool checkpoint;
 	FLOAT_TYPE significantTopoChange;
+	string outgroupString;
 	
 	//finishing the run
 	bool enforceTermConditions;

@@ -501,6 +501,13 @@ class Bipartition{
 		for(int i=1;i<=ntax;i++) if(ContainsTaxon(i)) nodes.push_back(i);
 		return nodes; 
 		}
+	
+	void BipartFromNodenums(vector<int> nodes){
+		ClearBipartition();
+		Bipartition temp;
+		for(vector<int>::iterator it = nodes.begin();it < nodes.end();it++)
+			*this += temp.TerminalBipart(*it);
+		}
 	};
 
 bool BipartitionLessThan(const Bipartition &lhs, const Bipartition &rhs);
@@ -516,6 +523,8 @@ class Constraint{
 	bool backbone;
 	Bipartition backboneMask;
 
+	//an outgroup is a special type of positive constraint
+	bool outgroup;
 public:
 	Constraint() {};
 	Constraint(const Bipartition *b, bool pos){
@@ -531,13 +540,19 @@ public:
 		backboneMask = m;
 		}
 
-	const bool IsPositive() {return positive;}
+	const bool IsPositive() const {return positive;}
 
-	const bool IsBackbone() {return backbone;}
+	const bool IsBackbone() const {return backbone;}
+
+	const bool IsOutgroup() const {return outgroup;}
 
 	const Bipartition *GetBipartition(){return &con;}
 
 	const Bipartition *GetBackboneMask(){return &backboneMask;}
+
+	void SetAsOutgroup() {outgroup = true;}
+
+	void Standardize() {con.Standardize();}
 
 	void ReadDotStarConstraint(const char *c){
 		Bipartition b;

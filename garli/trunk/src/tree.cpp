@@ -93,6 +93,7 @@ FLOAT_TYPE Tree::distanceSwapBias;
 float Tree::uniqueSwapPrecalc[500];
 float Tree::distanceSwapPrecalc[1000];
 
+Bipartition *Tree::outgroup = NULL;
 
 void InferStatesFromCla(char *states, FLOAT_TYPE *cla, int nchar);
 FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int nchar);
@@ -134,6 +135,34 @@ void Tree::SetTreeStatics(ClaManager *claMan, const HKYData *data, const General
 		precalcMult[i] =  exp((FLOAT_TYPE)(precalcIncr[i]));
 		}
 #endif
+	//deal with the outgroup specification, if there is one
+	if(conf->outgroupString.length() > 0){
+		NxsString s(conf->outgroupString.c_str());
+		vector<int> nums;
+		char *tax = FirstToken(s, " ");
+		do{
+			nums.push_back(atoi(tax));
+			tax = NextToken(s, " ");
+			}while(tax);
+
+		if(outgroup) outgroup->ClearBipartition();
+		else outgroup = new Bipartition();
+		outgroup->BipartFromNodenums(nums);
+		
+		//if the outgroup consists of multiple taxa, make a constraint that the ingroup be monophyletic
+/*		if(nums.size() > 1){
+			Constraint out(outgroup, true);
+			out.Standardize();
+			out.SetAsOutgroup();
+
+			int num=1;
+			for(vector<Constraint>::iterator con=constraints.begin();con!=constraints.end();con++){
+				if((*con).IsCompatibleWithConstraint(&out) == false) throw ErrorException("Specified outgroup is not compatible with constraint number %d!", num);
+				num++;
+				}
+			constraints.push_back(out);
+			}
+*/		}
 	}
 
 //DJZ 4-28-04
@@ -766,7 +795,9 @@ TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition *bip){
 	
 	//now start moving down the tree from that taxon until a bipart that
 	//conflicts or a match is found
-	TreeNode *nd=allNodes[tax]->anc;
+	//7/17/07 changing this to start from the trivial terminal branch, rather
+	//then its anc
+	TreeNode *nd=allNodes[tax];
 	while(nd->anc){
 		if(nd->bipart->IsASubsetOf(bip) == false) break;
 		else if(nd->bipart->EqualsEquals(bip)) return nd;
@@ -778,7 +809,9 @@ TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition *bip){
 	
 	//now start moving down the tree from that taxon until a bipart that
 	//conflicts or a match is found
-	nd=allNodes[tax]->anc;
+	//7/17/07 changing this to start from the trivial terminal branch, rather
+	//then its anc
+	nd=allNodes[tax];
 	while(nd->anc){
 		//if(nd->bipart->ComplementIsASubsetOf(bip) == false){
 		if(bip->IsASubsetOf(nd->bipart) == false){
@@ -1569,14 +1602,7 @@ void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, FLOAT_TYPE optP
 
 	SetBranchLength(oldroot->left, dividedBlen);
 	SetBranchLength(oldroot->right, dividedBlen);
-
-	root->CheckTreeFormation();
-
-	//dirty CLAs as needed
-/*	for(vector<TreeNode*>::iterator it=path.begin();it!=path.end();it++){
-		SweepDirtynessOverTree(*it);
-		}
-*/
+ 
 	if(createTopologyOnly == false){
 		SweepDirtynessOverTree(newroot);
 		SweepDirtynessOverTree(oldroot);
@@ -1699,93 +1725,10 @@ bool Tree::AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *bro
 				if(broken->withinCutSubtree == false)  propTree.SPRMutate(cut->nodeNum, broken, -1.0, 0);
 				else propTree.ReorientSubtreeSPRMutate(cut->nodeNum, broken, -1.0);
 
-				propTree.root->CheckTreeFormation();
-	/*
-				TreeNode *tcut = propTree.allNodes[cut->nodeNum];
-				TreeNode *sib;
-				//note that this assignment of the sib can be overridden below if cut is attached to the root or the subtreeNode
-				if(tcut->next!=NULL) sib=tcut->next;
-				else sib=tcut->prev;
-				TreeNode *connector=NULL;
-		
-				//determine who the connector node will be.  It will be cut->anc unless that is the root
-				//if cut->anc is the root, connector will be one of cut's siblings, which is freed when
-				//the basal trichotomy is reestablished after removing cut.
-				if(tcut->anc->anc != NULL){
-					connector=tcut->anc;
-					}
-				else{
-					if(propTree.root->left!=tcut && propTree.root->left->left != NULL) connector = propTree.root->left;
-					else if(propTree.root->left->next!=tcut && propTree.root->left->next->left != NULL) connector = propTree.root->left->next;
-					else if(propTree.root->right!=tcut && propTree.root->right->left != NULL) connector = propTree.root->right;
-					else{//this should be quite rare, and means that the three descendents of the propTree.root
-						//are tcut and two terminals, so no viable swap exists, just try again
-						return false;
-						}
-					}
-		
-				TreeNode *replaceForConn;
-				if(tcut->anc->anc){
-					//tcut is not connected to the propTree.root, so we can steal it's ancestor as the new connector
-					if(tcut==connector->left){
-			   			assert(tcut->next==connector->right);
-						replaceForConn=connector->right;
-	   					}
-	   				else{
-	   					assert(tcut==connector->right); 
-			   			replaceForConn=connector->left;
-			   			}
-					replaceForConn->dlen+=connector->dlen;
-			   		connector->SubstituteNodeWithRespectToAnc(replaceForConn);
-	   				}
-				else{//tcut is connected to the propTree.root so we need to steal a non terminal sib node as the connector
-					//Disconnect tcut from the propTree.root
-					if(tcut==propTree.root->left){
-						propTree.root->left=tcut->next;
-						tcut->next->prev=NULL;
-						}
-					else if(tcut==propTree.root->right){
-						propTree.root->right=tcut->prev;
-						tcut->prev->next=NULL;
-						}
-					else{
-						assert(tcut->prev==propTree.root->left && tcut->next==propTree.root->right);//can only have a basal trifucation, or we're in trouble
-						tcut->prev->next=tcut->next;
-						tcut->next->prev=tcut->prev;
-						}
-					//propTree.root is now bifurcation
-					//preserve branch length info
-					if(propTree.root->right==connector){
-						propTree.root->left->dlen+=	connector->dlen;
-						sib=propTree.root->left;
-						}
-					else{
-						propTree.root->right->dlen+=	connector->dlen;	
-						sib=propTree.root->right;
-						}
-				
-					//add the connectors two desccendants as descendants of the propTree.root
-					assert(connector->right==connector->left->next);
-					connector->SubstituteNodeWithRespectToAnc(connector->left);
-					propTree.root->AddDes(connector->right);
-					}
-		
-				//establish correct topology for connector and tcut nodes
-				tcut->anc=connector;
-				connector->left=connector->right=tcut;
-				connector->next=connector->prev=connector->anc=tcut->next=tcut->prev=NULL;
+				propTree.CalcBipartitions();
 
-			TreeNode *tbroken;
-			tbroken=propTree.allNodes[broken->nodeNum];
-			
-			tbroken->SubstituteNodeWithRespectToAnc(connector);
-			connector->AddDes(tbroken);
-*/
-			propTree.CalcBipartitions();
-
-			bool containsBip = (propTree.ContainsBipartitionOrComplement(constr->GetBipartition()) != NULL);
-			return (containsBip == false);
-
+				bool containsBip = (propTree.ContainsBipartitionOrComplement(constr->GetBipartition()) != NULL);
+				return (containsBip == false);
 				}
 			}
 		}

@@ -155,6 +155,8 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetStringOption("ratematrix", rateMatrix, true);
 	cr.GetStringOption("invariantsites", proportionInvariant, true);
 
+	cr.GetStringOption("outgroup", outgroupString, true);
+
 	if(isMaster) errors += cr.SetSection("master");
 	else errors += cr.SetSection("remote");
 	

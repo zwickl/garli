@@ -388,6 +388,7 @@ private:
 		void FindTreeStructsForNextGeneration();
 		void PerformMutation(int indNum);
 		void UpdateFractionDone();
+		bool OutgroupRoot(int indnum);
 
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );
