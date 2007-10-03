@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual Studio 2005
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "standardGarli", "standardGarli.vcproj", "{E40AF4AF-9D7C-4CA5-A6F3-758C7364EB7F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{231E5B5A-5A50-4591-9515-0AE457040FB6} = {231E5B5A-5A50-4591-9515-0AE457040FB6}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libncl", "..\..\..\ncl-2.0\VC6\libncl\libncl.vcproj", "{231E5B5A-5A50-4591-9515-0AE457040FB6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E40AF4AF-9D7C-4CA5-A6F3-758C7364EB7F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E40AF4AF-9D7C-4CA5-A6F3-758C7364EB7F}.Debug|Win32.Build.0 = Debug|Win32
+		{E40AF4AF-9D7C-4CA5-A6F3-758C7364EB7F}.Release|Win32.ActiveCfg = Release|Win32
+		{E40AF4AF-9D7C-4CA5-A6F3-758C7364EB7F}.Release|Win32.Build.0 = Release|Win32
+		{231E5B5A-5A50-4591-9515-0AE457040FB6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{231E5B5A-5A50-4591-9515-0AE457040FB6}.Debug|Win32.Build.0 = Debug|Win32
+		{231E5B5A-5A50-4591-9515-0AE457040FB6}.Release|Win32.ActiveCfg = Release|Win32
+		{231E5B5A-5A50-4591-9515-0AE457040FB6}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

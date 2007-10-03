@@ -1,0 +1,60 @@
+#uncomment one of the following CC lines and one of the CC_FLAGS lines depending on your situation
+
+#CC       = icpc #intel compiler (icc)
+CC	  = g++  #gnu compiler   (gcc)
+
+NCL_INCLUDES = ../../ncl-2.0/src
+LIB_NCL = ../../ncl-2.0/src/libncl.a
+
+#gcc: must be used if you are using  gcc version 2.95!!!
+#CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -DUNIX -DGCC295 -DNDEBUG -include defs.h
+
+#gcc: OSX universal binary (may only compile on intel machines)
+#CC_FLAGS = -O3 -fstrict-aliasing -arch i386 -arch ppc -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h -I$(NCL_INCLUDES)
+
+#gcc: linux or OSX binary that will work on the machine type that it is compiled on
+CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -fsigned-char -DUNIX -DNDEBUG  -I$(NCL_INCLUDES)
+
+#icc: any machine type
+#CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -I$(NCL_INCLUDES)
+
+EXEC     = Garli0.96b4
+
+OBJECT_LIST =	condlike.o datamatr.o individual.o\
+		population.o rng.o set.o\
+		garlireader.o topologylist.o translatetable.o tree.o treenode.o\
+		funcs.o	configreader.o configoptions.o\
+		bipartition.o model.o linalg.o adaptation.o mlhky.o\
+		optimization.o
+
+Garli0.96b4 : $(OBJECT_LIST) garlimain.o
+	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) $(LIB_NCL) garlimain.o
+
+garlimain.o:	mlhky.h tree.h population.h \
+		individual.h mlhky.h garlimain.cpp adaptation.h \
+		hashdefines.h defs.h
+	$(CC) $(CC_FLAGS) -c -I. garlimain.cpp
+
+.cpp.o: 
+	$(CC) -c $(CC_FLAGS)  -I.  $*.cpp
+
+condlike.o:      condlike.h
+configreader.o:  configreader.h  
+configoptions.o: configoptions.h hashdefines.h 
+tree.o:          tree.h hashdefines.h funcs.h defs.h clamanager.h
+optimization.o:	 tree.h funcs.h defs.h
+population.o:    population.h clamanager.h
+individual.o:    individual.h clamanager.h
+datamatr.o:      datamatr.h defs.h
+model.o:         model.h defs.h
+funcs.o:         funcs.h defs.h
+linalg.o:        linalg.h
+treenode.o:      treenode.h
+bipartition.o:   bipartition.h
+translatetable.o:translatetable.h defs.h
+set.o:           set.h
+rng.o:           rng.h
+topologylist.o:  topologylist.h
+adaptation.o:	 	 adaptation.h hashdefines.h defs.h
+mlhky.o:		 mlhky.h defs.h
+garlireader.o:	garlireader.h defs.h
