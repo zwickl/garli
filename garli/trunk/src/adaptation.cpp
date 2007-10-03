@@ -1,6 +1,6 @@
 
 
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -15,7 +15,6 @@
 //  email: zwickl@nescent.org
 //
 
-
 #include <iostream>
 #include <fstream>
 #include <cstdio>
@@ -27,16 +26,6 @@ using namespace std;
 #include "math.h"
 #include "configoptions.h"
 #include "individual.h"
-
-#ifdef BOINC
-	#include "boinc_api.h"
-	#include "filesys.h"
-	#ifdef _WIN32
-		#include "boinc_win.h"
-	#else
-		#include "config.h"
-	#endif
-#endif
 
 Adaptation::Adaptation(const GeneralGamlConfig *gc){
 
@@ -169,8 +158,8 @@ void Adaptation::SetChangeableVariablesFromConfAfterReadingCheckpoint(const Gene
 	limSPRrange = gc->limSPRrange;
 	}
 
-#ifdef BOINC
-void Adaptation::WriteToCheckpointBOINC(MFILE &out) const{
+
+void Adaptation::WriteToCheckpoint(OUTPUT_CLASS &out) const{
 	//this function assumes that it has been passed an MFILE that is already open for 
 	//binary writing
 
@@ -180,40 +169,40 @@ void Adaptation::WriteToCheckpointBOINC(MFILE &out) const{
 	//manually.  This should make it work irrespective of things like memory padding
 	//for data member alignment, which could vary between platforms and compilers
 	intptr_t scalarSize = (intptr_t) &improvetotal - (intptr_t) this;
-	out.write(this, 1, scalarSize);
+	out.WRITE_TO_FILE(this, scalarSize, 1);
 
 	//now the arrays, which should be of length intervalsToStore
-	out.write((char *) improvetotal, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(improvetotal, sizeof(FLOAT_TYPE), intervalsToStore);
 
-	out.write((char *) randNNI, sizeof(FLOAT_TYPE), intervalsToStore);
-	out.write((char *) randNNInum, sizeof(int), intervalsToStore);
+	out.WRITE_TO_FILE(randNNI, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(randNNInum, sizeof(int), intervalsToStore);
 	
-	out.write((char *) exNNI, sizeof(FLOAT_TYPE), intervalsToStore);
-	out.write((char *) exNNInum, sizeof(int), intervalsToStore);
+	out.WRITE_TO_FILE(exNNI, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(exNNInum, sizeof(int), intervalsToStore);
 
-	out.write((char *) randSPR, sizeof(FLOAT_TYPE), intervalsToStore);
-	out.write((char *) randSPRnum, sizeof(int), intervalsToStore);
+	out.WRITE_TO_FILE(randSPR, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(randSPRnum, sizeof(int), intervalsToStore);
 	
-	out.write((char *) limSPR, sizeof(FLOAT_TYPE), intervalsToStore);
-	out.write((char *) limSPRnum, sizeof(int), intervalsToStore);
+	out.WRITE_TO_FILE(limSPR, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(limSPRnum, sizeof(int), intervalsToStore);
 
-	out.write((char *) exlimSPR, sizeof(FLOAT_TYPE), intervalsToStore);
-	out.write((char *) exlimSPRnum, sizeof(int), intervalsToStore);
+	out.WRITE_TO_FILE(exlimSPR, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(exlimSPRnum, sizeof(int), intervalsToStore);
 
-	out.write((char *) randRecom, sizeof(FLOAT_TYPE), intervalsToStore);
-	out.write((char *) randRecomnum, sizeof(int), intervalsToStore);
+	out.WRITE_TO_FILE(randRecom, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(randRecomnum, sizeof(int), intervalsToStore);
 	
-	out.write((char *) bipartRecom, sizeof(FLOAT_TYPE), intervalsToStore);
-	out.write((char *) bipartRecomnum, sizeof(int), intervalsToStore);
+	out.WRITE_TO_FILE(bipartRecom, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(bipartRecomnum, sizeof(int), intervalsToStore);
 
-	out.write((char *) onlyBrlen, sizeof(FLOAT_TYPE), intervalsToStore);
-	out.write((char *) onlyBrlennum, sizeof(int), intervalsToStore);
+	out.WRITE_TO_FILE(onlyBrlen, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(onlyBrlennum, sizeof(int), intervalsToStore);
 
-	out.write((char *) anyModel, sizeof(FLOAT_TYPE), intervalsToStore);
-	out.write((char *) anyModelnum, sizeof(int), intervalsToStore);
+	out.WRITE_TO_FILE(anyModel, sizeof(FLOAT_TYPE), intervalsToStore);
+	out.WRITE_TO_FILE(anyModelnum, sizeof(int), intervalsToStore);
 	}
-#endif
 
+/*
 void Adaptation::WriteToCheckpoint(ofstream &out) const{
 	//this function assumes that it has been passed a stream that is already open for 
 	//binary writing
@@ -258,7 +247,7 @@ void Adaptation::WriteToCheckpoint(ofstream &out) const{
 	out.write((char *) anyModel, sizeof(FLOAT_TYPE)*intervalsToStore);
 	out.write((char *) anyModelnum, sizeof(int)*intervalsToStore);
 	}
-
+*/
 
 void Adaptation::ReadFromCheckpoint(FILE *in){
 	//this function assumes that it has been passed a FILE* that is already open for 

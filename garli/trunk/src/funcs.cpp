@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -28,6 +28,7 @@
 #include "population.h"
 #include "tree.h"
 #include "outputman.h"
+#include "garlireader.h"
 
 extern OutputManager outman;
 
@@ -106,22 +107,119 @@ void GetRestartParams( Parameters& params )
 	rnd.set_seed( params.randomSeed );
 }
 */
-int ReadData(const char* filename, HKYData* data)	{
-	if (!FileExists(filename))	{
-		throw ErrorException("data file not found: %s!", filename);
-		return -1;
+
+int GetToken( FILE *in, char* tokenbuf, int maxlen){
+	int ok = 1;
+
+	int i;
+	char ch = ' ';
+
+	// skip leading whitespace
+	while( in && ( isspace(ch) || ch == '[' ) ){
+		ch = getc(in);
+		}
+	if( !in ) return 0;
+
+	tokenbuf[0] = ch;
+	tokenbuf[1] = '\0';
+	tokenbuf[maxlen-1] = '\0';
+		
+	for( i = 1; i < maxlen-1; i++ ) {
+		ch = getc(in);
+		if( isspace(ch) || ch == ']' )
+			break;
+		tokenbuf[i] = ch;
+		tokenbuf[i+1] = '\0';
 	}
 
-	outman.UserMessage("Reading data file: %s...", filename);
+	if( i >= maxlen-1 )
+		ok = 0;
 
-#ifndef BOINC
-	data->Read( filename );
-	if((data->NChar() > 0) == false) throw ErrorException("problem reading data!");
+	return ok;
+}
+
+bool FileIsNexus(const char *name){
+	if (!FileExists(name))	{
+		throw ErrorException("could not open file: %s!", name);
+		}
+
+	bool nexus = false;
+	FILE *inf;
+#ifdef BOINC
+	inf = boinc_fopen(name, "r");
 #else
-	data->ReadBOINC( filename );
-	if((data->NChar() > 0) == false) throw ErrorException("BOINC version of GARLI requires \"compressed\" input datafile");
+	inf = fopen(name, "r");
 #endif
+	char buf[1024];
+	GetToken(inf, buf, 1024);
+	if(!(_stricmp(buf, "#NEXUS"))) nexus = true;
 
+	fclose(inf);
+	return nexus;
+	}
+
+bool FileIsFasta(const char *name){
+	if (!FileExists(name))	{
+		throw ErrorException("could not open file: %s!", name);
+		}
+
+	bool fasta = false;
+	FILE *inf;
+#ifdef BOINC
+	inf = boinc_fopen(name, "r");
+#else
+	inf = fopen(name, "r");
+#endif
+	char buf[1024];
+	GetToken(inf, buf, 1024);
+	if(buf[0] == '>') fasta = true;
+
+	fclose(inf);
+	return fasta;
+	}
+
+bool ReadData(const char* filename, HKYData* data)	{
+	bool usedNCL = false;
+
+	if(modSpec.IsAminoAcid()) data->SetAminoAcid();
+
+	if (!FileExists(filename))	{
+		throw ErrorException("data file not found: %s!", filename);
+		}
+
+	if(FileIsNexus(filename)){
+		outman.UserMessage("Attempting to read data file in Nexus format (using NCL): %s ...", filename);
+		GarliReader &reader = GarliReader::GetInstance();
+		int err = reader.HandleExecute(filename);
+		if(err) throw ErrorException("Problem reading nexus datafile");
+		NxsCharactersBlock *chars = reader.GetCharactersBlock();
+		if(modSpec.IsAminoAcid() && chars->GetDataType() != NxsCharactersBlock::protein)
+			throw ErrorException("protein data specified, but nexus file does not contain protein data!");
+		data->CreateMatrixFromNCL(reader);
+		usedNCL = true;
+		}
+	else if(FileIsFasta(filename)){
+		outman.UserMessage("Attempting to read data file in Fasta format: %s ...", filename);
+		data->ReadFasta(filename);
+		}
+	else{
+		outman.UserMessage("Attempting to read data file in Phylip format: %s ...", filename);
+		data->ReadPhylip(filename);
+		}
+
+	if(modSpec.IsCodon()){
+		if(modSpec.IsVertMitoCode()){
+			static_cast<CodonData*>(data)->SetVertMitoCode();
+			}
+		static_cast<CodonData*>(data)->FillCodonMatrix(false);
+		}
+	else if(modSpec.IsCodonAminoAcid()){
+		if(modSpec.IsVertMitoCode()){
+			static_cast<CodonData*>(data)->SetVertMitoCode();
+			}
+		static_cast<CodonData*>(data)->SetAminoAcid();
+		static_cast<CodonData*>(data)->FillCodonMatrix(true);
+		}
 
 	// report summary statistics about data
 	data->Summarize();
@@ -133,23 +231,31 @@ int ReadData(const char* filename, HKYData* data)	{
 	outman.UserMessage(" %d total characters.", total);
 	outman.flush();
 
-	// try to compress
-	if (!data->Dense())	{
-		outman.UserMessage("Compressing data matrix...");
-		data->Collapse();
-		outman.UserMessage("%d columns in data matrix after compression.", data->NChar());
+	//if(modSpec.IsNucleotide()){
+	if(1){
+		// try to compress
+		if (!data->Dense())	{
+			outman.UserMessage("Compressing data matrix...");
+			data->Collapse();
+			outman.UserMessage("%d columns in data matrix after compression.", data->NChar());
+			}
+		else {
+			outman.UserMessage("Datafile already compressed.");
+			outman.UserMessage("%d columns in compressed data matrix.\n", data->NChar());
+			}
+		
+		if(modSpec.IsNucleotide()){
+			data->DetermineConstantSites();
+//			if(!data->Dense()) data->Save(filename, "new");
+			}
 		}
-	else {
-		outman.UserMessage("Datafile already compressed.");
-		outman.UserMessage("%d columns in compressed data matrix.\n", data->NChar());
-		}
-	data->DetermineConstantSites();
-	if(!data->Dense()) data->Save(filename, "new");
-	return 0;
+	return usedNCL;
 	}
 
-int ReadData(GeneralGamlConfig *conf, HKYData* data)	{
 
+
+int ReadData(GeneralGamlConfig *conf, HKYData* data)	{
+	assert(0);
 	// regurgitate params specified
 /*	if( params.restart ) {
 		outman.UserMessage("Restarting using state file \"%s\"", params.statefname);
@@ -164,7 +270,7 @@ int ReadData(GeneralGamlConfig *conf, HKYData* data)	{
 
 	// Check to be sure data file exists
 	//
-	if( !FileExists( conf->datafname.c_str() ) ) throw ErrorException("data file does not exist: %s", conf->datafname.c_str());
+/*	if( !FileExists( conf->datafname.c_str() ) ) throw ErrorException("data file does not exist: %s", conf->datafname.c_str());
 
 	// Read in the data matrix
 	outman.flush();
@@ -192,7 +298,7 @@ int ReadData(GeneralGamlConfig *conf, HKYData* data)	{
 	data->DetermineConstantSites();
 	outman.UserMessage("");
 	outman.flush();
-	return 0;
+*/	return 0;
 
 }
 
@@ -929,7 +1035,6 @@ void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArra
 	
 	for(int i=0;i<nchar;i++) {
 		if(leftEQ[i] == false){
-		//if(1){
 			L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
 			L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
 			L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
@@ -937,7 +1042,6 @@ void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArra
 			}
 
 		if(rightEQ[i] == false){
-		//if(1){
 			R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
 			R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
 			R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
@@ -950,14 +1054,7 @@ void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArra
 		dest[3] = L4 * R4;
 
 		assert(dest[0] == dest[0]);
-
-#ifndef OMP_INTINTCLA
-		dest+=4;
-		LCL+=4;
-		RCL+=4;
-			
 		}
-#endif
 
 	const int *left_mult=LCLA->underflow_mult;
 	const int *right_mult=RCLA->underflow_mult;
@@ -968,8 +1065,6 @@ void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArra
 		}
 	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
 	}
-
-
 
 void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats){
 	//this function assumes that the pmat is arranged with the 16 entries for the
@@ -1085,142 +1180,12 @@ void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LC
 			dest = &(destCLA->arr[index]);
 			LCL = &(LCLA->arr[index]); 
 			RCL= &(RCLA->arr[index]);
-#else			
-
-#endif
-
-#undef BROOK_GPU
-#define BETTER_WAY
-
-#ifdef BROOK_GPU
-
-
-//		brook::internal::Profiler *prof;// = brook::internal::Profiler::getInstance();
-//		*prof = brook::internal::Profiler::getInstance();
-//		ProfilerNode node("here");
-//		node.enter();
-
-
-		float Lp[16], Rp[16];
-		//float p[32];
-		for(int i=0;i<16;i++){
-			Lp[i] = Lpr[i];
-			Rp[i] = Rpr[i];
-			//p[i] = Lpr[i];
-			//p[i+16] = Rpr[i];
-			}
-
-#ifdef BETTER_WAY
-/*		brook::stream LCLstream(brook::getStreamType(( float4  *)0), 890, -1);
-		brook::stream RCLstream(brook::getStreamType(( float4  *)0), 890, -1);
-		brook::stream deststream(brook::getStreamType(( float4  *)0), 890, -1);
-//		brook::stream tempstream(brook::getStreamType(( float4  *)0), 890, -1);
-//		brook::stream tempstream2(brook::getStreamType(( float4  *)0), 890, -1);
-		brook::stream Lprstream(brook::getStreamType(( float  *)0), 16, -1);
-		brook::stream Rprstream(brook::getStreamType(( float  *)0), 16, -1);
-*/
-
-		streamRead(LCLstream, (void*) LCL);
-		streamRead(Lprstream, Lp);
-		//streamRead(Lprstream, p);
-		streamRead(RCLstream, (void*) RCL);
-		streamRead(Rprstream, Rp);
-
-//		SingleLikeKernel(LCLstream, RCLstream, LCLstream, Lprstream);
-
-		//BranchLike2(LCLstream, tempstream, Lprstream);
-		BranchLike2(LCLstream, deststream, Lprstream);
-		//BranchLike2(LCLstream, LCLstream, Lprstream);
-
-		//method 1
-		SecondBranchLike(RCLstream, deststream, deststream, Rprstream);
-		//SecondBranchLike(RCLstream, LCLstream, LCLstream, Rprstream);
-
-		//method 2
-//		BranchLike2(RCLstream, tempstream2, Rprstream);
-//		streamWrite(tempstream2,dest);
-//		Product4(tempstream, tempstream2, deststream);
-
-		streamWrite(deststream,dest);
-		//streamWrite(LCLstream, dest);
-//		node.exit();
-//		node.dump(cout);
-
-/*		for(int i=0;i<nchar;i++) {
 			for(r=0;r<nRateCats;r++){
-				//DEBUG
-				debSum += dest[0];
-				dest+=4;
-				}
-			}
-*/
-		//older way
-#else
+#else			
 		for(int i=0;i<nchar;i++) {
 			for(r=0;r<nRateCats;r++){
-				float L[4];
-				float Lnorm[4];
-				float R[4];
-				float D[4];
-				float Ldes[4];
-				
-				for(int i=0;i<4;i++) Ldes[i] = (float) LCL[i];
-
-/*				Lnorm[0]=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
-				Lnorm[1]=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
-				Lnorm[2]=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
-				Lnorm[3]=( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]);
-*/
-				DoOneBranchLike(Ldes, L, Lp, 4);
-
-				//assert(fabs(Lnorm[0] - L[0]) < .001);
-/*				if(fabs(Lnorm[0] - L[0]) > .001){
-					int poo=2;
-					}
-				if(fabs(Lnorm[1] - L[1]) > .001){
-					int poo=2;
-					}
-				if(fabs(Lnorm[2] - L[2]) > .001){
-					int poo=2;
-					}
-				if(fabs(Lnorm[3] - L[3]) > .001){
-					int poo=2;
-					}
-*/
-				R[0]=(Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
-				R[1]=(Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
-				R[2]=(Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);			
-				R[3]=(Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
-					
-				DoGPUProduct(L, R, D, 4);
-				dest[0] = D[0];
-				dest[1] = D[1];
-				dest[2] = D[2];
-				dest[3] = D[3];
-
-				/*
-				assert(dest[0] > 1e-25);
-				assert(dest[1] > 1e-25);
-				assert(dest[2] > 1e-25);
-				assert(dest[3] > 1e-25);
-*/
-				//DEBUG
-				debSum += dest[0];
-				dest+=4;
-				LCL+=4;
-				RCL+=4;
-				}
-			}
 #endif
-
-#else
-
-//#define ALT
-//#define ALT2
 #define NORM
-
-	for(int i=0;i<nchar;i++) {
-			for(r=0;r<nRateCats;r++){
 #ifdef ALT
 				//alt
 				dest[0] = ( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]) * (Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
@@ -1268,12 +1233,68 @@ void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LC
 				dest+=4;
 				LCL+=4;
 				RCL+=4;
+#endif
 				}
 			}
-#endif
-#endif
 		}
 
+
+	const int *left_mult=LCLA->underflow_mult;
+	const int *right_mult=RCLA->underflow_mult;
+	int *undermult=destCLA->underflow_mult;
+	
+	for(int i=0;i<nchar;i++){
+		undermult[i] = left_mult[i] + right_mult[i];
+		}
+	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
+	}
+
+void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats, const int nstates){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *LCL=LCLA->arr;
+	const FLOAT_TYPE *RCL=RCLA->arr;
+	FLOAT_TYPE L1, R1;
+	
+#ifdef UNIX
+	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)LCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)RCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+#ifdef OMP_INTINTCLA_NSTATE
+	#pragma omp parallel for private(dest, LCL, RCL, L1, R1)
+	for(int i=0;i<nchar;i++){
+		int index = nstates * i;
+		dest = &(destCLA->arr[index]);
+		LCL = &(LCLA->arr[index]); 
+		RCL= &(RCLA->arr[index]);
+
+#else
+	for(int i=0;i<nchar;i++) {
+
+#endif
+		for(int rate=0;rate<nRateCats;rate++){
+			for(int from=0;from<nstates;from++){
+				L1 = Lpr[rate*nstates*nstates + from*nstates] * LCL[0];
+				R1 = Rpr[rate*nstates*nstates + from*nstates] * RCL[0];
+				for(int to=1;to<nstates;to++){
+					L1 += Lpr[rate*nstates*nstates + from*nstates + to] * LCL[to];
+					R1 += Rpr[rate*nstates*nstates + from*nstates + to] * RCL[to];
+					}
+				dest[from] = L1 * R1;
+				}
+#ifndef OMP_INTCLACLA_NSTATE
+			LCL += nstates;
+			RCL += nstates;
+			dest += nstates;
+#endif
+			}
+		assert(dest[-nstates*nRateCats] >= 0.0);
+		assert(dest[-nstates*nRateCats] == dest[-nstates*nRateCats]);
+		//assert(dest[19] < 1e10);
+		}
 
 	const int *left_mult=LCLA->underflow_mult;
 	const int *right_mult=RCLA->underflow_mult;
@@ -1413,6 +1434,59 @@ void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, 
 			}
 		destCLA->rescaleRank=2;
 	}
+
+void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats, const int nstates){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+
+#ifdef UNIX
+	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	for(int i=0;i<nchar;i++){
+		if(*Ldata < nstates && *Rdata < nstates){
+			for(int rate=0;rate<nRateCats;rate++){
+				for(int from=0;from<nstates;from++){
+					dest[rate*nstates + from] = Lpr[(*Ldata) + from*nstates + rate*nstates*nstates] * Rpr[(*Rdata) + from*nstates + rate*nstates*nstates];	
+					}
+				}
+			Ldata++;
+			Rdata++;
+			}
+			
+		else{//total ambiguity of left, right or both
+			
+			if(*Ldata == nstates && *Rdata == nstates) //total ambiguity of both
+				for(int rate=0;rate<nRateCats;rate++)
+					for(int from=0;from<nstates;from++)
+						dest[rate*nstates + from] = ONE_POINT_ZERO;
+			
+			else if(*Ldata == nstates){//total ambiguity of left
+				for(int rate=0;rate<nRateCats;rate++)
+					for(int from=0;from<nstates;from++)
+						dest[rate*nstates + from] = Rpr[(*Rdata) + from*nstates + rate*nstates*nstates];
+					
+				}
+			else{//total ambiguity of right
+				for(int rate=0;rate<nRateCats;rate++)
+					for(int from=0;from<nstates;from++)
+						dest[rate*nstates + from] = Lpr[(*Ldata) + from*nstates + rate*nstates*nstates];
+				}
+			Ldata++;
+			Rdata++;
+			}	
+//		assert(dest[i*nstates] > 0.0);
+//		assert(dest[i*nstates+19] < 1e10);
+//		assert(dest[i*nstates] == dest[i*nstates]);
+		dest += nRateCats*nstates;
+		}
+		for(int site=0;site<nchar;site++){
+			destCLA->underflow_mult[site]=0;
+			}
+		destCLA->rescaleRank=2;
+	}
+
 
 void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const int nchar, const int nRateCats, const unsigned *ambigMap /*=NULL*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
@@ -1586,6 +1660,59 @@ void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LC
 			}
 		}
 		
+	for(int i=0;i<nchar;i++)
+		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
+	
+	destCLA->rescaleRank=LCLA->rescaleRank+2;
+	} 
+
+void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const int nchar, const int nRateCats, const int nstates, const unsigned *ambigMap /*=NULL*/){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *des=destCLA->arr;
+	FLOAT_TYPE *dest=des;
+	const FLOAT_TYPE *CL=LCLA->arr;
+	const FLOAT_TYPE *CL1=CL;
+	const char *data2=dat2;
+
+#ifdef UNIX	
+	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);	
+#endif
+#ifdef OMP_INTTERMCLA_NSTATE
+	#pragma omp parallel for private(dest, CL1, data2)
+	for(int i=0;i<nchar;i++){
+		dest=&des[nstates*i];
+		CL1=&CL[nstates*i];
+		data2=&dat2[i];
+#else
+	for(int i=0;i<nchar;i++){
+#endif
+		for(int rate=0;rate<nRateCats;rate++){
+			for(int from=0;from<nstates;from++){
+				dest[from] = pr1[rate*nstates*nstates + from*nstates] * CL1[0];
+				for(int to=1;to<nstates;to++){
+					dest[from] += pr1[rate*nstates*nstates + from*nstates + to] * CL1[to];
+					}
+				if(*data2 < nstates) //no ambiguity
+					dest[from] *= pr2[rate*nstates*nstates + (*data2)+from*nstates];
+				else if(*data2 == nstates){
+					int p=2;//total ambiguity
+					}
+				else{
+					//write this for partial ambiguity
+					assert(0);
+					}
+				}
+			assert(dest[19] < 1e10);
+#ifndef OMP_INTTERMCLA_NSTATE
+			dest += nstates;
+			CL1 += nstates;
+#endif
+			}
+		data2++;
+		}
+	
 	for(int i=0;i<nchar;i++)
 		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
 	

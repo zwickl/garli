@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -14,7 +14,7 @@
 //
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
-#include "memchk.h"
+#include "defs.h"
 #include "condlike.h"
 #include "clamanager.h"
 #include "utility.h"

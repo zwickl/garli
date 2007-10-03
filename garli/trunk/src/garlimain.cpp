@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -16,17 +16,20 @@
 
 
 //allocation monitoring stuff from Paul, Mark and Dave
+#undef INSTANTIATE_MEMCHK
+#include "defs.h"
+#include "memchk.h"
 #define WRITE_MEM_REPORT_TO_FILE
-#undef MONITORING_ALLOCATION
+
 #ifdef MONITORING_ALLOCATION
 	#define INSTANTIATE_MEMCHK
 #endif
-#include "defs.h"
 
 #ifdef WIN32
 #include <conio.h>
 #endif
 
+#include "defs.h"
 #include "population.h"
 #include "individual.h"
 #include "adaptation.h"
@@ -50,22 +53,11 @@
 #import "MFEInterfaceClient.h"
 #endif
 
-#ifdef PROFILE
-#include "profiler.h"
-#endif
-
 #ifdef MPI_VERSION
 #include "mpi.h"
 #endif
 
-#ifdef BOINC
-	#include "boinc_api.h"
-	#ifdef _WIN32
-		#include "boinc_win.h"
-	#else
-		#include "config.h"
-	#endif
-#endif
+#undef RUN_TESTS
 
 char programName[81];
 
@@ -101,19 +93,19 @@ char **argv=NULL;
 	
 #ifdef BOINC
 	int retval = boinc_init();
-	assert(!retval);
+	if(retval){
+		cout << "Problem initializing BOINC system!" << endl;
+		return retval;
+		}
 	outman.SetNoOutput(true);
-#endif
 
-	bool poo=true;
-//	while(poo);
+#endif
 
 	CREATE_MEMCHK{
 
 	#ifdef MPI_VERSION
 		MPIMain(argc, argv);
-	#else
-	// init some stuff
+	#endif
 
 	string conf_name;
 #ifndef SUBROUTINE_GARLI
@@ -163,6 +155,10 @@ char **argv=NULL;
 	if(Tree::random_p==false) Tree::ComputeRealCatalan();
 #endif
 
+		HKYData *data = NULL;
+		//create the population object
+		Population pop;
+
 		try{
 			MasterGamlConfig conf;
 			bool confOK;
@@ -178,53 +174,131 @@ char **argv=NULL;
 			rnd.set_seed(randomSeed);
 			
 			char temp_buf[100];
+
+			string datafile = conf.datafname;
+
+#ifdef BOINC
+			//deal with stdout and stderr, although I don't think that anything is being
+			//sent to them in BOINC mode
+			char buffer[2048];
+			boinc_resolve_filename("boinc_stdout", buffer, 2048);
+			FILE *stdout_fp = freopen(buffer, "w", stdout);
+			boinc_resolve_filename("boinc_stderr", buffer, 2048);
+			FILE *stderr_fp = freopen(buffer, "w", stderr);
+
+			//check for the presence of BOINC checkpoint files
+			conf.restart = true;
+			
+			sprintf(temp_buf, "%s.adap.check", conf.ofprefix.c_str());
+			boinc_resolve_filename(temp_buf, buffer, sizeof(buffer));
+			if(FileExists(buffer) == false) conf.restart = false;
+
+			sprintf(temp_buf, "%s.pop.check", conf.ofprefix.c_str());
+			boinc_resolve_filename(temp_buf, buffer, sizeof(buffer));
+			if(FileExists(buffer) == false) conf.restart = false;
+
+			if(conf.uniqueSwapBias != ONE_POINT_ZERO){
+				sprintf(temp_buf, "%s.swaps.check", conf.ofprefix.c_str());
+				boinc_resolve_filename(temp_buf, buffer, sizeof(buffer));
+				if(FileExists(buffer) == false) conf.restart = false;
+				}
+
+			if(confOK == true){
+				sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
+				}
+			else sprintf(temp_buf, "ERROR.log");
+
+			if(conf.restart)
+				outman.SetLogFileForAppend(temp_buf);
+			else 
+				outman.SetLogFile(temp_buf);
+
+			outman.UserMessage("Running BOINC GARLI, version 0.96beta4 (Aug 2007)\n(->BOINC Amino acid and Codon testing version<-)\n");
+			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
+
+			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
+			datafile = buffer;
+#else
 			if(confOK == true){
 				if(conf.restart == false) sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
 				else sprintf(temp_buf, "%s.restart%d.screen.log", conf.ofprefix.c_str(), CheckRestartNumber(conf.ofprefix));
 				}
 			else sprintf(temp_buf, "ERROR.log");
 			outman.SetLogFile(temp_buf);
+			outman.UserMessage("Running serial GARLI, version 0.96beta4 (Aug 2007)\n(->Amino acid and Codon testing version<-)\n");
 
-#ifndef BOINC
-			outman.UserMessage("Running serial GARLI, version 0.952Beta2 (Feb 2007)\n(->Backbone constraint testing version<-)\n");
-#else
-			outman.UserMessage("Running BOINC GARLI, version 0.952Beta2 (July 2007)\n(->BOINC testing version<-)\n");
-			//check for the presence of BOINC checkpoint files
-			conf.restart = true;
-			sprintf(temp_buf, "%s.adap.check", conf.ofprefix.c_str());
-			if(FileExists(temp_buf) == false) conf.restart = false;
-			sprintf(temp_buf, "%s.pop.check", conf.ofprefix.c_str());
-			if(FileExists(temp_buf) == false) conf.restart = false;
-			if(conf.uniqueSwapBias != ONE_POINT_ZERO){
-				sprintf(temp_buf, "%s.swaps.check", conf.ofprefix.c_str());
-				if(FileExists(temp_buf) == false) conf.restart = false;
-				}
-			if(conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
-		
 #endif
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
+			//set up the model specification
+			modSpec.SetupModSpec(conf);
+
 			// Create the data object
-			HKYData data;
-			int err=ReadData(conf.datafname.c_str(), &data);
-			if(err==-1) return 0;
-			
-			//create the population object
-			Population pop;
+			if(modSpec.IsNucleotide() || modSpec.IsAminoAcid())
+				data = new HKYData();
+			else
+				data = new CodonData();
+
+			pop.usedNCL = ReadData(datafile.c_str(), data);
 		
-			pop.Setup(&conf, &data, 1, 0);
+			pop.Setup(&conf, data, 1, 0);
 
-			#ifdef PROFILE
-				ProfilerInit(collectDetailed, bestTimeBase, 100000, 1000);
-			#endif
+			if(conf.runmode != 0){
+				if(conf.runmode == 1)
+					pop.ApplyNSwaps(10);
+				else if(conf.runmode > 1)
+					pop.SwapToCompletion(conf.startOptPrec);
+				}
+			else{
+#ifdef RUN_TESTS
+				pop.RunTests();
+			
+#endif
+				if(pop.conf->restart) pop.ReadStateFiles();
 
+				if(pop.conf->bootstrapReps == 0){//NOT bootstrapping
+					pop.PerformSearch();
+					}
+				else pop.Bootstrap();
+				}
+				}catch(ErrorException err){
+					if(outman.IsLogSet() == false)
+						outman.SetLogFile("ERROR.log");
+					outman.UserMessage("\nERROR: %s\n\n", err.message);
+#ifdef BOINC
+					boinc_finish(1);
+#endif
+
+#ifdef MAC_FRONTEND
+				NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+				NSString *messageForInterface = [NSString stringWithUTF8String:err.message];
+				[[MFEInterfaceClient sharedClient] didEncounterError:messageForInterface];
+				[pool release];
+#endif				
+				}
+			catch(int error){
+				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
+				}
+	if(data != NULL) delete data;
+	
+	if(interactive==true){
+		outman.UserMessage("\n-Press enter to close program.-");
+		char d=getchar();
+		}
+
+	outman.CloseLogFile();
+#ifdef BOINC
+	boinc_finish(0);
+#endif
+
+/* OLD WAY
 			if(pop.conf->bootstrapReps == 0){
 				pop.GetConstraints();
 				if(conf.restart == false){
 					outman.UserMessage("Running Genetic Algorithm with initial seed=%d\n", rnd.init_seed());
 					pop.SeedPopulationWithStartingTree();
-					//DEBUG - to look at effect of prec during init opt on score
+*/					//DEBUG - to look at effect of prec during init opt on score
 /*					pop.InitializeOutputStreams();
 					time_t repStart;
 					ofstream res("optresults.log");
@@ -242,7 +316,7 @@ char **argv=NULL;
 						}
 					return 1;
 */					}
-				else{
+/*				else{
 					pop.ReadStateFiles();
 					outman.UserMessage("Restarting Genetic Algorithm from checkpoint");
 					outman.UserMessage("generation %d, seed %d, best lnL %.3f", pop.Gen(), rnd.init_seed(), pop.BestFitness());
@@ -268,6 +342,7 @@ char **argv=NULL;
 				}
 			}catch(ErrorException err){
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
+/*
 #ifdef BOINC
 				boinc_finish(1);
 #endif
@@ -287,14 +362,14 @@ char **argv=NULL;
 		outman.UserMessage("\n-Press enter to close program.-");
 		char d=getchar();
 		}
-	
+
+	delete data;
 	outman.CloseLogFile();
 #ifdef BOINC
 	boinc_finish(0);
 #endif
-
-#endif
 	}
+*/
 	#if defined(MONITORING_ALLOCATION) && !defined(NDEBUG)
 		#if defined(WRITE_MEM_REPORT_TO_FILE)
 			char filename[50];
@@ -311,10 +386,6 @@ char **argv=NULL;
 		#else
 			MEMCHK_REPORT(cout)
 		#endif
-	#endif
-	#ifdef PROFILE
-	ProfilerDump("\phalfnewrescale.prof");
-	ProfilerTerm();
 	#endif
 
 #ifdef BOINC

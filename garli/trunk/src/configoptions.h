@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -50,7 +50,9 @@ class GeneralGamlConfig{
 	bool checkpoint;
 	FLOAT_TYPE significantTopoChange;
 	string outgroupString;
-	
+	unsigned searchReps;
+	unsigned runmode;
+
 	//finishing the run
 	bool enforceTermConditions;
 	unsigned lastTopoImproveThresh;
@@ -59,6 +61,8 @@ class GeneralGamlConfig{
 	unsigned stoptime;
 
 	//model settings
+	string datatype;
+	string geneticCode;
 	string stateFrequencies; //equal, estimate, emprical, fixed
 	string rateMatrix;		 //6rate, 2rate, 1rate, fixed, custom(
 	string proportionInvariant; //none, fixed, estimate

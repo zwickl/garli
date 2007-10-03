@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -24,19 +24,13 @@ using namespace std;
 #include "defs.h"
 #include "datamatr.h"
 #include "rng.h"
-#include "stricl.h"
+#include "nxsstring.h"
 #include "errorexception.h"
 #include "outputman.h"
+#include "model.h"
+#include "garlireader.h"
 
-#ifdef BOINC
-	#include "boinc_api.h"
-	#include "filesys.h"
-	#ifdef _WIN32
-		#include "boinc_win.h"
-	#else
-		#include "config.h"
-	#endif
-#endif
+extern ModelSpecification modSpec;
 
 #define MAX_TAXON_LABEL		80
 
@@ -494,13 +488,83 @@ void DataMatrix::SwapCharacters( int i, int j )
 		}
 }
 
-void DataMatrix::BeginNexusTreesBlock(ofstream &treeout){
+void DataMatrix::CreateMatrixFromNCL(GarliReader &reader){
+	
+	NxsCharactersBlock *charblock = reader.GetCharactersBlock();
+//	vector<unsigned> reducedToOrigCharMap = charblock->GetOrigIndexVector();
+	NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
+	
+	int numOrigTaxa = charblock->GetNTax();
+	int numActiveTaxa = charblock->GetNumActiveTaxa();
+	int numOrigChar = charblock->GetNChar();
+	int numActiveChar = charblock->GetNumActiveChar();
+	//int num_chars = reducedToOrigCharMap.size();
+	//cout << num_chars << endl;
+
+	NewMatrix( numActiveTaxa, numActiveChar );
+
+	// read in the data, including taxon names
+	int i=0;
+	if(modSpec.IsAminoAcid() == false){
+		for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+			if(charblock->IsActiveTaxon(origTaxIndex)){
+				SetTaxonLabel( i, taxablock->GetTaxonLabel(origTaxIndex).c_str());
+				
+				int j = 0;
+				for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
+					if(charblock->IsActiveChar(origIndex)){	
+						unsigned char datum = '\0';
+						if(charblock->IsGapState(origTaxIndex, origIndex) == true) datum = 15;
+						else if(charblock->IsMissingState(origTaxIndex, origIndex) == true) datum = 15;
+						else{
+							int nstates = charblock->GetNumStates(origTaxIndex, origIndex);
+							for(int s=0;s<nstates;s++){
+								datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, origIndex, s));
+								}
+							}
+						SetMatrix( i, j++, datum );
+						}
+					}
+				i++;
+				}
+			}
+		}
+	else{
+		for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+			if(charblock->IsActiveTaxon(origTaxIndex)){
+				SetTaxonLabel( i, taxablock->GetTaxonLabel(origTaxIndex).c_str());
+				
+				int j = 0;
+				for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
+					if(charblock->IsActiveChar(origIndex)){	
+						unsigned char datum = '\0';
+						if(charblock->IsGapState(origTaxIndex, origIndex) == true) datum = 20;
+						else if(charblock->IsMissingState(origTaxIndex, origIndex) == true) datum = 20;
+						else{
+							int nstates = charblock->GetNumStates(origTaxIndex, origIndex);
+							assert(nstates == 1);
+							datum = CharToAminoAcidNumber(charblock->GetState(origTaxIndex, origIndex, 0));
+/*							for(int s=0;s<nstates;s++){
+								datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, origIndex, s));
+								}
+*/							}
+						SetMatrix( i, j++, datum );
+						}
+					}
+				i++;
+				}
+			}
+		}
+	}
+
+
+void DataMatrix::BeginNexusTreesBlock(ofstream &treeout) const{
 	//this outputs everything up through the translate table
 	treeout << "#NEXUS\n\nbegin trees;\ntranslate\n";
 	for(int k=0;k<nTax;k++){
 		treeout << "  " << (k+1);
 		NxsString tnstr = TaxonLabel(k);
-		tnstr.blanks_to_underscores();
+		tnstr.BlanksToUnderscores();
 		treeout << "  " << tnstr.c_str();
 		if( k == nTax-1 )
 			treeout << ";\n";
@@ -564,8 +628,8 @@ void DataMatrix::Collapse(){
 
 	Sort();
 
-	while( i < nChar ) {
-		while( j < nChar && ComparePatterns( i, j ) == 0 ) {
+	while( i < NChar() ) {
+		while( j < NChar() && ComparePatterns( i, j ) == 0 ) {
 			// pattern j same as pattern i
 			count[i] += count[j];
 			count[j] = 0;
@@ -708,17 +772,17 @@ int DataMatrix::GetToken( istream& in, char* tokenbuf, int maxlen, bool acceptCo
 	return ok;
 }
 
-int DataMatrix::GetTokenBOINC( FILE *in, char* tokenbuf, int maxlen){
+int DataMatrix::GetToken( FILE *in, char* tokenbuf, int maxlen){
 	int ok = 1;
 
 	int i;
 	char ch = ' ';
 
 	// skip leading whitespace
-	while( in && ( isspace(ch) || ch == '[' ) ){
+	while( !ferror(in) && ( isspace(ch) || ch == '[' ) ){
 		ch = getc(in);
 		}
-	if( !in ) return 0;
+	if( ferror(in) ) return 0;
 
 	tokenbuf[0] = ch;
 	tokenbuf[1] = '\0';
@@ -740,140 +804,122 @@ int DataMatrix::GetTokenBOINC( FILE *in, char* tokenbuf, int maxlen){
 //
 // Read reads in data from a file
 
-int DataMatrix::Read( const char* infname, char* left_margin )
-{
+int DataMatrix::ReadPhylip( const char* infname){
 	char ch;
 	bool isNexus=false;
 
-//	ofstream debug("debug.log");
-	ofstream debug;//killing this stream
-	left_margin=new char[20];
-	strcpy(left_margin, "  ");
-
-	ifstream inf( infname );
-	assert( inf );
-
+	FILE *inf;
+#ifdef BOINC
+	char input_path[512];
+	boinc_resolve_filename(infname, input_path, sizeof(input_path));
+    inf = boinc_fopen(input_path, "r");
+#else
+	inf = fopen(infname, "r");
+#endif
+	if(ferror(inf)) throw ErrorException("problem opening datafile %s for reading", infname);
+	
 	// get comments (note: comments only allowed at the beginning of the file)
 	int end_of_comments = 0;
-	while( !end_of_comments )
-	{
-		inf.get(ch);
+	while( !end_of_comments ){
+		ch = getc(inf);
 		if( ch != '/' ) {
-			inf.putback(ch);
+			ungetc(ch, inf);
 			end_of_comments = 1;
-		}
+			}
 		else {
 			// ch is a slash, ignore rest of this line
-			char tmp[256];
-			while( ch != '\n' ) {
-				inf.get( tmp, 255, '\n' ); // will not extract end of line character
-				inf.get(ch);   // try to get the end of line character
+			while( ch != '\n' && ch != '\r' && ch != EOF) {
+				ch = getc(inf);
+				}
 			}
 		}
-	}
 
 	// get the dimensions of the data file
 	int num_taxa=0, num_chars=0;
-	char buf[200];
-	inf >> buf;
-	if((!(strcmp(buf, "#NEXUS"))) || (!(strcmp(buf, "#nexus"))) || (!(strcmp(buf, "#Nexus")))){
-		isNexus=true;
-		while(strcmp(buf, "dimensions") && strcmp(buf, "Dimensions") && strcmp(buf, "DIMENSIONS")) inf >> buf;
-		int numread=0;
-		do{
-			inf >> buf;
-			numread++;
-			if(buf[1]=='t' || buf[1]=='T'){
-				num_taxa=atoi(buf+5);
-				}
-			if(buf[1]=='c' || buf[1]=='C'){
-				num_chars=atoi(buf+6);
-				}
-			}while(numread < 2);
-		if(!(num_taxa > 0) ){
-			throw ErrorException("Problem reading ntax on dimensions line of Nexus file!");
-			}
-		if(!(num_chars > 0) ){
-			throw ErrorException("Problem reading nchar on dimensions line of Nexus file!");
-			return -1;
-			}
-		do{
-			inf >> buf;
-			if(inf.eof()){
-				throw ErrorException("Could not find data matrix!");
-				return -1;
-				}
-			}while(strcmp(buf, "matrix") && strcmp(buf, "Matrix") && strcmp(buf, "MATRIX"));
-		}		
-	else{
-		num_taxa=atoi(buf);
-		inf >> num_chars;
-		}
+	fscanf(inf, "%d  %d", &num_taxa, &num_chars);
 
-	assert(num_taxa<30000);	//if this trips ToplogyList will have to be modified (ints to longs
 	NewMatrix( num_taxa, num_chars );
 
 	// read in the data, including taxon names
-	for( int i = 0; i < num_taxa; i++ ) {
+	int blockStartNum = 0, charNum, i;
+	bool firstPass = true;
+	bool allDataRead = false;
+	bool interleaved = false;
 
-		// get name for taxon i
-		char taxon_name[ MAX_TAXON_LABEL ];
-		int ok = GetToken( inf, taxon_name, MAX_TAXON_LABEL, false);
-		if(ok == -1){
-			throw ErrorException("\nERROR: Confused by comments (i.e. [...]) in datafile.\nPlease remove comments by exporting dataset from PAUP* or a similar program.\n");			
-			}
-		if( !ok ) {
-			if( left_margin )
-				debug << left_margin << "Error reading data: label for taxon " << (i+1) << " too long" << endl;
-			Flush();
-			return 0;
-		}
-		SetTaxonLabel( i, taxon_name );
-
-		// get data for taxon i
-		for( int j = 0; j < num_chars; j++ ) {
-			inf >> ch;
-			if(ch == '['){//if there is a comment here, which is how the "color" used to be represented
-				while (ch != ']') inf >> ch;
-				inf >> ch;
+	while(allDataRead == false){
+		//loop over the taxa, doing so multiple times for interleaved data
+		for( i = 0; i < num_taxa; i++ ) {
+			if(firstPass){
+				// get name for taxon i
+				char taxon_name[ MAX_TAXON_LABEL ];
+				int ok = GetToken(inf, taxon_name, MAX_TAXON_LABEL);
+				if( !ok ) {
+					throw ErrorException("problem reading data: name for taxon #%d too long", i+1);
+					}
+				SetTaxonLabel( i, taxon_name );
 				}
+
+			// get data for taxon i
 			unsigned char datum;
-			if( ch == '.' ) 
-	    		datum = Matrix( 0, j );
-		 		
-	 		else 
-				datum = CharToBitwiseRepresentation(ch);
-				
-			SetMatrix( i, j, datum );
+			for( charNum = blockStartNum; charNum < num_chars; charNum++ ) {
+				if(firstPass == false && charNum == blockStartNum){
+					do{
+						ch = getc(inf);
+						}while(isspace(ch) && ch != EOF);
+					}
+				else{
+					do{
+						ch = getc(inf);
+						}while(ch == ' ' || ch == '\t');
+					}
+				if(ch == '['){//if there is a comment here, which is how the "color" used to be represented
+					while (ch != ']' && ch != EOF) ch = getc(inf);
+					ch = getc(inf);
+					}
+				if( ch == '.' ){
+	    			datum = Matrix( 0, charNum );
+					}
+				else if(ch == '\n' || ch == '\r'){
+					//file must be interleaved (or broken)
+					if(!interleaved && i != 0)
+						throw ErrorException("Unexpected line break found while reading data for taxon %s", TaxonLabel(i));
+					else{
+						interleaved = true;
+						break;
+						}
+					}
+	 			else{ 
+					if(modSpec.IsAminoAcid())
+						datum = CharToAminoAcidNumber(ch);
+					else 
+						datum = CharToBitwiseRepresentation(ch);
+					}
+				SetMatrix( i, charNum, datum );
+				}
+			}
+		if(charNum == num_chars && i == num_taxa) allDataRead = true;
+		else{
+			firstPass = false;
+			blockStartNum = charNum;
 			}
 		}
 
 	// read in the line containing the counts
-	//DZ 11-25-02 This left_margin stuff seems to be totally screwed up, and results in the 
-	//counts not being read.  Commenting out.
-	if( inf ) {
+	do{
+		ch = getc(inf);
+		}while(ch != EOF && isspace(ch));
+	if( !feof(inf) ) {
+		ungetc(ch, inf);
 		int i;
-
+		char buf[10];
 		for( i = 0; i < num_chars; i++ ) {
-			int cnt;			
-
-			inf >> cnt;
-			if( !inf ) break;
+			int ok = GetToken( inf, buf, 10);
+			if(feof(inf)) break;
+			int cnt = atoi(buf);			
 			SetCount( i, cnt );
-		}
-		if( inf && i == num_chars ) {
-			if( left_margin )
-				debug << left_margin << "Counts read sucessfully" << endl;
-			dense = 1;
-		}
-		else if( !inf && i > 0 ) {
-			if( left_margin )
-				debug << left_margin << "Error reading count number " << i << endl;
-		}
-		else {
-			if( left_margin )
-				debug << left_margin << "No counts found" << endl;
-		}
+			}
+		if(i != num_chars) throw ErrorException("problem reading pattern counts");
+		else dense = 1;
 		//DJZ 9-13-06
 		//It is very important to properly set the totalNChar variable now
 		//to be the sum of the counts, otherwise bootstrapping after reading
@@ -882,43 +928,88 @@ int DataMatrix::Read( const char* infname, char* left_margin )
 		for(int i=0;i<num_chars;i++){
 			totalNChar += count[i];
 			}
-
-
-	}
+		}
 
 	// read in the line containing the number of states for each character
-	if( inf ) {
+	if( ferror(inf) == false ) {
 		int i;
+		char buf[10];
 		for( i = 0; i < num_chars; i++ ) {
 			int nstates;
-			inf >> nstates;
+			GetToken(inf, buf, 10);
 			if( !inf ) break;
+			nstates = atoi(buf);
 			SetNumStates( i, nstates );
-			// njstart.numstates[i]=nstates;
-		}
-		if( inf && i == num_chars ) {
-			if( left_margin )
-				debug << left_margin << "Number of states for each character read sucessfully" << endl;
-			dense = 1;
-		}
-		else if( !inf && i > 0 ) {
-			if( left_margin )
-				debug << left_margin << "Error reading number of states for character number " << i << endl;
-		}
-		else {
-			if( left_margin )
-				debug << left_margin << "Line containing number of states for each character not found" << endl;
 		}
 	}
 
-	inf.close();
-	delete []left_margin;
-
-	CheckForIdenticalTaxonNames();
-
+	fclose(inf);
 	return 1;
 }
 
+int DataMatrix::ReadFasta( const char* infname){
+	char ch;
+	bool isNexus=false;
+
+	FILE *inf;
+#ifdef BOINC
+	char input_path[512];
+	boinc_resolve_filename(infname, input_path, sizeof(input_path));
+    inf = boinc_fopen(input_path, "r");
+#else
+	inf = fopen(infname, "r");
+#endif
+	if(ferror(inf)) throw ErrorException("problem opening datafile %s for reading", infname);
+	
+	//we don't know in advance what the number of characters or taxa is with fasta files
+	//So, look through the file to get that info, then read it for real
+	
+	int num_taxa=0, num_chars=0, cur_char;
+	char taxon_name[ MAX_TAXON_LABEL ];
+	while( !feof(inf) ){
+		GetToken(inf, taxon_name, MAX_TAXON_LABEL);
+		num_taxa++;
+		cur_char = 0;
+		do{
+			ch = getc(inf);
+			if( !isspace(ch) && ch != '>' && ch != EOF) cur_char++;
+			}while(ch != '>' && ch != EOF);
+		if(num_taxa == 1) num_chars = cur_char;
+		else if(cur_char != num_chars) throw ErrorException("# of characters for taxon %s (%d) not equal\n\tto the # of characters for first taxon (%d)", taxon_name, cur_char, num_chars);
+		}
+	rewind(inf);
+
+	NewMatrix( num_taxa, num_chars );
+
+	for(int i = 0; i < num_taxa; i++ ) {
+		// get name for taxon i
+		char taxon_name[ MAX_TAXON_LABEL ];
+		int ok = GetToken(inf, taxon_name, MAX_TAXON_LABEL);
+		if( !ok ) {
+			throw ErrorException("problem reading data: name for taxon #%d too long", i+1);
+			}
+		SetTaxonLabel( i, taxon_name+1 );
+			
+
+		// get data for taxon i
+		unsigned char datum;
+		for(int charNum = 0; charNum < num_chars; charNum++ ) {
+			do{
+				ch = getc(inf);
+				}while(isspace(ch));
+			if(modSpec.IsAminoAcid())
+				datum = CharToAminoAcidNumber(ch);
+			else 
+				datum = CharToBitwiseRepresentation(ch);
+
+			SetMatrix( i, charNum, datum );
+			}
+		}
+
+	fclose(inf);
+	return 1;
+}
+/*
 #ifdef BOINC
 int DataMatrix::ReadBOINC( const char* infname){
 	char ch;
@@ -945,7 +1036,7 @@ int DataMatrix::ReadBOINC( const char* infname){
 
 		// get name for taxon i
 		char taxon_name[ MAX_TAXON_LABEL ];
-		int ok = GetTokenBOINC( inf, taxon_name, MAX_TAXON_LABEL);
+		int ok = GetToken( inf, taxon_name, MAX_TAXON_LABEL);
 		if( !ok ) {
 			cout << "Error reading data (BOINC): label for taxon " << (i+1) << " too long" << endl;
 			return 0;
@@ -972,7 +1063,7 @@ int DataMatrix::ReadBOINC( const char* infname){
 		int i;
 
 		for( i = 0; i < num_chars; i++ ) {
-			int ok = GetTokenBOINC( inf, buf, 10);
+			int ok = GetToken( inf, buf, 10);
 			assert(ok);
 			int cnt = atoi(buf);			
 
@@ -999,7 +1090,7 @@ int DataMatrix::ReadBOINC( const char* infname){
 		int i;
 		for( i = 0; i < num_chars; i++ ) {
 			int nstates;
-			GetTokenBOINC(inf, buf, 10);
+			GetToken(inf, buf, 10);
 			if( !inf ) break;
 			nstates = atoi(buf);
 			SetNumStates( i, nstates );
@@ -1014,7 +1105,7 @@ int DataMatrix::ReadBOINC( const char* infname){
 	return 1;
 }
 #endif
-
+*/
 void DataMatrix::DumpCounts( const char* s )
 {
 	ofstream tmpf( "tmpfile.txt", ios::out | ios::app );
@@ -1627,7 +1718,14 @@ void DataMatrix::Reweight(FLOAT_TYPE prob){
 		}
 	}
 
-void DataMatrix::BootstrapReweight(){
+void DataMatrix::BootstrapReweight(int seed){
+	
+	//allow for a seed to be passed in and used for the reweighting
+	//and then have the original seed restored.  Used for bootstrap restarting
+	int originalSeed = rnd.seed();
+	if(seed > 0){
+		rnd.set_seed(seed);
+		}
 
 	RestoreOriginalCounts();
 	
@@ -1656,6 +1754,7 @@ void DataMatrix::BootstrapReweight(){
 		}
 //	deb << endl;
 //	deb.close();
+	if(seed > 0) rnd.set_seed(originalSeed);
 	}
 
 void DataMatrix::CheckForIdenticalTaxonNames(){
@@ -1667,7 +1766,7 @@ void DataMatrix::CheckForIdenticalTaxonNames(){
 		for(int t2=t1+1;t2<nTax;t2++){
 			name1 = TaxonLabel(t1);
 			name2 = TaxonLabel(t2);
-			if(strcmp(name1, name2) == 0) identicals.push_back(make_pair(t1, t2));
+			if(_stricmp(name1, name2) == 0) identicals.push_back(make_pair(t1, t2));
 			}
 		}
 	

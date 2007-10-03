@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -21,8 +21,8 @@
 #include <string>
 #include <map>
 
-using std::string;
-using std::map;
+//using std::string;
+//using std::map;
 
 typedef map<string, string> Options;
 typedef map<string, Options> Sections;

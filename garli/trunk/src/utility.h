@@ -2,7 +2,6 @@
 #define GAML_UTIL_HPP
 //	code from MTH for allocating flattened matrices
 
-#include "memchk.h"
 #include <stdlib.h>
 #include <cassert>
 #include <ostream>

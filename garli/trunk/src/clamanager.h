@@ -4,12 +4,12 @@
 #include <vector>
 #include <algorithm>
 #include <cassert>
-#include "memchk.h"
 #include "condlike.h"
+#include "model.h"
 using namespace std;
 
 extern int memLevel;
-
+extern ModelSpecification modSpec;
 
 #ifdef UNIX
 	#include <sys/mman.h>
@@ -39,7 +39,7 @@ class ClaManager{
 		claStack.reserve(numClas);
 		for(int i=numClas-1;i>=0;i--){
 			allClas[i]=new CondLikeArray;
-			allClas[i]->Allocate(4, nchar, numRates);
+			allClas[i]->Allocate(modSpec.nstates, nchar, numRates);
 			claStack.push_back(allClas[i]);
 			}
 		holders = new CondLikeArrayHolder[numHolders];
@@ -205,7 +205,7 @@ class ClaManager{
 			holderStack.push_back(index);
 			if(holders[index].theArray != NULL){
 				assert(find(claStack.begin(), claStack.end(), holders[index].theArray) == claStack.end());
-				assert(holders[index].theArray->NStates()==4);
+				//assert(holders[index].theArray->NStates()==4);
 				claStack.push_back(holders[index].theArray);
 				}
 			holders[index].Reset();

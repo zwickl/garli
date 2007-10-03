@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -20,22 +20,13 @@
 
 using namespace std;
 
+#include "defs.h"
 #include "treenode.h"
 #include "clamanager.h"
 #include "bipartition.h"
 #include "errorexception.h"
 #include "outputman.h"
 #include "mlhky.h"
-
-#ifdef BOINC
-	#include "boinc_api.h"
-	#include "filesys.h"
-	#ifdef _WIN32
-		#include "boinc_win.h"
-	#else
-		#include "config.h"
-	#endif
-#endif
 
 extern OutputManager outman;
 
@@ -707,7 +698,7 @@ void TreeNode::SetEquivalentConditionalVectors(const HKYData *data){
 			}
 		}
 	}
-
+/*
 void TreeNode::OutputBinaryNodeInfo(ofstream &out) const{
 	int zero = 0;
 
@@ -726,24 +717,23 @@ void TreeNode::OutputBinaryNodeInfo(ofstream &out) const{
 	
 	out.write((char*) &dlen, sizeof(FLOAT_TYPE));
 	}
+*/
 
-#ifdef BOINC
-void TreeNode::OutputBinaryNodeInfoBOINC(MFILE &out) const{
+void TreeNode::OutputBinaryNodeInfo(OUTPUT_CLASS &out) const{
 	int zero = 0;
 
 	if(this->IsInternal()){
-		out.write((char*) &(left->nodeNum), sizeof(int), 1);
-		out.write((char*) &(right->nodeNum), sizeof(int), 1);
+		out.WRITE_TO_FILE(&(left->nodeNum), sizeof(int), 1);
+		out.WRITE_TO_FILE(&(right->nodeNum), sizeof(int), 1);
 		}
-	if(prev == NULL) out.write((char*) &zero, sizeof(int), 1);
-	else out.write((char*) &(prev->nodeNum), sizeof(int), 1);
+	if(prev == NULL) out.WRITE_TO_FILE(&zero, sizeof(int), 1);
+	else out.WRITE_TO_FILE(&(prev->nodeNum), sizeof(int), 1);
 
-	if(next == NULL) out.write((char*) &zero, sizeof(int), 1);
-	else out.write((char*) &(next->nodeNum), sizeof(int), 1);
+	if(next == NULL) out.WRITE_TO_FILE(&zero, sizeof(int), 1);
+	else out.WRITE_TO_FILE(&(next->nodeNum), sizeof(int), 1);
 	
-	if(anc == NULL) out.write((char*) &zero, sizeof(int), 1);
-	else out.write((char*) &(anc->nodeNum), sizeof(int), 1);
+	if(anc == NULL) out.WRITE_TO_FILE(&zero, sizeof(int), 1);
+	else out.WRITE_TO_FILE(&(anc->nodeNum), sizeof(int), 1);
 	
-	out.write((char*) &dlen, sizeof(FLOAT_TYPE), 1);
+	out.WRITE_TO_FILE(&dlen, sizeof(FLOAT_TYPE), 1);
 	}
-#endif

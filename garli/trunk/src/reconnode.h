@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -26,16 +26,6 @@ extern rng rnd;
 
 using namespace std;
 
-#ifdef BOINC
-	#include "boinc_api.h"
-	#include "filesys.h"
-	#ifdef _WIN32
-		#include "boinc_win.h"
-	#else
-		#include "config.h"
-	#endif
-#endif
-
 class ReconNode;
 
 typedef list<ReconNode>::iterator listIt;
@@ -44,12 +34,15 @@ class ReconNode{
 	public:
 	unsigned short nodeNum;
 	unsigned short reconDist;
-	float pathlength;
+	FLOAT_TYPE pathlength;
 	FLOAT_TYPE weight;
-	float chooseProb;
+	FLOAT_TYPE chooseProb;
 	bool withinCutSubtree;
 	
 	ReconNode(unsigned short nn, unsigned short rd, float pl, bool wcs=false) : nodeNum(nn), reconDist(rd), pathlength(pl), withinCutSubtree(wcs) {}
+	void Report(ofstream &deb){
+		deb << nodeNum << "\t" << reconDist << "\t" << pathlength << "\t" << weight << "\t" << chooseProb << "\t" << withinCutSubtree << "\n";
+		}
 	};
 
 class DistEquals:public binary_function<ReconNode, int, bool>{
@@ -166,6 +159,10 @@ class ReconList{
 		return (NthElement(rnd.random_int((int)l.size())))->nodeNum;
 		}
 
+	void Reverse(){
+		reverse(l.begin(), l.end());
+		}
+
 	ReconNode *RandomReconNode(){
 		return &(*(NthElement(rnd.random_int((int)l.size()))));
 		}
@@ -186,10 +183,20 @@ class ReconList{
 		l.push_back(ReconNode(nn, rd, pl, withinCutSubtree));
 		num++;
 		}
+	
+	void DebugReport(){
+		ofstream deb("recons.log");
+		for(listIt it=l.begin();it!=l.end();it++){
+			(*it).Report(deb);
+			}
+		deb.close();
+		}
+
 	};
 
 class Swap;
 bool SwapLessThan(const Swap &lhs, const Swap &rhs);
+bool SwapLessThanDist(const Swap &lhs, const Swap &rhs);
 
 class Swap{
 	Bipartition b;
@@ -216,11 +223,11 @@ public:
 		count++;	
 		}
 
-	int Count(){
+	int Count()const {
 		return count;	
 		}
 
-	int ReconDist(){
+	int ReconDist() const{
 		return reconDist;
 		}
 
@@ -229,22 +236,21 @@ public:
 		}
 
 	void Output(ofstream &out){
-		out << b.Output() << "\t" << count << "\t" << cutnum << "\t" << brokenum << "\t" << reconDist << "\n";
+		out << b.Output() << "\t" << count << "\t" << cutnum << "\t" << brokenum << "\t" << reconDist << endl;
 		}
-
+/*
 	void BinaryOutput(ofstream &out){
 		b.BinaryOutput(out);
 		intptr_t scalarSize = (intptr_t) &reconDist - (intptr_t) &count + sizeof(reconDist);
 		out.write((char*)&count, (streamsize) scalarSize);
 		}
+*/
 
-#ifdef BOINC
-	void BinaryOutputBOINC(MFILE &out){
-		b.BinaryOutputBOINC(out);
+	void BinaryOutput(OUTPUT_CLASS &out){
+		b.BinaryOutput(out);
 		intptr_t scalarSize = (intptr_t) &reconDist - (intptr_t) &count + sizeof(reconDist);
-		out.write((char*)&count, (streamsize) scalarSize, 1);
+		out.WRITE_TO_FILE(&count, (streamsize) scalarSize, 1);
 		}
-#endif
 
 	unsigned BipartitionBlock(int block) const{
 		return b.rep[block];	
@@ -252,8 +258,8 @@ public:
 
 	bool operator<(const Swap &rhs){
 		//note that this is "less than" for sorting purposes, not in a subset sense
-		//returns false is in the case of equality of bipatitions AND nodenums, but
-		//otherwise sorts based on the cut node
+		//it is a strict weak ordering, so it returns false in the case of possible equality
+		//ordering is based first on bip, then on reconDist
 		int i;
 		for(i=0;i<Bipartition::nBlocks-1;i++){
 			if(BipartitionBlock(i) > rhs.BipartitionBlock(i)) return false;
@@ -261,21 +267,29 @@ public:
 			}
 
 		if(((BipartitionBlock(i)) & Bipartition::partialBlockMask) < ((rhs.BipartitionBlock(i)) & Bipartition::partialBlockMask)) return true;
-		else{
-			if(((BipartitionBlock(i)) & Bipartition::partialBlockMask) == ((rhs.BipartitionBlock(i)) & Bipartition::partialBlockMask) && cutnum < rhs.cutnum) return true;
+		
+		else if(((BipartitionBlock(i)) & Bipartition::partialBlockMask) == ((rhs.BipartitionBlock(i)) & Bipartition::partialBlockMask)){
+			//bipartitions are equal
+			if(reconDist < rhs.reconDist) return true; //dists are not
+			else if(reconDist == rhs.reconDist)
+				if(cutnum < rhs.cutnum) return true;//cutnum is not
 			}
 		return false;
 		}
 
 	bool operator==(const Swap &rhs){
 		bool bipEqual = b.EqualsEquals(&rhs.b);
-		if(reconDist == 1){//NNI's with different cuts and brokens can give the same topo, so just look at the bip
-			if(bipEqual == true) return true;
+		if(bipEqual == false) return false;
+		//if the bips are equal but the distances are different, the pre-swap topos must be different
+		//so we want to consider this a different swap
+		if(reconDist != rhs.reconDist) return false;
+		
+		if(reconDist == 1){//NNI's with different cuts and brokens can give the same topo
+			return true;
 			}
-		else{
-			if((bipEqual == true) && (cutnum == rhs.cutnum) && (brokenum == rhs.brokenum)) return true;
+		else if((cutnum == rhs.cutnum) && (brokenum == rhs.brokenum)){
+			return true;
 			}
-//		if((bipEqual == true) && (cutnum == rhs.cutnum) && (brokenum == rhs.brokenum)) return true;
 		return false;
 		}
 	};
@@ -289,7 +303,7 @@ class AttemptedSwapList{
 public:
 
 	AttemptedSwapList(){
-		unique=total=0;	
+		unique=total=0;
 		}
 
 	int GetUnique() {return unique;}
@@ -304,7 +318,7 @@ public:
 	list<Swap>::iterator end(){
 		return swaps.end();
 		}
-
+/*
 	void WriteSwapCheckpoint(ofstream &out){
 		intptr_t scalarSize = (intptr_t) &total - (intptr_t) &unique + sizeof(total);
 		out.write((char*) &unique, (streamsize) scalarSize);
@@ -312,16 +326,15 @@ public:
 			(*it).BinaryOutput(out);
 			}
 		}
+*/
 
-#ifdef BOINC
-	void WriteSwapCheckpointBOINC(MFILE &out){
+	void WriteSwapCheckpoint(OUTPUT_CLASS &out){
 		intptr_t scalarSize = (intptr_t) &total - (intptr_t) &unique + sizeof(total);
-		out.write((char*) &unique, scalarSize, 1);
+		out.WRITE_TO_FILE(&unique, scalarSize, 1);
 		for(list<Swap>::iterator it=swaps.begin();it != swaps.end(); it++){
-			(*it).BinaryOutputBOINC(out);
+			(*it).BinaryOutput(out);
 			}
 		}
-#endif
 
 	void ReadBinarySwapCheckpoint(FILE* &in){
 		assert(ferror(in) == false);
@@ -335,10 +348,9 @@ public:
 		IndexSwaps();
 
 		assert(swaps.size() == unique);
-		//DEBUG
 		int tot=0;
 		for(list<Swap>::iterator it=swaps.begin();it != swaps.end(); it++) tot += (*it).Count();
-		assert(tot == total);
+		if(tot != total) throw ErrorException("problem reading swap checkpoint!");
 		}
 
 	void ReadSwapCheckpoint(ifstream &in, int ntax){
@@ -405,7 +417,7 @@ public:
 	list<Swap>::iterator FindSwap(Swap &swap, bool &found){
 		//this function returns the matching swap if found in the list
 		//or the swap that would come immediately after it if not
-		
+
 		list<Swap>::iterator start;
 
 		if(indeces.size() == 0) start=swaps.begin();
@@ -433,7 +445,6 @@ public:
 				return it;
 				}
 			}
-
 
 /*
 		//a complete search from the start
@@ -470,6 +481,13 @@ public:
 			swapLog << distUniqueCounts[i] << "\t" << distTotCounts[i] << "\t";
 			}
 		swapLog << endl;
+		}
+
+	void AttemptedSwapDump(ofstream &deb){
+		deb << "\t" << GetUnique() << "\t" << GetTotal() << "\n" ;
+		for(list<Swap>::iterator it = swaps.begin();it != swaps.end();it++){
+			(*it).Output(deb);
+			}
 		}
 
 };

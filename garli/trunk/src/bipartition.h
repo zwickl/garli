@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -25,16 +25,6 @@
 using namespace std;
 
 #include "errorexception.h"
-
-#ifdef BOINC
-	#include "boinc_api.h"
-	#include "filesys.h"
-	#ifdef _WIN32
-		#include "boinc_win.h"
-	#else
-		#include "config.h"
-	#endif
-#endif
 
 class Bipartition{
 	public:	
@@ -478,22 +468,18 @@ class Bipartition{
 			}
 		return str;
 		}
-
+/*
 	void BinaryOutput(ofstream &out){
 		int size = nBlocks * sizeof(unsigned int);
-		out.write((char*) rep, nBlocks);
+		out.write((char*) rep, size);
 		}
-
-#ifdef BOINC
-	void BinaryOutputBOINC(MFILE &out){
-		int size = nBlocks * sizeof(unsigned int);
-		out.write((char*) rep, nBlocks, 1);
+*/
+	void BinaryOutput(OUTPUT_CLASS &out){
+		out.WRITE_TO_FILE(rep, sizeof(unsigned int), nBlocks);
 		}
-#endif
 
 	void BinaryInput(FILE* &in){
-		int size = nBlocks * sizeof(unsigned int);
-		fread((char*) rep, nBlocks, 1, in);
+		fread((char*) rep, sizeof(unsigned int), nBlocks, in);
 		}
 
 	vector<int> NodenumsFromBipart(){

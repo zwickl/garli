@@ -40,15 +40,16 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				AdditionalIncludeDirectories="../../../ncl-2.0/src"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="3"
+				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
-				ForcedIncludeFiles="defs.h"
+				ForcedIncludeFiles=""
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -118,7 +119,10 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				EnableIntrinsicFunctions="false"
+				FavorSizeOrSpeed="1"
 				OmitFramePointers="false"
+				WholeProgramOptimization="true"
+				AdditionalIncludeDirectories="../../../ncl-2.0/src"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
@@ -127,7 +131,7 @@
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
-				ForcedIncludeFiles="defs.h"
+				ForcedIncludeFiles=""
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -214,6 +218,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\src\garlireader.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\src\individual.cpp"
 				>
 			</File>
@@ -251,10 +259,6 @@
 			</File>
 			<File
 				RelativePath="..\..\src\set.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\src\stricl.cpp"
 				>
 			</File>
 			<File

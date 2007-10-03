@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -19,7 +19,7 @@
 
 using namespace std;
 
-#include "memchk.h"
+#include "defs.h"
 #include "set.h"
 #include "adaptation.h"
 #include "model.h"
@@ -53,6 +53,23 @@ Individual::Individual() : dirty(1), fitness(0.0),
 	 
  	treeStruct=NULL;
 	mod=new Model();
+	}
+
+Individual::Individual(const Individual *other) : 
+	dirty(1), fitness(0.0), 
+	reproduced(false), willreproduce(false), parent(-1),
+	willrecombine(false), recombinewith(-1), topo(-1), mutated_brlen(0), 
+	mutation_type(0), accurateSubtrees(0){
+
+	mod=new Model();
+	treeStruct=new Tree();
+
+	CopyNonTreeFields(other);
+	
+	treeStruct->MimicTopo(other->treeStruct);
+	dirty=false;
+	treeStruct->lnL=other->fitness;
+	treeStruct->mod=mod;
 	}
 
 Individual::~Individual(){
@@ -245,8 +262,10 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		//check if the taxon numbers or names are present in the tree string
 		c=' ';
 		c=stf.get();
-		if(c=='#')
+		if(c=='#'){//nexus tree files should now be going through NCL elsewhere, so we shouldn't be here
+				assert(0);
 				throw ErrorException("Sorry, GARLI does not yet read Nexus tree files.  See manual for starting tree/model format.");
+				}
 		strlen=1;
 		foundModel=false;
 		foundTree=false;
@@ -254,7 +273,8 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		while(c!='\n' && c!='\r' && c!=';' && stf.eof()==false){
 			if(foundModel==false && foundTree==false){
 				if(isalpha(c)){
-					if(c=='r'||c=='R'||c=='b'||c=='B'||c=='a'||c=='A'||c=='p'||c=='P'||c=='n'||c=='f') foundModel=true;
+					//changing from b for base freqs to e, for equilibrium freqs
+					if(c=='r'||c=='R'||c=='e'||c=='E'||c=='a'||c=='A'||c=='p'||c=='P'||c=='n'||c=='f'||c=='o') foundModel=true;
 					else throw ErrorException("Unknown model parameter specification! \"%c\"", c);
 					}
 				}
@@ -284,7 +304,8 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	stf.open( fname, ios::in );
 
 	char *temp=new char[strlen + 100];
-
+	
+	
 	//if this is a remote population in a parallel run, find the proper tree (ie line number)
 	int effectiveRank=rank;
 	for(int r=0;r<effectiveRank;r++){
@@ -305,6 +326,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	//bool foundRmat, foundStateFreqs, foundAlpha, foundPinv;
 	//foundRmat=foundStateFreqs=foundAlpha=foundPinv = false;
 
+	
 	if(foundModel == true){//this is UGLY!
 		c=stf.get();
 		do{
@@ -323,24 +345,30 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 					}
 				modSpec.gotRmatFromFile=true;
 				}
-			else if(c == 'B' || c == 'b'){//base freqs
+			else if(c == 'E' || c == 'e'){//base freqs
 				//7/12/07 changing this to pay attention to the 4th state, if specified
 				//although it should be calcuable from the other three, having exact restartability
 				//sometimes requires that it is taken as is
-				FLOAT_TYPE b[4];
-				for(int i=0;i<3;i++){
+				//FLOAT_TYPE b[4];
+				int nstates = modSpec.nstates;
+				vector<FLOAT_TYPE> b(nstates);
+				for(int i=0;i<nstates-1;i++){
 					stf >> temp;
-					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading base frequency parameters in file %s!\nExamine file and check manual for format.\n", fname));
+					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading equilirium state frequency parameters in file %s!\nExamine file and check manual for format.\n", fname));
 					b[i]=(FLOAT_TYPE)atof(temp);
 					}
 				do{c=stf.get();}while(c==' ');
 				if(isdigit(c) || c=='.'){
 					stf >> temp;
-					b[3]=(FLOAT_TYPE)atof(temp);
+					b[nstates-1]=(FLOAT_TYPE)atof(temp);
 					do{c=stf.get();}while(c==' ');				
 					}
-				else b[3] = ONE_POINT_ZERO - b[0] - b[1] - b[2];
-				mod->SetPis(b, restart==false);
+				else{
+					FLOAT_TYPE tot = ZERO_POINT_ZERO;
+					for(int i=0;i<nstates-1;i++) tot += b[i];
+					b[nstates-1] = ONE_POINT_ZERO - b[0] - b[1] - b[2];
+					}
+				mod->SetPis(&b[0], restart==false);
 				modSpec.gotStateFreqsFromFile=true;
 				}
 			else if(c == 'A' || c == 'a'){//alpha shape
@@ -387,10 +415,12 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		}//if(foundModel == true)
 
 	//Here we'll error out if something was fixed but didn't appear
-	if(modSpec.fixRelativeRates == true && modSpec.gotRmatFromFile == false) throw ErrorException("ratematrix = fixed in conf file, but parameter values not found in %s.", fname);
-	if(modSpec.fixStateFreqs == true && modSpec.equalStateFreqs == false && modSpec.empiricalStateFreqs == false && modSpec.gotStateFreqsFromFile == false) throw ErrorException("statefrequencies = fixed in conf file, but parameter values not found in %s.", fname);
-	if(modSpec.fixAlpha == true && modSpec.gotAlphaFromFile == false) throw ErrorException("ratehetmodel = gammafixed in conf file, but no parameter value for alpha found in %s.", fname);
-	if(modSpec.fixInvariantSites == true && modSpec.gotPinvFromFile == false) throw ErrorException("invariantsites = fixed in conf file, but no parameter value found in %s.", fname);
+	if(modSpec.IsNucleotide()){
+		if(modSpec.fixRelativeRates == true && modSpec.gotRmatFromFile == false) throw ErrorException("ratematrix = fixed in conf file, but parameter values not found in %s.", fname);
+		if(modSpec.fixStateFreqs == true && modSpec.equalStateFreqs == false && modSpec.empiricalStateFreqs == false && modSpec.gotStateFreqsFromFile == false) throw ErrorException("statefrequencies = fixed in conf file, but parameter values not found in %s.", fname);
+		if(modSpec.fixAlpha == true && modSpec.gotAlphaFromFile == false) throw ErrorException("ratehetmodel = gammafixed in conf file, but no parameter value for alpha found in %s.", fname);
+		if(modSpec.fixInvariantSites == true && modSpec.gotPinvFromFile == false) throw ErrorException("invariantsites = fixed in conf file, but no parameter value found in %s.", fname);
+		}
 
 	if(foundTree==true){
 		stf >> temp;
@@ -430,6 +460,45 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	delete []temp;
 	}
 
+void Individual::GetStartingConditionsFromNCL(NxsTreesBlock *treesblock, int rank, int nTax, bool restart /*=false*/){
+	assert(treeStruct == NULL);
+
+	int strlen;
+
+	int totalTrees = treesblock->GetNumTrees();
+
+	int effectiveRank = rank % totalTrees;
+	treeStruct=new Tree(treesblock->GetTreeDescription(effectiveRank).c_str(), true);
+
+	//check that any defined constraints are present in the starting tree
+	treeStruct->CalcBipartitions();
+	int conNum=1;
+	for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
+		if((*conit).IsPositive()){
+			if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
+		}
+		else if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
+		conNum++;
+		}
+	treeStruct->AssignCLAsFromMaster();
+
+	if(restart == false){
+			outman.UserMessage("Got starting tree %d from NCL)", effectiveRank+1);
+
+//		if(foundModel==true) outman.UserMessage("Obtained starting model from file %s:", fname);
+				
+//		else outman.UserMessage("No starting model found in %s\nUsing default parameter values:", fname);
+			
+//		mod->OutputGarliFormattedModel(cout);
+
+//		string modStr;
+//	mod->CreateGarliFormattedModel(modStr);
+//		outman.UserMessage(modStr.c_str());
+		}
+
+	mod->UpdateQMat();
+	}
+
 void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	if(optModel && mod->NRateCats() > 1 && modSpec.gotFlexFromFile == false) outman.UserMessage("optimizing starting branch lengths and rate heterogeneity parameters...");
 	else outman.UserMessage("optimizing starting branch lengths...");
@@ -447,7 +516,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		SetDirty();
 		CalcFitness(0);
 		FLOAT_TYPE trueImprove= Fitness() - passStart;
-//		assert(trueImprove >= -1.0);
+		assert(trueImprove >= -1.0);
 		if(trueImprove < ZERO_POINT_ZERO) trueImprove = ZERO_POINT_ZERO;
 		scaleImprove=treeStruct->OptimizeTreeScale(branchPrec);
 		SetDirty();

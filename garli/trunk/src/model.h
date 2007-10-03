@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -13,20 +13,24 @@
 //  email: zwickl@nescent.org
 //
 
-
 #ifndef _MODEL_
 #define _MODEL_
 
-#include "memchk.h"
+#if !defined(_MSC_VER)
+#define _stricmp strcasecmp
+#endif
+
 #include <iostream>
 #include <cassert>
 #include <math.h>
 #include <vector>
-#include "stricl.h"
+
+using namespace std;
+
 #include "rng.h"
 #include "mlhky.h"
+#include "configoptions.h"
 #include "errorexception.h"
-
 
 class ModelSpecification;
 class MFILE;
@@ -192,6 +196,7 @@ public:
 	int nstates;
 	int nst;
 	int numRateCats;
+	int numOmegaCats;
 
 	bool equalStateFreqs;
 	bool empiricalStateFreqs;
@@ -211,6 +216,27 @@ public:
 	bool gotFlexFromFile;
 	bool gotPinvFromFile;
 
+	enum{
+		DNA = 0,
+		RNA = 1,
+		CODON = 2,
+		AMINOACID = 3,
+		CODONAMINOACID = 4
+		}datatype;
+	
+	enum{
+		NONE = 0,
+		JONES = 1,
+		DAYHOFF = 2,
+		POISSON = 3,
+		WAG = 4
+		}AAmatrix, AAfreqs;
+		
+	enum{
+		STANDARD = 0,
+		VERTMITO = 1
+		}geneticCode;	
+
 	ModelSpecification(){
 		nstates=4;
 		//this is the default model
@@ -218,10 +244,19 @@ public:
 		SetGammaRates();
 		SetNumRateCats(4, false);
 		SetInvariantSites();
+		datatype=DNA;
 		gotRmatFromFile = gotStateFreqsFromFile = gotAlphaFromFile = gotFlexFromFile = gotPinvFromFile = false;
+		geneticCode=STANDARD;
+		AAmatrix = NONE;
+		AAfreqs = NONE;
 		}
 
+	bool IsCodon() {return datatype == CODON;}
+	bool IsNucleotide() {return (datatype == DNA || datatype == RNA);}
+	bool IsAminoAcid() {return datatype == AMINOACID;}
+	bool IsCodonAminoAcid() {return datatype == CODONAMINOACID;}
 	//A number of canned model setups
+	
 
 	void SetJC(){
 		nstates=4;
@@ -260,6 +295,22 @@ public:
 
 	void SetNst(int n){
 		nst=n;
+		}
+
+	void SetCodon(){
+		datatype = CODON;
+		nstates = 61;
+		numOmegaCats = 1;
+		}
+
+	void SetAminoAcid(){
+		datatype = AMINOACID;
+		nstates = 20;
+		}
+
+	void SetCodonAminoAcid(){
+		datatype = CODONAMINOACID;
+		nstates = 20;
 		}
 
 	void SetGammaRates(){
@@ -328,45 +379,126 @@ public:
 	void SetFixedRateMatrix(){
 		fixRelativeRates=true;
 		}
+	void SetJonesAAMatrix(){
+		AAmatrix = JONES;
+		}
+	void SetPoissonAAMatrix(){
+		AAmatrix = POISSON;
+		}	
+	void SetDayhoffAAMatrix(){
+		AAmatrix = DAYHOFF;
+		}
+	void SetWAGAAMatrix(){
+		AAmatrix = WAG;
+		}	
+	
+	void SetJonesAAFreqs(){
+		fixStateFreqs=true;
+		equalStateFreqs=empiricalStateFreqs=false;
+		AAfreqs = JONES;
+		}
+	void SetDayhoffAAFreqs(){
+		fixStateFreqs=true;
+		equalStateFreqs=empiricalStateFreqs=false;
+		AAfreqs = DAYHOFF;	
+		}
+	void SetWAGAAFreqs(){
+		fixStateFreqs=true;
+		equalStateFreqs=empiricalStateFreqs=false;
+		AAfreqs = WAG;	
+		}
+
+	bool IsJonesAAFreqs() {return (AAfreqs == JONES);}
+	bool IsJonesAAMatrix() {return (AAmatrix == JONES);}
+	bool IsDayhoffAAFreqs() {return (AAfreqs == DAYHOFF);}
+	bool IsDayhoffAAMatrix() {return (AAmatrix == DAYHOFF);}
+	bool IsWAGAAFreqs() {return (AAfreqs == WAG);}
+	bool IsWAGAAMatrix() {return (AAmatrix == WAG);}
+	bool IsVertMitoCode() {return (geneticCode == VERTMITO);}
+	bool IsPoissonAAMatrix() {return (AAmatrix == POISSON);}
+
 	void SetStateFrequencies(const char *str){
-		if(strcmp(str, "equal") == 0) SetEqualStateFreqs();
-		else if(strcmp(str, "estimate") == 0) SetEstimateStateFreqs();
-		else if(strcmp(str, "empirical") == 0) SetEmpiricalStateFreqs();
-		else if(strcmp(str, "fixed") == 0) SetFixedStateFreqs();
-		else throw(ErrorException("Unknown setting for statefrequencies: %s", str));
+		if(_stricmp(str, "equal") == 0) SetEqualStateFreqs();
+		else if(_stricmp(str, "estimate") == 0){
+			//if((datatype == CODON || datatype == AMINOACID)) throw(ErrorException("Sorry, estimation of equilibrium state frequencies not yet supported with Codon data"));
+			SetEstimateStateFreqs();
+			}
+		else if(_stricmp(str, "empirical") == 0) SetEmpiricalStateFreqs();
+		else if(_stricmp(str, "fixed") == 0) SetFixedStateFreqs();
+		else if(_stricmp(str, "jones") == 0) SetJonesAAFreqs();
+		else if(_stricmp(str, "dayhoff") == 0) SetDayhoffAAFreqs();
+		else if(_stricmp(str, "wag") == 0) SetWAGAAFreqs();
+		else throw(ErrorException("Unknown setting for statefrequencies: %s\n\t(options are equal, estimate, empirical, fixed, dayhoff, jones, wag)", str));
 		}
 	void SetRateMatrix(const char *str){
-		if(strcmp(str, "6rate") == 0) SetNst(6);
-		else if(strcmp(str, "2rate") == 0) SetNst(2);
-		else if(strcmp(str, "1rate") == 0) SetNst(1);
-		else if(strcmp(str, "fixed") == 0) SetFixedRateMatrix();
-		else throw(ErrorException("Unknown setting for ratematrix: %s", str));
+		if(datatype == AMINOACID || datatype == CODONAMINOACID){
+			if(_stricmp(str, "jones") == 0) SetJonesAAMatrix();
+			else if(_stricmp(str, "dayhoff") == 0) SetDayhoffAAMatrix();
+			else if(_stricmp(str, "poisson") == 0) SetPoissonAAMatrix();
+			else if(_stricmp(str, "wag") == 0) SetWAGAAMatrix();
+			else throw(ErrorException("Sorry, %s is not a valid AminoAcid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag)", str));
+			}
+		else{
+			if(_stricmp(str, "6rate") == 0) SetNst(6);
+			else if(_stricmp(str, "2rate") == 0) SetNst(2);
+			else if(_stricmp(str, "1rate") == 0) SetNst(1);
+			else if(_stricmp(str, "fixed") == 0) SetFixedRateMatrix();
+			else throw(ErrorException("Unknown setting for ratematrix: %s\n\t(options are: 6rate, 2rate, 1rate, fixed)", str));
+			}
 		}
 	void SetProportionInvariant(const char *str){
-		if(strcmp(str, "none") == 0) RemoveInvariantSites();
-		else if(strcmp(str, "fixed") == 0) SetFixedInvariantSites();
-		else if(strcmp(str, "estimate") == 0) SetInvariantSites();
-		else throw(ErrorException("Unknown setting for proportioninvariant: %s", str));
+		if(_stricmp(str, "none") == 0) RemoveInvariantSites();
+		else if(datatype == CODON || datatype == AMINOACID) throw(ErrorException("Sorry, invariant sites not yet supported with Codon/Aminoacid data"));
+		else if(_stricmp(str, "fixed") == 0) SetFixedInvariantSites();
+		else if(_stricmp(str, "estimate") == 0) SetInvariantSites();
+		else throw(ErrorException("Unknown setting for proportioninvariant: %s\n\t(options are: none, fixed, estimate)", str));
 		}
 	void SetRateHetModel(const char *str){
-		if(strcmp(str, "gamma") == 0) SetGammaRates();
-		else if(strcmp(str, "gammafixed") == 0){
+	//	if((datatype != DNA) && (datatype != AMINOACID) && _stricmp(str, "none")) throw(ErrorException("Sorry, rate heterogeneity not yet supported with Codon/Aminoacid data"));
+		if(_stricmp(str, "gamma") == 0) SetGammaRates();
+		else if(_stricmp(str, "gammafixed") == 0){
 			SetGammaRates();
 			SetFixedAlpha();		
 			}
-		else if(strcmp(str, "flex") == 0) SetFlexRates();
-		else if(strcmp(str, "none") == 0) SetNumRateCats(1, false);
-		else throw(ErrorException("Unknown setting for ratehetmodel: %s", str));
-		}	
+		else if(_stricmp(str, "flex") == 0) SetFlexRates();
+		else if(_stricmp(str, "none") == 0) SetNumRateCats(1, false);
+		else throw(ErrorException("Unknown setting for ratehetmodel: %s\n\t(options are: gamma, gammafixed, flex, none)", str));
+		}
+	void SetDataType(const char *str){
+		if(_stricmp(str, "codon") == 0) SetCodon();
+		else if(_stricmp(str, "codon-aminoacid") == 0) SetCodonAminoAcid();
+		else if(_stricmp(str, "aminoacid") == 0) SetAminoAcid();
+		else if(_stricmp(str, "protein") == 0) SetAminoAcid();
+		else if(_stricmp(str, "dna") == 0) str;
+		else if(_stricmp(str, "rna") == 0) str;
+		else if(_stricmp(str, "nucleotide") == 0) str;
+		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna)", str));
+		}
+	void SetGeneticCode(const char *str){
+		if(_stricmp(str, "standard") == 0) geneticCode = STANDARD;
+		else if(_stricmp(str, "vertmito") == 0) geneticCode = VERTMITO;
+		else throw(ErrorException("Unknown genetic code: %s\n\t(options are: standard, vertmito)", str));
+		}
 
+	void SetupModSpec(const GeneralGamlConfig &conf){
+		SetDataType(conf.datatype.c_str());
+		SetGeneticCode(conf.geneticCode.c_str());
+		SetStateFrequencies(conf.stateFrequencies.c_str());
+		SetRateMatrix(conf.rateMatrix.c_str());
+		SetProportionInvariant(conf.proportionInvariant.c_str());
+		SetRateHetModel(conf.rateHetModel.c_str());
+		SetNumRateCats(conf.numRateCats, true);
+		}
 	};
 
 class Model{
 	int nst;
 	int nstates;
-//	FLOAT_TYPE pi[4];
+
 	vector<FLOAT_TYPE*> stateFreqs;
-	vector<FLOAT_TYPE*> relRates;
+	vector<FLOAT_TYPE*> relNucRates;
+	vector<FLOAT_TYPE*> omegas;
+	vector<FLOAT_TYPE*> omegaProbs;
 
 	bool eigenDirty;
 	FLOAT_TYPE blen_multiplier;
@@ -379,12 +511,14 @@ class Model{
 
 	//variables used for the eigen process if nst=6
 	int *iwork, *indx;
-	FLOAT_TYPE *eigvals, *eigvalsimag, **eigvecs, **inveigvecs, **teigvecs, *work, *temp, *col, *c_ijk, *EigValexp;//, **p;
+	FLOAT_TYPE *eigvals, *eigvalsimag, **eigvecs, **inveigvecs, **teigvecs, *work, *temp, *col, *c_ijk, *EigValexp, *EigValderiv, *EigValderiv2;
 	FLOAT_TYPE **qmat, ***pmat;
 	FLOAT_TYPE **tempqmat;
 	
 	//Newton Raphson crap
 	FLOAT_TYPE ***deriv1, ***deriv2;
+
+	int *qmatLookup;
 
 	public:
 //	static bool noPinvInModel;
@@ -399,7 +533,7 @@ class Model{
 
 	Model(){
 		stateFreqs.reserve(4);
-		relRates.reserve(6);
+		relNucRates.reserve(6);
 		paramsToMutate.reserve(5);
 		CreateModelFromSpecification();
 		}
@@ -415,8 +549,11 @@ class Model{
 
 	public:
 	void CalcPmat(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat, bool flip =false);
+	void CalcPmatNState(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat);
 	void CalcDerivatives(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
 	void UpdateQMat();
+	void UpdateQMatCodon();
+	void UpdateQMatAminoAcid();
 	void DiscreteGamma(FLOAT_TYPE *, FLOAT_TYPE *, FLOAT_TYPE);
 	bool IsModelEqual(const Model *other) const ;	
 	void CopyModel(const Model *from);
@@ -425,9 +562,16 @@ class Model{
 	void FillPaupBlockStringForModel(string &str, const char *treefname) const;
 	void OutputGarliFormattedModel(ostream &) const;
 	void FillGarliFormattedModelString(string &s) const;
-	void OutputBinaryFormattedModel(ofstream &) const;
-	void OutputBinaryFormattedModelBOINC(MFILE &out) const;
+	void OutputBinaryFormattedModel(OUTPUT_CLASS &) const;
+
 	void ReadBinaryFormattedModel(FILE *);
+	void FillQMatLookup();
+	void SetJonesAAFreqs();
+	void SetDayhoffAAFreqs();
+	void SetWAGAAFreqs();
+	void MultiplyByJonesAAMatrix();
+	void MultiplyByDayhoffAAMatrix();
+	void MultiplyByWAGAAMatrix();
 
 	//model mutations
 	void MutateRates();
@@ -441,8 +585,9 @@ class Model{
 	FLOAT_TYPE StateFreq(int p) const{ return *stateFreqs[p];}
 	FLOAT_TYPE TRatio() const;
 	int Nst() const {return nst;}
-	FLOAT_TYPE Rates(int r) const { return *relRates[r];}
+	FLOAT_TYPE Rates(int r) const { return *relNucRates[r];}
 	int NRateCats() const {return modSpec.numRateCats;}
+	int NOmegaCats() const {return modSpec.numOmegaCats;}
 	FLOAT_TYPE *GetRateMults() {return rateMults;}
 	FLOAT_TYPE Alpha() const {return *alpha;}
 	FLOAT_TYPE PropInvar() const { return *propInvar;}
@@ -454,6 +599,7 @@ class Model{
 	//Setting things
 	void SetDefaultModelParameters(const HKYData *data);
 	void SetRmat(FLOAT_TYPE *r, bool checkValidity){
+		assert(modSpec.IsAminoAcid() == false);
 		if(checkValidity == true){
 			if(nst==1){
 				if((r[0]==r[1] && r[1]==r[2] &&
@@ -465,21 +611,27 @@ class Model{
 					throw(ErrorException("Config file specifies ratematrix = 2rate, but starting model does not match!\n"));
 				}
 			}
-		for(int i=0;i<5;i++) *relRates[i]=r[i];
-		*relRates[5]=1.0;
+		for(int i=0;i<5;i++) *relNucRates[i]=r[i];
+		*relNucRates[5]=1.0;
 		eigenDirty=true;
 		}
 	void SetPis(FLOAT_TYPE *b, bool checkValidity){
 		//7/12/07 we'll now assume that all freqs have been passed in, rather than calcing the last
 		//from the others
 		if(checkValidity == true){
-			if(modSpec.equalStateFreqs==true && (b[0]==b[1] && b[1]==b[2]) == false) 
-				throw(ErrorException("Config file specifies equal statefrequencies,\nbut starting model has nonequal frequencies!\n"));
-			if(modSpec.empiricalStateFreqs==true) 
-				throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model specifies frequencies!\n"));
+			if(modSpec.IsNucleotide()){
+				if(modSpec.equalStateFreqs==true && (b[0]==b[1] && b[1]==b[2]) == false) 
+					throw(ErrorException("Config file specifies equal statefrequencies,\nbut starting model has nonequal frequencies!\n"));
+				if(modSpec.empiricalStateFreqs==true) 
+					throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model specifies frequencies!\n"));
+				}
 			}
-		for(int i=0;i<4;i++) *stateFreqs[i]=b[i];
-		if(fabs(ONE_POINT_ZERO - (*stateFreqs[0] + *stateFreqs[1] + *stateFreqs[2] + *stateFreqs[3])) > (FLOAT_TYPE) 1.0e-6)
+		FLOAT_TYPE freqTot = 0.0;
+		for(int i=0;i<nstates;i++){
+			*stateFreqs[i]=b[i];
+			freqTot += *stateFreqs[i];
+			}
+		if(fabs(ONE_POINT_ZERO - freqTot) > (FLOAT_TYPE) 1.0e-5)
 			throw(ErrorException("State frequencies do not appear to add up to 1.0!\n"));
 		eigenDirty=true;
 		}

@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -23,7 +23,6 @@ using namespace std;
 #include "defs.h"
 #include "configoptions.h"
 #include "configreader.h"
-#include "memchk.h"
 #include "errorexception.h"
 
 /////////////////////////////////////////////////////////////////////////
@@ -54,6 +53,9 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	restart = false;
 	checkpoint = false;
 	significantTopoChange = (FLOAT_TYPE)0.01;
+	searchReps = 1;
+	//this isn't for general consumption, but lets me easily enable hacked in features
+	runmode = 0;
 
 	//finishing the run
 	enforceTermConditions = true;
@@ -68,6 +70,8 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	proportionInvariant = "estimate";
 	rateHetModel = "gamma";
 	numRateCats = 4;
+	datatype = "dna";
+	geneticCode = "standard";
 
 	//general population stuff
 	nindivs = 4;
@@ -147,6 +151,9 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetBoolOption("restart", restart, true);
 	cr.GetBoolOption("writecheckpoints", checkpoint, true);
 
+	cr.GetUnsignedOption("searchreps", searchReps, true);
+	cr.GetUnsignedOption("runmode", runmode, true);
+
 	//cr.GetBoolOption("useflexrates", useflexrates, true);
 	//cr.GetBoolOption("dontinferproportioninvariant", dontInferProportionInvariant, true);
 	cr.GetStringOption("ratehetmodel", rateHetModel, true);
@@ -154,6 +161,8 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetStringOption("statefrequencies", stateFrequencies, true);
 	cr.GetStringOption("ratematrix", rateMatrix, true);
 	cr.GetStringOption("invariantsites", proportionInvariant, true);
+	cr.GetStringOption("datatype", datatype, true);
+	cr.GetStringOption("geneticcode", geneticCode, true);
 
 	cr.GetStringOption("outgroup", outgroupString, true);
 

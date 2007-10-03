@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -123,10 +123,8 @@ class Adaptation{
 			}
 		else return false;
 		}
-#ifdef BOINC
-	void WriteToCheckpointBOINC(MFILE &) const;
-#endif
-	void WriteToCheckpoint(ofstream &) const;
+
+	void WriteToCheckpoint(OUTPUT_CLASS &) const;
 	void ReadFromCheckpoint(FILE *);
 
 };

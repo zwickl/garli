@@ -12,11 +12,8 @@
 //	Durham, NC 27705
 //  email: zwickl@nescent.org
 //
-
-
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
-#include "memchk.h"
 #ifdef MPI_VERSION
 	#include <mpi.h>
 #endif
@@ -27,6 +24,9 @@
 #include <cmath>
 #include <iomanip>
 #include <fstream>
+#include <signal.h>
+
+using namespace std;
 
 #ifdef WIN32
 #include <conio.h>
@@ -38,19 +38,7 @@
 #import "MFEInterfaceClient.h"
 #endif
 
-#ifdef BOINC
-	#include "boinc_api.h"
-	#include "filesys.h"
-	#ifdef _WIN32
-		#include "boinc_win.h"
-	#else
-		#include "config.h"
-	#endif
-#endif
-
-using namespace std;
-
-#include <signal.h>
+#include "defs.h"
 #include "population.h"
 #include "individual.h"
 #include "translatetable.h"
@@ -65,6 +53,7 @@ using namespace std;
 #include "errorexception.h"
 #include "outputman.h"
 #include "model.h"
+#include "garlireader.h"
 
 #ifdef ENABLE_CUSTOM_PROFILER
 #include "utility.h"
@@ -92,6 +81,7 @@ ModelSpecification modSpec;
 
 ofstream outf, paupf;
 int tempGlobal=1;
+bool uniqueSwapTried;
 
 FLOAT_TYPE globalBest;
 
@@ -184,12 +174,50 @@ void InterruptMessage( int )
 	askQuitNow = 1;
 }
 
-void Population::CatchInterrupt()
+void CatchInterrupt()
 {
 	if( signal( SIGINT, SIG_IGN ) != SIG_IGN ){
 		signal( SIGINT, InterruptMessage );
 		}
 }
+
+bool CheckForUserSignal(){
+	if(askQuitNow == 1){//this will be set if the user raises a signal with ctrl-C
+		char c;
+#if defined (WIN32)
+		c = AskUser("Perform final branch-length optimization and terminate now? (y/n)");
+#else
+		outman.UserMessage("Perform final branch-length optimization and terminate now? (y/n)");
+#ifdef MAC_FRONTEND
+		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+		BOOL shouldQuit = [[MFEInterfaceClient sharedClient] programShouldTerminate];
+		c = shouldQuit ? 'y' : 'n';
+		[pool release];
+#else
+		c = getchar();
+#endif
+#endif
+		if(c=='y'){
+			signal( SIGINT, SIG_DFL );
+#ifdef MAC
+			cin.get();
+#endif   
+			return true;
+			}
+		else{
+			askQuitNow = 0;
+			CatchInterrupt();
+			outman.UserMessage("continuing ...");
+#ifndef MAC_FRONTEND
+#ifndef WIN32
+			cin.get();
+#endif
+#endif
+			return false;
+			}
+		}
+	return false;
+	}
 
 //
 //
@@ -289,6 +317,8 @@ Population::~Population()
 		delete *delit;
 		
 	if(adap!=NULL) delete adap;
+
+	Tree::attemptedSwaps.ClearAttemptedSwaps();
 		
 }
 
@@ -310,6 +340,14 @@ void Population::ErrorMsg( char* msgstr, int len )
 	}
 }
 
+void Population::CheckForIncompatibleConfigEntries(){
+	//DEBUG
+//	if(conf->checkpoint && (modSpec.IsNucleotide() == false))
+//		throw ErrorException("Sorry, checkpointing not yet implemented for non-nucleotide models");
+	if(conf->inferInternalStateProbs && (modSpec.IsNucleotide() == false))
+		throw ErrorException("Sorry, internal state reconstruction not yet implemented for non-nucleotide models");
+	}
+
 void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 	stopwatch.Start();
 
@@ -321,6 +359,8 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 
 	subtreeNode=0;
 
+	CheckForIncompatibleConfigEntries();
+
 	//put info that was read from the config file in its place
 
 	if(rank == 0) total_size = conf->nindivs + nprocs-1;
@@ -329,13 +369,6 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 #ifdef INPUT_RECOMBINATION
 	total_size = conf->nindivs + NUM_INPUT;
 #endif
-
-	//setup the model specification
-	modSpec.SetStateFrequencies(conf->stateFrequencies.c_str());
-	modSpec.SetRateMatrix(conf->rateMatrix.c_str());
-	modSpec.SetProportionInvariant(conf->proportionInvariant.c_str());
-	modSpec.SetRateHetModel(conf->rateHetModel.c_str());
-	modSpec.SetNumRateCats(conf->numRateCats, true);
 
 	adap=new Adaptation(conf);
 
@@ -350,8 +383,8 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 		}
 
 	//process the data
-	data->MakeAmbigStrings();	
 	data->CalcEmpiricalFreqs();
+	if(modSpec.IsNucleotide()) data->MakeAmbigStrings();	
 
 	//allocate the treeString
 	//remember that we also encode internal node numbers sometimes
@@ -402,7 +435,9 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 		}
 		
 	const int MB = 1024 * 1024;
-	int claSizePerNode = (4 * modSpec.numRateCats * data->NChar() * sizeof(FLOAT_TYPE)) + (data->NChar() * sizeof(int));
+	int sites = data->NChar();
+
+	int claSizePerNode = (modSpec.nstates * modSpec.numRateCats * sites * sizeof(FLOAT_TYPE)) + (sites * sizeof(int));
 	int numNodesPerIndiv = data->NTax()-2;
 	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
@@ -440,7 +475,7 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 	//if we do tons of recombination 
 	idealClas *= 2;
-	claMan=new ClaManager(data->NTax()-2, numClas, idealClas, data->NChar(), modSpec.numRateCats);
+	claMan=new ClaManager(data->NTax()-2, numClas, idealClas, sites, modSpec.numRateCats);
 
 	//setup the bipartition statics
 	Bipartition::SetBipartitionStatics(data->NTax());
@@ -450,6 +485,164 @@ void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
 
 	//set one model static
 	Model::mutationShape = conf->gammaShapeModel;
+
+	//load any constraints
+	GetConstraints();
+
+	//try to get nexus starting tree/trees from file, which we don't want to do within the PerformSearch loop
+	if(_stricmp(conf->streefname.c_str(), "random") != 0)
+		if(FileIsNexus(conf->streefname.c_str()))
+			LoadNexusStartingTrees();
+	}
+
+void Population::LoadNexusStartingTrees(){
+	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
+		//in this case we should have already read in the tree when getting the data, so check
+		GarliReader & reader = GarliReader::GetInstance();
+		NxsTreesBlock *treesblock = reader.GetTreesBlock();
+		if(treesblock->GetNumTrees() == 0)
+			throw ErrorException("No nexus trees block found in file %s, which was specified\n\tas source of starting trees", conf->streefname.c_str());
+		}
+	else{
+		//use NCL to get trees from the specified file
+		GarliReader & reader = GarliReader::GetInstance();
+		outman.UserMessage("Obtaining starting trees from file %s", conf->streefname.c_str());
+		NxsTreesBlock *treesblock = reader.GetTreesBlock();
+		if(treesblock->GetNumTrees() > 0)//if we already had trees loaded, toss them
+			treesblock->Reset();
+		reader.HandleExecute(conf->streefname.c_str());
+		treesblock = reader.GetTreesBlock();
+		if(treesblock->GetNumTrees() == 0)
+			throw ErrorException("No nexus trees block found in file %s, which was specified\n\tas source of starting trees", conf->streefname.c_str());
+		}
+	startingTreesInNCL = true;
+	}
+
+//return population more or less to what it looked like just after Setup()
+void Population::Reset(){
+	if(adap != NULL) delete adap;
+	adap=new Adaptation(conf);
+	lastTopoImprove = lastPrecisionReduction = gen = 0;
+	conf->restart = false;
+	finishedRep = false;
+	bestFitness = prevBestFitness = -(DBL_MAX);
+
+	for(unsigned i=0;i<total_size;i++){
+		if(indiv[i].treeStruct != NULL){
+			indiv[i].treeStruct->RemoveTreeFromAllClas();
+			for(unsigned j=0;j<total_size;j++)//because indivs and newindivs can share 
+				//tree structures in some situations, this check is necessary to avoid double deletion
+				if(newindiv[j].treeStruct == indiv[i].treeStruct) newindiv[j].treeStruct=NULL;
+			delete indiv[i].treeStruct;
+			indiv[i].treeStruct=NULL;
+			}
+		}
+	for(unsigned i=0;i<total_size;i++){
+		if(newindiv[i].treeStruct != NULL){
+			newindiv[i].treeStruct->RemoveTreeFromAllClas();
+			delete newindiv[i].treeStruct;
+			newindiv[i].treeStruct=NULL;
+			}
+		}
+	Tree::attemptedSwaps.ClearAttemptedSwaps();
+	}
+
+void Population::ApplyNSwaps(int numSwaps){
+	double optPrecision = 0.01;
+
+	Individual *ind0 = &newindiv[0];
+
+	ind0->GetStartingConditionsFromFile(conf->streefname.c_str(), 0, data->NTax());
+	ind0->treeStruct->mod = ind0->mod;
+	//ind0->GetStartingConditionsFromNCL(	File(conf->streefname.c_str(), 0, data->NTax());
+	
+	Individual *repResult = new Individual(ind0);
+	storedTrees.push_back(repResult);
+	for(int s=0;s<numSwaps;s++){
+		ind0->treeStruct->TopologyMutator(0.01, 10, 0);
+		ind0->SetDirty();
+		ind0->CalcFitness(0);
+		Individual *repResult = new Individual(ind0);
+		storedTrees.push_back(repResult);
+		}
+
+	WriteStoredTrees("swapped.tre");		
+	}
+
+void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
+	SeedPopulationWithStartingTree(currentSearchRep);
+	InitializeOutputStreams(1);
+
+	if(conf->runmode == 2)
+		indiv[0].treeStruct->DeterministicSwapperByDist(&indiv[0], optPrecision, conf->limSPRrange, false);
+	else if(conf->runmode == 3)
+		indiv[0].treeStruct->DeterministicSwapperByCut(&indiv[0], optPrecision, conf->limSPRrange, false);
+	else if(conf->runmode == 4)
+		indiv[0].treeStruct->DeterministicSwapperRandom(&indiv[0], optPrecision, conf->limSPRrange);
+	else if(conf->runmode == 5)
+		indiv[0].treeStruct->DeterministicSwapperByDist(&indiv[0], optPrecision, conf->limSPRrange, true);
+	else if(conf->runmode == 6)
+		indiv[0].treeStruct->DeterministicSwapperByCut(&indiv[0], optPrecision, conf->limSPRrange, true);
+
+	bestIndiv = 0;
+	FinalOptimization();
+	WriteTreeFile(besttreefile.c_str());
+/*	double imp = 999.9;
+	do{
+		imp = indiv[0].treeStruct->OptimizeAllBranches(optPrecision);
+		optPrecision /= 1.5;
+		}while(imp > 0.0);
+*/	outman.UserMessage("final score: %f, %d sec", indiv[0].treeStruct->lnL, stopwatch.SplitTime());
+	}
+
+void Population::RunTests(){
+	//test a number of functions to ensure that any code changes haven't broken anything
+	//it assumes that Setup has been called
+
+	Individual *ind0 = &newindiv[0];
+	Individual *ind1 = &newindiv[1];
+
+	ind0->MakeRandomTree(data->NTax());
+	ind0->treeStruct->mod=ind0->mod;
+
+	ind1->treeStruct=new Tree();
+	ind1->CopySecByRearrangingNodesOfFirst(ind1->treeStruct, &newindiv[0]);
+	ind1->treeStruct->mod=ind1->mod;
+
+	ind0->SetDirty();
+	ind0->CalcFitness(0);
+
+	ind1->SetDirty();
+	ind1->CalcFitness(0);
+
+	assert(ind0->Fitness() == ind1->Fitness());
+	ind0->treeStruct->MakeAllNodesDirty();
+	ind1->treeStruct->MakeAllNodesDirty();
+
+	for(int i=0;i<100;i++){
+		ind0->treeStruct->RerootHere(ind0->treeStruct->GetRandomInternalNode());
+		ind1->treeStruct->RerootHere(ind1->treeStruct->GetRandomInternalNode());
+		
+		//check rerooting and bipartition comparisons
+		ind0->treeStruct->CalcBipartitions();
+		ind1->treeStruct->CalcBipartitions();
+		assert(ind0->treeStruct->IdenticalTopologyAllowingRerooting(ind1->treeStruct->root));
+
+		ind0->SetDirty();
+		ind1->SetDirty();
+
+		//check minimal recalculation scoring (proper readjustment of CLAs during rerooting)
+		ind0->CalcFitness(0);
+		ind1->CalcFitness(0);
+		assert(fabs(ind0->Fitness() - ind1->Fitness()) < 0.001);
+
+		//check full rescoring from arbitrary nodes in the trees		
+		ind0->treeStruct->MakeAllNodesDirty();
+		ind1->treeStruct->MakeAllNodesDirty();
+		ind0->treeStruct->Score(ind0->treeStruct->GetRandomInternalNode());
+		ind1->treeStruct->Score(ind1->treeStruct->GetRandomInternalNode());
+		assert(fabs(ind0->treeStruct->lnL - ind1->treeStruct->lnL) < 0.001);
+		}
 	}
 
 void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
@@ -477,7 +670,7 @@ void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
 
 void Population::GetConstraints(){
 	//first see if there are any constraints
-	if((strlen(conf->constraintfile.c_str()) != 0) && (strcmp(conf->constraintfile.c_str(), "none") != 0)){
+	if((strlen(conf->constraintfile.c_str()) != 0) && (_stricmp(conf->constraintfile.c_str(), "none") != 0)){
 		ifstream con(conf->constraintfile.c_str());
 		if(con.good() == false) throw ErrorException("Could not open constraint file %s!", conf->constraintfile.c_str());
 		if(con.good()){
@@ -487,7 +680,7 @@ void Population::GetConstraints(){
 		}
 	}
 
-void Population::SeedPopulationWithStartingTree(){
+void Population::SeedPopulationWithStartingTree(int rep){
 	
 	for(unsigned i=0;i<total_size;i++){
 		if(indiv[i].treeStruct != NULL) indiv[i].treeStruct->RemoveTreeFromAllClas();
@@ -500,14 +693,25 @@ void Population::SeedPopulationWithStartingTree(){
 #ifdef INPUT_RECOMBINATION
 	if(0){
 #else
-	if(strcmp(conf->streefname.c_str(), "random") != 0){
+	if(_stricmp(conf->streefname.c_str(), "random") != 0){
 #endif
-		outman.UserMessage("Obtaining starting conditions from file %s", conf->streefname.c_str());
-		indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank, data->NTax());
+		if(startingTreesInNCL){
+			GarliReader & reader = GarliReader::GetInstance();
+			NxsTreesBlock *treesblock = reader.GetTreesBlock();
+			indiv[0].GetStartingConditionsFromNCL(treesblock, (rank + rep - 1), data->NTax());
+			if(modSpec.IsNucleotide() && modSpec.fixStateFreqs && modSpec.empiricalStateFreqs==false && modSpec.equalStateFreqs==false) throw(ErrorException("Sorry, specifying fixed paramter values is not supported when\n\tstarting trees are specified in Nexus format"));
+			else if(modSpec.fixAlpha) throw(ErrorException("Sorry, specifying fixed paramter values is not supported when\n\tstarting trees are specified in Nexus format"));
+			else if(modSpec.fixInvariantSites) throw(ErrorException("Sorry, specifying fixed paramter values is not supported when\n\tstarting trees are specified in Nexus format"));
+			else if(modSpec.fixRelativeRates) throw(ErrorException("Sorry, specifying fixed paramter values is not supported when\n\tstarting trees are specified in Nexus format"));
+			}
+		else{//use the old garli starting tree format
+			outman.UserMessage("Obtaining starting conditions from file %s", conf->streefname.c_str());
+			indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank, data->NTax());
+			}
 		}
 	else{
 		//we shouldn't be here if something was designated to be fixed
-		if(modSpec.fixStateFreqs && modSpec.empiricalStateFreqs==false && modSpec.equalStateFreqs==false) throw(ErrorException("state frequencies specified as fixed, but no\nstarting condition file (streefname) specified!!"));
+		if(modSpec.IsNucleotide() && modSpec.fixStateFreqs && modSpec.empiricalStateFreqs==false && modSpec.equalStateFreqs==false) throw(ErrorException("state frequencies specified as fixed, but no\nstarting condition file (streefname) specified!!"));
 		else if(modSpec.fixAlpha) throw(ErrorException("alpha parameter specified as fixed, but no\nstarting condition file (streefname) specified!!"));
 		else if(modSpec.fixInvariantSites) throw(ErrorException("proportion of invariant sites specified as fixed, but no\nstarting condition file (streefname) specified!!"));
 		else if(modSpec.fixRelativeRates) throw(ErrorException("relative rate matrix specified as fixed, but no\nstarting condition file (streefname) specified!!"));
@@ -530,7 +734,7 @@ void Population::SeedPopulationWithStartingTree(){
 	indiv[0].treeStruct->mod=indiv[0].mod;
 	indiv[0].SetDirty();
 	indiv[0].CalcFitness(0);
-
+	
 	if(conf->bootstrapReps == 0){
 		OutputModelReport();
 		//if there are not mutable params in the model, remove any weight assigned to the model
@@ -589,17 +793,41 @@ void Population::SeedPopulationWithStartingTree(){
 void Population::OutputModelReport(){
 	//Report on the model setup
 	outman.UserMessage("\nMODEL REPORT:");
-	outman.UserMessage("  Number of states = 4 (nucleotide data)");
+	if(modSpec.IsCodon())
+		outman.UserMessage("  Number of states = 61 (codon data)");
+	else if(modSpec.IsAminoAcid() || modSpec.IsCodonAminoAcid())
+		outman.UserMessage("  Number of states = 20 (aminoacid data)");
+	else 
+		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
-	outman.UserMessageNoCR("  Relative Rate Matrix: ");
-	if(modSpec.nst == 6 && modSpec.fixRelativeRates == false) outman.UserMessage("6 rates");
-	else if(modSpec.nst == 6 && modSpec.fixRelativeRates == true) outman.UserMessage("specified by user (fixed)");
-	else if(modSpec.nst == 2) outman.UserMessage("2 rates (transition and transversion)");
-	else outman.UserMessage("1 rate");
+	if(modSpec.IsAminoAcid() == false && modSpec.IsCodonAminoAcid() == false){
+		outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix: ");
+		if(modSpec.nst == 6 && modSpec.fixRelativeRates == false) outman.UserMessage("6 rates");
+		else if(modSpec.nst == 6 && modSpec.fixRelativeRates == true) outman.UserMessage("specified by user (fixed)");
+		else if(modSpec.nst == 2) outman.UserMessage("2 rates (transition and transversion)");
+		else outman.UserMessage("1 rate");
+		}
+	else{
+		outman.UserMessageNoCR("  Amino Acid Rate Matrix: ");
+		if(modSpec.AAmatrix == modSpec.JONES) outman.UserMessage("Jones");
+		else if(modSpec.AAmatrix == modSpec.DAYHOFF) outman.UserMessage("Dayhoff");
+		else if(modSpec.AAmatrix == modSpec.POISSON) outman.UserMessage("Poisson");
+		else if(modSpec.AAmatrix == modSpec.WAG) outman.UserMessage("WAG");
+		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
-	if(modSpec.equalStateFreqs == true) outman.UserMessage("equal (0.25, fixed)");
+	if(modSpec.equalStateFreqs == true){
+		if(modSpec.IsCodon())
+			outman.UserMessage("equal (0.01639, fixed)");
+		else if(modSpec.IsAminoAcid() || modSpec.IsCodonAminoAcid())
+			outman.UserMessage("equal (0.05, fixed)");
+		else 
+			outman.UserMessage("equal (0.25, fixed)");
+		}
 	else if(modSpec.empiricalStateFreqs == true) outman.UserMessage("empirical values (fixed)");
+	else if(modSpec.AAfreqs == modSpec.JONES)  outman.UserMessage("Jones");
+	else if(modSpec.AAfreqs == modSpec.WAG)  outman.UserMessage("WAG");
+	else if(modSpec.AAfreqs == modSpec.DAYHOFF)  outman.UserMessage("Dayhoff");
 	else if(modSpec.fixStateFreqs == true) outman.UserMessage("specified by user (fixed)");
 	else outman.UserMessage("estimated");
 
@@ -664,15 +892,14 @@ void Population::WriteStateFiles(){
 	//write the adaptation info checkpoint in binary format
 	sprintf(name, "%s.adap.check", conf->ofprefix.c_str());
 #ifdef BOINC
-	char physical_name[100];
+	char physical_name[256];
 	boinc_resolve_filename(name, physical_name, sizeof(physical_name));
 	MFILE out;
 	out.open(physical_name, "wb");
-	adap->WriteToCheckpointBOINC(out);
 #else
 	ofstream out(name, ios::out | ios::binary);
-	adap->WriteToCheckpoint(out);
 #endif
+	adap->WriteToCheckpoint(out);
 	out.close();
 
 	//write the state of the population, including the seed, generation, elapsed time,
@@ -682,11 +909,10 @@ void Population::WriteStateFiles(){
 	MFILE pout;
 	boinc_resolve_filename(name, physical_name, sizeof(physical_name));
 	pout.open(physical_name, "wb");
-	WritePopulationCheckpointBOINC(pout);
 #else
 	ofstream pout(name, ios::out | ios::binary);
-	WritePopulationCheckpoint(pout);
 #endif
+	WritePopulationCheckpoint(pout);
 	pout.close();
 
 	//if we are keeping track of swaps, write a checkpoint for that
@@ -696,18 +922,16 @@ void Population::WriteStateFiles(){
 		MFILE sout;
 		boinc_resolve_filename(name, physical_name, sizeof(physical_name));
 		sout.open(physical_name, "wb");
-		Tree::attemptedSwaps.WriteSwapCheckpointBOINC(sout);
 #else
 		ofstream sout(name, ios::out | ios::binary);
-		Tree::attemptedSwaps.WriteSwapCheckpoint(sout);
 #endif
+		Tree::attemptedSwaps.WriteSwapCheckpoint(sout);
 		sout.close();
 		}
 	}
 
 void Population::ReadStateFiles(){
 	char name[100];
-	outman.UserMessage("Reading checkpoint from previous run....\n");
 
 	//read the adaptation binary checkpoint
 	sprintf(name, "%s.adap.check", conf->ofprefix.c_str());
@@ -742,7 +966,7 @@ void Population::ReadStateFiles(){
 		fclose(sin);
 		}	
 	}
-
+/*
 void Population::WritePopulationCheckpoint(ofstream &out) {
 	long currentSeed = rnd.seed();
 	out.write((char*) &currentSeed, sizeof(currentSeed));
@@ -763,13 +987,13 @@ void Population::WritePopulationCheckpoint(ofstream &out) {
 		indiv[i].treeStruct->OutputBinaryFormattedTree(out);
 		}
 	}
+*/
 
-#ifdef BOINC
-void Population::WritePopulationCheckpointBOINC(MFILE &out) {
+void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 	long currentSeed = rnd.seed();
-	out.write((char*) &currentSeed, sizeof(currentSeed), 1);
+	out.WRITE_TO_FILE(&currentSeed, sizeof(currentSeed), 1);
 	long currentTime = stopwatch.SplitTime();
-	out.write((char*) &currentTime, sizeof(currentTime), 1);
+	out.WRITE_TO_FILE(&currentTime, sizeof(currentTime), 1);
 
 	//7/13/07 changing this to calculate the actual size of the chunk of scalars
 	//(the number of bytes between the start of the object and the first nonscalar
@@ -777,14 +1001,21 @@ void Population::WritePopulationCheckpointBOINC(MFILE &out) {
 	//manually.  This should make it work irrespective of things like memory padding
 	//for data member alignment, which could vary between platforms and compilers
 	intptr_t scalarSize = (intptr_t) &fraction_done - (intptr_t) this + sizeof(fraction_done);
-	out.write((char*) this, (streamsize) scalarSize, 1);
+	out.WRITE_TO_FILE(this, (streamsize) scalarSize, 1);
 
+	//save the current members of the population
 	for(unsigned i=0;i<total_size;i++){
-		indiv[i].mod->OutputBinaryFormattedModelBOINC(out);
-		indiv[i].treeStruct->OutputBinaryFormattedTreeBOINC(out);
+		indiv[i].mod->OutputBinaryFormattedModel(out);
+		indiv[i].treeStruct->OutputBinaryFormattedTree(out);
+		}
+
+	//write any individuals that we may have stored from previous search reps
+	for(vector<Individual*>::iterator it = storedTrees.begin(); it < storedTrees.end() ; it++){
+		(*it)->mod->OutputBinaryFormattedModel(out);
+		(*it)->treeStruct->OutputBinaryFormattedTree(out);
 		}
 	}
-#endif
+
 
 void Population::ReadPopulationCheckpoint(){
 	//we'll just have a single line for each indiv, with the 
@@ -817,6 +1048,13 @@ void Population::ReadPopulationCheckpoint(){
 	intptr_t scalarSize = (intptr_t) &fraction_done - (intptr_t) this + sizeof(fraction_done);
 	fread(this, scalarSize, 1, pin);
 
+	//if were restarting a bootstrap run we need to change to the bootstrapped data
+	//now, so that scoring below is correct
+	if(conf->bootstrapReps > 0){
+		data->ReserveOriginalCounts();
+		data->BootstrapReweight(lastBootstrapSeed);
+		}
+
 	for(unsigned i=0;i<total_size;i++){
 		indiv[i].mod->SetDefaultModelParameters(data);
 		indiv[i].mod->ReadBinaryFormattedModel(pin);
@@ -828,9 +1066,28 @@ void Population::ReadPopulationCheckpoint(){
 		indiv[i].treeStruct->root->CheckTreeFormation();
 		indiv[i].CalcFitness(0);
 		}
+
+	//if we are doing multiple reps, there should have been one tree per completed rep written to file
+	//remember that currentSearchRep starts at 1
+	for(int i=1;i<currentSearchRep;i++){
+		Individual *ind = new Individual;
+		ind->mod->SetDefaultModelParameters(data);
+		ind->mod->ReadBinaryFormattedModel(pin);
+		ind->treeStruct = new Tree();
+		ind->treeStruct->ReadBinaryFormattedTree(pin);
+		ind->treeStruct->AssignCLAsFromMaster();
+		ind->treeStruct->mod=ind->mod;
+		ind->SetDirty();
+		ind->treeStruct->root->CheckTreeFormation();
+		ind->CalcFitness(0);
+		storedTrees.push_back(ind);
+		}
+
 	//as far as the TopologyList is concerned, each individual will be considered different
 	ntopos = total_size;
+	assert(fabs(bestFitness - indiv[bestIndiv].Fitness()) < 0.01);
 	CalcAverageFitness();
+	globalBest = bestFitness;
 	}
 
 void Population::Run(){
@@ -858,25 +1115,40 @@ void Population::Run(){
 	CalcAverageFitness();
 
 	outman.precision(6);
-	outman.UserMessage("\t%-10s%-15s%-10s%-10s", "gen", "current_lnL", "precision", "last_tree_improvement");
-	outman.UserMessage("\t%-10d%-15.4f%-10.3f\t%-10d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+#ifdef SWAP_BASED_TERMINATION
+	outman.UserMessage("%-10s%-15s%-10s%-15s%-15s", "gen", "current_lnL", "precision", "last_tree_imp", "swaps_on_cur");
+#else
+	outman.UserMessage("%-10s%-15s%-10s%-15s%", "gen", "current_lnL", "precision", "last_tree_imp");
+#endif
+	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
 	OutputLog();
 	if(conf->outputMostlyUselessFiles) OutputFate();	
 
+#ifndef BOINC
 	CatchInterrupt();
+#endif
 
 	gen++;
 	for (; gen < conf->stopgen+1; ++gen){
 
 		NextGeneration();
+#ifdef SWAP_BASED_TERMINATION
+		if(uniqueSwapTried){
+			lastUniqueSwap = gen;
+			uniqueSwapTried = false;
+			}
+#endif
 		keepTrack();
 		if(conf->outputMostlyUselessFiles) OutputFate();		 
 		if(!(gen % conf->logevery)) OutputLog();
 		if(!(gen % conf->saveevery)){
-#ifndef BOINC
 			if(conf->bootstrapReps==0) WriteTreeFile( besttreefile.c_str() );
+
+#ifdef SWAP_BASED_TERMINATION
+			outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove, indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
+#else
+			outman.UserMessage("%-10d%-15.4f%-10.3f%-8d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
 #endif
-			outman.UserMessage("\t%-10d%-15.4f%-10.3f\t%-10d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
 			
 			if(conf->outputMostlyUselessFiles){
 #ifdef DETAILED_SWAP_REPORT
@@ -888,40 +1160,10 @@ void Population::Run(){
 				}
 
 			}
-		if(askQuitNow == 1){
-			char c;
-#if defined (WIN32)
-			c = AskUser("Perform final branch-length optimization and terminate now? (y/n)");
-#else
-			outman.UserMessage("Perform final branch-length optimization and terminate now? (y/n)");
-	#ifdef MAC_FRONTEND
-			NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-			BOOL shouldQuit = [[MFEInterfaceClient sharedClient] programShouldTerminate];
-			c = shouldQuit ? 'y' : 'n';
-			[pool release];
-	#else
-			c = getchar();
-	#endif
+#ifndef BOINC
+		prematureTermination = CheckForUserSignal();
+		if(prematureTermination) break;
 #endif
-			if(c=='y'){
-				prematureTermination=true;
-				signal( SIGINT, SIG_DFL );
-#ifdef MAC
-				cin.get();
-#endif   
-				break;
-				}
-			else{
-				askQuitNow = 0;
-				CatchInterrupt();
-				outman.UserMessage("continuing ...");
-#ifndef MAC_FRONTEND
-#ifndef WIN32
-				cin.get();
-#endif
-#endif
-				}
-			}
 
 #ifdef PERIODIC_SCORE_DEBUG
 		if(gen % 500 == 0 ||gen==1)
@@ -933,18 +1175,7 @@ void Population::Run(){
 			NNISpectrum(bestIndiv);
 #endif
 
-#ifdef BOINC
-		if(boinc_time_to_checkpoint()){
-			WriteStateFiles();
-			boinc_checkpoint_completed();
-			}
-#endif
-
 		if(!(gen%adap->intervalLength)){
-#ifndef BOINC
-			if(conf->checkpoint==true && (gen%(adap->intervalLength*adap->intervalsToStore)) == 0) WriteStateFiles();
-#endif
-
 			outman.precision(10);
 			bool reduced=false;
 			if(gen-(max(lastTopoImprove, lastPrecisionReduction)) >= adap->intervalsToStore*adap->intervalLength){
@@ -974,7 +1205,12 @@ void Population::Run(){
 */			
 			//termination conditions
 			if(conf->enforceTermConditions == true
+#ifdef SWAP_BASED_TERMINATION
+				&& (gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || adap->topoMutateProb == ZERO_POINT_ZERO)) 
+#else
 				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || adap->topoMutateProb == ZERO_POINT_ZERO) 
+#endif
+				&& (gen > adap->intervalsToStore * adap->intervalLength)
 				&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
 				&& (adap->branchOptPrecision == adap->minOptPrecision || adap->numPrecReductions==0)){
 				if(adap->topoMutateProb > ZERO_POINT_ZERO) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
@@ -982,10 +1218,23 @@ void Population::Run(){
 				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
 				break;
 				}
+#ifndef BOINC
+			//non-BOINC checkpointing
+			if(conf->checkpoint==true && gen % adap->intervalsToStore == 0) WriteStateFiles();
+#endif
+
 #ifdef INCLUDE_PERTURBATION
 			CheckPerturbSerial();
 #endif
 			}
+
+#ifdef BOINC 
+//BOINC checkpointing can occur whenever the BOINC client wants it to
+		if(boinc_time_to_checkpoint()){
+			WriteStateFiles();
+			boinc_checkpoint_completed();
+			}
+#endif
 		if(conf->stoptime - stopwatch.SplitTime() < 120){
 			outman.UserMessage("time limit of %d seconds reached...", conf->stoptime);
 			break;
@@ -1127,6 +1376,7 @@ void Population::FinalOptimization(){
 		if(prematureTermination == true) outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
 		}
 	outman.unsetf(ios::fixed);
+	finishedRep = true;
 
 #ifdef ENABLE_CUSTOM_PROFILER
 	ofstream prof("profileresults.log");
@@ -1171,6 +1421,96 @@ void Population::FinalOptimization(){
 	cout << "pmat calls " << pmatcalls << " time " << pmattime/(double)(ticspersec.QuadPart) << endl;
 */	}
 
+int Population::EvaluateStoredTrees(bool report){
+	double bestL=-DBL_MAX;
+	int bestRep;
+	if(report) outman.UserMessage("\nCompleted %d replicate runs (of %d).\nResults:", storedTrees.size(), conf->searchReps);
+	for(unsigned r=0;r<storedTrees.size();r++){
+		if(storedTrees[r]->Fitness() > bestL){
+			bestL = storedTrees[r]->Fitness();
+			bestRep = r;
+			}
+		}
+	if(report){
+		for(unsigned r=0;r<storedTrees.size();r++){
+			if(r == bestRep) outman.UserMessage("Replicate %d : %f (best)", r+1, storedTrees[r]->Fitness());
+			else outman.UserMessage("Replicate %d : %f", r+1, storedTrees[r]->Fitness());
+			}
+		}
+	return bestRep;
+	}
+
+void Population::ClearStoredTrees(){
+	for(vector<Individual*>::iterator it=storedTrees.begin();it!=storedTrees.end();it++){
+		delete (*it)->treeStruct;
+		(*it)->treeStruct=NULL;
+		delete (*it);
+		}
+	storedTrees.clear();
+	}
+
+void Population::Bootstrap(){
+	if(conf->inferInternalStateProbs == true) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
+
+	data->ReserveOriginalCounts();
+
+	//if we're not restarting
+	if(gen == 0) currentBootstrapRep=1;
+
+	for( ;currentBootstrapRep<=conf->bootstrapReps;currentBootstrapRep++){
+#ifndef BOINC
+		CatchInterrupt();
+#endif
+#ifdef MAC_FRONTEND
+		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+		[[MFEInterfaceClient sharedClient] didBeginBootstrapReplicate:rep];
+		[pool release];
+#endif
+		if(gen == 0){
+			lastBootstrapSeed = rnd.seed();
+			outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
+			data->BootstrapReweight(0);
+			}
+		
+
+		PerformSearch();
+//		SeedPopulationWithStartingTree(0);
+//		Run();
+		
+		if(prematureTermination == false){
+/*			//outman.UserMessage("finished with bootstrap rep %d\n", rep);
+			Individual *bestInd;
+			if(searchReps > 1){//find the best tree for this boot rep
+				double bestL=-DBL_MAX;
+				int bestRep;
+				for(unsigned r=0;r<storedTrees.size();r++){
+					if(storedTrees[r]->Fitness() > bestL){
+						bestL = storedTrees[r]->Fitness();
+						bestRep = r;
+						}
+					bestInd = storedTrees[bestRep];
+					outman.UserMessage("Saving best search rep (#%d) to bootstrap file", bestRep);
+					}				
+				}
+			else bestInd = storedTrees[0];
+			
+			AppendTreeToBootstrapLog(bestInd, currentBootstrapRep);
+*/
+#ifdef MAC_FRONTEND
+			pool = [[NSAutoreleasePool alloc] init];
+			[[MFEInterfaceClient sharedClient] didCompleteBoostrapReplicate:rep];
+			[pool release];
+#endif		
+			}
+		else {
+			outman.UserMessage("abandoning bootstrap rep %d ....terminating", currentBootstrapRep);
+			break;
+			}
+		}
+	FinalizeOutputStreams();
+	}
+
+/* OLD VERSION
 void Population::Bootstrap(){
 	
 	data->ReserveOriginalCounts();
@@ -1208,7 +1548,63 @@ void Population::Bootstrap(){
 		}
 	FinalizeOutputStreams();
 	}
+*/
 
+//this function manages multiple search replicates, setting up the population
+//and then calling Run().  It can be called either directly from main(), or 
+//from Bootstrap(), in the case of doing multiple search reps per bootstrap rep
+void Population::PerformSearch(){
+	if(conf->restart == false) currentSearchRep = 1;
+
+	for(;currentSearchRep<=conf->searchReps;currentSearchRep++){
+		string s;
+#ifndef BOINC
+		CatchInterrupt();
+#endif		
+
+		GetRepNums(s);
+		if(conf->restart == false){
+			if(s.length() > 0) outman.UserMessage(">>>%s<<<", s.c_str());
+			outman.UserMessage("Starting search with seed=%d\n", rnd.seed());
+			SeedPopulationWithStartingTree(currentSearchRep);
+			}
+		else{
+			outman.UserMessage("\nRestarting from checkpoint...");
+			adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(conf);
+			if(currentSearchRep > conf->searchReps) throw ErrorException("rep number in checkpoint (%d) is larger than total rep specified in config (%d)", currentSearchRep, conf->searchReps);
+			outman.UserMessage("%s, generation %d, seed %d, best lnL %.3f", s.c_str(), gen, rnd.init_seed(), indiv[bestIndiv].Fitness());
+			}
+		
+		InitializeOutputStreams(currentSearchRep);
+		Run();
+
+		if(prematureTermination == false){
+			Individual *repResult = new Individual(&indiv[bestIndiv]);
+			storedTrees.push_back(repResult);
+			if(conf->bootstrapReps == 0) if(conf->searchReps > 1 && storedTrees.size() > 0) WriteStoredTrees(besttreefile.c_str());
+			}
+		
+		if(prematureTermination == false) outman.UserMessage(">>>Completed %s<<<\n", s.c_str());
+		else outman.UserMessage(">>>Terminated %s<<<\n", s.c_str());
+
+		if(currentSearchRep == conf->searchReps || prematureTermination){
+			int best=0;
+			if(conf->searchReps > 1 && storedTrees.size() > 0) best=EvaluateStoredTrees(true);
+			if(conf->bootstrapReps > 0){
+				if(prematureTermination) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
+				else{
+					if(conf->searchReps > 1) outman.UserMessage("Saving best search rep (#%d) to bootstrap file", best+1);
+					FinishBootstrapRep(storedTrees[best], currentBootstrapRep);
+					}
+				}
+			}
+	
+		FinalizeOutputStreams();
+		if(prematureTermination == true) break;
+		Reset();
+		}
+	ClearStoredTrees();
+	}
 
 void Population::QuickSort( FLOAT_TYPE **scoreArray, int top, int bottom ){
 
@@ -1628,7 +2024,7 @@ void Population::PerformMutation(int indNum){
 			if(ind->recombinewith==-1){//all types of "normal" mutation that occur at the inidividual level
 				if(rank==0){//if we are the master
 				 	if(ind->accurateSubtrees==false || paraMan->subtreeModeActive==false){
-			 	
+
 			       		ind->Mutate(adap->branchOptPrecision, adap);
 
 						if(output_tree){
@@ -1907,11 +2303,9 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	}
 
 
-void Population::FinishBootstrapRep(int rep){
+void Population::FinishBootstrapRep(const Individual *ind, int rep){
 
 	if(bootLog.is_open() == false) return;
-
-	Individual *ind = &indiv[bestIndiv];
 
 	if(Tree::outgroup != NULL) OutgroupRoot(bestIndiv);
 
@@ -1945,10 +2339,10 @@ bool Population::OutgroupRoot(int indnum){
 	if(Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal()) r = r->anc;
 	if(r->IsNotRoot()){
 		ind->treeStruct->RerootHere(r->nodeNum);
-		topologies[ind->topo]->RemoveInd(indnum);
+/*		topologies[ind->topo]->RemoveInd(indnum);
 		ind->topo = -1;
-		ntopos--;
 		UpdateTopologyList(indiv);
+*/		AssignNewTopology(indiv, indnum);
 		return true;
 		}
 	else return false;
@@ -1991,7 +2385,7 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 	str += "begin trees;\ntranslate\n";
 	for(k=0;k<ntaxa;k++){
 		NxsString tnstr = data->TaxonLabel(k);
-		tnstr.blanks_to_underscores();
+		tnstr.BlanksToUnderscores();
 		sprintf(temp, " %d %s", k+1, tnstr.c_str());
 		str += temp;
 		if(k < ntaxa-1) 
@@ -2026,7 +2420,9 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 #endif	
 	//add a paup block setting the model params
 	str = "";
-	best->mod->FillPaupBlockStringForModel(str, treefname);
+	if(modSpec.IsNucleotide()){
+		best->mod->FillPaupBlockStringForModel(str, treefname);
+		}
 #ifdef BOINC
 	s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
@@ -2056,6 +2452,62 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 	outf << best->treeStruct->lnL << "\t" << best->kappa << "\t" << treeString << ";";
 	outf.close();
 */
+	}
+
+void Population::WriteStoredTrees( const char* treefname ){
+	assert( treefname );
+
+	char name[85];
+	sprintf(name, "%s.all", treefname);
+	ofstream outf( name );
+	outf.precision(8);
+
+	outf << "#nexus" << endl << endl;
+
+	int ntaxa = data->NTax();
+	outf << "begin trees;\ntranslate\n";
+	for(int k=0;k<ntaxa;k++){
+		outf << "  " << (k+1);
+		NxsString tnstr = data->TaxonLabel(k);
+		tnstr.BlanksToUnderscores();
+		outf << "  " << tnstr.c_str();
+		if(k < ntaxa-1) 
+			outf << ",\n";
+		}		
+
+	outf << ";\n";
+
+	ofstream phytree;
+	if(conf->outputPhylipTree){
+		char phyname[85];
+		sprintf(phyname, "%s.phy.all", treefname);
+		phytree.open(phyname);
+		phytree.precision(8);
+		}
+
+	int bestRep = EvaluateStoredTrees(false);
+	for(unsigned r=0;r<storedTrees.size();r++){
+		if(r == bestRep) outf << "tree rep" << r+1 << "BEST = [&U][" << storedTrees[r]->Fitness() << "][";
+		else outf << "tree rep" << r+1 << " = [&U][" << storedTrees[r]->Fitness() << "][";
+		storedTrees[r]->mod->OutputGarliFormattedModel(outf);
+		outf << "]";
+
+		outf.setf( ios::floatfield, ios::fixed );
+		outf.setf( ios::showpoint );
+		storedTrees[r]->treeStruct->root->MakeNewick(treeString, false, true);
+		outf << treeString << ";\n";
+
+		if(conf->outputPhylipTree){//output a phylip formatted tree if requested
+			WritePhylipTree(phytree);
+			}
+		}
+	outf << "end;\n";
+	
+	//add a paup block setting the model params
+	storedTrees[bestRep]->mod->OutputPaupBlockForModel(outf, name);
+	outf << "[!****NOTE: The model parameters loaded are the final model estimates****\n****from GARLI for the best scoring search replicate (#" << bestRep + 1 << ").****\n****The best model parameters for other trees may vary.****]" << endl;
+	outf.close();
+	if(conf->outputPhylipTree) phytree.close();
 	}
 
 //CAREFUL HERE!  This function assumes the the treestring was just
@@ -2996,11 +3448,17 @@ void Population::keepTrack(){
 					if(typ&Individual::anyTopo || adap->topoWeight==ZERO_POINT_ZERO){
 						//clearing of the swaps records needs to be done for _any_ new best topo, not
 						//just ones that are significantly better
-						if(i == bestIndiv) indiv[0].treeStruct->attemptedSwaps.ClearAttemptedSwaps();
+						indiv[0].treeStruct->CalcBipartitions();
+						indiv[i].treeStruct->CalcBipartitions();
+						bool sameTopo = indiv[0].treeStruct->IdenticalTopologyAllowingRerooting(indiv[i].treeStruct->root);
+						//if this is a new best and isn't the same topology, clear the swaplist
+						if(i == bestIndiv && sameTopo == false)
+							indiv[0].treeStruct->attemptedSwaps.ClearAttemptedSwaps();
+
 						if(scoreDif > conf->significantTopoChange){
-							indiv[0].treeStruct->CalcBipartitions();
-							indiv[i].treeStruct->CalcBipartitions();
-							if(indiv[0].treeStruct->IdenticalTopology(indiv[i].treeStruct->root)==false){
+							//if this is a new best, it is a different topology and it is significantly better 
+							//update the lastTopoImprove
+							if(sameTopo == false){
 								lastTopoImprove=gen;
 								if(i == bestIndiv){
 									AppendTreeToTreeLog(indiv[bestIndiv].mutation_type);
@@ -3993,6 +4451,174 @@ void ParallelManager::FindNonSubtreeNodes(TreeNode *nd){
 		}
 	}
 
+void Population::GetRepNums(string &s){
+	char buf[100];
+	if(conf->bootstrapReps > 0){
+		sprintf(buf, "Bootstrap rep %d (of %d) ", currentBootstrapRep, conf->bootstrapReps);
+		s += buf;
+		}
+	if(conf->searchReps > 1){
+		sprintf(buf, "Search rep %d (of %d)", currentSearchRep, conf->searchReps);
+		s += buf;
+		}
+	}
+
+void Population::OutputRepNums(ofstream &out){
+	if(conf->bootstrapReps > 0 || conf->searchReps > 1){
+		if(conf->bootstrapReps > 0) out << "Bootstrap rep " << currentBootstrapRep << " (of " << conf->bootstrapReps << ") ";
+		if(conf->searchReps > 1) out << "Search rep " << currentSearchRep << " (of " << conf->searchReps <<  ")";
+		out << "\n";
+		}
+	}
+
+void Population::InitializeOutputStreams(int rep){
+	char temp_buf[100];
+	char runString[10];
+	char restartString[15];
+
+	bool appendOnRestart = false;
+#ifdef BOINC
+	appendOnRestart = true;
+#endif
+
+	if(conf->searchReps > 1) 
+		sprintf(runString, ".run%d", rep);
+	else runString[0]='\0';
+
+	if(conf->restart == true && appendOnRestart == false){
+		//check if this run has been restarted before.  If so, increment the restart number
+		sprintf(restartString, ".restart%d", CheckRestartNumber(conf->ofprefix));
+		}
+	else restartString[0]='\0';
+
+	sprintf(temp_buf, "%s%s.best.tre", conf->ofprefix.c_str(), restartString);
+	besttreefile = temp_buf;
+
+	if(conf->outputMostlyUselessFiles){
+		//initialize the fate file
+		if(fate.is_open() == false){
+			if (rank > 9)
+				sprintf(temp_buf, "%s%s.fate%d.log", conf->ofprefix.c_str(), restartString, rank);
+			else
+				sprintf(temp_buf, "%s%s.fate0%d.log", conf->ofprefix.c_str(), restartString, rank);
+			if(conf->restart == true && appendOnRestart == true)
+				fate.open(temp_buf, ios::app);
+			else 
+				fate.open(temp_buf);
+			fate.precision(10);
+			}
+		#ifdef MPI_VERSION
+		fate << "gen\tind\tparent\trecomWith\tscore\tMutType\t#brlen\taccurateSubtrees\tTime\tprecision\n";
+		#else
+		OutputRepNums(fate);
+		fate << "gen\tind\tparent\tscore\tMutType\t#brlen\tTime\tprecision\n";
+		#endif	
+
+		//initialize the problog
+		if(probLog.is_open() == false){
+			if (rank > 9)
+				sprintf(temp_buf, "%s%s.problog%d.log", conf->ofprefix.c_str(), restartString, rank);
+			else
+				sprintf(temp_buf, "%s%s.problog0%d.log", conf->ofprefix.c_str(), restartString, rank);
+			if(conf->restart == true && appendOnRestart == true)
+				probLog.open(temp_buf, ios::app);
+			else
+				probLog.open(temp_buf);
+			if(!probLog.good()) throw ErrorException("problem opening problog");
+			}
+		OutputRepNums(probLog);
+		adap->BeginProbLog(probLog, gen);
+
+		//initialize the swaplog
+		if(conf->uniqueSwapBias != 1.0){
+			if(swapLog.is_open() == false){
+				sprintf(temp_buf, "%s%s.swap.log", conf->ofprefix.c_str(), restartString);
+				if(conf->restart == true && appendOnRestart == true)
+					swapLog.open(temp_buf, ios::app);
+				else
+					swapLog.open(temp_buf);
+				}
+			OutputRepNums(swapLog);
+			swapLog << "gen\tuniqueSwaps\ttotalSwaps\n";
+			}
+		}
+
+	//initialize the log file
+	if(log.is_open() == false){
+		if (rank > 9)
+			sprintf(temp_buf, "%s%s.log%d.log", conf->ofprefix.c_str(), restartString, rank);
+		else
+			sprintf(temp_buf, "%s%s.log0%d.log", conf->ofprefix.c_str(), restartString, rank);
+		if(conf->restart == true && appendOnRestart == true)
+			log.open(temp_buf, ios::app);
+		else
+			log.open(temp_buf);
+		log.precision(10);
+		}
+
+	OutputRepNums(log);
+	if(conf->restart == false)
+		log << "random seed = " << rnd.init_seed() << "\n";
+	else log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
+	log << "gen\tbest_like\ttime\toptPrecision\n";
+
+	//initialize the treelog
+	if(conf->outputTreelog){
+		if (rank > 9)
+			sprintf(temp_buf, "%s%s%s.treelog%d.log", conf->ofprefix.c_str(), runString, restartString, rank);
+		else
+			sprintf(temp_buf, "%s%s%s.treelog0%d.log", conf->ofprefix.c_str(), runString, restartString, rank);
+		if(conf->restart == true && appendOnRestart == true)
+			treeLog.open(temp_buf, ios::app);
+		else
+			treeLog.open(temp_buf);
+		treeLog.precision(10);
+		if(currentSearchRep == 1 || appendOnRestart == false)
+			data->BeginNexusTreesBlock(treeLog);
+		AppendTreeToTreeLog(-1, -1);
+		}
+	
+	//initialize the bootstrap tree file
+	if(conf->bootstrapReps > 0 && rank==0 && bootLog.is_open() == false){
+		sprintf(temp_buf, "%s%s.boot.tre", conf->ofprefix.c_str(), restartString);
+		if(conf->restart == true && appendOnRestart == true)
+			bootLog.open(temp_buf, ios::app);
+		else
+			bootLog.open(temp_buf);
+		bootLog.precision(10);
+		if(currentBootstrapRep == 1 || appendOnRestart == false)
+			data->BeginNexusTreesBlock(bootLog);
+
+		if(conf->outputPhylipTree == true){
+			sprintf(temp_buf, "%s%s.boot.phy", conf->ofprefix.c_str(), restartString);
+			if(conf->restart == true && appendOnRestart == true)
+				bootLogPhylip.open(temp_buf, ios::app);
+			else
+				bootLogPhylip.open(temp_buf);
+			bootLogPhylip.precision(10);
+			}	
+		}	
+
+	ClearDebugLogs();
+	
+	#ifdef DEBUG_SCORES
+	outf.open("toscore.tre");
+	paupf.open("toscore.nex");
+	#endif
+
+	#ifdef VARIABLE_OPTIMIZATION
+	outf.open("toscore.tre");
+	paupf.open("toscore.nex");
+	#endif
+
+	#ifdef PERIODIC_SCORE_DEBUG
+	outf.open("toscore.tre");
+	paupf.open("toscore.nex");
+	#endif	
+	
+	}
+
+/* OLD WAY
 void Population::InitializeOutputStreams(){
 	char temp_buf[100];
 	char restart[12];
@@ -4038,7 +4664,6 @@ void Population::InitializeOutputStreams(){
 			}
 		}
 
-#ifndef BOINC
 	//initialize the log file
 	if (rank > 9)
 		sprintf(temp_buf, "%s%s.log%d.log", conf->ofprefix.c_str(), restart, rank);
@@ -4051,14 +4676,13 @@ void Population::InitializeOutputStreams(){
 	else log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << BestFitness() << endl;
 
 	log << "gen\tbest_like\ttime\toptPrecision\n";
-#endif
 
 	//initialize the treelog
 	if(conf->outputTreelog){
 		if (rank > 9)
-			sprintf(temp_buf, "%s%s.treelog%d.log", conf->ofprefix.c_str(), restart, rank);
+			sprintf(temp_buf, "%s%s.treelog%d.tre", conf->ofprefix.c_str(), restart, rank);
 		else
-			sprintf(temp_buf, "%s%s.treelog0%d.log", conf->ofprefix.c_str(), restart, rank);
+			sprintf(temp_buf, "%s%s.treelog0%d.tre", conf->ofprefix.c_str(), restart, rank);
 
 		treeLog.open(temp_buf);
 		treeLog.precision(10);
@@ -4101,6 +4725,7 @@ void Population::InitializeOutputStreams(){
 	#endif	
 	
 	}
+*/
 
 void Population::SetNewBestIndiv(int indivIndex){
 	//this should be called when a new best individual is set outside of
@@ -4115,6 +4740,42 @@ void Population::SetNewBestIndiv(int indivIndex){
 	indiv[bestIndiv].treeStruct->ProtectClas();
 	}
 
+void Population::FinalizeOutputStreams(){
+	if(prematureTermination == true  && conf->bootstrapReps == 0){
+		log << "***NOTE: Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***" << endl;
+		if(treeLog.is_open()) treeLog << "[! ***NOTE: GARLI run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***]" << endl;
+		}
+
+	if(((conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps) && (currentSearchRep == conf->searchReps)) || prematureTermination == true){
+		log.close();
+		if(fate.is_open()) fate.close();
+		if(probLog.is_open()) probLog.close();
+		if(swapLog.is_open()) swapLog.close();
+		}
+
+	if(treeLog.is_open() && (conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps)){
+		AppendTreeToTreeLog(-1);
+		treeLog << "end;\n";
+		treeLog.close();
+		}
+
+	if(((currentBootstrapRep == conf->bootstrapReps) && (currentSearchRep == conf->searchReps)) || prematureTermination == true){
+		if(bootLog.is_open()){
+			bootLog << "end;\n";
+			bootLog.close();
+			}
+		if(bootLogPhylip.is_open()) bootLogPhylip.close();
+		}
+	
+	#ifdef DEBUG_SCORES
+	outf << "end;\n";
+	outf.close();
+	paupf << "end;\n";
+	paupf.close();
+	#endif
+	}
+
+/* OLD WAY
 void Population::FinalizeOutputStreams(){
 	if(prematureTermination == true){
 		log << "***NOTE: Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***" << endl;
@@ -4142,6 +4803,7 @@ void Population::FinalizeOutputStreams(){
 	paupf.close();
 	#endif
 	}
+*/
 
 void Population::FindLostClas(){
 	vector<CondLikeArray *> arr;

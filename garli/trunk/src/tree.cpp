@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -24,27 +24,15 @@
 
 using namespace std;
 
+#include "defs.h"
 #include "mlhky.h"
 #include "clamanager.h"
 #include "funcs.h"
 #include "stopwatch.h"
 #include "model.h"
-#include "defs.h"
 #include "tree.h"
 #include "datamatr.h"
 #include "reconnode.h"
-
-#ifdef BOINC
-	#include "boinc_api.h"
-	#include "filesys.h"
-	#ifdef _WIN32
-		#include "boinc_win.h"
-	#else
-		#include "config.h"
-	#endif
-#endif
-
-#include "memchk.h"
 
 #include "utility.h"
 Profiler ProfIntInt   ("ClaIntInt     ");
@@ -61,9 +49,14 @@ int precalcIncr[30] = {1, 3, 5, 7, 10, 12, 14, 17, 19, 21, 24, 26, 28, 30, 33, 3
 
 extern rng rnd;
 extern bool output_tree;
+extern bool uniqueSwapTried;
 
 #ifdef VARIABLE_OPTIMIZATION
 ofstream var("variable.log");
+ofstream uni("unique.log");
+#endif
+
+#ifdef OUTPUT_UNIQUE_TREES
 ofstream uni("unique.log");
 #endif
 
@@ -73,6 +66,7 @@ extern int optCalcs;
 extern ofstream opt;
 extern ofstream optsum;
 extern int memLevel;
+extern ModelSpecification modSpec;
 
 //Tree static definitions
 FLOAT_TYPE Tree::meanBrlenMuts;
@@ -137,13 +131,16 @@ void Tree::SetTreeStatics(ClaManager *claMan, const HKYData *data, const General
 #endif
 	//deal with the outgroup specification, if there is one
 	if(conf->outgroupString.length() > 0){
-		NxsString s(conf->outgroupString.c_str());
+		//NxsString s(conf->outgroupString.c_str());
+		const char *o = conf->outgroupString.c_str();
 		vector<int> nums;
-		char *tax = FirstToken(s, " ");
-		do{
-			nums.push_back(atoi(tax));
-			tax = NextToken(s, " ");
-			}while(tax);
+		int pos1=0, pos2;
+		while(pos1 < conf->outgroupString.size()){
+			pos2 = conf->outgroupString.find(" ", pos1+1);
+			string tax = conf->outgroupString.substr(pos1, pos2);
+			nums.push_back(atoi(tax.c_str()));
+			pos1 = pos2;
+			}
 
 		if(outgroup) outgroup->ClearBipartition();
 		else outgroup = new Bipartition();
@@ -354,10 +351,16 @@ Tree::Tree(){
 	root->attached=true;
 	//assign data to tips
 	for(int i=1;i<=data->NTax();i++){
-		allNodes[i]->tipData=data->GetAmbigString(i-1);
+		if(modSpec.IsCodon() || modSpec.IsCodonAminoAcid())
+			allNodes[i]->tipData=(char *) static_cast<const CodonData*>(data)->GetCodonRow(i-1);
+		else if(modSpec.IsAminoAcid())
+			allNodes[i]->tipData=(char *)(data)->GetRow(i-1);
+		else{
+			allNodes[i]->tipData=data->GetAmbigString(i-1);
 #ifdef OPEN_MP
-		allNodes[i]->ambigMap=data->GetAmbigToCharMap(i-1);
+			allNodes[i]->ambigMap=data->GetAmbigToCharMap(i-1);
 #endif
+			}
 		}
 	
 	numTipsAdded=0;
@@ -390,10 +393,16 @@ void Tree::AllocateTree(){
 	root=allNodes[0];
 	//assign data to tips
 	for(int i=1;i<=data->NTax();i++){
-		allNodes[i]->tipData=data->GetAmbigString(i-1);
+		if(modSpec.IsCodon() || modSpec.IsCodonAminoAcid())
+			allNodes[i]->tipData=(char *) static_cast<const CodonData*>(data)->GetCodonRow(i-1);
+		else if(modSpec.IsAminoAcid())
+			allNodes[i]->tipData=(char *)(data)->GetRow(i-1);
+		else{
+			allNodes[i]->tipData=data->GetAmbigString(i-1);
 #ifdef OPEN_MP
-		allNodes[i]->ambigMap=data->GetAmbigToCharMap(i-1);
+			allNodes[i]->ambigMap=data->GetAmbigToCharMap(i-1);
 #endif
+			}
 		}
 	
 	numTipsAdded=0;
@@ -930,7 +939,7 @@ bool Tree::IdenticalSubtreeTopology(const TreeNode *other){
 
 bool Tree::IdenticalTopology(const TreeNode *other){
 	//this is intitially called with the root, it will detect any difference in the 
-	//overall topology
+	//overall topology, but assumes the same rooting
 	bool identical;
 	
 	if(other->IsRoot() == false){
@@ -946,6 +955,33 @@ bool Tree::IdenticalTopology(const TreeNode *other){
 		TreeNode *nd=other->left;
 		while(nd != NULL){
 			identical=IdenticalTopology(nd);
+			if(identical == false){
+				return identical;
+				}
+			nd=nd->next;
+			}
+		}
+	return identical;
+	}
+
+bool Tree::IdenticalTopologyAllowingRerooting(const TreeNode *other){
+	//this is intitially called with the root, it will detect any difference in the 
+	//overall topology
+	bool identical;
+	
+	if(other->IsRoot() == false){
+		if(other->IsTerminal()) return true;
+		identical= (ContainsBipartitionOrComplement(other->bipart) != NULL);
+		if(identical==true){
+			identical=IdenticalTopologyAllowingRerooting(other->left);
+			if(identical==true)
+				identical=IdenticalTopologyAllowingRerooting(other->right);
+			}
+		}
+	else{
+		TreeNode *nd=other->left;
+		while(nd != NULL){
+			identical=IdenticalTopologyAllowingRerooting(nd);
 			if(identical == false){
 				return identical;
 				}
@@ -1031,7 +1067,410 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 	else return -1;
 	return 1;
 	}
+	
+//this is essentially a version of TopologyMutator that goes through cut nodes in order
+//and for each cut node goes through the broken nodes in order.  It the swaps are performed
+//on a temporary tree
+void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, int range, bool furthestFirst){
 
+	TreeNode *cut;
+	int swapNum=0;
+	double bestScore = -DBL_MAX;
+	
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source);
+
+	//ensure that the starting tree is optimal up to the required precision
+	FLOAT_TYPE imp = 999.9;
+	do{
+		imp = tempIndiv.treeStruct->OptimizeAllBranches(optPrecision);
+		}while(imp > 0.0);
+
+	outman.UserMessage("starting score:%f", tempIndiv.treeStruct->lnL);
+
+	char str[50];
+	if(furthestFirst) sprintf(str, "determImpsCutR.%d.%f.tre", range, optPrecision);
+	else sprintf(str, "determImpsCut.%d.%f.tre", range, optPrecision);
+	ofstream better(str);
+	better.precision(9);
+	data->BeginNexusTreesBlock(better);
+
+	if(furthestFirst) sprintf(str, "determCutR%d.%f.log", range, optPrecision);
+	else sprintf(str, "determCut%d.%f.log", range, optPrecision);
+	FILE *log = fopen(str, "w");
+	
+	//allocate a treeString
+	double taxsize=log10((double) ((double)data->NTax())*data->NTax()*2);
+	int stringSize=(int)((data->NTax()*2)*(10+DEF_PRECISION));
+	char *treeString=new char[stringSize];
+	stringSize--;
+	treeString[stringSize]='\0';
+	bool newBest=false;
+	attemptedSwaps.ClearAttemptedSwaps();
+	int startC, c=1;
+
+	/*
+	AttemptedSwapList availableSwaps;
+
+	Bipartition proposed;
+	for(int i=1;i<numNodesTotal;i++){
+		cut=allNodes[i];
+		GatherValidReconnectionNodes(range, cut, NULL);
+		for(list<ReconNode>::iterator b = sprRang.begin();b != sprRang.end();b++){
+			ReconNode *broken = &(*b);
+			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+			availableSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+			}
+		}
+*/	
+
+	int acceptedSwaps = 0;
+	startC = c;
+
+	while(1){
+		cut=allNodes[c];
+		GatherValidReconnectionNodes(range, cut, NULL);
+		if(furthestFirst) sprRang.Reverse();
+
+		for(list<ReconNode>::iterator b = sprRang.begin();b != sprRang.end();b++){
+			ReconNode *broken = &(*b);
+			
+			//log the swap about to be performed.  Although this func goes through the swaps in order,
+			//there will be duplication because of the way that NNIs are performed.  Two different cut
+			//nodes can be reconnected with an NNI such that the same topology results
+			bool unique=false;
+			Bipartition proposed;
+			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+
+			if(unique){
+				swapNum++;
+				if(swapNum %100 == 0) fprintf(log, "%d\t%d\t%f\n", swapNum, acceptedSwaps, lnL);
+				if(broken->withinCutSubtree == true){
+					tempIndiv.treeStruct->ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
+					}
+				else{
+					tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
+					}
+
+				if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
+
+					outman.UserMessage("%f\t%f\t%d\t%d", tempIndiv.treeStruct->lnL, lnL - tempIndiv.treeStruct->lnL, c, b->reconDist);
+					source->CopySecByRearrangingNodesOfFirst(source->treeStruct, &tempIndiv, true);
+					lnL = tempIndiv.treeStruct->lnL;
+
+					tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+					better << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
+					newBest = true;
+					acceptedSwaps++;
+					attemptedSwaps.ClearAttemptedSwaps();
+					break;
+					}
+				else{
+					tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source, true);
+					}
+				}
+			}
+		c++;
+		if(c == numNodesTotal) c = 1;
+		if(newBest == true){
+			startC = c;
+			newBest = false;
+			}
+		else if(c == startC){
+			outman.UserMessage("done. %d swaps, %d accepted", swapNum, acceptedSwaps);
+			break;
+			}
+		}
+
+	better << "end;";
+	better.close();
+	delete []treeString;
+	fclose(log);
+
+	tempIndiv.treeStruct->RemoveTreeFromAllClas();
+	delete tempIndiv.treeStruct;
+	tempIndiv.treeStruct=NULL;
+	}
+
+//this is essentially a version of TopologyMutator that goes through cut nodes in order
+//and for each cut node goes through the broken nodes in order.  It the swaps are performed
+//on a temporary tree
+void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, int range, bool furthestFirst){
+
+	TreeNode *cut;
+	int swapNum=0;
+	
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source);
+
+	//ensure that the starting tree is optimal up to the required precision
+	FLOAT_TYPE imp = 999.9;
+	do{
+		imp = tempIndiv.treeStruct->OptimizeAllBranches(optPrecision);
+		}while(imp > 0.0);
+
+	outman.UserMessage("starting score:%f", tempIndiv.treeStruct->lnL);
+
+	char str[50];
+	if(furthestFirst) sprintf(str, "determImpsDistR.%d.%f.tre", range, optPrecision);
+	else sprintf(str, "determImpsDist.%d.%f.tre", range, optPrecision);
+
+	ofstream better(str);
+	better.precision(9);
+	data->BeginNexusTreesBlock(better);
+
+	if(furthestFirst) sprintf(str, "determDistR%d.%f.log", range, optPrecision);
+	else sprintf(str, "determDist%d.%f.log", range, optPrecision);
+	FILE *log = fopen(str, "w");
+	
+	//allocate a treeString
+	double taxsize=log10((double) ((double)data->NTax())*data->NTax()*2);
+	int stringSize=(int)((data->NTax()*2)*(10+DEF_PRECISION));
+	char *treeString=new char[stringSize];
+	stringSize--;
+	treeString[stringSize]='\0';
+	bool newBest=false;
+	attemptedSwaps.ClearAttemptedSwaps();
+	int startC, c=1;
+
+	/*
+	AttemptedSwapList availableSwaps;
+
+	Bipartition proposed;
+	for(int i=1;i<numNodesTotal;i++){
+		cut=allNodes[i];
+		GatherValidReconnectionNodes(range, cut, NULL);
+		for(list<ReconNode>::iterator b = sprRang.begin();b != sprRang.end();b++){
+			ReconNode *broken = &(*b);
+			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+			availableSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+			}
+		}
+*/	
+
+	int currentDist;
+	if(furthestFirst) currentDist = range;
+	else currentDist = 1;
+	int acceptedSwaps = 0;
+	startC = c;
+	do{
+		cut=allNodes[c];
+		//outman.UserMessageNoCR("cut=%d ", c);
+		GatherValidReconnectionNodes(range, cut, NULL);
+
+		for(list<ReconNode>::iterator b = sprRang.GetFirstNodeAtDist(currentDist);b != sprRang.end() && b->reconDist == currentDist;b++){
+			ReconNode *broken = &(*b);
+			
+			//log the swap about to be performed.  Although this func goes through the swaps in order,
+			//there will be duplication because of the way that NNIs are performed.  Two different cut
+			//nodes can be reconnected with an NNI such that the same topology results
+			bool unique=false;
+			Bipartition proposed;
+			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+
+			if(unique){
+				swapNum++;
+				if(broken->withinCutSubtree == true){
+					tempIndiv.treeStruct->ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
+					}
+				else{
+					tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
+					}
+
+				if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
+					outman.UserMessage("%f\t%f\t%d\t%d", tempIndiv.treeStruct->lnL, lnL - tempIndiv.treeStruct->lnL, c, b->reconDist);
+				
+					source->CopySecByRearrangingNodesOfFirst(source->treeStruct, &tempIndiv, true);
+					lnL = tempIndiv.treeStruct->lnL;
+
+					tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+					better << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
+					newBest = true;
+					acceptedSwaps++;
+					attemptedSwaps.ClearAttemptedSwaps();
+					break;
+					}
+				else{
+					tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source, true);
+					}
+				if(swapNum %100 == 0) fprintf(log, "%d\t%d\t%f\n", swapNum, acceptedSwaps, lnL);
+				}
+			}
+		c++;
+		if(c == numNodesTotal) c = 1;
+		if(newBest == true){
+			startC = c;
+			if(furthestFirst)
+				currentDist = range;
+			else
+				currentDist = 1;
+			newBest = false;
+			}	
+		else if(c == startC){
+			if(furthestFirst) 
+				currentDist--;
+			else currentDist++;
+			outman.UserMessage("dist = %d", currentDist);
+			}
+		}while(currentDist <= range && currentDist > 0);
+
+	outman.UserMessage("done. %d swaps, %d accepted", swapNum, acceptedSwaps);
+
+	better << "end;";
+	better.close();
+	delete []treeString;
+	fclose(log);
+
+	tempIndiv.treeStruct->RemoveTreeFromAllClas();
+	delete tempIndiv.treeStruct;
+	tempIndiv.treeStruct=NULL;
+	}
+
+
+//this is essentially a version of TopologyMutator that goes through cut nodes in order
+//and for each cut node goes through the broken nodes in order.  It the swaps are performed
+//on a temporary tree
+void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, int range){
+
+	TreeNode *cut;
+	int swapNum=0;
+	double bestScore = -DBL_MAX;
+	
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source);
+
+	//ensure that the starting tree is optimal up to the required precision
+	FLOAT_TYPE imp = 999.9;
+	do{
+		imp = tempIndiv.treeStruct->OptimizeAllBranches(optPrecision);
+		}while(imp > 0.0);
+
+	outman.UserMessage("starting score:%f", tempIndiv.treeStruct->lnL);
+
+	char str[50];
+	sprintf(str, "determImpsRand.%d.%f.tre", range, optPrecision);
+	ofstream better(str);
+	better.precision(9);
+	data->BeginNexusTreesBlock(better);
+	
+	sprintf(str, "determRand%d.%f.log", range, optPrecision);
+	FILE *log = fopen(str, "w");
+
+	//allocate a treeString
+	double taxsize=log10((double) ((double)data->NTax())*data->NTax()*2);
+	int stringSize=(int)((data->NTax()*2)*(10+DEF_PRECISION));
+	char *treeString=new char[stringSize];
+	stringSize--;
+	treeString[stringSize]='\0';
+	bool newBest=false;
+	attemptedSwaps.ClearAttemptedSwaps();
+	int c=1;
+
+	/*
+	AttemptedSwapList availableSwaps;
+
+	Bipartition proposed;
+	for(int i=1;i<numNodesTotal;i++){
+		cut=allNodes[i];
+		GatherValidReconnectionNodes(range, cut, NULL);
+		for(list<ReconNode>::iterator b = sprRang.begin();b != sprRang.end();b++){
+			ReconNode *broken = &(*b);
+			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+			availableSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+			}
+		}
+*/	
+
+	int *completed = new int[numNodesTotal];
+	for(int i=1;i<numNodesTotal;i++) completed[i] = 0;
+
+	int acceptedSwaps = 0;
+
+	while(1){
+		int attempts = 0;
+		do{
+			c = GetRandomNonRootNode();
+			if(attempts++ > numNodesTotal){
+				int n=1;
+				while(completed[n] && n < numNodesTotal) n++;
+				if(n == numNodesTotal){
+					outman.UserMessage("done. %d swaps, %d accepted", swapNum, acceptedSwaps);
+
+					better << "end;";
+					better.close();
+					delete []treeString;
+					fclose(log);
+
+					tempIndiv.treeStruct->RemoveTreeFromAllClas();
+					delete tempIndiv.treeStruct;
+					tempIndiv.treeStruct=NULL;
+					return;
+					}
+				}
+			}while(completed[c]);
+		cut=allNodes[c];
+		//outman.UserMessageNoCR("cut=%d ", c);
+		GatherValidReconnectionNodes(range, cut, NULL);
+
+		//for(list<ReconNode>::iterator b = sprRang.GetFirstNodeAtDist(currentDist);b != sprRang.end() && b->reconDist == currentDist;b++){
+		bool noSwapFound = true;
+		listIt b;
+		while(sprRang.size() > 0){
+			b = sprRang.NthElement(rnd.random_int(sprRang.size()));
+			ReconNode *broken = &(*b);
+			
+			//log the swap about to be performed.  Although this func goes through the swaps in order,
+			//there will be duplication because of the way that NNIs are performed.  Two different cut
+			//nodes can be reconnected with an NNI such that the same topology results
+			bool unique=false;
+			Bipartition proposed;
+			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+
+			if(unique){
+				swapNum++;
+				if(broken->withinCutSubtree == true){
+					tempIndiv.treeStruct->ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
+					}
+				else{
+					tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
+					}
+
+				if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
+					outman.UserMessage("%f\t%f\t%d\t%d", tempIndiv.treeStruct->lnL, lnL - tempIndiv.treeStruct->lnL, c, b->reconDist);
+					source->CopySecByRearrangingNodesOfFirst(source->treeStruct, &tempIndiv, true);
+					lnL = tempIndiv.treeStruct->lnL;
+
+					tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+					better << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
+					newBest = true;
+					acceptedSwaps++;
+					attemptedSwaps.ClearAttemptedSwaps();
+					for(int i=0;i<numNodesTotal;i++) completed[i] = 0;
+					break;
+					}
+				else{
+					tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source, true);
+					break;
+					}
+				}
+			else sprRang.RemoveElement(b);
+			}
+		if(swapNum %100 == 0) fprintf(log, "%d\t%d\t%f\n", swapNum, acceptedSwaps, lnL);
+		if(sprRang.size() == 0){
+			outman.UserMessage("completed %d", c);
+			completed[c] = 1;
+			}
+		}
+	}
 
 //this function now returns the reconnection distance, with it being negative if its a
 //subtree reorientation swap
@@ -1041,6 +1480,7 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 	//of random SPR's
 	TreeNode *cut;
 	ReconNode *broken;
+	bool unique;
 
 #ifdef EQUIV_CALCS
 	dirtyEQ = true;
@@ -1048,6 +1488,7 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 	
 	int err=0;
 	int ret=0;
+	int tryNum = 0;
 	do{
 		do{
 			cut=allNodes[GetRandomNonRootNode()];
@@ -1057,50 +1498,64 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 		if((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)
 			broken = sprRang.RandomReconNode();
 		else{//only doing this on limSPR and NNI
-			AssignWeightsToSwaps(cut);
-			sprRang.CalcProbsFromWeights();
-			broken = sprRang.ChooseNodeByWeight();
+			err = AssignWeightsToSwaps(cut);
+			err = err && (tryNum++ < 5);
+#ifdef SWAP_BASED_TERMINATION
+			if(!err){
+#else
+			if(1){
+#endif
+				sprRang.CalcProbsFromWeights();
+				broken = sprRang.ChooseNodeByWeight();
+				}
 			}
 
-		//log the swap about to be performed
-		bool unique=false;
-		if( ! ((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)){
-			Bipartition proposed;
-			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
-			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
-			}
+#ifdef SWAP_BASED_TERMINATION
+		if(!err){
+#else
+		if(1){
+#endif
+			//log the swap about to be performed
+			if( ! ((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)){
+				Bipartition proposed;
+				proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+				unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+				uniqueSwapTried = uniqueSwapTried || unique;
+				//uniqueSwapTried = uniqueSwapTried || attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+				}
 
-		if(broken->withinCutSubtree == true){
-			#ifdef OPT_DEBUG
-				optsum << "reorientSPR\t" << broken->reconDist << "\t" << range << "\n";
+			if(broken->withinCutSubtree == true){
+				#ifdef OPT_DEBUG
+					optsum << "reorientSPR\t" << broken->reconDist << "\t" << range << "\n";
+				#endif
+				#ifdef VARIABLE_OPTIMIZATION
+					if(unique == true) ReorientSubtreeSPRMutateDummy(cut->nodeNum, broken, optPrecision);
+					else return broken->reconDist * -1;
+				#endif
+				ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);	
+				ret=broken->reconDist * -1;
+				}
+			else{
+				#ifdef OPT_DEBUG
+					optsum << "SPR\t" << broken->reconDist << "\t" << range << "\n";
+				#endif
+				#ifdef VARIABLE_OPTIMIZATION
+					if(unique == true) err=SPRMutateDummy(cut->nodeNum, broken, optPrecision, subtreeNode);
+					else return broken->reconDist;
+				#endif
+				err=SPRMutate(cut->nodeNum, broken, optPrecision, subtreeNode);
+				ret=broken->reconDist;
+				}
+			#ifdef OUTPUT_UNIQUE_TREES
+			if(unique == true){
+				output_tree = true;
+				//uni.precision(9);
+				if(broken->withinCutSubtree == false) uni << "SPR" << "\t" << broken->reconDist << "\t" << lnL << "\t" << cut->nodeNum << "\t" << broken->nodeNum << "\n";
+				else uni << "reSPR" << "\t" << broken->reconDist << "\t" << lnL << "\t" << cut->nodeNum << "\t" << broken->nodeNum << "\n";
+				}
 			#endif
-			#ifdef VARIABLE_OPTIMIZATION
-				if(unique == true) ReorientSubtreeSPRMutateDummy(cut->nodeNum, broken, optPrecision);
-				else return broken->reconDist * -1;
-			#endif
-			ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);	
-			ret=broken->reconDist * -1;
 			}
-		else{
-			#ifdef OPT_DEBUG
-				optsum << "SPR\t" << broken->reconDist << "\t" << range << "\n";
-			#endif
-			#ifdef VARIABLE_OPTIMIZATION
-				if(unique == true) err=SPRMutateDummy(cut->nodeNum, broken, optPrecision, subtreeNode);
-				else return broken->reconDist;
-			#endif
-			err=SPRMutate(cut->nodeNum, broken, optPrecision, subtreeNode);
-			ret=broken->reconDist;
-			}
-		#ifdef OUTPUT_UNIQUE_TREES
-		if(unique == true){
-			output_tree = true;
-			//uni.precision(9);
-			if(broken->withinCutSubtree == false) uni << "SPR" << "\t" << broken->reconDist << "\t" << lnL << "\t" << cut->nodeNum << "\t" << broken->nodeNum << "\n";
-			else uni << "reSPR" << "\t" << broken->reconDist << "\t" << lnL << "\t" << cut->nodeNum << "\t" << broken->nodeNum << "\n";
-			}
-		#endif
-		}while(err<0);
+		}while(err);
 
 #ifndef NDEBUG
 	CalcBipartitions();
@@ -1218,33 +1673,37 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 //	if(maxDist != 1)
 //		sprRang.RemoveNodesOfDist(1); //remove branches equivalent to NNIs
 	
+	CalcBipartitions();
+
 #ifdef CONSTRAINTS
 	//now deal with constraints, if any
-	CalcBipartitions();
-	Bipartition scratch;
+	if(constraints.size() > 0){
+		Bipartition scratch;
 
-	for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
-		if(sprRang.size() != 0){
-			listIt it=sprRang.begin();
-			do{
-				TreeNode* broken=allNodes[it->nodeNum];
-				//if(AllowedByConstraint(&(*conit), cut, broken, scratch) == false) it=sprRang.RemoveElement(it);
-				if(AllowedByConstraint(&(*conit), cut, &*it, scratch) == false) it=sprRang.RemoveElement(it);
-				else it++;
-				}while(it != sprRang.end());
+		for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+			if(sprRang.size() != 0){
+				listIt it=sprRang.begin();
+				do{
+					TreeNode* broken=allNodes[it->nodeNum];
+					//if(AllowedByConstraint(&(*conit), cut, broken, scratch) == false) it=sprRang.RemoveElement(it);
+					if(AllowedByConstraint(&(*conit), cut, &*it, scratch) == false) it=sprRang.RemoveElement(it);
+					else it++;
+					}while(it != sprRang.end());
+				}
+			else return;
 			}
-		else return;
 		}
 #endif
 	}
 
 
-void Tree::AssignWeightsToSwaps(TreeNode *cut){
+bool Tree::AssignWeightsToSwaps(TreeNode *cut){
 	//Assign weights to each swap (reconnection node) based on 
 	//some criterion
 
 	Bipartition proposed;
 	list<Swap>::iterator thisSwap;
+	bool someUnique = false;
 
 	for(listIt it = sprRang.begin();it != sprRang.end();it++){
 		bool found;
@@ -1253,6 +1712,7 @@ void Tree::AssignWeightsToSwaps(TreeNode *cut){
 		thisSwap = attemptedSwaps.FindSwap(tmp, found);
 
 		if(found == false){
+			someUnique = true;
 			if((*it).reconDist - 1 < 1000)
 				(*it).weight = distanceSwapPrecalc[(*it).reconDist - 1];
 			else (*it).weight = 0.0;
@@ -1263,6 +1723,7 @@ void Tree::AssignWeightsToSwaps(TreeNode *cut){
 			else (*it).weight = 0.0;
 			}
 		}
+	return someUnique==false;
 	}
 
 int Tree::SPRMutateDummy(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, int subtreeNode){
@@ -1457,7 +1918,7 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, int s
 		else 
 			OptimizeBranchesWithinRadius(connector, optPrecision, subtreeNode, NULL);
 		}
-	return 1;
+	return 0;
 }
 
 void Tree::ReorientSubtreeSPRMutateDummy(int oroot, ReconNode *nroot, FLOAT_TYPE optPrecision){
@@ -2154,6 +2615,47 @@ bool RescaleRateHet(CondLikeArray *destCLA, int nsites, int nRateCats){
 		return reduceRescale;
 		}
 
+bool RescaleRateHetNState(CondLikeArray *destCLA, int nsites, int nstates, int nRateCats){
+
+		FLOAT_TYPE *destination=destCLA->arr;
+		int *underflow_mult=destCLA->underflow_mult;
+
+		//check if any clas are getting close to underflow
+#ifdef UNIX
+		madvise(destination, sizeof(FLOAT_TYPE)*nstates*nRateCats*nsites, MADV_SEQUENTIAL);
+		madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
+#endif
+		bool reduceRescale=false;
+		FLOAT_TYPE small1, large1;
+		for(int i=0;i<nsites;i++){
+			small1 = (destination[0] < destination[1]) ? destination[0] :  destination[1];
+			large1 = (destination[0] > destination[1]) ? destination[0] :  destination[1];
+			for(int s=2;s<nstates*nRateCats;s++){
+				small1 = (destination[s] < small1) ? destination[s] : small1;
+				large1 = (destination[s] > large1) ? destination[s] : large1;
+				}
+
+			assert(large1 < 1e10);
+			if(large1< 1e-5){
+				if(large1 < 1e-150){
+					throw(1);
+					}
+				int incr=((int) -log(large1))+5;
+				underflow_mult[i]+=incr;
+				FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
+				for(int q=0;q<nstates*nRateCats;q++){
+					destination[q]*=mult;
+					assert(destination[q] == destination[q]);
+					assert(destination[q] < 1e50);
+					}
+				}
+			destination+= nstates*nRateCats;
+			}
+
+		destCLA->rescaleRank=0;
+		return reduceRescale;
+		}
+
 int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA /*=false*/){
 	//note that fillFinalCLA just refers to whether we actually want to calc a CLA
 	//representing the contribution of the entire tree vs just calcing the score
@@ -2164,13 +2666,15 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 
 	calcCount++;
 	
-	int nsites=data->NChar();
+	int nsites = data->NChar();
+
 	CondLikeArray *destCLA=NULL;
 
 	TreeNode* Lchild, *Rchild;
 	CondLikeArray *LCLA=NULL, *RCLA=NULL, *partialCLA=NULL;
-	vector<FLOAT_TYPE> Rprmat(16*mod->NRateCats());
-	vector<FLOAT_TYPE> Lprmat(16*mod->NRateCats());	
+
+	vector<FLOAT_TYPE> Rprmat(mod->NStates() * mod->NStates() * mod->NRateCats());
+	vector<FLOAT_TYPE> Lprmat(mod->NStates() * mod->NStates() * mod->NRateCats());
 
 	if(direction != ROOT){
 		//the only complicated thing here will be to set up the two children depending on the direction
@@ -2241,6 +2745,9 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 				}
 			else 
 #endif
+			if(modSpec.IsNucleotide() == false)
+				CalcFullCLAInternalInternalNState(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats(), mod->NStates());
+			else
 				CalcFullCLAInternalInternal(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats());
 			ProfIntInt.Stop();
 			}
@@ -2248,23 +2755,36 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		else if(LCLA==NULL && RCLA==NULL){
 			//two terminal children
 			ProfTermTerm.Start();
-			CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData, nsites,  mod->NRateCats());
+			if(modSpec.IsNucleotide() == false)
+				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData, nsites,  mod->NRateCats(), mod->NStates());
+			else
+				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData, nsites,  mod->NRateCats());
 			ProfTermTerm.Stop();
 			}
 
 		else{
 			//one terminal, one internal
 			ProfIntTerm.Start();
+
+			if(modSpec.IsNucleotide() == false){
+				if(LCLA==NULL)
+					CalcFullCLAInternalTerminalNState(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats(), mod->NStates());
+				else 
+					CalcFullCLAInternalTerminalNState(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats(), mod->NStates());
+				}
+			else{
 #ifdef OPEN_MP
-			if(LCLA==NULL)
-				CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats(), Lchild->ambigMap);
-			else
-				CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats(), Rchild->ambigMap);
+				if(LCLA==NULL)
+					CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats(), Lchild->ambigMap);
+				else
+					CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats(), Rchild->ambigMap);
+				}
 #else
-			if(LCLA==NULL)
-				CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats());
-			else 
-				CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats());
+				if(LCLA==NULL)
+					CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats());
+				else 
+					CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats());
+				}
 #endif
 			ProfIntTerm.Stop();
 			}
@@ -2275,7 +2795,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		//valid CLA that already represents two of these three. If so we can save a bit of
 		//computation.  This will mainly be the case during blen optimization, when when we 
 		//only change one of the branches again and again.
-		vector<FLOAT_TYPE> prmat(16*mod->NRateCats());
+		vector<FLOAT_TYPE> prmat(mod->NStates() * mod->NStates() * mod->NRateCats());
 		TreeNode *child;
 		CondLikeArray *childCLA=NULL;
 		int *childUnderMult=NULL;
@@ -2329,12 +2849,20 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		if(fillFinalCLA==false){
 			if(childCLA!=NULL){//if child is internal
 				ProfScoreInt.Start();
-				lnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &prmat[0]);
+				if(modSpec.IsNucleotide())
+					lnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &prmat[0]);
+				else
+					lnL = GetScorePartialInternalNState(partialCLA, childCLA, &prmat[0]);
+					
 				ProfScoreInt.Stop();
 				}	
 			else{
 				ProfScoreTerm.Start();
-				lnL = GetScorePartialTerminalRateHet(partialCLA, &prmat[0], child->tipData);
+				if(modSpec.IsNucleotide())
+					lnL = GetScorePartialTerminalRateHet(partialCLA, &prmat[0], child->tipData);
+				else
+					lnL = GetScorePartialTerminalNState(partialCLA, &prmat[0], child->tipData);
+
 				ProfScoreTerm.Stop();
 				}
 			}
@@ -2357,7 +2885,11 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 	if(direction != ROOT)
 		if(destCLA->rescaleRank >= rescaleEvery){
 			ProfRescale.Start();
-			RescaleRateHet(destCLA, nsites, mod->NRateCats());
+			if(modSpec.IsNucleotide())
+				RescaleRateHet(destCLA, nsites, mod->NRateCats());
+			else
+				RescaleRateHetNState(destCLA, nsites, mod->NStates(), mod->NRateCats());
+
 			ProfRescale.Stop();
 			}
 	return -1;
@@ -3344,21 +3876,22 @@ void Tree::MarkClasNearTipsToReclaim(int subtreeNode){
 
 void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site){
 	//int site=0;
-	int index=16*site;
+	int nstates = mod->NStates();
+	int index=nstates * mod->NRateCats() * site;
 	
 	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexDown) == false){
 		deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
-		for(int i=0;i<16;i++) deb << claMan->GetCla(nd->claIndexDown)->arr[index+i] << "\t";
+		for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexDown)->arr[index+i] << "\t";
 		deb << claMan->GetCla(nd->claIndexDown)->underflow_mult[site] <<"\n";
 		}
 	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexUL) == false){
 		deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
-		for(int i=0;i<16;i++) deb << claMan->GetCla(nd->claIndexUL)->arr[index+i] << "\t";
+		for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexUL)->arr[index+i] << "\t";
 		deb << claMan->GetCla(nd->claIndexUL)->underflow_mult[site] <<"\n";
 		}
 	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexUR) == false){
 		deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
-		for(int i=0;i<16;i++) deb << claMan->GetCla(nd->claIndexUR)->arr[index+i] << "\t";
+		for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexUR)->arr[index+i] << "\t";
 		deb << claMan->GetCla(nd->claIndexUR)->underflow_mult[site] <<"\n";
 		}
 
@@ -3546,16 +4079,128 @@ FLOAT_TYPE Tree::CountClasInUse(){
 	return inUse;
 	}
 	
-FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata){
+FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata){
 
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *partial=partialCLA->arr;
 	int *underflow_mult=partialCLA->underflow_mult;
 
+	int nstates = mod->NStates();
+	int nRateCats = mod->NRateCats();
+	int nchar = data->NChar();
+	const int *countit=data->GetCounts();
+
+	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+
+#ifdef UNIX
+	madvise(partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE siteL, totallnL=0.0;
+
+	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
+	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
+
+#undef OUTPUT_SITELIKES
+
+#ifdef OUTPUT_SITELIKES
+	ofstream sit("sitelikes.log");
+	sit.precision(15);
+#endif
+
+	if(nRateCats == 1){
+		for(int i=0;i<nchar;i++){
+			siteL = 0.0;
+			if(*Ldata < nstates){ //no ambiguity
+				for(int from=0;from<nstates;from++){
+					siteL += prmat[(*Ldata)+nstates*from] * partial[from] * freqs[from];
+					}
+				partial += nstates;
+				Ldata++;
+				}
+				
+			else if(*Ldata == nstates){ //total ambiguity
+				for(int from=0;from<nstates;from++){
+					siteL += partial[from] * freqs[from];
+					}
+				partial += nstates;
+				Ldata++;
+				}
+			else{ //partial ambiguity
+				assert(0);
+				}
+
+			totallnL += (countit[i] * (log(siteL) - underflow_mult[i]));
+	#ifndef OUTPUT_SITELIKES
+			}
+	#else
+//			for(int q=0;q<countit[i];q++)
+				sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
+			}
+		sit.close();
+	#endif
+		}
+	else{
+
+		vector<FLOAT_TYPE> stateContrib(nstates);
+
+		for(int i=0;i<nchar;i++){
+			for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
+			if(*Ldata < nstates){ //no ambiguity
+				for(int rate=0;rate<nRateCats;rate++){
+					for(int from=0;from<nstates;from++){
+						stateContrib[from] += prmat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from] * rateProb[rate];
+						}
+					partial += nstates;
+					}
+				Ldata++;
+				}
+				
+			else if(*Ldata == nstates){ //total ambiguity
+				for(int rate=0;rate<nRateCats;rate++){
+					for(int from=0;from<nstates;from++){
+						stateContrib[from] += partial[from] * rateProb[rate];
+						}
+					partial += nstates;
+					}
+				Ldata++;
+				}
+
+			else{ //partial ambiguity
+				assert(0);
+				}
+
+			siteL = 0.0;
+			for(int from=0;from<nstates;from++)
+				siteL += stateContrib[from] * freqs[from];
+			totallnL += *countit++ * (log(siteL) - underflow_mult[i]);
+	#ifndef OUTPUT_SITELIKES
+			}
+	#else
+			for(int q=0;q<*(countit-1);q++)
+				sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
+			}
+		sit.close();
+	#endif
+		}
+
+
+	delete []freqs;
+	return totallnL;
+	}
+
+FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata){
+
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *partial=partialCLA->arr;
+	int *underflow_mult=partialCLA->underflow_mult;
+	const int nRateCats=mod->NRateCats();
+
 	int nchar=data->NChar();
 #ifdef UNIX
-	madvise(partial, nchar*16*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise(partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE siteL, totallnL=0.0;
@@ -3564,7 +4209,6 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	//gamma and invariants
 	const int *countit=data->GetCounts();
 	
-	const int nRateCats=mod->NRateCats();
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
 
 	int lastConst=data->LastConstant();
@@ -3574,6 +4218,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+
+#undef OUTPUT_SITELIKES
+
+#ifdef OUTPUT_SITELIKES
+	ofstream sit("sitelikes.log");
+#endif
 
 	for(int i=0;i<nchar;i++){
 		La=Lc=Lg=Lt=0.0;
@@ -3627,7 +4277,13 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 			siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
 
 		totallnL += (*countit++ * (log(siteL) - underflow_mult[i]));
+#ifndef OUTPUT_SITELIKES
 		}
+#else
+		sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
+		}
+	sit.close();
+#endif
 	return totallnL;
 	}
 	
@@ -3640,10 +4296,12 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	int *underflow_mult2=childCLA->underflow_mult;
 
 	int nchar=data->NChar();
+	const int nRateCats=mod->NRateCats();
+
 
 #ifdef UNIX
-	madvise(partial, nchar*16*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise(CL1, nchar*16*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise(partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise(CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE siteL, totallnL=0.0;
@@ -3652,7 +4310,6 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	//gamma and invariants
 	const int *countit=data->GetCounts();
 
-	const int nRateCats=mod->NRateCats();
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
 	FLOAT_TYPE prI=mod->PropInvar();
 	int lastConst=data->LastConstant();
@@ -3703,6 +4360,95 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	return totallnL;
 	}
 
+
+FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat){
+	//this function assumes that the pmat is arranged with nstates^2 entries for the
+	//first rate, followed by nstate^2 for the second, etc.
+	FLOAT_TYPE *CL1=childCLA->arr;
+	FLOAT_TYPE *partial=partialCLA->arr;
+	int *underflow_mult1=partialCLA->underflow_mult;
+	int *underflow_mult2=childCLA->underflow_mult;
+
+	int nchar=data->NChar();
+	const int *countit=data->GetCounts();
+	const int nRateCats = mod->NRateCats();
+	int nstates = mod->NStates();
+
+	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+
+#ifdef UNIX
+	madvise(partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise(CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE totallnL=0.0;
+
+	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
+	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
+
+#undef OUTPUT_SITELIKES
+
+#ifdef OUTPUT_SITELIKES
+	ofstream sit("sitelikes.log");
+#endif
+
+	if(nRateCats == 1){
+		for(int i=0;i<nchar;i++){
+			FLOAT_TYPE siteL = 0.0;
+			for(int from=0;from<nstates;from++){
+				FLOAT_TYPE temp = 0.0;
+				for(int to=0;to<nstates;to++){
+					temp += prmat[from*nstates + to]*CL1[to];
+					}
+				siteL += temp * partial[from] * freqs[from];
+				}
+			totallnL += (*countit++ * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
+			CL1 += nstates;
+			partial += nstates;
+#ifndef OUTPUT_SITELIKES
+			}
+#else
+//			for(int q=0;q<*(countit-1);q++)
+				sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
+			}
+		sit.close();
+#endif
+		}
+	else{//this is a lot nastier in the case of rate het, and I don't see a clean way to do it except by writing the
+		//likelihood contributions of the various states to a temp array, instead of keeping a running total
+		vector<FLOAT_TYPE> stateContrib(nstates);
+
+		for(int i=0;i<nchar;i++){
+			FLOAT_TYPE siteL = 0.0;
+			for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
+			for(int rate=0;rate<nRateCats;rate++){
+				for(int from=0;from<nstates;from++){
+					FLOAT_TYPE temp = 0.0;
+					for(int to=0;to<nstates;to++){
+						temp += prmat[rate*nstates*nstates + from*nstates + to]*CL1[to];
+						}
+					stateContrib[from] += temp * partial[from] * rateProb[rate];
+					}
+				CL1 += nstates;
+				partial += nstates;
+				}
+			siteL = 0.0;
+			for(int from=0;from<nstates;from++)
+				siteL += stateContrib[from] * freqs[from];
+			totallnL += (*countit++ * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
+#ifndef OUTPUT_SITELIKES
+			}
+#else
+			for(int q=0;q<*(countit-1);q++)
+				sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
+			}
+		sit.close();
+#endif
+		}
+
+	delete []freqs;
+	return totallnL;
+	}
 
 void Tree::LocalMove(){
 	assert(0);
@@ -4079,7 +4825,7 @@ void Tree::NNIMutate(int node, int branch, FLOAT_TYPE optPrecision, int subtreeN
 	OptimizeBranchesWithinRadius(connector, optPrecision, subtreeNode, NULL);
 	}
 
-
+/*
 void Tree::OutputBinaryFormattedTree(ofstream &out) const{
 	
 	for(int i=0;i<numNodesTotal;i++){
@@ -4092,21 +4838,19 @@ void Tree::OutputBinaryFormattedTree(ofstream &out) const{
 	out.write((char*) &numBranchesAdded, sizeof(numBranchesAdded));
 	out.write((char*) &numNodesTotal, sizeof(numNodesTotal));
 	}
+*/
 
-#ifdef BOINC
-void Tree::OutputBinaryFormattedTreeBOINC(MFILE &out) const{
-	
+void Tree::OutputBinaryFormattedTree(OUTPUT_CLASS &out) const{
 	for(int i=0;i<numNodesTotal;i++){
-		allNodes[i]->OutputBinaryNodeInfoBOINC(out);
+		allNodes[i]->OutputBinaryNodeInfo(out);
 		}
-	out.write((char*) &lnL, sizeof(FLOAT_TYPE), 1);
-	out.write((char*) &numTipsTotal, sizeof(numTipsTotal), 1);
-	out.write((char*) &numTipsAdded, sizeof(numTipsAdded), 1);
-	out.write((char*) &numNodesAdded, sizeof(numNodesAdded), 1);
-	out.write((char*) &numBranchesAdded, sizeof(numBranchesAdded), 1);
-	out.write((char*) &numNodesTotal, sizeof(numNodesTotal), 1);
+	out.WRITE_TO_FILE(&lnL, sizeof(FLOAT_TYPE), 1);
+	out.WRITE_TO_FILE(&numTipsTotal, sizeof(numTipsTotal), 1);
+	out.WRITE_TO_FILE(&numTipsAdded, sizeof(numTipsAdded), 1);
+	out.WRITE_TO_FILE(&numNodesAdded, sizeof(numNodesAdded), 1);
+	out.WRITE_TO_FILE(&numBranchesAdded, sizeof(numBranchesAdded), 1);
+	out.WRITE_TO_FILE(&numNodesTotal, sizeof(numNodesTotal), 1);
 	}
-#endif
 
 void Tree::ReadBinaryFormattedTree(FILE *in){
 	int dum;

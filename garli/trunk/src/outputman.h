@@ -30,6 +30,10 @@ class OutputManager{
 			if(log==true) logOut.close();
 			}
 
+		bool IsLogSet(){
+			return (log == true);
+			}
+
 		void SetOutputStream(ostream &out){
 			defaultOut=&out;
 			}
@@ -37,6 +41,11 @@ class OutputManager{
 		void SetLogFile(const char *logname){
 			log=true;
 			logOut.open(logname);
+			}
+		
+		void SetLogFileForAppend(const char *logname){
+			log=true;
+			logOut.open(logname, ios::app);
 			}
 
 		void CloseLogFile(){

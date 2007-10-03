@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -40,6 +40,7 @@ class HKYData;
 class ClaManager;
 class GeneralGamlConfig;
 class Model;
+class Individual;
 extern rng rnd;
 
 class Tree{
@@ -113,13 +114,13 @@ class Tree{
 		inline void SetBranchLength(TreeNode *nd, FLOAT_TYPE len);
 		bool IdenticalSubtreeTopology(const TreeNode *other);
 		bool IdenticalTopology(const TreeNode *other);
+		bool IdenticalTopologyAllowingRerooting(const TreeNode *other);
 		void RotateNodesAtRoot(TreeNode *newroot);
 		void RerootHere(int newroot);
 		void SwapNodeDataForReroot(TreeNode *nroot);
 		void CheckBalance();
 		void SwapAndFreeNodes(TreeNode *cop);
-		void OutputBinaryFormattedTree(ofstream &) const;
-		void OutputBinaryFormattedTreeBOINC(MFILE &) const;
+		void OutputBinaryFormattedTree(OUTPUT_CLASS &) const;
 		void ReadBinaryFormattedTree(FILE *);
 
 		//functions for copying trees
@@ -131,8 +132,11 @@ class Tree{
 
 		// mutation functions
 		int TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode);
+		void DeterministicSwapperByDist(Individual *source, double optPrecision, int range, bool furthestFirst);
+		void DeterministicSwapperByCut(Individual *source, double optPrecision, int range, bool furthestFirst);
+		void DeterministicSwapperRandom(Individual *source, double optPrecision, int range);
 		void GatherValidReconnectionNodes(int maxRange, TreeNode *cut, const TreeNode *subtreeNode);
-		void AssignWeightsToSwaps(TreeNode *cut);
+		bool AssignWeightsToSwaps(TreeNode *cut);
 		int SPRMutate(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, int subtreeNode);
 		int SPRMutateDummy(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, int subtreeNode);
 		void ReorientSubtreeSPRMutate(int oldRoot, ReconNode *newRoot, FLOAT_TYPE optPrecision);
@@ -170,7 +174,9 @@ class Tree{
 		bool ConditionalLikelihood(int direction, TreeNode* nd);	
 		int ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA=false);
 		FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata);
+		FLOAT_TYPE GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata);
 		FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat);
+		FLOAT_TYPE GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat);
 		int Score(int rootNodeNum =0);
 	
 		//functions to optimize blens and params
@@ -180,7 +186,9 @@ class Tree{
 		FLOAT_TYPE NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool goodGuess);
 #endif
 		void GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, const unsigned *ambigMap =NULL);
+		void GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, const unsigned *ambigMap =NULL);
 		void GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2);
+		void GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2);
 		void GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, char *equiv);
 		FLOAT_TYPE OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, bool goodGuess);
 		FLOAT_TYPE OptimizeAllBranches(FLOAT_TYPE optPrecision);
@@ -422,7 +430,8 @@ inline void Tree::ProtectClas(){
 
 inline void Tree::UnprotectClas(){
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		claMan->UnreserveCla(allNodes[i]->claIndexDown);
+		if(allNodes[i]->claIndexDown > -1)
+			claMan->UnreserveCla(allNodes[i]->claIndexDown);
 		}
 	}
 

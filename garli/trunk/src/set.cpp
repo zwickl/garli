@@ -26,6 +26,7 @@
 
 using namespace std;
 
+#include "defs.h"
 #include "set.h"
 
 DNASet& DNASet::operator|=( DNASet& b )

@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -273,9 +273,13 @@ private:
 	int subtreeDefNumber;
 
 	unsigned gen;
+	unsigned currentBootstrapRep;
+	int lastBootstrapSeed;
+	unsigned currentSearchRep;
 	//termination related variables
 	unsigned lastTopoImprove;
 	unsigned lastPrecisionReduction;
+	unsigned lastUniqueSwap;
 	
 	unsigned total_size; //this will be equal to conf->nindiv, except in 
 					//the case of the parallel master
@@ -316,12 +320,18 @@ private:
 	int stringSize;
 
 	bool prematureTermination;//if the user killed the run
-		
+	bool finishedRep;//when a single search replicate is finished (not a bootstrap rep)
+
 	vector<Tree *> unusedTrees;
+	//trees that are being stored for some reason, for example the
+	//best from a number of reps
+	vector<Individual *> storedTrees;
 
 	public:
 		enum { nomem=1, nofile, baddimen };
 		int error;
+	bool usedNCL;
+	bool startingTreesInNCL;
 
 	FLOAT_TYPE** cumfit;//allocated in setup, deleted in dest
 		
@@ -336,12 +346,13 @@ private:
 #endif
 
 	public:
-		Population() : error(0), conf(NULL),
-			bestFitness(-(FLT_MAX)), bestIndiv(0),
+		Population() : error(0), conf(NULL), usedNCL(false), startingTreesInNCL(false),
+			bestFitness(-(FLT_MAX)), bestIndiv(0), currentSearchRep(1), 
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			treeString(NULL), adap(NULL), fraction_done(ZERO_POINT_ZERO),
-			topologies(NULL), prematureTermination(false)
+			topologies(NULL), prematureTermination(false), currentBootstrapRep(0),
+			finishedRep(false), lastBootstrapSeed(0)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
 #endif
@@ -362,25 +373,30 @@ private:
 		void Run();
 #endif
 
-		int TimeToQuit();
-		void CatchInterrupt();
-		
+		//functions added for multiple replicate searches
+		void WriteStoredTrees( const char* treefname );
+		void OutputRepNums(ofstream &out);
+		void GetRepNums(string &s);
+		void PerformSearch();
+		int EvaluateStoredTrees(bool report);
+		void ClearStoredTrees();
+
 		char *TreeStructToNewick(int i);
 		char *MakeNewick(int, bool);
 		void CreateGnuPlotFile();
-		void WritePopulationCheckpoint(ofstream &out) ;
-		void WritePopulationCheckpointBOINC(MFILE &out) ;
+		void WritePopulationCheckpoint(OUTPUT_CLASS &out) ;
+
 		void ReadPopulationCheckpoint();
 		void WriteStateFiles();
-		void WriteStateFilesBOINC();
 		void ReadStateFiles();
 		void GetConstraints();
 		void WriteTreeFile( const char* treefname, int fst = -1, int lst = -1 );
 		void WritePhylipTree(ofstream &phytree);
 
 		void Setup(GeneralGamlConfig *conf, HKYData *, int nprocs = 1, int rank = 0);
+		void Reset();
 		int Restart(int type, int rank, int nprocs, int restart_count);
-		void SeedPopulationWithStartingTree();
+		void SeedPopulationWithStartingTree(int rep);//mult rep change
 		FLOAT_TYPE CalcAverageFitness();
 		void CalculateReproductionProbabilies(FLOAT_TYPE **scoreArray, FLOAT_TYPE selectionIntensity, int indivsInArray);
 		void NextGeneration();
@@ -389,6 +405,7 @@ private:
 		void PerformMutation(int indNum);
 		void UpdateFractionDone();
 		bool OutgroupRoot(int indnum);
+		void LoadNexusStartingTrees();
 
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );
@@ -453,11 +470,11 @@ private:
 		int prResizeCumFitArray(int);
 				
 	public:
-		void InitializeOutputStreams();
+		void InitializeOutputStreams(int rep);//mult rep change
 		void FinalizeOutputStreams();
 
 		void AppendTreeToTreeLog(int mutType, int indNum=-1);
-		void FinishBootstrapRep(int rep);
+		void FinishBootstrapRep(const Individual *ind, int rep);
 		void UpdateTreeModels();
 		
 		void OutputFate();
@@ -467,6 +484,10 @@ private:
 		void OutputModelAddresses();
 		void OutputClaReport(Individual *arr);
 		void OutputFilesForScoreDebugging(Individual *ind=NULL, int num=0);
+		void RunTests();
+		void ApplyNSwaps(int numSwaps);
+		void SwapToCompletion(FLOAT_TYPE optPrecision);
+		void CheckForIncompatibleConfigEntries();
 
 		void Bootstrap();
 		void AssignNewTopology(Individual *ind, int indNum);

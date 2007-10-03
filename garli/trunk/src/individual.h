@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -17,7 +17,6 @@
 #ifndef INDIVIDUAL_H
 #define INDIVIDUAL_H
 
-#include "memchk.h"
 #include "tree.h"
 #include "model.h"
 #include "hashdefines.h"
@@ -87,6 +86,7 @@ class Individual
 		int recombinewith;
 		int parent,topo;
 		Individual();
+		Individual(const Individual *other);
 		~Individual();
 
 		FLOAT_TYPE Fitness() const { return fitness; }
@@ -98,6 +98,7 @@ class Individual
 			dirty=false;
 			}
 		void GetStartingConditionsFromFile(const char *fname, int rank, int nTax, bool restart=false);
+		void GetStartingConditionsFromNCL(NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false);
 		void RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec);
 		void CalcFitness(int subtreeNode);
 		void ReadTreeFromFile(istream & inf);

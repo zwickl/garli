@@ -337,7 +337,7 @@ int RemoteMaster(GeneralGamlConfig& conf, HKYData& data)	{
 	g_gen = &pop.gen;
 
 	
-	//DEBUG for now all nodes will be SW
+	//for now all nodes will be SW
 	debug_mpi("doing remote subtree worker");
 	RemoteSubtreeWorker(pop, conf);
 	/*

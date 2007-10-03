@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -13,7 +13,6 @@
 //  email: zwickl@nescent.org
 //
 
-
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -23,21 +22,10 @@
 
 using namespace std;
 
+
 #include "defs.h"
 #include "configreader.h"
 #include "errorexception.h"
-
-#ifdef BOINC
-	#include "boinc_api.h"
-	#include "filesys.h"
-	#ifdef _WIN32
-		#include "boinc_win.h"
-	#else
-		#include "config.h"
-	#endif
-#endif
-
-using std::pair;
 
 int ConfigReader::UNKNOWN=0;
 int ConfigReader::SECTION=1;
@@ -65,7 +53,7 @@ int ConfigReader::Load(const char* filename)	{
 	file = fopen(filename, "r");
 #else
 	char input_path[512];
-    boinc_resolve_filename("garli.conf", input_path, sizeof(input_path));
+    boinc_resolve_filename(filename, input_path, sizeof(input_path));
     file = boinc_fopen(input_path, "r");
 #endif
 

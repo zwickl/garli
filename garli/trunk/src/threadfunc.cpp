@@ -20,9 +20,9 @@
 
 #ifdef MPI_VERSION
 
+#include "defs.h"
 #include "threaddcls.h"
 #include "mpifuncs.h"
-#include "defs.h"
 #include "individual.h"
 
 // local vars
@@ -54,7 +54,7 @@ void *thread_func2(void *varg)	{
 	int method = 0, nprocs = targs->nprocs;
 	
 	for(who=0;who<nprocs;who++){
-		//DEBUG make all remotes SubtreeWorkers
+		//make all remotes SubtreeWorkers
 		remote_types[who]=SW;
 		
 		/*if (conf->gc.method == "sm" || (conf->gc.method == "hybrid" && who <= (int) (conf->gc.hybridpercent*(nprocs -1))))
@@ -455,7 +455,6 @@ int DoMasterSW(char *buf, int size, int who, int tag, thread_arg_t *targ)	{
 		}
 #ifndef NDEBUG
 	if(paraMan->subtreeModeActive && paraMan->subtreeDefNumber==remoteSubtreeDef){
-        //DEBUG
         //if we think that this remote gave us a tree with accurate subtrees, check
         paraMan->CheckSubtreeAccuracy(pop->indiv[which[0]].treeStruct);
 		}

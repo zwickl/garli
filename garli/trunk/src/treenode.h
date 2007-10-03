@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -102,8 +102,7 @@ class TreeNode{
 			if(right) right->SetUnoptimized();
 			}
 		void SetEquivalentConditionalVectors(const HKYData *data);
-		void OutputBinaryNodeInfo(ofstream &out) const;
-		void OutputBinaryNodeInfoBOINC(MFILE &out) const;
+		void OutputBinaryNodeInfo(OUTPUT_CLASS &out) const;
 		     
 		//debugging functions for checking tree formation
 		void CheckforPolytomies();

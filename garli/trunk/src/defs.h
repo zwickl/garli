@@ -28,6 +28,11 @@
 	#define OMP_INTTERMCLA
 	#define OMP_TERMDERIV
 	#define OMP_INTDERIV
+	
+	#define OMP_INTINTCLA_NSTATE
+	#define OMP_INTTERMCLA_NSTATE
+	#undef OMP_TERMDERIV_NSTATE
+	#define OMP_INTDERIV_NSTATE
 #endif
 
 /*
@@ -38,6 +43,9 @@
 
 #undef OPT_DEBUG
 
+//#define MONITORING_ALLOCATION
+//#include "memchk.h"
+
 #define CONSTRAINTS
 #define STOCHASTIC_STARTING_BLENS
 #undef IGNORE_SMALL_TOPO_IMP
@@ -45,6 +53,7 @@
 #undef SUBTREE_VERSION
 #undef ENABLE_CUSTOM_PROFILER
 #undef SINGLE_PRECISION_FLOATS
+#undef SWAP_BASED_TERMINATION
 
 #undef OUTPUT_UNIQUE_TREES
 #undef VARIABLE_OPTIMIZATION
@@ -77,6 +86,22 @@
 
 #define MEM_DELETE_ARRAY(v)		{ delete [] v; v=NULL; }
 #define MEM_NEW_ARRAY(a,t,n)	{ a = new t[n]; }
+
+#ifdef BOINC
+	#define WRITE_TO_FILE(ptr, size, count) write((void *) ptr, (size_t) size, (size_t) count)
+	#define OUTPUT_CLASS MFILE
+
+	#include "boinc_api.h"
+	#include "filesys.h"
+	#ifdef _WIN32
+		#include "boinc_win.h"
+	#else
+		#include "config.h"
+	#endif
+#else
+	#define WRITE_TO_FILE(ptr, size, count) write((const char *) ptr, (streamsize) size*count)
+	#define OUTPUT_CLASS ofstream
+#endif
 
 //mpi message tags
 #ifdef MPI_VERSION

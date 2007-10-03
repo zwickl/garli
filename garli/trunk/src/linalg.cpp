@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -30,9 +30,9 @@
 
 using namespace std;
 
+#include "defs.h"
 #include "linalg.h"
 #include "jph.h"
-#include "memchk.h"
 
 static void     LUBackSubst (FLOAT_TYPE **a, int n, int *indx, FLOAT_TYPE *b);
 static int      EigenRG (int n, FLOAT_TYPE **a, FLOAT_TYPE *wr, FLOAT_TYPE *wi, FLOAT_TYPE **z, int *iv1, FLOAT_TYPE *fv1);

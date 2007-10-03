@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -23,8 +23,10 @@
 #include <math.h>
 using namespace std;
 
-#include "stricl.h"
+#include "ncl.h"
 #include "errorexception.h"
+
+class GarliReader;
 
 typedef FLOAT_TYPE** DblPtrPtr;
 #define MAX_STATES (8*sizeof(unsigned char))
@@ -39,8 +41,8 @@ typedef FLOAT_TYPE** DblPtrPtr;
 #endif
 
 // Note: the class below has pure virtual member functions
-class DataMatrix
-{
+class DataMatrix{
+protected:
 	int		nTax;
 	int		nChar;     //after compression
 	int		totalNChar; //columns in matrix, with all missing columns removed
@@ -73,8 +75,8 @@ class DataMatrix
 
 	protected:
 		char	info[80];
-		void	SwapCharacters( int i, int j );
-		int	ComparePatterns( const int i, const int j ) const;
+		virtual void	SwapCharacters( int i, int j );
+		virtual int	ComparePatterns( const int i, const int j ) const;
 		void	BSort( int byCounts = 0 );
 		void	DebugSaveQSortState( int top, int bottom, int ii, int jj, int xx, const char* title );
 		void	QSort( int top, int bottom );
@@ -130,7 +132,7 @@ class DataMatrix
 			{ return ( numStates && (j < nChar) ? numStates[j] : 0 ); }
 
 		FLOAT_TYPE prNumStates( int n ) const;
-
+		virtual void SetAminoAcid() {maxNumStates = 20;}
 		// functions for quizzing dmFlags
 		int InvarCharsExpected() { return !(dmFlags & allvariable); }
 		int VariableNumStates() { return (dmFlags & vnstates); }
@@ -138,9 +140,9 @@ class DataMatrix
 
 		// functions for getting the data in and out
 		int GetToken( istream& in, char* tokenbuf, int maxlen, bool acceptComments=true );
-		int GetTokenBOINC( FILE *in, char* tokenbuf, int maxlen);
-		int Read( const char* filename, char* left_margin = 0 );
-		int ReadBOINC(const char* filename);
+		int GetToken( FILE *in, char* tokenbuf, int maxlen);
+		int ReadPhylip( const char* filename);
+		int ReadFasta( const char* filename);
 		int Save( const char* filename, char* newfname = 0, char* nxsfname = 0 );
 
 		char*	DataType() { return info; }
@@ -149,7 +151,7 @@ class DataMatrix
 		int NTax() const { return nTax; }
 		void SetNTax(int ntax) { nTax = ntax; }
 
-		int NChar() const { return nChar; }
+		virtual int NChar() const { return nChar; }
 		int TotalNChar() const { return totalNChar; }
 		int GapsIncludedNChar() const { return gapsIncludedNChar; }
 		void SetNChar(int nchar) { nChar = nchar; }
@@ -160,9 +162,9 @@ class DataMatrix
 		int Number(int j) const
 			{ return ( number && (j < totalNChar) ? number[j] : 0 ); }
 
-		int Count(int j) const
+		virtual int Count(int j) const
 			{ return ( count && (j < nChar) ? count[j] : 0 ); }
-		const int *GetCounts() const {return count;}
+		virtual const int *GetCounts() const {return count;}
 		const int *GetConstBases() const {return constBases;}
 		void SetCount(int j, int c)
 			{ if( count && (j < nChar) ) count[j] = c; }
@@ -177,18 +179,19 @@ class DataMatrix
 		
 		int TaxonNameToNumber(const NxsString &name) const{
 			for(int i=0;i<nTax;i++){
-				if(Strcmp(name, TaxonLabel(i)) == 0) return i+1;//indeces run 0->ntax-1, taxon numbers 1->ntax
+				if(strcmp(name.c_str(), TaxonLabel(i)) == 0) return i+1;//indeces run 0->ntax-1, taxon numbers 1->ntax
 				}
 			return -1;
 			}
 		
-		void BeginNexusTreesBlock(ofstream &treeout);
+		void BeginNexusTreesBlock(ofstream &treeout) const;
+		void CreateMatrixFromNCL(GarliReader &reader);
 		
 		// added 3/20/1998 in order to implement the Muse and Gaut codon model
 //		virtual int NCodons() { return 0; }
 //		virtual unsigned char CodonState( int i, int j ) { return (unsigned char)0; }
 		
-		unsigned char Matrix( int i, int j ) const {
+		virtual unsigned char Matrix( int i, int j ) const {
 //			assert( matrix );
 //			assert( i >= 0 );
 //			assert( i < nTax );
@@ -203,7 +206,7 @@ class DataMatrix
 			assert( i < nTax );
 			return matrix[i];
 		}
-		void SetMatrix( int i, int j, unsigned char c )
+		virtual void SetMatrix( int i, int j, unsigned char c )
 			{ if( matrix && (i < nTax) && (j < nChar) ) matrix[i][j] = c; }
 
 		int MatrixExists() const { return ( matrix && nTax>0 && nChar>0 ? 1 : 0 ); }
@@ -216,12 +219,12 @@ class DataMatrix
 
 		void Sort( int byCounts = 0 ){
 			byCounts;
-			QSort( 0, nChar-1 );
+			QSort( 0, NChar()-1 );
 			}
-		int PatternType( int , int*, unsigned char *) const;	// returns PT_XXXX constant indicating type of pattern
+		virtual int PatternType( int , int*, unsigned char *) const;	// returns PT_XXXX constant indicating type of pattern
 		void Summarize();       // fills in nConstant, nInformative, and nAutapomorphic data members
-		void Collapse();
-		void Pack();
+		virtual void Collapse();
+		virtual void Pack();
 		void NewMatrix(int nt, int nc);	// flushes old matrix, creates new one
 		int PositionOf( char* s ) const; // returns pos (0..nTax-1) of taxon named s
 		void AllocPr( DblPtrPtr& pr );
@@ -235,6 +238,7 @@ class DataMatrix
 		bool operator==(const DataMatrix& rhs) const; // cjb - to test serialization
 		void ExplicitDestructor();  // cjb - totally clear the DataMatrix and revert it to its original state as if it was just constructed
 		void CheckForIdenticalTaxonNames();
+		virtual char CharToAminoAcidNumber(unsigned char d);
 	public:	// exception classes
 #if defined( CPLUSPLUS_EXCEPTIONS )
 		class XBadState {
@@ -264,12 +268,13 @@ class DataMatrix
       			}
       		}
       void RestoreOriginalCounts(){
+			if(origCounts==NULL) return;
       		for(int i=0;i<nChar;i++){
       			count[i]=origCounts[i];
       			}
       		}
       void Reweight(FLOAT_TYPE prob);
-      void BootstrapReweight();
+      void BootstrapReweight(int seed);
       
 #endif
 };
@@ -530,11 +535,61 @@ inline unsigned char DNAData::CharToBitwiseRepresentation( char ch )
        	case 'n' : datum=15; break;
        	case '-' : datum=15; break;
   		case '?' : datum=15; break;
-       	default  : throw ErrorException("ERROR: Unknown character!", ch);
+       	default  : throw ErrorException("Unknown nucleotide %c!", ch);
 		}
 	return datum;
 }
 
+
+inline char DataMatrix::CharToAminoAcidNumber(unsigned char d){
+	char ch = 20;
+	switch(d){
+		case'A'	: ch=	0	;break;
+		case'C' : ch=	1	;break;
+		case'D' : ch=	2	;break;
+		case'E' : ch=	3	;break;
+		case'F' : ch=	4	;break;
+		case'G' : ch=	5	;break;
+		case'H' : ch=	6	;break;
+		case'I' : ch=	7	;break;
+		case'K' : ch=	8	;break;
+		case'L' : ch=	9	;break;
+		case'M' : ch=	10	;break;
+		case'N' : ch=	11	;break;
+		case'P' : ch=	12	;break;
+		case'Q' : ch=	13	;break;
+		case'R' : ch=	14	;break;
+		case'S' : ch=	15	;break;
+		case'T' : ch=	16	;break;
+		case'V'	: ch=	17	;break;
+		case'W'	: ch=	18	;break;
+		case'Y' : ch=	19	;break;
+		case'-'	: ch=   20  ;break;
+		case'?'	: ch=   20  ;break;
+		case'a'	: ch=	0	;break;
+		case'c' : ch=	1	;break;
+		case'd' : ch=	2	;break;
+		case'e' : ch=	3	;break;
+		case'f' : ch=	4	;break;
+		case'g' : ch=	5	;break;
+		case'h' : ch=	6	;break;
+		case'i' : ch=	7	;break;
+		case'k' : ch=	8	;break;
+		case'l' : ch=	9	;break;
+		case'm' : ch=	10	;break;
+		case'n' : ch=	11	;break;
+		case'p' : ch=	12	;break;
+		case'q' : ch=	13	;break;
+		case'r' : ch=	14	;break;
+		case's' : ch=	15	;break;
+		case't' : ch=	16	;break;
+		case'v'	: ch=	17	;break;
+		case'w'	: ch=	18	;break;
+		case'y' : ch=	19	;break;
+		default : throw ErrorException("Unknown Amino Acid %c!", ch);
+		}
+	return ch;
+	}
 
 inline char DNAData::DatumToChar( unsigned char d )
 {

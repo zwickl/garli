@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -13,11 +13,9 @@
 //  email: zwickl@nescent.org
 //
 
-
-
+#include "defs.h"
 #include "topologylist.h"
 #include "individual.h"
-
 
 long TopologyList::ntoposexamined(0);
 Individual *TopologyList::listOfInd(0L);

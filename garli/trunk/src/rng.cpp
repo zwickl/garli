@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -18,6 +18,7 @@
 #include <iostream>
 using namespace std;
 
+#include "defs.h"
 #include "rng.h"
 rng rnd;
 

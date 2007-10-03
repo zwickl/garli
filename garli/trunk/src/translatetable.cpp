@@ -1,4 +1,4 @@
-// GARLI version 0.952b2 source code
+// GARLI version 0.96b4 source code
 // Copyright  2005-2006 by Derrick J. Zwickl
 // All rights reserved.
 //
@@ -13,11 +13,11 @@
 //  email: zwickl@nescent.org
 //
 
-
+#include "defs.h"
 #include "translatetable.h"
 #include "datamatr.h"
 #include "mlhky.h"
-#include "defs.h"
+
 
 void TranslateTable::SetTaxonName( int i, char* s )
 {
