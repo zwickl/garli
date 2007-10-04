@@ -118,7 +118,7 @@ class Adaptation{
 			//changing this to a linear reduction in prec.  Geometric was too fast
 			//branchOptPrecision*=precReductionFactor;
 			branchOptPrecision -= precReductionFactor;
-			if((branchOptPrecision - precReductionFactor) < minOptPrecision) branchOptPrecision=minOptPrecision;
+			if((branchOptPrecision < minOptPrecision) || (branchOptPrecision - minOptPrecision) < (precReductionFactor / 2.0)) branchOptPrecision=minOptPrecision;
 			return true;
 			}
 		else return false;
