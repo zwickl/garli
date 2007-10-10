@@ -32,7 +32,7 @@ using namespace std;
 
 extern ModelSpecification modSpec;
 
-#define MAX_TAXON_LABEL		80
+#define MAX_TAXON_LABEL		100
 
 extern rng rnd;
 extern OutputManager outman;
@@ -72,7 +72,9 @@ void DataMatrix::ReplaceTaxonLabel( int i, const char* s )
 	if( taxonLabel[i] ) {
 		MEM_DELETE_ARRAY(taxonLabel[i]); // taxonLabel[i] is of length strlen(taxonLabel[i])+1
 	}
-	MEM_NEW_ARRAY(taxonLabel[i],char,(strlen(s)+1));
+	int newLength = (strlen(s)+1);
+	if(newLength > MAX_TAXON_LABEL) throw ErrorException("Sorry, taxon name %s for taxon #%d is too long (max length=%d)", s, i+1, MAX_TAXON_LABEL);
+	MEM_NEW_ARRAY(taxonLabel[i],char,newLength);
 	strcpy(taxonLabel[i], s);
 }
 

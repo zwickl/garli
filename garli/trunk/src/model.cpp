@@ -1937,7 +1937,7 @@ void Model::CreateModelFromSpecification(){
 	else *propInvar=ZERO_POINT_ZERO;
 
 	if(NRateCats() > 1){
-		assert(modSpec.IsNucleotide() || modSpec.IsAminoAcid());
+		//assert(modSpec.IsNucleotide() || modSpec.IsAminoAcid());
 		alpha = new FLOAT_TYPE;
 		*alpha = ZERO_POINT_FIVE;
 		

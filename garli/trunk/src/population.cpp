@@ -2378,7 +2378,7 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 #endif
 
 	string str;
-	char temp[50];
+	char temp[101];//the max taxon name is 100 (defined as MAX_TAXON_LABEL in datamatr.cpp)
 	str = "#nexus\n\n";
 
 	int ntaxa = data->NTax();
