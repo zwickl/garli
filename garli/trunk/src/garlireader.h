@@ -138,7 +138,6 @@ class GarliReader
 
 	public:
 		int				HandleExecute(const char *filename);
-
 		};
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -172,15 +171,6 @@ inline void GarliReader::ExecuteStopping()
 	{
 	}
 
-/*----------------------------------------------------------------------------------------------------------------------
-|	Called if an "output comment" is encountered in a NEXUS data file. An output comment is a comment [text enclosed in
-|	square brackets] that begins with an exclamation point. [!This is an example of a NEXUS output comment]. Output
-|	comments are supposed to be displayed when encountered. Modify this function's body to display output comments, 
-|	which are made available as they are encountered via the `msg' argument.
-*/
-inline void	GarliReader::OutputComment(const NxsString &)
-	{
-	}
 
 #endif
 

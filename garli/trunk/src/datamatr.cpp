@@ -500,6 +500,8 @@ void DataMatrix::CreateMatrixFromNCL(GarliReader &reader){
 	int numActiveTaxa = charblock->GetNumActiveTaxa();
 	int numOrigChar = charblock->GetNChar();
 	int numActiveChar = charblock->GetNumActiveChar();
+
+	if(numActiveChar == 0) throw ErrorException("NCL did not read any active characters in the datafile");
 	//int num_chars = reducedToOrigCharMap.size();
 	//cout << num_chars << endl;
 

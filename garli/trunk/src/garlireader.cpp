@@ -20,9 +20,13 @@
 #include "defs.h"
 #include "ncl.h"
 #include "garlireader.h"
+#include "outputman.h"
+#include "errorexception.h"
 #include <sstream>
 
 int GARLI_main( int argc, char* argv[] );
+
+extern OutputManager outman;
 
 /*----------------------------------------------------------------------------------------------------------------------
 |	The constructor simply passes along `i' to the base class constructor. Nothing else needs to be done.
@@ -35,13 +39,12 @@ MyNexusToken::MyNexusToken(
 
 /*----------------------------------------------------------------------------------------------------------------------
 |	Overrides the NxsToken::OutputComment virtual function (which does nothing) to display output comments [!comments
-|	like this one beginning with an exclamation point]. The output comment contained in `msg' is simply sent to the
-|	standard output stream cout.
+|	like this one beginning with an exclamation point]. The output comment is passed through the OutputManager
 */
 void MyNexusToken::OutputComment(
   const NxsString &msg)	/* the output comment to be displayed */
 	{
-	cout << msg << endl;
+	outman.UserMessage("\ncomment found in NEXUS file: %s", msg.c_str());
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -106,7 +109,7 @@ bool GarliReader::EnteringBlock(
 	message = "Reading ";
 	message += blockName;
 	message += " block...";
-	PrintMessage();
+	PrintMessage(false);
 
 	return true;
 	}
@@ -118,6 +121,8 @@ bool GarliReader::EnteringBlock(
 void GarliReader::ExitingBlock(
   NxsString )	/* the name of the block just exited */
 	{
+	//message to indicate that we sucessfully read whatever block this was
+	outman.UserMessage("successful");
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -254,6 +259,7 @@ void GarliReader::HandleEndblock(
 /*----------------------------------------------------------------------------------------------------------------------
 |	Handles everything after the EXECUTE keyword and the terminating semicolon. Purges all blocks before executing 
 |	file specified, and no warning is given of this.
+| DJZ THIS IS NOT THE VERSION OF HandleExecute USED.  See the other overloaded version below.
 */
 void GarliReader::HandleExecute(
   NxsToken &token)	/* the token used to read from `in' */
@@ -300,13 +306,10 @@ void GarliReader::HandleExecute(
 
 		try
 			{
-			cout << "about to exec" << endl;
 			Execute(ftoken);
-			cout << "returned from execute" << endl;
 			}
 		catch(NxsException x)
 			{
-			cout << "in catch" << endl;
 			NexusError(errormsg, x.pos, x.line, x.col);
 			}
 
@@ -331,10 +334,9 @@ void GarliReader::HandleExecute(
 		}
 	}
 
-int GarliReader::HandleExecute(const char *filename)	/* the token used to read from `in' */
+int GarliReader::HandleExecute(const char *filename)	
 	{
-	// Get the file name to execute (note: if filename contains underscores, these will be
-	// automatically converted to spaces; user should surround such filenames with single quotes)
+	// The filename to execute is passed in
 	//
 
 	NxsString fn = filename;
@@ -342,9 +344,6 @@ int GarliReader::HandleExecute(const char *filename)	/* the token used to read f
 
 	if (FileExists(fn.c_str()))
 		{
-		cerr << endl;
-		cerr << "Opening " << fn << "..." << endl;
-
 		PurgeBlocks();
 
 		ifstream inf(fn.c_str(), ios::binary | ios::in);
@@ -377,8 +376,7 @@ int GarliReader::HandleExecute(const char *filename)	/* the token used to read f
 
 	else
 		{
-		cerr << endl;
-		cerr << "Oops! Could not find specified file: " << fn << endl;
+		outman.UserMessage("Sorry, could not find specified file: %s", fn.c_str());
 		ret = 1;
 		}
 	return ret;
@@ -686,7 +684,7 @@ void GarliReader::NexusError(
 	message += msg;
 	PrintMessage();
 
-	if (inf_open)
+	if (1)
 		{
 		message = "Line:   ";
 		message += line;
@@ -696,6 +694,7 @@ void GarliReader::NexusError(
 		message += col;
 		PrintMessage();
 		}
+	throw ErrorException("NCL encountered a problem reading the dataset.");
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -746,11 +745,16 @@ void GarliReader::PreprocessNextCommand()
 |	All output is funneled through here. Writes string currently stored in `message' (a NxsString data member) to the 
 |	output file stream, if open, and also to the console via cerr. Places a newline after the string if `linefeed' is 
 |	true.
+|	DJZ - funneling all messages through my OutputManager, which already outputs to the screen and a log file
 */
 void GarliReader::PrintMessage(
   bool linefeed)	/* if true, places newline character after message */
 	{
-	cerr << message;
+	if(linefeed)
+		outman.UserMessage("%s", message.c_str());
+	else 
+		outman.UserMessageNoCR("%s", message.c_str());
+/*	cerr << message;
 	if (linefeed)
 		cerr << endl;
 
@@ -760,6 +764,7 @@ void GarliReader::PrintMessage(
 		if (linefeed)
 			logf << endl;
 		}
+*/	
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -908,6 +913,7 @@ void GarliReader::Report(
 |	Runs the command line interpreter, allowing GarliReader to interact with user. Typically, this is the only 
 |	function called in main after a GarliReader object is created. If `infile_name' is non-NULL, the first command 
 |	executed by the command interpreter will be "EXECUTE `infile_name'".
+|  DJZ - not currently used, since I'm just using NCL to parse the datafile
 */
 void GarliReader::Run(
   char *infile_name)	/* the name of the NEXUS data file to execute (can be NULL) */
@@ -1067,31 +1073,17 @@ bool GarliReader::UserQuery(
 
 	return yep;
 	}
-/*
-int main(int argc, char *argv[])
-	{
-	char* infile_name = NULL;
 
-	if (argc > 2)
-		{
-		cerr << "Sorry, this program can accept at most one command" << endl;
-		cerr << "line argument, which must be the name of a NEXUS" << endl;
-		cerr << "data file." << endl;
-		cerr << endl;
-		exit(0);
-		}
-
-	else if (argc > 1)
-		{
-		infile_name = argv[1];
-		}
-
-	GarliReader & reader = GarliReader::GetInstance();
-	reader.Run(infile_name);
-
-	return 0;
-	}
+/*----------------------------------------------------------------------------------------------------------------------
+|	Called if an "output comment" is encountered in a NEXUS data file. An output comment is a comment [text enclosed in
+|	square brackets] that begins with an exclamation point. [!This is an example of a NEXUS output comment]. Output
+|	comments are supposed to be displayed when encountered. Modify this function's body to display output comments, 
+|	which are made available as they are encountered via the `msg' argument.
 */
+inline void	GarliReader::OutputComment(const NxsString &msg)
+	{
+		outman.UserMessage("\ncomment found in NEXUS file: %s", msg.c_str());
+	}
 
 GarliReader & GarliReader::GetInstance()
 	{

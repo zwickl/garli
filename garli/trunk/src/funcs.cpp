@@ -221,14 +221,15 @@ bool ReadData(const char* filename, HKYData* data)	{
 		static_cast<CodonData*>(data)->FillCodonMatrix(true);
 		}
 
-	// report summary statistics about data
+	// report summary statistics about the data
 	data->Summarize();
-
-	outman.UserMessage(" %d constant characters.", data->NConstant());
-	outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
-	outman.UserMessage(" %d autapomorphic characters.", data->NAutapomorphic());
-	int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
-	outman.UserMessage(" %d total characters.", total);
+	outman.UserMessage("\nData summary:");
+	outman.UserMessage(" %d taxa", data->NTax());
+	outman.UserMessage(" %d total characters.", data->NChar());
+	outman.UserMessage("   %d constant characters.", data->NConstant());
+	outman.UserMessage("   %d parsimony-informative characters.", data->NInformative());
+	outman.UserMessage("   %d autapomorphic characters.", data->NAutapomorphic());
+	//int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
 	outman.flush();
 
 	//if(modSpec.IsNucleotide()){
