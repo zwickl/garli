@@ -716,6 +716,11 @@ void ElTran (int n, int low, int high, FLOAT_TYPE **a, int *intchg, FLOAT_TYPE *
 |	Calls CDiv for complex division.
 */
 
+//DJZ - Intel compiler 10.0 -O2 optimization breaks this function
+//so this pragma reduces the optimization level
+#if (defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 1000)
+#pragma intel optimization_level 1
+#endif
 int Hqr2 (int n, int low, int high, FLOAT_TYPE **h, FLOAT_TYPE *wr, FLOAT_TYPE *wi, FLOAT_TYPE **z)
 
 {
