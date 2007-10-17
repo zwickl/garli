@@ -483,7 +483,7 @@ void Individual::GetStartingConditionsFromNCL(NxsTreesBlock *treesblock, int ran
 	treeStruct->AssignCLAsFromMaster();
 
 	if(restart == false){
-			outman.UserMessage("Got starting tree %d from NCL)", effectiveRank+1);
+			outman.UserMessage("Got starting tree %d from NCL", effectiveRank+1);
 
 //		if(foundModel==true) outman.UserMessage("Obtained starting model from file %s:", fname);
 				

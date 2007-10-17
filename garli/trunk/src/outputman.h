@@ -87,6 +87,14 @@ class OutputManager{
 			PrintNoCR(*defaultOut);
 			}
 
+		void UserMessage(const string &mess){
+			Print(*defaultOut, mess);
+			}
+
+		void UserMessageNoCR(const string &mess){
+			PrintNoCR(*defaultOut, mess);
+			}
+
 		void flush(){
 			if(noOutput == false) defaultOut->flush();
 			if(log==true) logOut.flush();	
@@ -100,6 +108,16 @@ class OutputManager{
 		void PrintNoCR(ostream &out){
 			if(noOutput == false) out << message;
 			if(log==true) logOut << message;
+			}
+
+		void Print(ostream &out, const string &mess){
+			if(noOutput == false) out << mess << endl;
+			if(log==true) logOut << mess << endl;
+			}
+
+		void PrintNoCR(ostream &out, const string &mess){
+			if(noOutput == false) out << mess;
+			if(log==true) logOut << mess;
 			}
 	};
 	

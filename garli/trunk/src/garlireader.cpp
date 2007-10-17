@@ -44,7 +44,8 @@ MyNexusToken::MyNexusToken(
 void MyNexusToken::OutputComment(
   const NxsString &msg)	/* the output comment to be displayed */
 	{
-	outman.UserMessage("\ncomment found in NEXUS file: %s", msg.c_str());
+	outman.UserMessage("\nCOMMENT FOUND IN NEXUS FILE (output verbatim):");
+	outman.UserMessage(msg);
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -122,7 +123,8 @@ void GarliReader::ExitingBlock(
   NxsString )	/* the name of the block just exited */
 	{
 	//message to indicate that we sucessfully read whatever block this was
-	outman.UserMessage("successful");
+	string mess = "successful";
+	outman.UserMessage(mess);
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -751,9 +753,9 @@ void GarliReader::PrintMessage(
   bool linefeed)	/* if true, places newline character after message */
 	{
 	if(linefeed)
-		outman.UserMessage("%s", message.c_str());
+		outman.UserMessage(message);
 	else 
-		outman.UserMessageNoCR("%s", message.c_str());
+		outman.UserMessageNoCR(message);
 /*	cerr << message;
 	if (linefeed)
 		cerr << endl;
@@ -1082,7 +1084,8 @@ bool GarliReader::UserQuery(
 */
 inline void	GarliReader::OutputComment(const NxsString &msg)
 	{
-		outman.UserMessage("\ncomment found in NEXUS file: %s", msg.c_str());
+	outman.UserMessage("\nCOMMENT FOUND IN NEXUS FILE (output verbatim):");
+	outman.UserMessage(msg);
 	}
 
 GarliReader & GarliReader::GetInstance()
