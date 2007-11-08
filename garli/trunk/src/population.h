@@ -333,6 +333,36 @@ private:
 	bool usedNCL;
 	bool startingTreesInNCL;
 
+	enum output_details {
+		DONT_OUTPUT = 0,
+		REPLACE = 1,
+		APPEND = 2,
+		NEWNAME = 4,
+
+		WRITE_CONTINUOUS = 8,
+		WRITE_REP_TERM = 16,
+		WRITE_REPSET_TERM = 32,
+		WRITE_PREMATURE = 64,
+		
+		FINALIZE_REP_TERM = 128,
+		FINALIZE_REPSET_TERM = 256,
+		FINALIZE_FULL_TERM = 512,
+		FINALIZE_PREMATURE = 1024,
+		
+		WARN_PREMATURE = 2048,
+		NEWNAME_PER_REP = 4096
+		};
+	
+	output_details screen_output;
+	output_details log_output;
+	output_details best_output;
+	output_details all_best_output;
+	output_details treelog_output;
+	output_details fate_output;
+	output_details problog_output;
+	output_details swaplog_output;
+	output_details bootlog_output;
+
 	FLOAT_TYPE** cumfit;//allocated in setup, deleted in dest
 		
 	TopologyList **topologies;//allocated in Setup(), deleted in dest
@@ -372,6 +402,8 @@ private:
 #if !defined( PARALLEL_MPI_VERSION )
 		void Run();
 #endif
+		void SetOutputDetails();
+		void DetermineFilename(output_details details, char *outname, string suffix);
 
 		//functions added for multiple replicate searches
 		void WriteStoredTrees( const char* treefname );
@@ -390,7 +422,7 @@ private:
 		void WriteStateFiles();
 		void ReadStateFiles();
 		void GetConstraints();
-		void WriteTreeFile( const char* treefname, int fst = -1, int lst = -1 );
+		void WriteTreeFile( const char* treefname, int indnum = -1);
 		void WritePhylipTree(ofstream &phytree);
 
 		void Setup(GeneralGamlConfig *conf, HKYData *, int nprocs = 1, int rank = 0);
@@ -404,7 +436,7 @@ private:
 		void FindTreeStructsForNextGeneration();
 		void PerformMutation(int indNum);
 		void UpdateFractionDone();
-		bool OutgroupRoot(int indnum);
+		bool OutgroupRoot(Individual *ind, int indnum);
 		void LoadNexusStartingTrees();
 
 		int IsError() const { return error; }
@@ -470,8 +502,8 @@ private:
 		int prResizeCumFitArray(int);
 				
 	public:
-		void InitializeOutputStreams(int rep);//mult rep change
-		void FinalizeOutputStreams();
+		void InitializeOutputStreams();
+		void FinalizeOutputStreams(int type);
 
 		void AppendTreeToTreeLog(int mutType, int indNum=-1);
 		void FinishBootstrapRep(const Individual *ind, int rep);

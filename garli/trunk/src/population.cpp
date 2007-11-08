@@ -341,11 +341,10 @@ void Population::ErrorMsg( char* msgstr, int len )
 }
 
 void Population::CheckForIncompatibleConfigEntries(){
-	//DEBUG
-//	if(conf->checkpoint && (modSpec.IsNucleotide() == false))
-//		throw ErrorException("Sorry, checkpointing not yet implemented for non-nucleotide models");
+
 	if(conf->inferInternalStateProbs && (modSpec.IsNucleotide() == false))
 		throw ErrorException("Sorry, internal state reconstruction not yet implemented for non-nucleotide models");
+	if(conf->inferInternalStateProbs == true) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
 	}
 
 void Population::Setup(GeneralGamlConfig *c, HKYData *d, int nprocs, int r){
@@ -523,6 +522,8 @@ void Population::Reset(){
 	if(adap != NULL) delete adap;
 	adap=new Adaptation(conf);
 	lastTopoImprove = lastPrecisionReduction = gen = 0;
+	//conf->restart indicates whether the current rep was restarted, so if we complete one rep and then
+	//move on to another it should be false
 	conf->restart = false;
 	finishedRep = false;
 	bestFitness = prevBestFitness = -(DBL_MAX);
@@ -571,7 +572,7 @@ void Population::ApplyNSwaps(int numSwaps){
 
 void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
 	SeedPopulationWithStartingTree(currentSearchRep);
-	InitializeOutputStreams(1);
+	InitializeOutputStreams();
 
 	if(conf->runmode == 2)
 		indiv[0].treeStruct->DeterministicSwapperByDist(&indiv[0], optPrecision, conf->limSPRrange, false);
@@ -942,7 +943,7 @@ void Population::ReadStateFiles(){
 	in = boinc_fopen(physical_name, "rb");
 
 #else
-	if(FileExists(name) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", name));
+	if(FileExists(name) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe checkpoint files were moved/deleted or the ofprefix setting\nin the config file was changed.", name));
 	in = fopen(name, "rb");
 #endif
 	adap->ReadFromCheckpoint(in);
@@ -1018,8 +1019,6 @@ void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 
 
 void Population::ReadPopulationCheckpoint(){
-	//we'll just have a single line for each indiv, with the 
-	//model followed by the parenthetical tree
 	char str[100];
 	sprintf(str, "%s.pop.check", conf->ofprefix.c_str());
 	if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
@@ -1051,9 +1050,10 @@ void Population::ReadPopulationCheckpoint(){
 	//if were restarting a bootstrap run we need to change to the bootstrapped data
 	//now, so that scoring below is correct
 	if(conf->bootstrapReps > 0){
-		data->ReserveOriginalCounts();
 		data->BootstrapReweight(lastBootstrapSeed);
 		}
+
+	if(gen == UINT_MAX) finishedRep = true;
 
 	for(unsigned i=0;i<total_size;i++){
 		indiv[i].mod->SetDefaultModelParameters(data);
@@ -1069,7 +1069,7 @@ void Population::ReadPopulationCheckpoint(){
 
 	//if we are doing multiple reps, there should have been one tree per completed rep written to file
 	//remember that currentSearchRep starts at 1
-	for(int i=1;i<currentSearchRep;i++){
+	for(int i=1;i<(finishedRep == false ? currentSearchRep : currentSearchRep+1);i++){
 		Individual *ind = new Individual;
 		ind->mod->SetDefaultModelParameters(data);
 		ind->mod->ReadBinaryFormattedModel(pin);
@@ -1085,7 +1085,8 @@ void Population::ReadPopulationCheckpoint(){
 
 	//as far as the TopologyList is concerned, each individual will be considered different
 	ntopos = total_size;
-	assert(fabs(bestFitness - indiv[bestIndiv].Fitness()) < 0.01);
+	if(fabs(bestFitness - indiv[bestIndiv].Fitness()) > 0.01)
+		throw ErrorException("Problem reading checkpoint files.  Scores of stored trees don't match calculated scores.");
 	CalcAverageFitness();
 	globalBest = bestFitness;
 	}
@@ -1142,7 +1143,8 @@ void Population::Run(){
 		if(conf->outputMostlyUselessFiles) OutputFate();		 
 		if(!(gen % conf->logevery)) OutputLog();
 		if(!(gen % conf->saveevery)){
-			if(conf->bootstrapReps==0) WriteTreeFile( besttreefile.c_str() );
+			if(best_output & WRITE_CONTINUOUS)
+				WriteTreeFile( besttreefile.c_str() );
 
 #ifdef SWAP_BASED_TERMINATION
 			outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove, indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
@@ -1260,15 +1262,9 @@ void Population::Run(){
 	FinalOptimization();
 	gen = UINT_MAX;
 	OutputLog();
-	if(conf->bootstrapReps==0) FinalizeOutputStreams();
 
 	//outman.UserMessage("Maximum # clas used = %d out of %d", claMan->MaxUsedClas(), claMan->NumClas());
 	
-	if(conf->inferInternalStateProbs == true){
-		outman.UserMessage("Inferring internal state probabilities....");
-		indiv[bestIndiv].treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
-		}
-		
 	if(conf->bootstrapReps==0) outman.UserMessage("finished");
 		
 //	log << calcCount << " cla calcs, " << optCalcs << " branch like calls\n";
@@ -1371,12 +1367,12 @@ void Population::FinalOptimization(){
 	[[MFEInterfaceClient sharedClient] reportFinalScore:BestFitness()];
 	[pool release];
 #endif	
-	if(conf->bootstrapReps == 0){
-		WriteTreeFile( besttreefile.c_str() );
-		if(prematureTermination == true) outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
-		}
+
 	outman.unsetf(ios::fixed);
 	finishedRep = true;
+	
+	if(conf->outputTreelog && treeLog.is_open())
+		AppendTreeToTreeLog(-1);
 
 #ifdef ENABLE_CUSTOM_PROFILER
 	ofstream prof("profileresults.log");
@@ -1450,12 +1446,9 @@ void Population::ClearStoredTrees(){
 	}
 
 void Population::Bootstrap(){
-	if(conf->inferInternalStateProbs == true) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
-
-	data->ReserveOriginalCounts();
 
 	//if we're not restarting
-	if(gen == 0) currentBootstrapRep=1;
+	if(conf->restart == false) currentBootstrapRep=1;
 
 	for( ;currentBootstrapRep<=conf->bootstrapReps;currentBootstrapRep++){
 #ifndef BOINC
@@ -1466,36 +1459,17 @@ void Population::Bootstrap(){
 		[[MFEInterfaceClient sharedClient] didBeginBootstrapReplicate:rep];
 		[pool release];
 #endif
-		if(gen == 0){
+		if(conf->restart == false){
 			lastBootstrapSeed = rnd.seed();
 			outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
 			data->BootstrapReweight(0);
 			}
 		
-
 		PerformSearch();
-//		SeedPopulationWithStartingTree(0);
-//		Run();
+		Reset();
 		
 		if(prematureTermination == false){
-/*			//outman.UserMessage("finished with bootstrap rep %d\n", rep);
-			Individual *bestInd;
-			if(searchReps > 1){//find the best tree for this boot rep
-				double bestL=-DBL_MAX;
-				int bestRep;
-				for(unsigned r=0;r<storedTrees.size();r++){
-					if(storedTrees[r]->Fitness() > bestL){
-						bestL = storedTrees[r]->Fitness();
-						bestRep = r;
-						}
-					bestInd = storedTrees[bestRep];
-					outman.UserMessage("Saving best search rep (#%d) to bootstrap file", bestRep);
-					}				
-				}
-			else bestInd = storedTrees[0];
-			
-			AppendTreeToBootstrapLog(bestInd, currentBootstrapRep);
-*/
+
 #ifdef MAC_FRONTEND
 			pool = [[NSAutoreleasePool alloc] init];
 			[[MFEInterfaceClient sharedClient] didCompleteBoostrapReplicate:rep];
@@ -1507,7 +1481,6 @@ void Population::Bootstrap(){
 			break;
 			}
 		}
-	FinalizeOutputStreams();
 	}
 
 /* OLD VERSION
@@ -1552,15 +1525,30 @@ void Population::Bootstrap(){
 
 //this function manages multiple search replicates, setting up the population
 //and then calling Run().  It can be called either directly from main(), or 
-//from Bootstrap(), in the case of doing multiple search reps per bootstrap rep
+//from Bootstrap()
 void Population::PerformSearch(){
 	if(conf->restart == false) currentSearchRep = 1;
+	else{
+		outman.UserMessage("\nRestarting from checkpoint...");
+		if(finishedRep == true){
+			//if we've restarted but the last checkpoint written apparently represents 
+			//the state of the population immediately after the completion of a replicate
+			currentSearchRep++;
+			if(currentSearchRep > conf->searchReps && (conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps)) 
+				outman.UserMessage("The checkpoint loaded indicates that this run already completed.\nTo start a new run set restart to 0 and change the output\nfile prefix (ofprefix).");
+			else{//we need to initialize the output here, while the population still knows that this was a restart (before calling Reset)
+				InitializeOutputStreams();
+				Reset();
+				}
+			}
+		}
 
 	for(;currentSearchRep<=conf->searchReps;currentSearchRep++){
 		string s;
 #ifndef BOINC
 		CatchInterrupt();
 #endif		
+		if(conf->restart == false && currentSearchRep > 1) Reset();
 
 		GetRepNums(s);
 		if(conf->restart == false){
@@ -1569,40 +1557,119 @@ void Population::PerformSearch(){
 			SeedPopulationWithStartingTree(currentSearchRep);
 			}
 		else{
-			outman.UserMessage("\nRestarting from checkpoint...");
 			adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(conf);
 			if(currentSearchRep > conf->searchReps) throw ErrorException("rep number in checkpoint (%d) is larger than total rep specified in config (%d)", currentSearchRep, conf->searchReps);
-			outman.UserMessage("%s, generation %d, seed %d, best lnL %.3f", s.c_str(), gen, rnd.init_seed(), indiv[bestIndiv].Fitness());
+			outman.UserMessage("%s generation %d, seed %d, best lnL %.3f", s.c_str(), gen, rnd.init_seed(), indiv[bestIndiv].Fitness());
 			}
 		
-		InitializeOutputStreams(currentSearchRep);
+		InitializeOutputStreams();
 		Run();
 
+		//this rep is over
 		if(prematureTermination == false){
+			if(s.length() > 0) outman.UserMessage(">>>Completed %s<<<\n", s.c_str());
 			Individual *repResult = new Individual(&indiv[bestIndiv]);
 			storedTrees.push_back(repResult);
-			if(conf->bootstrapReps == 0) if(conf->searchReps > 1 && storedTrees.size() > 0) WriteStoredTrees(besttreefile.c_str());
+			}
+		else{
+			if(s.length() > 0) outman.UserMessage(">>>Terminated %s<<<\n", s.c_str());
+			outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
+			}
+
+		int best=0;
+		if((currentSearchRep == conf->searchReps) || prematureTermination){
+			if(storedTrees.size() > 1)
+				best=EvaluateStoredTrees(true);
+			}
+
+		if( (prematureTermination == false && (all_best_output & WRITE_REP_TERM)) ||
+			(prematureTermination == false && (currentSearchRep == conf->searchReps) && (all_best_output & WRITE_REPSET_TERM)) ||
+			(prematureTermination && (all_best_output & WRITE_PREMATURE)))
+			if(storedTrees.size() > 0) WriteStoredTrees(besttreefile.c_str());
+
+		if( (prematureTermination == false && (best_output & WRITE_REP_TERM)) ||
+			(prematureTermination == false && (currentSearchRep == conf->searchReps) && (best_output & WRITE_REPSET_TERM)) ||
+			(prematureTermination && (best_output & WRITE_PREMATURE))){
+			if(conf->searchReps > 1 && storedTrees.size() > 0){
+				WriteTreeFile(besttreefile.c_str(), best);
+				}
+			else WriteTreeFile(besttreefile.c_str());
 			}
 		
-		if(prematureTermination == false) outman.UserMessage(">>>Completed %s<<<\n", s.c_str());
-		else outman.UserMessage(">>>Terminated %s<<<\n", s.c_str());
+		if(conf->bootstrapReps > 0){
+			if( (prematureTermination == false && (bootlog_output & WRITE_REP_TERM)) ||
+				(prematureTermination == false && (currentSearchRep == conf->searchReps) && (bootlog_output & WRITE_REPSET_TERM)) ||
+				(prematureTermination && (bootlog_output & WRITE_PREMATURE))){
+				if(conf->searchReps > 1 && storedTrees.size() > 0){
+					outman.UserMessage("Saving best search rep (#%d) to bootstrap file", best+1);
+					FinishBootstrapRep(storedTrees[best], currentBootstrapRep);
+					}
+				else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
+				}
+			else if(prematureTermination && !(bootlog_output & WRITE_PREMATURE)) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
+			}
 
+		if(conf->inferInternalStateProbs == true){
+			if(prematureTermination == false && currentSearchRep == conf->searchReps){
+				if(storedTrees.size() > 1){
+					outman.UserMessage("Inferring internal state probabilities on best tree....");
+					storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
+					}
+				}
+			else if(prematureTermination){
+				outman.UserMessage(">>>Internal state probabilities not inferred due to premature termination<<<");
+				}
+			}
+				
+/*
+		//the entire set of replicate searches is over, or was terminated early
 		if(currentSearchRep == conf->searchReps || prematureTermination){
 			int best=0;
 			if(conf->searchReps > 1 && storedTrees.size() > 0) best=EvaluateStoredTrees(true);
 			if(conf->bootstrapReps > 0){
-				if(prematureTermination) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
+				//if bootstrapping, write the overall best tree to the bootstrap tree file
+				if(prematureTermination && (!(bootlog_output & WRITE_PREMATURE))) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
 				else{
 					if(conf->searchReps > 1) outman.UserMessage("Saving best search rep (#%d) to bootstrap file", best+1);
 					FinishBootstrapRep(storedTrees[best], currentBootstrapRep);
 					}
 				}
+			else{
+				if(!prematureTermination || (best_output & WRITE_PREMATURE)){
+					if(storedTrees.size() > 0)
+						WriteTreeFile(besttreefile.c_str(), best);
+					else WriteTreeFile(besttreefile.c_str());
+					}
+				if(prematureTermination == true) outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
+		
+				if(conf->inferInternalStateProbs == true){
+					if(storedTrees.size() > 0){
+						outman.UserMessage("Inferring internal state probabilities on best tree....");
+						storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
+						}
+					else{
+						outman.UserMessage(">>>Internal state probabilities not inferred due to premature termination<<<");
+						}
+					}
+				}
 			}
-	
-		FinalizeOutputStreams();
+*/
+		//finalize anything that needs it at rep end
+		FinalizeOutputStreams(0);
+		//finalize anything that needs it at the end of the repset
+		if(currentSearchRep == conf->searchReps) FinalizeOutputStreams(1);
+
 		if(prematureTermination == true) break;
-		Reset();
+#ifndef BOINC
+		else if(conf->checkpoint)
+#endif
+			//write a checkpoint that will indicate that the rep is done and results have been written to file
+			//the gen will be UINT_MAX, as it is after a rep has terminated, which will tell the function that reads
+			//the checkpoint to set finishedrep = true.  This automatically happens in the BOINC case
+			WriteStateFiles();
+
 		}
+
 	ClearStoredTrees();
 	}
 
@@ -2293,8 +2360,8 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	if(indNum==-1) ind=&indiv[bestIndiv];
 	else ind=&indiv[indNum];
 
-	if(Tree::outgroup != NULL) OutgroupRoot(indNum > 0 ? indNum : bestIndiv);
-
+	if(Tree::outgroup != NULL) OutgroupRoot(&indiv[indNum > 0 ? indNum : bestIndiv], indNum);
+		
 	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
 	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
 	ind->mod->OutputGarliFormattedModel(treeLog);
@@ -2307,7 +2374,7 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 
 	if(bootLog.is_open() == false) return;
 
-	if(Tree::outgroup != NULL) OutgroupRoot(bestIndiv);
+	if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
 
 	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << ind->Fitness() << " ";
 	
@@ -2321,8 +2388,9 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 		}
 	}
 
-bool Population::OutgroupRoot(int indnum){
-	Individual *ind=&indiv[indnum];
+bool Population::OutgroupRoot(Individual *ind, int indnum){
+	//if indnum != -1 the individual is in the indiv array, and a few extra things need to be done 
+
 	ind->treeStruct->CalcBipartitions(true);
 	Bipartition b = *(Tree::outgroup);
 	b.Standardize();
@@ -2342,23 +2410,31 @@ bool Population::OutgroupRoot(int indnum){
 /*		topologies[ind->topo]->RemoveInd(indnum);
 		ind->topo = -1;
 		UpdateTopologyList(indiv);
-*/		AssignNewTopology(indiv, indnum);
+*/		if(indnum != -1) AssignNewTopology(indiv, indnum);
 		return true;
 		}
 	else return false;
 	}
 
-void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int lst /* = -1 */ ){
+void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	int k;
-	int first = ( fst < 0 ? 0 : fst );
-	int last = ( lst < 0 ? conf->nindivs : lst );
-	assert( last <= (int)conf->nindivs );
 
 	assert( treefname );
+	string filename = treefname;
+	filename += ".tre";
 
-	Individual *best=&indiv[bestIndiv];
-	
-	if(Tree::outgroup != NULL) OutgroupRoot(bestIndiv);
+	//output an individual from the storedTrees if an indnum is passed in
+	//otherwise the best in the population
+	Individual *ind;
+	if(indnum == -1){
+		ind = &indiv[bestIndiv];
+		if(Tree::outgroup != NULL) OutgroupRoot(ind, bestIndiv);
+		}
+	else{
+		assert(indnum < storedTrees.size());
+		ind = storedTrees[indnum];
+		if(Tree::outgroup != NULL) OutgroupRoot(ind, -1);
+		}
 
 #ifdef INCLUDE_PERTURBATION
 	if(allTimeBest != NULL){
@@ -2368,12 +2444,12 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 
 #ifdef BOINC
 	char physical_name[100];
-	boinc_resolve_filename(treefname, physical_name, sizeof(physical_name));
+	boinc_resolve_filename(filename.c_str(), physical_name, sizeof(physical_name));
 	MFILE outf;
 	outf.open(physical_name, "w");
 #else
 	ofstream outf;
-	outf.open( treefname );
+	outf.open( filename.c_str() );
 	outf.precision(8);
 #endif
 
@@ -2393,18 +2469,24 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 		}		
 
 	str += ";\n";
-	if(prematureTermination == true) str += "[NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!]\n";
-	sprintf(temp, "tree best = [&U][%f][", best->Fitness()); 
+	if(prematureTermination == true){
+		if(indnum == -1)
+			str += "[NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!]\n";
+		else
+			str += "[NOTE: GARLI Run was terminated before full completion!  This is the best tree from a completed replicate.]\n";
+		}
+	if(indnum == -1) sprintf(temp, "tree best = [&U][%f][", ind->Fitness()); 
+	else sprintf(temp, "tree bestREP%d = [&U][%f][", indnum+1, ind->Fitness()); 
 	str += temp;
 	string modstr;
-	best->mod->FillGarliFormattedModelString(modstr);
+	ind->mod->FillGarliFormattedModelString(modstr);
 	str += modstr;
 	str += "]";
 
 #ifdef BOINC
 	const char *s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
-	best->treeStruct->root->MakeNewick(treeString, false, true);
+	ind->treeStruct->root->MakeNewick(treeString, false, true);
 	size_t len = strlen(treeString);
 	outf.write(treeString, sizeof(char), len);
 	str = ";\nend;\n";
@@ -2414,14 +2496,14 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 	outf << str;
 	outf.setf( ios::floatfield, ios::fixed );
 	outf.setf( ios::showpoint );
-	best->treeStruct->root->MakeNewick(treeString, false, true);
+	ind->treeStruct->root->MakeNewick(treeString, false, true);
 	outf << treeString << ";\n";
 	outf << "end;\n";
 #endif	
 	//add a paup block setting the model params
 	str = "";
 	if(modSpec.IsNucleotide()){
-		best->mod->FillPaupBlockStringForModel(str, treefname);
+		ind->mod->FillPaupBlockStringForModel(str, filename.c_str());
 		}
 #ifdef BOINC
 	s = str.c_str();
@@ -2440,7 +2522,7 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 	
 	if(conf->outputPhylipTree){//output a phylip formatted tree if desired
 		char phyname[85];
-		sprintf(phyname, "%s.phy", treefname);
+		sprintf(phyname, "%s.tre.phy", treefname);
 		ofstream phytree(phyname);
 		phytree.precision(8);
 		WritePhylipTree(phytree);
@@ -2457,9 +2539,10 @@ void Population::WriteTreeFile( const char* treefname, int fst /* = -1 */, int l
 void Population::WriteStoredTrees( const char* treefname ){
 	assert( treefname );
 
-	char name[85];
-	sprintf(name, "%s.all", treefname);
-	ofstream outf( name );
+	string name;
+	name = treefname;
+	name += ".all.tre";
+	ofstream outf( name.c_str() );
 	outf.precision(8);
 
 	outf << "#nexus" << endl << endl;
@@ -2480,7 +2563,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 	ofstream phytree;
 	if(conf->outputPhylipTree){
 		char phyname[85];
-		sprintf(phyname, "%s.phy.all", treefname);
+		sprintf(phyname, "%s.all.phy", treefname);
 		phytree.open(phyname);
 		phytree.precision(8);
 		}
@@ -2504,7 +2587,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 	outf << "end;\n";
 	
 	//add a paup block setting the model params
-	storedTrees[bestRep]->mod->OutputPaupBlockForModel(outf, name);
+	storedTrees[bestRep]->mod->OutputPaupBlockForModel(outf, name.c_str());
 	outf << "[!****NOTE: The model parameters loaded are the final model estimates****\n****from GARLI for the best scoring search replicate (#" << bestRep + 1 << ").****\n****The best model parameters for other trees may vary.****]" << endl;
 	outf.close();
 	if(conf->outputPhylipTree) phytree.close();
@@ -4471,37 +4554,135 @@ void Population::OutputRepNums(ofstream &out){
 		}
 	}
 
-void Population::InitializeOutputStreams(int rep){
-	char temp_buf[100];
-	char runString[10];
-	char restartString[15];
+void Population::SetOutputDetails(){
+	/*
+		DONT_OUTPUT = 0,
+		REPLACE = 1,
+		APPEND = 2,
+		NEWNAME = 4,
 
-	bool appendOnRestart = false;
-#ifdef BOINC
-	appendOnRestart = true;
+		WRITE_CONTINUOUS = 8,
+		WRITE_REP_TERM = 16,
+		WRITE_REPSET_TERM = 32,
+		WRITE_PREMATURE = 64,
+		
+		FINALIZE_REP_TERM = 128,
+		FINALIZE_REPSET_TERM = 256,
+		FINALIZE_FULL_TERM = 512,
+		FINALIZE_PREMATURE = 1024,
+		
+		WARN_PREMATURE = 2048,
+		NEWNAME_PER_REP = 4096
+	*/
+	//not restarted
+	if(conf->restart == false){
+		screen_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WARN_PREMATURE);
+		log_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WARN_PREMATURE);
+		if(conf->outputMostlyUselessFiles)
+			fate_output = problog_output = swaplog_output = (output_details) (REPLACE | WRITE_CONTINUOUS);
+		else
+			fate_output = problog_output = swaplog_output = (output_details) (DONT_OUTPUT);
+
+		//not bootstrap
+		if(conf->bootstrapReps == 0){
+			bootlog_output = (output_details) (DONT_OUTPUT);
+			//normal 1 rep
+			if(conf->searchReps == 1){
+#ifndef BOINC
+				best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
+#else
+				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM);
+#endif				
+				all_best_output = (output_details) DONT_OUTPUT;
+				treelog_output = (output_details) (conf->outputTreelog ? (REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
+				}
+			//normal multirep run
+			else if(conf->searchReps > 1){
+				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE );
+				all_best_output = (output_details) (REPLACE | WRITE_REP_TERM | WRITE_PREMATURE | WARN_PREMATURE);
+				treelog_output = (output_details) (conf->outputTreelog ? (REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
+				}
+			}
+		//bootstrapping
+		else {
+			best_output = all_best_output = treelog_output = (output_details) DONT_OUTPUT;
+			//bootstrap, 1 OR multiple search reps per bootstrap rep
+			bootlog_output = (output_details) (REPLACE | WRITE_REPSET_TERM | FINALIZE_FULL_TERM | FINALIZE_PREMATURE);
+			}
+		}
+	else{//restarted 
+		screen_output = (output_details) (APPEND | WRITE_CONTINUOUS | WARN_PREMATURE);
+		log_output = (output_details) (APPEND | WRITE_CONTINUOUS | WARN_PREMATURE);
+		if(conf->outputMostlyUselessFiles)
+			fate_output = problog_output = swaplog_output = (output_details) (APPEND | WRITE_CONTINUOUS);
+		else
+			fate_output = problog_output = swaplog_output = (output_details) (DONT_OUTPUT);
+		//restarted, not bootstrap
+		if(conf->bootstrapReps == 0){
+			bootlog_output = (output_details) (DONT_OUTPUT);
+			//restarted 1 rep search
+			if(conf->searchReps == 1){
+#ifndef BOINC
+				best_output = (output_details) (NEWNAME | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
+				treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
+#else
+				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WARN_PREMATURE);
+				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM ) : DONT_OUTPUT);
 #endif
+				all_best_output = (output_details) DONT_OUTPUT;
+				}
+			//restarted multirep run
+			else if(conf->bootstrapReps == 0 && conf->searchReps > 1){
+				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WARN_PREMATURE);
+				all_best_output = (output_details) (REPLACE | WRITE_REP_TERM | WARN_PREMATURE);
+#ifndef BOINC
+				treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
+#else
+				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM | NEWNAME_PER_REP) : DONT_OUTPUT);
+#endif
+				}
+			}
+		else {//restarted bootstrap, 1 OR multiple search reps per bootstrap rep
+#ifndef BOINC
+			bootlog_output = (output_details) (NEWNAME | WRITE_REPSET_TERM | FINALIZE_FULL_TERM | FINALIZE_PREMATURE);
+#else
+			bootlog_output = (output_details) (APPEND | WRITE_REPSET_TERM | FINALIZE_FULL_TERM);
+#endif
+			best_output = all_best_output = treelog_output = (output_details) DONT_OUTPUT;
+			}
+		}
+	}
 
-	if(conf->searchReps > 1) 
-		sprintf(runString, ".run%d", rep);
+void Population::DetermineFilename(output_details details, char *outname, string suffix){
+	char restartString[20];
+	char runString[20];
+
+	if(conf->restart && (details & NEWNAME)) sprintf(restartString, ".restart%d", CheckRestartNumber(conf->ofprefix));
+	else restartString[0]='\0';
+	if(conf->searchReps > 1 && (details & NEWNAME_PER_REP)) sprintf(runString, ".rep%d", currentSearchRep);
 	else runString[0]='\0';
 
-	if(conf->restart == true && appendOnRestart == false){
-		//check if this run has been restarted before.  If so, increment the restart number
-		sprintf(restartString, ".restart%d", CheckRestartNumber(conf->ofprefix));
-		}
-	else restartString[0]='\0';
+	sprintf(outname, "%s%s%s.%s", conf->ofprefix.c_str(), runString, restartString, suffix.c_str());
+	}
 
-	sprintf(temp_buf, "%s%s.best.tre", conf->ofprefix.c_str(), restartString);
+void Population::InitializeOutputStreams(){
+	char temp_buf[100];
+
+	char suffix[100];
+	sprintf(suffix, "best", rank);
+	DetermineFilename(best_output, temp_buf, suffix);
+
+	//sprintf(temp_buf, "%s%s.best", conf->ofprefix.c_str(), restartString);
 	besttreefile = temp_buf;
 
-	if(conf->outputMostlyUselessFiles){
+	if(fate_output != DONT_OUTPUT){
 		//initialize the fate file
 		if(fate.is_open() == false){
-			if (rank > 9)
-				sprintf(temp_buf, "%s%s.fate%d.log", conf->ofprefix.c_str(), restartString, rank);
-			else
-				sprintf(temp_buf, "%s%s.fate0%d.log", conf->ofprefix.c_str(), restartString, rank);
-			if(conf->restart == true && appendOnRestart == true)
+			char suffix[100];
+			sprintf(suffix, "fate0%d.log", rank);
+			DetermineFilename(fate_output, temp_buf, suffix);
+				
+			if(fate_output & APPEND)
 				fate.open(temp_buf, ios::app);
 			else 
 				fate.open(temp_buf);
@@ -4510,94 +4691,134 @@ void Population::InitializeOutputStreams(int rep){
 		#ifdef MPI_VERSION
 		fate << "gen\tind\tparent\trecomWith\tscore\tMutType\t#brlen\taccurateSubtrees\tTime\tprecision\n";
 		#else
+		if(conf->restart) fate << "Restarting from checkpoint...\n";
 		OutputRepNums(fate);
 		fate << "gen\tind\tparent\tscore\tMutType\t#brlen\tTime\tprecision\n";
 		#endif	
+		}
 
+	if(problog_output != DONT_OUTPUT){
 		//initialize the problog
 		if(probLog.is_open() == false){
-			if (rank > 9)
-				sprintf(temp_buf, "%s%s.problog%d.log", conf->ofprefix.c_str(), restartString, rank);
-			else
-				sprintf(temp_buf, "%s%s.problog0%d.log", conf->ofprefix.c_str(), restartString, rank);
-			if(conf->restart == true && appendOnRestart == true)
+			char suffix[100];
+			sprintf(suffix, "problog0%d.log", rank);
+			DetermineFilename(problog_output, temp_buf, suffix);
+
+			if(problog_output & APPEND)
 				probLog.open(temp_buf, ios::app);
-			else
+			else 
 				probLog.open(temp_buf);
 			if(!probLog.good()) throw ErrorException("problem opening problog");
 			}
+		if(conf->restart) probLog << "Restarting from checkpoint...\n";
 		OutputRepNums(probLog);
 		adap->BeginProbLog(probLog, gen);
+		}
 
 		//initialize the swaplog
+	if(swaplog_output != DONT_OUTPUT){
 		if(conf->uniqueSwapBias != 1.0){
 			if(swapLog.is_open() == false){
-				sprintf(temp_buf, "%s%s.swap.log", conf->ofprefix.c_str(), restartString);
-				if(conf->restart == true && appendOnRestart == true)
+				char suffix[100];
+				sprintf(suffix, "swaplog0%d.log", rank);
+				DetermineFilename(swaplog_output, temp_buf, suffix);
+
+				if(swaplog_output & APPEND)
 					swapLog.open(temp_buf, ios::app);
-				else
-					swapLog.open(temp_buf);
+				else 
+					swapLog.open(temp_buf);				
 				}
+			if(conf->restart) swapLog << "Restarting from checkpoint...\n";
 			OutputRepNums(swapLog);
 			swapLog << "gen\tuniqueSwaps\ttotalSwaps\n";
 			}
 		}
 
 	//initialize the log file
-	if(log.is_open() == false){
-		if (rank > 9)
-			sprintf(temp_buf, "%s%s.log%d.log", conf->ofprefix.c_str(), restartString, rank);
-		else
-			sprintf(temp_buf, "%s%s.log0%d.log", conf->ofprefix.c_str(), restartString, rank);
-		if(conf->restart == true && appendOnRestart == true)
-			log.open(temp_buf, ios::app);
-		else
-			log.open(temp_buf);
-		log.precision(10);
+	if(log_output != DONT_OUTPUT){
+		if(log.is_open() == false){
+			char suffix[100];
+			sprintf(suffix, "log0%d.log", rank);
+			DetermineFilename(log_output, temp_buf, suffix);
+
+			if(log_output & APPEND)
+				log.open(temp_buf, ios::app);
+			else 
+				log.open(temp_buf);		
+			log.precision(10);
+			}
+		OutputRepNums(log);
+		if(conf->restart == false)
+			log << "random seed = " << rnd.init_seed() << "\n";
+		else{
+			if(finishedRep ==false) 
+				log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
+			else
+				log << "Restarting from checkpoint...\n";
+			}
+
+		log << "gen\tbest_like\ttime\toptPrecision\n";
 		}
 
-	OutputRepNums(log);
-	if(conf->restart == false)
-		log << "random seed = " << rnd.init_seed() << "\n";
-	else log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
-	log << "gen\tbest_like\ttime\toptPrecision\n";
-
 	//initialize the treelog
-	if(conf->outputTreelog){
-		if (rank > 9)
-			sprintf(temp_buf, "%s%s%s.treelog%d.log", conf->ofprefix.c_str(), runString, restartString, rank);
-		else
-			sprintf(temp_buf, "%s%s%s.treelog0%d.log", conf->ofprefix.c_str(), runString, restartString, rank);
-		if(conf->restart == true && appendOnRestart == true)
-			treeLog.open(temp_buf, ios::app);
-		else
-			treeLog.open(temp_buf);
+	if(treelog_output != DONT_OUTPUT){
+		if(treeLog.is_open() == false){
+			char suffix[100];
+			sprintf(suffix, "treelog0%d.tre", rank);
+			DetermineFilename(treelog_output, temp_buf, suffix);
+
+			if(treelog_output & APPEND)
+				treeLog.open(temp_buf, ios::app);
+			else 
+				treeLog.open(temp_buf);		
+			treeLog.precision(10);
+			}
 		treeLog.precision(10);
-		if(currentSearchRep == 1 || appendOnRestart == false)
+		if((conf->restart == false && conf->searchReps == 1) ||
+			(conf->restart == false && (treelog_output & NEWNAME_PER_REP)) ||
+			(conf->restart && (treelog_output & NEWNAME)))
 			data->BeginNexusTreesBlock(treeLog);
 		AppendTreeToTreeLog(-1, -1);
 		}
 	
 	//initialize the bootstrap tree file
-	if(conf->bootstrapReps > 0 && rank==0 && bootLog.is_open() == false){
-		sprintf(temp_buf, "%s%s.boot.tre", conf->ofprefix.c_str(), restartString);
-		if(conf->restart == true && appendOnRestart == true)
-			bootLog.open(temp_buf, ios::app);
-		else
-			bootLog.open(temp_buf);
-		bootLog.precision(10);
-		if(currentBootstrapRep == 1 || appendOnRestart == false)
-			data->BeginNexusTreesBlock(bootLog);
+	if(bootlog_output != DONT_OUTPUT){
+		if(rank==0 && bootLog.is_open() == false){
+			char suffix[100];
+			sprintf(suffix, "boot.tre");
+			DetermineFilename(bootlog_output, temp_buf, suffix);
+			
+			if(bootlog_output & APPEND){
+				if(FileExists(temp_buf) && FileIsNexus(temp_buf)){
+					//this will verify whether we previously started a trees block in the bootstrap file
+					//if so, we shouldn't do so again.  If not, we need to start it now
+					bootLog.open(temp_buf, ios::app);
+					}
+				else{
+					bootLog.open(temp_buf, ios::app);
+					data->BeginNexusTreesBlock(bootLog);
+					}
+				}
+			else{
+				bootLog.open(temp_buf);
+				data->BeginNexusTreesBlock(bootLog);
+				}
+			bootLog.precision(10);
+			}
+		if(conf->outputPhylipTree){
+			if(!(bootLogPhylip.is_open())){
+				char suffix[100];
+				sprintf(suffix, "boot.phy");
+				DetermineFilename(bootlog_output, temp_buf, suffix);
 
-		if(conf->outputPhylipTree == true){
-			sprintf(temp_buf, "%s%s.boot.phy", conf->ofprefix.c_str(), restartString);
-			if(conf->restart == true && appendOnRestart == true)
-				bootLogPhylip.open(temp_buf, ios::app);
-			else
-				bootLogPhylip.open(temp_buf);
-			bootLogPhylip.precision(10);
-			}	
-		}	
+				if(bootlog_output & APPEND)
+					bootLogPhylip.open(temp_buf, ios::app);
+				else 
+					bootLogPhylip.open(temp_buf);		
+				bootLogPhylip.precision(10);
+				}	
+			}
+		}
 
 	ClearDebugLogs();
 	
@@ -4615,7 +4836,6 @@ void Population::InitializeOutputStreams(int rep){
 	outf.open("toscore.tre");
 	paupf.open("toscore.nex");
 	#endif	
-	
 	}
 
 /* OLD WAY
@@ -4740,33 +4960,106 @@ void Population::SetNewBestIndiv(int indivIndex){
 	indiv[bestIndiv].treeStruct->ProtectClas();
 	}
 
-void Population::FinalizeOutputStreams(){
-	if(prematureTermination == true  && conf->bootstrapReps == 0){
-		log << "***NOTE: Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***" << endl;
-		if(treeLog.is_open()) treeLog << "[! ***NOTE: GARLI run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***]" << endl;
+void Population::FinalizeOutputStreams(int type){
+	/*the types are:
+		repTerm = 0
+		repsetTerm = 1
+		fullTerm = 2
+	*/
+
+	if(prematureTermination == true && type == 0){
+		if(log_output & WARN_PREMATURE)
+			log << "***NOTE: Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***" << endl;
+		if(treelog_output & WARN_PREMATURE)
+			if(treeLog.is_open()) treeLog << "[! ***NOTE: GARLI run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***]" << endl;
 		}
 
-	if(((conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps) && (currentSearchRep == conf->searchReps)) || prematureTermination == true){
-		log.close();
-		if(fate.is_open()) fate.close();
-		if(probLog.is_open()) probLog.close();
-		if(swapLog.is_open()) swapLog.close();
+	bool repTerm, repsetTerm, fullTerm;
+	if(prematureTermination){
+		fullTerm = false;
+		repsetTerm = false;
+		repTerm = false;		
+		}
+	else if(type == 2){
+		fullTerm = true;
+		repsetTerm = false;
+		repTerm = false;
+		}
+	else if(type == 1) {
+		fullTerm = false;
+		repsetTerm = true;
+		repTerm = false;
+		}
+	else {
+		fullTerm = false;
+		repsetTerm = false;
+		repTerm = true;
 		}
 
-	if(treeLog.is_open() && (conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps)){
-		AppendTreeToTreeLog(-1);
-		treeLog << "end;\n";
-		treeLog.close();
+	//if(((conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps) && (currentSearchRep == conf->searchReps)) || prematureTermination == true){
+	if(log.is_open()){
+		if(prematureTermination && (log_output & FINALIZE_PREMATURE)) log.close();
+		else if((!prematureTermination) && (
+			   (repTerm && (log_output & FINALIZE_REP_TERM))
+			|| (repsetTerm && (log_output & FINALIZE_REPSET_TERM))
+			|| (fullTerm && (log_output & FINALIZE_FULL_TERM)))
+			) log.close();
 		}
 
-	if(((currentBootstrapRep == conf->bootstrapReps) && (currentSearchRep == conf->searchReps)) || prematureTermination == true){
-		if(bootLog.is_open()){
+	if(fate.is_open()){
+		if(prematureTermination && (fate_output & FINALIZE_PREMATURE)) fate.close();
+		else if((!prematureTermination) && (
+			   (repTerm && (fate_output & FINALIZE_REP_TERM))
+			|| (repsetTerm && (fate_output & FINALIZE_REPSET_TERM))
+			|| (fullTerm && (fate_output & FINALIZE_FULL_TERM)))
+			) fate.close();
+		}
+
+	if(probLog.is_open()){
+		if(prematureTermination && (problog_output & FINALIZE_PREMATURE)) probLog.close();
+		else if((!prematureTermination) && (
+			   (repTerm && (problog_output & FINALIZE_REP_TERM))
+			|| (repsetTerm && (problog_output & FINALIZE_REPSET_TERM))
+			|| (fullTerm && (problog_output & FINALIZE_FULL_TERM)))
+			) probLog.close();
+		}
+
+	if(swapLog.is_open()){
+		if(prematureTermination && (swaplog_output & FINALIZE_PREMATURE)) swapLog.close();
+		else if((!prematureTermination) && (
+			   (repTerm && (swaplog_output & FINALIZE_REP_TERM))
+			|| (repsetTerm && (swaplog_output & FINALIZE_REPSET_TERM))
+			|| (fullTerm && (swaplog_output & FINALIZE_FULL_TERM)))
+			) swapLog.close();
+		}
+
+	if(treeLog.is_open()){
+		if((prematureTermination && (treelog_output & FINALIZE_PREMATURE)) ||
+			((prematureTermination == false) &&
+				( (repTerm && (treelog_output & FINALIZE_REP_TERM)) || (repsetTerm && (treelog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (treelog_output & FINALIZE_FULL_TERM)) )
+				)){
+			treeLog << "end;\n";
+			treeLog.close();
+			}
+		}
+
+	if(bootLog.is_open()){
+		if((prematureTermination && (bootlog_output & FINALIZE_PREMATURE)) ||
+			((prematureTermination == false) && 
+			   ( (repTerm && (bootlog_output & FINALIZE_REP_TERM)) || (repsetTerm && (bootlog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (bootlog_output & FINALIZE_FULL_TERM)) )
+				)){
 			bootLog << "end;\n";
 			bootLog.close();
 			}
-		if(bootLogPhylip.is_open()) bootLogPhylip.close();
 		}
-	
+
+	if(bootLogPhylip.is_open()){
+		if(prematureTermination && (bootlog_output & FINALIZE_PREMATURE)) bootLogPhylip.close();
+		else if((prematureTermination == false) && 
+			   ( (repTerm && (bootlog_output & FINALIZE_REP_TERM)) || (repsetTerm && (bootlog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (bootlog_output & FINALIZE_FULL_TERM)) )
+				) bootLogPhylip.close();
+		}
+
 	#ifdef DEBUG_SCORES
 	outf << "end;\n";
 	outf.close();
