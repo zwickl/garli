@@ -220,13 +220,17 @@ char **argv=NULL;
 			datafile = buffer;
 #else
 			if(confOK == true){
-				if(conf.restart == false) sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
-				else sprintf(temp_buf, "%s.restart%d.screen.log", conf.ofprefix.c_str(), CheckRestartNumber(conf.ofprefix));
+				//changing this to always append to the .screen.log after a restart
+				sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
+				//if(conf.restart == false) sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
+				//else sprintf(temp_buf, "%s.restart%d.screen.log", conf.ofprefix.c_str(), CheckRestartNumber(conf.ofprefix));
 				}
 			else sprintf(temp_buf, "ERROR.log");
-			outman.SetLogFile(temp_buf);
-			outman.UserMessage("Running serial GARLI, version 0.96beta4 (Aug 2007)\n(->Amino acid and Codon testing version<-)\n");
 
+			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
+			else outman.SetLogFile(temp_buf);
+
+			outman.UserMessage("Running serial GARLI, version 0.96beta4 (Aug 2007)\n(->Amino acid and Codon testing version<-)\n");
 #endif
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
@@ -257,17 +261,19 @@ char **argv=NULL;
 #endif
 				if(pop.conf->restart) pop.ReadStateFiles();
 
+				pop.SetOutputDetails();
 				if(pop.conf->bootstrapReps == 0){//NOT bootstrapping
 					pop.PerformSearch();
 					}
 				else pop.Bootstrap();
+				pop.FinalizeOutputStreams(2);
 				}
-				}catch(ErrorException err){
-					if(outman.IsLogSet() == false)
-						outman.SetLogFile("ERROR.log");
-					outman.UserMessage("\nERROR: %s\n\n", err.message);
+			}catch(ErrorException err){
+				if(outman.IsLogSet() == false)
+					outman.SetLogFile("ERROR.log");
+				outman.UserMessage("\nERROR: %s\n\n", err.message);
 #ifdef BOINC
-					boinc_finish(1);
+				boinc_finish(1);
 #endif
 
 #ifdef MAC_FRONTEND

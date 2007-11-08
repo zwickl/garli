@@ -274,6 +274,8 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 							name += *++s;
 							}						
 						taxonnodeNum = atoi( name.c_str() );
+						if(taxonnodeNum == 0) throw ErrorException("Unexpected character(s) found in tree description \"%s!\"", name.c_str());
+						if(taxonnodeNum > numTipsTotal) throw ErrorException("Taxon  number in tree description (%d) is greater than\n\tnumber of taxa in dataset!", taxonnodeNum);
 						}
 					else{
 						while(*(s+1) != ':' && *(s+1) != ',' && *(s+1) != ')'){
@@ -287,8 +289,10 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 	                numNodesAdded++;
 					numTipsAdded++;
 	                s++;
-			
+					while(*s == ' ') s++;;//eat any spaces here
+					
 					if(*s!=':' && *s!=',' && *s!=')'){
+						throw ErrorException("Problem parsing tree string!  Expecting : or , or ), found %c", *s);
 						s--;	
 						ofstream str("treestring.log", ios::app);
 						str << s << endl;
@@ -489,7 +493,36 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 	//(ie, not right after tree creation)
 	TreeNode *t1, *t2, *removedNode;
 	FLOAT_TYPE l;
+	vector<TreeNode *> rootDesc;
 	assert(root->left->next==root->right);
+
+	if(root->left->IsInternal()){
+		removedNode = root->left;
+		root->right->dlen += removedNode->dlen;
+		rootDesc.push_back(root->right);
+		}
+	else{
+		removedNode = root->right;
+		root->left->dlen += removedNode->dlen;
+		rootDesc.push_back(root->left);
+		}
+	if(clasAssigned){
+		removedNode->claIndexDown=claMan->SetDirty(removedNode->claIndexDown);
+		removedNode->claIndexUL=claMan->SetDirty(removedNode->claIndexUL);
+		removedNode->claIndexUR=claMan->SetDirty(removedNode->claIndexUR);			
+		}
+	t1 = removedNode->left;
+	while(t1){
+		rootDesc.push_back(t1);
+		t1 = t1->next;
+		}
+	//now we have all of the new desc of the root
+	//disconnect the old ones
+	root->left = root->right = NULL;
+	for(int t=0;t<rootDesc.size();t++)
+		root->AddDes(rootDesc[t]);
+
+/*
 	if(root->left->IsInternal()){
 		removedNode=root->left;
 		t1=root->left->left;
@@ -531,7 +564,7 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 		t2->anc=root;
 	 	root->right=t2;
 		}
-	if(reducenodes==1){
+*/	if(reducenodes==1){
 		//we need to permanently get rid of the node that was removed and decrement the nodeNums of those greater 
 		//than it.
 		SortAllNodesArray();
@@ -2107,7 +2140,13 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 				bool pos;
 				if(temp[0] == '+') pos=true;
 				else pos=false;
+				//this is rather silly, but because any call to the Tree constructor will generate random
+				//branch lengths (even though this tree is only temporary for the reading of the constraint),
+				//it will change the seed.  So, store and restore it
+				int seed = rnd.seed();
 				Tree contree(temp.c_str()+1, numericalTaxa, true);
+				rnd.set_seed(seed);
+
 				contree.CalcBipartitions();
 				vector<Bipartition> bip;
 				contree.root->GatherConstrainedBiparitions(bip);
@@ -4841,18 +4880,37 @@ void Tree::OutputBinaryFormattedTree(ofstream &out) const{
 */
 
 void Tree::OutputBinaryFormattedTree(OUTPUT_CLASS &out) const{
-	for(int i=0;i<numNodesTotal;i++){
-		allNodes[i]->OutputBinaryNodeInfo(out);
-		}
-	out.WRITE_TO_FILE(&lnL, sizeof(FLOAT_TYPE), 1);
+
 	out.WRITE_TO_FILE(&numTipsTotal, sizeof(numTipsTotal), 1);
+	out.WRITE_TO_FILE(&lnL, sizeof(FLOAT_TYPE), 1);
 	out.WRITE_TO_FILE(&numTipsAdded, sizeof(numTipsAdded), 1);
 	out.WRITE_TO_FILE(&numNodesAdded, sizeof(numNodesAdded), 1);
 	out.WRITE_TO_FILE(&numBranchesAdded, sizeof(numBranchesAdded), 1);
 	out.WRITE_TO_FILE(&numNodesTotal, sizeof(numNodesTotal), 1);
+
+	for(int i=0;i<numNodesTotal;i++){
+		allNodes[i]->OutputBinaryNodeInfo(out);
+		}
 	}
 
 void Tree::ReadBinaryFormattedTree(FILE *in){
+	//this allows a check that the checkpoint was written for the same
+	//dataset that was specified in the conf
+	int expectedNumTipsTotal = numTipsTotal;
+
+	fread((char*) &numTipsTotal, sizeof(numTipsTotal), 1, in);
+	if(numTipsTotal != expectedNumTipsTotal){
+		int wrong = numTipsTotal;
+		numTipsTotal = expectedNumTipsTotal;
+		throw ErrorException("Number of taxa from checkpoint (%d) is not the same as in the current\n\tdatafile (%d)! The checkpoint seems to be from a different run!", wrong, expectedNumTipsTotal);
+		}	
+	
+	fread((char*) &lnL, sizeof(FLOAT_TYPE), 1, in);
+	fread((char*) &numTipsAdded, sizeof(numTipsAdded), 1, in);
+	fread((char*) &numNodesAdded, sizeof(numNodesAdded), 1, in);
+	fread((char*) &numBranchesAdded, sizeof(numBranchesAdded), 1, in);
+	fread((char*) &numNodesTotal, sizeof(numNodesTotal), 1, in);
+
 	int dum;
 
 	fread((char*) &dum, sizeof(dum), 1, in);
@@ -4915,11 +4973,4 @@ void Tree::ReadBinaryFormattedTree(FILE *in){
 		
 		fread((char*) &allNodes[i]->dlen, sizeof(FLOAT_TYPE), 1, in);
 		}
-
-	fread((char*) &lnL, sizeof(FLOAT_TYPE), 1, in);
-	fread((char*) &numTipsTotal, sizeof(numTipsTotal), 1, in);
-	fread((char*) &numTipsAdded, sizeof(numTipsAdded), 1, in);
-	fread((char*) &numNodesAdded, sizeof(numNodesAdded), 1, in);
-	fread((char*) &numBranchesAdded, sizeof(numBranchesAdded), 1, in);
-	fread((char*) &numNodesTotal, sizeof(numNodesTotal), 1, in);
 	}

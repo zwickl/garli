@@ -444,8 +444,12 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	if(restart == false){
 		if(foundTree==true)
 			outman.UserMessage("Obtained starting tree from file %s", fname);
-		else 
-			outman.UserMessage("No starting tree found in file %s, creating random tree", fname);
+		else{
+			if(treeStruct->constraints.size() == 0)
+				outman.UserMessage("No starting tree found in file %s, creating random tree", fname);
+			else 
+				outman.UserMessage("No starting tree found in file %s, creating random tree (compatible with constraint)", fname);
+			}
 
 		if(foundModel==true) outman.UserMessage("Obtained starting model from file %s:", fname);
 				

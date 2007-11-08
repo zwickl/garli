@@ -1767,7 +1767,7 @@ void Model::FillPaupBlockStringForModel(string &str, const char *treefname) cons
 	sprintf(temp, "begin paup;\nclear;\ngett file=%s storebr;\nlset userbr ", treefname);
 	str += temp;
 	if(Nst() == 2){
-		sprintf(temp, "st=2 trat=%f ", TRatio());
+		sprintf(temp, "nst=2 trat=%f ", TRatio());
 		str += temp;
 		}
 	else if(Nst() == 1) str += "nst=1 ";

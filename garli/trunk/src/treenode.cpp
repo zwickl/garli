@@ -54,7 +54,8 @@ TreeNode::~TreeNode(){
 }
 
 TreeNode* TreeNode::AddDes(TreeNode *d){
-	//leaves blens as-is
+	//leaves blens as-is, ignores the current values
+	//of anc, prev and next for d
 	d->anc=this;
 	d->next=NULL;
 	if(left){

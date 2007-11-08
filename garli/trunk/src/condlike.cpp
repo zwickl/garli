@@ -54,13 +54,13 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	arr = NewAlignedArray<FLOAT_TYPE>(nk*nr*ns, CLA_ALIGNMENT);
 #endif
 	if(arr==NULL){
-		throw(1);
+		throw ErrorException("GARLI had a problem allocating memory!  Try reducing the availablememory setting.");
 		}
 	//DJZ 1-5-05 - the underflow mult used to be ns*nr in length,
 	//but only needs to be ns
 	underflow_mult=new int[ns];
 	if(underflow_mult==NULL){
-		throw(1);
+		throw ErrorException("GARLI had a problem allocating memory!  Try reducing the availablememory setting.");
 		}
 	}
 

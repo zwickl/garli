@@ -250,6 +250,8 @@ bool ReadData(const char* filename, HKYData* data)	{
 //			if(!data->Dense()) data->Save(filename, "new");
 			}
 		}
+	//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
+	data->ReserveOriginalCounts();
 	return usedNCL;
 	}
 
