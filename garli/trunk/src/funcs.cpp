@@ -37,6 +37,11 @@ extern OutputManager outman;
 
 #define LOG_MIN_BRLEN log(min_brlen)
 
+bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon){
+	FLOAT_TYPE diff = fabs(first - sec);
+	return (diff < epsilon);
+	}
+
 #ifdef BROOK_GPU
 #include <brook/brook.hpp>
 //#include <brook/profiler.hpp>
@@ -178,10 +183,8 @@ bool FileIsFasta(const char *name){
 	return fasta;
 	}
 
-bool ReadData(const char* filename, HKYData* data)	{
+bool ReadData(const char* filename, SequenceData* data)	{
 	bool usedNCL = false;
-
-	if(modSpec.IsAminoAcid()) data->SetAminoAcid();
 
 	if (!FileExists(filename))	{
 		throw ErrorException("data file not found: %s!", filename);
@@ -193,7 +196,7 @@ bool ReadData(const char* filename, HKYData* data)	{
 		int err = reader.HandleExecute(filename);
 		if(err) throw ErrorException("Problem reading nexus datafile");
 		NxsCharactersBlock *chars = reader.GetCharactersBlock();
-		if(modSpec.IsAminoAcid() && chars->GetDataType() != NxsCharactersBlock::protein)
+		if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid()==false && chars->GetDataType() != NxsCharactersBlock::protein)
 			throw ErrorException("protein data specified, but nexus file does not contain protein data!");
 		data->CreateMatrixFromNCL(reader);
 		usedNCL = true;
@@ -207,20 +210,24 @@ bool ReadData(const char* filename, HKYData* data)	{
 		data->ReadPhylip(filename);
 		}
 
+/*
 	if(modSpec.IsCodon()){
+		assert(0);
 		if(modSpec.IsVertMitoCode()){
 			static_cast<CodonData*>(data)->SetVertMitoCode();
 			}
 		static_cast<CodonData*>(data)->FillCodonMatrix(false);
 		}
 	else if(modSpec.IsCodonAminoAcid()){
+		assert(0);
 		if(modSpec.IsVertMitoCode()){
 			static_cast<CodonData*>(data)->SetVertMitoCode();
 			}
 		static_cast<CodonData*>(data)->SetAminoAcid();
 		static_cast<CodonData*>(data)->FillCodonMatrix(true);
 		}
-
+*/
+/*
 	// report summary statistics about the data
 	data->Summarize();
 	outman.UserMessage("\nData summary:");
@@ -249,15 +256,15 @@ bool ReadData(const char* filename, HKYData* data)	{
 			data->DetermineConstantSites();
 //			if(!data->Dense()) data->Save(filename, "new");
 			}
+		else if(modSpec.IsAminoAcid()){
+//			static_cast<CodonData*>(data)->DetermineConstantAASites();
+			}
 		}
-	//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
-	data->ReserveOriginalCounts();
+*/	
 	return usedNCL;
 	}
 
-
-
-int ReadData(GeneralGamlConfig *conf, HKYData* data)	{
+int ReadData(GeneralGamlConfig *conf, NucleotideData* data)	{
 	assert(0);
 	// regurgitate params specified
 /*	if( params.restart ) {
@@ -944,890 +951,52 @@ vector<InternalState *> *InferStatesFromCla(FLOAT_TYPE *cla, int nchar, int nrat
 	return stateVec;
 	}
 
-FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar){
-	FLOAT_TYPE count=ZERO_POINT_ZERO;
-	int offset1=0, offset2=0;
-	int effectiveChar=nchar;
-	bool skipChar=false;
-	for(int i=0;i<nchar;i++){
-		if(str2[i+offset2]<0){
-			if(str2[i+offset2]==-4) skipChar=true;
-			else{
-				int s=-str2[i+offset2];
-				for(int i=0;i<s;i++) offset2++;
-				}
-			}
-		if(str1[i+offset1]<0){
-			if(str1[i+offset1]==-4) skipChar=true;
-			else{
-				int s=-str1[i+offset1];
-				for(int i=0;i<s;i++) offset1++;
-				}
-			}
-		if(skipChar==false){
-			if(str1[i+offset1]!=str2[i+offset2]){
-				count += ONE_POINT_ZERO;
-				}
-			}
-		else effectiveChar--;
-		skipChar=false;
-		}
-	return count/(FLOAT_TYPE)effectiveChar;
-	}
-
-#ifndef GANESH
-FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int nchar){
-	FLOAT_TYPE count=ZERO_POINT_ZERO;
-	int offset=0;
-	int effectiveChar=nchar;
-	for(int i=0;i<nchar;i++){
-		if(str2[i+offset]<0){
-			if(str2[i+offset]==-4) effectiveChar--;
-			else{
-				int s=-str2[i+offset];
-				for(int i=0;i<s;i++) offset++;
-				}
-			}
-		else if(str1[i]!=str2[i+offset]) count += ONE_POINT_ZERO;
-		}
-	return count/(FLOAT_TYPE)effectiveChar;
-	}
-#else
-FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, 
-                                const int *col_count, int nchar){
-	FLOAT_TYPE count=0.0;
-	int offset=0;
+FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, const int *counts, int nchar, int nstates){
+	FLOAT_TYPE diff=0.0;
+	int pos1=0, pos2=0;
 	int effectiveChar=0;
 	for(int i=0;i<nchar;i++){
-        effectiveChar += col_count[i];
-		if(str2[i+offset]<0){
-			if(str2[i+offset]==-4) {
-                effectiveChar = effectiveChar-col_count[i];
-            }    
-			else{
-    				int s=-str2[i+offset];
-	    			for(int i=0;i<s;i++) offset++;
+		bool unambig1 = true;
+		bool unambig2 = true;
+		if(nstates == 4){
+			if(str1[pos1] < 0){
+				unambig1 = false;
+				if(str1[pos1] == -4) pos1++;
+				else{
+    				int s=-str2[pos1++];
+	    			for(int i=0;i<s;i++) pos1++;
+					}
+				}
+			if(str2[pos2] < 0){
+				unambig2 = false;
+				if(str2[pos2] == -4) pos2++;
+				else{
+    				int s=-str2[pos2++];
+	    			for(int i=0;i<s;i++) pos2++;
+					}
 				}
 			}
-		else if(str1[i]!=str2[i+offset]) count += col_count[i]*ONE_POINT_ZERO;
+		else{
+			if(str1[pos1] == nstates){
+				unambig1 = false;
+				pos1++;
+				}
+			if(str1[pos2] == nstates){
+				unambig2 = false;
+				pos2++;
+				}
+			}
+		if(unambig1 && unambig2){
+			effectiveChar += counts[i];
+			if(str1[pos1++] != str2[pos2++]) diff += (FLOAT_TYPE) counts[i]; 
+			}
 		}
-	return count/(FLOAT_TYPE)effectiveChar;
+
+	return diff/(FLOAT_TYPE)effectiveChar;
 }
-#endif
 
 void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree){
 	for(FLOAT_TYPE len=(FLOAT_TYPE)effectiveMin;len<(FLOAT_TYPE)effectiveMax;len*=2.0)
 		(*func)(thisnode, thistree, len, true);
 	}
 
-void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats, const char *leftEQ, const char *rightEQ){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *dest=destCLA->arr;
-	const FLOAT_TYPE *LCL=LCLA->arr;
-	const FLOAT_TYPE *RCL=RCLA->arr;
-	FLOAT_TYPE L1, L2, L3, L4, R1, R2, R3, R4;
-
-	assert(nRateCats == 1);
-	
-#ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-	
-	for(int i=0;i<nchar;i++) {
-		if(leftEQ[i] == false){
-			L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
-			L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
-			L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
-			L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
-			}
-
-		if(rightEQ[i] == false){
-			R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-			R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-			R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
-			R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-			}
-
-		dest[0] = L1 * R1;
-		dest[1] = L2 * R2;
-		dest[2] = L3 * R3;
-		dest[3] = L4 * R4;
-
-		assert(dest[0] == dest[0]);
-		}
-
-	const int *left_mult=LCLA->underflow_mult;
-	const int *right_mult=RCLA->underflow_mult;
-	int *undermult=destCLA->underflow_mult;
-	
-	for(int i=0;i<nchar;i++){
-		undermult[i] = left_mult[i] + right_mult[i];
-		}
-	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
-	}
-
-void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *dest=destCLA->arr;
-	const FLOAT_TYPE *LCL=LCLA->arr;
-	const FLOAT_TYPE *RCL=RCLA->arr;
-	FLOAT_TYPE L1, L2, L3, L4, R1, R2, R3, R4;
-	
-#ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-	
-	if(nRateCats == 4){//the unrolled 4 rate version
-#ifdef OMP_INTINTCLA
-		#pragma omp parallel for private(dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
-		for(int i=0;i<nchar;i++){
-			int index=4*4*i;
-			dest = &(destCLA->arr[index]);
-			LCL = &(LCLA->arr[index]); 
-			RCL= &(RCLA->arr[index]);
-#else
-			for(int i=0;i<nchar;i++){
-#endif
-
-			L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
-			L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
-			L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
-			L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
-
-			R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-			R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-			R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
-			R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-			
-			dest[0] = L1 * R1;
-			dest[1] = L2 * R2;
-			dest[2] = L3 * R3;
-			dest[3] = L4 * R4;
-
-			dest+=4;
-			LCL+=4;
-			RCL+=4;
-			
-			L1=( Lpr[16+0]*LCL[0]+Lpr[16+1]*LCL[1]+Lpr[16+2]*LCL[2]+Lpr[16+3]*LCL[3]);
-			L2=( Lpr[16+4]*LCL[0]+Lpr[16+5]*LCL[1]+Lpr[16+6]*LCL[2]+Lpr[16+7]*LCL[3]);
-			L3=( Lpr[16+8]*LCL[0]+Lpr[16+9]*LCL[1]+Lpr[16+10]*LCL[2]+Lpr[16+11]*LCL[3]);
-			L4=( Lpr[16+12]*LCL[0]+Lpr[16+13]*LCL[1]+Lpr[16+14]*LCL[2]+Lpr[16+15]*LCL[3]);
-
-			R1=(Rpr[16+0]*RCL[0]+Rpr[16+1]*RCL[1]+Rpr[16+2]*RCL[2]+Rpr[16+3]*RCL[3]);
-			R2=(Rpr[16+4]*RCL[0]+Rpr[16+5]*RCL[1]+Rpr[16+6]*RCL[2]+Rpr[16+7]*RCL[3]);
-			R3=(Rpr[16+8]*RCL[0]+Rpr[16+9]*RCL[1]+Rpr[16+10]*RCL[2]+Rpr[16+11]*RCL[3]);			
-			R4=(Rpr[16+12]*RCL[0]+Rpr[16+13]*RCL[1]+Rpr[16+14]*RCL[2]+Rpr[16+15]*RCL[3]);
-			
-			dest[0] = L1 * R1;
-			dest[1] = L2 * R2;
-			dest[2] = L3 * R3;
-			dest[3] = L4 * R4;
-
-			dest+=4;
-			LCL+=4;
-			RCL+=4;		
-
-			L1=( Lpr[32+0]*LCL[0]+Lpr[32+1]*LCL[1]+Lpr[32+2]*LCL[2]+Lpr[32+3]*LCL[3]);
-			L2=( Lpr[32+4]*LCL[0]+Lpr[32+5]*LCL[1]+Lpr[32+6]*LCL[2]+Lpr[32+7]*LCL[3]);
-			L3=( Lpr[32+8]*LCL[0]+Lpr[32+9]*LCL[1]+Lpr[32+10]*LCL[2]+Lpr[32+11]*LCL[3]);
-			L4=( Lpr[32+12]*LCL[0]+Lpr[32+13]*LCL[1]+Lpr[32+14]*LCL[2]+Lpr[32+15]*LCL[3]);
-
-			R1=(Rpr[32+0]*RCL[0]+Rpr[32+1]*RCL[1]+Rpr[32+2]*RCL[2]+Rpr[32+3]*RCL[3]);
-			R2=(Rpr[32+4]*RCL[0]+Rpr[32+5]*RCL[1]+Rpr[32+6]*RCL[2]+Rpr[32+7]*RCL[3]);
-			R3=(Rpr[32+8]*RCL[0]+Rpr[32+9]*RCL[1]+Rpr[32+10]*RCL[2]+Rpr[32+11]*RCL[3]);			
-			R4=(Rpr[32+12]*RCL[0]+Rpr[32+13]*RCL[1]+Rpr[32+14]*RCL[2]+Rpr[32+15]*RCL[3]);
-			
-			dest[0] = L1 * R1;
-			dest[1] = L2 * R2;
-			dest[2] = L3 * R3;
-			dest[3] = L4 * R4;
-
-			dest+=4;
-			LCL+=4;
-			RCL+=4;
-
-			L1=( Lpr[48+0]*LCL[0]+Lpr[48+1]*LCL[1]+Lpr[48+2]*LCL[2]+Lpr[48+3]*LCL[3]);
-			L2=( Lpr[48+4]*LCL[0]+Lpr[48+5]*LCL[1]+Lpr[48+6]*LCL[2]+Lpr[48+7]*LCL[3]);
-			L3=( Lpr[48+8]*LCL[0]+Lpr[48+9]*LCL[1]+Lpr[48+10]*LCL[2]+Lpr[48+11]*LCL[3]);
-			L4=( Lpr[48+12]*LCL[0]+Lpr[48+13]*LCL[1]+Lpr[48+14]*LCL[2]+Lpr[48+15]*LCL[3]);
-
-			R1=(Rpr[48+0]*RCL[0]+Rpr[48+1]*RCL[1]+Rpr[48+2]*RCL[2]+Rpr[48+3]*RCL[3]);
-			R2=(Rpr[48+4]*RCL[0]+Rpr[48+5]*RCL[1]+Rpr[48+6]*RCL[2]+Rpr[48+7]*RCL[3]);
-			R3=(Rpr[48+8]*RCL[0]+Rpr[48+9]*RCL[1]+Rpr[48+10]*RCL[2]+Rpr[48+11]*RCL[3]);			
-			R4=(Rpr[48+12]*RCL[0]+Rpr[48+13]*RCL[1]+Rpr[48+14]*RCL[2]+Rpr[48+15]*RCL[3]);
-			
-			dest[0] = L1 * R1;
-			dest[1] = L2 * R2;
-			dest[2] = L3 * R3;
-			dest[3] = L4 * R4;
-
-			dest+=4;
-			LCL+=4;
-			RCL+=4;
-			}
-		}
-	
-	else{//the general N rate version
-		int r;
-#ifdef OMP_INTINTCLA
-		int index;
-		#pragma omp parallel for private(r, index, dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
-		for(int i=0;i<nchar;i++) {
-			index=4*nRateCats*i;
-			dest = &(destCLA->arr[index]);
-			LCL = &(LCLA->arr[index]); 
-			RCL= &(RCLA->arr[index]);
-			for(r=0;r<nRateCats;r++){
-#else			
-		for(int i=0;i<nchar;i++) {
-			for(r=0;r<nRateCats;r++){
-#endif
-#define NORM
-#ifdef ALT
-				//alt
-				dest[0] = ( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]) * (Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-				dest[1] = ( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]) * (Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-				dest[2] = ( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]) * (Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);
-				dest[3] = ( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]) * (Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-#endif
-				/*
-				dest[0] = ( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]) * (Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
-				dest[1] = ( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]) * (Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
-				dest[2] = ( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]) * (Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);
-				dest[3] = ( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]) * (Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
-*/
-#ifdef ALT2
-				//alt2
-				dest[0]=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
-				dest[1]=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
-				dest[2]=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
-				dest[3]=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
-
-				dest[0]*=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-				dest[1]*=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-				dest[2]*=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
-				dest[3]*=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-#endif
-#ifdef NORM
-				L1=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
-				L2=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
-				L3=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
-				L4=( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]);
-
-				R1=(Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
-				R2=(Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
-				R3=(Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);			
-				R4=(Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
-
-				dest[0] = L1 * R1;
-				dest[1] = L2 * R2;
-				dest[2] = L3 * R3;
-				dest[3] = L4 * R4;
-
-	//			assert(dest[0] == dest[0] && dest[0] > 0.0f && dest[0] < 1.0e20);
-#endif
-#ifndef OMP_INTINTCLA
-				dest+=4;
-				LCL+=4;
-				RCL+=4;
-#endif
-				}
-			}
-		}
-
-
-	const int *left_mult=LCLA->underflow_mult;
-	const int *right_mult=RCLA->underflow_mult;
-	int *undermult=destCLA->underflow_mult;
-	
-	for(int i=0;i<nchar;i++){
-		undermult[i] = left_mult[i] + right_mult[i];
-		}
-	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
-	}
-
-void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats, const int nstates){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *dest=destCLA->arr;
-	const FLOAT_TYPE *LCL=LCLA->arr;
-	const FLOAT_TYPE *RCL=RCLA->arr;
-	FLOAT_TYPE L1, R1;
-	
-#ifdef UNIX
-	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-#ifdef OMP_INTINTCLA_NSTATE
-	#pragma omp parallel for private(dest, LCL, RCL, L1, R1)
-	for(int i=0;i<nchar;i++){
-		int index = nstates * i;
-		dest = &(destCLA->arr[index]);
-		LCL = &(LCLA->arr[index]); 
-		RCL= &(RCLA->arr[index]);
-
-#else
-	for(int i=0;i<nchar;i++) {
-
-#endif
-		for(int rate=0;rate<nRateCats;rate++){
-			for(int from=0;from<nstates;from++){
-				L1 = Lpr[rate*nstates*nstates + from*nstates] * LCL[0];
-				R1 = Rpr[rate*nstates*nstates + from*nstates] * RCL[0];
-				for(int to=1;to<nstates;to++){
-					L1 += Lpr[rate*nstates*nstates + from*nstates + to] * LCL[to];
-					R1 += Rpr[rate*nstates*nstates + from*nstates + to] * RCL[to];
-					}
-				dest[from] = L1 * R1;
-				}
-#ifndef OMP_INTCLACLA_NSTATE
-			LCL += nstates;
-			RCL += nstates;
-			dest += nstates;
-#endif
-			}
-		assert(dest[-nstates*nRateCats] >= 0.0);
-		assert(dest[-nstates*nRateCats] == dest[-nstates*nRateCats]);
-		//assert(dest[19] < 1e10);
-		}
-
-	const int *left_mult=LCLA->underflow_mult;
-	const int *right_mult=RCLA->underflow_mult;
-	int *undermult=destCLA->underflow_mult;
-	
-	for(int i=0;i<nchar;i++){
-		undermult[i] = left_mult[i] + right_mult[i];
-		}
-	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
-	}
-
-void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *dest=destCLA->arr;
-	
-#ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-	for(int i=0;i<nchar;i++){
-		if(*Ldata > -1 && *Rdata > -1){
-			for(int r=0;r<nRateCats;r++){
-				*(dest++) = Lpr[(*Ldata)+16*r] * Rpr[(*Rdata)+16*r];
-				*(dest++) = Lpr[(*Ldata+4)+16*r] * Rpr[(*Rdata+4)+16*r];
-				*(dest++) = Lpr[(*Ldata+8)+16*r] * Rpr[(*Rdata+8)+16*r];
-				*(dest++) = Lpr[(*Ldata+12)+16*r] * Rpr[(*Rdata+12)+16*r];
-				}
-			Ldata++;
-			Rdata++;
-			}
-			
-		else if((*Ldata == -4 && *Rdata == -4) || (*Ldata == -4 && *Rdata > -1) || (*Rdata == -4 && *Ldata > -1)){//total ambiguity of left, right or both
-			
-			if(*Ldata == -4 && *Rdata == -4) //total ambiguity of both
-				for(int i=0;i< (4*nRateCats);i++) *(dest++) = ONE_POINT_ZERO;
-			
-			else if(*Ldata == -4){//total ambiguity of left
-				for(int i=0;i<nRateCats;i++){
-					*(dest++) = Rpr[(*Rdata)+16*i];
-					*(dest++) = Rpr[(*Rdata+4)+16*i];
-					*(dest++) = Rpr[(*Rdata+8)+16*i];
-					*(dest++) = Rpr[(*Rdata+12)+16*i];
-					assert(*(dest-4)>=ZERO_POINT_ZERO);
-					}
-				}
-			else{//total ambiguity of right
-				for(int i=0;i<nRateCats;i++){
-					*(dest++) = Lpr[(*Ldata)+16*i];
-					*(dest++) = Lpr[(*Ldata+4)+16*i];
-					*(dest++) = Lpr[(*Ldata+8)+16*i];
-					*(dest++) = Lpr[(*Ldata+12)+16*i];
-					assert(*(dest-4)>=ZERO_POINT_ZERO);
-					}
-				}
-			Ldata++;
-			Rdata++;
-			}	
-		else {//partial ambiguity of left, right or both
-			if(*Ldata>-1){//unambiguous left
-				for(int i=0;i<nRateCats;i++){
-					*(dest+(i*4)) = Lpr[(*Ldata)+16*i];
-					*(dest+(i*4)+1) = Lpr[(*Ldata+4)+16*i];
-					*(dest+(i*4)+2) = Lpr[(*Ldata+8)+16*i];
-					*(dest+(i*4)+3) = Lpr[(*Ldata+12)+16*i];
-					assert(*(dest)>=ZERO_POINT_ZERO);
-					}
-				Ldata++;
-				}
-			else{
-				if(*Ldata==-4){//fully ambiguous left
-					for(int i=0;i< (4*nRateCats);i++){
-						*(dest+i)=ONE_POINT_ZERO;
-						}
-					Ldata++;
-					}
-			 
-				else{//partially ambiguous left
-					int nstates=-*(Ldata++);
-					for(int q=0;q< (4*nRateCats);q++) dest[q]=0;
-					for(int i=0;i<nstates;i++){
-						for(int r=0;r<nRateCats;r++){
-							*(dest+(r*4)) += Lpr[(*Ldata)+16*r];
-							*(dest+(r*4)+1) += Lpr[(*Ldata+4)+16*r];
-							*(dest+(r*4)+2) += Lpr[(*Ldata+8)+16*r];
-							*(dest+(r*4)+3) += Lpr[(*Ldata+12)+16*r];
-//							assert(*(dest-1)>ZERO_POINT_ZERO);
-							}
-						Ldata++;
-						}
-					}
-				}
-			if(*Rdata>-1){//unambiguous right
-				for(int i=0;i<nRateCats;i++){
-					*(dest++) *= Rpr[(*Rdata)+16*i];
-					*(dest++) *= Rpr[(*Rdata+4)+16*i];
-					*(dest++) *= Rpr[(*Rdata+8)+16*i];
-					*(dest++) *= Rpr[(*Rdata+12)+16*i];
-//					assert(*(dest-1)>ZERO_POINT_ZERO);
-					}
-				Rdata++;		
-				}
-			else if(*Rdata != -4){//partially ambiguous right
-				char nstates=-1 * *(Rdata++);
-				//create a temporary cla to hold the results from the ambiguity of the right, 
-				//which need to be +'s 
-				//FLOAT_TYPE *tempcla=new FLOAT_TYPE[4*nRateCats];
-				vector<FLOAT_TYPE> tempcla(4*nRateCats);
-				for(int i=0;i<nstates;i++){
-					for(int r=0;r<nRateCats;r++){
-						tempcla[(r*4)]   += Rpr[(*Rdata)+16*r];
-						tempcla[(r*4)+1] += Rpr[(*Rdata+4)+16*r];
-						tempcla[(r*4)+2] += Rpr[(*Rdata+8)+16*r];
-						tempcla[(r*4)+3] += Rpr[(*Rdata+12)+16*r];
-//						assert(*(dest-1)>ZERO_POINT_ZERO);
-						}
-					Rdata++;
-					}
-				//Now multiply the temporary results against the already calced left
-				for(int i=0;i<nRateCats;i++){
-					*(dest++) *= tempcla[(i*4)];
-					*(dest++) *= tempcla[(i*4)+1];
-					*(dest++) *= tempcla[(i*4)+2];
-					*(dest++) *= tempcla[(i*4)+3];
-//					assert(*(dest-1)>ZERO_POINT_ZERO);
-					}
-				}
-			else{//fully ambiguous right
-				dest+=(4*nRateCats);
-				Rdata++;
-				}
-			}
-		}
-		
-		for(int site=0;site<nchar;site++){
-			destCLA->underflow_mult[site]=0;
-			}
-		destCLA->rescaleRank=2;
-	}
-
-void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats, const int nstates){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *dest=destCLA->arr;
-
-#ifdef UNIX
-	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-	for(int i=0;i<nchar;i++){
-		if(*Ldata < nstates && *Rdata < nstates){
-			for(int rate=0;rate<nRateCats;rate++){
-				for(int from=0;from<nstates;from++){
-					dest[rate*nstates + from] = Lpr[(*Ldata) + from*nstates + rate*nstates*nstates] * Rpr[(*Rdata) + from*nstates + rate*nstates*nstates];	
-					}
-				}
-			Ldata++;
-			Rdata++;
-			}
-			
-		else{//total ambiguity of left, right or both
-			
-			if(*Ldata == nstates && *Rdata == nstates) //total ambiguity of both
-				for(int rate=0;rate<nRateCats;rate++)
-					for(int from=0;from<nstates;from++)
-						dest[rate*nstates + from] = ONE_POINT_ZERO;
-			
-			else if(*Ldata == nstates){//total ambiguity of left
-				for(int rate=0;rate<nRateCats;rate++)
-					for(int from=0;from<nstates;from++)
-						dest[rate*nstates + from] = Rpr[(*Rdata) + from*nstates + rate*nstates*nstates];
-					
-				}
-			else{//total ambiguity of right
-				for(int rate=0;rate<nRateCats;rate++)
-					for(int from=0;from<nstates;from++)
-						dest[rate*nstates + from] = Lpr[(*Ldata) + from*nstates + rate*nstates*nstates];
-				}
-			Ldata++;
-			Rdata++;
-			}	
-//		assert(dest[i*nstates] > 0.0);
-//		assert(dest[i*nstates+19] < 1e10);
-//		assert(dest[i*nstates] == dest[i*nstates]);
-		dest += nRateCats*nstates;
-		}
-		for(int site=0;site<nchar;site++){
-			destCLA->underflow_mult[site]=0;
-			}
-		destCLA->rescaleRank=2;
-	}
-
-
-void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const int nchar, const int nRateCats, const unsigned *ambigMap /*=NULL*/){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *des=destCLA->arr;
-	FLOAT_TYPE *dest=des;
-	const FLOAT_TYPE *CL=LCLA->arr;
-	const FLOAT_TYPE *CL1=CL;
-	const char *data2=dat2;
-
-#ifdef UNIX	
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);	
-#endif
-
-	if(nRateCats==4){//unrolled 4 rate version
-#ifdef OMP_INTTERMCLA
-		#pragma omp parallel for private(dest, CL1, data2)
-		for(int i=0;i<nchar;i++){
-			dest=&des[4*4*i];
-			CL1=&CL[4*4*i];
-			data2=&dat2[ambigMap[i]];
-#else
-		for(int i=0;i<nchar;i++){
-#endif
-			if(*data2 > -1){ //no ambiguity
-				dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * pr2[(*data2)];
-				dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * pr2[(*data2+4)];
-				dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * pr2[(*data2+8)];
-				dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * pr2[(*data2+12)];
-				
-				dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]) * pr2[(*data2)+16];
-				dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]) * pr2[(*data2+4)+16];
-				dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]) * pr2[(*data2+8)+16];
-				dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]) * pr2[(*data2+12)+16];
-			
-				dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]) * pr2[(*data2)+32];
-				dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]) * pr2[(*data2+4)+32];
-				dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]) * pr2[(*data2+8)+32];
-				dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]) * pr2[(*data2+12)+32];
-			
-				dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]) * pr2[(*data2)+48];
-				dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * pr2[(*data2+4)+48];
-				dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * pr2[(*data2+8)+48];
-				dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * pr2[(*data2+12)+48];
-#ifndef OMP_INTTERMCLA
-				dest+=16;
-				data2++;
-#endif
-				}
-			else if(*data2 == -4){//total ambiguity
-				dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-				dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-				dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-				dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
-				
-				dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
-				dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
-				dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
-				dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
-			
-				dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
-				dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
-				dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
-				dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
-			
-				dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
-				dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
-				dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
-				dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-#ifndef OMP_INTTERMCLA
-				dest+=16;
-				data2++;
-#endif
-				}
-			else {//partial ambiguity
-				//first figure in the ambiguous terminal
-				int nstates=-1 * *(data2++);
-				for(int j=0;j<16;j++) dest[j]=ZERO_POINT_ZERO;
-				for(int s=0;s<nstates;s++){
-					for(int r=0;r<4;r++){
-						*(dest+(r*4)) += pr2[(*data2)+16*r];
-						*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
-						*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
-						*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
-						}
-					data2++;
-					}
-				
-				//now add the internal child
-				*(dest++) *= ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-				*(dest++) *= ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-				*(dest++) *= ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-				*(dest++) *= ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
-				
-				*(dest++) *= ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
-				*(dest++) *= ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
-				*(dest++) *= ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
-				*(dest++) *= ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
-			
-				*(dest++) *= ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
-				*(dest++) *= ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
-				*(dest++) *= ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
-				*(dest++) *= ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
-			
-				*(dest++) *= ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
-				*(dest++) *= ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
-				*(dest++) *= ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
-				*(dest++) *= ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-				}
-#ifndef OMP_INTTERMCLA		
-			CL1+=16;
-#endif
-			}
-		}
-	else{//general N rate version
-#ifdef OMP_INTTERMCLA
-		#pragma omp parallel for private(dest, CL1, data2)
-		for(int i=0;i<nchar;i++){
-			dest=&des[4*nRateCats*i];
-			CL1=&CL[4*nRateCats*i];
-			data2=&dat2[ambigMap[i]];
-#else
-		for(int i=0;i<nchar;i++){
-#endif
-			if(*data2 > -1){ //no ambiguity
-				for(int r=0;r<nRateCats;r++){
-					dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * pr2[(*data2)+16*r];
-					dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * pr2[(*data2+4)+16*r];
-					dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * pr2[(*data2+8)+16*r];
-					dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * pr2[(*data2+12)+16*r];
-					dest+=4;
-					}
-				data2++;
-				}
-			else if(*data2 == -4){//total ambiguity
-				for(int r=0;r<nRateCats;r++){
-					dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
-					dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
-					dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
-					dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
-					dest+=4;
-					}
-				data2++;
-				}
-			else {//partial ambiguity
-				//first figure in the ambiguous terminal
-				int nstates=-1 * *(data2++);
-				for(int q=0;q<4*nRateCats;q++) dest[q]=0;
-				for(int s=0;s<nstates;s++){
-					for(int r=0;r<nRateCats;r++){
-						*(dest+(r*4)) += pr2[(*data2)+16*r];
-						*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
-						*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
-						*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
-						}
-					data2++;
-					}
-				
-				//now add the internal child
-				for(int r=0;r<nRateCats;r++){
-					*(dest++) *= ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
-					*(dest++) *= ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
-					*(dest++) *= ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
-					*(dest++) *= ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
-					}
-				}
-#ifndef OMP_INTTERMCLA	
-			CL1 += 4*nRateCats;
-#endif
-			}
-		}
-		
-	for(int i=0;i<nchar;i++)
-		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
-	
-	destCLA->rescaleRank=LCLA->rescaleRank+2;
-	} 
-
-void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const int nchar, const int nRateCats, const int nstates, const unsigned *ambigMap /*=NULL*/){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *des=destCLA->arr;
-	FLOAT_TYPE *dest=des;
-	const FLOAT_TYPE *CL=LCLA->arr;
-	const FLOAT_TYPE *CL1=CL;
-	const char *data2=dat2;
-
-#ifdef UNIX	
-	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);	
-#endif
-#ifdef OMP_INTTERMCLA_NSTATE
-	#pragma omp parallel for private(dest, CL1, data2)
-	for(int i=0;i<nchar;i++){
-		dest=&des[nstates*i];
-		CL1=&CL[nstates*i];
-		data2=&dat2[i];
-#else
-	for(int i=0;i<nchar;i++){
-#endif
-		for(int rate=0;rate<nRateCats;rate++){
-			for(int from=0;from<nstates;from++){
-				dest[from] = pr1[rate*nstates*nstates + from*nstates] * CL1[0];
-				for(int to=1;to<nstates;to++){
-					dest[from] += pr1[rate*nstates*nstates + from*nstates + to] * CL1[to];
-					}
-				if(*data2 < nstates) //no ambiguity
-					dest[from] *= pr2[rate*nstates*nstates + (*data2)+from*nstates];
-				else if(*data2 == nstates){
-					int p=2;//total ambiguity
-					}
-				else{
-					//write this for partial ambiguity
-					assert(0);
-					}
-				}
-			assert(dest[19] < 1e10);
-#ifndef OMP_INTTERMCLA_NSTATE
-			dest += nstates;
-			CL1 += nstates;
-#endif
-			}
-		data2++;
-		}
-	
-	for(int i=0;i<nchar;i++)
-		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
-	
-	destCLA->rescaleRank=LCLA->rescaleRank+2;
-	} 
-
-void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats /*=4*/){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *dest=destCLA->arr;
-	FLOAT_TYPE *CL1=LCLA->arr;
-	FLOAT_TYPE *partial=partialCLA->arr;
-	
-#ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise(partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-	if(nRateCats==4){
-		for(int i=0;i<nchar;i++){
-			*(dest++) = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * *(partial++);
-			*(dest++) = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * *(partial++);
-			*(dest++) = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * *(partial++);
-			*(dest++) = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * *(partial++);
-			
-			*(dest++) = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]) * *(partial++);
-			*(dest++) = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]) * *(partial++);
-			*(dest++) = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]) * *(partial++);
-			*(dest++) = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]) * *(partial++);
-		
-			*(dest++) = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]) * *(partial++);
-			*(dest++) = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]) * *(partial++);
-			*(dest++) = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]) * *(partial++);
-			*(dest++) = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]) * *(partial++);
-		
-			*(dest++) = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]) * *(partial++);
-			*(dest++) = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * *(partial++);
-			*(dest++) = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * *(partial++);
-			*(dest++) = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * *(partial++);
-			CL1+=16;
-			assert(*(dest-1)>ZERO_POINT_ZERO);
-			}
-		}
-	else{
-		for(int i=0;i<nchar;i++){
-			for(int r=0;r<nRateCats;r++){
-				*(dest++) = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * *(partial++);
-				*(dest++) = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * *(partial++);
-				*(dest++) = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * *(partial++);
-				*(dest++) = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * *(partial++);
-				CL1+=4;
-				assert(*(dest-1)>ZERO_POINT_ZERO);
-				}
-			}
-		}
-		
-	for(int site=0;site<nchar;site++){
-		destCLA->underflow_mult[site]=partialCLA->underflow_mult[site] + LCLA->underflow_mult[site];
-		}
-	}
-
-void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata, int nchar, int nRateCats /*=4*/){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *dest=destCLA->arr;
-	FLOAT_TYPE *partial=partialCLA->arr;
-#ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-	for(int i=0;i<nchar;i++){
-		if(*Ldata > -1){ //no ambiguity
-			for(int i=0;i<nRateCats;i++){
-				*(dest++) = Lpr[(*Ldata)+16*i] * *(partial++);
-				*(dest++) = Lpr[(*Ldata+4)+16*i] * *(partial++);
-				*(dest++) = Lpr[(*Ldata+8)+16*i] * *(partial++);
-				*(dest++) = Lpr[(*Ldata+12)+16*i] * *(partial++);
-//				assert(*(dest-1)>ZERO_POINT_ZERO);
-				}
-			Ldata++;
-			}
-			
-		else if(*Ldata == -4){ //total ambiguity
-			for(int i=0;i<4*nRateCats;i++) *(dest++) = *(partial++);
-			Ldata++;
-			}
-		else{ //partial ambiguity
-			//first figure in the ambiguous terminal
-			char nstates=-1 * *(Ldata++);
-			for(int q=0;q<4*nRateCats;q++) dest[q]=0;
-			for(int i=0;i<nstates;i++){
-				for(int i=0;i<nRateCats;i++){
-					*(dest+(i*4)) += Lpr[(*Ldata)+16*i];
-					*(dest+(i*4)+1) += Lpr[(*Ldata+4)+16*i];
-					*(dest+(i*4)+2) += Lpr[(*Ldata+8)+16*i];
-					*(dest+(i*4)+3) += Lpr[(*Ldata+12)+16*i];
-//					assert(*(dest-1)>ZERO_POINT_ZERO);
-					}
-				Ldata++;
-				}
-			
-			//now add the partial
-			for(int r=0;r<nRateCats;r++){
-				*(dest++) *= *(partial++);
-				*(dest++) *= *(partial++);
-				*(dest++) *= *(partial++);
-				*(dest++) *= *(partial++);
-				}
-			}
-		}
-	for(int i=0;i<nchar;i++)
-		destCLA->underflow_mult[i]=partialCLA->underflow_mult[i];
-}

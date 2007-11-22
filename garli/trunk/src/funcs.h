@@ -22,7 +22,7 @@
 #include <stdlib.h>
 
 #include "population.h"
-#include "mlhky.h"
+#include "sequencedata.h"
 #ifdef UNIX
 #include <sys/mman.h>
 #endif
@@ -52,11 +52,13 @@ class InternalState{
 		}
 	};
 
+bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
+
 int FileExists(const char* s);
 bool FileIsFasta(const char *name);
 bool FileIsNexus(const char *name);
-int ReadData(GeneralGamlConfig *, HKYData* data);
-bool ReadData(const char* filename, HKYData* data);
+int ReadData(GeneralGamlConfig *, SequenceData* data);
+bool ReadData(const char* filename, SequenceData* data);
 //void GetRestartParams(Parameters& params);
 int RandomInt(int lb, int ub);
 FLOAT_TYPE RandomFrac();
@@ -68,24 +70,9 @@ FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, F
 void DirichletRandomVariable (FLOAT_TYPE *alp, FLOAT_TYPE *z, int n);
 void InferStatesFromCla(char *states, FLOAT_TYPE *cla, int nchar);
 vector<InternalState *> *InferStatesFromCla(FLOAT_TYPE *cla, int nchar, int nrates);
-FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar);
-#ifndef GANESH
-FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int nchar);
-#else
-FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, const int *col_count, int nchar)
-#endif
+FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, const int *counts, int nchar, int nstates);
+
 void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree);
-
-void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats);
-void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats, const char *leftEQ, const char *rightEQ);
-void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats);
-void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, int nchar, int nRateCats, const unsigned *ambigMap=NULL);
-void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA, int nchar, int nRateCats=4);
-void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata, int nchar, int nRateCats=4);
-
-void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const int nchar, const int nRateCats, const int nstates);
-void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, const int nchar, const int nRateCats, const int nstates, const unsigned *ambigMap=NULL);
-void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, const int nchar, const int nRateCats, const int nstates);
 
 int DZbrak(FLOAT_TYPE *worstOuter, FLOAT_TYPE *mid, FLOAT_TYPE *bestOuter, FLOAT_TYPE *worstOuterL, FLOAT_TYPE *midL, FLOAT_TYPE *bestOuterL, FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree);
 FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, FLOAT_TYPE fx, FLOAT_TYPE fc, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE, bool), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree);
