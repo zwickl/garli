@@ -55,7 +55,7 @@ DataMatrix::~DataMatrix()
 			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] is of length nChar
 		MEM_DELETE_ARRAY(matrix); // matrix is of length nTax
 	}
-	if(constBases!=NULL) delete []constBases;
+	if(constStates!=NULL) delete []constStates;
 	if(origCounts!=NULL) delete []origCounts;
 	memset(this, 0, sizeof(DataMatrix));
 }
@@ -155,10 +155,6 @@ int DataMatrix::PatternType( int k , int *c, unsigned char *s) const
 	for( i = 0; i < nTax; i++ )
 		c[i] = 1;
 
-	// create an array to hold this pattern
-//	unsigned char* s;
-//       MEM_NEW_ARRAY(s,unsigned char,nTax);
-
 	for( i = 0; i < nTax; i++ )
 		s[i] = Matrix( i, k );
 
@@ -174,35 +170,58 @@ int DataMatrix::PatternType( int k , int *c, unsigned char *s) const
 	}
 	
 	// add counts of duplicate elements of s to first instance
-	int nStates = 1; 	// treats ? as a new state
-	bool ambig = false;	// will be true if any ? found
-	bool allMissing = true;
+	int nStates = 0; 
+	bool ambig = false;	//any total or partial ambiguity
 	i = 0;
-	//if( s[0] == MISSING_DATA ) missing = 1;
-	if( s[0] & (s[0]-1) ) ambig = true;
-	if(s[0]!=15)  allMissing=false;
-	for( j = 1; j < nTax; j++ ) {
-		if(s[j]!=15)  allMissing=false;
-		if( s[j] == s[i] ) {
-			c[i]++;
-			c[j]--;
+	
+	if(maxNumStates == 4){
+		//dna/rna data is stored in bitwise format (1,2,4,8)
+		//with ambiguity indicated by and'ing individual states
+		//so full ambiguity (gap, ? or N) is 15
+		if( s[0] & (s[0]-1) ) ambig = true;
+		if(s[0]!=15)  nStates++;
+		for( j = 1; j < nTax; j++ ) {
+			if( s[j] == s[i] ) {
+				c[i]++;
+				c[j]--;
+				}
+			else {
+				if( s[j] & (s[j]-1)) ambig=true;
+				if((s[i] & s[j]) == false){
+					//in the case of ambiguity, a new state is only indicated if
+					//no resolution of the ambiguity matches a previously observed
+					//state.  Thus, nStates is the _minimum_ number of states
+					i = j;
+					nStates++;
+					}
+				}
+			}
 		}
-		else {
-			if( s[j] & (s[j]-1)) ambig=true;
-			if((s[i] & s[j])==false){
+	else {//not allowing partial ambiguity for codon/AA data
+		//data are stored as index (0-19) or (0-60) with maxNumStates (20 or 61)
+		//representing total ambiguity
+		ambig = false;
+		if(s[0] != maxNumStates)  nStates++;
+		for( j = 1; j < nTax; j++ ) {
+			if( s[j] == s[i] ) {
+				c[i]++;
+				c[j]--;
+				}
+			else {
 				i = j;
 				nStates++;
 				}
+			}
 		}
-	}
 
 	//DJZ 10/28/03 changing this to allow for invariant sites.  Sites which contain 
 	//some missing data but are otherwise constant must be marked as such because they 
 	//will be considered constant for the purposes of invariant sites calcs.
 	//also marking sites that are all missing
 
-//	if( nStates == 1 )
-	if( nStates == 1 /*|| (nStates==2 && missing)*/)
+	if( nStates == 0 )
+		retval = PT_MISSING;
+	else if( nStates == 1)//remember that this is any site that _could_ be constant given ambiguity
 		retval = PT_CONSTANT;
 	else if( nStates == 2 && ( c[0] == 1 || c[0] == nTax-1 ) )
 		retval = PT_AUTAPOMORPHIC | PT_VARIABLE;
@@ -211,11 +230,6 @@ int DataMatrix::PatternType( int k , int *c, unsigned char *s) const
 	else
 		retval = PT_VARIABLE;
 
-//	MEM_DELETE_ARRAY(s); // s is of length nTax
-//	MEM_DELETE_ARRAY(c); // c is of length nTax
-
-//	numStates[k] = ( missing ? nStates-1 : nStates );
-	if(allMissing) nStates=0;
 	numStates[k] = nStates;
 	return retval;
 }
@@ -228,7 +242,7 @@ void DataMatrix::Summarize()
 	int i, k;
 	assert( nChar > 0 );
 
-	nConstant = nInformative = nAutapomorphic = 0;
+	nMissing = nConstant = nInformative = nAutapomorphic = 0;
    int nTotal = 0;
 
    int max = maxNumStates;
@@ -237,25 +251,25 @@ void DataMatrix::Summarize()
 
 	//DJZ moved these out of PatternType to reduce the amount of allocation
 	int *c = new int[nTax];
- 	//MEM_NEW_ARRAY(c,int,nTax);
 	unsigned char *s = new unsigned char[nTax];
-//	MEM_NEW_ARRAY(s,unsigned char,nTax);
 	
 	for( k = 0; k < nChar; k++ ) {
 		int ptFlags = PatternType(k, c, s);
-      stateDistr[numStates[k]] += (FLOAT_TYPE)count[k];
-      nTotal += count[k];
-
-		if( ptFlags & PT_CONSTANT )
+		stateDistr[numStates[k]] += (FLOAT_TYPE)count[k];
+		nTotal += count[k];
+		
+		if( ptFlags == PT_MISSING )
+			nMissing++;
+		else if( ptFlags & PT_CONSTANT )
 			nConstant += count[k];
 		else if( ptFlags & PT_INFORMATIVE )
 			nInformative += count[k];
 		else if( ptFlags & PT_AUTAPOMORPHIC )
 			nAutapomorphic += count[k];
-	}
+		}
 
    for( k = 0; k <= max; k++ )
-   	stateDistr[k] /= (FLOAT_TYPE)nTotal;
+		stateDistr[k] /= (FLOAT_TYPE)nTotal;
    stateDistrComputed = 1;
    
    delete []c;
@@ -432,45 +446,48 @@ void DataMatrix::Pack()
 
 
 void DataMatrix::DetermineConstantSites(){
-	//DJZ 10/28/03 note where all of the constant sites are, and what they are
+	//note where all of the constant sites are, and what they are
 	//this is kind of ugly, but will never be rate limiting
-	lastConstant=-1;	
+	lastConstant=-1;
+	assert(numStates[0] > 0);
 	while(numStates[lastConstant+1]==1) lastConstant++;
-
-	//now that I'm allowing partial ambiguity, the determination of constants needs to change
-	//can't just depend on the numStates field
 	
-	constBases=new int[lastConstant+1];
+	constStates=new int[lastConstant+1];
 	int t;
-	for(int i=0;i<lastConstant+1;i++){
-		t=0;
-		char c=15;
-		while(t<nTax){
-		char ch=Matrix(t, i);
-			c = c & ch;
-			t++;
+	if(maxNumStates == 4){
+		for(int i=0;i<lastConstant+1;i++){
+			t=0;
+			char c=15;
+			while(t<nTax){
+			char ch=Matrix(t, i);
+				c = c & ch;
+				t++;
+				}
+			assert(c!=0);
+			constStates[i]=c;
 			}
-		assert(c!=0);
-//		while(Matrix(t, i)==MISSING_DATA) t++;
-//		constBases[i]=Matrix(t, i);
-		constBases[i]=c;
 		}
-/*	//now convert from the bitwise 1, 2, 4, 8 designation to 0, 1, 2, 3
-	for(int i=0;i<lastConstant+1;i++){
-		if(constBases[i]==1) constBases[i]=0;
-		else if(constBases[i]==2) constBases[i]=1;
-		else if(constBases[i]==4) constBases[i]=2;
-		else if(constBases[i]==8) constBases[i]=3;
+	else{//not allowing ambiguity for codon/AA's, so this is a bit easier
+		for(int i=0;i<lastConstant+1;i++){
+			t=0;
+			char c = maxNumStates;
+			do{
+				c = Matrix(t, i);
+				t++;
+				}while(c == maxNumStates && t < nTax);
+			assert(t != nTax);
+			constStates[i]=c;
+			}
 		}
-*/
-	origCounts=new int[nChar];
 	}
 
 //
 //	SwapCharacters swaps matrix column i with column j
 //
-void DataMatrix::SwapCharacters( int i, int j )
-{
+void DataMatrix::SwapCharacters( int i, int j ){
+	//this should NOT be called if the data is already packed
+	assert(count[i] == 1 && count[j] == 1);
+
 	unsigned char tmp;
 	for( int k = 0; k < nTax; k++ ) {
 		tmp = Matrix( k, i );
@@ -489,78 +506,6 @@ void DataMatrix::SwapCharacters( int i, int j )
 		else if(number[c] == j) number[c]=i;
 		}
 }
-
-void DataMatrix::CreateMatrixFromNCL(GarliReader &reader){
-	
-	NxsCharactersBlock *charblock = reader.GetCharactersBlock();
-//	vector<unsigned> reducedToOrigCharMap = charblock->GetOrigIndexVector();
-	NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
-	
-	int numOrigTaxa = charblock->GetNTax();
-	int numActiveTaxa = charblock->GetNumActiveTaxa();
-	int numOrigChar = charblock->GetNChar();
-	int numActiveChar = charblock->GetNumActiveChar();
-
-	if(numActiveChar == 0) throw ErrorException("NCL did not read any active characters in the datafile");
-	//int num_chars = reducedToOrigCharMap.size();
-	//cout << num_chars << endl;
-
-	NewMatrix( numActiveTaxa, numActiveChar );
-
-	// read in the data, including taxon names
-	int i=0;
-	if(modSpec.IsAminoAcid() == false){
-		for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
-			if(charblock->IsActiveTaxon(origTaxIndex)){
-				SetTaxonLabel( i, taxablock->GetTaxonLabel(origTaxIndex).c_str());
-				
-				int j = 0;
-				for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
-					if(charblock->IsActiveChar(origIndex)){	
-						unsigned char datum = '\0';
-						if(charblock->IsGapState(origTaxIndex, origIndex) == true) datum = 15;
-						else if(charblock->IsMissingState(origTaxIndex, origIndex) == true) datum = 15;
-						else{
-							int nstates = charblock->GetNumStates(origTaxIndex, origIndex);
-							for(int s=0;s<nstates;s++){
-								datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, origIndex, s));
-								}
-							}
-						SetMatrix( i, j++, datum );
-						}
-					}
-				i++;
-				}
-			}
-		}
-	else{
-		for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
-			if(charblock->IsActiveTaxon(origTaxIndex)){
-				SetTaxonLabel( i, taxablock->GetTaxonLabel(origTaxIndex).c_str());
-				
-				int j = 0;
-				for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
-					if(charblock->IsActiveChar(origIndex)){	
-						unsigned char datum = '\0';
-						if(charblock->IsGapState(origTaxIndex, origIndex) == true) datum = 20;
-						else if(charblock->IsMissingState(origTaxIndex, origIndex) == true) datum = 20;
-						else{
-							int nstates = charblock->GetNumStates(origTaxIndex, origIndex);
-							assert(nstates == 1);
-							datum = CharToAminoAcidNumber(charblock->GetState(origTaxIndex, origIndex, 0));
-/*							for(int s=0;s<nstates;s++){
-								datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, origIndex, s));
-								}
-*/							}
-						SetMatrix( i, j++, datum );
-						}
-					}
-				i++;
-				}
-			}
-		}
-	}
-
 
 void DataMatrix::BeginNexusTreesBlock(ofstream &treeout) const{
 	//this outputs everything up through the translate table
@@ -893,8 +838,8 @@ int DataMatrix::ReadPhylip( const char* infname){
 						}
 					}
 	 			else{ 
-					if(modSpec.IsAminoAcid())
-						datum = CharToAminoAcidNumber(ch);
+					if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid() == false)
+						datum = CharToDatum(ch);
 					else 
 						datum = CharToBitwiseRepresentation(ch);
 					}
@@ -1001,8 +946,8 @@ int DataMatrix::ReadFasta( const char* infname){
 			do{
 				ch = getc(inf);
 				}while(isspace(ch));
-			if(modSpec.IsAminoAcid())
-				datum = CharToAminoAcidNumber(ch);
+			if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid() == false)
+				datum = CharToDatum(ch);
 			else 
 				datum = CharToBitwiseRepresentation(ch);
 
@@ -1456,7 +1401,7 @@ int DataMatrix::Serialize(char** buf_, int* size_)	{
 
 	memcpy(buf+bptr, &constbase_size, sizeof(constbase_size));
 	bptr += sizeof(constbase_size);
-	memcpy(buf+bptr, constBases, constbase_size);
+	memcpy(buf+bptr, constStates, constbase_size);
 	bptr += constbase_size;
 
 	memcpy(buf+bptr, &number_size, sizeof(number_size));
@@ -1560,14 +1505,14 @@ int DataMatrix::Deserialize(const char* buf, const int size_in)	{
 		p += size;
 	}
 
-	// create the constBases array...
+	// create the constStates array...
 
 	memcpy(&size, p, sizeof(size));
 	p += sizeof(size);
 
 	if (size > 0)	{
-		constBases = new int[size];
-		memcpy(constBases, p, size);
+		constStates = new int[size];
+		memcpy(constStates, p, size);
 		p += size;
 	}
 
@@ -1722,17 +1667,21 @@ void DataMatrix::Reweight(FLOAT_TYPE prob){
 		}
 	}
 
-void DataMatrix::BootstrapReweight(int seed){
-	
-	//allow for a seed to be passed in and used for the reweighting
-	//and then have the original seed restored.  Used for bootstrap restarting
-	int originalSeed = rnd.seed();
-	if(seed > 0){
-		rnd.set_seed(seed);
-		}
+long DataMatrix::BootstrapReweight(int restartSeed){
+	//allow for a seed to be passed in and used for the reweighting - Used for bootstrap restarting.
+	//Either way we'll save the seed at the end of the reweighting as the DataMatrix currentBootstrapSeed,
+	//which allows exactly the same bootstraped datasets to be used in multiple runs, but with different
+	//settings for the actual search
+	if(currentBootstrapSeed == 0) currentBootstrapSeed = rnd.seed();
 
-	RestoreOriginalCounts();
-	
+	int originalSeed = rnd.seed();
+	if(restartSeed > 0) //if a seed was passed in for restarting
+		rnd.set_seed(restartSeed);
+	else //otherwise use the stored bootstrap seed 
+		rnd.set_seed(currentBootstrapSeed);
+
+	long seedUsed = rnd.seed();
+
 	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
 	
 	FLOAT_TYPE p=0.0;
@@ -1758,13 +1707,15 @@ void DataMatrix::BootstrapReweight(int seed){
 		}
 //	deb << endl;
 //	deb.close();
-	if(seed > 0) rnd.set_seed(originalSeed);
+	currentBootstrapSeed = rnd.seed();
+	if(restartSeed > 0) rnd.set_seed(originalSeed);
+	delete []cumProbs;
+	return seedUsed;
 	}
 
 void DataMatrix::CheckForIdenticalTaxonNames(){
-	char *name1, *name2;
+	const char *name1, *name2;
 	vector< pair<int, int> > identicals;
-
 
 	for(int t1=0;t1<nTax-1;t1++){
 		for(int t2=t1+1;t2<nTax;t2++){

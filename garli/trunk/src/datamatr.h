@@ -48,7 +48,7 @@ protected:
 	int		totalNChar; //columns in matrix, with all missing columns removed
 	int 	gapsIncludedNChar; //the actual number of columns in the data matrix read in
 								//only used when outputting something relative to input alignment
-	int		dense;
+	int		dense;		//whether the data has been sorted and identical patterns combined
 	
 	unsigned char**         matrix;
 	int*		count;
@@ -60,17 +60,19 @@ protected:
 						//This used to represent something else (I think)
 	char**          taxonLabel;
 	char**          taxonColor;
+	int		nMissing;
 	int		nConstant;
-	int 	lastConstant;//DJZ
-	int 	*constBases;//DJZ
 	int		nInformative;
 	int		nAutapomorphic;
-	FLOAT_TYPE*         stateDistr;
+	int 	lastConstant;//DJZ
+	int 	*constStates;//the state (or states) that a constant site contains
+	FLOAT_TYPE*	stateDistr;
 	int		stateDistrComputed;
+	int		currentBootstrapSeed;
 	
 	protected:
 		int*	numStates;
-		int	dmFlags;
+		int		dmFlags;
 		int     maxNumStates;
 
 	protected:
@@ -91,6 +93,7 @@ protected:
 			ambigstates = 0x0004	// ambiguous states found in data matrix
 		};
 		enum {
+			PT_MISSING		= 0x0000,
 			PT_CONSTANT		= 0x0001,
 			PT_INFORMATIVE		= 0x0002,
 			PT_AUTAPOMORPHIC	= 0x0004,
@@ -100,31 +103,25 @@ protected:
 	public:
 		DataMatrix() : dmFlags(0), dense(0), nTax(0), nChar(0), matrix(0), count(0)
 			, number(0), taxonLabel(0), numStates(0), stateDistr(0)
-			, nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
-			constBases(0), origCounts(0)
+			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
+			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
 			: nTax(ntax), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
 			, number(0), taxonLabel(0), numStates(0), stateDistr(0)
-			, nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
-			constBases(0), origCounts(0)
+			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
+			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
-		~DataMatrix();
+		virtual ~DataMatrix();
 
 		// pure virtual functions - must override in derived class
-		virtual unsigned char	CharToDatum( char ch )	                        = 0;
-		virtual unsigned char CharToBitwiseRepresentation( char ch ) 			=0;
-		virtual char	DatumToChar( unsigned char d )	                        = 0;
-		virtual unsigned char	FirstState()		                        = 0;
+		virtual unsigned char	CharToDatum( char ch )					= 0;
+		virtual unsigned char CharToBitwiseRepresentation( char ch ) 	= 0;
+		virtual char	DatumToChar( unsigned char d )	                = 0;
+		virtual unsigned char	FirstState()		                    = 0;
 		virtual unsigned char	LastState()		                        = 0;
 //		virtual FLOAT_TYPE	Freq( unsigned char, int = 0)	                        = 0;
-/*
-#if defined( RATIO_FOR_EACH_BRANCH )
-		virtual void	CalcPrMatrix( FLOAT_TYPE** pr, FLOAT_TYPE brlen, FLOAT_TYPE kappa )       = 0;
-#else
-		virtual void	CalcPrMatrix( FLOAT_TYPE** pr, FLOAT_TYPE brlen )       = 0;
-#endif
-*/
+
 		// virtual functions - can override in derived class
 		virtual FLOAT_TYPE	TransitionProb( int /*i*/, int /*j*/
 			, int /*site*/, FLOAT_TYPE /*brlen*/) { return 0.0; }
@@ -132,7 +129,7 @@ protected:
 			{ return ( numStates && (j < nChar) ? numStates[j] : 0 ); }
 
 		FLOAT_TYPE prNumStates( int n ) const;
-		virtual void SetAminoAcid() {maxNumStates = 20;}
+
 		// functions for quizzing dmFlags
 		int InvarCharsExpected() { return !(dmFlags & allvariable); }
 		int VariableNumStates() { return (dmFlags & vnstates); }
@@ -165,14 +162,14 @@ protected:
 		virtual int Count(int j) const
 			{ return ( count && (j < nChar) ? count[j] : 0 ); }
 		virtual const int *GetCounts() const {return count;}
-		const int *GetConstBases() const {return constBases;}
+		const int *GetConstStates() const {return constStates;}
 		void SetCount(int j, int c)
 			{ if( count && (j < nChar) ) count[j] = c; }
 
 		void SetNumStates(int j, int c)
 			{ if( numStates && (j < nChar) ) numStates[j] = c; }
 
-		char* TaxonLabel(int i) const{
+		const char* TaxonLabel(int i) const{
 			return ( taxonLabel && (i < nTax) ? taxonLabel[i] : 0 );
 			}
 		void SetTaxonLabel(int i, const char* s);
@@ -183,23 +180,23 @@ protected:
 				}
 			return -1;
 			}
-		
+		void CopyNamesFromOtherMatrix(const DataMatrix *dat){
+			assert(taxonLabel);
+			for(int t=0;t<nTax;t++) SetTaxonLabel(t, dat->TaxonLabel(t));
+			}
+
 		void BeginNexusTreesBlock(ofstream &treeout) const;
-		void CreateMatrixFromNCL(GarliReader &reader);
-		
-		// added 3/20/1998 in order to implement the Muse and Gaut codon model
-//		virtual int NCodons() { return 0; }
-//		virtual unsigned char CodonState( int i, int j ) { return (unsigned char)0; }
+		virtual void CreateMatrixFromNCL(GarliReader &reader) {};
 		
 		virtual unsigned char Matrix( int i, int j ) const {
-//			assert( matrix );
-//			assert( i >= 0 );
-//			assert( i < nTax );
-//			assert( j >= 0 );
-//			assert( j < nChar );
+			assert( matrix );
+			assert( i >= 0 );
+			assert( i < nTax );
+			assert( j >= 0 );
+			assert( j < nChar );
 			return (unsigned char)matrix[i][j];
-		}
-				//MTH
+			}
+
 		unsigned char *GetRow( int i) const {
 			assert( matrix );
 			assert( i >= 0 );
@@ -210,6 +207,7 @@ protected:
 			{ if( matrix && (i < nTax) && (j < nChar) ) matrix[i][j] = c; }
 
 		int MatrixExists() const { return ( matrix && nTax>0 && nChar>0 ? 1 : 0 ); }
+		int NMissing() const { return nMissing; }
 		int NConstant() const { return nConstant; }
 		int LastConstant() const {return lastConstant;}
 		int NInformative() const { return nInformative; }
@@ -238,7 +236,7 @@ protected:
 		bool operator==(const DataMatrix& rhs) const; // cjb - to test serialization
 		void ExplicitDestructor();  // cjb - totally clear the DataMatrix and revert it to its original state as if it was just constructed
 		void CheckForIdenticalTaxonNames();
-		virtual char CharToAminoAcidNumber(unsigned char d);
+
 	public:	// exception classes
 #if defined( CPLUSPLUS_EXCEPTIONS )
 		class XBadState {
@@ -274,7 +272,7 @@ protected:
       			}
       		}
       void Reweight(FLOAT_TYPE prob);
-      void BootstrapReweight(int seed);
+      long BootstrapReweight(int seed);
       
 #endif
 };
@@ -447,186 +445,6 @@ inline char MorphData::DatumToChar( unsigned char d )
 	else if( d == 0x80 )
 		ch = '7';
 
-	return ch;
-}
-
-// ********************* new material above *****************************
-
-class DNAData : public DataMatrix
-{
-	public:
-		DNAData() : DataMatrix()
-			{ maxNumStates=4; strcpy( info, "DNA" ); }
-		DNAData( int ntax, int nchar ) : DataMatrix( ntax, nchar )
-			{ maxNumStates=4; strcpy( info, "DNA" ); }
-		~DNAData() {}
-
-		// overrides of base class's virtual fuctions
-		virtual unsigned char 	CharToDatum( char ch );
-		virtual unsigned char CharToBitwiseRepresentation( char ch );
-		virtual char	DatumToChar( unsigned char d );
-		virtual unsigned char	FirstState() { return 0; }
-		virtual unsigned char	LastState() { return 3; }
-		virtual int	NumStates(int) const { return 4; }
-
-		
-};
-
-inline unsigned char DNAData::CharToDatum( char ch )
-{
-	unsigned char datum;
-
-	if( ch == 'A' || ch == 'a' )
-		datum = 0;
-	else if( ch == 'C' || ch == 'c' )
-		datum = 1;
-	else if( ch == 'G' || ch == 'g' )
-		datum  = 2;
-	else if( ch == 'T' || ch == 't' )
-		datum = 3;
-	else if( ch == '?' || ch == '-' )
-		datum = MISSING_DATA;
-	else if( strchr( "rRyYmMkKsSwWhHbBvVdDnN", ch ) ) {
-		datum = MISSING_DATA;
-		dmFlags |= ambigstates;
-	}
-	else
-		THROW_BADSTATE(ch);
-
-	return datum;
-}
-
-inline unsigned char DNAData::CharToBitwiseRepresentation( char ch )
-{
-	unsigned char datum=0;
-	switch(ch){
-		case 'A' : datum=1; break;
-    	case 'C' : datum=2; break;
-       	case 'G' : datum=4; break;
-       	case 'T' : datum=8; break;
-       	case 'U' : datum=8; break;
-       	case 'M' : datum=3; break;
-       	case 'R' : datum=5; break;
-       	case 'S' : datum=6; break;
-       	case 'V' : datum=7; break;
-       	case 'W' : datum=9; break;
-       	case 'Y' : datum=10; break;
-       	case 'H' : datum=11; break;
-      	case 'K' : datum=12; break;
-       	case 'D' : datum=13; break;
-       	case 'B' : datum=14; break;
-       	case 'N' : datum=15; break;
-
-		case 'a' : datum=1; break;
-    	case 'c' : datum=2; break;
-       	case 'g' : datum=4; break;
-       	case 't' : datum=8; break;
-		case 'u' : datum=8; break;
-       	case 'm' : datum=3; break;
-       	case 'r' : datum=5; break;
-       	case 's' : datum=6; break;
-       	case 'v' : datum=7; break;
-       	case 'w' : datum=9; break;
-       	case 'y' : datum=10; break;
-       	case 'h' : datum=11; break;
-      	case 'k' : datum=12; break;
-       	case 'd' : datum=13; break;
-       	case 'b' : datum=14; break;
-       	case 'n' : datum=15; break;
-       	case '-' : datum=15; break;
-  		case '?' : datum=15; break;
-       	default  : throw ErrorException("Unknown nucleotide %c!", ch);
-		}
-	return datum;
-}
-
-
-inline char DataMatrix::CharToAminoAcidNumber(unsigned char d){
-	char ch = 20;
-	switch(d){
-		case'A'	: ch=	0	;break;
-		case'C' : ch=	1	;break;
-		case'D' : ch=	2	;break;
-		case'E' : ch=	3	;break;
-		case'F' : ch=	4	;break;
-		case'G' : ch=	5	;break;
-		case'H' : ch=	6	;break;
-		case'I' : ch=	7	;break;
-		case'K' : ch=	8	;break;
-		case'L' : ch=	9	;break;
-		case'M' : ch=	10	;break;
-		case'N' : ch=	11	;break;
-		case'P' : ch=	12	;break;
-		case'Q' : ch=	13	;break;
-		case'R' : ch=	14	;break;
-		case'S' : ch=	15	;break;
-		case'T' : ch=	16	;break;
-		case'V'	: ch=	17	;break;
-		case'W'	: ch=	18	;break;
-		case'Y' : ch=	19	;break;
-		case'-'	: ch=   20  ;break;
-		case'?'	: ch=   20  ;break;
-		case'a'	: ch=	0	;break;
-		case'c' : ch=	1	;break;
-		case'd' : ch=	2	;break;
-		case'e' : ch=	3	;break;
-		case'f' : ch=	4	;break;
-		case'g' : ch=	5	;break;
-		case'h' : ch=	6	;break;
-		case'i' : ch=	7	;break;
-		case'k' : ch=	8	;break;
-		case'l' : ch=	9	;break;
-		case'm' : ch=	10	;break;
-		case'n' : ch=	11	;break;
-		case'p' : ch=	12	;break;
-		case'q' : ch=	13	;break;
-		case'r' : ch=	14	;break;
-		case's' : ch=	15	;break;
-		case't' : ch=	16	;break;
-		case'v'	: ch=	17	;break;
-		case'w'	: ch=	18	;break;
-		case'y' : ch=	19	;break;
-		default : throw ErrorException("Unknown Amino Acid %c!", ch);
-		}
-	return ch;
-	}
-
-inline char DNAData::DatumToChar( unsigned char d )
-{
-	char ch;
-	switch(d){
-		case 1 : ch='A'; break;
-    	case 2 : ch='C'; break;
-       	case 4 : ch='G'; break;
-       	case 8 : ch='T'; break;
- //      	case 8 : ch='U'; break;
-       	case 3 : ch='M'; break;
-       	case 5 : ch='R'; break;
-       	case 6 : ch='S'; break;
-       	case 7 : ch='V'; break;
-       	case 9 : ch='W'; break;
-       	case 10 : ch='Y'; break;
-       	case 11 : ch='H'; break;
-      	case 12 : ch='K'; break;
-       	case 13 : ch='D'; break;
-       	case 14 : ch='B'; break;
-       	case 15 : ch='?'; break;
-		default  : assert(0);
-		}
-/*		
-	char ch = 'X';
-
-	if( d == MISSING_DATA )
-		ch = '?';
-	else if( d == 0 )
-		ch = 'A';
-	else if( d == 1 )
-		ch = 'C';
-	else if( d == 2 )
-		ch = 'G';
-	else if( d == 3 )
-		ch = 'T';
-*/
 	return ch;
 }
 
