@@ -43,6 +43,10 @@ class ReconNode{
 	void Report(ofstream &deb){
 		deb << nodeNum << "\t" << reconDist << "\t" << pathlength << "\t" << weight << "\t" << chooseProb << "\t" << withinCutSubtree << "\n";
 		}
+
+	bool operator<(const ReconNode &rhs){
+		return reconDist < rhs.reconDist;
+		}
 	};
 
 class DistEquals:public binary_function<ReconNode, int, bool>{
@@ -67,11 +71,11 @@ class NodeEquals:public binary_function<ReconNode, int, bool>{
 	};
 
 class ReconList{
-	list<ReconNode> l;
 	unsigned num;
+	list<ReconNode> l;
 
 	public:
-	
+
 	listIt begin(){
 		return l.begin();
 		}
@@ -177,13 +181,24 @@ class ReconList{
 		it--;
 		return &(*it);
 		}
+	void AddNode(ReconNode &nd){
+		//this just duplicates the added ReconNode via the default copy constructor, assumably added from another list
+		l.push_back(nd);
+		num++;
+		}
+
 	void AddNode(int nn, int rd, float pl, bool withinCutSubtree=false){	
 		//first verify that we don't already have this node in the list
 		if(find_if(l.begin(),l.end(),bind2nd(NodeEquals(), nn)) != l.end()) return;	
 		l.push_back(ReconNode(nn, rd, pl, withinCutSubtree));
 		num++;
+		}	
+
+
+	void SortByDist(){
+		l.sort();
 		}
-	
+
 	void DebugReport(){
 		ofstream deb("recons.log");
 		for(listIt it=l.begin();it!=l.end();it++){
