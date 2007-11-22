@@ -33,20 +33,14 @@
 #include "population.h"
 #include "individual.h"
 #include "adaptation.h"
-#include "mlhky.h"
+#include "sequencedata.h"
 
 #include "funcs.h"
 #include "mpifuncs.h"
 #include "hashdefines.h"
 #include "tree.h"
-#include "mlhky.h"
 #include "errorexception.h"
 #include "outputman.h"
-
-//include Sioux console manipulators
-#ifdef MAC
-	#include "sioux.h"
-#endif
 
 #ifdef MAC_FRONTEND
 #import <Foundation/Foundation.h>
@@ -57,11 +51,8 @@
 #include "mpi.h"
 #endif
 
-#undef RUN_TESTS
-
-char programName[81];
-
 OutputManager outman;
+bool interactive;
 
 int CheckRestartNumber(const string str){
 	int num=1;
@@ -74,34 +65,32 @@ int CheckRestartNumber(const string str){
 	return num;
 	}
 
-#ifndef SUBROUTINE_GARLI
-int main( int argc, char* argv[] )	{
-#else
-int SubGarliMain(int rank)	{
-int argc=1;
-char **argv=NULL;
-#endif
-
-	#ifdef SIOUX
-	SIOUXSettings.columns = 90;
-	SIOUXSettings.rows = 45;
-	SIOUXSettings.asktosaveonclose = false;
-	SIOUXSettings.autocloseonquit = true;
-	SIOUXSettings.showstatusline = true;
-	SIOUXSetTitle("\pGARLI 0.94");
-	#endif
-	
 #ifdef BOINC
+int boinc_garli_main( int argc, char* argv[] );
+
+int main( int argc, char* argv[] ){
 	int retval = boinc_init();
 	if(retval){
 		cout << "Problem initializing BOINC system!" << endl;
 		return retval;
 		}
+	retval = boinc_garli_main( argc, argv );
+	if(retval) boinc_finish(retval);
+	else boinc_finish(0);
+	}
+
+int boinc_garli_main( int argc, char* argv[] )	{
 	outman.SetNoOutput(true);
 
+#elif defined( SUBROUTINE_GARLI )
+int SubGarliMain(int rank)	{
+	int argc=1;
+	char **argv=NULL;
+#else
+int main( int argc, char* argv[] )	{
 #endif
 
-	CREATE_MEMCHK{
+	CREATE_MEMCHK{//memory lead detecting trick - no overhead when turned off
 
 	#ifdef MPI_VERSION
 		MPIMain(argc, argv);
@@ -117,11 +106,12 @@ char **argv=NULL;
 #endif
 
 #if defined(UNIX) || defined(BOINC)
-	bool interactive=false;
+	interactive=false;
 #else
-	bool interactive=true;
+	interactive=true;
 #endif
 
+	bool runTests = false;
     if (argc > 1) {
     	int curarg=1;
         while(curarg<argc){
@@ -140,7 +130,8 @@ char **argv=NULL;
 						}
 						[pool release];
 					}
-#endif															
+#endif				
+					else if(argv[curarg][1]=='t') runTests = true;
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						exit(0);
@@ -155,10 +146,11 @@ char **argv=NULL;
 	if(Tree::random_p==false) Tree::ComputeRealCatalan();
 #endif
 
-		HKYData *data = NULL;
+
 		//create the population object
 		Population pop;
-
+		SequenceData *data = NULL;
+		
 		try{
 			MasterGamlConfig conf;
 			bool confOK;
@@ -232,6 +224,11 @@ char **argv=NULL;
 
 			outman.UserMessage("Running serial GARLI, version 0.96beta4 (Aug 2007)\n(->Amino acid and Codon testing version<-)\n");
 #endif
+#ifdef OPEN_MP
+			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
+#endif
+			outman.UserMessage("Compiled %s %s\n", __DATE__, __TIME__); 
+
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
@@ -239,26 +236,68 @@ char **argv=NULL;
 			modSpec.SetupModSpec(conf);
 
 			// Create the data object
-			if(modSpec.IsNucleotide() || modSpec.IsAminoAcid())
-				data = new HKYData();
-			else
-				data = new CodonData();
+			if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid() == false)
+				data = new AminoacidData();
+			else //all data besides AA will be read into a DNA matrix and
+				//then converted if necessary
+				data = new NucleotideData();
 
 			pop.usedNCL = ReadData(datafile.c_str(), data);
-		
+			
+			if(modSpec.IsCodon()){
+				CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
+				pop.rawData = data;
+				data = d;
+				//this probably shouldn't go here, but...
+				if(modSpec.IsF1x4StateFrequencies()) d->SetEmpType(1);
+				if(modSpec.IsF3x4StateFrequencies()) d->SetEmpType(2);
+				}
+			else if(modSpec.IsCodonAminoAcid()){
+				AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
+				pop.rawData = data;
+				data = d;				
+				}
+
+			data->Summarize();
+			outman.UserMessage("\nSummary of dataset:");
+			outman.UserMessage(" %d sequences.", data->NTax());
+			outman.UserMessage(" %d constant characters.", data->NConstant());
+			outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
+			outman.UserMessage(" %d autapomorphic characters.", data->NAutapomorphic());
+			int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
+			outman.UserMessage(" %d total characters.", total);
+
+			if(data->NMissing() > 0)
+				outman.UserMessage(" %d characters were completely missing or ambiguous (removed).", data->NMissing());
+
+			outman.flush();
+
+			data->Collapse();
+			outman.UserMessage("%d columns in compressed data matrix.\n", data->NChar());
+
+			//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
+			data->ReserveOriginalCounts();
+
+			if(modSpec.includeInvariantSites && modSpec.IsCodon() == false)
+				data->DetermineConstantSites();
+
 			pop.Setup(&conf, data, 1, 0);
 
+			if(runTests){
+				outman.UserMessage("starting internal tests...");
+				pop.RunTests();
+				throw ErrorException("(not actually an error!) Successfully completed tests.");
+				}
+			
 			if(conf.runmode != 0){
 				if(conf.runmode == 1)
 					pop.ApplyNSwaps(10);
+				if(conf.runmode == 7)
+					pop.VariableStartingTreeOptimization();
 				else if(conf.runmode > 1)
 					pop.SwapToCompletion(conf.startOptPrec);
 				}
 			else{
-#ifdef RUN_TESTS
-				pop.RunTests();
-			
-#endif
 				if(pop.conf->restart) pop.ReadStateFiles();
 
 				pop.SetOutputDetails();
@@ -272,9 +311,9 @@ char **argv=NULL;
 				if(outman.IsLogSet() == false)
 					outman.SetLogFile("ERROR.log");
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
-#ifdef BOINC
-				boinc_finish(1);
-#endif
+				pop.FinalizeOutputStreams(0);
+				pop.FinalizeOutputStreams(1);
+				pop.FinalizeOutputStreams(2);
 
 #ifdef MAC_FRONTEND
 				NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -282,101 +321,24 @@ char **argv=NULL;
 				[[MFEInterfaceClient sharedClient] didEncounterError:messageForInterface];
 				[pool release];
 #endif				
+
+#ifdef BOINC
+				return 1;
+#endif
 				}
 			catch(int error){
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
 				}
-	if(data != NULL) delete data;
+		if(data != NULL) delete data;
 	
-	if(interactive==true){
-		outman.UserMessage("\n-Press enter to close program.-");
-		char d=getchar();
+		if(interactive==true){
+			outman.UserMessage("\n-Press enter to close program.-");
+			char d=getchar();
+			}
+		outman.CloseLogFile();
 		}
 
-	outman.CloseLogFile();
-#ifdef BOINC
-	boinc_finish(0);
-#endif
-
-/* OLD WAY
-			if(pop.conf->bootstrapReps == 0){
-				pop.GetConstraints();
-				if(conf.restart == false){
-					outman.UserMessage("Running Genetic Algorithm with initial seed=%d\n", rnd.init_seed());
-					pop.SeedPopulationWithStartingTree();
-*/					//DEBUG - to look at effect of prec during init opt on score
-/*					pop.InitializeOutputStreams();
-					time_t repStart;
-					ofstream res("optresults.log");
-					for(FLOAT_TYPE prec=0.5;prec > 0.0001;){
-						repStart = pop.stopwatch.SplitTime();
-						for(int rep=0;rep<10;rep++){
-							pop.adap->branchOptPrecision = prec;
-							pop.SeedPopulationWithStartingTree();
-							pop.AppendTreeToTreeLog(-1, -1);
-							res << prec << "\t" << pop.indiv[0].Fitness() << endl;
-							}
-						res << "TIME: " << prec << "\t" << pop.stopwatch.SplitTime() - repStart << endl;
-						if(prec > 0.051) prec -= 0.05;
-						else prec -= 0.01;
-						}
-					return 1;
-*/					}
-/*				else{
-					pop.ReadStateFiles();
-					outman.UserMessage("Restarting Genetic Algorithm from checkpoint");
-					outman.UserMessage("generation %d, seed %d, best lnL %.3f", pop.Gen(), rnd.init_seed(), pop.BestFitness());
-					pop.adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(&conf);
-					}
-				pop.InitializeOutputStreams();
-				pop.AppendTreeToTreeLog(-1, -1);
-				pop.Run();
-				}
-			else{
-				pop.InitializeOutputStreams();
-				if(conf.restart == true) throw(ErrorException("Restarting of bootstrap runs is not supported.\nYou should simply start a new bootstrap run and\ncombine all trees obtained into one bootstrap sample."));
-				if(conf.inferInternalStateProbs == true) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
-				pop.OutputModelReport();
-				//if there are not mutable params in the model, remove any weight assigned to the model
-				if(pop.indiv[0].mod->NumMutatableParams() == 0) {
-					outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
-					pop.adap->modelMutateProb=0.0;
-					pop.adap->UpdateProbs();
-					}
-				pop.GetConstraints();
-				pop.Bootstrap();
-				}
-			}catch(ErrorException err){
-				outman.UserMessage("\nERROR: %s\n\n", err.message);
-/*
-#ifdef BOINC
-				boinc_finish(1);
-#endif
-
-#ifdef MAC_FRONTEND
-				NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-				NSString *messageForInterface = [NSString stringWithUTF8String:err.message];
-				[[MFEInterfaceClient sharedClient] didEncounterError:messageForInterface];
-				[pool release];
-#endif				
-				}
-			catch(int error){
-				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
-				}
-
-	if(interactive==true){
-		outman.UserMessage("\n-Press enter to close program.-");
-		char d=getchar();
-		}
-
-	delete data;
-	outman.CloseLogFile();
-#ifdef BOINC
-	boinc_finish(0);
-#endif
-	}
-*/
-	#if defined(MONITORING_ALLOCATION) && !defined(NDEBUG)
+#if defined(MONITORING_ALLOCATION) && !defined(NDEBUG)
 		#if defined(WRITE_MEM_REPORT_TO_FILE)
 			char filename[50];
 			#ifndef WIN32
@@ -393,10 +355,6 @@ char **argv=NULL;
 			MEMCHK_REPORT(cout)
 		#endif
 	#endif
-
-#ifdef BOINC
-	boinc_finish(0);
-#endif
 
 	return 0;
 };
