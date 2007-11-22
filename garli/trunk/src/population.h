@@ -331,7 +331,7 @@ private:
 		enum { nomem=1, nofile, baddimen };
 		int error;
 	bool usedNCL;
-	bool startingTreesInNCL;
+	bool startingTreeOrModelInNCL;
 
 	enum output_details {
 		DONT_OUTPUT = 0,
@@ -367,7 +367,10 @@ private:
 		
 	TopologyList **topologies;//allocated in Setup(), deleted in dest
 			
-	HKYData* data;
+	SequenceData* data;
+	SequenceData* rawData;//this will hold the original data as read in, before it might be converted
+					//to codons or aminoacid
+
 	Stopwatch stopwatch;
 
 #ifdef INCLUDE_PERTURBATION
@@ -376,13 +379,13 @@ private:
 #endif
 
 	public:
-		Population() : error(0), conf(NULL), usedNCL(false), startingTreesInNCL(false),
+		Population() : error(0), conf(NULL), usedNCL(false), startingTreeOrModelInNCL(false),
 			bestFitness(-(FLT_MAX)), bestIndiv(0), currentSearchRep(1), 
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			treeString(NULL), adap(NULL), fraction_done(ZERO_POINT_ZERO),
 			topologies(NULL), prematureTermination(false), currentBootstrapRep(0),
-			finishedRep(false), lastBootstrapSeed(0)
+			finishedRep(false), lastBootstrapSeed(0), data(NULL), rawData(NULL)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
 #endif
@@ -425,7 +428,7 @@ private:
 		void WriteTreeFile( const char* treefname, int indnum = -1);
 		void WritePhylipTree(ofstream &phytree);
 
-		void Setup(GeneralGamlConfig *conf, HKYData *, int nprocs = 1, int rank = 0);
+		void Setup(GeneralGamlConfig *conf, SequenceData *, int nprocs = 1, int rank = 0);
 		void Reset();
 		int Restart(int type, int rank, int nprocs, int restart_count);
 		void SeedPopulationWithStartingTree(int rep);//mult rep change
@@ -438,6 +441,7 @@ private:
 		void UpdateFractionDone();
 		bool OutgroupRoot(Individual *ind, int indnum);
 		void LoadNexusStartingTrees();
+		void VariableStartingTreeOptimization();
 
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );
