@@ -26,7 +26,7 @@ using namespace std;
 #include "bipartition.h"
 #include "errorexception.h"
 #include "outputman.h"
-#include "mlhky.h"
+#include "sequencedata.h"
 
 extern OutputManager outman;
 
@@ -602,6 +602,13 @@ void TreeNode::PrintSubtreeMembers(ofstream &out){
 	}
 	
 void TreeNode::AdjustClasForReroot(int dir){
+	//11/19/07 this was really, really dumb!  CLA's were 
+	//being reoriented even when more than one tree 
+	//was pointing to them.  There isn't an easy way
+	//of checking the number of users of a cla from here
+	//so just deprecating this function for now.
+	assert(0);
+
 	int tmp=claIndexDown;
 	if(dir==2){//the ancestor and left des have been swapped
 		claIndexDown=claIndexUL;
@@ -625,7 +632,7 @@ void TreeNode::RecursivelyAddOrRemoveSubtreeFromBipartitions(Bipartition *subtre
 
 //unsigned MATCH_II=0, MATCH_TT=0, MATCH_IT=0, TOT_II=0, TOT_IT=0, TOT_TT=0;
 
-void TreeNode::SetEquivalentConditionalVectors(const HKYData *data){
+void TreeNode::SetEquivalentConditionalVectors(const SequenceData *data){
 	if(nodeNum == 0){
 		if(left->IsInternal()) left->SetEquivalentConditionalVectors(data);
 		if(left->next->IsInternal()) left->next->SetEquivalentConditionalVectors(data);

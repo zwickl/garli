@@ -29,7 +29,7 @@ using namespace std;
 /* GANESH included the following #includes */
 #include "hashdefines.h"
 
-class HKYData;
+class NucleotideData;
 class MFILE;
 
 class TreeNode{
@@ -101,7 +101,7 @@ class TreeNode{
 			if(left) left->SetUnoptimized();
 			if(right) right->SetUnoptimized();
 			}
-		void SetEquivalentConditionalVectors(const HKYData *data);
+		void SetEquivalentConditionalVectors(const SequenceData *data);
 		void OutputBinaryNodeInfo(OUTPUT_CLASS &out) const;
 		     
 		//debugging functions for checking tree formation
