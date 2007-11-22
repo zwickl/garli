@@ -21,17 +21,17 @@
 #define MPIFUNCS_H
 
 #include "configoptions.h"
-#include "mlhky.h"
+#include "sequencedata.h"
 #include "parameters.h"
 #include "population.h"
 #include "threaddcls.h"
 
 int MPIMain(int arc, char** argv);
 
-int StartProcs(const GeneralGamlConfig&, HKYData&);
+int StartProcs(const GeneralGamlConfig&, NucleotideData&);
 
-int MasterMaster(MasterGamlConfig&, HKYData&);
-int RemoteMaster(GeneralGamlConfig&, HKYData&);
+int MasterMaster(MasterGamlConfig&, NucleotideData&);
+int RemoteMaster(GeneralGamlConfig&, NucleotideData&);
 int MasterFullDuplexExchange(Population& pop, const MasterGamlConfig& conf);
 int RemoteFullDuplexExchange(Population& pop, const GeneralGamlConfig& conf);
 int MasterShieldedMigrants(Population& pop, const MasterGamlConfig& conf);
@@ -47,7 +47,7 @@ int MasterLastCall(Population& pop, int master_mem);
 //int DoMasterSM(Population& pop, const GamlConfig& conf, int who, transferred_data_t results);
 //int DoMasterAMR(Population& pop, const GamlConfig& conf, int who, transferred_data_t results);
 
-int CalcMaxIndivs(const HKYData&, int);
+int CalcMaxIndivs(const NucleotideData&, int);
 
 // buf, size in bytes, from, tag, blocking
 int RecvMPIMessage(char**, int*, int*, int*, bool block = true);
@@ -64,7 +64,7 @@ int GetResultsFromNode(int node_num, int* nindivs_, char** tree_strings_);
 int SendResultsToNode(int node, int n, char* tree_strings);
 
 int ReceiveParams(Parameters* params_, int node);
-int ReceiveData(HKYData* data_, int node);
+int ReceiveData(NucleotideData* data_, int node);
 
 int debug_mpi(const char* fmt, ...);
 int LogConfig(const GeneralGamlConfig&);

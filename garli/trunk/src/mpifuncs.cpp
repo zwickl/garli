@@ -68,7 +68,7 @@ int MPIMain(int argc, char** argv)	{
 		LogConfig(conf);
 
 	        // Create the data object
-        	HKYData data;
+        	NucleotideData data;
         	ReadData(conf.datafname.c_str(), &data);
 
 	        // start the remote nodes going...
@@ -82,7 +82,7 @@ int MPIMain(int argc, char** argv)	{
 	
 		int from, tag, size;
 		char* buf;
-		HKYData data;
+		NucleotideData data;
 		GeneralGamlConfig conf;
 		if (conf.Read("garli.conf") < 0)	{
 			throw ErrorException("Error in config file (Remote)...aborting.");
@@ -120,14 +120,14 @@ int MPIMain(int argc, char** argv)	{
 	return 0;
 }
 
-int StartProcs(const GeneralGamlConfig& conf, HKYData& data)	{
+int StartProcs(const GeneralGamlConfig& conf, NucleotideData& data)	{
 
 //	debug_mpi("entering StartProcs()");
 
 	char* conf_buf, *data_buf;
 	int conf_size, data_size;
 	GeneralGamlConfig ctest;
-//	HKYData dtest;
+//	NucleotideData dtest;
 
 	data.Serialize(&data_buf, &data_size);
 //	conf.Serialize(&conf_buf, &conf_size);
@@ -158,7 +158,7 @@ int StartProcs(const GeneralGamlConfig& conf, HKYData& data)	{
 /* threaded MasterMaster */
 /* i would prefer that the thread initialization code happen in MPIMain(), but
  * it needs Population pop, which is declared here */
-int MasterMaster(MasterGamlConfig& conf, HKYData& data)	{
+int MasterMaster(MasterGamlConfig& conf, NucleotideData& data)	{
 	Parameters params;
 	params.SetParams(conf, data);
 	LogParams(params);
@@ -265,7 +265,7 @@ int MasterMaster(MasterGamlConfig& conf, HKYData& data)	{
 }
 
 /* old MasterMaster 
-int MasterMaster(const GamlConfig& conf, HKYData& data)	{
+int MasterMaster(const GamlConfig& conf, NucleotideData& data)	{
 	Parameters params;
 	params.SetParams(conf, data, true);
 	LogParams(params);
@@ -307,7 +307,7 @@ int MasterMaster(const GamlConfig& conf, HKYData& data)	{
 */
 
 
-int RemoteMaster(GeneralGamlConfig& conf, HKYData& data)	{
+int RemoteMaster(GeneralGamlConfig& conf, NucleotideData& data)	{
 
 	debug_mpi("starting RemoteMaster()...");
 	
@@ -363,7 +363,7 @@ int RemoteMaster(GeneralGamlConfig& conf, HKYData& data)	{
 }
 
 /*
-int RemoteMaster(const GamlConfig& conf, HKYData& data)	{
+int RemoteMaster(const GamlConfig& conf, NucleotideData& data)	{
 
 	debug_mpi("starting RemoteMaster()...");
 	
@@ -617,8 +617,8 @@ int ReceiveParams(Parameters* params_, int node)	{
 	return 0;
 }
 
-int ReceiveData(HKYData* data_, int node)	{
-	HKYData& data = *data_;
+int ReceiveData(NucleotideData* data_, int node)	{
+	NucleotideData& data = *data_;
 
     int size;
     MPI_Status status;
@@ -925,7 +925,7 @@ int strlen2(char* p)	{
 	return count;
 }
 
-int CalcMaxIndivs(const HKYData& data, int mem)	{
+int CalcMaxIndivs(const NucleotideData& data, int mem)	{
 	const int KB = 1024;
 	const int MB = KB*KB;
 	int sizeof_treenode = 4*data.NChar()*sizeof(double);
