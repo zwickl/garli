@@ -55,7 +55,7 @@ void MyNexusToken::OutputComment(
 */
 GarliReader::GarliReader()
 	{
-	id				= "GarliReader";
+	id				= "GARLI";
 
 	// Make sure all data members that are pointers are initialized to NULL!
 	// Failure to do this will result in problems because functions such as
@@ -423,7 +423,7 @@ void GarliReader::HandleHelp(
 
 void GarliReader::HandleGarliReader(
   NxsToken &token){	/* the token used to read from `in' */
-//	GARLI_main(1, NULL);
+	
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -805,6 +805,7 @@ void GarliReader::PurgeBlocks()
 	Add(distances);
 	Add(characters);
 	Add(data);
+	Add(this);
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -832,7 +833,10 @@ void GarliReader::Read(
 		}
 
 	for (;;)
-		{
+		{//only allowing three things to happen here 
+		//1. endblock is reached, sucessfully exiting the garli block
+		//2. something besides an endblock is read.  This is interpreted as part of the model string, with minimal error checking
+		//3. eof is hit before an endblock
 		token.GetNextToken();
 
 		if (token.Abbreviation("ENdblock"))
@@ -840,6 +844,24 @@ void GarliReader::Read(
 			HandleEndblock(token);
 			break;
 			}
+		else if(token.AtEOF() == false){
+			NxsString s = token.GetToken();
+			if(s.size() > 1 && (s.IsADouble() == false && s.IsALong() == false)){
+				errormsg = "Unexpected character(s) in Garli block.\n     See manual for model parameter format.";
+				throw NxsException(errormsg, token.GetFilePosition(), token.GetFileLine(), token.GetFileColumn());
+				}
+			if(token.IsPunctuationToken() == false){//toss semicolons and such
+				modelString += token.GetToken();
+				modelString += ' ';
+				}
+			}
+		else
+			{
+			errormsg = "Unexpected end of file encountered before \"end;\" or\n     \"endblock;\" command in Garli block";
+			throw NxsException(errormsg, token.GetFilePosition(), token.GetFileLine(), token.GetFileColumn());
+			}
+		}
+/*
 		else if (token.Abbreviation("GarliReader"))
 			{
 			HandleGarliReader(token);
@@ -884,7 +906,7 @@ void GarliReader::Read(
 				throw NxsException(errormsg, token.GetFilePosition(), token.GetFileLine(), token.GetFileColumn());
 				}
 			}
-		}
+*/
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------

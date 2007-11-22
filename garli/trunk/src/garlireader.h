@@ -69,6 +69,7 @@
 |	o Report it in some way in the Report function
 |~
 */
+
 class GarliReader
   : public NxsBlock,
   public NxsReader
@@ -119,7 +120,9 @@ class GarliReader
 		NxsDistancesBlock	*distances;			/* pointer to NxsDistancesBlock object */
 		NxsCharactersBlock	*characters;		/* pointer to NxsCharactersBlock object */
 		NxsDataBlock		*data;				/* pointer to NxsDataBlock object */
+
 		char				*next_command;		/* workspace for processing next command entered interactively by user */
+		NxsString			modelString;
 
 		unsigned			CharLabelToNumber(NxsString s);
 		bool				FileExists(const char* fn);
@@ -138,6 +141,11 @@ class GarliReader
 
 	public:
 		int				HandleExecute(const char *filename);
+		const char*			GetModelString(){
+			return modelString.c_str();
+			}
+		bool FoundModelString() {return modelString.length() > 0;}
+		void ClearModelString() {modelString.clear();}
 		};
 
 /*----------------------------------------------------------------------------------------------------------------------
