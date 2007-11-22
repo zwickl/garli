@@ -31,8 +31,10 @@
 	
 	#define OMP_INTINTCLA_NSTATE
 	#define OMP_INTTERMCLA_NSTATE
-	#undef OMP_TERMDERIV_NSTATE
+	#define OMP_TERMDERIV_NSTATE
 	#define OMP_INTDERIV_NSTATE
+	#define OMP_INTSCORE_NSTATE
+	#define OMP_TERMSCORE_NSTATE
 #endif
 
 /*
@@ -40,6 +42,8 @@
 #undef NDEBUG
 #endif
 */
+
+#define USE_COUNTS_IN_BOOT
 
 #undef OPT_DEBUG
 
