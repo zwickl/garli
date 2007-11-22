@@ -468,6 +468,59 @@ class Bipartition{
 			}
 		return str;
 		}
+	
+	void NumericalOutput(string &out, const Bipartition *mask){
+		string left = "(";
+		string right = "(";
+		char temp[100];
+		int lastLeft=-1, lastRight=-1;
+		if(mask != NULL){
+			for(int i=0;i<nBlocks;i++){
+				unsigned int t=rep[i];
+				unsigned int m=mask->rep[i];
+				unsigned int bit = largestBlockDigit;
+				for(int j=0;j<blockBits;j++){
+					if(i*blockBits+j >= ntax) break;
+					if(bit & m){
+						if(bit & t){
+							if(strcmp(left.c_str(), "(")) left += ',';
+							sprintf(temp, "%d", (i*blockBits + j + 1));
+							left += temp;
+							}
+						else{
+							if(strcmp(right.c_str(), "(")) right += ',';
+							sprintf(temp, "%d", (i*blockBits + j + 1));
+							right += temp;
+							}
+						}
+					bit = bit >> 1;	
+					}
+				}
+			}
+		else{
+			for(int i=0;i<nBlocks;i++){
+				unsigned int t=rep[i];
+				unsigned int bit = largestBlockDigit;
+				for(int j=0;j<blockBits;j++){
+					if(i*blockBits+j >= ntax) break;
+					if(bit & t){
+						if(strcmp(left.c_str(), "(")) left += ',';
+						sprintf(temp, "%d", (i*blockBits + j + 1));
+						left += temp;
+						}
+					else{
+						if(strcmp(right.c_str(), "(")) right += ',';
+						sprintf(temp, "%d", (i*blockBits + j + 1));
+						right += temp;
+						}
+					bit = bit >> 1;	 
+					}
+				}
+			}
+		left += ')';
+		right += ')';
+		out = left + " | " + right;
+		}
 /*
 	void BinaryOutput(ofstream &out){
 		int size = nBlocks * sizeof(unsigned int);
@@ -575,6 +628,10 @@ public:
 		if(positive == true)
 			return con.IsCompatibleWithBipartitionWithMask(other, mask);		
 		else return con.IsIncompatibleWithBipartitionWithMask(other, mask);
+		}
+	void NumericalOutput(string &out){
+		if(IsBackbone()) con.NumericalOutput(out, &backboneMask);
+		else con.NumericalOutput(out, NULL);
 		}
 	};
 
