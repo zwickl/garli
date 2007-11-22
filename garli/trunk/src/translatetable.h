@@ -24,7 +24,7 @@
 
 using namespace std;
 
-class  HKYData;
+class  SequenceData;
 
 class TranslateTable
 {
@@ -35,14 +35,14 @@ class TranslateTable
 		{ return (i >= 0 && i<nTax ? 1 : 0 ); }
 	void Alloc();
 	void Destroy();
-	void SetName( int i, char* s );
+	void SetName( int i, const char* s );
 
 	public:
 		TranslateTable( int n ) : nTax(n) { Alloc(); }
-		TranslateTable( HKYData* d );
+		TranslateTable( SequenceData* d );
 		~TranslateTable() { Destroy(); }
 
-		void SetTaxonName( int i, char* s );
+		void SetTaxonName( int i, const char* s );
 		char* GetTaxonName( int i )
 			{ assert( Check(i-1) ); return taxonName[i-1]; }
 		int GetNameLength( int i )
