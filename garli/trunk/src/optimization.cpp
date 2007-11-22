@@ -165,7 +165,9 @@ FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
 			}
 		else{//if we have lots of data, move
 			//very slowly here
-			if(data->NInformative() > 500){
+			//DEBUG
+			//if(data->NInformative() > 500){
+			if(0){
 				if(d1 > ZERO_POINT_ZERO) t=(FLOAT_TYPE)1.01;
 				else t=(FLOAT_TYPE)0.99;
 				}
@@ -299,6 +301,129 @@ FLOAT_TYPE Tree::OptimizeAlpha(FLOAT_TYPE optPrecision){
 	return -1;
 	}
 
+FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE)){
+
+#ifdef DEBUG_ALPHA_OPT
+	FLOAT_TYPE initVal=mod->Alpha();
+
+	ofstream deb("alphaTrace.log");
+	deb.precision(20);
+	for(int s=0;s<50;s++){
+		FLOAT_TYPE a=.3 + s*.025;
+		mod->SetAlpha(a, false);
+		MakeAllNodesDirty();
+		Score();
+		deb << a << "\t" << lnL << endl;
+		}
+	deb.close();
+	mod->SetAlpha(initVal, false);
+	MakeAllNodesDirty();
+	Score();	
+#endif
+
+	if(lnL==-1) Score();
+	FLOAT_TYPE start, prev, cur;
+	prev = start = cur = lnL;
+	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
+	FLOAT_TYPE upperBracket = highBound;   //the smallest value we know of with a negative d1, or the minimum allowed value
+	FLOAT_TYPE lowerBracket = lowBound;   //the largest value we know of with a positive d1 , or the maximum allowed value
+	FLOAT_TYPE incr;
+	FLOAT_TYPE epsilon = 1e-5;
+	int lowBoundOvershoot = 0;
+	int upperBoundOvershoot = 0;
+
+	while(1){
+#ifdef SINGLE_PRECISION_FLOATS
+		incr=0.005f;
+#else
+		incr=min(0.001, min(prevVal - lowerBracket, upperBracket - prevVal));
+#endif
+		//mod->SetAlpha(prevVal+incr, false);
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal+incr);
+
+		MakeAllNodesDirty();
+		Score();
+		cur=lnL;
+		FLOAT_TYPE d11=(cur-prev)/incr;
+		
+		//mod->SetAlpha(prevVal-incr, false);
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal-incr);
+		MakeAllNodesDirty();
+		Score();
+		cur=lnL;
+		FLOAT_TYPE d12=(cur-prev)/-incr;
+		
+		FLOAT_TYPE d1=(d11+d12)*ZERO_POINT_FIVE;
+		if((d11 - d12) == ZERO_POINT_ZERO){
+			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);;
+			MakeAllNodesDirty();			
+			return prev-start;
+			}
+		
+		FLOAT_TYPE d2=(d11-d12)/incr;
+		
+		FLOAT_TYPE est=-d1/d2;
+		
+		FLOAT_TYPE proposed = prevVal + est;
+
+		if(d2 > ZERO_POINT_ZERO){
+			if(d1 > ZERO_POINT_ZERO) proposed=prevVal*(FLOAT_TYPE)1.25;
+			else proposed=prevVal*(FLOAT_TYPE)0.8;
+			}
+		if(proposed < (lowerBracket + epsilon)){
+			if(prevVal - lowerBracket - epsilon < epsilon * ZERO_POINT_FIVE){
+				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);;
+				MakeAllNodesDirty();			
+				return prev-start;
+				}
+			lowBoundOvershoot++;
+			if(lowBoundOvershoot > 1)
+				proposed = lowerBracket + epsilon;
+			else
+				proposed = (prevVal + lowerBracket) * ZERO_POINT_FIVE;
+			}
+		else if(proposed > upperBracket - epsilon){
+			if(upperBracket - epsilon - prevVal < epsilon * ZERO_POINT_FIVE){
+				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);;
+				MakeAllNodesDirty();			
+				return prev-start;
+				}
+			upperBoundOvershoot++;
+			if(upperBoundOvershoot > 1)
+				proposed = upperBracket - epsilon;
+			else
+				proposed = (prevVal + upperBracket) * ZERO_POINT_FIVE;
+			}
+
+		FLOAT_TYPE estImprove;
+		if(d2 < ZERO_POINT_ZERO) estImprove = d1*(proposed - prevVal) + (d2 * (proposed - prevVal) * (proposed - prevVal)) * ZERO_POINT_FIVE;
+		else estImprove = 9999.9;
+
+		if(estImprove < optPrecision){
+			//mod->SetAlpha(prevVal, false);
+			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);;
+			MakeAllNodesDirty();			
+			return prev-start;
+			}
+		
+		//update the brackets
+		if(d1 <= ZERO_POINT_ZERO && prevVal < upperBracket)
+			upperBracket = prevVal;
+		else if(d1 > ZERO_POINT_ZERO && prevVal > lowerBracket)
+			lowerBracket = prevVal;
+
+		//mod->SetAlpha(t, false);
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, proposed);;
+		MakeAllNodesDirty();			
+		Score();
+		lastChange = lnL - prev;
+		prev=lnL;
+		prevVal=proposed;
+		}
+	return -1;
+	}
+
+
 FLOAT_TYPE Tree::OptimizePinv(){
 
 
@@ -384,7 +509,7 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 	//improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, goodGuess);
 	//abandoning use of goodGuess.  Doesn't seem to be reducing opt passes, which
 	//was the point.
-	optCalcs++;
+	//optCalcs++;
 	ProfNewton.Start();
 	improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, true);
 	ProfNewton.Stop();
@@ -426,13 +551,27 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 #endif
 
 	FLOAT_TYPE totalIncrease=ZERO_POINT_ZERO, prunePointIncrease=ZERO_POINT_ZERO, thisIncr, pruneRadIncrease=ZERO_POINT_ZERO;
+	
+#ifdef CHECK_LNL_BEFORE_RAD
+	FLOAT_TYPE leftIncrease=ZERO_POINT_ZERO, rightIncrease=ZERO_POINT_ZERO, ancIncrease=ZERO_POINT_ZERO;
+	leftIncrease = OptimizeBranchLength(optPrecision, nd->left, false);
+	ancIncrease = OptimizeBranchLength(optPrecision, nd, false);
+	rightIncrease = OptimizeBranchLength(optPrecision, nd->right, false);	
+
+	if(leftIncrease > ZERO_POINT_ZERO) nodeOptVector.push_back(nd->left);
+	if(ancIncrease > ZERO_POINT_ZERO) nodeOptVector.push_back(nd);
+	if(rightIncrease > ZERO_POINT_ZERO) nodeOptVector.push_back(nd->right);
+	totalIncrease = leftIncrease + rightIncrease + ancIncrease;
+#else
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->left, false);
-	totalIncrease += OptimizeBranchLength(optPrecision, nd, false);
+	totalIncrease+= OptimizeBranchLength(optPrecision, nd, false);
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->right, false);	
 
 	nodeOptVector.push_back(nd->left);
 	nodeOptVector.push_back(nd);
 	nodeOptVector.push_back(nd->right);
+
+#endif
 
 	if(prune!=NULL){
 		prunePointIncrease = OptimizeBranchLength(optPrecision, prune, true);
@@ -446,12 +585,21 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 		}
 	else Score(nd->nodeNum);
 
-	FLOAT_TYPE fourBranchTot = totalIncrease;
+	#ifdef OPT_DEBUG
+	optsum << "3/4 branch total\t" << totalIncrease << endl;
+	if(lnL < globalBest - treeRejectionThreshold)
+		optsum << "bailing early\t";
+	optsum << "Scores:" << globalBest << "\t" << lnL << "\t" << globalBest-lnL << endl;
+	#endif
+
+#ifdef CHECK_LNL_BEFORE_RAD
+	bool fullOpt = false;
+	if(lnL > globalBest){
+		fullOpt = true;
+		}
+#endif
+
 	if(lnL < globalBest - treeRejectionThreshold){
-		#ifdef OPT_DEBUG
-		optsum << "4 branch total\t" << totalIncrease << endl;
-		optsum << "bailing early\t" << globalBest-lnL << endl;
-		#endif
 		return;
 		}
 
@@ -459,13 +607,21 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 	int rad=10;
 
 	if(rad>0){
+#ifdef CHECK_LNL_BEFORE_RAD
+		if(((rightIncrease > ZERO_POINT_ZERO) || fullOpt) && nd->right->left!=NULL && nd->right->left->alreadyOptimized==false) totalIncrease += RecursivelyOptimizeBranches(nd->right->left, optPrecision, subtreeNode, rad, false, ZERO_POINT_ZERO);
+		if(((leftIncrease > ZERO_POINT_ZERO) || fullOpt) && nd->left->left!=NULL && nd->left->left->alreadyOptimized==false) totalIncrease += RecursivelyOptimizeBranches(nd->left->left, optPrecision, subtreeNode, rad, false, ZERO_POINT_ZERO);
+		if(((ancIncrease > ZERO_POINT_ZERO)) || fullOpt){
+#else
 		if(nd->right->left!=NULL && nd->right->left->alreadyOptimized==false) totalIncrease += RecursivelyOptimizeBranches(nd->right->left, optPrecision, subtreeNode, rad, false, ZERO_POINT_ZERO);
 		if(nd->left->left!=NULL && nd->left->left->alreadyOptimized==false) totalIncrease += RecursivelyOptimizeBranches(nd->left->left, optPrecision, subtreeNode, rad, false, ZERO_POINT_ZERO);
-		if(nd->anc!=root && nd->anc->alreadyOptimized==false) totalIncrease += RecursivelyOptimizeBranchesDown(nd->anc, nd, optPrecision, subtreeNode, rad, ZERO_POINT_ZERO);
-		else{
-			if(root->left != nd && root->left->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->left, optPrecision, subtreeNode, rad, true, ZERO_POINT_ZERO);
-			if(root->left->next != nd && root->left->next->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->left->next, optPrecision, subtreeNode, rad, true, ZERO_POINT_ZERO);
-			if(root->right != nd && root->right->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->right, optPrecision, subtreeNode, rad, true, ZERO_POINT_ZERO);
+		if(1){
+#endif
+			if(nd->anc!=root && nd->anc->alreadyOptimized==false) totalIncrease += RecursivelyOptimizeBranchesDown(nd->anc, nd, optPrecision, subtreeNode, rad, ZERO_POINT_ZERO);
+			else{
+				if(root->left != nd && root->left->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->left, optPrecision, subtreeNode, rad, true, ZERO_POINT_ZERO);
+				if(root->left->next != nd && root->left->next->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->left->next, optPrecision, subtreeNode, rad, true, ZERO_POINT_ZERO);
+				if(root->right != nd && root->right->alreadyOptimized==false) totalIncrease +=  RecursivelyOptimizeBranches(root->right, optPrecision, subtreeNode, rad, true, ZERO_POINT_ZERO);
+				}
 			}
 		
 		if(prunePointIncrease > ZERO_POINT_ZERO){//now doing a radius opt at the prune point starting from the 4 branches attached to that branch
@@ -538,18 +694,22 @@ optsum << "radiusopt intial pass total\t" << totalIncrease << endl;
 					}
 				}
 			}
-*/	while(nodeOptVector.empty() == false){
-		list<TreeNode*>::iterator it=nodeOptVector.begin();
-		while(it!=nodeOptVector.end()){
-			if(nodeOptVector.size() == 1) finalNode=*it;
-			thisIncr=OptimizeBranchLength(optPrecision, *(it), true);
-			postIncr+= thisIncr;
-			if(!(thisIncr > optPrecision)){
-				list<TreeNode*>::iterator del=it;
-				it++;
-				nodeOptVector.erase(del);
+*/	
+	if(nodeOptVector.empty()) finalNode = nd->right;
+	else{
+		while(nodeOptVector.empty() == false){
+			list<TreeNode*>::iterator it=nodeOptVector.begin();
+			while(it!=nodeOptVector.end()){
+				if(nodeOptVector.size() == 1) finalNode=*it;
+				thisIncr=OptimizeBranchLength(optPrecision, *(it), true);
+				postIncr+= thisIncr;
+				if(!(thisIncr > optPrecision)){
+					list<TreeNode*>::iterator del=it;
+					it++;
+					nodeOptVector.erase(del);
+					}
+				else it++;
 				}
-			else it++;
 			}
 		}
 	if(finalNode != root)
@@ -562,6 +722,7 @@ optsum << "radiusopt intial pass total\t" << totalIncrease << endl;
 
 #ifdef OPT_DEBUG
 optsum << "postopt total\t" << postIncr << endl;
+optsum << "total\t" << totalIncrease << endl;
 #endif
 	}
 
@@ -622,7 +783,7 @@ FLOAT_TYPE Tree::RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledF
 	return scoreIncrease;
 	}
 
-pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2){
+pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2, FLOAT_TYPE &like){
 	//nd1 and nd2 are the nodes on either side of the branch of interest
 	//nd1 will always be the "lower" one, and will always be internal, while
 	//nd2 can be internal or terminal
@@ -653,12 +814,12 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 		ProfTermDeriv.Start();
 #ifdef OPEN_MP
 		if(modSpec.IsNucleotide() == false)
-			GetDerivsPartialTerminalNState(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2);
+			GetDerivsPartialTerminalNState(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, like);
 		else
 			GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, nd2->ambigMap);
 #else
 		if(modSpec.IsNucleotide() == false)
-			GetDerivsPartialTerminalNState(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2);
+			GetDerivsPartialTerminalNState(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, like);
 		else
 			GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2);
 #endif
@@ -670,7 +831,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 		GetDerivsPartialInternalEQUIV(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, nd2->tipData);
 #else
 		if(modSpec.IsNucleotide() == false)
-			GetDerivsPartialInternalNState(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2);
+			GetDerivsPartialInternalNState(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, like);
 		else
 			GetDerivsPartialInternal(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2);
 #endif
@@ -734,7 +895,46 @@ void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 	SetBranchLength(nd, initialLen);	
 	} 
 
+void Tree::CalcEmpiricalDerivatives(TreeNode *nd, FLOAT_TYPE &D1, FLOAT_TYPE &D2){
+	FLOAT_TYPE start_blen = nd->dlen;
 
+	FLOAT_TYPE incr;
+	FLOAT_TYPE blen_used = start_blen;
+
+	if(blen_used > 1e-6)
+		incr= blen_used * 0.001;
+	else if(blen_used > min_brlen + 1.0e-8) incr = blen_used * 0.01; 
+	else{
+		incr =1.0e-8;
+		blen_used = max(start_blen, min_brlen + incr);
+		SetBranchLength(nd, blen_used);
+		}
+	
+	MakeAllNodesDirty();
+	Score();
+	FLOAT_TYPE start=lnL;
+
+	SetBranchLength(nd, blen_used + incr);
+//	MakeAllNodesDirty();
+	Score();
+
+	FLOAT_TYPE empD11= (lnL - start)/incr;
+
+//	SetBranchLength(nd, prevDLen);
+//	Score();
+
+	SetBranchLength(nd, blen_used - incr);
+//	MakeAllNodesDirty();
+	Score();
+
+	FLOAT_TYPE empD12 = (lnL - start)/-incr;
+
+	D1=(empD11+empD12)*.5;
+	D2=(empD11-empD12)/incr;
+
+	SetBranchLength(nd, start_blen);
+//	MakeAllNodesDirty();
+	}
 
 #ifdef SPOOF_NEWTON_RAPHSON
 //this allows the ability to play with optimization without actually disrupting program flow
@@ -782,7 +982,7 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 //if(nd->dlen==min_brlen){
 #ifdef OPT_DEBUG
 /*
-//if(nd->nodeNum == 3 && nd->anc->nodeNum==116){
+if(nd->nodeNum == 8){
 	ofstream scr("NRcurve.log");
 	scr.precision(20);
 	assert(scr.good());
@@ -797,67 +997,40 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 	nd->dlen=initDlen;
 	SweepDirtynessOverTree(nd);
 	scr.close();
-//	}	
+	}	
 */
 #endif
 //	nd->dlen=.3254;
 //	SweepDirtynessOverTree(nd);
-
-/*	
-	ofstream deb("curves.log");
-	SampleBlenCurve(nd, deb);
-	deb.close();
+/*
+	if(nd->nodeNum==4){	
+		ofstream deb("curves.log");
+		SampleBlenCurve(nd, deb);
+		deb.close();
+		 }
 */	
 
 //	MakeAllNodesDirty();
-
-/*	const FLOAT_TYPE startDLen = nd->dlen;
-	FLOAT_TYPE incr;
-	if(nd->nodeNum==1){
-		int poo=1;
-		}
-	if(nd->dlen > 1e-4)
-		incr=.00001;
-	else incr=.0000001;
-	
-	incr=nd->dlen/1000.0;
-	
-	MakeAllNodesDirty();
-	Score();
-	FLOAT_TYPE start=lnL;
-
-	SetBranchLength(nd, startDLen + incr);
-	MakeAllNodesDirty();
-	Score();
-
-	FLOAT_TYPE empD11= (lnL - start)/incr;
-
-//	SetBranchLength(nd, prevDLen);
-//	Score();
-
-	SetBranchLength(nd, startDLen - incr);
-	MakeAllNodesDirty();
-	Score();
-
-	FLOAT_TYPE empD12 = (lnL - start)/-incr;
-
-	FLOAT_TYPE empD1=(empD11+empD12)*.5;
-	FLOAT_TYPE empD2=(empD11-empD12)/incr;
-
-	SetBranchLength(nd, startDLen);
-	}
-//	MakeAllNodesDirty();
+/*	FLOAT_TYPE start, empD11, empD12, empD1, empD2;
+	 if(nd->nodeNum == 4 && nd->dlen < 1e-7 && nd->anc->nodeNum==12 && nd->next != NULL && nd->next->nodeNum==10){
+	 //if(0){
+		SetBranchLength(nd, 1.0e-5);
+		MakeAllNodesDirty();
+		Score();
+		 }
 */
+
 #ifdef OPT_DEBUG
 //	ofstream log("optimization.log", ios::app);
 //	log.precision(10);
 
-	opt << nd->nodeNum << "\t" << nd->dlen << "\n";
+	opt << nd->nodeNum << "\t" << nd->dlen << "\t" << lnL <<endl;
 	
 //	ofstream scr("impVSd1.log", ios::app);
 	if(lnL > -2){
 		Score(nd->anc->nodeNum);
 		}
+
 	FLOAT_TYPE delta;
 	
 #endif
@@ -874,6 +1047,7 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 	FLOAT_TYPE knownMin=min_brlen, knownMax=max_brlen;
 	FLOAT_TYPE d1, d2, estScoreDelta, estDeltaNR;
 
+	FLOAT_TYPE L, initialL;
 	do{
 		bool scoreOK;
 		int sweeps=0;
@@ -882,7 +1056,8 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 				//function if it decides that the current rescaleEvery is too large
 			try{
 				scoreOK=true;
-				derivs = CalcDerivativesRateHet(nd->anc, nd);
+				derivs = CalcDerivativesRateHet(nd->anc, nd, L);
+				if(iter == 0) initialL = L;
 				}catch(int err){
 				scoreOK=false;
 				if(err==1){
@@ -906,6 +1081,18 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 		
 		d1=derivs.first;
 		d2=derivs.second;
+		//DEBUG
+		optCalcs++;
+
+#ifdef OPT_DEBUG
+		FLOAT_TYPE empD1, empD2;
+//		if(nd->nodeNum == 4){// && nd->anc->nodeNum==12 && nd->next != NULL && nd->next->nodeNum==10){
+			CalcEmpiricalDerivatives(nd, empD1, empD2);
+			opt << empD1 << "\t" << empD2 << "\t" << nd->dlen + (-empD1/empD2) << "\t";
+//			d1 = empD1;
+//			d2 = empD2;
+//			}
+#endif
 
 		estDeltaNR=-d1/d2;
 		//estimated change in score by a Taylor series
@@ -914,6 +1101,11 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 		if(d1 <= ZERO_POINT_ZERO && nd->dlen < knownMax) knownMax = nd->dlen;
 		else if(d1 > ZERO_POINT_ZERO && nd->dlen > knownMin) knownMin = nd->dlen;
 
+		//DEBUG
+/*		ofstream poo("poo.log", ios::app);
+		poo << nd->nodeNum << "\t" << iter << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t" << initialL << "\t" << L << endl;
+		poo.close();
+*/
 														#ifdef OPT_DEBUG			
 														opt << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
 														#endif
@@ -994,7 +1186,23 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 				}
 			}
 		else{//trying NR is feasible
+			//DEBUG - keep going if the abs_d1 increased, regardless of what the estScoreDelta is
+#define CHECK_LIKE
+
+#ifdef IGNORE_INCREASED_D1
 			if(estScoreDelta < precision1){
+			
+#elif defined(IGNORE_SMALL_INCREASED_D1)
+			if(estScoreDelta < precision1 && (iter == 0 || abs_d1 < abs_d1_prev * 2.0) && L >= initialL){
+
+#elif defined(CHECK_LIKE)
+			//if(estScoreDelta < precision1 && L < initialL) outman.UserMessage("Worsened!: %f %f", initialL, L);
+			
+			if(estScoreDelta < precision1 && (mod->NStates() > 4 ? L >= initialL : 1)){
+	//		if(estScoreDelta < precision1 && L >= initialL){
+#else
+			if(estScoreDelta < precision1 && abs_d1 < abs_d1_prev){
+#endif
 														#ifdef OPT_DEBUG			
 														opt << "delta < prec, return\n";
 														if(curScore==-ONE_POINT_ZERO){
@@ -1103,6 +1311,7 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 		assert(v <= knownMax);
 
 		SetBranchLength(nd, v);
+
 #ifdef OPT_DEBUG
 		Score(nd->anc->nodeNum);
 
@@ -1111,10 +1320,10 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 				cout << lnL << "\t" << curScore << endl;
 				if(curScore - lnL < .005){
 					//don't want to have different logic when OPT_DEBUG is on
-/*					SetBranchLength(nd, v_prev);
-					Score(nd->anc->nodeNum);
-					return lnL;
-*/					}
+//					SetBranchLength(nd, v_prev);
+//					Score(nd->anc->nodeNum);
+//					return lnL;
+					}
 				else {//assert(0);
 					FLOAT_TYPE poo=lnL;
 					SetBranchLength(nd, v_prev);
@@ -1134,7 +1343,9 @@ FLOAT_TYPE Tree::NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool go
 		delta=prevScore - lnL;
 
 opt << v << "\t" << lnL << "\n";
+opt.flush();
 #endif
+
 		prevScore=lnL;
 		v_prev=v;
 		
@@ -1643,7 +1854,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	const int *countit=data->GetCounts();
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
 	const int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstBases();
+	const int *conBases=data->GetConstStates();
 	const FLOAT_TYPE prI=mod->PropInvar();
 
 	FLOAT_TYPE freqs[4];
@@ -1657,7 +1868,11 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 #else
 	for(int i=0;i<nchar;i++){
 #endif
-		if((countit[i]) != 0){//this check speeds us up in the case of bootstrapping
+#ifdef USE_COUNTS_IN_BOOT
+		if(countit[i] > 0){
+#else
+		if(1){
+#endif
 			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=ZERO_POINT_ZERO;
 			if(*Ldata > -1){ //no ambiguity
 				for(int r=0;r<nRateCats;r++){
@@ -1744,7 +1959,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			}
 #ifndef OMP_TERMDERIV
 		else{
-			partial+=4*nRateCats;
+			//partial+=4*nRateCats;
 			if(!(*Ldata < 0)) Ldata++;
 			else if(*Ldata == -4) Ldata++;
 			else{
@@ -1759,10 +1974,9 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	d2Tot = tot2;
 	}
 	
-void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, const unsigned *ambigMap /*=NULL*/){
-
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
+void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, FLOAT_TYPE &like){
+	//this function assumes that the pmat is arranged with nstates^2 entries for the
+	//first rate, followed by nstates^2 for the second, etc.
 	FLOAT_TYPE *partial=partialCLA->arr;
 	const int nRateCats=mod->NRateCats();
 
@@ -1772,23 +1986,50 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	const char *Ldata = Ldat;
 
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+	const int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
+	const FLOAT_TYPE prI=mod->PropInvar();
 
 #ifdef UNIX
 	madvise(partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
-	double like=0.0;
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
+
+#undef OUTPUT_DERIVS
+
+#ifdef OUTPUT_DERIVS
+	ofstream out("derivs.log");
+
+	ofstream pout("pmat.log");
+	ofstream d1out("d1mat.log");
+	ofstream d2out("d2mat.log");
+
+	for(int a = 0;a < nstates;a++){
+		for(int b = 0;b < nstates;b++){
+			pout << prmat[b + nstates*a] << "\t";
+			d1out << d1mat[b + nstates*a] << "\t";
+			d2out << d2mat[b + nstates*a] << "\t";
+			}
+		pout << endl;
+		d1out << endl;
+		d2out << endl;
+		}
+	pout.close();
+	d1out.close();
+	d2out.close();
+
+#endif
 
 	if(nRateCats == 1){
 
 	#ifdef OMP_TERMDERIV_NSTATE
-		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2)
+		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL)
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates*nRateCats];
@@ -1798,7 +2039,11 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 			siteL = ZERO_POINT_ZERO;
 			siteD1 = ZERO_POINT_ZERO;
 			siteD2 = ZERO_POINT_ZERO;
-			if((countit[i]) != 0){//this check speeds us up in the case of bootstrapping
+#ifdef USE_COUNTS_IN_BOOT
+			if((countit[i]) > 0){//this check speeds us up in the case of bootstrapping
+#else
+			if(1){
+#endif
 				if(*Ldata != nstates){ //no ambiguity
 					for(int from=0;from<nstates;from++){
 						siteL += prmat[(*Ldata)+nstates*from] * partial[from] * freqs[from];
@@ -1815,40 +2060,71 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				else{ //partial ambiguity
 					assert(0);
 					}
-				//like += log(siteL) - partialCLA->underflow_mult[i];
+				siteL *= rateProb[0]; //multiply by (1-pinv)
+				
+				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+					siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]));
+					}
+				
+				totL += log(siteL) * countit[i];
+				
 				siteD1 /= siteL;
 				tot1 += countit[i] * siteD1;
 				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
 				assert(tot1 == tot1);
 				assert(tot2 == tot2);
+
+#ifdef OUTPUT_DERIVS
+				out << "L\t" << siteL << "\tD1\t" << siteD1 << "\tD2\t" << siteD2 << "\tcount\t" << countit[i] << "\tunderM\t" << partialCLA->underflow_mult[i] << endl;
+#endif
+
+				Ldata++;
+				partial+=nstates*nRateCats;
 				}
-	#ifndef OMP_TERMDERIV_NSTATE
-			Ldata++;
-			partial+=nstates*nRateCats;
-	#endif
+			else{
+#ifdef OPEN_MP
+				//this is a little strange, but the arrays needs to be advanced in the case of OMP (if this function is not OMP enabled)
+				//because sections of the CLAs corresponding to sites with count=0 are skipped
+				//over in OMP instead of being eliminated
+				partial+=nstates*nRateCats;
+#endif
+				Ldata++;
+				}
 			}
 		}
 	else{
-		vector<FLOAT_TYPE> stateContribL(nstates);
-		vector<FLOAT_TYPE> stateContribD1(nstates);
-		vector<FLOAT_TYPE> stateContribD2(nstates);
 
+#ifdef OMP_TERMDERIV_NSTATE
+		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL)
 		for(int i=0;i<nchar;i++){
-			siteL = ZERO_POINT_ZERO;
-			siteD1 = ZERO_POINT_ZERO;
-			siteD2 = ZERO_POINT_ZERO;
-			for(int from=0;from<nstates;from++){
-				stateContribL[from] = 0.0;
-				stateContribD1[from] = 0.0;
-				stateContribD2[from] = 0.0;
-				}
+			Ldata = &Ldat[i];
+			partial = &partialCLA->arr[i*nstates*nRateCats];
+#else
+		for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
 			if((countit[i]) != 0){//this check speeds us up in the case of bootstrapping
+#else
+			if(1){
+#endif
+				siteL = ZERO_POINT_ZERO;
+				siteD1 = ZERO_POINT_ZERO;
+				siteD2 = ZERO_POINT_ZERO;
+				vector<FLOAT_TYPE> stateContribL(nstates);
+				vector<FLOAT_TYPE> stateContribD1(nstates);
+				vector<FLOAT_TYPE> stateContribD2(nstates);
+				for(int from=0;from<nstates;from++){
+					stateContribL[from] = 0.0;
+					stateContribD1[from] = 0.0;
+					stateContribD2[from] = 0.0;
+					}
+
 				if(*Ldata < nstates){ //no ambiguity
 					for(int rate=0;rate<nRateCats;rate++){
 						for(int from=0;from<nstates;from++){
-							stateContribL[from] += prmat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from];
-							stateContribD1[from] += d1mat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from];
-							stateContribD2[from] += d2mat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from];
+							stateContribL[from] += prmat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from] * rateProb[rate];
+							stateContribD1[from] += d1mat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from] * rateProb[rate];
+							stateContribD2[from] += d2mat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from] * rateProb[rate];
 							}
 						partial += nstates;
 						}
@@ -1874,22 +2150,36 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 					siteD2 += stateContribD2[from] * freqs[from];
 					}
 
-				//like += log(siteL) - partialCLA->underflow_mult[i];
+				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+					siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]));
+					}
+
+				totL += log(siteL) * countit[i];
 				siteD1 /= siteL;
 				tot1 += countit[i] * siteD1;
 				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+				assert(siteL == siteL);
+				assert(totL == totL);
 				assert(tot1 == tot1);
 				assert(tot2 == tot2);
 				}
 			else{
-				partial += nstates*nRateCats;
+#ifdef OPEN_MP	//this needs to be advanced in the case of openmp, regardless of whether
+				//this function actually has OMP enabled or not.
+				partial += nstates * nRateCats;
+#endif
 				Ldata++;
 				}
 			}
 		}
 
+#ifdef OUTPUT_DERIVS
+	out.close();
+#endif
+
 	d1Tot = tot1;
 	d2Tot = tot2;
+	like = totL;
 	delete []freqs;
 	}
 
@@ -1917,7 +2207,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
 		
 	const int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstBases();
+	const int *conBases=data->GetConstStates();
 	const FLOAT_TYPE prI=mod->PropInvar();	
 
 	FLOAT_TYPE freqs[4];
@@ -1931,7 +2221,11 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 #else
 	for(int i=0;i<nchar;i++){
 #endif
-		if((countit[i]) != 0){
+#ifdef USE_COUNTS_IN_BOOT
+		if(countit[i] > 0){
+#else
+		if(1){
+#endif
 			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=ZERO_POINT_ZERO;
 			for(int r=0;r<nRateCats;r++){
 				int rOff=r*16;
@@ -1983,8 +2277,8 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 			}
 #ifndef OMP_INTDERIV
 		else{
-			partial+=4*nRateCats;
-			CL1+=4*nRateCats;			
+	//		partial+=4*nRateCats;
+	//		CL1+=4*nRateCats;			
 			}
 #endif
 		}
@@ -1992,9 +2286,9 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	d2Tot = tot2;
 	}
 
-void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
+void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, FLOAT_TYPE &like){
+	//this function assumes that the pmat is arranged with the nstates^2 entries for the
+	//first rate, followed by nstates^2 for the second, etc.
 	FLOAT_TYPE *CL1=childCLA->arr;
 	FLOAT_TYPE *partial=partialCLA->arr;
 
@@ -2005,12 +2299,16 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
 
+	const int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
+	const FLOAT_TYPE prI=mod->PropInvar();	
+
 #ifdef UNIX
 	madvise(partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 	madvise(CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
@@ -2023,87 +2321,119 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	FLOAT_TYPE tempD2 = 0.0;
 
 	if(nRateCats == 1){
-	#ifdef OMP_INTDERIV_NSTATE
-	#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, partial, CL1) reduction(+ : tot1, tot2)
+#ifdef OMP_INTDERIV_NSTATE
+	#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, partial, CL1) reduction(+ : tot1, tot2, totL)
 		for(int i=0;i<nchar;i++){
 			partial = &(partialCLA->arr[nstates*i]);
 			CL1		= &(childCLA->arr[nstates*i]);
-	#else
+#else
 		for(int i=0;i<nchar;i++){
-	#endif
-			siteL = 0.0;
-			siteD1 = 0.0;
-			siteD2 = 0.0;
-			for(int from=0;from<nstates;from++){
-				FLOAT_TYPE tempL = prmat[from*nstates]*CL1[0];
-				FLOAT_TYPE tempD1 = d1mat[from*nstates]*CL1[0];
-				FLOAT_TYPE tempD2 = d2mat[from*nstates]*CL1[0];
-				for(int to=1;to<nstates;to++){
-					tempL += prmat[from*nstates + to]*CL1[to];
-					tempD1 += d1mat[from*nstates + to]*CL1[to];
-					tempD2 += d2mat[from*nstates + to]*CL1[to];
-					}
-				siteL += tempL * partial[from] * freqs[from];
-				siteD1 += tempD1 * partial[from] * freqs[from];
-				siteD2 += tempD2 * partial[from] * freqs[from];
-				}
-			siteD1 /= siteL;
-			tot1 += countit[i] * siteD1;
-			tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
-			assert(tot1 == tot1);
-			assert(tot2 == tot2);
-	#ifndef OMP_INTDERIV_NSTATE
-			partial += nstates;
-			CL1 += nstates;
-	#endif
-			}
-		}
-	else{
-		vector<FLOAT_TYPE> stateContribL(nstates);
-		vector<FLOAT_TYPE> stateContribD1(nstates);
-		vector<FLOAT_TYPE> stateContribD2(nstates);
-
-		for(int i=0;i<nchar;i++){
-			siteL = 0.0;
-			siteD1 = 0.0;
-			siteD2 = 0.0;
-			for(int from=0;from<nstates;from++){
-				stateContribL[from] = 0.0;
-				stateContribD1[from] = 0.0;
-				stateContribD2[from] = 0.0;
-				}
-			for(int rate=0;rate<nRateCats;rate++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+			if(countit[i] > 0){//this check speeds us up in the case of bootstrapping
+#else
+			if(1){
+#endif
+				siteL = 0.0;
+				siteD1 = 0.0;
+				siteD2 = 0.0;
 				for(int from=0;from<nstates;from++){
-					FLOAT_TYPE tempL = prmat[rate*nstates*nstates + from*nstates]*CL1[0];
-					FLOAT_TYPE tempD1 = d1mat[rate*nstates*nstates + from*nstates]*CL1[0];
-					FLOAT_TYPE tempD2 = d2mat[rate*nstates*nstates + from*nstates]*CL1[0];
+					tempL = prmat[from*nstates]*CL1[0];
+					tempD1 = d1mat[from*nstates]*CL1[0];
+					tempD2 = d2mat[from*nstates]*CL1[0];
 					for(int to=1;to<nstates;to++){
-						tempL += prmat[rate*nstates*nstates + from*nstates + to]*CL1[to];
-						tempD1 += d1mat[rate*nstates*nstates + from*nstates + to]*CL1[to];
-						tempD2 += d2mat[rate*nstates*nstates + from*nstates + to]*CL1[to];
+						tempL += prmat[from*nstates + to]*CL1[to];
+						tempD1 += d1mat[from*nstates + to]*CL1[to];
+						tempD2 += d2mat[from*nstates + to]*CL1[to];
 						}
-					stateContribL[from] += tempL * partial[from];
-					stateContribD1[from] += tempD1 * partial[from];
-					stateContribD2[from] += tempD2 * partial[from];
+					siteL += tempL * partial[from] * freqs[from];
+					siteD1 += tempD1 * partial[from] * freqs[from];
+					siteD2 += tempD2 * partial[from] * freqs[from];
 					}
+				siteL *= rateProb[0]; //multiply by (1-pinv)
+
+				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+					siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]));
+					}
+
+				totL += log(siteL) * countit[i];
+				siteD1 /= siteL;
+				tot1 += countit[i] * siteD1;
+				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+				assert(tot1 == tot1);
+				assert(tot2 == tot2);
+
 				partial += nstates;
 				CL1 += nstates;
 				}
-			for(int from=0;from<nstates;from++){
-				siteL += stateContribL[from] * freqs[from];
-				siteD1 += stateContribD1[from] * freqs[from];
-				siteD2 += stateContribD2[from] * freqs[from];
+			}
+		}
+	else{
+
+#ifdef OMP_INTDERIV_NSTATE
+		#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, partial, CL1) reduction(+ : tot1, tot2, totL)
+		for(int i=0;i<nchar;i++){
+			partial = &(partialCLA->arr[nRateCats * nstates * i]);
+			CL1		= &(childCLA->arr[nRateCats * nstates * i]);
+#else
+		for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+			if(countit[i] > 0){//this check speeds us up in the case of bootstrapping
+#else
+			if(1){
+#endif
+				siteL = 0.0;
+				siteD1 = 0.0;
+				siteD2 = 0.0;
+
+				vector<FLOAT_TYPE> stateContribL(nstates);
+				vector<FLOAT_TYPE> stateContribD1(nstates);
+				vector<FLOAT_TYPE> stateContribD2(nstates);
+
+				for(int from=0;from<nstates;from++){
+					stateContribL[from] = 0.0;
+					stateContribD1[from] = 0.0;
+					stateContribD2[from] = 0.0;
+					}
+				for(int rate=0;rate<nRateCats;rate++){
+					for(int from=0;from<nstates;from++){
+						tempL = prmat[rate*nstates*nstates + from*nstates]*CL1[0];
+						tempD1 = d1mat[rate*nstates*nstates + from*nstates]*CL1[0];
+						tempD2 = d2mat[rate*nstates*nstates + from*nstates]*CL1[0];
+						for(int to=1;to<nstates;to++){
+							tempL += prmat[rate*nstates*nstates + from*nstates + to]*CL1[to];
+							tempD1 += d1mat[rate*nstates*nstates + from*nstates + to]*CL1[to];
+							tempD2 += d2mat[rate*nstates*nstates + from*nstates + to]*CL1[to];
+							}
+						stateContribL[from] += tempL * partial[from] * rateProb[rate];
+						stateContribD1[from] += tempD1 * partial[from] * rateProb[rate];
+						stateContribD2[from] += tempD2 * partial[from] * rateProb[rate];
+						}
+					partial += nstates;
+					CL1 += nstates;
+					}
+				for(int from=0;from<nstates;from++){
+					siteL += stateContribL[from] * freqs[from];
+					siteD1 += stateContribD1[from] * freqs[from];
+					siteD2 += stateContribD2[from] * freqs[from];
+					}
+				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+					siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]));
+					}
+				totL += log(siteL) * countit[i];
+				siteD1 /= siteL;
+				tot1 += countit[i] * siteD1;
+				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+				assert(tot1 == tot1);
+				assert(tot2 == tot2);
 				}
-			siteD1 /= siteL;
-			tot1 += countit[i] * siteD1;
-			tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
-			assert(tot1 == tot1);
-			assert(tot2 == tot2);
 			}
 		}
 
 	d1Tot = tot1;
 	d2Tot = tot2;
+	like = totL;
 	delete []freqs;
 	}
 
@@ -2137,7 +2467,7 @@ void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const 
 	assert(nRateCats  == 1);
 
 	const int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstBases();
+	const int *conBases=data->GetConstStates();
 	const FLOAT_TYPE prI=mod->PropInvar();	
 
 	FLOAT_TYPE freqs[4];
