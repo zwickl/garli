@@ -60,6 +60,8 @@ class GeneralGamlConfig{
 	unsigned stopgen;
 	unsigned stoptime;
 
+	unsigned attachmentsPerTaxon;
+
 	//model settings
 	string datatype;
 	string geneticCode;

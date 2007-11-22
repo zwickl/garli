@@ -56,6 +56,8 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	searchReps = 1;
 	//this isn't for general consumption, but lets me easily enable hacked in features
 	runmode = 0;
+	
+	attachmentsPerTaxon = 50;
 
 	//finishing the run
 	enforceTermConditions = true;
@@ -144,6 +146,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetUnsignedOption("genthreshfortopoterm", lastTopoImproveThresh);
 	errors += cr.GetPositiveDoubleOption("scorethreshforterm", improveOverStoredIntervalsThresh);
 	cr.GetPositiveDoubleOption("significanttopochange", significantTopoChange, true);
+	cr.GetUnsignedOption("attachmentspertaxon", attachmentsPerTaxon, true);
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
