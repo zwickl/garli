@@ -105,7 +105,7 @@ inline DNASet& DNASet::operator+=( const unsigned char i )
 {
 	// Note: this function is designed to take values of type unsigned char
 	// see file datamatr.h before changing the relationship between
-	// bases and unsigned char values, specifically the function DNAData::DatumToChar
+	// bases and unsigned char values, specifically the function SequenceData::DatumToChar
 	//
 	// BUGBUG: unsigned char should be defined in its own header file along with
 	// the necessary conversion functions such as DatumToChar and CharToDatum
@@ -127,7 +127,7 @@ inline DNASet& DNASet::operator-=( const unsigned char i )
 {
 	// Note: this function is designed to take values of type unsigned char
 	// see file datamatr.h before changing the relationship between
-	// bases and unsigned char values, specifically the function DNAData::DatumToChar
+	// bases and unsigned char values, specifically the function SequenceData::DatumToChar
 	if( i == 0 )
 		set &= ~BASE_A;
 	else if( i == 1 )
