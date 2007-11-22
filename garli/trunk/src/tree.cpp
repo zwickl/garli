@@ -25,13 +25,12 @@
 using namespace std;
 
 #include "defs.h"
-#include "mlhky.h"
+#include "sequencedata.h"
 #include "clamanager.h"
 #include "funcs.h"
 #include "stopwatch.h"
 #include "model.h"
 #include "tree.h"
-#include "datamatr.h"
 #include "reconnode.h"
 
 #include "utility.h"
@@ -76,7 +75,7 @@ FLOAT_TYPE Tree::max_brlen;
 FLOAT_TYPE Tree::exp_starting_brlen;    // expected starting branch length
 ClaManager *Tree::claMan;
 list<TreeNode *> Tree::nodeOptVector;
-const HKYData *Tree::data;
+const SequenceData *Tree::data;
 unsigned Tree::rescaleEvery;
 FLOAT_TYPE Tree::treeRejectionThreshold;
 vector<Constraint> Tree::constraints;
@@ -94,11 +93,8 @@ FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int ncha
 void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree);
 FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar);
 inline FLOAT_TYPE CallBranchLike(TreeNode *thisnode, Tree *thistree, FLOAT_TYPE blen, bool brak);
-bool Rescale(CondLikeArray *destCLA, int nsites);
-bool RescaleRateHet(CondLikeArray *destCLA, int nsites);
 
-
-void Tree::SetTreeStatics(ClaManager *claMan, const HKYData *data, const GeneralGamlConfig *conf){
+void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const GeneralGamlConfig *conf){
 	Tree::claMan=claMan;
 	Tree::data=data;
 #ifdef SINGLE_PRECISION_FLOATS
@@ -134,7 +130,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const HKYData *data, const General
 		//NxsString s(conf->outgroupString.c_str());
 		const char *o = conf->outgroupString.c_str();
 		vector<int> nums;
-		int pos1=0, pos2;
+		unsigned pos1=0, pos2;
 		while(pos1 < conf->outgroupString.size()){
 			pos2 = conf->outgroupString.find(" ", pos1+1);
 			string tax = conf->outgroupString.substr(pos1, pos2);
@@ -339,9 +335,11 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 	root->CheckforLeftandRight();
 	if(allowPolytomies == false) root->CheckforPolytomies();
 	root->CheckTreeFormation();
+	
+	if(numTipsAdded != numTipsTotal) throw ErrorException("Number of taxa in tree description (%d) not equal to number of taxa in dataset (%d)!", numTipsAdded, numTipsTotal);
+
 	} 
 
-	
 //DZ 10-31-02
 //separating general tree construction stuff from CLA assignment/allocation
 //which will happend differently if the CLAs are shared or not
@@ -355,16 +353,14 @@ Tree::Tree(){
 	root->attached=true;
 	//assign data to tips
 	for(int i=1;i<=data->NTax();i++){
-		if(modSpec.IsCodon() || modSpec.IsCodonAminoAcid())
-			allNodes[i]->tipData=(char *) static_cast<const CodonData*>(data)->GetCodonRow(i-1);
-		else if(modSpec.IsAminoAcid())
-			allNodes[i]->tipData=(char *)(data)->GetRow(i-1);
-		else{
-			allNodes[i]->tipData=data->GetAmbigString(i-1);
+		if(modSpec.IsNucleotide()){
+			allNodes[i]->tipData=static_cast<const NucleotideData *>(data)->GetAmbigString(i-1);
 #ifdef OPEN_MP
-			allNodes[i]->ambigMap=data->GetAmbigToCharMap(i-1);
+			allNodes[i]->ambigMap=static_cast<const NucleotideData *>(data)->GetAmbigToCharMap(i-1);
 #endif
 			}
+		else
+			allNodes[i]->tipData=(char *)(data)->GetRow(i-1);
 		}
 	
 	numTipsAdded=0;
@@ -395,18 +391,15 @@ void Tree::AllocateTree(){
 		allNodes[i]->bipart=new Bipartition();
 		}
 	root=allNodes[0];
-	//assign data to tips
 	for(int i=1;i<=data->NTax();i++){
-		if(modSpec.IsCodon() || modSpec.IsCodonAminoAcid())
-			allNodes[i]->tipData=(char *) static_cast<const CodonData*>(data)->GetCodonRow(i-1);
-		else if(modSpec.IsAminoAcid())
-			allNodes[i]->tipData=(char *)(data)->GetRow(i-1);
-		else{
-			allNodes[i]->tipData=data->GetAmbigString(i-1);
+		if(modSpec.IsNucleotide()){
+			allNodes[i]->tipData=static_cast<const NucleotideData *>(data)->GetAmbigString(i-1);
 #ifdef OPEN_MP
-			allNodes[i]->ambigMap=data->GetAmbigToCharMap(i-1);
+			allNodes[i]->ambigMap=static_cast<const NucleotideData *>(data)->GetAmbigToCharMap(i-1);
 #endif
 			}
+		else
+			allNodes[i]->tipData=(char *)(data)->GetRow(i-1);
 		}
 	
 	numTipsAdded=0;
@@ -457,6 +450,14 @@ void Tree::PerturbAllBranches(){
 	MakeAllNodesDirty();
 	}
 
+void Tree::RandomizeBranchLengths(FLOAT_TYPE lowLimit, FLOAT_TYPE highLimit){
+	FLOAT_TYPE range = (highLimit - lowLimit);
+	for(int i=1;i<numNodesTotal;i++){
+		allNodes[i]->dlen = lowLimit + (rnd.uniform() * range);
+		}
+	MakeAllNodesDirty();
+	}
+
 void Tree::ScaleWholeTree(FLOAT_TYPE factor/*=-1.0*/){
 	if(factor==-1.0) factor = rnd.gamma( Tree::alpha );
 	//9-12-06 Stupid!  Why the hell was this only scaling the internals?
@@ -491,8 +492,7 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 
 	//clasAssigned should be true if the clas have been assigned to the nodes by the claManager.
 	//(ie, not right after tree creation)
-	TreeNode *t1, *t2, *removedNode;
-	FLOAT_TYPE l;
+	TreeNode *t1, *removedNode;
 	vector<TreeNode *> rootDesc;
 	assert(root->left->next==root->right);
 
@@ -519,7 +519,7 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 	//now we have all of the new desc of the root
 	//disconnect the old ones
 	root->left = root->right = NULL;
-	for(int t=0;t<rootDesc.size();t++)
+	for(unsigned t=0;t<rootDesc.size();t++)
 		root->AddDes(rootDesc[t]);
 
 /*
@@ -571,6 +571,34 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 		EliminateNode(removedNode->nodeNum);
 		numBranchesAdded--;
 		}
+	}
+
+void Tree::ArbitrarilyBifurcate(){
+	//first figure out which internal nodenums haven't been used yet
+	int placeInAllNodes=1;
+	while(allNodes[placeInAllNodes]->attached == true) placeInAllNodes++;
+	vector<TreeNode*> nodes;
+	TreeNode *curNode = root->left;
+	TreeNode *desNode;
+	
+	while(1){
+		if(curNode->IsInternal()) desNode = curNode->left;
+		nodes.push_back(desNode);
+		while(desNode->next){
+			desNode = desNode->next;
+			nodes.push_back(desNode);
+			}
+		if(nodes.size() > 2){
+			int first = rnd.random_int(nodes.size());
+			int second;
+			do{
+				second = rnd.random_int(nodes.size());
+				}while(first == second);
+		//	curNode-
+			
+			}
+		}
+
 	}
 
 void Tree::AddRandomNode(int nodenum , int &placeInAllNodes){
@@ -1102,7 +1130,7 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 	}
 	
 //this is essentially a version of TopologyMutator that goes through cut nodes in order
-//and for each cut node goes through the broken nodes in order.  It the swaps are performed
+//and for each cut node goes through the broken nodes in order.  The swaps are performed
 //on a temporary tree
 void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, int range, bool furthestFirst){
 
@@ -1130,6 +1158,14 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 	better.precision(9);
 	data->BeginNexusTreesBlock(better);
 
+#ifdef OUTPUT_ALL
+	if(furthestFirst) sprintf(str, "determAllCutR.%d.%f.tre", range, optPrecision);
+	else sprintf(str, "determAllCut.%d.%f.tre", range, optPrecision);	
+	
+	ofstream all(str);
+	data->BeginNexusTreesBlock(all);
+#endif
+
 	if(furthestFirst) sprintf(str, "determCutR%d.%f.log", range, optPrecision);
 	else sprintf(str, "determCut%d.%f.log", range, optPrecision);
 	FILE *log = fopen(str, "w");
@@ -1142,32 +1178,19 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 	treeString[stringSize]='\0';
 	bool newBest=false;
 	attemptedSwaps.ClearAttemptedSwaps();
+	
 	int startC, c=1;
-
-	/*
-	AttemptedSwapList availableSwaps;
-
-	Bipartition proposed;
-	for(int i=1;i<numNodesTotal;i++){
-		cut=allNodes[i];
-		GatherValidReconnectionNodes(range, cut, NULL);
-		for(list<ReconNode>::iterator b = sprRang.begin();b != sprRang.end();b++){
-			ReconNode *broken = &(*b);
-			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
-			availableSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
-			}
-		}
-*/	
-
+		
 	int acceptedSwaps = 0;
 	startC = c;
 
 	while(1){
-		cut=allNodes[c];
-		GatherValidReconnectionNodes(range, cut, NULL);
-		if(furthestFirst) sprRang.Reverse();
+		cut=tempIndiv.treeStruct->allNodes[c];
+		tempIndiv.treeStruct->GatherValidReconnectionNodes(range, cut, NULL);
+		tempIndiv.treeStruct->sprRang.SortByDist();
+		if(furthestFirst) tempIndiv.treeStruct->sprRang.Reverse();
 
-		for(list<ReconNode>::iterator b = sprRang.begin();b != sprRang.end();b++){
+		for(list<ReconNode>::iterator b = tempIndiv.treeStruct->sprRang.begin();b != tempIndiv.treeStruct->sprRang.end();b++){
 			ReconNode *broken = &(*b);
 			
 			//log the swap about to be performed.  Although this func goes through the swaps in order,
@@ -1175,7 +1198,7 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 			//nodes can be reconnected with an NNI such that the same topology results
 			bool unique=false;
 			Bipartition proposed;
-			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+			proposed.FillWithXORComplement(cut->bipart, tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart);
 			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 
 			if(unique){
@@ -1187,6 +1210,11 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 				else{
 					tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
 					}
+
+#ifdef OUTPUT_ALL
+				tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+				all << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;				
+#endif
 
 				if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
 
@@ -1257,6 +1285,14 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 	better.precision(9);
 	data->BeginNexusTreesBlock(better);
 
+#ifdef OUTPUT_ALL
+	if(furthestFirst) sprintf(str, "determAllDistR.%d.%f.tre", range, optPrecision);
+	else sprintf(str, "determAllDist.%d.%f.tre", range, optPrecision);	
+	
+	ofstream all(str);
+	data->BeginNexusTreesBlock(all);
+#endif
+
 	if(furthestFirst) sprintf(str, "determDistR%d.%f.log", range, optPrecision);
 	else sprintf(str, "determDist%d.%f.log", range, optPrecision);
 	FILE *log = fopen(str, "w");
@@ -1271,21 +1307,6 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 	attemptedSwaps.ClearAttemptedSwaps();
 	int startC, c=1;
 
-	/*
-	AttemptedSwapList availableSwaps;
-
-	Bipartition proposed;
-	for(int i=1;i<numNodesTotal;i++){
-		cut=allNodes[i];
-		GatherValidReconnectionNodes(range, cut, NULL);
-		for(list<ReconNode>::iterator b = sprRang.begin();b != sprRang.end();b++){
-			ReconNode *broken = &(*b);
-			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
-			availableSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
-			}
-		}
-*/	
-
 	int currentDist;
 	if(furthestFirst) currentDist = range;
 	else currentDist = 1;
@@ -1295,6 +1316,7 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 		cut=allNodes[c];
 		//outman.UserMessageNoCR("cut=%d ", c);
 		GatherValidReconnectionNodes(range, cut, NULL);
+		sprRang.SortByDist();
 
 		for(list<ReconNode>::iterator b = sprRang.GetFirstNodeAtDist(currentDist);b != sprRang.end() && b->reconDist == currentDist;b++){
 			ReconNode *broken = &(*b);
@@ -1315,6 +1337,11 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 				else{
 					tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
 					}
+					
+#ifdef OUTPUT_ALL
+				tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+				all << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;	
+#endif
 
 				if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
 					outman.UserMessage("%f\t%f\t%d\t%d", tempIndiv.treeStruct->lnL, lnL - tempIndiv.treeStruct->lnL, c, b->reconDist);
@@ -1365,9 +1392,28 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 	tempIndiv.treeStruct=NULL;
 	}
 
+void Tree::FillAllSwapsList(ReconList *cuts, int reconLim){
+	CalcBipartitions();
+	for(int i=1;i<numNodesTotal;i++) cuts[i].clear();
+	for(int i=1;i<numNodesTotal;i++){
+		GatherValidReconnectionNodes(cuts[i], reconLim, allNodes[i], NULL);
+		}
+	}
+
+unsigned Tree::FillWeightsForAllSwaps(ReconList *cuts, double *cutWeights){
+	double tot = 0.0, runningTot = 0.0;
+	for(int i=1;i<numNodesTotal;i++)
+		tot += cuts[i].size();
+	for(int i=1;i<numNodesTotal;i++){
+		runningTot += (double) cuts[i].size() / tot;
+		cutWeights[i] = runningTot;
+		}
+	cutWeights[numNodesTotal] = 1.0;
+	return (unsigned) tot;
+	}
 
 //this is essentially a version of TopologyMutator that goes through cut nodes in order
-//and for each cut node goes through the broken nodes in order.  It the swaps are performed
+//and for each cut node goes through the broken nodes in some order. The swaps are performed
 //on a temporary tree
 void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, int range){
 
@@ -1393,6 +1439,13 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 	ofstream better(str);
 	better.precision(9);
 	data->BeginNexusTreesBlock(better);
+
+#ifdef OUTPUT_ALL
+	sprintf(str, "determAllRand.%d.%f.tre", range, optPrecision);	
+	
+	ofstream all(str);
+	data->BeginNexusTreesBlock(all);
+#endif
 	
 	sprintf(str, "determRand%d.%f.log", range, optPrecision);
 	FILE *log = fopen(str, "w");
@@ -1407,27 +1460,75 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 	attemptedSwaps.ClearAttemptedSwaps();
 	int c=1;
 
-	/*
-	AttemptedSwapList availableSwaps;
-
-	Bipartition proposed;
-	for(int i=1;i<numNodesTotal;i++){
-		cut=allNodes[i];
-		GatherValidReconnectionNodes(range, cut, NULL);
-		for(list<ReconNode>::iterator b = sprRang.begin();b != sprRang.end();b++){
-			ReconNode *broken = &(*b);
-			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
-			availableSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
-			}
-		}
-*/	
-
-	int *completed = new int[numNodesTotal];
-	for(int i=1;i<numNodesTotal;i++) completed[i] = 0;
+	//zeroth element won't be used, for clarity of indexing
+	vector<ReconList> cuts(numNodesTotal+1);
+	vector<double> cutWeights(numNodesTotal+1);
+	tempIndiv.treeStruct->FillAllSwapsList(&cuts[0], range);
+	unsigned swapsLeft = tempIndiv.treeStruct->FillWeightsForAllSwaps(&cuts[0], &cutWeights[0]);
 
 	int acceptedSwaps = 0;
+	int swapsOnCurrent=0;
+	do{
+		double r = rnd.uniform();
+		c = 1;
+		while(cutWeights[c] < r) c++;
+		cut = tempIndiv.treeStruct->allNodes[c];
+		listIt b = cuts[c].NthElement(rnd.random_int(cuts[c].size()));
+		ReconNode *broken = &(*b);
+			
+		//log the swap about to be performed.  Although this func goes through the swaps in order,
+		//there will be duplication because of the way that NNIs are performed.  Two different cut
+		//nodes can be reconnected with an NNI such that the same topology results
+		bool unique=false;
+		newBest = false;
+		Bipartition proposed;
+		proposed.FillWithXORComplement(cut->bipart, tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart);
+		unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 
-	while(1){
+		if(unique){
+			swapNum++;
+			swapsOnCurrent++;
+			if(broken->withinCutSubtree == true){
+				tempIndiv.treeStruct->ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
+				}
+			else{
+				tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
+				}
+#ifdef OUTPUT_ALL
+			tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+			all << "tree " << c << "." << b->nodeNum << "." << b->reconDist << "." << swapsOnCurrent << " = [&U][" << lnL << "]" << treeString << ";" << endl;	
+#endif
+			
+			if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
+				outman.UserMessage("%f\t%f\t%d\t%d", tempIndiv.treeStruct->lnL, lnL - tempIndiv.treeStruct->lnL, c, b->reconDist);
+				source->CopySecByRearrangingNodesOfFirst(source->treeStruct, &tempIndiv, true);
+				lnL = tempIndiv.treeStruct->lnL;
+
+				tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+				better << "tree " << c << "." << b->nodeNum << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
+				newBest = true;
+				acceptedSwaps++;
+				outman.UserMessage("%d swaps before reset", swapsOnCurrent);
+				swapsOnCurrent = 0;
+				attemptedSwaps.ClearAttemptedSwaps();
+				tempIndiv.treeStruct->FillAllSwapsList(&cuts[0], range);
+				}
+			else{
+				tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source, true);
+				}
+			}
+		else{
+			if(broken->reconDist != 1) throw ErrorException("nonunique swap > NNI found! %d %d %d", c, b->nodeNum, b->reconDist);
+			}
+		if(newBest == false)//if the swap either wasn't better or wasn't unique
+			cuts[c].RemoveElement(b);
+		if(swapNum %100 == 0) fprintf(log, "%d\t%d\t%f\n", swapNum, acceptedSwaps, lnL);
+		swapsLeft = tempIndiv.treeStruct->FillWeightsForAllSwaps(&cuts[0], &cutWeights[0]);
+		}while(swapsLeft);
+	
+	outman.UserMessage("%d swaps before completion", swapsOnCurrent);
+
+/*	while(1){
 		int attempts = 0;
 		do{
 			c = GetRandomNonRootNode();
@@ -1476,7 +1577,11 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 				else{
 					tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
 					}
-
+#ifdef OUTPUT_ALL
+				tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+				all << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;	
+#endif
+				
 				if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
 					outman.UserMessage("%f\t%f\t%d\t%d", tempIndiv.treeStruct->lnL, lnL - tempIndiv.treeStruct->lnL, c, b->reconDist);
 					source->CopySecByRearrangingNodesOfFirst(source->treeStruct, &tempIndiv, true);
@@ -1503,7 +1608,7 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 			completed[c] = 1;
 			}
 		}
-	}
+*/	}
 
 //this function now returns the reconnection distance, with it being negative if its a
 //subtree reorientation swap
@@ -1729,6 +1834,117 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 #endif
 	}
 
+//same as the normal GatherValidReconnectionNodes, but fills ReconList passed in, not the normal tree one
+void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNode *cut, const TreeNode *subtreeNode){
+	const TreeNode *center=cut->anc;
+	
+	//add the descendent branches
+	if(center->left != cut) 
+		thisList.AddNode(center->left->nodeNum, 0, (float) center->left->dlen);
+	if(center->left->next != cut) 
+		thisList.AddNode(center->left->next-> nodeNum, 0, (float) center->left->next->dlen);
+	
+	//add either the center node itself or the third descendent in the case of the root
+	if(center->IsNotRoot()){
+		if(center->anc != subtreeNode)
+			thisList.AddNode(center->nodeNum, 0, (float) center->dlen);
+		}
+	else{
+		if(center->left->next->next != cut)
+			thisList.AddNode(center->left->next->next->nodeNum, 0, (float) center->left->next->next->dlen);
+		}
+	
+	assert(thisList.size() == 2);
+	
+	for(int curDist = 0; curDist < maxDist || maxDist < 0; curDist++){
+		//list<ReconNode>::iterator it=thisList.GetFirstNodeAtDist(curDist);
+		listIt it=thisList.GetFirstNodeAtDist(curDist);
+		if(it == thisList.end()){
+			break; //need this to break out of loop when curDist exceeds any branches in the tree
+			}
+		for(; it != thisList.end() && it->reconDist == curDist; it++){
+			TreeNode *cur=allNodes[it->nodeNum];
+			assert(cur->IsNotRoot());
+			
+			if(cur->left!=NULL && cur->left!=cut) 
+			    thisList.AddNode(cur->left->nodeNum, curDist+1, (float) (it->pathlength + cur->left->dlen));
+			if(cur->right!=NULL && cur->right!=cut) 
+		    	thisList.AddNode(cur->right->nodeNum, curDist+1, (float) (it->pathlength + cur->right->dlen));
+			if(cur->next!=NULL && cur->next!=cut){
+			    thisList.AddNode(cur->next->nodeNum, curDist+1, (float) (it->pathlength + cur->next->dlen));
+			    if(cur->next->next!=NULL && cur->next->next!=cut){//if cur is the left descendent of the root
+			    	thisList.AddNode(cur->next->next->nodeNum, curDist+1, (float) (it->pathlength + cur->next->next->dlen));
+			    	}
+			    }
+			if(cur->prev!=NULL && cur->prev!=cut){
+			    thisList.AddNode(cur->prev->nodeNum, curDist+1, (float) (it->pathlength + cur->prev->dlen));
+			    if(cur->prev->prev!=NULL && cur->prev->prev!=cut){//if cur is the right descendent of the root
+			    	thisList.AddNode(cur->prev->prev->nodeNum, curDist+1, (float) (it->pathlength + cur->prev->prev->dlen));
+			    	}
+			    }
+		    if(cur->anc->nodeNum != 0){//if the anc is not the root, add it.
+		    	if(cur->anc!=subtreeNode){
+			    	thisList.AddNode(cur->anc->nodeNum, curDist+1, (float) (it->pathlength + cur->anc->dlen));
+			 		}
+			 	}
+		    }
+		}
+	
+	if(maxDist != 1 && cut->IsInternal()){
+		//Gather nodes within the cut subtree to allow SPRs in which the portion of the tree containing
+		//the root is considered the subtree to be reattached
+		//start by adding cut's left and right
+		thisList.AddNode(cut->left->nodeNum, 0, (float) cut->left->dlen, true);
+		thisList.AddNode(cut->right->nodeNum, 0, (float) cut->right->dlen, true);
+
+		for(int curDist = 0; curDist < maxDist || maxDist < 0; curDist++){
+			//list<ReconNode>::iterator it=thisList.GetFirstNodeAtDistWithinCutSubtree(curDist);
+			listIt it=thisList.GetFirstNodeAtDistWithinCutSubtree(curDist);	
+			if(it == thisList.end()){
+				break; //need this to break out of loop when curDist exceeds any branches in the tree
+				}
+			for(; it != thisList.end() && it->reconDist == curDist; it++){
+				TreeNode *cur=allNodes[it->nodeNum];
+				
+				if(cur->left!=NULL) 
+					thisList.AddNode(cur->left->nodeNum, curDist+1, (float) (it->pathlength + cur->left->dlen), true);
+				if(cur->right!=NULL) 
+		    		thisList.AddNode(cur->right->nodeNum, curDist+1, (float) (it->pathlength + cur->right->dlen), true);
+				if(cur->next!=NULL){
+					thisList.AddNode(cur->next->nodeNum, curDist+1, (float) (it->pathlength + cur->next->dlen), true);
+					}
+				}
+			}
+		}
+
+    //remove general unwanted nodes from the subset
+	thisList.RemoveNodesOfDist(0); //remove branches adjacent to cut
+	//try removing nni's that would be dupes
+	for(listIt it = thisList.begin(); it != thisList.end();){
+		if(cut->nodeNum > (*it).nodeNum) it = thisList.RemoveElement(it);
+		else it++;
+		}
+
+#ifdef CONSTRAINTS
+	//now deal with constraints, if any
+	if(constraints.size() > 0){
+		Bipartition scratch;
+
+		for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+			if(thisList.size() != 0){
+				listIt it=thisList.begin();
+				do{
+					TreeNode* broken=allNodes[it->nodeNum];
+					//if(AllowedByConstraint(&(*conit), cut, broken, scratch) == false) it=thisList.RemoveElement(it);
+					if(AllowedByConstraint(&(*conit), cut, &*it, scratch) == false) it=thisList.RemoveElement(it);
+					else it++;
+					}while(it != thisList.end());
+				}
+			else return;
+			}
+		}
+#endif
+	}
 
 bool Tree::AssignWeightsToSwaps(TreeNode *cut){
 	//Assign weights to each swap (reconnection node) based on 
@@ -2124,7 +2340,7 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 		if(temp[0] != '\0'){
 			if(temp[0] != '+' && temp[0] != '-') throw ErrorException("constraint string must start with \'+\' (positive constraint) or \'-\' (negative constraint)");
 			if(temp[1] == '.' || temp[1] == '*'){//if individual biparts are specified in *. format
-				if(len != nTaxa+1) throw ErrorException("constraint # %d does not have the correct number of characters!\n(has %d) constraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format", conNum, len);
+				if(len != nTaxa+1) throw ErrorException("constraint # %d does not have the correct number of characters!\n(has %d) constraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format.  \nNote that backbone constraints cannot be specified in ...*** format.", conNum, len);
 				constr.ReadDotStarConstraint(temp.c_str());
 				constraints.push_back(constr);
 				conNum++;
@@ -2187,6 +2403,24 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 			}
 			}
 		}
+	//summarize the constraint info to the screen
+	string str;
+	int num=1;
+	if(constraints[0].IsPositive()){
+		outman.UserMessage("Found %d positively constrained bipartition(s)", constraints.size());
+		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
+			(*first).NumericalOutput(str);
+			if((*first).IsBackbone()) outman.UserMessage("     Bipartition %d (backbone): %s", num, str.c_str());
+			else outman.UserMessage("     Bipartition %d: %s", num, str.c_str());
+			num++;
+			}
+		}
+	else{
+		outman.UserMessage("Found 1 negatively (conversely) constrained bipartition");
+		constraints[0].NumericalOutput(str);
+		if(constraints[0].IsBackbone()) outman.UserMessage("     Bipartition %d (backbone): %s", num, str.c_str());
+		else outman.UserMessage("     Bipartition %d: %s", num, str.c_str());
+		}
 	}
 
 bool Tree::AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *broken, Bipartition &proposed) {
@@ -2194,19 +2428,40 @@ bool Tree::AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *bro
 	proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
 
 	if(constr->IsBackbone()){
-		bool compat = constr->IsCompatibleWithConstraint(&proposed);
-		if(compat == false) return compat;
+		if(constr->IsPositive()){
+			bool compat = constr->IsCompatibleWithConstraint(&proposed);
+			if(compat == false) return compat;
 
-		//this screws up the biparitions, so they need to be recalculated before returning
-		if(cut->anc->IsNotRoot()) cut->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(cut->bipart);
-		if(allNodes[broken->nodeNum]->anc->IsNotRoot()) allNodes[broken->nodeNum]->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(cut->bipart);
-		
-		if(root->left->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, constr->GetBackboneMask(), root->left);
-		if(compat == true) if(root->left->next->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, constr->GetBackboneMask(), root->left->next);
-		if(compat == true) if(root->right->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, constr->GetBackboneMask(), root->right);
+			//this screws up the biparitions, so they need to be recalculated before returning
+			if(cut->anc->IsNotRoot()) cut->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(cut->bipart);
+			if(allNodes[broken->nodeNum]->anc->IsNotRoot()) allNodes[broken->nodeNum]->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(cut->bipart);
+			
+			if(root->left->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, constr->GetBackboneMask(), root->left);
+			if(compat == true) if(root->left->next->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, constr->GetBackboneMask(), root->left->next);
+			if(compat == true) if(root->right->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, constr->GetBackboneMask(), root->right);
 
-		CalcBipartitions();//fix the bipartitions
-		return compat;
+			CalcBipartitions();//fix the bipartitions
+			return compat;
+			}
+		else{
+			bool compat=constr->IsCompatibleWithConstraint(&proposed);
+			if(compat==false) return compat;
+			else{//here we need to check if the removal of the cut subtree would create the unallowed bipart
+				//I think this could happen about anywhere in the tree, so the cleanest way i see to check
+				//is to actually make the tree and verify that it doesn't have the constrained bipart
+				//this introduces a bit of overhead
+				Tree propTree;
+				propTree.MimicTopo(this);
+
+				if(broken->withinCutSubtree == false)  propTree.SPRMutate(cut->nodeNum, broken, -1.0, 0);
+				else propTree.ReorientSubtreeSPRMutate(cut->nodeNum, broken, -1.0);
+
+				propTree.CalcBipartitions();
+
+				bool containsBip = (propTree.ContainsMaskedBipartitionOrComplement(constr->GetBipartition(), constr->GetBackboneMask()) != NULL);
+				return (containsBip == false);
+				}
+			}
 		}
 
 	else{
@@ -2218,7 +2473,7 @@ bool Tree::AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *bro
 			else{//here we need to check if the removal of the cut subtree would create the unallowed bipart
 				//I think this could happen about anywhere in the tree, so the cleanest way i see to check
 				//is to actually make the tree and verify that it doesn't have the constrained bipart
-				
+				//this introduces a bit of overhead
 				Tree propTree;
 				propTree.MimicTopo(this);
 
@@ -2531,142 +2786,166 @@ void Tree::DirtyNodesInSubtree(TreeNode *nd){
 	
 	}
 
-bool RescaleRateHet(CondLikeArray *destCLA, int nsites, int nRateCats){
-
+void Tree::RescaleRateHet(CondLikeArray *destCLA){
 
 		FLOAT_TYPE *destination=destCLA->arr;
 		int *underflow_mult=destCLA->underflow_mult;
+		const int *c=data->GetCounts();
+		const int nsites = data->NChar();
+		const int nRateCats = mod->NRateCats();
 
 		//check if any clas are getting close to underflow
 #ifdef UNIX
 		madvise(destination, sizeof(FLOAT_TYPE)*4*nRateCats*nsites, MADV_SEQUENTIAL);
 		madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
 #endif
-		bool reduceRescale=false;
 		FLOAT_TYPE small1, large1, small2, large2;
 		for(int i=0;i<nsites;i++){
+#ifdef USE_COUNTS_IN_BOOT
+			if(c[i] > 0){
+#else
+			if(1){
+#endif
 #ifdef GCC295
-			small1= min(destination[0] , destination[8]);
-			large1= max(destination[0] , destination[8]);
-			small2= min(destination[1] , destination[9]);
-			large2= max(destination[1] , destination[9]);
+				small1= min(destination[0] , destination[8]);
+				large1= max(destination[0] , destination[8]);
+				small2= min(destination[1] , destination[9]);
+				large2= max(destination[1] , destination[9]);
 
-			small1 = min(small1 , small2);
-			large1= max(large1 , large2);
-			small2= min(destination[2] , destination[10]);
-			large2= max(destination[2] , destination[10]);
-			
-			small1 = min(small1 , small2);
-			large1= max(large1 , large2);
-			
-			small2= min(destination[3] , destination[11]);
-			large2= max(destination[3] , destination[11]);
-			
-			small1 = min(small1 , small2);
-			large1= max(large1 , large2);
-			
-			small2= min(destination[4] , destination[12]);
-			large2= max(destination[4] , destination[12]);
+				small1 = min(small1 , small2);
+				large1= max(large1 , large2);
+				small2= min(destination[2] , destination[10]);
+				large2= max(destination[2] , destination[10]);
+				
+				small1 = min(small1 , small2);
+				large1= max(large1 , large2);
+				
+				small2= min(destination[3] , destination[11]);
+				large2= max(destination[3] , destination[11]);
+				
+				small1 = min(small1 , small2);
+				large1= max(large1 , large2);
+				
+				small2= min(destination[4] , destination[12]);
+				large2= max(destination[4] , destination[12]);
 
-			small1 = min(small1 , small2);
-			large1= max(large1 , large2);
+				small1 = min(small1 , small2);
+				large1= max(large1 , large2);
 
-			small2= min(destination[5] , destination[13]);
-			large2= max(destination[5] , destination[13]);		
-			
-			small1 = min(small1 , small2);
-			large1= max(large1 , large2);
+				small2= min(destination[5] , destination[13]);
+				large2= max(destination[5] , destination[13]);		
+				
+				small1 = min(small1 , small2);
+				large1= max(large1 , large2);
 
-			small2= min(destination[6] , destination[14]);
-			large2= max(destination[6] , destination[14]);
-			
-			small1 = min(small1 , small2);
-			large1= max(large1 , large2);
+				small2= min(destination[6] , destination[14]);
+				large2= max(destination[6] , destination[14]);
+				
+				small1 = min(small1 , small2);
+				large1= max(large1 , large2);
 
-			small2= min(destination[7] , destination[15]);
-			large2= max(destination[7] , destination[15]);
-			
-			small1 = min(small1 , small2);
-			large1= max(large1 , large2);
-			
-#else
-			small1= (destination[0] < destination[2] ? destination[0] : destination[2]);
-			large1= (destination[0] > destination[2] ? destination[0] : destination[2]);
-			small2= (destination[1] < destination[3] ? destination[1] : destination[3]);
-			large2= (destination[1] > destination[3] ? destination[1] : destination[3]);
-			small1 = (small1 < small2 ? small1 : small2);
-			large1= (large1 > large2 ? large1 : large2);
-
-			for(int r=1;r<nRateCats;r++){
-				small2= (destination[0 + r*4] < destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
-				large2= (destination[0 + r*4] > destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
+				small2= min(destination[7] , destination[15]);
+				large2= max(destination[7] , destination[15]);
+				
+				small1 = min(small1 , small2);
+				large1= max(large1 , large2);
+				
+	#else
+				small1= (destination[0] < destination[2] ? destination[0] : destination[2]);
+				large1= (destination[0] > destination[2] ? destination[0] : destination[2]);
+				small2= (destination[1] < destination[3] ? destination[1] : destination[3]);
+				large2= (destination[1] > destination[3] ? destination[1] : destination[3]);
 				small1 = (small1 < small2 ? small1 : small2);
-				large1= (large1 > large2 ? large1 : large2);				
-				small2= (destination[1 + r*4] < destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
-				large2= (destination[1 + r*4] > destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
-				small1 = (small1 < small2 ? small1 : small2);
-				large1= (large1 > large2 ? large1 : large2);	
-				}			
-#endif
-#ifdef SINGLE_PRECISION_FLOATS
-			if(large1< 1.0f){
-				if(large1 < 1e-30f){
-					throw(1);
-					}
-				int index=0;
-				while(precalcThresh[index] > large1){
-					index++;
-					}
-				int incr = precalcIncr[index];
-				int incr2=((int) -log(large1));
-				underflow_mult[i]+=incr;
-				FLOAT_TYPE mult=precalcMult[index];
-				//FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
-				for(int r=0;r<nRateCats;r++){
-					for(int q=0;q<4;q++){
-						destination[r*4 + q]*=mult;
-						assert(destination[r*4 +q] == destination[r*4 +q]);
-						assert(destination[r*4 +q] < 1e10);
+				large1= (large1 > large2 ? large1 : large2);
+
+				for(int r=1;r<nRateCats;r++){
+					small2= (destination[0 + r*4] < destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
+					large2= (destination[0 + r*4] > destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
+					small1 = (small1 < small2 ? small1 : small2);
+					large1= (large1 > large2 ? large1 : large2);				
+					small2= (destination[1 + r*4] < destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
+					large2= (destination[1 + r*4] > destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
+					small1 = (small1 < small2 ? small1 : small2);
+					large1= (large1 > large2 ? large1 : large2);	
+					}			
+	#endif
+	#ifdef SINGLE_PRECISION_FLOATS
+				if(large1< 1.0f){
+					if(large1 < 1e-30f){
+						throw(1);
+						}
+					int index=0;
+					while(precalcThresh[index] > large1){
+						index++;
+						}
+					int incr = precalcIncr[index];
+					int incr2=((int) -log(large1));
+					underflow_mult[i]+=incr;
+					FLOAT_TYPE mult=precalcMult[index];
+					//FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
+					for(int r=0;r<nRateCats;r++){
+						for(int q=0;q<4;q++){
+							destination[r*4 + q]*=mult;
+							assert(destination[r*4 +q] == destination[r*4 +q]);
+							assert(destination[r*4 +q] < 1e10);
+							}
 						}
 					}
-				}
-#else
-			if(large1< 1e-5){
-				if(large1 < 1e-150){
-					throw(1);
-					}
-				int incr=((int) -log(large1))+5;
-				underflow_mult[i]+=incr;
-				FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
-				for(int r=0;r<nRateCats;r++){
-					for(int q=0;q<4;q++){
-						destination[r*4 + q]*=mult;
-						assert(destination[r*4 +q] == destination[r*4 +q]);
-						assert(destination[r*4 +q] < 1e50);
+	#else
+				if(large1< 1e-5){
+					if(large1 < 1e-150){
+						throw(1);
+						}
+					int incr=((int) -log(large1))+5;
+					underflow_mult[i]+=incr;
+					FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
+					for(int r=0;r<nRateCats;r++){
+						for(int q=0;q<4;q++){
+							destination[r*4 + q]*=mult;
+							assert(destination[r*4 +q] == destination[r*4 +q]);
+							assert(destination[r*4 +q] < 1e50);
+							}
 						}
 					}
+				destination+= 4*nRateCats;
 				}
+			else{
+#ifdef OPEN_MP
+			//this is a little strange, but dest only needs to be advanced in the case of OMP
+			//because sections of the CLAs corresponding to sites with count=0 are skipped
+			//over in OMP instead of being eliminated
+				destination += 4 * nRateCats;
 #endif
-			destination+= 4*nRateCats;
+				}
+	#endif
 			}
 
 		destCLA->rescaleRank=0;
-		return reduceRescale;
 		}
 
-bool RescaleRateHetNState(CondLikeArray *destCLA, int nsites, int nstates, int nRateCats){
+void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 
-		FLOAT_TYPE *destination=destCLA->arr;
-		int *underflow_mult=destCLA->underflow_mult;
+	FLOAT_TYPE *destination=destCLA->arr;
+	int *underflow_mult=destCLA->underflow_mult;
 
-		//check if any clas are getting close to underflow
+	const int nsites = data->NChar();
+	const int nstates = mod->NStates();
+	const int nRateCats = mod->NRateCats();
+	const int *c = data->GetCounts();
+
+	//check if any clas are getting close to underflow
 #ifdef UNIX
-		madvise(destination, sizeof(FLOAT_TYPE)*nstates*nRateCats*nsites, MADV_SEQUENTIAL);
-		madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
+	madvise(destination, sizeof(FLOAT_TYPE)*nstates*nRateCats*nsites, MADV_SEQUENTIAL);
+	madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
 #endif
-		bool reduceRescale=false;
-		FLOAT_TYPE small1, large1;
-		for(int i=0;i<nsites;i++){
+	bool reduceRescale=false;
+	FLOAT_TYPE small1, large1;
+	for(int i=0;i<nsites;i++){
+#ifdef USE_COUNTS_IN_BOOT
+		if(c[i] > 0){
+#else
+		if(1){
+#endif
 			small1 = (destination[0] < destination[1]) ? destination[0] :  destination[1];
 			large1 = (destination[0] > destination[1]) ? destination[0] :  destination[1];
 			for(int s=2;s<nstates*nRateCats;s++){
@@ -2674,7 +2953,7 @@ bool RescaleRateHetNState(CondLikeArray *destCLA, int nsites, int nstates, int n
 				large1 = (destination[s] > large1) ? destination[s] : large1;
 				}
 
-			assert(large1 < 1e10);
+			assert(large1 < 1.0e15);
 			if(large1< 1e-5){
 				if(large1 < 1e-150){
 					throw(1);
@@ -2685,15 +2964,23 @@ bool RescaleRateHetNState(CondLikeArray *destCLA, int nsites, int nstates, int n
 				for(int q=0;q<nstates*nRateCats;q++){
 					destination[q]*=mult;
 					assert(destination[q] == destination[q]);
-					assert(destination[q] < 1e50);
+					assert(destination[q] < 1.0e50);
 					}
 				}
 			destination+= nstates*nRateCats;
 			}
-
-		destCLA->rescaleRank=0;
-		return reduceRescale;
+		else{
+#ifdef OPEN_MP
+			//this is a little strange, but dest only needs to be advanced in the case of OMP
+			//because sections of the CLAs corresponding to sites with count=0 are skipped
+			//over in OMP instead of being eliminated
+			destination += nstates * nRateCats;
+#endif
+			}
 		}
+
+	destCLA->rescaleRank=0;
+	}
 
 int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA /*=false*/){
 	//note that fillFinalCLA just refers to whether we actually want to calc a CLA
@@ -2785,9 +3072,9 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			else 
 #endif
 			if(modSpec.IsNucleotide() == false)
-				CalcFullCLAInternalInternalNState(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats(), mod->NStates());
+				CalcFullCLAInternalInternalNState(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0]);
 			else
-				CalcFullCLAInternalInternal(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats());
+				CalcFullCLAInternalInternal(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0]);
 			ProfIntInt.Stop();
 			}
 
@@ -2795,9 +3082,9 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			//two terminal children
 			ProfTermTerm.Start();
 			if(modSpec.IsNucleotide() == false)
-				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData, nsites,  mod->NRateCats(), mod->NStates());
+				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData);
 			else
-				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData, nsites,  mod->NRateCats());
+				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData);
 			ProfTermTerm.Stop();
 			}
 
@@ -2807,22 +3094,22 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 
 			if(modSpec.IsNucleotide() == false){
 				if(LCLA==NULL)
-					CalcFullCLAInternalTerminalNState(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats(), mod->NStates());
+					CalcFullCLAInternalTerminalNState(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData);
 				else 
-					CalcFullCLAInternalTerminalNState(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats(), mod->NStates());
+					CalcFullCLAInternalTerminalNState(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData);
 				}
 			else{
 #ifdef OPEN_MP
 				if(LCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats(), Lchild->ambigMap);
+					CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, Lchild->ambigMap);
 				else
-					CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats(), Rchild->ambigMap);
+					CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, Rchild->ambigMap);
 				}
 #else
 				if(LCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, nsites,  mod->NRateCats());
+					CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, NULL);
 				else 
-					CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, nsites,  mod->NRateCats());
+					CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, NULL);
 				}
 #endif
 			ProfIntTerm.Stop();
@@ -2913,9 +3200,9 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			claMan->FillHolder(wholeTreeIndex, ROOT);
 			claMan->ReserveCla(wholeTreeIndex);
 			if(childCLA!=NULL)//if child is internal
-				CalcFullCLAPartialInternalRateHet(claMan->GetCla(wholeTreeIndex), childCLA, &prmat[0], partialCLA, nsites,  mod->NRateCats());
+				CalcFullCLAPartialInternalRateHet(claMan->GetCla(wholeTreeIndex), childCLA, &prmat[0], partialCLA);
 			else
-				CalcFullCLAPartialTerminalRateHet(claMan->GetCla(wholeTreeIndex), partialCLA, &prmat[0], child->tipData, nsites,  mod->NRateCats());
+				CalcFullCLAPartialTerminalRateHet(claMan->GetCla(wholeTreeIndex), partialCLA, &prmat[0], child->tipData);
 				
 			return wholeTreeIndex;
 			}
@@ -2925,9 +3212,9 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		if(destCLA->rescaleRank >= rescaleEvery){
 			ProfRescale.Start();
 			if(modSpec.IsNucleotide())
-				RescaleRateHet(destCLA, nsites, mod->NRateCats());
+				RescaleRateHet(destCLA);
 			else
-				RescaleRateHetNState(destCLA, nsites, mod->NStates(), mod->NRateCats());
+				RescaleRateHetNState(destCLA);
 
 			ProfRescale.Stop();
 			}
@@ -2951,10 +3238,7 @@ int Tree::Score(int rootNodeNum /*=0*/){
 	do{
 		try{
 			scoreOK=true;
-/*			if(mod->NRateCats()==1)
-				ConditionalLikelihood( ROOT, rootNode);
-			else
-*/				ConditionalLikelihoodRateHet( ROOT, rootNode);
+				ConditionalLikelihoodRateHet( ROOT, rootNode);
 			}
 #if defined(NDEBUG)
 			catch(int){
@@ -3634,6 +3918,8 @@ void Tree::OptimizeBranchesAroundNode(TreeNode *nd, FLOAT_TYPE optPrecision, int
 void Tree::RerootHere(int newroot){
 	//DJZ 1-5-05 adding functionality to adjust the direction of existing clas
 	//so that they are still valid in the new context, rather than just dirtying everything
+	//DJZ 11/19/07 removing CLA adjustment code because it was buggy and didn't check the
+	//number of individuals that pointed to the same CLA, and so sometimes screwed things up.
 	//REMEMBER that the mutation_type of the individual this is called for needs to be 
 	// "|= rerooted" so that the topo numbers are updated properly
 
@@ -3647,6 +3933,7 @@ void Tree::RerootHere(int newroot){
 	//Each branch with take the length of its descendent on that path
 	//this will be easiest recursively
 	nroot->FlipBlensToRoot(0);
+	SweepDirtynessOverTree(nroot);
 	
 	//now take the new root's current ancestor and make it the middle des
 	//note that the existing cla directions at this node are still valid
@@ -3659,12 +3946,13 @@ void Tree::RerootHere(int newroot){
 	if(curnode!=root){
 		if(prevnode==curnode->left){
 			curnode->left=curnode->anc;
-			curnode->AdjustClasForReroot(UPLEFT);
+			//curnode->AdjustClasForReroot(UPLEFT);
 			}
 		else{
 			curnode->right=curnode->anc;
-			curnode->AdjustClasForReroot(UPRIGHT);
+			//curnode->AdjustClasForReroot(UPRIGHT);
 			}
+	//	SweepDirtynessOverTree(curnode);
 		
 		curnode->left->next=curnode->right;
 		curnode->left->prev=NULL;
@@ -3682,12 +3970,13 @@ void Tree::RerootHere(int newroot){
 	while(curnode!=root){
 		if(prevnode==curnode->left){
 			curnode->left=nextnode;
-			curnode->AdjustClasForReroot(UPLEFT);
+			//curnode->AdjustClasForReroot(UPLEFT);
 			}
 		else{
 			curnode->right=nextnode;
-			curnode->AdjustClasForReroot(UPRIGHT);
+			//curnode->AdjustClasForReroot(UPRIGHT);
 			}
+//		SweepDirtynessOverTree(curnode);
 			
 		curnode->left->next=curnode->right;
 		curnode->left->prev=NULL;
@@ -3705,7 +3994,7 @@ void Tree::RerootHere(int newroot){
 	if(prevnode==curnode->left){
 		curnode->left=curnode->right->prev;
 		curnode->left->prev=NULL;
-		curnode->AdjustClasForReroot(UPLEFT);
+		//curnode->AdjustClasForReroot(UPLEFT);
 		}
 	else if(prevnode==curnode->left->next){
 		curnode->left->next=curnode->right;
@@ -3715,8 +4004,9 @@ void Tree::RerootHere(int newroot){
 	else{
 		curnode->right=curnode->left->next;
 		curnode->right->next=NULL;		
-		curnode->AdjustClasForReroot(UPRIGHT);
+		//curnode->AdjustClasForReroot(UPRIGHT);
 		}
+	MakeNodeDirty(curnode);
 		
 	curnode->anc=prevnode;
 	
@@ -3738,6 +4028,7 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	if(root->anc==nroot) tempold.anc=root;
 	else tempold.anc=root->anc;
 	tempold.dlen=root->dlen;
+	
 	tempold.claIndexDown=root->claIndexDown;
 	tempold.claIndexUL=root->claIndexUL;
 	tempold.claIndexUR=root->claIndexUR;
@@ -3764,6 +4055,9 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	root->claIndexDown=tempnew.claIndexDown;
 	root->claIndexUL=tempnew.claIndexUL;
 	root->claIndexUR=tempnew.claIndexUR;
+	root->claIndexDown=claMan->SetDirty(root->claIndexDown);
+	root->claIndexUR=claMan->SetDirty(root->claIndexUR);
+	root->claIndexUL=claMan->SetDirty(root->claIndexUL);
 	
 	nroot->left=tempold.left;
 	nroot->left->anc=nroot;
@@ -3777,6 +4071,9 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	nroot->claIndexDown=tempold.claIndexDown;
 	nroot->claIndexUL=tempold.claIndexUL;
 	nroot->claIndexUR=tempold.claIndexUR;
+	nroot->claIndexDown=claMan->SetDirty(nroot->claIndexDown);
+	nroot->claIndexUR=claMan->SetDirty(nroot->claIndexUR);
+	nroot->claIndexUL=claMan->SetDirty(nroot->claIndexUL);
 	
 	if(nroot->anc->left==root){
 		nroot->anc->left=nroot;
@@ -4035,13 +4332,14 @@ void Tree::InferAllInternalStateProbs(const char *ofprefix){
 	sprintf(filename, "%s.internalstates.log", ofprefix);
 	ofstream out(filename);
 	out.precision(5);
+	AssignCLAsFromMaster();
 	RecursivelyCalculateInternalStateProbs(root, out);
 	out.close();
 	}
 
 void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 	if(nd->IsInternal()) RecursivelyCalculateInternalStateProbs(nd->left, out);
-	if(nd->IsInternal()) RecursivelyCalculateInternalStateProbs(nd->next, out);
+	if(nd->next) RecursivelyCalculateInternalStateProbs(nd->next, out);
 	
 	if(nd->IsInternal()){
 		int wholeTreeIndex=ConditionalLikelihoodRateHet(ROOT, nd, true);
@@ -4118,10 +4416,10 @@ FLOAT_TYPE Tree::CountClasInUse(){
 	return inUse;
 	}
 	
-FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata){
+FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldat){
 
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
+	//this function assumes that the pmat is arranged with the nstates^2 entries for the
+	//first rate, followed by nstates^2 for the second, etc.
 	FLOAT_TYPE *partial=partialCLA->arr;
 	int *underflow_mult=partialCLA->underflow_mult;
 
@@ -4129,8 +4427,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	int nRateCats = mod->NRateCats();
 	int nchar = data->NChar();
 	const int *countit=data->GetCounts();
+	const char *Ldata = Ldat;
 
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+	int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
+	FLOAT_TYPE prI=mod->PropInvar();
 
 #ifdef UNIX
 	madvise(partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
@@ -4149,71 +4451,116 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 #endif
 
 	if(nRateCats == 1){
+#ifdef OMP_TERMSCORE_NSTATE
+		#pragma omp parallel for private(partial, Ldata, siteL) reduction(+ : totallnL)
 		for(int i=0;i<nchar;i++){
-			siteL = 0.0;
-			if(*Ldata < nstates){ //no ambiguity
-				for(int from=0;from<nstates;from++){
-					siteL += prmat[(*Ldata)+nstates*from] * partial[from] * freqs[from];
+			Ldata = &Ldat[i];
+			partial = &partialCLA->arr[i*nstates];
+#else
+		for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+			if(countit[i] > 0){
+#else
+			if(1){
+#endif
+				siteL = 0.0;
+				if(*Ldata < nstates){ //no ambiguity
+					for(int from=0;from<nstates;from++){
+						siteL += prmat[(*Ldata)+nstates*from] * partial[from] * freqs[from];
+						}
+					partial += nstates;
 					}
-				partial += nstates;
-				Ldata++;
-				}
-				
-			else if(*Ldata == nstates){ //total ambiguity
-				for(int from=0;from<nstates;from++){
-					siteL += partial[from] * freqs[from];
+					
+				else if(*Ldata == nstates){ //total ambiguity
+					for(int from=0;from<nstates;from++){
+						siteL += partial[from] * freqs[from];
+						}
+					partial += nstates;
 					}
-				partial += nstates;
-				Ldata++;
+				else{ //partial ambiguity
+					assert(0);
+					}
+				siteL *= rateProb[0];//multiply by (1-pinv)
+				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+					if(underflow_mult[i] == 0)
+						siteL += prI*freqs[conStates[i]];
+					else 
+						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult[i]);
+					}
+				assert(siteL > 0.0);
+				totallnL += (countit[i] * (log(siteL) - underflow_mult[i]));
+				assert(totallnL < 0.0);
 				}
-			else{ //partial ambiguity
-				assert(0);
-				}
+			else{
 
-			totallnL += (countit[i] * (log(siteL) - underflow_mult[i]));
 	#ifndef OUTPUT_SITELIKES
-			}
+				}
 	#else
+				}
 //			for(int q=0;q<countit[i];q++)
 				sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
 			}
 		sit.close();
 	#endif
+			Ldata++;
+			}
 		}
 	else{
 
-		vector<FLOAT_TYPE> stateContrib(nstates);
-
+#ifdef OMP_TERMSCORE_NSTATE
+		#pragma omp parallel for private(partial, Ldata, siteL) reduction(+ : totallnL)
 		for(int i=0;i<nchar;i++){
-			for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
-			if(*Ldata < nstates){ //no ambiguity
-				for(int rate=0;rate<nRateCats;rate++){
-					for(int from=0;from<nstates;from++){
-						stateContrib[from] += prmat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from] * rateProb[rate];
+			Ldata = &Ldat[i];
+			partial = &partialCLA->arr[i*nstates*nRateCats];
+#else
+		for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+			if(countit[i] > 0){
+#else
+			if(1){
+#endif
+				vector<FLOAT_TYPE> stateContrib(nstates);
+				for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
+				if(*Ldata < nstates){ //no ambiguity
+					for(int rate=0;rate<nRateCats;rate++){
+						for(int from=0;from<nstates;from++){
+							stateContrib[from] += prmat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from] * rateProb[rate];
+							}
+						partial += nstates;
 						}
-					partial += nstates;
 					}
-				Ldata++;
-				}
-				
-			else if(*Ldata == nstates){ //total ambiguity
-				for(int rate=0;rate<nRateCats;rate++){
-					for(int from=0;from<nstates;from++){
-						stateContrib[from] += partial[from] * rateProb[rate];
+					
+				else if(*Ldata == nstates){ //total ambiguity
+					for(int rate=0;rate<nRateCats;rate++){
+						for(int from=0;from<nstates;from++){
+							stateContrib[from] += partial[from] * rateProb[rate];
+							}
+						partial += nstates;
 						}
-					partial += nstates;
 					}
-				Ldata++;
-				}
 
-			else{ //partial ambiguity
-				assert(0);
-				}
+				else{ //partial ambiguity
+					assert(0);
+					}
 
-			siteL = 0.0;
-			for(int from=0;from<nstates;from++)
-				siteL += stateContrib[from] * freqs[from];
-			totallnL += *countit++ * (log(siteL) - underflow_mult[i]);
+				siteL = 0.0;
+				for(int from=0;from<nstates;from++)
+					siteL += stateContrib[from] * freqs[from];
+				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+					if(underflow_mult[i] == 0)
+						siteL += prI*freqs[conStates[i]];
+					else 
+						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult[i]);
+					}
+				assert(siteL > ZERO_POINT_ZERO);
+
+
+				totallnL += countit[i] * (log(siteL) - underflow_mult[i]);
+				assert(totallnL < ZERO_POINT_ZERO);
+				}
+			Ldata++;
 	#ifndef OUTPUT_SITELIKES
 			}
 	#else
@@ -4251,71 +4598,90 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
 
 	int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstBases();
+	const int *conBases=data->GetConstStates();
 	FLOAT_TYPE prI=mod->PropInvar();
 //	FLOAT_TYPE scaledGammaProp=(1.0-prI) / mod->NRateCats();
 
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
-#undef OUTPUT_SITELIKES
-
 #ifdef OUTPUT_SITELIKES
 	ofstream sit("sitelikes.log");
 #endif
 
 	for(int i=0;i<nchar;i++){
-		La=Lc=Lg=Lt=0.0;
-		if(*Ldata > -1){ //no ambiguity
-			for(int i=0;i<nRateCats;i++){
-
-				La  += prmat[(*Ldata)+16*i] * partial[0] * rateProb[i];
-				Lc  += prmat[(*Ldata+4)+16*i] * partial[1] * rateProb[i];
-				Lg  += prmat[(*Ldata+8)+16*i] * partial[2] * rateProb[i];
-				Lt  += prmat[(*Ldata+12)+16*i] * partial[3] * rateProb[i];
-				partial += 4;
-				}
-			Ldata++;
-			}
-			
-		else if(*Ldata == -4){ //total ambiguity
-			for(int i=0;i<nRateCats;i++){
-				La += partial[0] * rateProb[i];
-				Lc += partial[1] * rateProb[i];
-				Lg += partial[2] * rateProb[i];
-				Lt += partial[3] * rateProb[i];
-				partial += 4;
-				}
-			Ldata++;
-			}
-		else{ //partial ambiguity
-			char nstates=-1 * *(Ldata++);
-			for(int i=0;i<nstates;i++){
+#ifdef USE_COUNTS_IN_BOOT
+		if(countit[i] > 0){
+#else
+		if(1){
+#endif
+			La=Lc=Lg=Lt=0.0;
+			if(*Ldata > -1){ //no ambiguity
 				for(int i=0;i<nRateCats;i++){
-					La += prmat[(*Ldata)+16*i]  * partial[4*i] * rateProb[i];
-					Lc += prmat[(*Ldata+4)+16*i] * partial[1+4*i] * rateProb[i];
-					Lg += prmat[(*Ldata+8)+16*i]* partial[2+4*i] * rateProb[i];
-					Lt += prmat[(*Ldata+12)+16*i]* partial[3+4*i] * rateProb[i];
+
+					La  += prmat[(*Ldata)+16*i] * partial[0] * rateProb[i];
+					Lc  += prmat[(*Ldata+4)+16*i] * partial[1] * rateProb[i];
+					Lg  += prmat[(*Ldata+8)+16*i] * partial[2] * rateProb[i];
+					Lt  += prmat[(*Ldata+12)+16*i] * partial[3] * rateProb[i];
+					partial += 4;
 					}
 				Ldata++;
 				}
-			partial+=4*nRateCats;
-			}
-		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
-			FLOAT_TYPE btot=0.0;
-			if(conBases[i]&1) btot+=freqs[0];
-			if(conBases[i]&2) btot+=freqs[1];
-			if(conBases[i]&4) btot+=freqs[2];
-			if(conBases[i]&8) btot+=freqs[3];
-			if(underflow_mult[i]==0)
-				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + prI*btot);
-			else 
-				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot*exp((FLOAT_TYPE)underflow_mult[i])));
-			}
-		else
-			siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
+				
+			else if(*Ldata == -4){ //total ambiguity
+				for(int i=0;i<nRateCats;i++){
+					La += partial[0] * rateProb[i];
+					Lc += partial[1] * rateProb[i];
+					Lg += partial[2] * rateProb[i];
+					Lt += partial[3] * rateProb[i];
+					partial += 4;
+					}
+				Ldata++;
+				}
+			else{ //partial ambiguity
+				char nstates=-1 * *(Ldata++);
+				for(int i=0;i<nstates;i++){
+					for(int i=0;i<nRateCats;i++){
+						La += prmat[(*Ldata)+16*i]  * partial[4*i] * rateProb[i];
+						Lc += prmat[(*Ldata+4)+16*i] * partial[1+4*i] * rateProb[i];
+						Lg += prmat[(*Ldata+8)+16*i]* partial[2+4*i] * rateProb[i];
+						Lt += prmat[(*Ldata+12)+16*i]* partial[3+4*i] * rateProb[i];
+						}
+					Ldata++;
+					}
+				partial+=4*nRateCats;
+				}
+			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+				FLOAT_TYPE btot=0.0;
+				if(conBases[i]&1) btot+=freqs[0];
+				if(conBases[i]&2) btot+=freqs[1];
+				if(conBases[i]&4) btot+=freqs[2];
+				if(conBases[i]&8) btot+=freqs[3];
+				if(underflow_mult[i]==0)
+					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + prI*btot);
+				else 
+					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot*exp((FLOAT_TYPE)underflow_mult[i])));
+				}
+			else
+				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
 
-		totallnL += (*countit++ * (log(siteL) - underflow_mult[i]));
+			totallnL += (countit[i] * (log(siteL) - underflow_mult[i]));
+			}
+		else{
+#ifdef OPEN_MP
+			//this is a little strange, but partial only needs to be advanced in the case of OMP
+			//because sections of the CLAs corresponding to sites with count=0 are skipped
+			//over in OMP instead of being eliminated
+			partial += 4*nRateCats;
+#endif
+			if(*Ldata > -1 || *Ldata == -4) Ldata++;
+			else{
+				int states = -1 * *Ldata;
+				do{
+					Ldata++;
+					}while (states-- > 0);
+				}
+			}
 #ifndef OUTPUT_SITELIKES
 		}
 #else
@@ -4352,43 +4718,56 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
 	FLOAT_TYPE prI=mod->PropInvar();
 	int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstBases();
+	const int *conBases=data->GetConstStates();
 
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
-
-#undef OUTPUT_SITELIKES
 
 #ifdef OUTPUT_SITELIKES
 	ofstream sit("sitelikes.log");
 #endif
 
 	for(int i=0;i<nchar;i++){
-		La=Lc=Lg=Lt=0.0;
-		for(int r=0;r<nRateCats;r++){
-			int rOff=r*16;
-			La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
-			Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
-			Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
-			Lt += ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3]) * partial[3] * rateProb[r];
-			partial+=4;
-			CL1+=4;
+#ifdef USE_COUNTS_IN_BOOT
+		if(countit[i] > 0){
+#else
+		if(1){
+#endif
+			La=Lc=Lg=Lt=0.0;
+			for(int r=0;r<nRateCats;r++){
+				int rOff=r*16;
+				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
+				Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
+				Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
+				Lt += ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3]) * partial[3] * rateProb[r];
+				partial+=4;
+				CL1+=4;
+				}
+			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+				FLOAT_TYPE btot=0.0;
+				if(conBases[i]&1) btot+=freqs[0];
+				if(conBases[i]&2) btot+=freqs[1];
+				if(conBases[i]&4) btot+=freqs[2];
+				if(conBases[i]&8) btot+=freqs[3];
+				if(underflow_mult1[i] + underflow_mult2[i] == 0)
+					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + prI*btot);
+				else 
+					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot*exp((FLOAT_TYPE)underflow_mult1[i]+underflow_mult2[i])));
+				}
+			else
+				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));	
+			
+			totallnL += (countit[i] * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
 			}
-		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
-			FLOAT_TYPE btot=0.0;
-			if(conBases[i]&1) btot+=freqs[0];
-			if(conBases[i]&2) btot+=freqs[1];
-			if(conBases[i]&4) btot+=freqs[2];
-			if(conBases[i]&8) btot+=freqs[3];
-			if(underflow_mult1[i] + underflow_mult2[i] == 0)
-				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + prI*btot);
-			else 
-				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot*exp((FLOAT_TYPE)underflow_mult1[i]+underflow_mult2[i])));
+		else{
+#ifdef OPEN_MP
+			//this is a little strange, but the arrays only needs to be advanced in the case of OMP
+			//because sections of the CLAs corresponding to sites with count=0 are skipped
+			//over in OMP instead of being eliminated
+			partial+=4*nRateCats;
+			CL1+=4*nRateCats;
+#endif
 			}
-		else
-			siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));	
-		
-		totallnL += (*countit++ * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
 #ifndef OUTPUT_SITELIKES
 		}
 #else
@@ -4414,6 +4793,9 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	int nstates = mod->NStates();
 
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+	FLOAT_TYPE prI=mod->PropInvar();
+	int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
 
 #ifdef UNIX
 	madvise(partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
@@ -4425,25 +4807,47 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-#undef OUTPUT_SITELIKES
-
 #ifdef OUTPUT_SITELIKES
 	ofstream sit("sitelikes.log");
 #endif
 
 	if(nRateCats == 1){
+#ifdef OMP_INTSCORE_NSTATE
+	#pragma omp parallel for private(partial, CL1) reduction(+ : totallnL)
 		for(int i=0;i<nchar;i++){
-			FLOAT_TYPE siteL = 0.0;
-			for(int from=0;from<nstates;from++){
-				FLOAT_TYPE temp = 0.0;
-				for(int to=0;to<nstates;to++){
-					temp += prmat[from*nstates + to]*CL1[to];
+			partial = &(partialCLA->arr[nstates*i]);
+			CL1		= &(childCLA->arr[nstates*i]);
+#else
+		for(int i=0;i<nchar;i++){
+#endif
+
+#ifdef USE_COUNTS_IN_BOOT
+			if(countit[i] > 0){
+#else
+			if(1){
+#endif
+				FLOAT_TYPE siteL = 0.0;
+				for(int from=0;from<nstates;from++){
+					FLOAT_TYPE temp = 0.0;
+					for(int to=0;to<nstates;to++){
+						temp += prmat[from*nstates + to]*CL1[to];
+						}
+					siteL += temp * partial[from] * freqs[from];
 					}
-				siteL += temp * partial[from] * freqs[from];
+				siteL *= rateProb[0]; //multiply by (1-pinv)
+				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+					if(underflow_mult1[i] + underflow_mult2[i] == 0)
+						siteL += prI*freqs[conStates[i]];
+					else 
+						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
+					}
+				totallnL += (countit[i] * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
+				CL1 += nstates;
+				partial += nstates;
 				}
-			totallnL += (*countit++ * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
-			CL1 += nstates;
-			partial += nstates;
+			else{
+				}
+
 #ifndef OUTPUT_SITELIKES
 			}
 #else
@@ -4455,26 +4859,50 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 		}
 	else{//this is a lot nastier in the case of rate het, and I don't see a clean way to do it except by writing the
 		//likelihood contributions of the various states to a temp array, instead of keeping a running total
-		vector<FLOAT_TYPE> stateContrib(nstates);
-
+		
+#ifdef OMP_INTSCORE_NSTATE
+		#pragma omp parallel for private(partial, CL1) reduction(+ : totallnL)
 		for(int i=0;i<nchar;i++){
-			FLOAT_TYPE siteL = 0.0;
-			for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
-			for(int rate=0;rate<nRateCats;rate++){
-				for(int from=0;from<nstates;from++){
-					FLOAT_TYPE temp = 0.0;
-					for(int to=0;to<nstates;to++){
-						temp += prmat[rate*nstates*nstates + from*nstates + to]*CL1[to];
+			partial = &(partialCLA->arr[nRateCats*nstates*i]);
+			CL1		= &(childCLA->arr[nRateCats*nstates*i]);
+#else
+		for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+			if(countit[i] > 0){
+#else
+			if(1){
+#endif
+				FLOAT_TYPE siteL = 0.0;
+				vector<FLOAT_TYPE> stateContrib(nstates);
+				for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
+				for(int rate=0;rate<nRateCats;rate++){
+					for(int from=0;from<nstates;from++){
+						FLOAT_TYPE temp = 0.0;
+						for(int to=0;to<nstates;to++){
+							temp += prmat[rate*nstates*nstates + from*nstates + to]*CL1[to];
+							}
+						stateContrib[from] += temp * partial[from] * rateProb[rate];
 						}
-					stateContrib[from] += temp * partial[from] * rateProb[rate];
+					CL1 += nstates;
+					partial += nstates;
 					}
-				CL1 += nstates;
-				partial += nstates;
+				siteL = 0.0;
+				for(int from=0;from<nstates;from++)
+					siteL += stateContrib[from] * freqs[from];
+				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+					if(underflow_mult1[i] + underflow_mult2[i] == 0)
+						siteL += prI*freqs[conStates[i]];
+					else 
+						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
+					}
+				assert(siteL == siteL);
+				assert(siteL != ZERO_POINT_ZERO);
+				totallnL += (countit[i] * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
+				assert(totallnL == totallnL);
 				}
-			siteL = 0.0;
-			for(int from=0;from<nstates;from++)
-				siteL += stateContrib[from] * freqs[from];
-			totallnL += (*countit++ * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
+			else{
+				}
 #ifndef OUTPUT_SITELIKES
 			}
 #else
@@ -4974,3 +5402,1013 @@ void Tree::ReadBinaryFormattedTree(FILE *in){
 		fread((char*) &allNodes[i]->dlen, sizeof(FLOAT_TYPE), 1, in);
 		}
 	}
+
+FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
+	FLOAT_TYPE omegaImprove=ZERO_POINT_ZERO;
+	FLOAT_TYPE minVal = 1.0e-5;
+	int i=0;
+	if(mod->NRateCats() == 1) 
+		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), 0, minVal, 9999.9, &Model::SetOmega);
+	else{
+		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, minVal, mod->Omega(1), &Model::SetOmega);
+//		for(int j=0;j<mod->NRateCats();j++)
+//			cout << mod->Omega(j) << "\t" << mod->OmegaProb(j) << endl;
+		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetOmegaProb);
+//		for(int j=0;j<mod->NRateCats();j++)
+//			cout << mod->Omega(j) << "\t" << mod->OmegaProb(j) << endl;
+		for(i=1;i < mod->NRateCats()-1;i++){
+			omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, mod->Omega(i-1), mod->Omega(i+1), &Model::SetOmega);
+//			for(int j=0;j<mod->NRateCats();j++)
+//				cout << mod->Omega(j) << "\t" << mod->OmegaProb(j) << endl;
+			omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetOmegaProb);
+//			for(int j=0;j<mod->NRateCats();j++)
+//				cout << mod->Omega(j) << "\t" << mod->OmegaProb(j) << endl;
+			}
+		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, mod->Omega(i-1), 9999.9, &Model::SetOmega);
+//		for(int j=0;j<mod->NRateCats();j++)
+//			cout << mod->Omega(j) << "\t" << mod->OmegaProb(j) << endl;
+		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetOmegaProb);
+//		for(int j=0;j<mod->NRateCats();j++)
+//			cout << mod->Omega(j) << "\t" << mod->OmegaProb(j) << endl;
+		}
+	return omegaImprove;
+	}
+
+FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
+	FLOAT_TYPE flexImprove=ZERO_POINT_ZERO;
+	FLOAT_TYPE minVal = 1.0e-5;
+	int i=0;
+
+	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, minVal, mod->FlexRate(i+1), &Model::SetFlexRate);
+
+//		for(int j=0;j<mod->NRateCats();j++)
+//			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
+	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetFlexProb);
+//		for(int j=0;j<mod->NRateCats();j++)
+//			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
+	for(i=1;i < mod->NRateCats()-1;i++){
+		flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, mod->FlexRate(i-1), mod->FlexRate(i+1), &Model::SetFlexRate);
+//			for(int j=0;j<mod->NRateCats();j++)
+//				cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
+		flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetFlexProb);
+//			for(int j=0;j<mod->NRateCats();j++)
+//				cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
+		}
+	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, mod->FlexRate(i-1), 9999.9, &Model::SetFlexRate);
+//		for(int j=0;j<mod->NRateCats();j++)
+//			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
+	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetFlexProb);
+//		for(int j=0;j<mod->NRateCats();j++)
+//			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
+	return flexImprove;
+	}
+
+void Tree::CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *leftEQ, const char *rightEQ){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *LCL=LCLA->arr;
+	const FLOAT_TYPE *RCL=RCLA->arr;
+	FLOAT_TYPE L1, L2, L3, L4, R1, R2, R3, R4;
+
+	const int nRateCats = mod->NRateCats();
+	const int nchar = data->NChar();
+	assert(nRateCats == 1);
+	
+#ifdef UNIX
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+	
+	for(int i=0;i<nchar;i++) {
+		if(leftEQ[i] == false){
+			L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
+			L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
+			L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
+			L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
+			}
+
+		if(rightEQ[i] == false){
+			R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
+			R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
+			R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
+			R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
+			}
+
+		dest[0] = L1 * R1;
+		dest[1] = L2 * R2;
+		dest[2] = L3 * R3;
+		dest[3] = L4 * R4;
+
+		assert(dest[0] == dest[0]);
+		assert(dest[0] >= 0);
+		dest += 4;
+		LCL += 4;
+		RCL += 4;
+		}
+
+	const int *left_mult=LCLA->underflow_mult;
+	const int *right_mult=RCLA->underflow_mult;
+	int *undermult=destCLA->underflow_mult;
+	
+	for(int i=0;i<nchar;i++){
+		undermult[i] = left_mult[i] + right_mult[i];
+		}
+	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
+	}
+
+void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *LCL=LCLA->arr;
+	const FLOAT_TYPE *RCL=RCLA->arr;
+	FLOAT_TYPE L1, L2, L3, L4, R1, R2, R3, R4;
+
+	const int nRateCats = mod->NRateCats();
+	const int nchar = data->NChar();
+	const int *counts = data->GetCounts();
+
+#ifdef UNIX
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+	
+	if(nRateCats == 4){//the unrolled 4 rate version
+#ifdef OMP_INTINTCLA
+		#pragma omp parallel for private(dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
+		for(int i=0;i<nchar;i++){
+			int index=4*4*i;
+			dest = &(destCLA->arr[index]);
+			LCL = &(LCLA->arr[index]); 
+			RCL= &(RCLA->arr[index]);
+#else
+		for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+			if(counts[i]> 0){
+#else
+			if(1){
+#endif
+				L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
+				L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
+				L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
+				L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
+
+				R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
+				R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
+				R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
+				R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
+				
+				dest[0] = L1 * R1;
+				dest[1] = L2 * R2;
+				dest[2] = L3 * R3;
+				dest[3] = L4 * R4;
+
+				assert(dest[0] > -1.0);
+				dest+=4;
+				LCL+=4;
+				RCL+=4;
+				
+				L1=( Lpr[16+0]*LCL[0]+Lpr[16+1]*LCL[1]+Lpr[16+2]*LCL[2]+Lpr[16+3]*LCL[3]);
+				L2=( Lpr[16+4]*LCL[0]+Lpr[16+5]*LCL[1]+Lpr[16+6]*LCL[2]+Lpr[16+7]*LCL[3]);
+				L3=( Lpr[16+8]*LCL[0]+Lpr[16+9]*LCL[1]+Lpr[16+10]*LCL[2]+Lpr[16+11]*LCL[3]);
+				L4=( Lpr[16+12]*LCL[0]+Lpr[16+13]*LCL[1]+Lpr[16+14]*LCL[2]+Lpr[16+15]*LCL[3]);
+
+				R1=(Rpr[16+0]*RCL[0]+Rpr[16+1]*RCL[1]+Rpr[16+2]*RCL[2]+Rpr[16+3]*RCL[3]);
+				R2=(Rpr[16+4]*RCL[0]+Rpr[16+5]*RCL[1]+Rpr[16+6]*RCL[2]+Rpr[16+7]*RCL[3]);
+				R3=(Rpr[16+8]*RCL[0]+Rpr[16+9]*RCL[1]+Rpr[16+10]*RCL[2]+Rpr[16+11]*RCL[3]);			
+				R4=(Rpr[16+12]*RCL[0]+Rpr[16+13]*RCL[1]+Rpr[16+14]*RCL[2]+Rpr[16+15]*RCL[3]);
+				
+				dest[0] = L1 * R1;
+				dest[1] = L2 * R2;
+				dest[2] = L3 * R3;
+				dest[3] = L4 * R4;
+
+				dest+=4;
+				LCL+=4;
+				RCL+=4;		
+
+				L1=( Lpr[32+0]*LCL[0]+Lpr[32+1]*LCL[1]+Lpr[32+2]*LCL[2]+Lpr[32+3]*LCL[3]);
+				L2=( Lpr[32+4]*LCL[0]+Lpr[32+5]*LCL[1]+Lpr[32+6]*LCL[2]+Lpr[32+7]*LCL[3]);
+				L3=( Lpr[32+8]*LCL[0]+Lpr[32+9]*LCL[1]+Lpr[32+10]*LCL[2]+Lpr[32+11]*LCL[3]);
+				L4=( Lpr[32+12]*LCL[0]+Lpr[32+13]*LCL[1]+Lpr[32+14]*LCL[2]+Lpr[32+15]*LCL[3]);
+
+				R1=(Rpr[32+0]*RCL[0]+Rpr[32+1]*RCL[1]+Rpr[32+2]*RCL[2]+Rpr[32+3]*RCL[3]);
+				R2=(Rpr[32+4]*RCL[0]+Rpr[32+5]*RCL[1]+Rpr[32+6]*RCL[2]+Rpr[32+7]*RCL[3]);
+				R3=(Rpr[32+8]*RCL[0]+Rpr[32+9]*RCL[1]+Rpr[32+10]*RCL[2]+Rpr[32+11]*RCL[3]);			
+				R4=(Rpr[32+12]*RCL[0]+Rpr[32+13]*RCL[1]+Rpr[32+14]*RCL[2]+Rpr[32+15]*RCL[3]);
+				
+				dest[0] = L1 * R1;
+				dest[1] = L2 * R2;
+				dest[2] = L3 * R3;
+				dest[3] = L4 * R4;
+
+				dest+=4;
+				LCL+=4;
+				RCL+=4;
+
+				L1=( Lpr[48+0]*LCL[0]+Lpr[48+1]*LCL[1]+Lpr[48+2]*LCL[2]+Lpr[48+3]*LCL[3]);
+				L2=( Lpr[48+4]*LCL[0]+Lpr[48+5]*LCL[1]+Lpr[48+6]*LCL[2]+Lpr[48+7]*LCL[3]);
+				L3=( Lpr[48+8]*LCL[0]+Lpr[48+9]*LCL[1]+Lpr[48+10]*LCL[2]+Lpr[48+11]*LCL[3]);
+				L4=( Lpr[48+12]*LCL[0]+Lpr[48+13]*LCL[1]+Lpr[48+14]*LCL[2]+Lpr[48+15]*LCL[3]);
+
+				R1=(Rpr[48+0]*RCL[0]+Rpr[48+1]*RCL[1]+Rpr[48+2]*RCL[2]+Rpr[48+3]*RCL[3]);
+				R2=(Rpr[48+4]*RCL[0]+Rpr[48+5]*RCL[1]+Rpr[48+6]*RCL[2]+Rpr[48+7]*RCL[3]);
+				R3=(Rpr[48+8]*RCL[0]+Rpr[48+9]*RCL[1]+Rpr[48+10]*RCL[2]+Rpr[48+11]*RCL[3]);			
+				R4=(Rpr[48+12]*RCL[0]+Rpr[48+13]*RCL[1]+Rpr[48+14]*RCL[2]+Rpr[48+15]*RCL[3]);
+				
+				dest[0] = L1 * R1;
+				dest[1] = L2 * R2;
+				dest[2] = L3 * R3;
+				dest[3] = L4 * R4;
+
+				dest+=4;
+				LCL+=4;
+				RCL+=4;
+				}
+			}
+		}
+
+	else{//the general N rate version
+		int r;
+#ifdef OMP_INTINTCLA
+		int index;
+		#pragma omp parallel for private(r, index, dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
+		for(int i=0;i<nchar;i++) {
+			index=4*nRateCats*i;
+			dest = &(destCLA->arr[index]);
+			LCL = &(LCLA->arr[index]); 
+			RCL= &(RCLA->arr[index]);
+#else			
+		for(int i=0;i<nchar;i++) {
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+			if(counts[i] > 0){
+#else
+			if(1){
+#endif
+				for(r=0;r<nRateCats;r++){
+#define NORM
+#ifdef ALT
+					//alt
+					dest[0] = ( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]) * (Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
+					dest[1] = ( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]) * (Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
+					dest[2] = ( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]) * (Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);
+					dest[3] = ( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]) * (Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
+#endif
+					/*
+					dest[0] = ( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]) * (Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
+					dest[1] = ( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]) * (Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
+					dest[2] = ( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]) * (Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);
+					dest[3] = ( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]) * (Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
+*/
+#ifdef ALT2
+					//alt2
+					dest[0]=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
+					dest[1]=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
+					dest[2]=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
+					dest[3]=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
+
+					dest[0]*=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
+					dest[1]*=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
+					dest[2]*=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
+					dest[3]*=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
+#endif
+#ifdef NORM
+					L1=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
+					L2=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
+					L3=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
+					L4=( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]);
+
+					R1=(Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
+					R2=(Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
+					R3=(Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);			
+					R4=(Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
+
+					dest[0] = L1 * R1;
+					dest[1] = L2 * R2;
+					dest[2] = L3 * R3;
+					dest[3] = L4 * R4;
+
+	//				assert(dest[0] == dest[0] && dest[0] > 0.0f && dest[0] < 1.0e20);
+#endif
+					dest+=4;
+					LCL+=4;
+					RCL+=4;
+					}
+				}
+			}
+		}
+
+	const int *left_mult=LCLA->underflow_mult;
+	const int *right_mult=RCLA->underflow_mult;
+	int *undermult=destCLA->underflow_mult;
+	
+	for(int i=0;i<nchar;i++){
+		undermult[i] = left_mult[i] + right_mult[i];
+		}
+	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
+	}
+
+void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *LCL=LCLA->arr;
+	const FLOAT_TYPE *RCL=RCLA->arr;
+	FLOAT_TYPE L1, R1;
+	
+	const int nRateCats = mod->NRateCats();
+	const int nstates = mod->NStates();
+	const int nchar = data->NChar();
+	const int *counts = data->GetCounts();
+
+#ifdef UNIX
+	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)LCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)RCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+#ifdef OMP_INTINTCLA_NSTATE
+	#pragma omp parallel for private(dest, LCL, RCL, L1, R1)
+	for(int i=0;i<nchar;i++){
+		dest = &(destCLA->arr[nRateCats * nstates * i]);
+		LCL = &(LCLA->arr[nRateCats * nstates * i]); 
+		RCL= &(RCLA->arr[nRateCats * nstates * i]);
+
+#else
+	for(int i=0;i<nchar;i++) {
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+		if(counts[i]> 0){
+#else
+		if(1){
+#endif
+			for(int rate=0;rate<nRateCats;rate++){
+				for(int from=0;from<nstates;from++){
+					L1 = Lpr[rate*nstates*nstates + from*nstates] * LCL[0];
+					R1 = Rpr[rate*nstates*nstates + from*nstates] * RCL[0];
+					for(int to=1;to<nstates;to++){
+						L1 += Lpr[rate*nstates*nstates + from*nstates + to] * LCL[to];
+						R1 += Rpr[rate*nstates*nstates + from*nstates + to] * RCL[to];
+						}
+					dest[from] = L1 * R1;
+					}
+				LCL += nstates;
+				RCL += nstates;
+				dest += nstates;
+				}
+			assert(dest[-nstates*nRateCats] >= 0.0);
+			assert(dest[-nstates*nRateCats] == dest[-nstates*nRateCats]);
+			}
+		}
+
+	const int *left_mult=LCLA->underflow_mult;
+	const int *right_mult=RCLA->underflow_mult;
+	int *undermult=destCLA->underflow_mult;
+	
+	for(int i=0;i<nchar;i++){
+		undermult[i] = left_mult[i] + right_mult[i];
+		}
+	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
+	}
+
+void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+
+	const int nRateCats = mod->NRateCats();
+	const int nchar = data->NChar();
+	const int *counts = data->GetCounts();
+
+#ifdef UNIX
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	for(int i=0;i<nchar;i++){
+#ifdef USE_COUNTS_IN_BOOT
+		if(counts[i] > 0){
+#else
+		if(1){
+#endif
+			if(*Ldata > -1 && *Rdata > -1){
+				for(int r=0;r<nRateCats;r++){
+					*(dest++) = Lpr[(*Ldata)+16*r] * Rpr[(*Rdata)+16*r];
+					*(dest++) = Lpr[(*Ldata+4)+16*r] * Rpr[(*Rdata+4)+16*r];
+					*(dest++) = Lpr[(*Ldata+8)+16*r] * Rpr[(*Rdata+8)+16*r];
+					*(dest++) = Lpr[(*Ldata+12)+16*r] * Rpr[(*Rdata+12)+16*r];
+					}
+				Ldata++;
+				Rdata++;
+				}
+				
+			else if((*Ldata == -4 && *Rdata == -4) || (*Ldata == -4 && *Rdata > -1) || (*Rdata == -4 && *Ldata > -1)){//total ambiguity of left, right or both
+				
+				if(*Ldata == -4 && *Rdata == -4) //total ambiguity of both
+					for(int i=0;i< (4*nRateCats);i++) *(dest++) = ONE_POINT_ZERO;
+				
+				else if(*Ldata == -4){//total ambiguity of left
+					for(int i=0;i<nRateCats;i++){
+						*(dest++) = Rpr[(*Rdata)+16*i];
+						*(dest++) = Rpr[(*Rdata+4)+16*i];
+						*(dest++) = Rpr[(*Rdata+8)+16*i];
+						*(dest++) = Rpr[(*Rdata+12)+16*i];
+						assert(*(dest-4)>=ZERO_POINT_ZERO);
+						}
+					}
+				else{//total ambiguity of right
+					for(int i=0;i<nRateCats;i++){
+						*(dest++) = Lpr[(*Ldata)+16*i];
+						*(dest++) = Lpr[(*Ldata+4)+16*i];
+						*(dest++) = Lpr[(*Ldata+8)+16*i];
+						*(dest++) = Lpr[(*Ldata+12)+16*i];
+						assert(*(dest-4)>=ZERO_POINT_ZERO);
+						}
+					}
+				Ldata++;
+				Rdata++;
+				}	
+			else {//partial ambiguity of left, right or both
+				if(*Ldata>-1){//unambiguous left
+					for(int i=0;i<nRateCats;i++){
+						*(dest+(i*4)) = Lpr[(*Ldata)+16*i];
+						*(dest+(i*4)+1) = Lpr[(*Ldata+4)+16*i];
+						*(dest+(i*4)+2) = Lpr[(*Ldata+8)+16*i];
+						*(dest+(i*4)+3) = Lpr[(*Ldata+12)+16*i];
+						assert(*(dest)>=ZERO_POINT_ZERO);
+						}
+					Ldata++;
+					}
+				else{
+					if(*Ldata==-4){//fully ambiguous left
+						for(int i=0;i< (4*nRateCats);i++){
+							*(dest+i)=ONE_POINT_ZERO;
+							}
+						Ldata++;
+						}
+				 
+					else{//partially ambiguous left
+						int nstates=-*(Ldata++);
+						for(int q=0;q< (4*nRateCats);q++) dest[q]=0;
+						for(int i=0;i<nstates;i++){
+							for(int r=0;r<nRateCats;r++){
+								*(dest+(r*4)) += Lpr[(*Ldata)+16*r];
+								*(dest+(r*4)+1) += Lpr[(*Ldata+4)+16*r];
+								*(dest+(r*4)+2) += Lpr[(*Ldata+8)+16*r];
+								*(dest+(r*4)+3) += Lpr[(*Ldata+12)+16*r];
+	//							assert(*(dest-1)>ZERO_POINT_ZERO);
+								}
+							Ldata++;
+							}
+						}
+					}
+				if(*Rdata>-1){//unambiguous right
+					for(int i=0;i<nRateCats;i++){
+						*(dest++) *= Rpr[(*Rdata)+16*i];
+						*(dest++) *= Rpr[(*Rdata+4)+16*i];
+						*(dest++) *= Rpr[(*Rdata+8)+16*i];
+						*(dest++) *= Rpr[(*Rdata+12)+16*i];
+	//					assert(*(dest-1)>ZERO_POINT_ZERO);
+						}
+					Rdata++;		
+					}
+				else if(*Rdata != -4){//partially ambiguous right
+					char nstates=-1 * *(Rdata++);
+					//create a temporary cla to hold the results from the ambiguity of the right, 
+					//which need to be +'s 
+					//FLOAT_TYPE *tempcla=new FLOAT_TYPE[4*nRateCats];
+					vector<FLOAT_TYPE> tempcla(4*nRateCats);
+					for(int i=0;i<nstates;i++){
+						for(int r=0;r<nRateCats;r++){
+							tempcla[(r*4)]   += Rpr[(*Rdata)+16*r];
+							tempcla[(r*4)+1] += Rpr[(*Rdata+4)+16*r];
+							tempcla[(r*4)+2] += Rpr[(*Rdata+8)+16*r];
+							tempcla[(r*4)+3] += Rpr[(*Rdata+12)+16*r];
+	//						assert(*(dest-1)>ZERO_POINT_ZERO);
+							}
+						Rdata++;
+						}
+					//Now multiply the temporary results against the already calced left
+					for(int i=0;i<nRateCats;i++){
+						*(dest++) *= tempcla[(i*4)];
+						*(dest++) *= tempcla[(i*4)+1];
+						*(dest++) *= tempcla[(i*4)+2];
+						*(dest++) *= tempcla[(i*4)+3];
+	//					assert(*(dest-1)>ZERO_POINT_ZERO);
+						}
+					}
+				else{//fully ambiguous right
+					dest+=(4*nRateCats);
+					Rdata++;
+					}
+				}
+			}
+		else{
+#ifdef OPEN_MP
+			//this is a little strange, but dest only needs to be advanced in the case of OMP
+			//because sections of the CLAs corresponding to sites with count=0 are skipped
+			//over in OMP instead of being eliminated
+			dest += 4 * nRateCats;
+#endif
+			if(*Ldata > -1 || *Ldata == -4) Ldata++;
+			else{
+				int states = -1 * *Ldata;
+				do{
+					Ldata++;
+					}while (states-- > 0);
+				}
+			if(*Rdata > -1 || *Rdata == -4) Rdata++;
+			else{
+				int states = -1 * *Rdata;
+				do{
+					Rdata++;
+					}while (states-- > 0);
+				}
+			}
+		}
+		
+		for(int site=0;site<nchar;site++){
+			destCLA->underflow_mult[site]=0;
+			}
+		destCLA->rescaleRank=2;
+	}
+
+void Tree::CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+
+	const int nRateCats = mod->NRateCats();
+	const int nstates = mod->NStates();
+	const int nchar = data->NChar();
+	const int *counts = data->GetCounts();
+
+#ifdef UNIX
+	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	for(int i=0;i<nchar;i++){
+#ifdef USE_COUNTS_IN_BOOT
+		if(counts[i]> 0){
+#else
+		if(1){
+#endif
+			if(*Ldata < nstates && *Rdata < nstates){
+				for(int rate=0;rate<nRateCats;rate++){
+					for(int from=0;from<nstates;from++){
+						dest[rate*nstates + from] = Lpr[(*Ldata) + from*nstates + rate*nstates*nstates] * Rpr[(*Rdata) + from*nstates + rate*nstates*nstates];	
+						}
+					}
+				Ldata++;
+				Rdata++;
+				}
+				
+			else{//total ambiguity of left, right or both
+				
+				if(*Ldata == nstates && *Rdata == nstates) //total ambiguity of both
+					for(int rate=0;rate<nRateCats;rate++)
+						for(int from=0;from<nstates;from++)
+							dest[rate*nstates + from] = ONE_POINT_ZERO;
+				
+				else if(*Ldata == nstates){//total ambiguity of left
+					for(int rate=0;rate<nRateCats;rate++)
+						for(int from=0;from<nstates;from++)
+							dest[rate*nstates + from] = Rpr[(*Rdata) + from*nstates + rate*nstates*nstates];
+						
+					}
+				else{//total ambiguity of right
+					for(int rate=0;rate<nRateCats;rate++)
+						for(int from=0;from<nstates;from++)
+							dest[rate*nstates + from] = Lpr[(*Ldata) + from*nstates + rate*nstates*nstates];
+					}
+				Ldata++;
+				Rdata++;
+				}
+
+//		assert(dest[i*nstates] > 0.0);
+//		assert(dest[i*nstates+19] < 1e10);
+//		assert(dest[i*nstates] == dest[i*nstates]);
+			dest += nRateCats*nstates;
+			}
+		else{
+#ifdef OPEN_MP
+			//this is a little strange, but dest only needs to be advanced in the case of OMP
+			//because sections of the CLAs corresponding to sites with count=0 are skipped
+			//over in OMP instead of being eliminated
+			dest += nRateCats*nstates;
+#endif
+			Ldata++;
+			Rdata++;
+			}
+		}
+		for(int site=0;site<nchar;site++){
+			destCLA->underflow_mult[site]=0;
+			}
+		destCLA->rescaleRank=2;
+	}
+
+
+void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const unsigned *ambigMap){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *des=destCLA->arr;
+	FLOAT_TYPE *dest=des;
+	const FLOAT_TYPE *CL=LCLA->arr;
+	const FLOAT_TYPE *CL1=CL;
+	const char *data2=dat2;
+
+	const int nchar = data->NChar();
+	const int nRateCats = mod->NRateCats();
+	const int *counts = data->GetCounts();
+
+#ifdef UNIX	
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);	
+#endif
+
+	if(nRateCats==4){//unrolled 4 rate version
+#ifdef OMP_INTTERMCLA
+		#pragma omp parallel for private(dest, CL1, data2)
+		for(int i=0;i<nchar;i++){
+			dest=&des[4*4*i];
+			CL1=&CL[4*4*i];
+			data2=&dat2[ambigMap[i]];
+#else
+		for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+			if(counts[i] > 0){
+#else
+			if(1){
+#endif
+
+				if(*data2 > -1){ //no ambiguity
+					dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * pr2[(*data2)];
+					dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * pr2[(*data2+4)];
+					dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * pr2[(*data2+8)];
+					dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * pr2[(*data2+12)];
+					
+					dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]) * pr2[(*data2)+16];
+					dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]) * pr2[(*data2+4)+16];
+					dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]) * pr2[(*data2+8)+16];
+					dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]) * pr2[(*data2+12)+16];
+				
+					dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]) * pr2[(*data2)+32];
+					dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]) * pr2[(*data2+4)+32];
+					dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]) * pr2[(*data2+8)+32];
+					dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]) * pr2[(*data2+12)+32];
+				
+					dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]) * pr2[(*data2)+48];
+					dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * pr2[(*data2+4)+48];
+					dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * pr2[(*data2+8)+48];
+					dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * pr2[(*data2+12)+48];
+	//				assert(dest[0] > 0.0);
+	#ifndef OMP_INTTERMCLA
+					dest+=16;
+					data2++;
+	#endif
+					}
+				else if(*data2 == -4){//total ambiguity
+					dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
+					dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
+					dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
+					dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
+					
+					dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
+					dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
+					dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
+					dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
+				
+					dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
+					dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
+					dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
+					dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
+				
+					dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
+					dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
+					dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
+					dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
+	//				assert(dest[0] > 0.0);
+	#ifndef OMP_INTTERMCLA
+					dest+=16;
+					data2++;
+	#endif
+					}
+				else {//partial ambiguity
+					//first figure in the ambiguous terminal
+					int nstates=-1 * *(data2++);
+					for(int j=0;j<16;j++) dest[j]=ZERO_POINT_ZERO;
+					for(int s=0;s<nstates;s++){
+						for(int r=0;r<4;r++){
+							*(dest+(r*4)) += pr2[(*data2)+16*r];
+							*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
+							*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
+							*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
+							}
+						data2++;
+						}
+					
+					//now add the internal child
+					*(dest++) *= ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
+					*(dest++) *= ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
+					*(dest++) *= ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
+					*(dest++) *= ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
+					
+					*(dest++) *= ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
+					*(dest++) *= ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
+					*(dest++) *= ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
+					*(dest++) *= ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
+				
+					*(dest++) *= ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
+					*(dest++) *= ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
+					*(dest++) *= ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
+					*(dest++) *= ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
+				
+					*(dest++) *= ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
+					*(dest++) *= ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
+					*(dest++) *= ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
+					*(dest++) *= ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
+					assert(dest[-16] >= 0.0);
+					}
+#ifndef OMP_INTTERMCLA		
+				CL1+=16;
+#endif			
+				}
+			else{
+				//dest += 16;
+				//CL1+=16;
+				if(*data2 > -1 || *data2 == -4) data2++;
+				else{
+					int states = -1 * *data2;
+					do{
+						data2++;
+						}while (states-- > 0);
+					}
+				}
+			}
+		}
+	else{//general N rate version
+#ifdef OMP_INTTERMCLA
+		#pragma omp parallel for private(dest, CL1, data2)
+		for(int i=0;i<nchar;i++){
+			dest=&des[4*nRateCats*i];
+			CL1=&CL[4*nRateCats*i];
+			data2=&dat2[ambigMap[i]];
+#else
+		for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+			if(counts[i] > 0){
+#else
+			if(1){
+#endif
+
+				if(*data2 > -1){ //no ambiguity
+					for(int r=0;r<nRateCats;r++){
+						dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * pr2[(*data2)+16*r];
+						dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * pr2[(*data2+4)+16*r];
+						dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * pr2[(*data2+8)+16*r];
+						dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * pr2[(*data2+12)+16*r];
+						dest+=4;
+						}
+					data2++;
+					}
+				else if(*data2 == -4){//total ambiguity
+					for(int r=0;r<nRateCats;r++){
+						dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
+						dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
+						dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
+						dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
+						dest+=4;
+						}
+					data2++;
+					}
+				else {//partial ambiguity
+					//first figure in the ambiguous terminal
+					int nstates=-1 * *(data2++);
+					for(int q=0;q<4*nRateCats;q++) dest[q]=0;
+					for(int s=0;s<nstates;s++){
+						for(int r=0;r<nRateCats;r++){
+							*(dest+(r*4)) += pr2[(*data2)+16*r];
+							*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
+							*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
+							*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
+							}
+						data2++;
+						}
+					
+					//now add the internal child
+					for(int r=0;r<nRateCats;r++){
+						*(dest++) *= ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
+						*(dest++) *= ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
+						*(dest++) *= ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
+						*(dest++) *= ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
+						}
+					}
+#ifndef OMP_INTTERMCLA	
+				CL1 += 4*nRateCats;
+#endif
+				}
+			else{
+				//dest += 16;
+				//CL1+=16;
+				if(*data2 > -1 || *data2 == -4) data2++;
+				else{
+					int states = -1 * *data2;
+					do{
+						data2++;
+						}while (states-- > 0);
+					}
+				}
+			}
+		}
+		
+	for(int i=0;i<nchar;i++)
+		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
+	
+	destCLA->rescaleRank=LCLA->rescaleRank+2;
+	} 
+
+void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *des=destCLA->arr;
+	FLOAT_TYPE *dest=des;
+	const FLOAT_TYPE *CL=LCLA->arr;
+	const FLOAT_TYPE *CL1=CL;
+	const char *data2=dat2;
+
+	const int nchar = data->NChar();
+	const int nRateCats = mod->NRateCats();
+	const int nstates = mod->NStates();
+	const int *counts = data->GetCounts();
+
+#ifdef UNIX	
+	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);	
+#endif
+#ifdef OMP_INTTERMCLA_NSTATE
+	#pragma omp parallel for private(dest, CL1, data2)
+	for(int i=0;i<nchar;i++){
+		dest=&des[nRateCats*nstates*i];
+		CL1=&CL[nRateCats*nstates*i];
+		data2=&dat2[i];
+#else
+	for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+		if(counts[i]> 0){
+#else
+		if(1){
+#endif
+			for(int rate=0;rate<nRateCats;rate++){
+				for(int from=0;from<nstates;from++){
+					dest[from] = pr1[rate*nstates*nstates + from*nstates] * CL1[0];
+					for(int to=1;to<nstates;to++){
+						dest[from] += pr1[rate*nstates*nstates + from*nstates + to] * CL1[to];
+						}
+					if(*data2 < nstates) //no ambiguity
+						dest[from] *= pr2[rate*nstates*nstates + (*data2)+from*nstates];
+					else if(*data2 == nstates){
+						int p=2;//total ambiguity
+						}
+					else{
+						//write this for partial ambiguity
+						assert(0);
+						}
+					}
+				assert(dest[19] < 1e10);
+				dest += nstates;
+				CL1 += nstates;
+				}
+			data2++;
+			}
+		else data2++;
+		}
+	
+	for(int i=0;i<nchar;i++)
+		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
+	
+	destCLA->rescaleRank=LCLA->rescaleRank+2;
+	} 
+
+void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	FLOAT_TYPE *CL1=LCLA->arr;
+	FLOAT_TYPE *partial=partialCLA->arr;
+
+	const int nchar = data->NChar();
+	const int nRateCats = mod->NRateCats();
+
+#ifdef UNIX
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise(partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	if(nRateCats==4){
+		for(int i=0;i<nchar;i++){
+			*(dest++) = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * *(partial++);
+			*(dest++) = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * *(partial++);
+			*(dest++) = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * *(partial++);
+			*(dest++) = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * *(partial++);
+			
+			*(dest++) = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]) * *(partial++);
+			*(dest++) = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]) * *(partial++);
+			*(dest++) = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]) * *(partial++);
+			*(dest++) = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]) * *(partial++);
+		
+			*(dest++) = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]) * *(partial++);
+			*(dest++) = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]) * *(partial++);
+			*(dest++) = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]) * *(partial++);
+			*(dest++) = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]) * *(partial++);
+		
+			*(dest++) = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]) * *(partial++);
+			*(dest++) = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * *(partial++);
+			*(dest++) = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * *(partial++);
+			*(dest++) = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * *(partial++);
+			CL1+=16;
+			assert(*(dest-1)>ZERO_POINT_ZERO);
+			}
+		}
+	else{
+		for(int i=0;i<nchar;i++){
+			for(int r=0;r<nRateCats;r++){
+				*(dest++) = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * *(partial++);
+				CL1+=4;
+				assert(*(dest-1)>ZERO_POINT_ZERO);
+				}
+			}
+		}
+		
+	for(int site=0;site<nchar;site++){
+		destCLA->underflow_mult[site]=partialCLA->underflow_mult[site] + LCLA->underflow_mult[site];
+		}
+	}
+
+void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	FLOAT_TYPE *partial=partialCLA->arr;
+
+	const int nchar = data->NChar();
+	const int nRateCats = mod->NRateCats();
+
+#ifdef UNIX
+	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	for(int i=0;i<nchar;i++){
+		if(*Ldata > -1){ //no ambiguity
+			for(int i=0;i<nRateCats;i++){
+				*(dest++) = Lpr[(*Ldata)+16*i] * *(partial++);
+				*(dest++) = Lpr[(*Ldata+4)+16*i] * *(partial++);
+				*(dest++) = Lpr[(*Ldata+8)+16*i] * *(partial++);
+				*(dest++) = Lpr[(*Ldata+12)+16*i] * *(partial++);
+//				assert(*(dest-1)>ZERO_POINT_ZERO);
+				}
+			Ldata++;
+			}
+			
+		else if(*Ldata == -4){ //total ambiguity
+			for(int i=0;i<4*nRateCats;i++) *(dest++) = *(partial++);
+			Ldata++;
+			}
+		else{ //partial ambiguity
+			//first figure in the ambiguous terminal
+			char nstates=-1 * *(Ldata++);
+			for(int q=0;q<4*nRateCats;q++) dest[q]=0;
+			for(int i=0;i<nstates;i++){
+				for(int i=0;i<nRateCats;i++){
+					*(dest+(i*4)) += Lpr[(*Ldata)+16*i];
+					*(dest+(i*4)+1) += Lpr[(*Ldata+4)+16*i];
+					*(dest+(i*4)+2) += Lpr[(*Ldata+8)+16*i];
+					*(dest+(i*4)+3) += Lpr[(*Ldata+12)+16*i];
+//					assert(*(dest-1)>ZERO_POINT_ZERO);
+					}
+				Ldata++;
+				}
+			
+			//now add the partial
+			for(int r=0;r<nRateCats;r++){
+				*(dest++) *= *(partial++);
+				*(dest++) *= *(partial++);
+				*(dest++) *= *(partial++);
+				*(dest++) *= *(partial++);
+				}
+			}
+		}
+	for(int i=0;i<nchar;i++)
+		destCLA->underflow_mult[i]=partialCLA->underflow_mult[i];
+}
