@@ -24,7 +24,7 @@ OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		population.o rng.o set.o\
 		garlireader.o topologylist.o translatetable.o tree.o treenode.o\
 		funcs.o	configreader.o configoptions.o\
-		bipartition.o model.o linalg.o adaptation.o mlhky.o\
+		bipartition.o model.o linalg.o adaptation.o sequencedata.o\
 		optimization.o
 
 Garli0.96b4 : $(OBJECT_LIST) garlimain.o
@@ -38,23 +38,23 @@ garlimain.o:	mlhky.h tree.h population.h \
 .cpp.o: 
 	$(CC) -c $(CC_FLAGS)  -I.  $*.cpp
 
-condlike.o:      condlike.h
-configreader.o:  configreader.h  
-configoptions.o: configoptions.h hashdefines.h 
+condlike.o:      condlike.h defs.h
+configreader.o:  configreader.h defs.h
+configoptions.o: configoptions.h hashdefines.h  defs.h
 tree.o:          tree.h hashdefines.h funcs.h defs.h clamanager.h
 optimization.o:	 tree.h funcs.h defs.h
-population.o:    population.h clamanager.h
-individual.o:    individual.h clamanager.h
+population.o:    population.h clamanager.h defs.h
+individual.o:    individual.h clamanager.h defs.h
 datamatr.o:      datamatr.h defs.h
 model.o:         model.h defs.h
 funcs.o:         funcs.h defs.h
-linalg.o:        linalg.h
-treenode.o:      treenode.h
-bipartition.o:   bipartition.h
+linalg.o:        linalg.h defs.h
+treenode.o:      treenode.h defs.h
+bipartition.o:   bipartition.h defs.h
 translatetable.o:translatetable.h defs.h
-set.o:           set.h
-rng.o:           rng.h
-topologylist.o:  topologylist.h
+set.o:           set.h defs.h
+rng.o:           rng.h defs.h
+topologylist.o:  topologylist.h defs.h
 adaptation.o:	 	 adaptation.h hashdefines.h defs.h
-mlhky.o:		 mlhky.h defs.h
+sequencedata.o:		 sequencedata.h defs.h
 garlireader.o:	garlireader.h defs.h
