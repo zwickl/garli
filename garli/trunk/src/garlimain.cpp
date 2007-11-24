@@ -222,7 +222,7 @@ int main( int argc, char* argv[] )	{
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running serial GARLI, version 0.96beta4 (Aug 2007)\n(->Amino acid and Codon testing version<-)\n");
+			outman.UserMessage("Running serial GARLI, version 0.96beta6 (revision 223) (Nov 2007)\n");
 #endif
 #ifdef OPEN_MP
 			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 

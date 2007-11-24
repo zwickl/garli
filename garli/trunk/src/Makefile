@@ -1,9 +1,9 @@
 s: 
-	make -f Makefile.ser Garli0.96b4
+	make -f Makefile.ser Garli0.96b6.r223
 
 p:
 	@echo '****Sorry, parallel compilation for version 0.96 is not yet available. ****'
-	@echo '****When it has been fully tested it will be made available.  Check the website soon. ****'
+	@echo '****When it has been fully tested it will be made available. ****'
 
 clean:
 	rm -f *.o Garli*
