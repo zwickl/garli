@@ -39,6 +39,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	outputTreelog = false;
 	outputMostlyUselessFiles = false;
 	outputPhylipTree = false;
+	writeCurrentBestTree = false;
 
 	//starting the run
 	randseed = -1;
@@ -129,11 +130,12 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	
 	int errors = 0;
 	errors += cr.SetSection("general");
+	if(errors < 0) throw ErrorException("Didn't find [general] section in config file\n     (this section heading is required)");
 	errors += cr.GetUnsignedOption("logevery", logevery);
 	errors += cr.GetUnsignedOption("saveevery", saveevery);
 	int found=cr.GetPositiveDoubleOption("megsclamemory", megsClaMemory, true);
 	found += cr.GetPositiveDoubleOption("availablememory", availableMemory, true);
-	if(found == -2) throw ErrorException("Error: either \"megsclamemory\" or \"availablememory\" must be specified in conf!");
+	if(found == -2) throw ErrorException("Either \"megsclamemory\" or \"availablememory\" must be specified in conf!");
 	
 	errors += cr.GetStringOption("datafname", datafname);
 	errors += cr.GetStringOption("ofprefix", ofprefix);
@@ -150,6 +152,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
+	cr.GetBoolOption("writecurrentbesttree", writeCurrentBestTree, true);
 
 	cr.GetBoolOption("restart", restart, true);
 	cr.GetBoolOption("writecheckpoints", checkpoint, true);
@@ -169,8 +172,14 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 
 	cr.GetStringOption("outgroup", outgroupString, true);
 
-	if(isMaster) errors += cr.SetSection("master");
-	else errors += cr.SetSection("remote");
+	if(isMaster){
+		errors += cr.SetSection("master");
+		if(errors < 0) throw ErrorException("Didn't find [master] section in config file\n     (this section heading is required)");
+		}
+	else{
+		errors += cr.SetSection("remote");
+		if(errors < 0) throw ErrorException("Didn't find [remote] section in config file\n     (this section heading is required)");
+		}
 	
 	errors += cr.GetUnsignedOption("nindivs", nindivs);
 	errors += cr.GetUnsignedOption("holdover", holdover);
