@@ -303,40 +303,51 @@ FLOAT_TYPE Tree::OptimizeAlpha(FLOAT_TYPE optPrecision){
 
 FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE)){
 
-#ifdef DEBUG_ALPHA_OPT
-	FLOAT_TYPE initVal=mod->Alpha();
+	FLOAT_TYPE epsilon = 1e-5;
 
-	ofstream deb("alphaTrace.log");
-	deb.precision(20);
-	for(int s=0;s<50;s++){
-		FLOAT_TYPE a=.3 + s*.025;
-		mod->SetAlpha(a, false);
+	assert(prevVal > lowBound - epsilon && prevVal < highBound + epsilon);
+
+	//DEBUG - if the initial value is already very near or equal to a bound, bump it off a tad so the emirical derivs below work right.
+	if(prevVal - lowBound < epsilon){
+		prevVal = lowBound + epsilon;
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
 		MakeAllNodesDirty();
-		Score();
-		deb << a << "\t" << lnL << endl;
 		}
-	deb.close();
-	mod->SetAlpha(initVal, false);
-	MakeAllNodesDirty();
-	Score();	
-#endif
+	else if(highBound - prevVal < epsilon){
+		prevVal = highBound - epsilon;
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
+		MakeAllNodesDirty();
+		}
 
-	if(lnL==-1) Score();
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1e-8)) Score();
 	FLOAT_TYPE start, prev, cur;
 	prev = start = cur = lnL;
 	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
 	FLOAT_TYPE upperBracket = highBound;   //the smallest value we know of with a negative d1, or the minimum allowed value
 	FLOAT_TYPE lowerBracket = lowBound;   //the largest value we know of with a positive d1 , or the maximum allowed value
 	FLOAT_TYPE incr;
-	FLOAT_TYPE epsilon = 1e-5;
 	int lowBoundOvershoot = 0;
 	int upperBoundOvershoot = 0;
-
+/*
+	ofstream curves("lcurve.log", ios::app);
+	curves.precision(8);
+	curves << endl;
+	for(double c = max(prevVal - 0.01, lowBound); c < min(prevVal + 0.01, highBound) ; c += 0.001){
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, c);
+		MakeAllNodesDirty();
+		Score();
+		curves << c << "\t" << lnL << endl;;
+		}
+	
+	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
+	MakeAllNodesDirty();
+	Score();
+*/
 	while(1){
 #ifdef SINGLE_PRECISION_FLOATS
 		incr=0.005f;
 #else
-		incr=min(0.001, min(prevVal - lowerBracket, upperBracket - prevVal));
+		incr=min(0.0001, min(prevVal - lowerBracket, upperBracket - prevVal));
 #endif
 		//mod->SetAlpha(prevVal+incr, false);
 		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal+incr);
@@ -1133,6 +1144,13 @@ if(nd->nodeNum == 8){
 					else proposed = nd->dlen * 0.25f;
 					}
 #else
+				if(FloatingPointEquals(nd->dlen, min_brlen, 1.0e-8)){
+					#ifdef OPT_DEBUG
+					opt << "already at min, return\n"; 
+					#endif
+					return totalEstImprove;
+					}
+
 				if(knownMin == min_brlen){
 					if(nd->dlen <= 1.0e-4) proposed = min_brlen;
 					else if(nd->dlen <= 0.005) proposed = 1.0e-4;
@@ -1186,6 +1204,14 @@ if(nd->nodeNum == 8){
 				}
 			}
 		else{//trying NR is feasible
+
+			if(d1 < ZERO_POINT_ZERO && FloatingPointEquals(nd->dlen, min_brlen, 1.0e-8)){
+				#ifdef OPT_DEBUG
+				opt << "already at min, return\n"; 
+				#endif
+				return totalEstImprove;
+				}
+
 			//DEBUG - keep going if the abs_d1 increased, regardless of what the estScoreDelta is
 #define CHECK_LIKE
 
@@ -1359,7 +1385,9 @@ opt.flush();
 			deb << "neg proposal num " << negProposalNum << endl;			
 			deb.close();
 */
-			throw(ErrorException("Problem with branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
+			if(iter == 51) outman.UserMessage("Notice: possible problem with branchlength optimization.\nIf you see this message frequently, please report it to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum);	
+			if(iter > 75)
+				throw(ErrorException("Problem with branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
 /*
 				ofstream scr("NRcurve.log");
 				scr.precision(20);
