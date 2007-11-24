@@ -719,6 +719,12 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	//if starting from a treefile, use the treestring
 	//to create the first indiv, and then copy the tree and clas
 	indiv[0].mod->SetDefaultModelParameters(data);
+
+
+	if(conf->bootstrapReps == 0 || currentBootstrapRep == 1){
+		OutputModelReport();
+		}
+
 #ifdef INPUT_RECOMBINATION
 	if(0){
 #else
@@ -779,10 +785,6 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].SetDirty();
 	indiv[0].CalcFitness(0);
 	
-	if(conf->bootstrapReps == 0 || currentBootstrapRep == 1){
-		OutputModelReport();
-		}
-
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	if(indiv[0].mod->NumMutatableParams() == 0) {
 		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
@@ -847,6 +849,7 @@ void Population::OutputModelReport(){
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
 	if(modSpec.IsAminoAcid() == false){
+		if(modSpec.IsCodon() && modSpec.numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega)\n");
 		if(modSpec.IsCodon()) outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model:\n     ");
 		else outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix: ");
 		if(modSpec.Nst() == 6 && modSpec.fixRelativeRates == false) outman.UserMessage("6 rates");
@@ -1632,6 +1635,8 @@ void Population::PerformSearch(){
 			if(s.length() > 0) outman.UserMessage(">>>%s<<<", s.c_str());
 			outman.UserMessage("Starting search with seed=%d\n", rnd.seed());
 			SeedPopulationWithStartingTree(currentSearchRep);
+			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
+			WriteStateFiles();
 			}
 		else{
 			adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(conf);
@@ -4770,7 +4775,7 @@ void Population::SetOutputDetails(){
 			//normal 1 rep
 			if(conf->searchReps == 1){
 #ifndef BOINC
-				if(interactive == false)
+				if(conf->writeCurrentBestTree)
 					best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 				else 
 					best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
