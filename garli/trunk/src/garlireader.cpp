@@ -182,6 +182,9 @@ void GarliReader::FactoryDefaults()
 		delete data;
 		data = NULL;
 		}
+	//"this" (the garli reader itself) is added to the block list to provide support for Garli blocks.
+	//we can't delete it, but need to detach it
+	Detach(this);
 
 	if (next_command == NULL)
 		next_command = new char[COMMAND_MAXLEN + 1];
@@ -783,6 +786,9 @@ void GarliReader::PurgeBlocks()
 		Detach(distances);
 		Detach(characters);
 		Detach(data);
+		//"this" (the garli reader itself) is added to the block list to provide support for Garli blocks.
+		//we can't delete it, but need to detach it
+		Detach(this);
 		}
 
 	delete taxa;

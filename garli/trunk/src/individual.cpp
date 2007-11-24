@@ -262,7 +262,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		
 	int placeInAllNodes=n+1;
 //	ofstream stepout("stepwise.log");
-	outman.UserMessage("taxa added:");
+	outman.UserMessage("number of taxa added:");
 
 	Bipartition mask;//mask is used for constrained trees
 	for(int i = 0;i<3;i++){//add the first 3
@@ -378,7 +378,8 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		else scratchT->Score();
 //		stepout << scratchT->lnL << endl;
 		CopySecByRearrangingNodesOfFirst(treeStruct, &scratchI, true);
-		outman.UserMessage(" %d %f", i+1, scratchT->lnL);
+		//outman.UserMessage(" %d %f", i+1, scratchT->lnL);
+		outman.UserMessageNoCR(" %d ", i+1);
 		//when we've added half the taxa optimize alpha, flex or omega 
 		if(i == (n/2) && (modSpec.IsCodon() || mod->NRateCats() > 1) && modSpec.fixAlpha == false){
 			FLOAT_TYPE rateOptImprove = 0.0;
@@ -650,8 +651,11 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		}
 
 	if(foundTree==true){
-		stf >> temp;
-		treeStruct=new Tree(temp, numericalTaxa);
+		char *t = new char[strlen+1];
+		stf.getline(t, strlen+1);
+		//stf >> temp;
+		treeStruct=new Tree(t, numericalTaxa);
+		delete []t;
 
 		//check that any defined constraints are present in the starting tree
 		treeStruct->CalcBipartitions();
