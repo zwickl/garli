@@ -773,10 +773,13 @@ class Model{
 		}
 
 	void SetOmegas(const FLOAT_TYPE *rates, const FLOAT_TYPE *probs){
+		FLOAT_TYPE tot=0.0;
 		for(int r=0;r<NRateCats();r++){
 			*omegas[r]=rates[r];
 			*omegaProbs[r]=probs[r];
+			tot += *omegaProbs[r];
 			}
+		if(FloatingPointEquals(tot, ONE_POINT_ZERO, 1.0e-5) == false) throw ErrorException("omega category proportions add up to %f, not 1.0.", tot);
 		eigenDirty = true;
 		}
 
@@ -837,6 +840,36 @@ class Model{
 	void SetDirty(bool tf){
 		if(tf) eigenDirty=true;
 		else eigenDirty=false;
+		}
+
+	void CheckAndCorrectRateOrdering(){
+		assert(NRateCats() > 1);
+		if(modSpec.IsNonsynonymousRateHet()){
+			for(int f=0;f<NRateCats()-1;f++){
+				if(*omegas[f] > *omegas[f+1]){
+					//outman.UserMessage("prevented: %f %f", *omegas[f], *omegas[f+1]); 
+					FLOAT_TYPE dum = *omegas[f+1];
+					*omegas[f+1] = *omegas[f];
+					*omegas[f] = dum;
+					dum = *omegaProbs[f+1];
+					*omegaProbs[f+1] = *omegaProbs[f];
+					*omegaProbs[f] = dum;
+					}
+				}
+			}
+		else if(modSpec.IsFlexRateHet()){
+			for(int f=0;f<NRateCats()-1;f++){
+				if(rateMults[f] > rateMults[f+1]){
+					FLOAT_TYPE dum = rateMults[f+1];
+					rateMults[f+1] = rateMults[f];
+					rateMults[f] = dum;
+					dum = rateProbs[f+1];
+					rateProbs[f+1] = rateProbs[f];
+					rateProbs[f] = dum;
+					}
+				}
+			}
+		else assert(0);
 		}
 
 	void AdjustRateProportions(){

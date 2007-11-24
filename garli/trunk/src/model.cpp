@@ -2081,6 +2081,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			if(NRateCats() == 1){//just a single omega value to get, maybe with a proportion of 1.0 following it
 				stf >> temp;
 				if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
+				rates[0]=(FLOAT_TYPE)atof(temp);
 				do{c=stf.get();}while(c==' ');
 				if(isdigit(c) || c=='.'){
 					string v;
@@ -2290,8 +2291,7 @@ void Model::CreateModelFromSpecification(int modnum){
 		rateProbs[2] = 0.03436;
 */
 		//*relNucRates[1] = 2.89288;
-
-		//DEBUG - need to implement reading and fixing of omega parameters (?)		
+	
 		if(NRateCats() > 1){
 			RateProportions *omegaP=new RateProportions(&omegaProbs[0], NRateCats());
 			omegaP->SetWeight((FLOAT_TYPE)NRateCats());
@@ -2424,6 +2424,10 @@ int Model::PerformModelMutation(){
 		}
 	else if(mut->Type() == RATEPROPS || mut->Type() == RATEMULTS){
 		//DEBUG - for now omega muts come through here too
+
+		//DEBUG - enforce an ordering of the rate multipliers, so that they can't "cross" one another
+		if(NRateCats() > 1) CheckAndCorrectRateOrdering();
+
 		if(modSpec.IsFlexRateHet() == true)
 			NormalizeRates();
 		else if(modSpec.IsCodon())
