@@ -118,6 +118,7 @@ int main( int argc, char* argv[] )	{
 				if(argv[curarg][0]=='-'){
 					//command line arguments with a dash
 					if(argv[curarg][1]=='b') interactive=false;
+					if(argv[curarg][1]=='i') interactive=true;
 #ifdef MAC_FRONTEND
 					else if (argv[curarg][1] == 'i') {
 						NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -205,7 +206,7 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC GARLI, version 0.96beta4 (Aug 2007)\n(->BOINC Amino acid and Codon testing version<-)\n");
+			outman.UserMessage("Running BOINC GARLI, version 0.96beta6 (revision 226) (Nov 2007)\n");
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -222,7 +223,7 @@ int main( int argc, char* argv[] )	{
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running serial GARLI, version 0.96beta6 (revision 223) (Nov 2007)\n");
+			outman.UserMessage("Running serial GARLI, version 0.96beta6 (revision 226) (Nov 2007)\n");
 #endif
 #ifdef OPEN_MP
 			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 

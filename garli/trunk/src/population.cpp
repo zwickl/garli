@@ -4772,22 +4772,21 @@ void Population::SetOutputDetails(){
 		//not bootstrap
 		if(conf->bootstrapReps == 0){
 			bootlog_output = (output_details) (DONT_OUTPUT);
+#ifndef BOINC
+			if(conf->outputCurrentBestTree) 
+				best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
+			else
+				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
+#else
+			best_output = (output_details) (REPLACE | WRITE_REPSET_TERM);
+#endif	
 			//normal 1 rep
 			if(conf->searchReps == 1){
-#ifndef BOINC
-				if(conf->outputCurrentBestTree)
-					best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
-				else 
-					best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
-#else
-				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM);
-#endif				
 				all_best_output = (output_details) DONT_OUTPUT;
 				treelog_output = (output_details) (conf->outputTreelog ? (REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
 				}
 			//normal multirep run
 			else if(conf->searchReps > 1){
-				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE );
 				all_best_output = (output_details) (REPLACE | WRITE_REP_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 				treelog_output = (output_details) (conf->outputTreelog ? (REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
 				}
