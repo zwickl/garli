@@ -35,7 +35,7 @@ class GeneralGamlConfig{
 	bool outputTreelog;
 	bool outputMostlyUselessFiles;
 	bool outputPhylipTree;
-	bool writeCurrentBestTree;
+	bool outputCurrentBestTree;
 
 	//starting the run
 	int randseed;

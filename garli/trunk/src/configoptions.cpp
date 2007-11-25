@@ -39,7 +39,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	outputTreelog = false;
 	outputMostlyUselessFiles = false;
 	outputPhylipTree = false;
-	writeCurrentBestTree = false;
+	outputCurrentBestTree = false;
 
 	//starting the run
 	randseed = -1;
@@ -152,7 +152,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
-	cr.GetBoolOption("writecurrentbesttree", writeCurrentBestTree, true);
+	cr.GetBoolOption("outputcurrentbesttree", outputCurrentBestTree, true);
 
 	cr.GetBoolOption("restart", restart, true);
 	cr.GetBoolOption("writecheckpoints", checkpoint, true);

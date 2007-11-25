@@ -1636,7 +1636,7 @@ void Population::PerformSearch(){
 			outman.UserMessage("Starting search with seed=%d\n", rnd.seed());
 			SeedPopulationWithStartingTree(currentSearchRep);
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
-			WriteStateFiles();
+			if(conf->checkpoint) WriteStateFiles();
 			}
 		else{
 			adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(conf);
@@ -4775,7 +4775,7 @@ void Population::SetOutputDetails(){
 			//normal 1 rep
 			if(conf->searchReps == 1){
 #ifndef BOINC
-				if(conf->writeCurrentBestTree)
+				if(conf->outputCurrentBestTree)
 					best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 				else 
 					best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
