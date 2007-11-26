@@ -467,23 +467,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\mlhky.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\src\model.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\mpifuncs.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\src\optimization.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\src\pecr.cpp"
 				>
 			</File>
 			<File
@@ -495,11 +483,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\set.cpp"
+				RelativePath="..\..\src\sequencedata.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\threadfunc.cpp"
+				RelativePath="..\..\src\set.cpp"
 				>
 			</File>
 			<File
@@ -585,10 +573,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\mlhky.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\src\model.h"
 				>
 			</File>
@@ -614,6 +598,10 @@
 			</File>
 			<File
 				RelativePath="..\..\src\rng.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\sequencedata.h"
 				>
 			</File>
 			<File
