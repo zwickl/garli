@@ -2806,51 +2806,23 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 #else
 			if(1){
 #endif
-#ifdef GCC295
-				small1= min(destination[0] , destination[8]);
-				large1= max(destination[0] , destination[8]);
-				small2= min(destination[1] , destination[9]);
-				large2= max(destination[1] , destination[9]);
+//for some reason optimzation in gcc 2.95 breaks the more optimal version of this code
+//this version is safer
+#if defined(__GNUC__) && __GNUC__ < 3 
+				small1 = DBL_MAX;
+				large1 = DBL_MIN;
+				for(int r=0;r<nRateCats;r++){
+					small2 = min(destination[4*r+0] , destination[4*r+1]);
+					large2= max(destination[4*r+0] , destination[4*r+1]);
+					small2 = min(small2 , destination[4*r+2]);
+					large2 = max(large2 , destination[4*r+2]);
+					small2 = min(small2 , destination[4*r+3]);
+					large2 = max(large2 , destination[4*r+3]);
+					small1 = min(small1, small2);
+					large1 = max(large1, large2);
+					}
 
-				small1 = min(small1 , small2);
-				large1= max(large1 , large2);
-				small2= min(destination[2] , destination[10]);
-				large2= max(destination[2] , destination[10]);
-				
-				small1 = min(small1 , small2);
-				large1= max(large1 , large2);
-				
-				small2= min(destination[3] , destination[11]);
-				large2= max(destination[3] , destination[11]);
-				
-				small1 = min(small1 , small2);
-				large1= max(large1 , large2);
-				
-				small2= min(destination[4] , destination[12]);
-				large2= max(destination[4] , destination[12]);
-
-				small1 = min(small1 , small2);
-				large1= max(large1 , large2);
-
-				small2= min(destination[5] , destination[13]);
-				large2= max(destination[5] , destination[13]);		
-				
-				small1 = min(small1 , small2);
-				large1= max(large1 , large2);
-
-				small2= min(destination[6] , destination[14]);
-				large2= max(destination[6] , destination[14]);
-				
-				small1 = min(small1 , small2);
-				large1= max(large1 , large2);
-
-				small2= min(destination[7] , destination[15]);
-				large2= max(destination[7] , destination[15]);
-				
-				small1 = min(small1 , small2);
-				large1= max(large1 , large2);
-				
-	#else
+#else
 				small1= (destination[0] < destination[2] ? destination[0] : destination[2]);
 				large1= (destination[0] > destination[2] ? destination[0] : destination[2]);
 				small2= (destination[1] < destination[3] ? destination[1] : destination[3]);

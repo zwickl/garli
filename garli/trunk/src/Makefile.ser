@@ -1,22 +1,70 @@
-#uncomment one of the following CC lines and one of the CC_FLAGS lines depending on your situation
+#GARLI version 0.96b6 makefile
 
-#CC       = icpc #intel compiler (icc)
-CC	  = g++  #gnu compiler   (gcc)
+#to use, follow steps 1, 2 and optionally 3
 
+#(1) choose one of these compile types
+#options are:
+#gcc_any		gnu compiler gcc, any architecture
+#gcc_osx_universal	gcc on OSX to make a universal binary
+#xlc_ppc970		ibm compiler for Power PC 970 architecture
+#icc_any		Intel compiler icc (commercial). \
+			icc code is much faster on intel hardware
+
+COMPILE_TYPE = gcc_any
+
+
+#(2) these need to be adjusted to the correct path to a compiled
+#copy of Paul Lewis's Nexus Class Library
+#(NCL is available here: http://hydrodictyon.eeb.uconn.edu/ncl)
+#See the NCL documentation for details on compiling it.
+#Note that you may be able to safely ignore some errors during
+#NCL compilation (Garli only needs the static library libncl.a)
 NCL_INCLUDES = ../../ncl-2.0/src
 LIB_NCL = ../../ncl-2.0/src/libncl.a
 
-#gcc: must be used if you are using  gcc version 2.95!!!
-#CC_FLAGS = -O3 -fstrict-aliasing -funroll-loops -DUNIX -DGCC295 -DNDEBUG -include defs.h
 
-#gcc: OSX universal binary (may only compile on intel machines)
-#CC_FLAGS = -O3 -fstrict-aliasing -arch i386 -arch ppc -fomit-frame-pointer -funroll-loops -DUNIX -DNDEBUG -include defs.h -I$(NCL_INCLUDES)
+#(3)set this to yes to compile a version that uses MPI to fork
+#multiple serial runs across processors (using the same config)
+#This is an advanced option and should generally be = no unless
+#you know what you are doing
+MPI_RUN_SPLITTER = no
 
-#gcc: linux or OSX binary that will work on the machine type that it is compiled on
-CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops -fsigned-char -DUNIX -DNDEBUG  -I$(NCL_INCLUDES)
+#gcc: gnu compiler 
+	#linux or OSX binary that will work on the machine type that it is compiled on
+ifeq ($(COMPILE_TYPE),gcc_any)
+	CC = g++
+	CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops \
+		 -fsigned-char -DUNIX -DNDEBUG  -I$(NCL_INCLUDES)
+	OK = 1
+endif
 
-#icc: any machine type
-#CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -I$(NCL_INCLUDES)
+#gcc: gnu compiler 
+	#OSX universal binary (may only compile on intel machines)
+ifeq ($(COMPILE_TYPE),gcc_osx_universal)
+	CC = g++
+	CC_FLAGS = -O3 -fstrict-aliasing -arch i386 -arch ppc -fomit-frame-pointer \
+		 -funroll-loops -DUNIX -DNDEBUG -include defs.h -I$(NCL_INCLUDES)
+endif
+
+#icc: intel compiler, any machine type
+ifeq ($(COMPILE_TYPE),icc_any)
+	CC = icpc
+	CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -I$(NCL_INCLUDES)
+endif
+
+#xlc: IBM compiler, PowerPC 970 processor
+ifeq ($(COMPILE_TYPE),xlc_ppc970)
+	CC = xlC
+	CC_FLAGS = -qsourcetype=c++ -qarch=ppc970 -qtune=ppc970 -qenablevmx \
+		-qaltivec -q64 -O3 -qalias=ansi -qunroll=yes -qchars=signed \
+		-qinclude=defs.h -I$(NCL_INCLUDES) -DUNIX -DNDEBUG
+endif
+
+ifeq ($(MPI_RUN_SPLITTER), yes)
+	CC = mpicxx
+	CC_FLAGS += -DSUBROUTINE_GARLI
+endif
+
 
 EXEC     = Garli0.96b6.r226
 
@@ -26,6 +74,10 @@ OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		funcs.o	configreader.o configoptions.o\
 		bipartition.o model.o linalg.o adaptation.o sequencedata.o\
 		optimization.o
+
+ifeq ($(MPI_RUN_SPLITTER), yes)
+	OBJECT_LIST += mpitrick.o
+endif
 
 Garli0.96b6.r226 : $(OBJECT_LIST) garlimain.o
 	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) $(LIB_NCL) garlimain.o
@@ -58,3 +110,4 @@ topologylist.o:  topologylist.h defs.h
 adaptation.o:	 	 adaptation.h hashdefines.h defs.h
 sequencedata.o:		 sequencedata.h defs.h
 garlireader.o:	garlireader.h defs.h
+

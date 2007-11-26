@@ -2655,8 +2655,8 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 		else
 			str += "[NOTE: GARLI Run was terminated before full completion!  This is the best tree from a completed replicate.]\n";
 		}
-	if(indnum == -1) sprintf(temp, "tree best = [&U][%f][", ind->Fitness()); 
-	else sprintf(temp, "tree bestREP%d = [&U][%f][", indnum+1, ind->Fitness()); 
+	if(indnum == -1) sprintf(temp, "tree best = [&U][!GarliScore %f][!GarliModel ", ind->Fitness()); 
+	else sprintf(temp, "tree bestREP%d = [&U][!GarliScore %f][!GarliModel ", indnum+1, ind->Fitness()); 
 	str += temp;
 	string modstr;
 	ind->mod->FillGarliFormattedModelString(modstr);
@@ -2750,8 +2750,8 @@ void Population::WriteStoredTrees( const char* treefname ){
 
 	int bestRep = EvaluateStoredTrees(false);
 	for(unsigned r=0;r<storedTrees.size();r++){
-		if(r == bestRep) outf << "tree rep" << r+1 << "BEST = [&U][" << storedTrees[r]->Fitness() << "][";
-		else outf << "tree rep" << r+1 << " = [&U][" << storedTrees[r]->Fitness() << "][";
+		if(r == bestRep) outf << "tree rep" << r+1 << "BEST = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
+		else outf << "tree rep" << r+1 << " = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
 		storedTrees[r]->mod->OutputGarliFormattedModel(outf);
 		outf << "]";
 

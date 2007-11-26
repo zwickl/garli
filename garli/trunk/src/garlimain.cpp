@@ -100,9 +100,11 @@ int main( int argc, char* argv[] )	{
 #ifndef SUBROUTINE_GARLI
 	conf_name = "garli.conf";
 #else
-	char temp[100];
-	sprintf(temp, "run%d.conf", rank);
-	conf_name = temp;
+//	char temp[100];
+//	sprintf(temp, "run%d.conf", rank);
+//	conf_name = temp;
+	//DEBUG - use the same config here too
+	conf_name = "garli.conf";
 #endif
 
 #if defined(UNIX) || defined(BOINC)
@@ -156,6 +158,16 @@ int main( int argc, char* argv[] )	{
 			MasterGamlConfig conf;
 			bool confOK;
 			confOK = ((conf.Read(conf_name.c_str()) < 0) == false);
+
+
+
+#ifdef SUBROUTINE_GARLI
+			//override the ofprefix here, tacking .runXX onto it 
+			char temp[10];
+			if(rank < 10) sprintf(temp, ".run0%d", rank);
+			else sprintf(temp, ".run%d", rank);
+			conf.ofprefix += temp;
+#endif
 
 			// now set the random seed
 			int randomSeed;
@@ -228,6 +240,11 @@ int main( int argc, char* argv[] )	{
 #ifdef OPEN_MP
 			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
 #endif
+
+#ifdef SUBROUTINE_GARLI
+			outman.UserMessage("->MPI Parallel Version<-\nNote: this version simply divides a number of independent runs across processors.\nIt is not the multipopulation parallel Garli algorithm."); 
+
+#endif
 			outman.UserMessage("Compiled %s %s\n", __DATE__, __TIME__); 
 
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
@@ -281,6 +298,7 @@ int main( int argc, char* argv[] )	{
 
 			if(modSpec.includeInvariantSites && modSpec.IsCodon() == false)
 				data->DetermineConstantSites();
+
 
 			pop.Setup(&conf, data, 1, 0);
 
