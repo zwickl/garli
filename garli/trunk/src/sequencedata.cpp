@@ -326,6 +326,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 
 	int tax=0, thisCodonNum;
 	for(int tax=0;tax<NTax();tax++){
+		bool firstAmbig = true;
 		for(int cod=0;cod<nChar;cod++){
 			short p1 = dnaData->Matrix(tax, cod*3);
 			short p2 = dnaData->Matrix(tax, cod*3+1);
@@ -340,8 +341,11 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 			if(pos1==15||pos2==15||pos3==15){//check for gaps or ambiguity
 				if(pos1+pos2+pos3 != 45){
 					//warn about gaps or ambiguity in codons
-					outman.UserMessage("Warning!: gaps or ambiguity codes found in codon site %d for taxon %s", cod, dnaData->TaxonLabel(tax));
-					outman.UserMessage("\tThis codon coded as missing (ambiguity not currently supported).");
+					if(firstAmbig){
+						outman.UserMessageNoCR("Gaps or ambiguity codes found within codon for taxon %s.\n\tCodons coded as missing for that taxon: ", dnaData->TaxonLabel(tax));
+						firstAmbig = false;
+						}
+					outman.UserMessageNoCR("%d ", cod);
 					}
 				thisCodonNum=64;
 				}
@@ -356,8 +360,14 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 			//note that a return code of 20 from the codon lookup indicates a stop codon, but a protein code of 20 generally means total ambiguity
 			if(thisCodonNum != 64){
 				prot = code.CodonLookup(thisCodonNum);
-				if(prot == 20)
-					throw ErrorException("stop codon found at codon site %d in taxon %s.  Bailing out.", cod,  TaxonLabel(tax));
+				if(prot == 20){
+					string c;
+					char b[4]={'A','C','G','T'};
+					c += b[pos1];
+					c += b[pos2];
+					c += b[pos3];
+					throw ErrorException("stop codon %s found at codon site %d in taxon %s.  Bailing out.", c.c_str(), cod+1,  dnaData->TaxonLabel(tax));
+					}
 				}
 
 			if(thisCodonNum == 64)//missing or ambiguous 
@@ -365,6 +375,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 			else 
 				matrix[tax][cod] = code.Map64stateTo61state(thisCodonNum);
 			}
+		if(firstAmbig == false) outman.UserMessage("");
 		}
 	for(int b=0;b<4;b++){
 		empBaseFreqsAllPos[b] = (empBaseFreqsPos1[b] + empBaseFreqsPos2[b] + empBaseFreqsPos3[b]) / (3.0 * total);
@@ -391,6 +402,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 	
 	int tax=0, thisCodonNum;
 	for(int tax=0;tax<NTax();tax++){
+		bool firstAmbig = true;
 		for(int cod=0;cod<nChar;cod++){
 			short p1 = dnaData->Matrix(tax, cod*3);
 			short p2 = dnaData->Matrix(tax, cod*3+1);
@@ -405,8 +417,11 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 			if(pos1==15||pos2==15||pos3==15){//check for gaps
 				if(pos1+pos2+pos3 != 45){
 					//warn about gaps or ambiguity in codons
-					outman.UserMessage("Warning!: gaps or ambiguity codes found in codon site %d for taxon %s", cod, dnaData->TaxonLabel(tax));
-					outman.UserMessage("\tThe corresponding Aminoacid will be coded as missing (ambiguity not currently supported).");
+					if(firstAmbig){
+						outman.UserMessageNoCR("Gaps or ambiguity codes found within codon for taxon %s.\n\tAminoacids coded as missing for that taxon: ", dnaData->TaxonLabel(tax));
+						firstAmbig = false;
+						}
+					outman.UserMessageNoCR("%d ", cod);
 					}
 				thisCodonNum=64;
 				}
@@ -415,13 +430,20 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 			//note that a return code of 20 from the codon lookup indicates a stop codon, but a protein code of 20 generally means total ambiguity
 			if(thisCodonNum != 64){
 				prot = code->CodonLookup(thisCodonNum);
-				if(prot == 20)
-					throw ErrorException("stop codon found at codon site %d in taxon %s.  Bailing out.", cod,  dnaData->TaxonLabel(tax));
+				if(prot == 20){
+					string c;
+					char b[4]={'A','C','G','T'};
+					c += b[pos1];
+					c += b[pos2];
+					c += b[pos3];
+					throw ErrorException("stop codon %s found at codon site %d in taxon %s.  Bailing out.", c.c_str(), cod+1,  dnaData->TaxonLabel(tax));
+					}
 				}
 			else prot = 20;
 
 			matrix[tax][cod] = prot;
 			}
+		if(firstAmbig == false) outman.UserMessage("");
 		}	
 	}
 
@@ -778,8 +800,32 @@ unsigned char AminoacidData::CharToDatum(char d){
 	}
 
 void NucleotideData::CreateMatrixFromNCL(GarliReader &reader){
-	
-	NxsCharactersBlock *charblock = reader.GetCharactersBlock();
+	NxsCharactersBlock *charblock;
+
+	int num=0, numNuc = -1;
+	do{
+		charblock = reader.GetCharactersBlock(num);
+		if(charblock->GetDataType() == NxsCharactersBlock::nucleotide ||
+			charblock->GetDataType() == NxsCharactersBlock::dna ||
+			charblock->GetDataType() == NxsCharactersBlock::rna){
+			if(numNuc < 0) numNuc = num;
+			else{
+				throw ErrorException("Multiple characters/data blocks containing nucleotide data found in Nexus datafile!\n\tEither combine the blocks or comment one out.");
+				}
+			}
+		else outman.UserMessage("Ignoring non-nucleotide characters block from Nexus datafile");
+		num++;
+		}while(num < reader.NumCharBlocks());
+	if(numNuc < 0) throw ErrorException("No characters/data blocks containing nucleotide data found in Nexus datafile!");
+	charblock = reader.GetCharactersBlock(numNuc);
+
+	if(charblock->GetNumActiveChar() < charblock->GetNChar()){
+		outman.UserMessageNoCR("Excluded characters:\n\t");
+		for(int c=0;c<charblock->GetNCharTotal();c++)
+			if(charblock->IsExcluded(c)) outman.UserMessageNoCR("%d ", c+1);
+		outman.UserMessage("");
+		}
+
 //	vector<unsigned> reducedToOrigCharMap = charblock->GetOrigIndexVector();
 	NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
 	
@@ -796,7 +842,10 @@ void NucleotideData::CreateMatrixFromNCL(GarliReader &reader){
 	int i=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
-			SetTaxonLabel( i, taxablock->GetTaxonLabel(origTaxIndex).c_str());
+			//internally, blanks in taxon names will be stored as underscores
+			NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			tlabel.BlanksToUnderscores();
+			SetTaxonLabel( i, tlabel.c_str());
 			
 			int j = 0;
 			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
@@ -816,11 +865,31 @@ void NucleotideData::CreateMatrixFromNCL(GarliReader &reader){
 			i++;
 			}
 		}
-
 	}
 void AminoacidData::CreateMatrixFromNCL(GarliReader &reader){
-	
-	NxsCharactersBlock *charblock = reader.GetCharactersBlock();
+	NxsCharactersBlock *charblock;
+	int num=0, numNuc = -1;
+	do{
+		charblock = reader.GetCharactersBlock(num);
+		if(charblock->GetDataType() == NxsCharactersBlock::protein){
+			if(numNuc < 0) numNuc = num;
+			else{
+				throw ErrorException("Multiple characters/data blocks containing protein data found in Nexus datafile!\n\tEither combine the blocks or comment one out.");
+				}
+			}
+		else outman.UserMessage("Ignoring non-protein characters block from Nexus datafile");
+		num++;
+		}while(num < reader.NumCharBlocks());
+	if(numNuc < 0) throw ErrorException("No characters/data blocks containing protein data found in Nexus datafile!");
+	charblock = reader.GetCharactersBlock(numNuc);
+
+	if(charblock->GetNumActiveChar() < charblock->GetNChar()){
+		outman.UserMessageNoCR("Excluded characters:\n\t");
+		for(int c=0;c<charblock->GetNCharTotal();c++)
+			if(charblock->IsExcluded(c)) outman.UserMessageNoCR("%d ", c+1);
+		outman.UserMessage("");
+		}
+
 //	vector<unsigned> reducedToOrigCharMap = charblock->GetOrigIndexVector();
 	NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
 	
@@ -837,9 +906,13 @@ void AminoacidData::CreateMatrixFromNCL(GarliReader &reader){
 	int i=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
-			SetTaxonLabel( i, taxablock->GetTaxonLabel(origTaxIndex).c_str());
+			//internally, blanks in taxon names will be stored as underscores
+			NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			tlabel.BlanksToUnderscores();
+			SetTaxonLabel( i, tlabel.c_str());
 			
 			int j = 0;
+			bool firstAmbig = true;
 			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 				if(charblock->IsActiveChar(origIndex)){	
 					unsigned char datum = '\0';
@@ -853,13 +926,18 @@ void AminoacidData::CreateMatrixFromNCL(GarliReader &reader){
 						if(nstates == 1)
 							datum = CharToDatum(charblock->GetState(origTaxIndex, origIndex, 0));
 						else{
-							outman.UserMessage("Partial ambiguity of character %d of taxon %s converted to full ambiguity", origIndex, TaxonLabel(origTaxIndex));
+							if(firstAmbig){
+								outman.UserMessageNoCR("Partially ambiguous characters of taxon %s converted to full ambiguity:\n\t", TaxonLabel(origTaxIndex));
+								firstAmbig = false;
+								}
+							outman.UserMessageNoCR("%d ", origIndex);
 							datum = CharToDatum('?');
 							}
 						}
 					SetMatrix( i, j++, datum );
 					}
 				}
+			if(firstAmbig == false) outman.UserMessage("");
 			i++;
 			}
 		}

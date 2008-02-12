@@ -197,6 +197,7 @@ class GeneticCode{
 	//amino acid number (0-19). Stop codons are 20.
 	int codonTable[64];
 	int map64to61[64];
+	vector<int> stops;
 
 	public:
 	GeneticCode(){
@@ -332,13 +333,20 @@ class GeneticCode{
 		map64to61[61]=58;
 		map64to61[62]=59;
 		map64to61[63]=60;
+
+		stops.clear();
+		stops.push_back(48);
+		stops.push_back(50);
+		stops.push_back(56);
 		}
 		
 	void SetVertMitoCode(){
 		SetStandardCode();
-		codonTable[56] = 18;
-		codonTable[8] = 20;
-		codonTable[47] = 20;
+		codonTable[56] = 18; //TGA
+		codonTable[8] = 20;  //AGA
+		codonTable[10] = 20;  //AGG
+		codonTable[12] = 10;
+		//codonTable[47] = 20; //???
 
 		map64to61[0]=0;
 		map64to61[1]=1;
@@ -350,60 +358,66 @@ class GeneticCode{
 		map64to61[7]=7;
 		map64to61[8]=-1;
 		map64to61[9]=8;
-		map64to61[10]=9;
-		map64to61[11]=10;
-		map64to61[12]=11;
-		map64to61[13]=12;
-		map64to61[14]=13;
-		map64to61[15]=14;
-		map64to61[16]=15;
-		map64to61[17]=16;
-		map64to61[18]=17;
-		map64to61[19]=18;
-		map64to61[20]=19;
-		map64to61[21]=20;
-		map64to61[22]=21;
-		map64to61[23]=22;
-		map64to61[24]=23;
-		map64to61[25]=24;
-		map64to61[26]=25;
-		map64to61[27]=26;
-		map64to61[28]=27;
-		map64to61[29]=28;
-		map64to61[30]=29;
-		map64to61[31]=30;
-		map64to61[32]=31;
-		map64to61[33]=32;
-		map64to61[34]=33;
-		map64to61[35]=34;
-		map64to61[36]=35;
-		map64to61[37]=36;
-		map64to61[38]=37;
-		map64to61[39]=38;
-		map64to61[40]=39;
-		map64to61[41]=40;
-		map64to61[42]=41;
-		map64to61[43]=42;
-		map64to61[44]=43;
-		map64to61[45]=44;
-		map64to61[46]=45;
-		map64to61[47]=-1;
-		map64to61[48]=46;
-		map64to61[49]=47;
+		map64to61[10]=-1;
+		map64to61[11]=9;
+		map64to61[12]=10;
+		map64to61[13]=11;
+		map64to61[14]=12;
+		map64to61[15]=13;
+		map64to61[16]=14;
+		map64to61[17]=15;
+		map64to61[18]=16;
+		map64to61[19]=17;
+		map64to61[20]=18;
+		map64to61[21]=19;
+		map64to61[22]=20;
+		map64to61[23]=21;
+		map64to61[24]=22;
+		map64to61[25]=23;
+		map64to61[26]=24;
+		map64to61[27]=25;
+		map64to61[28]=26;
+		map64to61[29]=27;
+		map64to61[30]=28;
+		map64to61[31]=29;
+		map64to61[32]=30;
+		map64to61[33]=31;
+		map64to61[34]=32;
+		map64to61[35]=33;
+		map64to61[36]=34;
+		map64to61[37]=35;
+		map64to61[38]=36;
+		map64to61[39]=37;
+		map64to61[40]=38;
+		map64to61[41]=39;
+		map64to61[42]=40;
+		map64to61[43]=41;
+		map64to61[44]=42;
+		map64to61[45]=43;
+		map64to61[46]=44;
+		map64to61[47]=45;
+		map64to61[48]=-1;
+		map64to61[49]=46;
 		map64to61[50]=-1;
-		map64to61[51]=48;
-		map64to61[52]=49;
-		map64to61[53]=50;
-		map64to61[54]=51;
-		map64to61[55]=52;
-		map64to61[56]=53;
-		map64to61[57]=54;
-		map64to61[58]=55;
-		map64to61[59]=56;
-		map64to61[60]=57;
-		map64to61[61]=58;
-		map64to61[62]=59;
-		map64to61[63]=60;
+		map64to61[51]=47;
+		map64to61[52]=48;
+		map64to61[53]=49;
+		map64to61[54]=50;
+		map64to61[55]=51;
+		map64to61[56]=52;
+		map64to61[57]=53;
+		map64to61[58]=54;
+		map64to61[59]=55;
+		map64to61[60]=56;
+		map64to61[61]=57;
+		map64to61[62]=58;
+		map64to61[63]=59;
+
+		stops.clear();
+		stops.push_back(8);
+		stops.push_back(10);
+		stops.push_back(48);
+		stops.push_back(50);
 		}
 		
 	int CodonLookup(int i){
@@ -412,6 +426,7 @@ class GeneticCode{
 		}
 	int Map64stateTo61state(int i){
 		assert(i >= 0 && i < 64);
+		assert(map64to61[i] != -1);
 		return map64to61[i];
 		}
 	};
@@ -461,6 +476,7 @@ public:
 		//by the NCL
 		assert(0);
 		}
+	GeneticCode* GetCode() {return &code;}
 	void SetEmpType(int t) {empType = t;}
 	void CalcEmpiricalFreqs();
 	void CalcF1x4Freqs();
