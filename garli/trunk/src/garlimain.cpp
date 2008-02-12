@@ -90,7 +90,7 @@ int SubGarliMain(int rank)	{
 int main( int argc, char* argv[] )	{
 #endif
 
-	CREATE_MEMCHK{//memory lead detecting trick - no overhead when turned off
+	CREATE_MEMCHK{//memory leak detecting trick - no overhead when turned off
 
 	#ifdef MPI_VERSION
 		MPIMain(argc, argv);
@@ -103,7 +103,7 @@ int main( int argc, char* argv[] )	{
 //	char temp[100];
 //	sprintf(temp, "run%d.conf", rank);
 //	conf_name = temp;
-	//DEBUG - use the same config here too
+	//use the same config here too
 	conf_name = "garli.conf";
 #endif
 
@@ -120,7 +120,7 @@ int main( int argc, char* argv[] )	{
 				if(argv[curarg][0]=='-'){
 					//command line arguments with a dash
 					if(argv[curarg][1]=='b') interactive=false;
-					if(argv[curarg][1]=='i') interactive=true;
+					else if(argv[curarg][1]=='i') interactive=true;
 #ifdef MAC_FRONTEND
 					else if (argv[curarg][1] == 'i') {
 						NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -173,7 +173,7 @@ int main( int argc, char* argv[] )	{
 			int randomSeed;
 			if(conf.randseed < 1){
 				srand((unsigned)time(NULL));
-				randomSeed = RandomInt(1, 10000);
+				randomSeed = RandomInt(1, 100000);
 				}
 			else randomSeed=conf.randseed;
 			rnd.set_seed(randomSeed);
@@ -218,7 +218,7 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC GARLI, version 0.96beta6 (revision 226) (Nov 2007)\n");
+			outman.UserMessage("Running BOINC GARLI, version 0.96beta7 (Jan 2008)\n");
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -235,14 +235,14 @@ int main( int argc, char* argv[] )	{
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running serial GARLI, version 0.96beta6 (revision 226) (Nov 2007)\n");
+			outman.UserMessage("Running serial GARLI, version 0.96beta7 (Jan 2008)\n");
 #endif
 #ifdef OPEN_MP
 			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
 #endif
 
 #ifdef SUBROUTINE_GARLI
-			outman.UserMessage("->MPI Parallel Version<-\nNote: this version simply divides a number of independent runs across processors.\nIt is not the multipopulation parallel Garli algorithm."); 
+			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.\nIt is not the multipopulation parallel Garli algorithm."); 
 
 #endif
 			outman.UserMessage("Compiled %s %s\n", __DATE__, __TIME__); 
