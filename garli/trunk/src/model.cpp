@@ -40,6 +40,7 @@ FLOAT_TYPE PointNormal (FLOAT_TYPE prob);
 FLOAT_TYPE IncompleteGamma (FLOAT_TYPE x, FLOAT_TYPE alpha, FLOAT_TYPE LnGamma_alpha);
 FLOAT_TYPE PointChi2 (FLOAT_TYPE prob, FLOAT_TYPE v);
 
+GeneticCode *Model::code = NULL;
 
 Model::~Model(){
 	if(stateFreqs.empty() == false){
@@ -74,7 +75,8 @@ Model::~Model(){
 	delete []work;
 	delete []col;
 	delete []indx;
-	Delete2DArray(c_ijk);
+	if(c_ijk != NULL)
+		Delete2DArray(c_ijk);
 	delete []EigValexp;
 	delete []EigValderiv;
 	delete []EigValderiv2;
@@ -84,7 +86,9 @@ Model::~Model(){
 	Delete3DArray(eigvecs);
 	Delete2DArray(teigvecs);
 	Delete3DArray(inveigvecs);
-	Delete3DArray(pmat);
+	//Delete3DArray(pmat);
+	Delete3DArray(pmat1);
+	Delete3DArray(pmat2);
 	Delete3DArray(qmat);
 	Delete3DArray(tempqmat);
 	Delete3DArray(deriv1);
@@ -122,21 +126,27 @@ void Model::AllocateEigenVariables(){
 	//create the matrix for the inverse eigenvectors
 	inveigvecs=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);	
 
-	//allocate the pmat
-	pmat=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	//allocate the pmats
+	pmat1=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	pmat2=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	
+	//it is actually less efficient to precalc the c_ijk for codon models due to the immense
+	//size of the matrix.  So don't allocate it at all.
+	if(modSpec.IsCodon() == false){
+		c_ijk=New2DArray<FLOAT_TYPE>(1,nstates*nstates*nstates);
+		}
+	else c_ijk = NULL;
 
 	//allocate qmat and tempqmat
 	//if this is a model with multiple qmats (like multi-omega models or mixtures)
 	//it needs to be bigger
 	if(modSpec.IsNonsynonymousRateHet() == false){
-		c_ijk=New2DArray<FLOAT_TYPE>(1,nstates*nstates*nstates);	
 		qmat=New3DArray<FLOAT_TYPE>(1, nstates,nstates);
 		tempqmat=New3DArray<FLOAT_TYPE>(1, nstates,nstates);
 		blen_multiplier = new FLOAT_TYPE[1];
 		eigvals=New2DArray<FLOAT_TYPE>(1, nstates);//eigenvalues
 		}
 	else{
-		c_ijk=New2DArray<FLOAT_TYPE>(NRateCats(), nstates*nstates*nstates);	
 		qmat=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
 		tempqmat=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
 		blen_multiplier = new FLOAT_TYPE[NRateCats()];
@@ -977,7 +987,11 @@ void Model::CalcEigenStuff(){
 
 		memcpy(*teigvecs, *eigvecs[m], nstates*nstates*sizeof(FLOAT_TYPE));
 		InvertMatrix(teigvecs, nstates, col, indx, inveigvecs[m]);
-		CalcCijk(&c_ijk[m][0], nstates, (const FLOAT_TYPE**) eigvecs[m], (const FLOAT_TYPE**) inveigvecs[m]);
+		
+		//For codon models using this precalculation actually makes things things slower in CalcPmat (cache thrashing,
+		//I think) so don't bother doing it here.  In fact, don't even allocate it in the model
+		if(modSpec.IsCodon() == false)
+			CalcCijk(&c_ijk[m][0], nstates, (const FLOAT_TYPE**) eigvecs[m], (const FLOAT_TYPE**) inveigvecs[m]);
 
 		if(modSpec.IsNucleotide() == false){
 			double diagsum=0;
@@ -1003,14 +1017,47 @@ void Model::CalcEigenStuff(){
 	ProfCalcEigen.Stop();
 	}
 
+void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLOAT_TYPE *&mat2){
+	ProfCalcPmat.Start();
+//	if(NStates() > 4){
+		if(!(blen1 < ZERO_POINT_ZERO)){
+			AltCalcPmat(blen1, pmat1);
+			mat1 = **pmat1;
+			}
+		if(!(blen2 < ZERO_POINT_ZERO)){
+			AltCalcPmat(blen2, pmat2);
+			mat2 = **pmat2;
+			}
+//		}
+
+/*		for(int i=0;i<61;i++)
+		for(int j=0;j<61;j++)
+			assert(FloatingPointEquals(metaPmat[i*nstates+j], pmat[0][i][j], 1e-5));
+*/
+	ProfCalcPmat.Stop();
+	return;
+	
+	}
+
+
 void Model::CalcPmat(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat, bool flip /*=false*/){
+	assert(0);
+	/*
 	ProfCalcPmat.Start();
 	assert(flip == false);
 
 	//this is a bit of a hack to avoid requiring the fuction calling this one to know if 
 	//this is a nucleotide, AA or codon model
 	if(NStates() > 4){
-		CalcPmatNState(blen, metaPmat);
+		if(NStates() == 20){
+			CalcPmatNState(blen, metaPmat);
+			}
+		else{
+			FLOAT_TYPE ***ptr;
+			AltCalcPmat(blen, ptr);
+			memcpy(metaPmat, **ptr, nstates*nstates*NRateCats()*sizeof(FLOAT_TYPE));
+			}
+
 		ProfCalcPmat.Stop();
 		return;
 		}
@@ -1109,9 +1156,12 @@ void Model::CalcPmat(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat, bool flip /*=false*/
 			}
 		}	
 	ProfCalcPmat.Stop();
+*/
 	}	
 
 void Model::CalcPmatNState(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat){
+	assert(0);
+/*
 	if(eigenDirty==true)
 		CalcEigenStuff();
 
@@ -1145,7 +1195,7 @@ void Model::CalcPmatNState(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat){
 					metaPmat[r*nstates*nstates + i*nstates + j]=pmat[0][0][i*nstates + j];
 			}
 		}
-
+*/
 /*	char filename[50];
 	char temp[10];
 	sprintf(temp, "%.2f.log", blen);	
@@ -1162,6 +1212,32 @@ void Model::CalcPmatNState(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat){
 		pmd << endl;
 		}
 */	}
+
+
+void Model::OutputPmats(ofstream &deb){
+	for(int r=0;r<NRateCats();r++){
+		deb << "pmat1 rate" << r << endl;
+		for(int f=0;f<nstates;f++){
+			for(int t=0;t<nstates;t++){
+				deb << pmat1[r][f][t] << "\t";
+				}
+			deb << endl;
+			}
+		deb << endl;
+		}
+	deb << endl;
+	for(int r=0;r<NRateCats();r++){
+		deb << "pmat2 rate" << r << endl;
+		for(int f=0;f<nstates;f++){
+			for(int t=0;t<nstates;t++){
+				deb << pmat2[r][f][t] << "\t";
+				}
+			deb << endl;
+			}
+		deb << endl;
+		}
+
+	}
 
 void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&one, FLOAT_TYPE ***&two){
 	if(eigenDirty==true)
@@ -1187,78 +1263,161 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 			}
 		}
 
-	for(int rate=0;rate<NRateCats();rate++)
-		{
-		int model=0;
-		if(modSpec.IsNonsynonymousRateHet())
-			model = rate;
-		const unsigned rateOffset = nstates*rate;
-		for (int i = 0; i < nstates; i++){
-			for (int j = 0; j < nstates; j++){
-				FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
-				FLOAT_TYPE sum_d1p=ZERO_POINT_ZERO;
-				FLOAT_TYPE sum_d2p = ZERO_POINT_ZERO;
-				for (int k = 0; k < nstates; k++){ 
-				//for (int k = 0; k < 4; k++){ 
-					//const FLOAT_TYPE x = eigvecs[i][k]*inveigvecs[j][k];
-					const FLOAT_TYPE x = eigvecs[model][i][k]*inveigvecs[model][k][j];
-					sum_p   += x*EigValexp[k+rateOffset];
-					sum_d1p += x*EigValderiv[k+rateOffset];
-					sum_d2p += x*EigValderiv2[k+rateOffset];
+	if(NStates() == 61){//using precalced eigvecs X inveigvecs (c_ijk) is less efficient for codon models, and I
+					//don't want a conditional in the inner loop
+		for(int rate=0;rate<NRateCats();rate++){
+			int model=0;
+			if(modSpec.IsNonsynonymousRateHet())
+				model = rate;
+			const unsigned rateOffset = nstates*rate;
+			for (int i = 0; i < 61; i++){
+				for (int j = 0; j < 61; j++){
+					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
+					FLOAT_TYPE sum_d1p=ZERO_POINT_ZERO;
+					FLOAT_TYPE sum_d2p = ZERO_POINT_ZERO;
+					for (int k = 0; k < 61; k++){ 
+						const FLOAT_TYPE x = eigvecs[model][i][k]*inveigvecs[model][k][j];
+						sum_p   += x*EigValexp[k+rateOffset];
+						sum_d1p += x*EigValderiv[k+rateOffset];
+						sum_d2p += x*EigValderiv2[k+rateOffset];
+						}
+					pmat1[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					deriv1[rate][i][j] = sum_d1p;
+					deriv2[rate][i][j] = sum_d2p;
 					}
-				
-				pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
-				deriv1[rate][i][j] = sum_d1p;
-				deriv2[rate][i][j] = sum_d2p;
+				}
+			}
+		}
+	else{ // aminoacids or nucleotides
+		for(int rate=0;rate<NRateCats();rate++){
+			const unsigned rateOffset = nstates*rate;
+			for (int i = 0; i < nstates; i++){
+				for (int j = 0; j < nstates; j++){
+					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
+					FLOAT_TYPE sum_d1p=ZERO_POINT_ZERO;
+					FLOAT_TYPE sum_d2p = ZERO_POINT_ZERO;
+					for (int k = 0; k < nstates; k++){ 
+						FLOAT_TYPE x = c_ijk[0][i*nstates*nstates + j*nstates +k];
+						sum_p   += x*EigValexp[k+rateOffset];
+						sum_d1p += x*EigValderiv[k+rateOffset];
+						sum_d2p += x*EigValderiv2[k+rateOffset];
+						}
+					pmat1[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					deriv1[rate][i][j] = sum_d1p;
+					deriv2[rate][i][j] = sum_d2p;
+					}
 				}
 			}
 		}
 	one=deriv1;
 	two=deriv2;
-	pr=pmat;
+	pr=pmat1;
 	}
 
-/*	
 
-			CalcPij(c_ijk, nstates, eigvals, 1, tempblen, p, EigValexp);
-	{
+bool DoubleAbsLessThan(double &first, double &sec){return fabs(first) <= fabs(sec);}
 
-	register int		nsq = n * n;
-	FLOAT_TYPE				sum;
-	const FLOAT_TYPE *ptr;
-	FLOAT_TYPE *pMat = p[0];
-	FLOAT_TYPE vr = v * r;
-	FLOAT_TYPE *g = EigValexp;
-	for (int k=0; k<n; k++)
-		*g++ = exp(*eigenValues++ * vr);
+void Model::AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pmat){
+	if(eigenDirty==true)
+		CalcEigenStuff();
 
-	ptr = c_ijk;
-#if 1
-	for(int i=0; i<nsq; i++){
-		g = EigValexp;
-		sum = ZERO_POINT_ZERO;
-		for(int k=0; k<n; k++)
-			sum += (*ptr++) * (*g++);
-		*pMat++ = (sum < ZERO_POINT_ZERO) ? ZERO_POINT_ZERO : sum;
-		}
-#else
-	for(i=0; i<n; i++)
-		{
-		for(j=0; j<n; j++)
-			{
-			g = EigValexp;
-			sum = ZERO_POINT_ZERO;
-			for(k=0; k<n; k++)
-				sum += (*ptr++) * (*g++);
-			//p[i][j] = (sum < ZERO_POINT_ZERO) ? ZERO_POINT_ZERO : sum;
-			*pMat++ = (sum < ZERO_POINT_ZERO) ? ZERO_POINT_ZERO : sum;
-					}
+	for(int rate=0;rate<NRateCats();rate++){
+		const unsigned rateOffset = nstates*rate; 
+		for(int k=0; k<nstates; k++){
+			FLOAT_TYPE scaledEigVal;
+			if(modSpec.IsNonsynonymousRateHet() == false){
+				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
+					//in the rate normalization, and doesn't need to be figured in here
+					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+				else
+					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
 				}
-#endif
-
+			else{
+				scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				}
+			EigValexp[k+rateOffset] = exp(scaledEigVal * dlen);
 			}
 		}
+
+	if(NStates() == 20){
+		for(int rate=0;rate<NRateCats();rate++){
+			int model=0;
+			const unsigned rateOffset = 20*rate;
+			for (int i = 0; i < 20; i++){
+				for (int j = 0; j < 20; j++){
+					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
+					for (int k = 0; k < 20; k++){ 
+						const FLOAT_TYPE x = c_ijk[0][model*20*20*20 + i*20*20 + j*20 +k];
+						sum_p   += x*EigValexp[k+rateOffset];
+						}
+					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					}
+				}
+			}
+		}
+	else if(NStates()==61){
+		for(int rate=0;rate<NRateCats();rate++){
+			int model=0;
+			if(modSpec.IsNonsynonymousRateHet())
+				model = rate;
+			const unsigned rateOffset = 61*rate;
+			for (int i = 0; i < 61; i++){
+				for (int j = 0; j < 61; j++){
+					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
+
+/*					
+					FLOAT_TYPE sum_pBig=ZERO_POINT_ZERO;
+					FLOAT_TYPE sum_pSmall=ZERO_POINT_ZERO;
+					FLOAT_TYPE sum_pBig2=ZERO_POINT_ZERO;
+					FLOAT_TYPE sum_pSmall2=ZERO_POINT_ZERO;
+					for (int k = 0; k < 61; k++){ 
+						const FLOAT_TYPE x = eigvecs[model][i][k]*inveigvecs[model][k][j];
+					
+						if(x < ZERO_POINT_ZERO){
+							if(x < -1e-4)
+								sum_pSmall   += x*EigValexp[k+rateOffset];
+							else 
+								sum_pSmall2   += x*EigValexp[k+rateOffset];
+							}
+						else{
+							if(x > 1e-4)
+								sum_pBig   += x*EigValexp[k+rateOffset];
+							else
+								sum_pBig2   += x*EigValexp[k+rateOffset];
+							}
+						}
+//					FLOAT_TYPE tot = sum_pBig2 + sum_pSmall2; 
+//					tot += sum_pBig + sum_pSmall;
+					FLOAT_TYPE tot = sum_pBig2 + sum_pBig; 
+					tot += (sum_pSmall2 + sum_pSmall);
+					sum_p = tot;
 */
+					for (int k = 0; k < 61; k++){ 
+						const FLOAT_TYPE x = eigvecs[model][i][k]*inveigvecs[model][k][j];
+						sum_p   += x*EigValexp[k+rateOffset];
+						}
+					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					}
+				}
+			}
+		}
+	else{
+		for(int rate=0;rate<NRateCats();rate++){
+			int model=0;
+			const unsigned rateOffset = 4*rate;
+			for (int i = 0; i < 4; i++){
+				for (int j = 0; j < 4; j++){
+					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
+					for (int k = 0; k < 4; k++){ 
+						const FLOAT_TYPE x = c_ijk[0][model*4*4*4 + i*4*4 + j*4 +k];
+						sum_p   += x*EigValexp[k+rateOffset];
+						}
+					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					}
+				}
+			}
+		}
+	}
 
 void Model::SetDefaultModelParameters(const SequenceData *data){
 	//some of these depend on having read the data already
@@ -1288,12 +1447,21 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 		}
 	else{
 		//if there are no constant sites, warn user that Pinv should not be used
-		if(data->NConstant() == 0) throw(ErrorException("This dataset contains no constant characters!\nInference of the proportion of invariant sites is therefore meaningless.\nPlease set invariantsites to \"none\""));
-		SetPinv((FLOAT_TYPE)0.25 * ((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic())), false);
-		SetMaxPinv((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic()));
-		if(modSpec.IsFlexRateHet()) NormalizeRates();
-		else AdjustRateProportions();
+		//if(data->NConstant() == 0) throw(ErrorException("This dataset contains no constant characters!\nInference of the proportion of invariant sites is therefore meaningless.\nPlease set invariantsites to \"none\""));
+		if(data->NConstant() == 0){
+			outman.UserMessage("This dataset contains no constant characters!\nInference of the proportion of invariant sites is therefore meaningless.\nSetting invariantsites to \"none\".");
+			SetPinv(ZERO_POINT_ZERO, false);
+			SetMaxPinv(ZERO_POINT_ZERO);
+			modSpec.includeInvariantSites = false;
+			}
+		else{
+			SetPinv((FLOAT_TYPE)0.25 * ((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic())), false);
+			SetMaxPinv((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic()));
+			if(modSpec.IsFlexRateHet()) NormalizeRates();
+			else AdjustRateProportions();
+			}
 		}
+	eigenDirty = true;
 	}
 
 void Model::MutateRates(){
@@ -1412,12 +1580,13 @@ void Model::CopyModel(const Model *from){
 void Model::CopyEigenVariables(const Model *from){
 	int effectiveModels = modSpec.IsNonsynonymousRateHet() ? NRateCats() : 1;
 	memcpy(**qmat, **from->qmat, effectiveModels*nstates*nstates*sizeof(FLOAT_TYPE));
-	memcpy(**pmat, **from->pmat, NRateCats()*nstates*nstates*sizeof(FLOAT_TYPE));
 	memcpy(**eigvecs, **from->eigvecs, NRateCats()*nstates*nstates*sizeof(FLOAT_TYPE));
 	memcpy(**inveigvecs, **from->inveigvecs, NRateCats()*nstates*nstates*sizeof(FLOAT_TYPE));
 	memcpy(*eigvals, *from->eigvals, effectiveModels * nstates * sizeof(FLOAT_TYPE));
 	memcpy(blen_multiplier, from->blen_multiplier, effectiveModels * sizeof(FLOAT_TYPE));
-	memcpy(*c_ijk, *from->c_ijk, effectiveModels*nstates*nstates*nstates*sizeof(FLOAT_TYPE));	
+	//c_ijk isn't allocated or used for codon models
+	if(c_ijk != NULL)
+		memcpy(*c_ijk, *from->c_ijk, effectiveModels*nstates*nstates*nstates*sizeof(FLOAT_TYPE));	
 	}
 
 void Model::SetModel(FLOAT_TYPE *model_string){
@@ -1894,7 +2063,7 @@ void Model::OutputGarliFormattedModel(ostream &outf) const{
 	}
 
 void Model::FillGarliFormattedModelString(string &s) const{
-	char temp[50];
+	char temp[1000];
 	if(modSpec.IsCodon()){
 		s += " o";
 		for(int i=0;i<omegas.size();i++){
@@ -2059,7 +2228,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			modSpec.gotPinvFromFile=true;
 			}
 		else if(c == 'F' || c == 'f'){//flex rates
-			if(modSpec.IsFlexRateHet()) throw(ErrorException("Flex rate parameters specified, but ratehetmodel is not flex!\n"));
+			if(modSpec.IsFlexRateHet()==false) throw(ErrorException("Flex rate parameters specified, but ratehetmodel is not flex!\n"));
 			FLOAT_TYPE rates[20];
 			FLOAT_TYPE probs[20];
 			for(int i=0;i<NRateCats();i++){
@@ -2070,7 +2239,8 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				if(isalpha(temp[0])) throw ErrorException("Problem with flex rates specification in starting condition file");
 				probs[i]=(FLOAT_TYPE)atof(temp);
 				}		
-			SetFlexRates(rates, probs);					
+			SetFlexRates(rates, probs);
+			NormalizeRates();
 			c=stf.get();
 			modSpec.gotFlexFromFile=true;
 			}
@@ -2109,6 +2279,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				if(isdigit(c) || c == '.') throw ErrorException("Problem with omega parameter specification in starting condition file");
 				SetOmegas(rates, probs);
 				}
+			modSpec.gotOmegasFromFile=true;
 			}
 		else if(c == 'n'){
 			//the number of cats should now be set in the config file
@@ -2425,7 +2596,7 @@ int Model::PerformModelMutation(){
 	else if(mut->Type() == RATEPROPS || mut->Type() == RATEMULTS){
 		//DEBUG - for now omega muts come through here too
 
-		//DEBUG - enforce an ordering of the rate multipliers, so that they can't "cross" one another
+		//enforce an ordering of the rate multipliers, so that they can't "cross" one another
 		if(NRateCats() > 1) CheckAndCorrectRateOrdering();
 
 		if(modSpec.IsFlexRateHet() == true)

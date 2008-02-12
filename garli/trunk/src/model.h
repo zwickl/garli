@@ -204,6 +204,7 @@ class ModelSpecification{
 	//this will hold the model specification as a global variable
 	//so that any models allocated will immediately know what they are
 public:
+	bool isSetup;
 	int nstates;
 	int numRateCats;
 
@@ -222,6 +223,7 @@ public:
 	bool gotAlphaFromFile;
 	bool gotFlexFromFile;
 	bool gotPinvFromFile;
+	bool gotOmegasFromFile;
 
 	enum{
 		DNA = 0,
@@ -274,8 +276,9 @@ public:
 		SetNumRateCats(4, false);
 		SetInvariantSites();
 		datatype=DNA;
-		gotRmatFromFile = gotStateFreqsFromFile = gotAlphaFromFile = gotFlexFromFile = gotPinvFromFile = false;
+		gotRmatFromFile = gotStateFreqsFromFile = gotAlphaFromFile = gotFlexFromFile = gotPinvFromFile = gotOmegasFromFile = false;
 		geneticCode=STANDARD;
+		isSetup = false;
 		}
 
 	bool IsCodon() {return datatype == CODON;}
@@ -469,7 +472,7 @@ public:
 		}
 
 	bool IsJonesAAFreqs() {return (stateFrequencies == JONES);}
-	bool IsJonesAAMatrix() {return (rateMatrix == JONES);}
+	bool IsJonesAAMatrix() {return (rateMatrix == JONESMAT);}
 	bool IsDayhoffAAFreqs() {return (stateFrequencies == DAYHOFF);}
 	bool IsDayhoffAAMatrix() {return (rateMatrix == DAYHOFFMAT);}
 	bool IsWAGAAFreqs() {return (stateFrequencies == WAG);}
@@ -490,7 +493,11 @@ public:
 
 	void SetStateFrequencies(const char *str){
 		if(_stricmp(str, "equal") == 0) SetEqualStateFreqs();
-		else if(_stricmp(str, "estimate") == 0) SetEstimateStateFreqs();
+		else if(_stricmp(str, "estimate") == 0){
+			if(datatype == CODON) throw ErrorException("Sorry, ML estimation of equilibrium frequencies is not available under\ncodon models.  Try statefrequencies = empirical");
+			else if(datatype == AMINOACID || datatype == CODONAMINOACID) outman.UserMessage("\nWARNING: to obtain good ML estimates of equilibrium aminoacid frequencies you\n\tmay need to run for a very long time or increase the modweight.\n\tConsider statefrequencies = empirical instead.\n");
+			SetEstimateStateFreqs();
+			}
 		else if(_stricmp(str, "empirical") == 0) SetEmpiricalStateFreqs();
 		else if(_stricmp(str, "fixed") == 0) SetUserSpecifiedStateFreqs();
 		else if(datatype == CODON && _stricmp(str, "f1x4") == 0) SetF1X4StateFreqs();
@@ -498,7 +505,7 @@ public:
 		else if((datatype == AMINOACID || datatype == CODONAMINOACID) && _stricmp(str, "jones") == 0) SetJonesAAFreqs();
 		else if((datatype == AMINOACID || datatype == CODONAMINOACID) && _stricmp(str, "dayhoff") == 0) SetDayhoffAAFreqs();
 		else if((datatype == AMINOACID || datatype == CODONAMINOACID) && _stricmp(str, "wag") == 0) SetWAGAAFreqs();
-		else throw(ErrorException("Invalid setting for statefrequencies: %s\n\tOptions for all datatypes: equal, estimate, empirical, fixed\n\tFor aminoacid datatype only: dayhoff, jones, wag\n\tFor codon datatype only: F1X4, F3X4", str));
+		else throw(ErrorException("Invalid setting for statefrequencies: %s\n\tOptions for all datatypes: equal, empirical, fixed\n\tFor all datatypes besides codon: estimate\n\tFor aminoacid datatype only: poisson, dayhoff, jones, wag\n\tFor codon datatype only: F1X4, F3X4", str));
 		}
 	void SetRateMatrix(const char *str){
 		if(datatype == AMINOACID || datatype == CODONAMINOACID){
@@ -513,7 +520,10 @@ public:
 			else if(_stricmp(str, "2rate") == 0) rateMatrix = NST2;
 			else if(_stricmp(str, "1rate") == 0) rateMatrix = NST1;
 			else if(_stricmp(str, "fixed") == 0) SetUserSpecifiedRateMatrix();
-			else throw(ErrorException("Unknown setting for ratematrix: %s\n\t(options are: 6rate, 2rate, 1rate, fixed)", str));
+			else{
+				if(datatype == CODON) throw(ErrorException("Unknown setting for codon ratematrix: %s\n\t(options are: 6rate, 2rate, 1rate, fixed)", str));
+				else throw(ErrorException("Unknown setting for dna/rna ratematrix: %s\n\t(options are: 6rate, 2rate, 1rate, fixed)", str));
+				}
 			}
 		}
 	void SetProportionInvariant(const char *str){
@@ -577,6 +587,7 @@ public:
 		SetProportionInvariant(conf.proportionInvariant.c_str());
 		SetRateHetModel(conf.rateHetModel.c_str());
 		SetNumRateCats(conf.numRateCats, true);
+		isSetup = true;
 		}
 	};
 
@@ -604,13 +615,14 @@ class Model{
 	//variables used for the eigen process if nst=6
 	int *iwork, *indx;
 	FLOAT_TYPE **eigvals, *eigvalsimag, ***eigvecs, ***inveigvecs, **teigvecs, *work, *temp, *col, **c_ijk, *EigValexp, *EigValderiv, *EigValderiv2;
-	FLOAT_TYPE ***qmat, ***pmat;
+	FLOAT_TYPE ***qmat, ***pmat1, ***pmat2;
 	FLOAT_TYPE ***tempqmat;
 	
 	//Newton Raphson crap
 	FLOAT_TYPE ***deriv1, ***deriv2;
 
 	int *qmatLookup;
+	static GeneticCode *code;
 
 	public:
 //	static bool noPinvInModel;
@@ -627,7 +639,9 @@ class Model{
 		stateFreqs.reserve(4);
 		relNucRates.reserve(6);
 		paramsToMutate.reserve(5);
-		//DEBUG - we should probably move this out of here
+		//DEBUG - we should probably move this out of here.  It assumes that the
+		//global modspec has been setup
+		assert(modSpec.isSetup);
 		CreateModelFromSpecification(0);
 		}
 
@@ -635,6 +649,7 @@ class Model{
 	BaseParameter *SelectModelMutation();
 	int PerformModelMutation();
 	void CreateModelFromSpecification(int);
+	static void SetCode(GeneticCode *c){Model::code = c;}
 
 	private:
 	void AllocateEigenVariables();
@@ -642,8 +657,11 @@ class Model{
 
 	public:
 	void CalcPmat(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat, bool flip =false);
+	void CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLOAT_TYPE *&mat2);
 	void CalcPmatNState(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat);
 	void CalcDerivatives(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
+	void OutputPmats(ofstream &deb);
+	void AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr);
 	void UpdateQMat();
 	void UpdateQMatCodon();
 	void UpdateQMatAminoAcid();
@@ -758,6 +776,28 @@ class Model{
 		return rateProbs[which];
 		}
 
+	//These are the set parameter functions used in the generic OptimizeBoundedParameter function
+	//They need to have a standardized form, despite the fact that the "which" argument is unneccesary
+	//for some of them
+
+	void SetPinv(int which, FLOAT_TYPE val){
+		assert(which == 0);
+		*propInvar=val;
+		//change the proportion of rates in each gamma cat
+		for(int i=0;i<NRateCats();i++){
+			rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
+			}
+		}
+
+	void SetAlpha(int which, FLOAT_TYPE val){
+		assert(modSpec.numRateCats > 1);
+		*alpha=val;
+		DiscreteGamma(rateMults, rateProbs, *alpha);
+		//This is odd, but we need to call normalize rates here if we are just using a gamma distrib to get starting rates for 
+		//flex.  Flex expects that the rates will be normalized including pinv elsewhere
+		if(modSpec.IsFlexRateHet()) NormalizeRates();
+		}
+
 	void SetFlexRate(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
 		rateMults[which] = val;
@@ -772,26 +812,10 @@ class Model{
 		eigenDirty = true;
 		}
 
-	void SetOmegas(const FLOAT_TYPE *rates, const FLOAT_TYPE *probs){
-		FLOAT_TYPE tot=0.0;
-		for(int r=0;r<NRateCats();r++){
-			*omegas[r]=rates[r];
-			*omegaProbs[r]=probs[r];
-			tot += *omegaProbs[r];
-			}
-		if(FloatingPointEquals(tot, ONE_POINT_ZERO, 1.0e-5) == false) throw ErrorException("omega category proportions add up to %f, not 1.0.", tot);
-		eigenDirty = true;
-		}
-
 	void SetOmega(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
 		*omegas[which] = val;
 		eigenDirty = true;
-		}
-
-	FLOAT_TYPE Omega(int which){
-		assert(which < NRateCats());
-		return *omegas[which];
 		}
 
 	void SetOmegaProb(int which, FLOAT_TYPE val){
@@ -808,6 +832,22 @@ class Model{
 		for(int i=0;i<NRateCats();i++) newTot += *omegaProbs[i];
 		assert(FloatingPointEquals(newTot, ONE_POINT_ZERO, 1.0e-5));
 		eigenDirty = true;
+		}
+
+	void SetOmegas(const FLOAT_TYPE *rates, const FLOAT_TYPE *probs){
+		FLOAT_TYPE tot=0.0;
+		for(int r=0;r<NRateCats();r++){
+			*omegas[r]=rates[r];
+			*omegaProbs[r]=probs[r];
+			tot += *omegaProbs[r];
+			}
+		if(FloatingPointEquals(tot, ONE_POINT_ZERO, 1.0e-5) == false) throw ErrorException("omega category proportions add up to %f, not 1.0.", tot);
+		eigenDirty = true;
+		}
+
+	FLOAT_TYPE Omega(int which){
+		assert(which < NRateCats());
+		return *omegas[which];
 		}
 
 	FLOAT_TYPE OmegaProb(int which){
