@@ -195,9 +195,10 @@ bool ReadData(const char* filename, SequenceData* data)	{
 		GarliReader &reader = GarliReader::GetInstance();
 		int err = reader.HandleExecute(filename);
 		if(err) throw ErrorException("Problem reading nexus datafile");
-		NxsCharactersBlock *chars = reader.GetCharactersBlock();
-		if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid()==false && chars->GetDataType() != NxsCharactersBlock::protein)
-			throw ErrorException("protein data specified, but nexus file does not contain protein data!");
+		//moving error checking and finding of correct char block into individual CreateMatrix functions
+	//	NxsCharactersBlock *chars = reader.GetCharactersBlock();
+	//	if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid()==false && chars->GetDataType() != NxsCharactersBlock::protein)
+	//		throw ErrorException("protein data specified, but nexus file does not contain protein data!");
 		data->CreateMatrixFromNCL(reader);
 		usedNCL = true;
 		}
