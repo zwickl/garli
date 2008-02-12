@@ -565,7 +565,9 @@ class Constraint{
 	//an outgroup is a special type of positive constraint
 	bool outgroup;
 public:
-	Constraint() {};
+	Constraint() {
+		backbone=false;
+		};
 	Constraint(const Bipartition *b, bool pos){
 		positive=pos;
 		con=b;
