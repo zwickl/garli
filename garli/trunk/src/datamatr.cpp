@@ -377,13 +377,27 @@ DataMatrix& DataMatrix::operator =(const DataMatrix& d)
 //
 void DataMatrix::Pack()
 {
-	int i, j, newNChar = 0;
+
+//ofstream deb("debug.log");
+//for(int q=0;q<nChar;q++){
+//	deb << q << "\t" << count[q] << "\t" << numStates[q] << "\t" << number[q] << endl;
+//	}
+
+int i, j, newNChar = 0;
 
 	// determine dimensions of new matrix
 	for( j = 0; j < nChar; j++ ) {
 		if( count[j] )
 			newNChar++;
 	}
+
+	//DEBUG - something was going wrong and causing crashes in some cases (only AA's?) when a new matrix
+	//was created with the same dimensions as the original.  Haven't figured out why yet, 
+	//but this avoids the crash at least.
+	if(newNChar == nChar){
+		dense = true;
+		return;
+		}
 
 	// create new matrix and count and number arrays and fill
 	unsigned char** newMatrix;
@@ -417,16 +431,21 @@ void DataMatrix::Pack()
 		}
 
 	// copy distribution of the number of states
-        int max = maxNumStates;
+/*        int max = maxNumStates;
         FLOAT_TYPE* newStateDistr;
 	MEM_NEW_ARRAY(newStateDistr,FLOAT_TYPE,(max+1));
         for( i = 0; i <= max; i++ )
    	        newStateDistr[i] = stateDistr[i];
+*/
+
+//for(int q=0;q<nChar;q++){
+//	deb << q << "\t" << count[q] << "\t" << numStates[q] << "\t" << number[q] << endl;
+//	}
 
 	// delete old matrix and count and number arrays
 	if( count ) MEM_DELETE_ARRAY(count); // count has length nChar
 	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates has length nChar
-	if( stateDistr ) MEM_DELETE_ARRAY(stateDistr); // stateDistr has length maxNumStates+1
+//	if( stateDistr ) MEM_DELETE_ARRAY(stateDistr); // stateDistr has length maxNumStates+1
 //	if( number ) MEM_DELETE_ARRAY(number); // number has length nChar
 	if( matrix ) {
 		for( i = 0; i < nTax; i++ )
@@ -437,7 +456,7 @@ void DataMatrix::Pack()
 	// set count, number and matrix to their new counterparts
 	count = newCount;
 	numStates = newNumStates;
-	stateDistr = newStateDistr;
+//	stateDistr = newStateDistr;
 //	number = newNumber;
 	matrix = newMatrix;
 	nChar = newNChar;
