@@ -86,7 +86,6 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL){
 				if(holders[i].GetReclaimLevel() == 2 && holders[i].tempReserved == false && holders[i].reserved == false){
-					assert(holders[i].theArray->NStates()==4);
 					claStack.push_back(holders[i].theArray);
 					holders[i].SetReclaimLevel(0);
 					holders[i].theArray=NULL;
@@ -99,7 +98,6 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL){
 				if((holders[i].GetReclaimLevel() == 1 && holders[i].tempReserved == false && holders[i].reserved == false)){
-					assert(holders[i].theArray->NStates()==4);
 					claStack.push_back(holders[i].theArray);
 					holders[i].SetReclaimLevel(0);
 					holders[i].theArray=NULL;
