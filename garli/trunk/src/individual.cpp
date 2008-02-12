@@ -134,7 +134,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 		if(reconDist == 1 || reconDist == -1) mutation_type |= randNNI;
 	    else if(reconDist < 0) mutation_type |= limSPRCon;
 		else  mutation_type |= limSPR;
-	    if(treeStruct->lnL !=-ONE_POINT_ZERO){
+	    if(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1.0e-8)){
 		    fitness=treeStruct->lnL;
 		    dirty=false;
 		    }
@@ -152,7 +152,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 			else if(reconDist >  (int) adap->limSPRrange) mutation_type |= randSPR;
 			else mutation_type |= limSPR;
 			}
-	    if(treeStruct->lnL !=-ONE_POINT_ZERO){
+	    if(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1.0e-8)){
 		    fitness=treeStruct->lnL;
 		    dirty=false;
 		    }
@@ -161,7 +161,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 	  else {
 		treeStruct->TopologyMutator(optPrecision, 1, 0);
 		mutation_type |= randNNI;
-   	    if(treeStruct->lnL !=-ONE_POINT_ZERO){
+   	    if(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1.0e-8)){
 		    fitness=treeStruct->lnL;
 		    dirty=false;
 		    }
@@ -183,7 +183,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 }
 
 void Individual::CalcFitness(int subtreeNode){
-	if(dirty){
+	if(dirty || FloatingPointEquals(treeStruct->lnL, ZERO_POINT_ZERO, 1e-8) || FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1e-8)){
 		if(subtreeNode>0 && accurateSubtrees==true){
 			treeStruct->Score( subtreeNode );
 			}
@@ -192,7 +192,11 @@ void Individual::CalcFitness(int subtreeNode){
 		fitness = treeStruct->lnL;
 		dirty = 0;
 		}
-	
+	else{
+		assert(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1e-8));
+		fitness = treeStruct->lnL;
+		}
+
 	if(memLevel > 0)
 		treeStruct->RemoveTempClaReservations();
 	}
@@ -317,8 +321,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 	taxset -= third;
 */
 	CopySecByRearrangingNodesOfFirst(treeStruct, &scratchI, true);
-	//DEBUG
-	calcCount=0;
+
 	for( int i = 3; i < n; i++ ) {
 		//select a random node
 		int pos = rnd.random_int( taxset.Size() );
@@ -376,10 +379,14 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 			scratchT->SPRMutate(added->nodeNum, best, optPrecision, 0);
 			}
 		else scratchT->Score();
+		scratchI.CalcFitness(0);
+
 //		stepout << scratchT->lnL << endl;
 		CopySecByRearrangingNodesOfFirst(treeStruct, &scratchI, true);
+
 		//outman.UserMessage(" %d %f", i+1, scratchT->lnL);
 		outman.UserMessageNoCR(" %d ", i+1);
+		outman.flush();
 		//when we've added half the taxa optimize alpha, flex or omega 
 		if(i == (n/2) && (modSpec.IsCodon() || mod->NRateCats() > 1) && modSpec.fixAlpha == false){
 			FLOAT_TYPE rateOptImprove = 0.0;
@@ -401,7 +408,6 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 				scratchT->Score();
 				FLOAT_TYPE start=scratchT->lnL;
 				scratchT->OptimizeAllBranches(optPrecision);
-				scratchT->Score();
 				FLOAT_TYPE bimprove = scratchT->lnL - start;
 				outman.UserMessage("\nOptimizing branchlengths... improved %f lnL", bimprove);
 				}
@@ -413,8 +419,6 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 	scratchI.treeStruct->RemoveTreeFromAllClas();
 	delete scratchI.treeStruct;
 	scratchI.treeStruct=NULL;
-	treeStruct->MakeAllNodesDirty();
-	SetDirty();
 	}
 
 
@@ -482,7 +486,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 
 	char *temp=new char[strlen + 100];
 	
-	//if this is a remote population in a parallel run, find the proper tree (ie line number)
+	//if this is a remote population in a parallel run or a multirep run, find the proper tree (ie line number)
 	int effectiveRank=rank;
 	for(int r=0;r<effectiveRank;r++){
 		c=stf.get();
@@ -502,160 +506,30 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	//bool foundRmat, foundStateFreqs, foundAlpha, foundPinv;
 	//foundRmat=foundStateFreqs=foundAlpha=foundPinv = false;
 	
-	if(foundModel == true){//this is UGLY!
+	if(foundModel == true){
 		string modString;
 		do{
 			c=stf.get();
 			modString += c;
-			}while(c != '(' && c != '\r' && c != '\n' && !stf.eof());
+			//}while(c != '(' && c != '\r' && c != '\n' && !stf.eof());
+			}while(stf.peek() != '(' && stf.peek() != '\r' && stf.peek() != '\n' && !stf.eof());
+		while((stf.peek() == '\n' || stf.peek() == '\r') && stf.eof() == false) stf.get(c);
 		mod->ReadGarliFormattedModelString(modString);
-		}
-/*
-		do{//read parameter values identified by single letter identifier.  Each section should
-			//take care of advancing to the following letter 
-			if(c == 'R' || c == 'r'){//rate parameters
-				if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid() == false) throw ErrorException("Rate matrix parameters can only be specified for nucleotide or codon models");
-				FLOAT_TYPE r[6];
-				for(int i=0;i<5;i++){
-					stf >> temp;
-					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading rate matrix parameters in file %s!\nExamine file and check manual for format.\n", fname));
-					r[i]=(FLOAT_TYPE)atof(temp);
-					}
-				do{c=stf.get();}while(c==' ');
-				if(isdigit(c) || c=='.'){//read the GT rate, if specified
-					string v;
-					v = c;
-					stf >> temp;
-					v += temp;
-					r[5] = atof(v.c_str());
-					c=stf.get();
-					}
-				else r[5] = ONE_POINT_ZERO;
-				mod->SetRmat(r, restart==false);
-				modSpec.gotRmatFromFile=true;
-				}
-			else if(c == 'E' || c == 'e' || c == 'b' || c == 'B'){//base freqs
-				//7/12/07 changing this to pay attention to the 4th state, if specified
-				//although it should be calcuable from the other three, having exact restartability
-				//sometimes requires that it is taken as is
-				//FLOAT_TYPE b[4];
-				int nstates = modSpec.nstates;
-				vector<FLOAT_TYPE> b(nstates);
-				for(int i=0;i<nstates-1;i++){
-					stf >> temp;
-					if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading equilirium state frequency parameters in file %s!\nExamine file and check manual for format.\n", fname));
-					b[i]=(FLOAT_TYPE)atof(temp);
-					}
-				do{c=stf.get();}while(c==' ');
-				if(isdigit(c) || c=='.'){
-					string v;
-					v = c;
-					stf >> temp;
-					v += temp;
-					b[nstates-1]=(FLOAT_TYPE)atof(v.c_str());
-					do{c=stf.get();}while(c==' ');				
-					}
-				else{
-					FLOAT_TYPE tot = ZERO_POINT_ZERO;
-					for(int i=0;i<nstates-1;i++) tot += b[i];
-					b[nstates-1] = ONE_POINT_ZERO - b[0] - b[1] - b[2];
-					}
-				mod->SetPis(&b[0], restart==false);
-				modSpec.gotStateFreqsFromFile=true;
-				}
-			else if(c == 'A' || c == 'a'){//alpha shape
-				if(modSpec.IsFlexRateHet()) throw(ErrorException("Config file specifies ratehetmodel = flex, but starting model contains alpha!\n"));
-				stf >> temp;
-				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading alpha parameter in file %s!\nExamine file and check manual for format.\n", fname));
-				mod->SetAlpha((FLOAT_TYPE)atof(temp), restart==false);
-				c=stf.get();
-				modSpec.gotAlphaFromFile=true;
-				}				
-			else if(c == 'P' || c == 'p' || c == 'i' || c == 'I'){//proportion invariant
-				stf >> temp;
-				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading proportion of invariant sites parameter in file %s!\nExamine file and check manual for format.\n", fname));
-				FLOAT_TYPE p=(FLOAT_TYPE)atof(temp);
-				mod->SetPinv(p, restart==false);
-				c=stf.get();
-				modSpec.gotPinvFromFile=true;
-				}
-			else if(c == 'F' || c == 'f'){//flex rates
-				FLOAT_TYPE rates[20];
-				FLOAT_TYPE probs[20];
-				for(int i=0;i<mod->NRateCats();i++){
-					stf >> temp;
-					if(isalpha(temp[0])) throw ErrorException("Problem with flex rates specification in starting condition file");
-					rates[i]=(FLOAT_TYPE)atof(temp);
-					stf >> temp;
-					if(isalpha(temp[0])) throw ErrorException("Problem with flex rates specification in starting condition file");
-					probs[i]=(FLOAT_TYPE)atof(temp);
-					}		
-				mod->SetFlexRates(rates, probs);					
-				c=stf.get();
-				modSpec.gotFlexFromFile=true;
-				}
-			else if(c == 'O' || c == 'o'){//omega parameters
-				if(modSpec.IsCodon() == false) throw ErrorException("Omega parameters specified for non-codon model?");
-				FLOAT_TYPE rates[20];
-				FLOAT_TYPE probs[20];
-				if(mod->NRateCats() == 1){//just a single omega value to get
-					stf >> temp;
-					if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
-					do{c=stf.get();}while(c==' ');
-					if(isdigit(c) || c=='.'){
-						string v;
-						v = c;
-						stf >> temp;
-						v += temp;
-						if(FloatingPointEquals(atof(v.c_str()), ONE_POINT_ZERO, 1.0e-5) == false)
-							throw ErrorException("Problem with omega parameter specification in starting condition file\n(wrong number of rate cats specified in config?)");
-						do{c=stf.get();}while(c==' ');		
-						if(isdigit(c) || c == '.') throw ErrorException("Problem with omega parameter specification in starting condition file");
-						}
-					probs[0] = ONE_POINT_ZERO;
-					mod->SetOmegas(rates, probs);
-					}
-				else{
-					for(int i=0;i<mod->NRateCats();i++){
-						stf >> temp;
-						if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
-						rates[i]=(FLOAT_TYPE)atof(temp);
-						stf >> temp;
-						if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
-						probs[i]=(FLOAT_TYPE)atof(temp);
-						}
-					do{c=stf.get();}while(c==' ');		
-					if(isdigit(c) || c == '.') throw ErrorException("Problem with omega parameter specification in starting condition file");
-					mod->SetOmegas(rates, probs);
-					}
-				}
-			else if(c == 'n'){
-				//the number of cats should now be set in the config file
-				c=stf.get();
-				assert(0);
-				}
-			else if(isalpha(c)) throw(ErrorException("Unknown model parameter specification in file %s!\nExamine file and check manual for format.\n", fname));
-			else if(c != '(') c=stf.get();
-			}while(c != '(' && c != '\r' && c != '\n' && !stf.eof());
-
-		if(foundTree == true) stf.putback(c);
-		}//if(foundModel == true)
-*/
-	//Here we'll error out if something was fixed but didn't appear
-	if(modSpec.IsNucleotide()){
-		if(modSpec.fixRelativeRates == true && modSpec.gotRmatFromFile == false) throw ErrorException("ratematrix = fixed in conf file, but parameter values not found in %s.", fname);
-		//if(modSpec.fixStateFreqs == true && modSpec.equalStateFreqs == false && modSpec.empiricalStateFreqs == false && modSpec.gotStateFreqsFromFile == false) throw ErrorException("statefrequencies = fixed in conf file, but parameter values not found in %s.", fname);
-		if(modSpec.IsUserSpecifiedStateFrequencies() && modSpec.gotStateFreqsFromFile == false) throw ErrorException("statefrequencies = fixed in conf file, but parameter values not found in %s.", fname);
-		if(modSpec.fixAlpha == true && modSpec.gotAlphaFromFile == false) throw ErrorException("ratehetmodel = gammafixed in conf file, but no parameter value for alpha found in %s.", fname);
-		if(modSpec.fixInvariantSites == true && modSpec.gotPinvFromFile == false) throw ErrorException("invariantsites = fixed in conf file, but no parameter value found in %s.", fname);
 		}
 
 	if(foundTree==true){
-		char *t = new char[strlen+1];
-		stf.getline(t, strlen+1);
-		//stf >> temp;
-		treeStruct=new Tree(t, numericalTaxa);
-		delete []t;
+		string treeString;
+		char c;
+		stf.get(c);
+		do{
+			treeString += c;
+			stf.get(c);
+			}while(c != '\n' && c!= '\r' && stf.eof() == false);
+		while((stf.peek() == '\n' || stf.peek() == '\r') && stf.eof() == false) stf.get(c);
+
+		//now allowing polytomies, since they will be taken care of in Population::SeedPopulationWithStartingTree
+		treeStruct=new Tree(treeString.c_str(), numericalTaxa, true);
+		//treeStruct=new Tree(treeString.c_str(), numericalTaxa);
 
 		//check that any defined constraints are present in the starting tree
 		treeStruct->CalcBipartitions();
@@ -674,7 +548,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 
 	if(restart == false){
 		if(foundTree==true)
-			outman.UserMessage("Obtained starting tree from file %s", fname);
+			outman.UserMessage("Obtained starting tree %d from file %s",  effectiveRank+1, fname);
 		else{
 			if(treeStruct->constraints.size() == 0)
 				outman.UserMessage("No starting tree found in file %s, creating random tree", fname);
@@ -682,12 +556,23 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 				outman.UserMessage("No starting tree found in file %s, creating random tree (compatible with constraint)", fname);
 			}
 
-		if(foundModel==true) outman.UserMessage("Obtained starting model from file %s:", fname);
-				
-		else outman.UserMessage("No starting model found in %s\nUsing default parameter values:", fname);
+		if(foundModel==true){
+			outman.UserMessage("Obtained starting or fixed model parameter values from file %s:", fname);
+			string m;
+			mod->FillGarliFormattedModelString(m);
+			outman.UserMessage("%s", m.c_str());
+			}
+		else{
+			//this checks whether we have already gotten some parameter values from file, which might have come from a garli block in the datafile
+			if(!(modSpec.gotRmatFromFile || modSpec.gotStateFreqsFromFile || modSpec.gotAlphaFromFile || modSpec.gotFlexFromFile || modSpec.gotPinvFromFile || modSpec.gotOmegasFromFile)){
+				outman.UserMessage("No starting model parameter values found in %s\nUsing default parameter values:", fname);
+				string m;
+				mod->FillGarliFormattedModelString(m);
+				outman.UserMessage("%s", m.c_str());
+				}
+			}
 			
-		mod->OutputGarliFormattedModel(cout);
-		outman.UserMessage("\n");
+		outman.UserMessage("");
 		}
 
 	mod->UpdateQMat();
@@ -701,7 +586,13 @@ void Individual::GetStartingConditionsFromNCL(NxsTreesBlock *treesblock, int ran
 	int totalTrees = treesblock->GetNumTrees();
 
 	int effectiveRank = rank % totalTrees;
-	treeStruct=new Tree(treesblock->GetTreeDescription(effectiveRank).c_str(), true);
+	
+	//we will get the tree string from NCL with names rather than numbers, regardless of how it was initially read in 
+	NxsString treestr = treesblock->GetTranslatedTreeDescription(effectiveRank);
+	treestr.BlanksToUnderscores();
+	
+	treeStruct=new Tree(treestr.c_str(), false, true);
+	//treeStruct=new Tree(treesblock->GetTreeDescription(effectiveRank).c_str(), false);
 
 	//check that any defined constraints are present in the starting tree
 	treeStruct->CalcBipartitions();
@@ -726,20 +617,25 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	CalcFitness(0);
 
 	for(int i=1;improve > branchPrec;i++){
-		FLOAT_TYPE rateOptImprove=0.0, optImprove=0.0, scaleImprove=0.0, omegaImprove=0.0;
+		FLOAT_TYPE rateOptImprove=0.0, pinvOptImprove = 0.0, optImprove=0.0, scaleImprove=0.0, omegaImprove=0.0;
 		
 		CalcFitness(0);
 		FLOAT_TYPE passStart=Fitness();
 		
 		optImprove=treeStruct->OptimizeAllBranches(branchPrec);
-
-		SetDirty();
 		CalcFitness(0);
+
 		FLOAT_TYPE trueImprove= Fitness() - passStart;
 		assert(trueImprove >= -1.0);
 		if(trueImprove < ZERO_POINT_ZERO) trueImprove = ZERO_POINT_ZERO;
+
 		scaleImprove=treeStruct->OptimizeTreeScale(branchPrec);
-		SetDirty();
+		//if some of the branch lengths are at the minimum or maximum boundaries the scale optimization
+		//can actually worsen the score.  This isn't particularly important during initial refinement,
+		//so just hide it to keep the user from thinking that there is something terribly wrong
+		if(scaleImprove < ZERO_POINT_ZERO) scaleImprove = ZERO_POINT_ZERO;
+
+		CalcFitness(0);
 		if(optModel){
 			if(modSpec.IsCodon())//optimize omega even if there is only 1
 				rateOptImprove = treeStruct->OptimizeOmegaParameters(branchPrec);
@@ -747,32 +643,36 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 				if(modSpec.IsFlexRateHet()){//Flex rates
 					rateOptImprove = ZERO_POINT_ZERO;
 					//for the first pass, use gamma to get in the right ballpark
-					if(i == 1) rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
+					//if(i == 1) rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
+					if(i == 1 && modSpec.gotFlexFromFile==false) rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 1.0e-8, 999.9, &Model::SetAlpha);
 					rateOptImprove += treeStruct->OptimizeFlexRates(branchPrec);
 					}
 				else if(modSpec.fixAlpha == false){//normal gamma
-					rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
+					//rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
+					//do NOT let alpha go too low here - on bad or random starting trees the branch lengths get crazy long
+					//rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 1.0e-8, 999.9, &Model::SetAlpha);
+					rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 					}
 				}
-			SetDirty();
+			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites)
+				pinvOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, &Model::SetPinv);
 			}
-		improve=scaleImprove + trueImprove + rateOptImprove;
+		improve=scaleImprove + trueImprove + rateOptImprove + pinvOptImprove;
 		outman.precision(8);
-		if(optModel==true && modSpec.IsCodon()) outman.UserMessage("pass %-2d: +%10.4f (branch=%8.2f scale=%8.2f omega=%8.2f)", i, improve, trueImprove, scaleImprove, rateOptImprove);
-		else if(optModel==true && mod->NRateCats() > 1){
-			if(modSpec.IsFlexRateHet() == false) outman.UserMessage("pass %-2d: +%10.4f (branch=%8.2f scale=%8.2f alpha=%8.2f)", i, improve, trueImprove, scaleImprove, rateOptImprove);
-			else if(modSpec.gotFlexFromFile == false) outman.UserMessage("pass %-2d: +%10.4f (branch=%8.2f scale=%8.2f flex rates=%8.2f)", i, improve, trueImprove, scaleImprove, rateOptImprove);
-			else outman.UserMessage("pass %-2d: +%10.4f (branch=%8.2f scale=%8.2f)", i, improve, trueImprove, scaleImprove);
+		outman.UserMessageNoCR("pass %-2d: +%10.4f (branch=%8.2f scale=%8.2f", i, improve, trueImprove, scaleImprove);
+		if(optModel && modSpec.IsCodon()) outman.UserMessageNoCR(" omega=%8.2f", rateOptImprove);
+		else if(optModel && mod->NRateCats() > 1){
+			if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false) outman.UserMessageNoCR(" alpha=%8.2f", rateOptImprove);
+			else if(modSpec.IsFlexRateHet() && modSpec.gotFlexFromFile == false) outman.UserMessageNoCR(" flex rates=%8.2f", rateOptImprove);
 			}
-		else
-			outman.UserMessage("pass %-2d: +%10.4f (branch=%8.2f scale=%8.2f)", i, improve, trueImprove, scaleImprove);
+		if(optModel && modSpec.includeInvariantSites && !modSpec.fixInvariantSites) outman.UserMessageNoCR(" pinv=%8.2f", pinvOptImprove);
+		outman.UserMessage(")");
 		}
 
-	treeStruct->MakeAllNodesDirty();
+	//DEBUG - don't think that this is necessary
+//	treeStruct->MakeAllNodesDirty();
 	treeStruct->nodeOptVector.clear();
-	treeStruct->calcs=calcCount;
-	calcCount=0;
-	dirty=true;
+//	dirty=true;
 	}
 
 void Individual::ReadTreeFromFile(istream & inf)
