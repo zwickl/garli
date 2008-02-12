@@ -256,11 +256,11 @@ void TreeNode::SubstituteNodeWithRespectToAnc(TreeNode *subs)//note THIS DOESN't
 
 int TreeNode::CountBranches(int s){
 	if(left)
-		s=left->CountBranches(++s);
+		left->CountBranches(++s);
 	if(nodeNum==0)
-	  s=left->next->CountBranches(++s);
+		left->next->CountBranches(++s);
 	if(right)
-		s=right->CountBranches(++s);
+		right->CountBranches(++s);
 	return s;
 }
 
@@ -419,6 +419,7 @@ void TreeNode::CountNumberofNodes(int &nnodes){
 		next->CountNumberofNodes(nnodes);
 		}
 	nnodes++;
+	
 	}
 	
 void TreeNode::CheckforLeftandRight(){
@@ -460,7 +461,7 @@ void TreeNode::FindCrazyShortBranches(){
 		outman.UserMessage("WTF?");
 		}
 	}
-	
+		
 void TreeNode::CheckTreeFormation()	{
 #ifndef NDEBUG
 	//make sure that nodes that this node points to also point back (ie this->ldes->anc=this)
@@ -495,10 +496,8 @@ void TreeNode::CheckforPolytomies(){
 	if(anc!=NULL){
 		if(left!=NULL){
 			if(left->next!=right){
-				//we don't ever allow polytomous trees to be used,
-				//so crap out here is we detect one
-				throw ErrorException("Error: Input tree has polytomies!!  See FAQ for suggestions on avoiding this.");
-				assert(0);
+				//polytomous tree should have been dealt with earlier.
+				throw ErrorException("Input tree has polytomies!!");
 				}
 			}
 		}

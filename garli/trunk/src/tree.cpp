@@ -182,10 +182,13 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 
 		if(*s == ';')
 			break;  // ignore semicolons
-		else if(*s == ' ')
-			break;  // ignore spaces
+		else if(*s == ' ' || *s == '\t')
+			s++;
+			//DEBUG
+			//break;  // ignore spaces
 		else if(*s == ')'){
 			assert(temp->anc);
+			if(!temp->anc) throw ErrorException("Problem reading tree description.  Mismatched parentheses?");
 			temp=temp->anc;
 			s++;
 			while(*s && !isgraph(*s))
@@ -217,12 +220,22 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 				{
 				if(*s==';'){
 					s++;
+					while(*s){
+						if(*s != ' ' && *s != '\t')
+							outman.UserMessage("Warning: extraneous character (%c) found after ; in tree description", *s);
+						s++;
+						}
+					break;
 					}
-				assert(!*s  || *s==';');
+				else if(*s == ' ' || *s == '\t') s++;
+				else if(*s == '\0' || *s == '\n' || *s == '\r') break;
+				else throw ErrorException("Unexpected character found in tree description at this point: %s", s);
+	//			assert(!*s  || *s==';');
 				}
 			}
 		else if(*s == ','){
 			assert(temp->anc);
+			if(!temp->anc) throw ErrorException("Problem reading tree description.  Mismatched parentheses?");
 			temp=temp->anc;
 			numBranchesAdded--;//sloppy way to avoid over incrementing numBranchesAdded
 			if(*(s+1)!='(') s++;
@@ -328,7 +341,8 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 		}
 	else	{
 		EliminateNode(2*data->NTax()-2);
-		numBranchesAdded--;
+		//DEBUG WTF was this being done?
+		//numBranchesAdded--;
 		}
 	assert(root->left->next!=root->right);
 
@@ -468,7 +482,7 @@ void Tree::ScaleWholeTree(FLOAT_TYPE factor/*=-1.0*/){
 		assert(!(allNodes[i]->dlen < min_brlen));
 		}
 	MakeAllNodesDirty();
-	lnL=-1;
+	lnL=-ONE_POINT_ZERO;
 	}
 
 int Tree::BrlenMutateSubset(vector<int> const &subtreeMemberNodes){
@@ -570,35 +584,84 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 		SortAllNodesArray();
 		EliminateNode(removedNode->nodeNum);
 		numBranchesAdded--;
+		//DEBUG
+		numNodesAdded--;
 		}
 	}
 
-void Tree::ArbitrarilyBifurcate(){
+bool Tree::ArbitrarilyBifurcate(){
+	//note that this assumes that the root has been already been made into at least a trichotomy
+	if(numNodesAdded == numNodesTotal) return false;
 	//first figure out which internal nodenums haven't been used yet
 	int placeInAllNodes=1;
 	while(allNodes[placeInAllNodes]->attached == true) placeInAllNodes++;
 	vector<TreeNode*> nodes;
-	TreeNode *curNode = root->left;
+	TreeNode *curNode = root;
 	TreeNode *desNode;
+	bool goingDown = false;
+	bool polytomiesFound = false;
 	
-	while(1){
-		if(curNode->IsInternal()) desNode = curNode->left;
-		nodes.push_back(desNode);
-		while(desNode->next){
-			desNode = desNode->next;
+	while(numNodesAdded < numNodesTotal){
+		if(curNode->IsInternal() && !goingDown){
+			desNode = curNode->left;
 			nodes.push_back(desNode);
-			}
-		if(nodes.size() > 2){
-			int first = rnd.random_int(nodes.size());
-			int second;
-			do{
-				second = rnd.random_int(nodes.size());
-				}while(first == second);
-		//	curNode-
-			
-			}
-		}
+			while(desNode->next){
+				desNode = desNode->next;
+				nodes.push_back(desNode);
+				}
+			if((curNode != root && nodes.size() > 2) || (curNode == root && nodes.size() > 3)){
+				polytomiesFound = true;
+				int first = rnd.random_int(nodes.size());
+				int second;
+				do{
+					second = rnd.random_int(nodes.size());
+					}while(first == second);
+				TreeNode *move1 = nodes[first];
+				TreeNode *move2 = nodes[second];
+				TreeNode *nextInternal = allNodes[placeInAllNodes];
+				
+				curNode->RemoveDes(move1);
+				curNode->RemoveDes(move2);
+				nextInternal->AddDes(move1);
+				nextInternal->AddDes(move2);
+				curNode->AddDes(nextInternal);
 
+				nextInternal->dlen=Tree::exp_starting_brlen;
+#ifdef STOCHASTIC_STARTING_BLENS
+				nextInternal->dlen *= rnd.gamma(1.0);
+#endif
+				placeInAllNodes++;
+				numNodesAdded++;
+				}
+			else{
+				if(curNode->left && !goingDown){
+					curNode = curNode->left;
+					}
+				else if(curNode->next){
+					curNode = curNode->next;
+					goingDown = false;
+					}
+				else{
+					curNode = curNode->anc;
+					goingDown = true;
+					}
+				}				
+			}
+		else{
+			if(curNode->next){
+				curNode = curNode->next;
+				goingDown = false;
+				}
+			else{
+				curNode = curNode->anc;
+				goingDown = true;
+				}
+			}
+
+		nodes.clear();
+		}
+	assert(numNodesAdded == numNodesTotal);
+	return polytomiesFound;
 	}
 
 void Tree::AddRandomNode(int nodenum , int &placeInAllNodes){
@@ -2328,7 +2391,17 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 	Constraint constr;
 	int conNum=0;
 	do{
-		getline(con, temp);
+		temp.clear();
+		char c;
+		con.get(c);
+		do{
+			temp += c;
+			con.get(c);
+			}while(c != '\n' && c!= '\r' && con.eof() == false);
+		while((con.peek() == '\n' || con.peek() == '\r') && con.eof() == false){
+			con.get(c);
+			}
+
 		//getline works strangely on some compilers.  temp should end with ; or \0 , but 
 		//might end with \r or \n
 		size_t len=temp.length();
@@ -2361,6 +2434,11 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 				//it will change the seed.  So, store and restore it
 				int seed = rnd.seed();
 				Tree contree(temp.c_str()+1, numericalTaxa, true);
+				//check if the tree is completely constrained - users try to do that to optimize on a fixed
+				//topology, but that should be done by specifying a starting tree and a topoweight of zero
+				if(contree.numNodesAdded == contree.numNodesTotal)
+					throw ErrorException("Constraint represents a fully resolved tree!\nIf you would like to fix the tree topology during a run,\ndo so by specifying your tree as a starting tree and\nsetting topoweight to 0.0");
+
 				rnd.set_seed(seed);
 
 				contree.CalcBipartitions();
@@ -2823,23 +2901,44 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 					}
 
 #else
-				small1= (destination[0] < destination[2] ? destination[0] : destination[2]);
+#if (defined(_MSC_VER) || defined(__INTEL_COMPILER))
+			//This is a neat trick for quickly finding the approximately largest
+			//value of an array of doubles, but it only works on littleendian
+			//systems.  There's no easy way of detecting endianness at compile
+			//time that I've been able to find, but since x86 machines are always
+			//littleendian, this should be safe
+				int size = 4 * nRateCats;
+				unsigned int absvalue, largest_abs = 0;
+				for (int j = 0; j < size; j++) {
+					// Get upper 32 bits of a[i] and shift out sign bit:
+					absvalue = *((unsigned int*)&destination[j] + 1) * 2;
+					// Find numerically largest element (approximately):
+					if (absvalue > largest_abs) {
+						largest_abs = absvalue;
+						large1 = destination[j];
+						}
+					}
+#else
+
+//				small1= (destination[0] < destination[2] ? destination[0] : destination[2]);
 				large1= (destination[0] > destination[2] ? destination[0] : destination[2]);
-				small2= (destination[1] < destination[3] ? destination[1] : destination[3]);
+//				small2= (destination[1] < destination[3] ? destination[1] : destination[3]);
 				large2= (destination[1] > destination[3] ? destination[1] : destination[3]);
-				small1 = (small1 < small2 ? small1 : small2);
+//				small1 = (small1 < small2 ? small1 : small2);
 				large1= (large1 > large2 ? large1 : large2);
 
 				for(int r=1;r<nRateCats;r++){
-					small2= (destination[0 + r*4] < destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
+//					small2= (destination[0 + r*4] < destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
 					large2= (destination[0 + r*4] > destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
-					small1 = (small1 < small2 ? small1 : small2);
+//					small1 = (small1 < small2 ? small1 : small2);
 					large1= (large1 > large2 ? large1 : large2);				
-					small2= (destination[1 + r*4] < destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
+//					small2= (destination[1 + r*4] < destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
 					large2= (destination[1 + r*4] > destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
-					small1 = (small1 < small2 ? small1 : small2);
+//					small1 = (small1 < small2 ? small1 : small2);
 					large1= (large1 > large2 ? large1 : large2);	
 					}			
+//				assert(FloatingPointEquals(l1, large1, 1e-8));
+#endif
 	#endif
 	#ifdef SINGLE_PRECISION_FLOATS
 				if(large1< 1.0f){
@@ -2918,13 +3017,33 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 #else
 		if(1){
 #endif
-			small1 = (destination[0] < destination[1]) ? destination[0] :  destination[1];
+
+#if (defined(_MSC_VER) || defined(__INTEL_COMPILER))
+			//This is a neat trick for quickly finding the approximately largest
+			//value of an array of doubles, but it only works on littleendian
+			//systems.  There's no easy way of detecting endianness at compile
+			//time that I've been able to find, but since x86 machines are always
+			//littleendian, this should be safe
+			int size = nstates * nRateCats;
+			unsigned int absvalue, largest_abs = 0;
+			for (int j = 0; j < size; j++) {
+				// Get upper 32 bits of a[i] and shift out sign bit:
+				absvalue = *((unsigned int*)&destination[j] + 1) * 2;
+				// Find numerically largest element (approximately):
+				if (absvalue > largest_abs) {
+					largest_abs = absvalue;
+					large1 = destination[j];
+					}
+				}
+#else
+			
+	//		small1 = (destination[0] < destination[1]) ? destination[0] :  destination[1];
 			large1 = (destination[0] > destination[1]) ? destination[0] :  destination[1];
 			for(int s=2;s<nstates*nRateCats;s++){
-				small1 = (destination[s] < small1) ? destination[s] : small1;
+	//			small1 = (destination[s] < small1) ? destination[s] : small1;
 				large1 = (destination[s] > large1) ? destination[s] : large1;
 				}
-
+#endif
 			assert(large1 < 1.0e15);
 			if(large1< 1e-5){
 				if(large1 < 1e-150){
@@ -2971,8 +3090,8 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 	TreeNode* Lchild, *Rchild;
 	CondLikeArray *LCLA=NULL, *RCLA=NULL, *partialCLA=NULL;
 
-	vector<FLOAT_TYPE> Rprmat(mod->NStates() * mod->NStates() * mod->NRateCats());
-	vector<FLOAT_TYPE> Lprmat(mod->NStates() * mod->NStates() * mod->NRateCats());
+	FLOAT_TYPE *Rprmat = NULL, *Lprmat = NULL;
+	FLOAT_TYPE blen1, blen2;
 
 	if(direction != ROOT){
 		//the only complicated thing here will be to set up the two children depending on the direction
@@ -2987,8 +3106,14 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			if(Rchild->IsInternal())
 				RCLA=GetClaDown(Rchild);
 			
-			mod->CalcPmat(Lchild->dlen, &Lprmat[0], false);
-			mod->CalcPmat(Rchild->dlen, &Rprmat[0], false);
+	//		Rprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
+	//		Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
+
+	//		mod->CalcPmat(Lchild->dlen, &Lprmat[0], false);
+	//		mod->CalcPmat(Rchild->dlen, &Rprmat[0], false);
+	//		mod->CalcPmats(Lchild->dlen, Rchild->dlen, Lprmat, Rprmat);
+			blen1 = Lchild->dlen;
+			blen2 = Rchild->dlen;
 			}
 		else if(direction==UPRIGHT || direction==UPLEFT){
 			if(nd->anc){
@@ -3004,7 +3129,9 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 					//and right, but not the middle.  We will confusingly store this in the root's DOWN cla
 					LCLA=GetClaDown(Lchild);
 
-				mod->CalcPmat(nd->dlen, &Lprmat[0], false);
+//				Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
+//				mod->CalcPmat(nd->dlen, &Lprmat[0], false);
+				blen1 = nd->dlen;
 			
 				if(direction==UPRIGHT) Rchild=nd->left;
 				else Rchild=nd->right;
@@ -3021,14 +3148,20 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 				if(Lchild->IsInternal())
 					LCLA=GetClaDown(Lchild);
 
-				mod->CalcPmat(Lchild->dlen, &Lprmat[0], false);
+			//	Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
+			//	mod->CalcPmat(Lchild->dlen, &Lprmat[0], false);
+				blen1 = Lchild->dlen;
 				}
 			
 			if(Rchild->IsInternal())
 				RCLA=GetClaDown(Rchild);
 			
-			mod->CalcPmat(Rchild->dlen, &Rprmat[0], false);
+//			Rprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
+//			mod->CalcPmat(Rchild->dlen, &Rprmat[0], false);
+			blen2 = Rchild->dlen;
 			}
+
+		mod->CalcPmats(blen1, blen2, Lprmat, Rprmat);
 
 		if(direction==DOWN) destCLA=GetClaDown(nd, false);
 		else if(direction==UPRIGHT) destCLA=GetClaUpRight(nd, false);
@@ -3093,7 +3226,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		//valid CLA that already represents two of these three. If so we can save a bit of
 		//computation.  This will mainly be the case during blen optimization, when when we 
 		//only change one of the branches again and again.
-		vector<FLOAT_TYPE> prmat(mod->NStates() * mod->NStates() * mod->NRateCats());
 		TreeNode *child;
 		CondLikeArray *childCLA=NULL;
 		int *childUnderMult=NULL;
@@ -3104,7 +3236,9 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			if(child->IsInternal()){
 				childCLA=GetClaDown(child, true);
 				}
-			mod->CalcPmat(child->dlen, &prmat[0], false);
+			//Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
+			//mod->CalcPmat(child->dlen, &Lprmat[0], false);
+			blen1 = child->dlen;
 			}
 		else if(claMan->IsDirty(nd->claIndexUR) == false){
 			partialCLA=GetClaUpRight(nd, false);
@@ -3112,7 +3246,9 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			if(child->IsInternal()){
 				childCLA=GetClaDown(child, true);
 				}
-			mod->CalcPmat(child->dlen, &prmat[0], false);
+			//Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
+			//mod->CalcPmat(child->dlen, &Lprmat[0], false);
+			blen1 = child->dlen;
 			}
 		else{//both of the UP clas must be dirty.  We'll use the down one as the 
 			//partial, and calc it now if necessary
@@ -3133,33 +3269,38 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 					//direction is stored as the root DOWN direction
 					childCLA=GetClaDown(child);
 					}
-				mod->CalcPmat(nd->dlen, &prmat[0], false);
+				//Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
+				//mod->CalcPmat(nd->dlen, &Lprmat[0], false);
+				blen1 = nd->dlen;
 				}
 			else{
 				child=nd->left->next;
 				if(child->IsInternal()){
 					childCLA=GetClaDown(child, true);
 					}
-				mod->CalcPmat(child->dlen, &prmat[0], false);
+				//Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
+				//mod->CalcPmat(child->dlen, &Lprmat[0], false);
+				blen1 = child->dlen;
 				}
 			}	
-		
+		mod->CalcPmats(blen1, -1.0, Lprmat, Rprmat);
+
 		if(fillFinalCLA==false){
 			if(childCLA!=NULL){//if child is internal
 				ProfScoreInt.Start();
 				if(modSpec.IsNucleotide())
-					lnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &prmat[0]);
+					lnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &Lprmat[0]);
 				else
-					lnL = GetScorePartialInternalNState(partialCLA, childCLA, &prmat[0]);
+					lnL = GetScorePartialInternalNState(partialCLA, childCLA, &Lprmat[0]);
 					
 				ProfScoreInt.Stop();
 				}	
 			else{
 				ProfScoreTerm.Start();
 				if(modSpec.IsNucleotide())
-					lnL = GetScorePartialTerminalRateHet(partialCLA, &prmat[0], child->tipData);
+					lnL = GetScorePartialTerminalRateHet(partialCLA, &Lprmat[0], child->tipData);
 				else
-					lnL = GetScorePartialTerminalNState(partialCLA, &prmat[0], child->tipData);
+					lnL = GetScorePartialTerminalNState(partialCLA, &Lprmat[0], child->tipData);
 
 				ProfScoreTerm.Stop();
 				}
@@ -3172,15 +3313,15 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			claMan->FillHolder(wholeTreeIndex, ROOT);
 			claMan->ReserveCla(wholeTreeIndex);
 			if(childCLA!=NULL)//if child is internal
-				CalcFullCLAPartialInternalRateHet(claMan->GetCla(wholeTreeIndex), childCLA, &prmat[0], partialCLA);
+				CalcFullCLAPartialInternalRateHet(claMan->GetCla(wholeTreeIndex), childCLA, &Lprmat[0], partialCLA);
 			else
-				CalcFullCLAPartialTerminalRateHet(claMan->GetCla(wholeTreeIndex), partialCLA, &prmat[0], child->tipData);
+				CalcFullCLAPartialTerminalRateHet(claMan->GetCla(wholeTreeIndex), partialCLA, &Lprmat[0], child->tipData);
 				
 			return wholeTreeIndex;
 			}
 		}
 
-	if(direction != ROOT)
+	if(direction != ROOT){
 		if(destCLA->rescaleRank >= rescaleEvery){
 			ProfRescale.Start();
 			if(modSpec.IsNucleotide())
@@ -3190,6 +3331,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 
 			ProfRescale.Stop();
 			}
+		}
 	return -1;
 	}
 
@@ -3465,7 +3607,8 @@ void Tree::EliminateNode(int nn){
 		}
 	allNodes[numNodesTotal-1]=NULL;
 	numNodesTotal--;
-	numNodesAdded--;
+	//DEBUG WTF was this needed for?
+//	numNodesAdded--;
 	//now make a new allNodes array of the proper length
 	TreeNode **newNodes=new TreeNode*[numNodesTotal];
 	memcpy(newNodes, allNodes, sizeof(TreeNode*)*numNodesTotal);
@@ -3473,6 +3616,8 @@ void Tree::EliminateNode(int nn){
 	allNodes=newNodes;
 	}
 
+//CAREFUL!  This is called from CheckBalance and assumes that this tree 
+//does not share CLAs with any other.  
 void Tree::RotateNodesAtRoot(TreeNode *newroot){
 	//DZ 11-3-02 This can be used to rebalance the tree
 	//I'm assuming that this will be called with one of the des of the root;
@@ -3482,6 +3627,10 @@ void Tree::RotateNodesAtRoot(TreeNode *newroot){
 	if(newroot==root->left){
 		root->left=newroot->next;
 		root->left->prev=NULL;
+		//DEBUG
+		int temp = root->claIndexDown;
+		root->claIndexDown = root->claIndexUL;
+		root->claIndexUL = temp;
 		}
 	else if(newroot==root->left->next){
 		root->left->next=root->right;
@@ -3490,6 +3639,10 @@ void Tree::RotateNodesAtRoot(TreeNode *newroot){
 	else{
 		root->right=root->left->next;
 		root->right->next=NULL;
+		//DEBUG
+		int temp = root->claIndexDown;
+		root->claIndexDown = root->claIndexUR;
+		root->claIndexUR = temp;
 		}
 	//now make the root the middle des of newroot and correct the dlens
 	root->anc=newroot;
@@ -3503,7 +3656,9 @@ void Tree::RotateNodesAtRoot(TreeNode *newroot){
 	newroot->next=newroot->prev=NULL;
 	 //now make the new root nodeNum 0 in the allNodes array
 	TreeNode *tempnode=root;
-	int tempindexdown=root->claIndexDown;
+
+	//DEBUG
+/*	int tempindexdown=root->claIndexDown;
 	root->claIndexDown=newroot->claIndexDown;
 	newroot->claIndexDown=tempindexdown;
 	int tempindexUL=root->claIndexUL;
@@ -3512,7 +3667,7 @@ void Tree::RotateNodesAtRoot(TreeNode *newroot){
 	int tempindexUR=root->claIndexUR;
 	root->claIndexUR=newroot->claIndexUR;
 	newroot->claIndexUR=tempindexUR;
-	root=newroot;
+*/	root=newroot;
 	allNodes[0]=newroot;
 	tempnode->nodeNum=root->nodeNum;
 	root->nodeNum=0;
@@ -3520,37 +3675,15 @@ void Tree::RotateNodesAtRoot(TreeNode *newroot){
 	//this form of setdirty won't shift every copy to a new topo, but will set them to dirty
 //	claMan->SetDirtyButDoNotMove(0, root->claIndex);
 //	claMan->SetDirtyButDoNotMove(tempnode->nodeNum, tempnode->claIndex);
-	root->claIndexDown=claMan->SetDirty(root->claIndexDown);
-	tempnode->claIndexDown=claMan->SetDirty(tempnode->claIndexDown);
+//	root->claIndexDown=claMan->SetDirty(root->claIndexDown);
+//	tempnode->claIndexDown=claMan->SetDirty(tempnode->claIndexDown);
 	}
 	
+//CAREFUL here!  This function assumes that this tree and ONLY this tree
+//points to a set of CLAs.  The indeces should all be valid on exit
+//but strange things may happen if other trees also point to them.
 void Tree::CheckBalance(){
-	//DZ 11-=3=02
-	//this function will keep the 3 subtrees decending from the root approximately the same
-	//depth.  This insures that on average an optimally small number of clas will have to
-	//be rescored due to blen or spr mutations.
-	
-/*	int l=0, m=0, r=0;
-	root->left->CalcDepth(l);
-	root->left->next->CalcDepth(m);
-	root->right->CalcDepth(r);
-	
-	do{
-		//its not exactly clear what a reasonable criterion for rebalancing the tree should be.
-		//this seems to work pretty well
-		if(l>m+1&&l>r+1) RotateNodesAtRoot(root->left);
-		else if(m>l+1&&m>r+1) RotateNodesAtRoot(root->left->next);
-		else if(r>m+1&&r>l+1) RotateNodesAtRoot(root->right);
-		else return;
-		
-		l=m=r=0;
-		root->left->CalcDepth(l);
-		root->left->next->CalcDepth(m);
-		root->right->CalcDepth(r);
-		}while(1);
-*/			
-	
-	//a more complicated option.  evaluate the average depth of all branches in the tree
+	//evaluate the average depth of all branches in the tree
 	int lb=0, mb=0, rb=0;
 	int ls=0, ms=0, rs=0;
 	int llb=0, lrb=0, mlb=0, mrb=0, rlb=0, rrb=0;
@@ -3599,8 +3732,6 @@ void Tree::CheckBalance(){
 			RotateNodesAtRoot(root->right);
 			lastRot=3;
 			}
-
-
 
 		lb=mb=rb=ls=ms=rs=llb=lrb=mlb=mrb=rlb=rrb=lls=lrs=mls=mrs=rls=rrs=0;
 	
@@ -3901,6 +4032,11 @@ void Tree::RerootHere(int newroot){
 	TreeNode *curnode=nroot->anc;
 	TreeNode *nextnode=nroot->anc->anc;
 
+	//this is necessary to properly dirty clas
+	TreeNode *lastOnPath=nroot;
+	while(lastOnPath->anc != root) lastOnPath = lastOnPath->anc;
+	SweepDirtynessOverTree(lastOnPath);
+
 	//first trace down to the old root and fix all the blens
 	//Each branch with take the length of its descendent on that path
 	//this will be easiest recursively
@@ -3924,7 +4060,7 @@ void Tree::RerootHere(int newroot){
 			curnode->right=curnode->anc;
 			//curnode->AdjustClasForReroot(UPRIGHT);
 			}
-	//	SweepDirtynessOverTree(curnode);
+//		SweepDirtynessOverTree(curnode);
 		
 		curnode->left->next=curnode->right;
 		curnode->left->prev=NULL;
@@ -3988,6 +4124,9 @@ void Tree::RerootHere(int newroot){
 	SwapNodeDataForReroot(nroot);
 
 	root->CheckTreeFormation();
+
+//	MakeAllNodesDirty();
+//	Score();
 	}
 
 void Tree::SwapNodeDataForReroot(TreeNode *nroot){
@@ -4186,8 +4325,35 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site){
 	//int site=0;
 	int nstates = mod->NStates();
 	int index=nstates * mod->NRateCats() * site;
-	
-	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexDown) == false){
+
+	//this version outputs the indeces even for dirty clas
+	if(nd->IsInternal()){
+		deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
+		if(claMan->IsDirty(nd->claIndexDown) == false){
+			for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexDown)->arr[index+i] << "\t";
+			deb << claMan->GetCla(nd->claIndexDown)->underflow_mult[site];
+			}
+		deb << "\n";
+		}
+	if(nd->IsInternal()){
+		deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
+		if(claMan->IsDirty(nd->claIndexUL) == false){
+			for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexUL)->arr[index+i] << "\t";
+			deb << claMan->GetCla(nd->claIndexUL)->underflow_mult[site];
+			}
+		deb <<"\n";
+		}
+	if(nd->IsInternal()){
+		deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
+		if(claMan->IsDirty(nd->claIndexUR) == false){
+			for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexUR)->arr[index+i] << "\t";
+			deb << claMan->GetCla(nd->claIndexUR)->underflow_mult[site];
+			}
+		deb <<"\n";
+		}
+
+	//this version only outputs clean clas
+/*	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexDown) == false){
 		deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
 		for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexDown)->arr[index+i] << "\t";
 		deb << claMan->GetCla(nd->claIndexDown)->underflow_mult[site] <<"\n";
@@ -4202,7 +4368,7 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site){
 		for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexUR)->arr[index+i] << "\t";
 		deb << claMan->GetCla(nd->claIndexUR)->underflow_mult[site] <<"\n";
 		}
-
+*/
 	if(nd->IsInternal())
 		OutputNthClaAcrossTree(deb, nd->left, site);
 	if(nd->next!=NULL)
@@ -4392,22 +4558,22 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 
 	//this function assumes that the pmat is arranged with the nstates^2 entries for the
 	//first rate, followed by nstates^2 for the second, etc.
-	FLOAT_TYPE *partial=partialCLA->arr;
-	int *underflow_mult=partialCLA->underflow_mult;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult=partialCLA->underflow_mult;
 
-	int nstates = mod->NStates();
-	int nRateCats = mod->NRateCats();
-	int nchar = data->NChar();
+	const int nstates = mod->NStates();
+	const int nRateCats = mod->NRateCats();
+	const int nchar = data->NChar();
 	const int *countit=data->GetCounts();
 	const char *Ldata = Ldat;
 
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
-	int lastConst=data->LastConstant();
+	const int lastConst=data->LastConstant();
 	const int *conStates=data->GetConstStates();
-	FLOAT_TYPE prI=mod->PropInvar();
+	const FLOAT_TYPE prI=mod->PropInvar();
 
 #ifdef UNIX
-	madvise(partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE siteL, totallnL=0.0;
@@ -4468,20 +4634,21 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 
 	#ifndef OUTPUT_SITELIKES
 				}
+			Ldata++;
+			}
 	#else
 				}
-//			for(int q=0;q<countit[i];q++)
+			Ldata++;
+			for(int q=0;q<countit[i];q++)
 				sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
 			}
 		sit.close();
 	#endif
-			Ldata++;
-			}
 		}
 	else{
-
+		FLOAT_TYPE rateL;
 #ifdef OMP_TERMSCORE_NSTATE
-		#pragma omp parallel for private(partial, Ldata, siteL) reduction(+ : totallnL)
+		#pragma omp parallel for private(partial, Ldata, siteL, rateL) reduction(+ : totallnL)
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates*nRateCats];
@@ -4493,6 +4660,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 #else
 			if(1){
 #endif
+/*
 				vector<FLOAT_TYPE> stateContrib(nstates);
 				for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
 				if(*Ldata < nstates){ //no ambiguity
@@ -4520,6 +4688,31 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				siteL = 0.0;
 				for(int from=0;from<nstates;from++)
 					siteL += stateContrib[from] * freqs[from];
+*/
+				siteL = ZERO_POINT_ZERO;
+				if(*Ldata < nstates){ //no ambiguity
+					for(int rate=0;rate<nRateCats;rate++){
+						rateL = ZERO_POINT_ZERO;
+						const int rateOffset = rate * nstates * nstates;
+						for(int from=0;from<nstates;from++){
+							const int offset = from * nstates;
+							rateL += prmat[rateOffset + offset + (*Ldata)] * partial[from] * freqs[from];
+							}
+						siteL += rateL * rateProb[rate];
+						partial += nstates;
+						}
+					}
+				else{ //total ambiguity
+					for(int rate=0;rate<nRateCats;rate++){
+						rateL = ZERO_POINT_ZERO;
+						for(int from=0;from<nstates;from++){
+							rateL += partial[from] * freqs[from];
+							}
+						siteL += rateL * rateProb[rate];
+						partial += nstates;
+						}
+					}
+
 				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 					if(underflow_mult[i] == 0)
 						siteL += prI*freqs[conStates[i]];
@@ -4549,33 +4742,31 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	}
 
 FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata){
-
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *partial=partialCLA->arr;
-	int *underflow_mult=partialCLA->underflow_mult;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult=partialCLA->underflow_mult;
 	const int nRateCats=mod->NRateCats();
 
-	int nchar=data->NChar();
-#ifdef UNIX
-	madvise(partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
+	const int nchar=data->NChar();
 
-	FLOAT_TYPE siteL, totallnL=0.0;
-	FLOAT_TYPE La, Lc, Lg, Lt;
-	
-	//gamma and invariants
 	const int *countit=data->GetCounts();
 	
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
 
-	int lastConst=data->LastConstant();
+	const int lastConst=data->LastConstant();
 	const int *conBases=data->GetConstStates();
-	FLOAT_TYPE prI=mod->PropInvar();
-//	FLOAT_TYPE scaledGammaProp=(1.0-prI) / mod->NRateCats();
+	const FLOAT_TYPE prI=mod->PropInvar();
 
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+
+#ifdef UNIX
+	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE siteL, totallnL=0.0;
+	FLOAT_TYPE La, Lc, Lg, Lt;
 
 #ifdef OUTPUT_SITELIKES
 	ofstream sit("sitelikes.log");
@@ -4587,10 +4778,9 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 #else
 		if(1){
 #endif
-			La=Lc=Lg=Lt=0.0;
+			La=Lc=Lg=Lt=ZERO_POINT_ZERO;
 			if(*Ldata > -1){ //no ambiguity
 				for(int i=0;i<nRateCats;i++){
-
 					La  += prmat[(*Ldata)+16*i] * partial[0] * rateProb[i];
 					Lc  += prmat[(*Ldata+4)+16*i] * partial[1] * rateProb[i];
 					Lg  += prmat[(*Ldata+8)+16*i] * partial[2] * rateProb[i];
@@ -4667,33 +4857,32 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *CL1=childCLA->arr;
-	FLOAT_TYPE *partial=partialCLA->arr;
-	int *underflow_mult1=partialCLA->underflow_mult;
-	int *underflow_mult2=childCLA->underflow_mult;
+	const FLOAT_TYPE *CL1=childCLA->arr;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult1=partialCLA->underflow_mult;
+	const int *underflow_mult2=childCLA->underflow_mult;
 
-	int nchar=data->NChar();
+	const int nchar=data->NChar();
 	const int nRateCats=mod->NRateCats();
 
-
-#ifdef UNIX
-	madvise(partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise(CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-	FLOAT_TYPE siteL, totallnL=0.0;
-	FLOAT_TYPE La, Lc, Lg, Lt;
-
-	//gamma and invariants
 	const int *countit=data->GetCounts();
 
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
-	FLOAT_TYPE prI=mod->PropInvar();
-	int lastConst=data->LastConstant();
+	const FLOAT_TYPE prI=mod->PropInvar();
+	const int lastConst=data->LastConstant();
 	const int *conBases=data->GetConstStates();
 
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+
+
+#ifdef UNIX
+	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE siteL, totallnL=0.0;
+	FLOAT_TYPE La, Lc, Lg, Lt;
 
 #ifdef OUTPUT_SITELIKES
 	ofstream sit("sitelikes.log");
@@ -4705,7 +4894,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 #else
 		if(1){
 #endif
-			La=Lc=Lg=Lt=0.0;
+			La=Lc=Lg=Lt=ZERO_POINT_ZERO;
 			for(int r=0;r<nRateCats;r++){
 				int rOff=r*16;
 				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
@@ -4716,7 +4905,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 				CL1+=4;
 				}
 			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
-				FLOAT_TYPE btot=0.0;
+				FLOAT_TYPE btot=ZERO_POINT_ZERO;
 				if(conBases[i]&1) btot+=freqs[0];
 				if(conBases[i]&2) btot+=freqs[1];
 				if(conBases[i]&4) btot+=freqs[2];
@@ -4754,33 +4943,36 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat){
 	//this function assumes that the pmat is arranged with nstates^2 entries for the
 	//first rate, followed by nstate^2 for the second, etc.
-	FLOAT_TYPE *CL1=childCLA->arr;
-	FLOAT_TYPE *partial=partialCLA->arr;
-	int *underflow_mult1=partialCLA->underflow_mult;
-	int *underflow_mult2=childCLA->underflow_mult;
+	const FLOAT_TYPE *CL1=childCLA->arr;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult1=partialCLA->underflow_mult;
+	const int *underflow_mult2=childCLA->underflow_mult;
 
-	int nchar=data->NChar();
+	const int nchar=data->NChar();
 	const int *countit=data->GetCounts();
 	const int nRateCats = mod->NRateCats();
-	int nstates = mod->NStates();
+	const int nstates = mod->NStates();
 
 	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
-	FLOAT_TYPE prI=mod->PropInvar();
-	int lastConst=data->LastConstant();
+	const FLOAT_TYPE prI=mod->PropInvar();
+	const int lastConst=data->LastConstant();
 	const int *conStates=data->GetConstStates();
 
 #ifdef UNIX
-	madvise(partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise(CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE totallnL=0.0;
+	FLOAT_TYPE totallnL=0.0, siteL;
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
 #ifdef OUTPUT_SITELIKES
 	ofstream sit("sitelikes.log");
+	sit.precision(15);
+	assert(sit.good());
+	ofstream deb2("deb.log");
 #endif
 
 	if(nRateCats == 1){
@@ -4798,7 +4990,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 #else
 			if(1){
 #endif
-				FLOAT_TYPE siteL = 0.0;
+				siteL = 0.0;
 				for(int from=0;from<nstates;from++){
 					FLOAT_TYPE temp = 0.0;
 					for(int to=0;to<nstates;to++){
@@ -4823,17 +5015,17 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 #ifndef OUTPUT_SITELIKES
 			}
 #else
-//			for(int q=0;q<*(countit-1);q++)
+//			for(int q=0;q<countit[i];q++)
 				sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
 			}
-		sit.close();
+//		sit.close();
 #endif
 		}
-	else{//this is a lot nastier in the case of rate het, and I don't see a clean way to do it except by writing the
-		//likelihood contributions of the various states to a temp array, instead of keeping a running total
+	else{
+		FLOAT_TYPE siteL, tempL, rateL;
 		
 #ifdef OMP_INTSCORE_NSTATE
-		#pragma omp parallel for private(partial, CL1) reduction(+ : totallnL)
+		#pragma omp parallel for private(partial, CL1, siteL, tempL, rateL) reduction(+ : totallnL)
 		for(int i=0;i<nchar;i++){
 			partial = &(partialCLA->arr[nRateCats*nstates*i]);
 			CL1		= &(childCLA->arr[nRateCats*nstates*i]);
@@ -4845,7 +5037,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 #else
 			if(1){
 #endif
-				FLOAT_TYPE siteL = 0.0;
+/*				FLOAT_TYPE siteL = 0.0;
 				vector<FLOAT_TYPE> stateContrib(nstates);
 				for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
 				for(int rate=0;rate<nRateCats;rate++){
@@ -4862,6 +5054,25 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				siteL = 0.0;
 				for(int from=0;from<nstates;from++)
 					siteL += stateContrib[from] * freqs[from];
+*/
+
+				siteL = ZERO_POINT_ZERO;
+				for(int rate=0;rate<nRateCats;rate++){
+					rateL = ZERO_POINT_ZERO;
+					int rateOffset = rate*nstates*nstates;
+					for(int from=0;from<nstates;from++){
+						tempL = ZERO_POINT_ZERO;
+						int offset = from * nstates;
+						for(int to=0;to<nstates;to++){
+							tempL += prmat[rateOffset + offset + to]*CL1[to];
+							}
+						rateL += tempL * partial[from] * freqs[from];
+						}
+					siteL += rateL * rateProb[rate];
+					partial += nstates;
+					CL1 += nstates;
+					}
+
 				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 					if(underflow_mult1[i] + underflow_mult2[i] == 0)
 						siteL += prI*freqs[conStates[i]];
@@ -4872,18 +5083,19 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				assert(siteL != ZERO_POINT_ZERO);
 				totallnL += (countit[i] * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
 				assert(totallnL == totallnL);
+#ifdef OUTPUT_SITELIKES
+				for(int q=0;q<countit[i];q++)
+					sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
+#endif
 				}
 			else{
 				}
-#ifndef OUTPUT_SITELIKES
 			}
-#else
-			for(int q=0;q<*(countit-1);q++)
-				sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
-			}
-		sit.close();
-#endif
+		
 		}
+#ifdef OUTPUT_SITELIKES
+	sit.close();
+#endif
 
 	delete []freqs;
 	return totallnL;
@@ -5432,6 +5644,7 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetFlexProb);
 //		for(int j=0;j<mod->NRateCats();j++)
 //			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
+	
 	return flexImprove;
 	}
 
@@ -5524,6 +5737,83 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 #else
 			if(1){
 #endif
+				L1=((Lpr[0]*LCL[0])+(Lpr[1]*LCL[1]))+((Lpr[2]*LCL[2])+(Lpr[3]*LCL[3]));
+				L2=((Lpr[4]*LCL[0])+(Lpr[5]*LCL[1]))+((Lpr[6]*LCL[2])+(Lpr[7]*LCL[3]));
+				L3=((Lpr[8]*LCL[0])+(Lpr[9]*LCL[1]))+((Lpr[10]*LCL[2])+(Lpr[11]*LCL[3]));
+				L4=((Lpr[12]*LCL[0])+(Lpr[13]*LCL[1]))+((Lpr[14]*LCL[2])+(Lpr[15]*LCL[3]));
+
+				R1=((Rpr[0]*RCL[0])+(Rpr[1]*RCL[1]))+((Rpr[2]*RCL[2])+(Rpr[3]*RCL[3]));
+				R2=((Rpr[4]*RCL[0])+(Rpr[5]*RCL[1]))+((Rpr[6]*RCL[2])+(Rpr[7]*RCL[3]));
+				R3=((Rpr[8]*RCL[0])+(Rpr[9]*RCL[1]))+((Rpr[10]*RCL[2])+(Rpr[11]*RCL[3]));			
+				R4=((Rpr[12]*RCL[0])+(Rpr[13]*RCL[1]))+((Rpr[14]*RCL[2])+(Rpr[15]*RCL[3]));
+
+				dest[0] = L1 * R1;
+				dest[1] = L2 * R2;
+				dest[2] = L3 * R3;
+				dest[3] = L4 * R4;
+
+				dest+=4;
+				LCL+=4;
+				RCL+=4;
+
+				L1=(Lpr[16+0]*LCL[0]+Lpr[16+1]*LCL[1])+(Lpr[16+2]*LCL[2]+Lpr[16+3]*LCL[3]);
+				L2=(Lpr[16+4]*LCL[0]+Lpr[16+5]*LCL[1])+(Lpr[16+6]*LCL[2]+Lpr[16+7]*LCL[3]);
+				L3=(Lpr[16+8]*LCL[0]+Lpr[16+9]*LCL[1])+(Lpr[16+10]*LCL[2]+Lpr[16+11]*LCL[3]);
+				L4=(Lpr[16+12]*LCL[0]+Lpr[16+13]*LCL[1])+(Lpr[16+14]*LCL[2]+Lpr[16+15]*LCL[3]);
+
+				R1=(Rpr[16+0]*RCL[0]+Rpr[16+1]*RCL[1])+(Rpr[16+2]*RCL[2]+Rpr[16+3]*RCL[3]);
+				R2=(Rpr[16+4]*RCL[0]+Rpr[16+5]*RCL[1])+(Rpr[16+6]*RCL[2]+Rpr[16+7]*RCL[3]);
+				R3=(Rpr[16+8]*RCL[0]+Rpr[16+9]*RCL[1])+(Rpr[16+10]*RCL[2]+Rpr[16+11]*RCL[3]);			
+				R4=(Rpr[16+12]*RCL[0]+Rpr[16+13]*RCL[1])+(Rpr[16+14]*RCL[2]+Rpr[16+15]*RCL[3]);
+
+				dest[0] = L1 * R1;
+				dest[1] = L2 * R2;
+				dest[2] = L3 * R3;
+				dest[3] = L4 * R4;
+
+				dest+=4;
+				LCL+=4;
+				RCL+=4;
+
+				L1=(Lpr[32+0]*LCL[0]+Lpr[32+1]*LCL[1])+(Lpr[32+2]*LCL[2]+Lpr[32+3]*LCL[3]);
+				L2=(Lpr[32+4]*LCL[0]+Lpr[32+5]*LCL[1])+(Lpr[32+6]*LCL[2]+Lpr[32+7]*LCL[3]);
+				L3=(Lpr[32+8]*LCL[0]+Lpr[32+9]*LCL[1])+(Lpr[32+10]*LCL[2]+Lpr[32+11]*LCL[3]);
+				L4=(Lpr[32+12]*LCL[0]+Lpr[32+13]*LCL[1])+(Lpr[32+14]*LCL[2]+Lpr[32+15]*LCL[3]);
+
+				R1=(Rpr[32+0]*RCL[0]+Rpr[32+1]*RCL[1])+(Rpr[32+2]*RCL[2]+Rpr[32+3]*RCL[3]);
+				R2=(Rpr[32+4]*RCL[0]+Rpr[32+5]*RCL[1])+(Rpr[32+6]*RCL[2]+Rpr[32+7]*RCL[3]);
+				R3=(Rpr[32+8]*RCL[0]+Rpr[32+9]*RCL[1])+(Rpr[32+10]*RCL[2]+Rpr[32+11]*RCL[3]);			
+				R4=(Rpr[32+12]*RCL[0]+Rpr[32+13]*RCL[1])+(Rpr[32+14]*RCL[2]+Rpr[32+15]*RCL[3]);
+
+				dest[0] = L1 * R1;
+				dest[1] = L2 * R2;
+				dest[2] = L3 * R3;
+				dest[3] = L4 * R4;
+
+				dest+=4;
+				LCL+=4;
+				RCL+=4;
+
+				L1=(Lpr[48+0]*LCL[0]+Lpr[48+1]*LCL[1])+(Lpr[48+2]*LCL[2]+Lpr[48+3]*LCL[3]);
+				L2=(Lpr[48+4]*LCL[0]+Lpr[48+5]*LCL[1])+(Lpr[48+6]*LCL[2]+Lpr[48+7]*LCL[3]);
+				L3=(Lpr[48+8]*LCL[0]+Lpr[48+9]*LCL[1])+(Lpr[48+10]*LCL[2]+Lpr[48+11]*LCL[3]);
+				L4=(Lpr[48+12]*LCL[0]+Lpr[48+13]*LCL[1])+(Lpr[48+14]*LCL[2]+Lpr[48+15]*LCL[3]);
+
+				R1=(Rpr[48+0]*RCL[0]+Rpr[48+1]*RCL[1])+(Rpr[48+2]*RCL[2]+Rpr[48+3]*RCL[3]);
+				R2=(Rpr[48+4]*RCL[0]+Rpr[48+5]*RCL[1])+(Rpr[48+6]*RCL[2]+Rpr[48+7]*RCL[3]);
+				R3=(Rpr[48+8]*RCL[0]+Rpr[48+9]*RCL[1])+(Rpr[48+10]*RCL[2]+Rpr[48+11]*RCL[3]);			
+				R4=(Rpr[48+12]*RCL[0]+Rpr[48+13]*RCL[1])+(Rpr[48+14]*RCL[2]+Rpr[48+15]*RCL[3]);
+
+				dest[0] = L1 * R1;
+				dest[1] = L2 * R2;
+				dest[2] = L3 * R3;
+				dest[3] = L4 * R4;
+
+				dest+=4;
+				LCL+=4;
+				RCL+=4;
+
+/*
 				L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
 				L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
 				L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
@@ -5533,7 +5823,7 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 				R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
 				R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
 				R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-				
+								
 				dest[0] = L1 * R1;
 				dest[1] = L2 * R2;
 				dest[2] = L3 * R3;
@@ -5600,7 +5890,7 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 				dest+=4;
 				LCL+=4;
 				RCL+=4;
-				}
+	*/			}
 			}
 		}
 
@@ -5717,13 +6007,12 @@ void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondL
 #ifdef USE_COUNTS_IN_BOOT
 		if(counts[i]> 0){
 #else
-		if(1){
+		if(1)
 #endif
 			for(int rate=0;rate<nRateCats;rate++){
 				for(int from=0;from<nstates;from++){
-					L1 = Lpr[rate*nstates*nstates + from*nstates] * LCL[0];
-					R1 = Rpr[rate*nstates*nstates + from*nstates] * RCL[0];
-					for(int to=1;to<nstates;to++){
+					L1 = R1 = ZERO_POINT_ZERO;
+					for(int to=0;to<nstates;to++){
 						L1 += Lpr[rate*nstates*nstates + from*nstates + to] * LCL[to];
 						R1 += Rpr[rate*nstates*nstates + from*nstates + to] * RCL[to];
 						}
@@ -6017,28 +6306,27 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 #else
 			if(1){
 #endif
-
 				if(*data2 > -1){ //no ambiguity
-					dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]) * pr2[(*data2)];
-					dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]) * pr2[(*data2+4)];
-					dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]) * pr2[(*data2+8)];
-					dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]) * pr2[(*data2+12)];
+					dest[0] = ((pr1[0]*CL1[0]+pr1[1]*CL1[1])+(pr1[2]*CL1[2]+pr1[3]*CL1[3])) * pr2[*data2];
+					dest[1] = ((pr1[4]*CL1[0]+pr1[5]*CL1[1])+(pr1[6]*CL1[2]+pr1[7]*CL1[3])) * pr2[*data2+4];
+					dest[2] = ((pr1[8]*CL1[0]+pr1[9]*CL1[1])+(pr1[10]*CL1[2]+pr1[11]*CL1[3])) * pr2[*data2+8];
+					dest[3] = ((pr1[12]*CL1[0]+pr1[13]*CL1[1])+(pr1[14]*CL1[2]+pr1[15]*CL1[3])) * pr2[*data2+12];
 					
-					dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]) * pr2[(*data2)+16];
-					dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]) * pr2[(*data2+4)+16];
-					dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]) * pr2[(*data2+8)+16];
-					dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]) * pr2[(*data2+12)+16];
+					dest[4] = ((pr1[16]*CL1[4]+pr1[17]*CL1[5])+(pr1[18]*CL1[6]+pr1[19]*CL1[7])) * pr2[*data2+16];
+					dest[5] = ((pr1[20]*CL1[4]+pr1[21]*CL1[5])+(pr1[22]*CL1[6]+pr1[23]*CL1[7])) * pr2[*data2+4+16];
+					dest[6] = ((pr1[24]*CL1[4]+pr1[25]*CL1[5])+(pr1[26]*CL1[6]+pr1[27]*CL1[7])) * pr2[*data2+8+16];
+					dest[7] = ((pr1[28]*CL1[4]+pr1[29]*CL1[5])+(pr1[30]*CL1[6]+pr1[31]*CL1[7])) * pr2[*data2+12+16];
 				
-					dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]) * pr2[(*data2)+32];
-					dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]) * pr2[(*data2+4)+32];
-					dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]) * pr2[(*data2+8)+32];
-					dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]) * pr2[(*data2+12)+32];
+					dest[8] = ((pr1[32]*CL1[8]+pr1[33]*CL1[9])+(pr1[34]*CL1[10]+pr1[35]*CL1[11])) * pr2[*data2+32];
+					dest[9] = ((pr1[36]*CL1[8]+pr1[37]*CL1[9])+(pr1[38]*CL1[10]+pr1[39]*CL1[11])) * pr2[*data2+4+32];
+					dest[10] = ((pr1[40]*CL1[8]+pr1[41]*CL1[9])+(pr1[42]*CL1[10]+pr1[43]*CL1[11])) * pr2[*data2+8+32];
+					dest[11] = ((pr1[44]*CL1[8]+pr1[45]*CL1[9])+(pr1[46]*CL1[10]+pr1[47]*CL1[11])) * pr2[*data2+12+32];
 				
-					dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]) * pr2[(*data2)+48];
-					dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]) * pr2[(*data2+4)+48];
-					dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * pr2[(*data2+8)+48];
-					dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * pr2[(*data2+12)+48];
-	//				assert(dest[0] > 0.0);
+					dest[12] = ((pr1[48]*CL1[12]+pr1[49]*CL1[13])+(pr1[50]*CL1[14]+pr1[51]*CL1[15])) * pr2[*data2+48];
+					dest[13] = ((pr1[52]*CL1[12]+pr1[53]*CL1[13])+(pr1[54]*CL1[14]+pr1[55]*CL1[15])) * pr2[*data2+4+48];
+					dest[14] = ((pr1[56]*CL1[12]+pr1[57]*CL1[13])+(pr1[58]*CL1[14]+pr1[59]*CL1[15])) * pr2[*data2+8+48];
+					dest[15] = ((pr1[60]*CL1[12]+pr1[61]*CL1[13])+(pr1[62]*CL1[14]+pr1[63]*CL1[15])) * pr2[*data2+12+48];
+
 	#ifndef OMP_INTTERMCLA
 					dest+=16;
 					data2++;
@@ -6239,19 +6527,11 @@ void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondL
 #endif
 			for(int rate=0;rate<nRateCats;rate++){
 				for(int from=0;from<nstates;from++){
-					dest[from] = pr1[rate*nstates*nstates + from*nstates] * CL1[0];
-					for(int to=1;to<nstates;to++){
-						dest[from] += pr1[rate*nstates*nstates + from*nstates + to] * CL1[to];
+					FLOAT_TYPE d = ZERO_POINT_ZERO;
+					for(int to=0;to<nstates;to++){
+						d += pr1[rate*nstates*nstates + from*nstates + to] * CL1[to];
 						}
-					if(*data2 < nstates) //no ambiguity
-						dest[from] *= pr2[rate*nstates*nstates + (*data2)+from*nstates];
-					else if(*data2 == nstates){
-						int p=2;//total ambiguity
-						}
-					else{
-						//write this for partial ambiguity
-						assert(0);
-						}
+					dest[from] = (*data2 < nstates ? d * pr2[rate*nstates*nstates + (*data2)+from*nstates] : d);
 					}
 				assert(dest[19] < 1e10);
 				dest += nstates;
