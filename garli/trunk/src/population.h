@@ -331,7 +331,7 @@ private:
 		enum { nomem=1, nofile, baddimen };
 		int error;
 	bool usedNCL;
-	bool startingTreeOrModelInNCL;
+	bool startingTreeInNCL;
 
 	enum output_details {
 		DONT_OUTPUT = 0,
@@ -379,7 +379,7 @@ private:
 #endif
 
 	public:
-		Population() : error(0), conf(NULL), usedNCL(false), startingTreeOrModelInNCL(false),
+		Population() : error(0), conf(NULL), usedNCL(false), startingTreeInNCL(false),
 			bestFitness(-(FLT_MAX)), bestIndiv(0), currentSearchRep(1), 
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 

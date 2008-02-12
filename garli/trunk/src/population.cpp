@@ -88,7 +88,6 @@ FLOAT_TYPE globalBest;
 
 #undef PERIODIC_SCORE_DEBUG
 
-#undef DEBUG_SCORES
 
 #undef NNI_SPECTRUM
 
@@ -506,6 +505,7 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 
 	//set one model static
 	Model::mutationShape = conf->gammaShapeModel;
+	if(modSpec.IsCodon()) Model::SetCode(static_cast<CodonData*>(data)->GetCode());
 
 	//load any constraints
 	GetConstraints();
@@ -527,18 +527,20 @@ void Population::LoadNexusStartingTrees(){
 	else{
 		//use NCL to get trees from the specified file
 		GarliReader & reader = GarliReader::GetInstance();
-		outman.UserMessage("Obtaining starting model and/or tree from file %s", conf->streefname.c_str());
+		outman.UserMessage("Loading starting model and/or tree from file %s", conf->streefname.c_str());
 		NxsTreesBlock *treesblock = reader.GetTreesBlock();
 		if(treesblock != NULL && treesblock->GetNumTrees() > 0)//if we already had trees loaded, toss them
 			treesblock->Reset();
-		if(reader.FoundModelString())
-			reader.ClearModelString();
+		//If a model string was already read it will be cleared when the 
+		//new one is encountered, so a block in the nexus start file will have precedence.
+//		if(reader.FoundModelString())
+//			reader.ClearModelString();
 		reader.HandleExecute(conf->streefname.c_str());
 		treesblock = reader.GetTreesBlock();
 		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
 			throw ErrorException("No nexus trees block or Garli block wasfound in file %s,\n     which was specified\n\tas source of starting model and/or tree", conf->streefname.c_str());
 		}
-	startingTreeOrModelInNCL = true;
+	startingTreeInNCL = true;
 	}
 
 //return population more or less to what it looked like just after Setup()
@@ -624,6 +626,10 @@ void Population::RunTests(){
 	//test a number of functions to ensure that any code changes haven't broken anything
 	//it assumes that Setup has been called
 
+#ifdef NDEBUG
+	outman.UserMessage("WARNING: You are running internal tests with NDEBUG defined!\nIt should not be defined for full error checking.");
+#endif
+
 	if(conf->bootstrapReps > 0) data->BootstrapReweight(0);
 
 	Individual *ind0 = &newindiv[0];
@@ -632,6 +638,28 @@ void Population::RunTests(){
 	//ind0->MakeRandomTree(data->NTax());
 	ind0->MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 	ind0->treeStruct->mod=ind0->mod;
+
+	//check that the score was correct coming out of MakeStepwiseTree
+	FLOAT_TYPE scr = ind0->treeStruct->lnL;
+	ind0->treeStruct->MakeAllNodesDirty();
+	ind0->SetDirty();
+	ind0->CalcFitness(0);
+
+	//this only really tests for major scoring problems in the optimization functions
+	scr = ind0->treeStruct->lnL;
+	ind0->treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
+	assert(ind0->treeStruct->lnL > scr);
+	assert(ind0->treeStruct->lnL * 2 < scr);
+
+	//test rescaling
+	scr = ind0->treeStruct->lnL;
+	int r = Tree::rescaleEvery;
+	Tree::rescaleEvery = 2;
+	ind0->treeStruct->MakeAllNodesDirty();
+	ind0->SetDirty();
+	ind0->CalcFitness(0);
+	assert(FloatingPointEquals(ind0->Fitness(), scr, 0.001));
+	Tree::rescaleEvery = r;
 
 	ind1->treeStruct=new Tree();
 	ind1->CopySecByRearrangingNodesOfFirst(ind1->treeStruct, &newindiv[0]);
@@ -660,9 +688,9 @@ void Population::RunTests(){
 		ind1->SetDirty();
 
 		//check minimal recalculation scoring (proper readjustment of CLAs during rerooting)
-		ind0->CalcFitness(0);
-		ind1->CalcFitness(0);
-		assert(FloatingPointEquals(ind0->Fitness(), ind1->Fitness(), 0.001));
+		ind0->treeStruct->Score(ind0->treeStruct->GetRandomInternalNode());
+		ind1->treeStruct->Score(ind1->treeStruct->GetRandomInternalNode());
+		assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, 0.001));
 
 		//check full rescoring from arbitrary nodes in the trees		
 		ind0->treeStruct->MakeAllNodesDirty();
@@ -720,18 +748,29 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	//to create the first indiv, and then copy the tree and clas
 	indiv[0].mod->SetDefaultModelParameters(data);
 
-
 	if(conf->bootstrapReps == 0 || currentBootstrapRep == 1){
 		OutputModelReport();
+		}
+
+	GarliReader & reader = GarliReader::GetInstance();
+	if(reader.FoundModelString()){//model string from garli block, which could have come either
+							//in starting condition file or in file with Nexus dataset
+		string modString = reader.GetModelString();
+		indiv[0].mod->ReadGarliFormattedModelString(modString);
+		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
+		string m;
+		indiv[0].mod->FillGarliFormattedModelString(m);
+		outman.UserMessage(m);
 		}
 
 #ifdef INPUT_RECOMBINATION
 	if(0){
 #else
 	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0)){
+		//some starting file has been specified
 #endif
-		if(startingTreeOrModelInNCL){
-			GarliReader & reader = GarliReader::GetInstance();
+		//we already checked in Setup whether NCL has trees for us
+		if(startingTreeInNCL){
 			NxsTreesBlock *treesblock = reader.GetTreesBlock();
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
@@ -739,36 +778,19 @@ void Population::SeedPopulationWithStartingTree(int rep){
 				indiv[0].GetStartingConditionsFromNCL(treesblock, (rank + rep - 1), data->NTax());
 				outman.UserMessage("Obtained starting tree %d from Nexus", treeNum+1);
 				}
-			if(reader.FoundModelString()){
-				string modString = reader.GetModelString();
-				indiv[0].mod->ReadGarliFormattedModelString(modString);
-				outman.UserMessage("Obtained starting parameter values from Nexus");
-				}
 			}
-		else{//use the old garli starting tree format
+		else{//use the old garli starting model/tree format
 			outman.UserMessage("Obtaining starting conditions from file %s", conf->streefname.c_str());
-			indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank, data->NTax());
+			indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank + rep - 1, data->NTax());
 			}
+		indiv[0].SetDirty();
 		}
-	else{
-		GarliReader & reader = GarliReader::GetInstance();
-		if(reader.FoundModelString()){//allow starting parameters to be specified in garli block, even if streefname is random or stepwise
-			string modString = reader.GetModelString();
-			indiv[0].mod->ReadGarliFormattedModelString(modString);
-			outman.UserMessage("Obtained starting parameter values from Nexus");
-			}
-		else{
-			//we shouldn't be here if something was designated to be fixed
-			if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies()) throw(ErrorException("state frequencies specified as fixed, but no\nstarting condition file (streefname) specified!!"));
-			else if(modSpec.fixAlpha) throw(ErrorException("alpha parameter specified as fixed, but no\nstarting condition file (streefname) specified!!"));
-			else if(modSpec.fixInvariantSites) throw(ErrorException("proportion of invariant sites specified as fixed, but no\nstarting condition file (streefname) specified!!"));
-			else if(modSpec.IsUserSpecifiedRateMatrix()) throw(ErrorException("relative rate matrix specified as fixed, but no\nstarting condition file (streefname) specified!!"));
-			}
-
+	else{//either random or stepwise tree specified
 		if(_stricmp(conf->streefname.c_str(), "random") ==0){
 			if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
 			else outman.UserMessage("creating random starting tree (compatible with constraints)...");
 			indiv[0].MakeRandomTree(data->NTax());
+			indiv[0].SetDirty();
 			}
 		else{
 			if(Tree::constraints.empty()) outman.UserMessage("creating likelihood stepwise addition starting tree...");
@@ -776,15 +798,32 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 			}
 		}
-
+		
+	//Here we'll error out if something was fixed but didn't appear
+	if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
+		//if no streefname file was specified, the param values should be in a garli block with the dataset
+		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found!!"));
+		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found!!"));
+		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found!!"));
+		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found!!"));
+		}
+	else{
+		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		}
+		
+	bool foundPolytomies = indiv[0].treeStruct->ArbitrarilyBifurcate();
+	if(foundPolytomies) outman.UserMessage("WARNING: Polytomies found in start tree.  These were arbitrarily resolved.");
+	
+	indiv[0].treeStruct->root->CheckTreeFormation();
 	indiv[0].treeStruct->root->CheckforPolytomies();
-	//DEBUG
-	//indiv[0].treeStruct->ArbitrarilyBifurcate();
+	
 	indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->mod=indiv[0].mod;
-	indiv[0].SetDirty();
 	indiv[0].CalcFitness(0);
-	
+
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	if(indiv[0].mod->NumMutatableParams() == 0) {
 		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
@@ -804,7 +843,9 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].treeStruct->CalcBipartitions();	
 	
 	if(conf->refineStart==true){
-		indiv[0].RefineStartingConditions((adap->modWeight == ZERO_POINT_ZERO || modSpec.fixAlpha == true) == false, adap->branchOptPrecision);
+		//12/26/07 now only passing the first argument here ("optModel") as false if no model muts are used
+		//if single parameters are fixed that will be checked in the Refine function itself
+		indiv[0].RefineStartingConditions(adap->modWeight != ZERO_POINT_ZERO, adap->branchOptPrecision);
 		indiv[0].CalcFitness(0);
 		outman.UserMessage("lnL after optimization: %.4f", indiv[0].Fitness());
 		}	
@@ -840,7 +881,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 
 void Population::OutputModelReport(){
 	//Report on the model setup
-	outman.UserMessage("\nMODEL REPORT:");
+	outman.UserMessage("MODEL REPORT:");
 	if(modSpec.IsCodon())
 		outman.UserMessage("  Number of states = 61 (codon data)");
 	else if(modSpec.IsAminoAcid())
@@ -912,7 +953,7 @@ void Population::OutputModelReport(){
 				}
 			}
 		}
-	outman.UserMessage("\n");
+	outman.UserMessage("");
 	}
 /*
 void Population::WriteStateFiles(){
@@ -1173,7 +1214,7 @@ void Population::Run(){
 #ifdef SWAP_BASED_TERMINATION
 	outman.UserMessage("%-10s%-15s%-10s%-15s%-15s", "gen", "current_lnL", "precision", "last_tree_imp", "swaps_on_cur");
 #else
-	outman.UserMessage("%-10s%-15s%-10s%-15s%", "gen", "current_lnL", "precision", "last_tree_imp");
+	outman.UserMessage("%-10s%-15s%-10s%-15s", "gen", "current_lnL", "precision", "last_tree_imp");
 #endif
 	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
 	OutputLog();
@@ -1287,15 +1328,16 @@ void Population::Run(){
 				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
 				break;
 				}
-#ifndef BOINC
-			//non-BOINC checkpointing
-			if(conf->checkpoint==true && gen % adap->intervalsToStore == 0) WriteStateFiles();
-#endif
 
 #ifdef INCLUDE_PERTURBATION
 			CheckPerturbSerial();
 #endif
 			}
+
+#ifndef BOINC
+			//non-BOINC checkpointing
+		if(conf->checkpoint==true && ((gen % conf->saveevery) == 0)) WriteStateFiles();
+#endif
 
 #ifdef BOINC 
 //BOINC checkpointing can occur whenever the BOINC client wants it to
@@ -1413,7 +1455,7 @@ void Population::FinalOptimization(){
 #endif	
 	int pass=1;
 	FLOAT_TYPE incr;
-	
+
 	if(modSpec.IsFlexRateHet()){
 		outman.UserMessage("Flex optimization: %f", indiv[bestIndiv].treeStruct->OptimizeFlexRates(adap->branchOptPrecision));
 		}
@@ -1422,7 +1464,7 @@ void Population::FinalOptimization(){
 		}
 	do{
 		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10));
-		indiv[bestIndiv].SetDirty();
+
 		indiv[bestIndiv].CalcFitness(0);
 		outman.UserMessage("\tpass %d %.4f", pass++, indiv[bestIndiv].Fitness());
 		}while(incr > .00001 || pass < 10);
@@ -1632,8 +1674,8 @@ void Population::PerformSearch(){
 
 		GetRepNums(s);
 		if(conf->restart == false){
-			if(s.length() > 0) outman.UserMessage(">>>%s<<<", s.c_str());
-			outman.UserMessage("Starting search with seed=%d\n", rnd.seed());
+			if(s.length() > 0) outman.UserMessage("\n>>>%s<<<", s.c_str());
+			outman.UserMessage("Starting with seed=%d\n", rnd.seed());
 			SeedPopulationWithStartingTree(currentSearchRep);
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
 			if(conf->checkpoint) WriteStateFiles();
@@ -2532,15 +2574,21 @@ paupf.close();
 #endif
 	}	
 
+//this assumes that the tree to be appended is a member of the population
+//if indNum is -1, then the bestIndiv from the pop is used
 void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
-
+	
 	if(treeLog.is_open() == false || conf->outputTreelog==false) return;
 
 	Individual *ind;
-	if(indNum==-1) ind=&indiv[bestIndiv];
-	else ind=&indiv[indNum];
+	int i = (indNum >= 0 ? indNum : bestIndiv);
+//	if(indNum==-1) ind=&indiv[bestIndiv];
+//	else ind=&indiv[indNum];
+	ind=&indiv[i];
 
-	if(Tree::outgroup != NULL) OutgroupRoot(&indiv[indNum > 0 ? indNum : bestIndiv], indNum);
+	//DEBUG - why was this > 0 rather than >=?
+	//if(Tree::outgroup != NULL) OutgroupRoot(&indiv[indNum > 0 ? indNum : bestIndiv], indNum);
+	if(Tree::outgroup != NULL) OutgroupRoot(ind, i);
 		
 	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
 	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
@@ -2587,10 +2635,7 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 	if(Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal()) r = r->anc;
 	if(r->IsNotRoot()){
 		ind->treeStruct->RerootHere(r->nodeNum);
-/*		topologies[ind->topo]->RemoveInd(indnum);
-		ind->topo = -1;
-		UpdateTopologyList(indiv);
-*/		if(indnum != -1) AssignNewTopology(indiv, indnum);
+		if(indnum != -1) AssignNewTopology(indiv, indnum);
 		return true;
 		}
 	else return false;
@@ -2689,13 +2734,13 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
 	if(prematureTermination == true){
-		str = "[! ****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****\n]";
+		str = "[!****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****\n]";
 		s = str.c_str();
 		outf.write(s, sizeof(char), str.length());
 		}
 #else
 	outf << str; 
-	if(prematureTermination == true) outf << "[! ****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****]" << endl;
+	if(prematureTermination == true) outf << "[!****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****]" << endl;
 #endif
 		
 	outf.close();
@@ -4773,6 +4818,7 @@ void Population::SetOutputDetails(){
 		if(conf->bootstrapReps == 0){
 			bootlog_output = (output_details) (DONT_OUTPUT);
 #ifndef BOINC
+			
 			if(conf->outputCurrentBestTree) 
 				best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 			else
@@ -4808,20 +4854,25 @@ void Population::SetOutputDetails(){
 		//restarted, not bootstrap
 		if(conf->bootstrapReps == 0){
 			bootlog_output = (output_details) (DONT_OUTPUT);
-			//restarted 1 rep search
-			if(conf->searchReps == 1){
 #ifndef BOINC
-				best_output = (output_details) (NEWNAME | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
-				treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
+			if(conf->outputCurrentBestTree)
+				best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
+			else 
+				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 #else
 				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WARN_PREMATURE);
+#endif
+			//restarted 1 rep search
+			if(conf->searchReps == 1){
+				all_best_output = (output_details) DONT_OUTPUT;
+#ifndef BOINC
+				treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
+#else
 				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM ) : DONT_OUTPUT);
 #endif
-				all_best_output = (output_details) DONT_OUTPUT;
 				}
 			//restarted multirep run
 			else if(conf->bootstrapReps == 0 && conf->searchReps > 1){
-				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WARN_PREMATURE);
 				all_best_output = (output_details) (REPLACE | WRITE_REP_TERM | WARN_PREMATURE);
 #ifndef BOINC
 				treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
@@ -5159,7 +5210,7 @@ void Population::FinalizeOutputStreams(int type){
 		if(log_output & WARN_PREMATURE)
 			log << "***NOTE: Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***" << endl;
 		if(treelog_output & WARN_PREMATURE)
-			if(treeLog.is_open()) treeLog << "[! ***NOTE: GARLI run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***]" << endl;
+			if(treeLog.is_open()) treeLog << "[!****NOTE: GARLI run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***]" << endl;
 		}
 
 	bool repTerm, repsetTerm, fullTerm;
