@@ -104,8 +104,25 @@ class GarliReader
 		virtual bool		UserQuery(NxsString mb_message, NxsString mb_title, GarliReader::UserQueryEnum mb_choices = GarliReader::uq_ok);
 
 		NxsTaxaBlock	*GetTaxaBlock(){return taxa;}
-		NxsCharactersBlock	*GetCharactersBlock(){return characters;}
 		NxsTreesBlock	*GetTreesBlock(){return trees;}
+
+		//I've added the charBlocks vector of characters blocks below, which 
+		//acts as storage for multiple char blocks.  Normally muliple blocks
+		//just overwrite earlier ones.  The vector will be empty unless multiple
+		//char blocks are found, in which case each character block will be pushed
+		//into the vector just before the next one is read (this happens in EnteringBlock
+		//which is probably not the ideal place to put it).  When the GetCharacterBlock
+		//function is called it will return the blocks in the order that they were read,
+		//which means that the one is the "characters" field is actually last
+		NxsCharactersBlock	*GetCharactersBlock(int i){
+			assert(i < charBlocks.size() + 1);
+			if(charBlocks.size() > 0){
+				if(i < charBlocks.size()) return charBlocks[i];
+				else return characters;
+				}
+			return characters;
+			}
+		int NumCharBlocks() {return charBlocks.size() + 1;}
 
 	protected:
 
@@ -119,6 +136,7 @@ class GarliReader
 		NxsAssumptionsBlock	*assumptions;		/* pointer to NxsAssumptionsBlock object */
 		NxsDistancesBlock	*distances;			/* pointer to NxsDistancesBlock object */
 		NxsCharactersBlock	*characters;		/* pointer to NxsCharactersBlock object */
+		vector<NxsCharactersBlock *> charBlocks; 
 		NxsDataBlock		*data;				/* pointer to NxsDataBlock object */
 
 		char				*next_command;		/* workspace for processing next command entered interactively by user */

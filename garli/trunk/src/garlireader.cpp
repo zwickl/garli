@@ -44,6 +44,26 @@ MyNexusToken::MyNexusToken(
 void MyNexusToken::OutputComment(
   const NxsString &msg)	/* the output comment to be displayed */
 	{
+	string s = "GarliScore";
+	unsigned pos = msg.find(s);
+	if(pos != string::npos){
+		outman.UserMessageNoCR("This is apparently a tree inferred by Garli in a previous run.\n\tIts score was");
+		outman.UserMessage(msg.substr(s.length()));
+		return;
+		}
+	s = "GarliModel";
+	pos = msg.find(s);
+	if(pos != string::npos){
+		outman.UserMessageNoCR("Garli's model parameter values used in inferring this tree:\n\t");
+		outman.UserMessage(msg.substr(s.length()));
+		return;
+		}
+	s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
+					//they are only optimal for a certain tree. This is mainly for output when reading the trees in PAUP
+					//and we will just ignore them here
+	pos = msg.find(s);
+	if(pos != string::npos) return;
+	
 	outman.UserMessage("\nCOMMENT FOUND IN NEXUS FILE (output verbatim):");
 	outman.UserMessage(msg);
 	}
@@ -112,6 +132,19 @@ bool GarliReader::EnteringBlock(
 	message += " block...";
 	PrintMessage(false);
 
+	if(blockName.Equals("CHARACTERS")){
+		if(characters->IsEmpty() == false){
+			charBlocks.push_back(characters);
+			NxsCharactersBlock *newchar	= new NxsCharactersBlock(taxa, assumptions);
+			Reassign(characters, newchar);
+			characters = newchar;
+			currBlock = characters;
+			}
+		}
+	else if(blockName.Equals("ASSUMPTIONS") && charBlocks.empty() == false){
+		outman.UserMessage("\n\nWARNING:Assumptions block found with multiple characters blocks.\n\tCheck output carefully to ensure that any excluded characters\n\twere applied to the correct characters block.\n\tThe correct exclusion format in an Assumptions block is this:\n\tEXSET * UNTITLED = 10-11;\n\tBut it will only be applied to the LAST characters block in the file.\n\tYou may want to comment out unused characters blocks.\n");
+		}
+
 	return true;
 	}
 
@@ -120,10 +153,34 @@ bool GarliReader::EnteringBlock(
 |	in parsing the NEXUS file. Virtual function that overrides the pure virtual function in the base class NxsReader.
 */
 void GarliReader::ExitingBlock(
-  NxsString )	/* the name of the block just exited */
+  NxsString blockName)	/* the name of the block just exited */
 	{
 	//message to indicate that we sucessfully read whatever block this was
-	string mess = "successful";
+	string mess;
+	if(blockName.Equals("CHARACTERS")){
+		switch (static_cast<NxsCharactersBlock *>(currBlock)->GetDataType()){
+			case NxsCharactersBlock::dna:
+				mess = " found dna data...";
+				break;
+			case NxsCharactersBlock::rna:
+				mess = " found rna data...";
+				break;
+			case NxsCharactersBlock::protein:
+				mess = " found protein data...";
+				break;
+			case NxsCharactersBlock::standard:
+				mess = " found standard data...";
+				break;
+			case NxsCharactersBlock::nucleotide:
+				mess = " found nucleotide data...";
+				break;
+			case NxsCharactersBlock::continuous:
+				mess = " found continuous data...";
+				break;
+			}
+		}
+
+	mess += " successful";
 	outman.UserMessage(mess);
 	}
 
@@ -176,6 +233,15 @@ void GarliReader::FactoryDefaults()
 		characters = NULL;
 		}
 
+	if (charBlocks.size() > 0)
+		{
+		for(vector<NxsCharactersBlock*>::iterator it = charBlocks.begin();it != charBlocks.end(); it++){
+//			Detach(*it);
+			delete *it;
+//			charBlocks.erase(it);
+			}
+		charBlocks.clear();
+		}
 	if (data != NULL)
 		{
 		Detach(data);
@@ -494,6 +560,15 @@ void GarliReader::HandleShow(
 		characters->Report(cerr);
 		if (logf_open)
 			characters->Report(logf);
+		if (!charBlocks.empty())
+			{
+			cerr << "\n  " << charBlocks.size() << " CHARACTERS block found" << endl;
+			for(vector<NxsCharactersBlock*>::iterator it=charBlocks.begin();it != charBlocks.end();it++){
+				(*it)->Report(cerr);
+				if (logf_open)
+					(*it)->Report(logf);
+				}
+			}
 		}
 
 	if (!data->IsEmpty())
@@ -796,6 +871,15 @@ void GarliReader::PurgeBlocks()
 	delete assumptions;
 	delete distances;
 	delete characters;
+	if (charBlocks.size() > 0)
+		{
+		for(vector<NxsCharactersBlock*>::iterator it = charBlocks.begin();it != charBlocks.end(); it++){
+//			Detach(*it);
+			delete *it;
+//			charBlocks.erase(it);
+			}
+		charBlocks.clear();
+		}
 	delete data;
 
 	taxa		= new NxsTaxaBlock();
@@ -823,6 +907,8 @@ void GarliReader::Read(
   NxsToken &token)	/* the token used to read from `in' */
 	{
 	isEmpty = false;
+	//if we already read a garli block with a model string, clear it
+	modelString.clear();
 
 	// This should be the semicolon after the block name
 	//
@@ -1112,6 +1198,24 @@ bool GarliReader::UserQuery(
 */
 inline void	GarliReader::OutputComment(const NxsString &msg)
 	{
+	string s = "GarliScore";
+	unsigned pos = msg.find(s);
+	if(pos != string::npos){
+		outman.UserMessage("This is apparently a tree inferred by Garli in a previous run.  Its score was %s", msg.substr(s.length()).c_str());
+		return;
+		}
+	s = "GarliModel";
+	pos = msg.find(s);
+	if(pos != string::npos){
+		outman.UserMessage("Garli's model parameter values used in inferring this tree:\n\t%s", msg.substr(s.length()).c_str());
+		return;
+		}
+	s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
+					//they are only optimal for a certain tree. This is mainly for output when reading the trees in PAUP
+					//and we will just ignore them here
+	pos = msg.find(s);
+	if(pos != string::npos) return;
+	
 	outman.UserMessage("\nCOMMENT FOUND IN NEXUS FILE (output verbatim):");
 	outman.UserMessage(msg);
 	}
