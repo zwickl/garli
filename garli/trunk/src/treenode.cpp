@@ -432,7 +432,7 @@ void TreeNode::CheckforLeftandRight(){
 		}
 	
 	if((left&&!right)||(right&&!left)){
-		assert(0);
+		throw ErrorException("There appears to be a problem with a tree specification string.\n\tCheck for extra parentheses.");
 		}
 	}
 	
@@ -503,13 +503,64 @@ void TreeNode::CheckforPolytomies(){
 		}
 	}
 
-Bipartition* TreeNode::CalcBipartition(){	
+void TreeNode::OutputNodeConnections(){
+	TreeNode *nd;
+	if(IsInternal()){
+		cout << nodeNum << "\t";
+		nd = left;
+		while(nd){
+			cout << nd->nodeNum << "\t";
+			nd = nd->next;
+			}
+		cout << endl;
+		nd = left;
+		while(nd){
+			if(nd->IsInternal())
+				nd->OutputNodeConnections();
+			nd = nd->next;
+			}
+		}
+	}
+
+Bipartition* TreeNode::VerifyBipartition(bool standardize){	
+	Bipartition before = *bipart;
 	if(IsInternal()){//not terminal
 		TreeNode *nd=left;
-		*bipart = nd->CalcBipartition();
+		*bipart = nd->CalcBipartition(standardize);
+		//the standardization needs to happen AFTER the child unstandardized bipart is used here
+		if(standardize)
+			nd->bipart->Standardize();
 		nd=nd->next;
 		do{
-			*bipart += nd->CalcBipartition();
+			*bipart += nd->CalcBipartition(standardize);
+			//the standardization needs to happen AFTER the child unstandardized bipart is used here
+			if(standardize)
+				nd->bipart->Standardize();
+			nd=nd->next;
+			}while(nd != NULL);
+		assert(bipart->EqualsEquals(before));
+		return bipart;
+		}
+	else if(IsNotRoot()){//terminal
+		bipart=bipart->TerminalBipart(nodeNum);	
+		return bipart;
+		}
+	return NULL;
+	}
+
+Bipartition* TreeNode::CalcBipartition(bool standardize){	
+	if(IsInternal()){//not terminal
+		TreeNode *nd=left;
+		*bipart = nd->CalcBipartition(standardize);
+		//the standardization needs to happen AFTER the child unstandardized bipart is used here
+		if(standardize)
+			nd->bipart->Standardize();
+		nd=nd->next;
+		do{
+			*bipart += nd->CalcBipartition(standardize);
+			//the standardization needs to happen AFTER the child unstandardized bipart is used here
+			if(standardize)
+				nd->bipart->Standardize();
 			nd=nd->next;
 			}while(nd != NULL);
 		return bipart;
@@ -620,7 +671,7 @@ void TreeNode::AdjustClasForReroot(int dir){
 	else assert(0);
 	}	
 
-void TreeNode::RecursivelyAddOrRemoveSubtreeFromBipartitions(Bipartition *subtree){
+void TreeNode::RecursivelyAddOrRemoveSubtreeFromBipartitions(const Bipartition &subtree){
 	//this function just tricks nodes down to the root into thinking
 	//that a taxon is in their subtree by flipping its bit in the bipartition
 	//this obviously needs to be undone by calcing the biparts if the true

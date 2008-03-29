@@ -71,7 +71,7 @@ class TreeNode{
 		void AddNodesToList(vector<int> &list);
 		void FlipBlensToRoot(TreeNode *from);
 		void FlipBlensToNode(TreeNode *from, TreeNode *stopNode);
-		void RecursivelyAddOrRemoveSubtreeFromBipartitions(Bipartition *);
+		void RecursivelyAddOrRemoveSubtreeFromBipartitions(const Bipartition &subtree);
 
 		//misc functions
 		char *MakeNewick(char *s, bool internalNodes, bool branchLengths, bool highPrec=false) const;
@@ -91,7 +91,8 @@ class TreeNode{
 			}
 		void CalcDepth(int &dep);
 		void CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, int dir);
-		Bipartition* CalcBipartition();
+		Bipartition* CalcBipartition(bool standardize);
+		Bipartition* VerifyBipartition(bool standardize);
 		void StandardizeBipartition();
 		void GatherConstrainedBiparitions(vector<Bipartition> &biparts);
 		void OutputBipartition(ostream &out);
@@ -110,6 +111,7 @@ class TreeNode{
 		void FindCrazyLongBranches();
 		void FindCrazyShortBranches();
 		void CheckTreeFormation();
+		void OutputNodeConnections();
 };
 
 inline void TreeNode::CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, int dir){
