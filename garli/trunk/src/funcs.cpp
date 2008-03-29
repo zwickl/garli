@@ -193,7 +193,7 @@ bool ReadData(const char* filename, SequenceData* data)	{
 	if(FileIsNexus(filename)){
 		outman.UserMessage("Attempting to read data file in Nexus format (using NCL): %s ...", filename);
 		GarliReader &reader = GarliReader::GetInstance();
-		int err = reader.HandleExecute(filename);
+		int err = reader.HandleExecute(filename, true);
 		if(err) throw ErrorException("Problem reading nexus datafile");
 		//moving error checking and finding of correct char block into individual CreateMatrix functions
 	//	NxsCharactersBlock *chars = reader.GetCharactersBlock();

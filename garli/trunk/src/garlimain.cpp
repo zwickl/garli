@@ -218,12 +218,12 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC GARLI, version 0.96beta7 (Jan 2008)\n");
+			outman.UserMessage("Running BOINC GARLI, version 0.96beta8 (March 2008)\n");
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
 			datafile = buffer;
-#else
+#else	//not BOINC
 			if(confOK == true){
 				//changing this to always append to the .screen.log after a restart
 				sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
@@ -234,18 +234,24 @@ int main( int argc, char* argv[] )	{
 
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
+#ifdef SUBROUTINE_GARLI
+			outman.UserMessage("Running GARLI, version 0.96beta8 (March 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.\nIt is not the multipopulation parallel Garli algorithm."); 
 
-			outman.UserMessage("Running serial GARLI, version 0.96beta7 (Jan 2008)\n");
+#else	//nonMPI version
+			outman.UserMessage("Running serial GARLI, version 0.96beta8 (March 2008)\n");
 #endif
+
+#endif  //not BOINC
+
 #ifdef OPEN_MP
 			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
 #endif
+			outman.UserMessage("THIS IS A BETA VERSION - Please check results carefully!");
 
-#ifdef SUBROUTINE_GARLI
-			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.\nIt is not the multipopulation parallel Garli algorithm."); 
-
-#endif
 			outman.UserMessage("Compiled %s %s\n", __DATE__, __TIME__); 
+#ifdef NCL_NAME_AND_VERSION
+			outman.UserMessage("Using %s\n", NCL_NAME_AND_VERSION);
+#endif
 
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
@@ -296,11 +302,10 @@ int main( int argc, char* argv[] )	{
 			//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 			data->ReserveOriginalCounts();
 
-			if(modSpec.includeInvariantSites && modSpec.IsCodon() == false)
-				data->DetermineConstantSites();
-
+			data->DetermineConstantSites();
 
 			pop.Setup(&conf, data, 1, 0);
+			pop.SetOutputDetails();
 
 			if(runTests){
 				outman.UserMessage("starting internal tests...");
@@ -313,6 +318,18 @@ int main( int argc, char* argv[] )	{
 					pop.ApplyNSwaps(10);
 				if(conf.runmode == 7)
 					pop.VariableStartingTreeOptimization();
+				else if(conf.runmode == 8){
+#ifdef OPEN_MP
+					throw ErrorException("can't estimate site rates in openmp version!");
+#endif
+#ifndef ALLOW_SINGLE_SITE
+					throw ErrorException("the program must be compiled with ALLOW_SINGLE_SITE defined in defs.h to use site rate estimation (runmode = 8)!");
+#endif
+					pop.OptimizeSiteRates();
+					}
+				else if(conf.runmode > 20){
+					pop.GenerateTreesOnly(conf.runmode);
+					}
 				else if(conf.runmode > 1)
 					pop.SwapToCompletion(conf.startOptPrec);
 				}
@@ -340,10 +357,7 @@ int main( int argc, char* argv[] )	{
 				[[MFEInterfaceClient sharedClient] didEncounterError:messageForInterface];
 				[pool release];
 #endif				
-
-#ifdef BOINC
 				return 1;
-#endif
 				}
 			catch(int error){
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
