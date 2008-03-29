@@ -157,7 +157,9 @@ protected:
 		int Dense() const { return dense; }
 		
 		int Number(int j) const
-			{ return ( number && (j < totalNChar) ? number[j] : 0 ); }
+			//this appears to have been a bug.  Should be gapsIncludedNChar
+			//{ return ( number && (j < totalNChar) ? number[j] : 0 ); }
+			{ return ( number && (j < gapsIncludedNChar) ? number[j] : 0 ); }
 
 		virtual int Count(int j) const
 			{ return ( count && (j < nChar) ? count[j] : 0 ); }

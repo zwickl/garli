@@ -198,7 +198,7 @@ int DataMatrix::PatternType( int k , int *c, unsigned char *s) const
 			}
 		}
 	else {//not allowing partial ambiguity for codon/AA data
-		//data are stored as index (0-19) or (0-60) with maxNumStates (20 or 61)
+		//data are stored as index (0-19) or (0-60) with maxNumStates (20, 60 or 61)
 		//representing total ambiguity
 		ambig = false;
 		if(s[0] != maxNumStates)  nStates++;
@@ -207,10 +207,14 @@ int DataMatrix::PatternType( int k , int *c, unsigned char *s) const
 				c[i]++;
 				c[j]--;
 				}
-			else {
+			//DOH!  2/18/08 There was a serious bug here in which constant sites with
+			//some missing/fully ambiguous states were not being identified as constant
+	//		else{
+			else if(s[j] != maxNumStates){
 				i = j;
 				nStates++;
 				}
+			else break;
 			}
 		}
 
@@ -494,7 +498,8 @@ void DataMatrix::DetermineConstantSites(){
 				c = Matrix(t, i);
 				t++;
 				}while(c == maxNumStates && t < nTax);
-			assert(t != nTax);
+			//assert(t != nTax);
+			assert(t <= nTax);
 			constStates[i]=c;
 			}
 		}
@@ -877,6 +882,7 @@ int DataMatrix::ReadPhylip( const char* infname){
 		ch = getc(inf);
 		}while(ch != EOF && isspace(ch));
 	if( !feof(inf) ) {
+		if(isdigit(ch) == false) throw ErrorException("Found extraneous information at end of phylip formatted datafile");
 		ungetc(ch, inf);
 		int i;
 		char buf[10];
