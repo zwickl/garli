@@ -156,8 +156,8 @@ FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
 		FLOAT_TYPE est = -d1/d2;
 		FLOAT_TYPE estImprove = d1*est + d2*(est*est*ZERO_POINT_FIVE);
 
-		//return conditions
-		if(estImprove < optPrecision && d2 < ZERO_POINT_ZERO){
+		//return conditions.  Leave if the estimated improvement is < precision of if the points straddle the optimum 
+		if((d11 - d12) == ZERO_POINT_ZERO || (d11 > ZERO_POINT_ZERO && d12 < ZERO_POINT_ZERO) || (d11 < ZERO_POINT_ZERO && d12 > ZERO_POINT_ZERO) || (estImprove < optPrecision && d2 < ZERO_POINT_ZERO)){
 			lnL = prev;
 			return prev-start;
 			}
@@ -168,7 +168,6 @@ FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
 			}
 		else{//if we have lots of data, move
 			//very slowly here
-			//DEBUG
 			//if(data->NInformative() > 500){
 			if(0){
 				if(d1 > ZERO_POINT_ZERO) t=(FLOAT_TYPE)1.01;
