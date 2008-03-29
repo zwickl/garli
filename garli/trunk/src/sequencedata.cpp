@@ -303,7 +303,7 @@ void NucleotideData::MakeAmbigStrings(){
 	}
 
 void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
-	//first we need to convert the nucleotide data to codons numbered 0-61 and assign them back to the terminals
+	//first we need to convert the nucleotide data to codons numbered 0-60 or 61 and assign them back to the terminals
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
 
@@ -345,7 +345,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 						outman.UserMessageNoCR("Gaps or ambiguity codes found within codon for taxon %s.\n\tCodons coded as missing for that taxon: ", dnaData->TaxonLabel(tax));
 						firstAmbig = false;
 						}
-					outman.UserMessageNoCR("%d ", cod);
+					outman.UserMessageNoCR("%d ", cod+1);
 					}
 				thisCodonNum=64;
 				}
@@ -366,14 +366,14 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 					c += b[pos1];
 					c += b[pos2];
 					c += b[pos3];
-					throw ErrorException("stop codon %s found at codon site %d in taxon %s.  Bailing out.", c.c_str(), cod+1,  dnaData->TaxonLabel(tax));
+					throw ErrorException("stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
 					}
 				}
 
 			if(thisCodonNum == 64)//missing or ambiguous 
-				matrix[tax][cod] = 61;
+				matrix[tax][cod] = maxNumStates;
 			else 
-				matrix[tax][cod] = code.Map64stateTo61state(thisCodonNum);
+				matrix[tax][cod] = code.Map64stateToNonStops(thisCodonNum);
 			}
 		if(firstAmbig == false) outman.UserMessage("");
 		}
@@ -421,7 +421,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 						outman.UserMessageNoCR("Gaps or ambiguity codes found within codon for taxon %s.\n\tAminoacids coded as missing for that taxon: ", dnaData->TaxonLabel(tax));
 						firstAmbig = false;
 						}
-					outman.UserMessageNoCR("%d ", cod);
+					outman.UserMessageNoCR("%d ", cod+1);
 					}
 				thisCodonNum=64;
 				}
@@ -436,7 +436,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 					c += b[pos1];
 					c += b[pos2];
 					c += b[pos3];
-					throw ErrorException("stop codon %s found at codon site %d in taxon %s.  Bailing out.", c.c_str(), cod+1,  dnaData->TaxonLabel(tax));
+					throw ErrorException("stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
 					}
 				}
 			else prot = 20;
@@ -465,8 +465,8 @@ void CodonData::CalcF1x4Freqs(){
 				}
 			}
 		}
-	//now normalize, because the stop codons will make the total of the 61 allowed codons < 1.0
-	for(int s=0;s<61;s++) empStateFreqs[s] /= total;
+	//now normalize, because the stop codons will make the total of the 60 or 61 allowed codons < 1.0
+	for(int s=0;s<maxNumStates;s++) empStateFreqs[s] /= total;
 	}
 
 void CodonData::CalcF3x4Freqs(){
@@ -500,8 +500,8 @@ void CodonData::CalcF3x4Freqs(){
 				}
 			}
 		}
-	//now normalize, because the stop codons will make the total of the 61 allowed codons < 1.0
-	for(int s=0;s<61;s++) empStateFreqs[s] /= total;
+	//now normalize, because the stop codons will make the total of the 60 or 61 allowed codons < 1.0
+	for(int s=0;s<maxNumStates;s++) empStateFreqs[s] /= total;
 	}
 
 //
@@ -930,7 +930,7 @@ void AminoacidData::CreateMatrixFromNCL(GarliReader &reader){
 								outman.UserMessageNoCR("Partially ambiguous characters of taxon %s converted to full ambiguity:\n\t", TaxonLabel(origTaxIndex));
 								firstAmbig = false;
 								}
-							outman.UserMessageNoCR("%d ", origIndex);
+							outman.UserMessageNoCR("%d ", origIndex+1);
 							datum = CharToDatum('?');
 							}
 						}

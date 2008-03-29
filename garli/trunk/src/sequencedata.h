@@ -196,7 +196,7 @@ class GeneticCode{
 	//mapping from codon number (ordered AAA, AAC, AAG, AAT, ACA, etc) to 
 	//amino acid number (0-19). Stop codons are 20.
 	int codonTable[64];
-	int map64to61[64];
+	int map64toNonStops[64];
 	vector<int> stops;
 
 	public:
@@ -269,70 +269,70 @@ class GeneticCode{
 		codonTable[ 62 ]= 9;
 		codonTable[ 63 ]= 4;
 		
-		map64to61[0]=0;
-		map64to61[1]=1;
-		map64to61[2]=2;
-		map64to61[3]=3;
-		map64to61[4]=4;
-		map64to61[5]=5;
-		map64to61[6]=6;
-		map64to61[7]=7;
-		map64to61[8]=8;
-		map64to61[9]=9;
-		map64to61[10]=10;
-		map64to61[11]=11;
-		map64to61[12]=12;
-		map64to61[13]=13;
-		map64to61[14]=14;
-		map64to61[15]=15;
-		map64to61[16]=16;
-		map64to61[17]=17;
-		map64to61[18]=18;
-		map64to61[19]=19;
-		map64to61[20]=20;
-		map64to61[21]=21;
-		map64to61[22]=22;
-		map64to61[23]=23;
-		map64to61[24]=24;
-		map64to61[25]=25;
-		map64to61[26]=26;
-		map64to61[27]=27;
-		map64to61[28]=28;
-		map64to61[29]=29;
-		map64to61[30]=30;
-		map64to61[31]=31;
-		map64to61[32]=32;
-		map64to61[33]=33;
-		map64to61[34]=34;
-		map64to61[35]=35;
-		map64to61[36]=36;
-		map64to61[37]=37;
-		map64to61[38]=38;
-		map64to61[39]=39;
-		map64to61[40]=40;
-		map64to61[41]=41;
-		map64to61[42]=42;
-		map64to61[43]=43;
-		map64to61[44]=44;
-		map64to61[45]=45;
-		map64to61[46]=46;
-		map64to61[47]=47;
-		map64to61[48]=-1;
-		map64to61[49]=48;
-		map64to61[50]=-1;
-		map64to61[51]=49;
-		map64to61[52]=50;
-		map64to61[53]=51;
-		map64to61[54]=52;
-		map64to61[55]=53;
-		map64to61[56]=-1;
-		map64to61[57]=54;
-		map64to61[58]=55;
-		map64to61[59]=56;
-		map64to61[60]=57;
-		map64to61[61]=58;
-		map64to61[62]=59;
-		map64to61[63]=60;
+		map64toNonStops[0]=0;
+		map64toNonStops[1]=1;
+		map64toNonStops[2]=2;
+		map64toNonStops[3]=3;
+		map64toNonStops[4]=4;
+		map64toNonStops[5]=5;
+		map64toNonStops[6]=6;
+		map64toNonStops[7]=7;
+		map64toNonStops[8]=8;
+		map64toNonStops[9]=9;
+		map64toNonStops[10]=10;
+		map64toNonStops[11]=11;
+		map64toNonStops[12]=12;
+		map64toNonStops[13]=13;
+		map64toNonStops[14]=14;
+		map64toNonStops[15]=15;
+		map64toNonStops[16]=16;
+		map64toNonStops[17]=17;
+		map64toNonStops[18]=18;
+		map64toNonStops[19]=19;
+		map64toNonStops[20]=20;
+		map64toNonStops[21]=21;
+		map64toNonStops[22]=22;
+		map64toNonStops[23]=23;
+		map64toNonStops[24]=24;
+		map64toNonStops[25]=25;
+		map64toNonStops[26]=26;
+		map64toNonStops[27]=27;
+		map64toNonStops[28]=28;
+		map64toNonStops[29]=29;
+		map64toNonStops[30]=30;
+		map64toNonStops[31]=31;
+		map64toNonStops[32]=32;
+		map64toNonStops[33]=33;
+		map64toNonStops[34]=34;
+		map64toNonStops[35]=35;
+		map64toNonStops[36]=36;
+		map64toNonStops[37]=37;
+		map64toNonStops[38]=38;
+		map64toNonStops[39]=39;
+		map64toNonStops[40]=40;
+		map64toNonStops[41]=41;
+		map64toNonStops[42]=42;
+		map64toNonStops[43]=43;
+		map64toNonStops[44]=44;
+		map64toNonStops[45]=45;
+		map64toNonStops[46]=46;
+		map64toNonStops[47]=47;
+		map64toNonStops[48]=-1;
+		map64toNonStops[49]=48;
+		map64toNonStops[50]=-1;
+		map64toNonStops[51]=49;
+		map64toNonStops[52]=50;
+		map64toNonStops[53]=51;
+		map64toNonStops[54]=52;
+		map64toNonStops[55]=53;
+		map64toNonStops[56]=-1;
+		map64toNonStops[57]=54;
+		map64toNonStops[58]=55;
+		map64toNonStops[59]=56;
+		map64toNonStops[60]=57;
+		map64toNonStops[61]=58;
+		map64toNonStops[62]=59;
+		map64toNonStops[63]=60;
 
 		stops.clear();
 		stops.push_back(48);
@@ -345,73 +345,72 @@ class GeneticCode{
 		codonTable[56] = 18; //TGA
 		codonTable[8] = 20;  //AGA
 		codonTable[10] = 20;  //AGG
-		codonTable[12] = 10;
-		//codonTable[47] = 20; //???
+		codonTable[12] = 10;  //ATA
 
-		map64to61[0]=0;
-		map64to61[1]=1;
-		map64to61[2]=2;
-		map64to61[3]=3;
-		map64to61[4]=4;
-		map64to61[5]=5;
-		map64to61[6]=6;
-		map64to61[7]=7;
-		map64to61[8]=-1;
-		map64to61[9]=8;
-		map64to61[10]=-1;
-		map64to61[11]=9;
-		map64to61[12]=10;
-		map64to61[13]=11;
-		map64to61[14]=12;
-		map64to61[15]=13;
-		map64to61[16]=14;
-		map64to61[17]=15;
-		map64to61[18]=16;
-		map64to61[19]=17;
-		map64to61[20]=18;
-		map64to61[21]=19;
-		map64to61[22]=20;
-		map64to61[23]=21;
-		map64to61[24]=22;
-		map64to61[25]=23;
-		map64to61[26]=24;
-		map64to61[27]=25;
-		map64to61[28]=26;
-		map64to61[29]=27;
-		map64to61[30]=28;
-		map64to61[31]=29;
-		map64to61[32]=30;
-		map64to61[33]=31;
-		map64to61[34]=32;
-		map64to61[35]=33;
-		map64to61[36]=34;
-		map64to61[37]=35;
-		map64to61[38]=36;
-		map64to61[39]=37;
-		map64to61[40]=38;
-		map64to61[41]=39;
-		map64to61[42]=40;
-		map64to61[43]=41;
-		map64to61[44]=42;
-		map64to61[45]=43;
-		map64to61[46]=44;
-		map64to61[47]=45;
-		map64to61[48]=-1;
-		map64to61[49]=46;
-		map64to61[50]=-1;
-		map64to61[51]=47;
-		map64to61[52]=48;
-		map64to61[53]=49;
-		map64to61[54]=50;
-		map64to61[55]=51;
-		map64to61[56]=52;
-		map64to61[57]=53;
-		map64to61[58]=54;
-		map64to61[59]=55;
-		map64to61[60]=56;
-		map64to61[61]=57;
-		map64to61[62]=58;
-		map64to61[63]=59;
+		map64toNonStops[0]=0;
+		map64toNonStops[1]=1;
+		map64toNonStops[2]=2;
+		map64toNonStops[3]=3;
+		map64toNonStops[4]=4;
+		map64toNonStops[5]=5;
+		map64toNonStops[6]=6;
+		map64toNonStops[7]=7;
+		map64toNonStops[8]=-1;
+		map64toNonStops[9]=8;
+		map64toNonStops[10]=-1;
+		map64toNonStops[11]=9;
+		map64toNonStops[12]=10;
+		map64toNonStops[13]=11;
+		map64toNonStops[14]=12;
+		map64toNonStops[15]=13;
+		map64toNonStops[16]=14;
+		map64toNonStops[17]=15;
+		map64toNonStops[18]=16;
+		map64toNonStops[19]=17;
+		map64toNonStops[20]=18;
+		map64toNonStops[21]=19;
+		map64toNonStops[22]=20;
+		map64toNonStops[23]=21;
+		map64toNonStops[24]=22;
+		map64toNonStops[25]=23;
+		map64toNonStops[26]=24;
+		map64toNonStops[27]=25;
+		map64toNonStops[28]=26;
+		map64toNonStops[29]=27;
+		map64toNonStops[30]=28;
+		map64toNonStops[31]=29;
+		map64toNonStops[32]=30;
+		map64toNonStops[33]=31;
+		map64toNonStops[34]=32;
+		map64toNonStops[35]=33;
+		map64toNonStops[36]=34;
+		map64toNonStops[37]=35;
+		map64toNonStops[38]=36;
+		map64toNonStops[39]=37;
+		map64toNonStops[40]=38;
+		map64toNonStops[41]=39;
+		map64toNonStops[42]=40;
+		map64toNonStops[43]=41;
+		map64toNonStops[44]=42;
+		map64toNonStops[45]=43;
+		map64toNonStops[46]=44;
+		map64toNonStops[47]=45;
+		map64toNonStops[48]=-1;
+		map64toNonStops[49]=46;
+		map64toNonStops[50]=-1;
+		map64toNonStops[51]=47;
+		map64toNonStops[52]=48;
+		map64toNonStops[53]=49;
+		map64toNonStops[54]=50;
+		map64toNonStops[55]=51;
+		map64toNonStops[56]=52;
+		map64toNonStops[57]=53;
+		map64toNonStops[58]=54;
+		map64toNonStops[59]=55;
+		map64toNonStops[60]=56;
+		map64toNonStops[61]=57;
+		map64toNonStops[62]=58;
+		map64toNonStops[63]=59;
 
 		stops.clear();
 		stops.push_back(8);
@@ -420,14 +419,91 @@ class GeneticCode{
 		stops.push_back(50);
 		}
 		
+	void SetInvertMitoCode(){
+		SetStandardCode();
+		codonTable[56] = 18; //TGA
+		codonTable[8] = 15;  //AGA
+		codonTable[10] = 15;  //AGG
+		codonTable[12] = 10;  //ATA
+
+		map64toNonStops[0]=0;
+		map64toNonStops[1]=1;
+		map64toNonStops[2]=2;
+		map64toNonStops[3]=3;
+		map64toNonStops[4]=4;
+		map64toNonStops[5]=5;
+		map64toNonStops[6]=6;
+		map64toNonStops[7]=7;
+		map64toNonStops[8]=8;
+		map64toNonStops[9]=9;
+		map64toNonStops[10]=10;
+		map64toNonStops[11]=11;
+		map64toNonStops[12]=12;
+		map64toNonStops[13]=13;
+		map64toNonStops[14]=14;
+		map64toNonStops[15]=15;
+		map64toNonStops[16]=16;
+		map64toNonStops[17]=17;
+		map64toNonStops[18]=18;
+		map64toNonStops[19]=19;
+		map64toNonStops[20]=20;
+		map64toNonStops[21]=21;
+		map64toNonStops[22]=22;
+		map64toNonStops[23]=23;
+		map64toNonStops[24]=24;
+		map64toNonStops[25]=25;
+		map64toNonStops[26]=26;
+		map64toNonStops[27]=27;
+		map64toNonStops[28]=28;
+		map64toNonStops[29]=29;
+		map64toNonStops[30]=30;
+		map64toNonStops[31]=31;
+		map64toNonStops[32]=32;
+		map64toNonStops[33]=33;
+		map64toNonStops[34]=34;
+		map64toNonStops[35]=35;
+		map64toNonStops[36]=36;
+		map64toNonStops[37]=37;
+		map64toNonStops[38]=38;
+		map64toNonStops[39]=39;
+		map64toNonStops[40]=40;
+		map64toNonStops[41]=41;
+		map64toNonStops[42]=42;
+		map64toNonStops[43]=43;
+		map64toNonStops[44]=44;
+		map64toNonStops[45]=45;
+		map64toNonStops[46]=46;
+		map64toNonStops[47]=47;
+		map64toNonStops[48]=-1;
+		map64toNonStops[49]=48;
+		map64toNonStops[50]=-1;
+		map64toNonStops[51]=49;
+		map64toNonStops[52]=50;
+		map64toNonStops[53]=51;
+		map64toNonStops[54]=52;
+		map64toNonStops[55]=53;
+		map64toNonStops[56]=54;
+		map64toNonStops[57]=55;
+		map64toNonStops[58]=56;
+		map64toNonStops[59]=57;
+		map64toNonStops[60]=58;
+		map64toNonStops[61]=59;
+		map64toNonStops[62]=60;
+		map64toNonStops[63]=61;
+
+		stops.clear();
+		stops.push_back(48);
+		stops.push_back(50);
+		}
+
 	int CodonLookup(int i){
 		assert(i >= 0 && i < 64);
 		return codonTable[i];
 		}
-	int Map64stateTo61state(int i){
+	int Map64stateToNonStops(int i){
 		assert(i >= 0 && i < 64);
-		assert(map64to61[i] != -1);
-		return map64to61[i];
+		assert(map64toNonStops[i] != -1);
+		return map64toNonStops[i];
 		}
 	};
 
@@ -453,9 +529,18 @@ public:
 
 	CodonData(const NucleotideData *dat, int genCode) : SequenceData(){
 		assert(dat->Dense() == false);
-		maxNumStates = 61;
-		if(genCode == 0) code.SetStandardCode();
-		else code.SetVertMitoCode();
+		if(genCode == 0){
+			code.SetStandardCode();
+			maxNumStates = 61;
+			}
+		else if(genCode == 1){
+			code.SetVertMitoCode();
+			maxNumStates = 60;
+			}
+		else{
+			code.SetInvertMitoCode();
+			maxNumStates = 62;
+			}
 		FillCodonMatrixFromDNA(dat);
 		CopyNamesFromOtherMatrix(dat);
 		empType = 0;
@@ -483,6 +568,7 @@ public:
 	void CalcF3x4Freqs();
 	//int ComparePatterns( const int i, const int j ) const;
 	void SetVertMitoCode() {code.SetVertMitoCode();}
+	void SetInvertMitoCode() {code.SetInvertMitoCode();}
 };
 
 
@@ -497,7 +583,8 @@ public:
 		maxNumStates = 20;
 		GeneticCode c;
 		if(genCode == 0) c.SetStandardCode();
-		else c.SetVertMitoCode();
+		else if(genCode == 1) c.SetVertMitoCode();
+		else c.SetInvertMitoCode();
 		FillAminoacidMatrixFromDNA(dat, &c);
 		CopyNamesFromOtherMatrix(dat);
 		}
