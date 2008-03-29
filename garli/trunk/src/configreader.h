@@ -46,13 +46,16 @@ public:
 	int GetStringOption(const char*, string&, bool optional=false);
 	int GetBoolOption(const char*, bool&, bool optional=false);
 	int GetIntOption(const char*, int&, bool optional=false);
+	int GetIntNonZeroOption(const char*, int&, bool optional=false);
 	int GetIntRangeOption(const char*, int&, int&);
 	int GetUnsignedOption(const char* option, unsigned& val, bool optional=false);
+	int GetUnsignedNonZeroOption(const char* option, unsigned& val, bool optional=false);
 	int GetFloatOption(const char*, float&);
 	int GetFloatRangeOption(const char*, float&, float&);
 	int GetDoubleOption(const char*, FLOAT_TYPE&, bool optional=false);
 	int GetDoubleRangeOption(const char*, FLOAT_TYPE&, FLOAT_TYPE&);
 	int GetPositiveDoubleOption(const char*, FLOAT_TYPE&, bool optional=false);
+	int GetPositiveNonZeroDoubleOption(const char* option, FLOAT_TYPE& val, bool optional=false);
 
 	Sections::const_iterator BeginSection() const	{
 		return sections.begin();

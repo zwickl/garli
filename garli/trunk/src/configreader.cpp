@@ -22,10 +22,10 @@
 
 using namespace std;
 
-
 #include "defs.h"
 #include "configreader.h"
 #include "errorexception.h"
+#include "funcs.h"
 
 int ConfigReader::UNKNOWN=0;
 int ConfigReader::SECTION=1;
@@ -322,6 +322,29 @@ int ConfigReader::GetIntOption(const char* option, int& val, bool optional /*=fa
 }
 
 /****************************************************************************************/
+/*** GetIntNonZeroOption() ***/
+/****************************************************************************************/
+int ConfigReader::GetIntNonZeroOption(const char* option, int& val, bool optional /*=false*/)	{
+	int rv;
+	string str;
+	FLOAT_TYPE dummy;//read into a FLOAT_TYPE first to check bounds
+	if (GetStringOption(option, str, optional) == 0)	{  // option exists
+		dummy = (FLOAT_TYPE) atof(str.c_str());
+		if(dummy > (INT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (INT_MAX-1));
+		if(FloatingPointEquals(dummy, ZERO_POINT_ZERO, 1e-8)) throw ErrorException("entry for option \"%s\" cannot be zero", option);
+		if(!(FloatingPointEquals(dummy, (int)dummy, 1e-8))) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
+		val = (int) dummy;
+		rv = 0;
+	}
+	else{
+		rv = -1;
+		if(!optional) throw ErrorException("could not find integer configuration entry \"%s\"", option);
+		}
+
+	return rv;
+}
+
+/****************************************************************************************/
 /*** GetUnsignedOption() ***/
 /****************************************************************************************/
 int ConfigReader::GetUnsignedOption(const char* option, unsigned& val, bool optional /*=false*/)	{
@@ -343,6 +366,30 @@ int ConfigReader::GetUnsignedOption(const char* option, unsigned& val, bool opti
 
 	return rv;
 }
+
+/****************************************************************************************/
+/*** GetUnsignedOption() ***/
+/****************************************************************************************/
+int ConfigReader::GetUnsignedNonZeroOption(const char* option, unsigned& val, bool optional /*=false*/)	{
+	int rv;
+	string str;
+	FLOAT_TYPE dummy;//read into a FLOAT_TYPE first to check sign and bounds
+	if (GetStringOption(option, str, optional) == 0)	{  // option exists
+		dummy = (FLOAT_TYPE) atof(str.c_str());
+		if(!(dummy > 0.0)) throw ErrorException("entry for option \"%s\" must be >0", option);
+		if(dummy > (UINT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (UINT_MAX-1));
+		if(!(FloatingPointEquals(dummy, (unsigned)dummy, 1e-8))) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
+		val = (unsigned) dummy;
+		rv = 0;
+	}
+	else{
+		rv = -1;
+		if(!optional) throw ErrorException("could not find unsigned integer configuration entry \"%s\"", option);
+		}
+
+	return rv;
+}
+
 
 /****************************************************************************************/
 /*** GetIntRangeOption() ***/
@@ -439,6 +486,29 @@ int ConfigReader::GetPositiveDoubleOption(const char* option, FLOAT_TYPE& val, b
 	string str;
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
 		val = (FLOAT_TYPE) atof(str.c_str());
+		if(val < 0.0) throw ErrorException("configuration entry \"%s\" cannot be negative", option);
+		rv = 0;
+	}
+	else{
+		rv = -1;
+		if(!optional) throw ErrorException("could not find float configuration entry \"%s\"", option);
+		}
+
+	return rv;
+}
+
+/****************************************************************************************/
+/*** GetPositiveNonZeroDoubleOption() ***/
+/****************************************************************************************/
+//this is just a version of GetDoubleOption that checks that the value is non-negative, and that it is not
+//zero.  atof returns zero when it encounters an error, which is very annoying behavior.  When the entry must
+//be nonzero, at least we can check for that
+int ConfigReader::GetPositiveNonZeroDoubleOption(const char* option, FLOAT_TYPE& val, bool optional /*=false*/)	{
+	int rv;
+	string str;
+	if (GetStringOption(option, str, optional) == 0)	{  // option exists
+		val = (FLOAT_TYPE) atof(str.c_str());
+		if(val == ZERO_POINT_ZERO) throw ErrorException("configuration entry \"%s\" cannot be zero (possible problems reading this entry)", option);
 		if(val < 0.0) throw ErrorException("configuration entry \"%s\" cannot be negative", option);
 		rv = 0;
 	}

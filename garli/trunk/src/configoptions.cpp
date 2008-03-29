@@ -133,22 +133,22 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	if(errors < 0) throw ErrorException("Didn't find [general] section in config file\n     (this section heading is required)");
 	errors += cr.GetUnsignedOption("logevery", logevery);
 	errors += cr.GetUnsignedOption("saveevery", saveevery);
-	int found=cr.GetPositiveDoubleOption("megsclamemory", megsClaMemory, true);
-	found += cr.GetPositiveDoubleOption("availablememory", availableMemory, true);
+	int found=cr.GetPositiveNonZeroDoubleOption("megsclamemory", megsClaMemory, true);
+	found += cr.GetPositiveNonZeroDoubleOption("availablememory", availableMemory, true);
 	if(found == -2) throw ErrorException("Either \"megsclamemory\" or \"availablememory\" must be specified in conf!");
 	
 	errors += cr.GetStringOption("datafname", datafname);
 	errors += cr.GetStringOption("ofprefix", ofprefix);
 	errors += cr.GetStringOption("streefname", streefname);
 	cr.GetStringOption("constraintfile", constraintfile, true);
-	errors += cr.GetIntOption("randseed", randseed);
+	errors += cr.GetIntNonZeroOption("randseed", randseed);
 	errors += cr.GetBoolOption("refinestart", refineStart);
 	errors += cr.GetBoolOption("outputeachbettertopology", outputTreelog);
 	errors += cr.GetBoolOption("enforcetermconditions", enforceTermConditions);
-	errors += cr.GetUnsignedOption("genthreshfortopoterm", lastTopoImproveThresh);
-	errors += cr.GetPositiveDoubleOption("scorethreshforterm", improveOverStoredIntervalsThresh);
-	cr.GetPositiveDoubleOption("significanttopochange", significantTopoChange, true);
-	cr.GetUnsignedOption("attachmentspertaxon", attachmentsPerTaxon, true);
+	errors += cr.GetUnsignedNonZeroOption("genthreshfortopoterm", lastTopoImproveThresh);
+	errors += cr.GetPositiveNonZeroDoubleOption("scorethreshforterm", improveOverStoredIntervalsThresh);
+	cr.GetPositiveNonZeroDoubleOption("significanttopochange", significantTopoChange, true);
+	cr.GetUnsignedNonZeroOption("attachmentspertaxon", attachmentsPerTaxon, true);
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
@@ -157,7 +157,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetBoolOption("restart", restart, true);
 	cr.GetBoolOption("writecheckpoints", checkpoint, true);
 
-	cr.GetUnsignedOption("searchreps", searchReps, true);
+	cr.GetUnsignedNonZeroOption("searchreps", searchReps, true);
 	cr.GetUnsignedOption("runmode", runmode, true);
 
 	//cr.GetBoolOption("useflexrates", useflexrates, true);
@@ -181,20 +181,20 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 		if(errors < 0) throw ErrorException("Didn't find [remote] section in config file\n     (this section heading is required)");
 		}
 	
-	errors += cr.GetUnsignedOption("nindivs", nindivs);
+	errors += cr.GetUnsignedNonZeroOption("nindivs", nindivs);
 	errors += cr.GetUnsignedOption("holdover", holdover);
-	errors += cr.GetPositiveDoubleOption("selectionintensity", selectionIntensity);
+	errors += cr.GetPositiveNonZeroDoubleOption("selectionintensity", selectionIntensity);
 	errors += cr.GetDoubleOption("holdoverpenalty", holdoverPenalty);
-	errors += cr.GetUnsignedOption("stopgen", stopgen);
-	errors += cr.GetUnsignedOption("stoptime", stoptime);
-	errors += cr.GetPositiveDoubleOption("startoptprec", startOptPrec);
-	errors += cr.GetPositiveDoubleOption("minoptprec", minOptPrec);
+	errors += cr.GetUnsignedNonZeroOption("stopgen", stopgen);
+	errors += cr.GetUnsignedNonZeroOption("stoptime", stoptime);
+	errors += cr.GetPositiveNonZeroDoubleOption("startoptprec", startOptPrec);
+	errors += cr.GetPositiveNonZeroDoubleOption("minoptprec", minOptPrec);
 	//changing this to specify either the number of reductions in the precision or the 
 	//multiplier as before.  Prefer the number, since it should be easier to specify.  
 	//
 	found=0;
 	found=cr.GetIntOption("numberofprecreductions", numPrecReductions, true);
-	found += cr.GetPositiveDoubleOption("precreductionfactor", precReductionFactor, true);
+	found += cr.GetPositiveNonZeroDoubleOption("precreductionfactor", precReductionFactor, true);
 	if(found == -2) throw ErrorException("Error: either \"numberofprecreductions\" (preferably) or \"precreductionfactor\" must be specified in conf!");
 	
 	errors += cr.GetPositiveDoubleOption("topoweight", topoWeight);
@@ -204,8 +204,8 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetPositiveDoubleOption("randsprweight", randSPRweight);	
 	errors += cr.GetPositiveDoubleOption("limsprweight", limSPRweight);
 	
-	cr.GetPositiveDoubleOption("uniqueswapbias", uniqueSwapBias, true);
-	cr.GetPositiveDoubleOption("distanceswapbias", distanceSwapBias, true);
+	cr.GetPositiveNonZeroDoubleOption("uniqueswapbias", uniqueSwapBias, true);
+	cr.GetPositiveNonZeroDoubleOption("distanceswapbias", distanceSwapBias, true);
 
 	cr.GetDoubleOption("treerejectionthreshold", treeRejectionThreshold, true);
 
@@ -226,18 +226,18 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 #endif
 //	errors += cr.GetUnsignedOption("gammashapebrlen", gammaShapeBrlen);	
 //	errors += cr.GetUnsignedOption("gammashapemodel", gammaShapeModel);
-	errors += cr.GetPositiveDoubleOption("gammashapebrlen", gammaShapeBrlen);	
-	errors += cr.GetPositiveDoubleOption("gammashapemodel", gammaShapeModel);
+	errors += cr.GetPositiveNonZeroDoubleOption("gammashapebrlen", gammaShapeBrlen);	
+	errors += cr.GetPositiveNonZeroDoubleOption("gammashapemodel", gammaShapeModel);
 
 
-	errors += cr.GetUnsignedOption("limsprrange", limSPRrange);
-	errors += cr.GetUnsignedOption("intervallength", intervalLength);
-	errors += cr.GetUnsignedOption("intervalstostore", intervalsToStore);
-	errors += cr.GetPositiveDoubleOption("meanbrlenmuts", meanBrlenMuts);
+	errors += cr.GetUnsignedNonZeroOption("limsprrange", limSPRrange);
+	errors += cr.GetUnsignedNonZeroOption("intervallength", intervalLength);
+	errors += cr.GetUnsignedNonZeroOption("intervalstostore", intervalsToStore);
+	errors += cr.GetPositiveNonZeroDoubleOption("meanbrlenmuts", meanBrlenMuts);
 
-	cr.GetPositiveDoubleOption("minbrlen", minBrlen, true);
-	cr.GetPositiveDoubleOption("maxbrlen", maxBrlen, true);
-	cr.GetPositiveDoubleOption("startingbrlen", startingBrlen, true);
+	cr.GetPositiveNonZeroDoubleOption("minbrlen", minBrlen, true);
+	cr.GetPositiveNonZeroDoubleOption("maxbrlen", maxBrlen, true);
+	cr.GetPositiveNonZeroDoubleOption("startingbrlen", startingBrlen, true);
 
 #ifdef INCLUDE_PERTURBATION
 	errors += cr.SetSection("perturbation");
