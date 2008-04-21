@@ -48,6 +48,7 @@ public:
 	virtual void CreateMatrixFromNCL(GarliReader &reader) = 0;
 	virtual void CalcEmpiricalFreqs() = 0;
 	virtual void GetEmpiricalFreqs(FLOAT_TYPE *f) const{
+		assert(empStateFreqs);
 		for(int i=0;i<maxNumStates;i++) f[i]=empStateFreqs[i];
 		}
 	};
@@ -516,7 +517,12 @@ class CodonData : public SequenceData {
 	FLOAT_TYPE empBaseFreqsPos3[4];
 
 	FLOAT_TYPE empBaseFreqsAllPos[4];
-	int empType; //codon table = 0
+	enum{ NOT_EMPIRICAL	= 0,
+		  CODON_TABLE	= 1,
+		  F1X4			= 2,
+		  F3X4			= 3
+		}empType;
+//	int empType; //codon table = 0
 				//F1x4 = 1
 				//F3x4 = 2
 
@@ -524,7 +530,7 @@ public:
 	CodonData() : SequenceData(){
 		maxNumStates = 61;
 		code.SetStandardCode();
-		empType = 0;
+		empType = NOT_EMPIRICAL;
 		}
 
 	CodonData(const NucleotideData *dat, int genCode) : SequenceData(){
@@ -543,7 +549,7 @@ public:
 			}
 		FillCodonMatrixFromDNA(dat);
 		CopyNamesFromOtherMatrix(dat);
-		empType = 0;
+		empType = NOT_EMPIRICAL;
 		}
 
 	~CodonData(){}
@@ -562,10 +568,14 @@ public:
 		assert(0);
 		}
 	GeneticCode* GetCode() {return &code;}
-	void SetEmpType(int t) {empType = t;}
+	//void SetEmpType(int t) {empType = t;}
+	void SetF1X4Freqs(){empType = F1X4;}
+	void SetF3X4Freqs(){empType = F3X4;}
+	void SetCodonTableFreqs(){empType = CODON_TABLE;}
 	void CalcEmpiricalFreqs();
 	void CalcF1x4Freqs();
 	void CalcF3x4Freqs();
+	void BaseFreqXPositionReport();
 	//int ComparePatterns( const int i, const int j ) const;
 	void SetVertMitoCode() {code.SetVertMitoCode();}
 	void SetInvertMitoCode() {code.SetInvertMitoCode();}

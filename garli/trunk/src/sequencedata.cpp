@@ -168,6 +168,7 @@ void AminoacidData::CalcEmpiricalFreqs(){
 	bool allPresent = true;
 	for(int j=0;j<maxNumStates;j++) if(empStateFreqs[j] == ZERO_POINT_ZERO) allPresent = false;
 	if(!allPresent){
+		outman.UserMessage("WARNING: Not all amino acids were observed in this dataset.\n\tOne pseudo-count will be added to each amino acid for calculation of the\n\tempirical frequencies. You should probably use\n\ta statefrequencies setting other than emprical.\n");
 		for(int j=0;j<maxNumStates;j++) empStateFreqs[j] += ONE_POINT_ZERO;
 		total += (FLOAT_TYPE) maxNumStates;
 		}
@@ -179,14 +180,23 @@ void AminoacidData::CalcEmpiricalFreqs(){
 	}
 
 void CodonData::CalcEmpiricalFreqs(){
+	if(empType == NOT_EMPIRICAL) return;
+
 	empStateFreqs=new FLOAT_TYPE[maxNumStates];//this is a member of the class, and where the final freqs will be stored
 
-	if(empType > 0){
-		if(empType == 1) CalcF1x4Freqs();
-		if(empType == 2) CalcF3x4Freqs();
+	if(empType == F1X4){
+		CalcF1x4Freqs();
+		BaseFreqXPositionReport();
+		return;
+		}
+	if(empType == F3X4){
+		CalcF3x4Freqs();
+		BaseFreqXPositionReport();
 		return;
 		}
 
+	//we must be using the actual observed frequencies
+	assert(empType == CODON_TABLE);
 	for(int i=0;i<maxNumStates;i++) empStateFreqs[i] = 0.0;
 	FLOAT_TYPE total = 0.0;
 	//for codons and aminoacids this will assume no ambiguity
@@ -203,12 +213,15 @@ void CodonData::CalcEmpiricalFreqs(){
 			}
 		}
 	FLOAT_TYPE freqTot = 0.0;
+
 	bool allPresent = true;
 	for(int j=0;j<maxNumStates;j++) if(empStateFreqs[j] == ZERO_POINT_ZERO) allPresent = false;
 	if(!allPresent){
+		outman.UserMessage("WARNING: Not all allowable codons were observed in this dataset.\n\tOne pseudo-count will be added to each codon for caluclation of the\n\tempirical frequencies. You should probably use\n\tstatefrequencies = f1x4 or f3x4 instead of empirical.\n");
 		for(int j=0;j<maxNumStates;j++) empStateFreqs[j] += ONE_POINT_ZERO;
 		total += (FLOAT_TYPE) maxNumStates;
 		}
+
 	for(int j=0;j<maxNumStates;j++){
 		empStateFreqs[j] /= total;
 		freqTot += empStateFreqs[j];
@@ -502,6 +515,16 @@ void CodonData::CalcF3x4Freqs(){
 		}
 	//now normalize, because the stop codons will make the total of the 60 or 61 allowed codons < 1.0
 	for(int s=0;s<maxNumStates;s++) empStateFreqs[s] /= total;
+	}
+
+void CodonData::BaseFreqXPositionReport(){
+	//positional frequency report
+	outman.UserMessage("Base usage at codon positions:");
+	outman.UserMessage("       %10c%10c%10c%10c", 'A', 'C', 'G', 'T');
+	outman.UserMessage(" pos 1   %10.5f%10.5f%10.5f%10.5f", empBaseFreqsPos1[0], empBaseFreqsPos1[1], empBaseFreqsPos1[2], empBaseFreqsPos1[3]);
+	outman.UserMessage(" pos 2   %10.5f%10.5f%10.5f%10.5f", empBaseFreqsPos2[0], empBaseFreqsPos2[1], empBaseFreqsPos2[2], empBaseFreqsPos2[3]);
+	outman.UserMessage(" pos 3   %10.5f%10.5f%10.5f%10.5f", empBaseFreqsPos3[0], empBaseFreqsPos3[1], empBaseFreqsPos3[2], empBaseFreqsPos3[3]);
+	outman.UserMessage(" all pos %10.5f%10.5f%10.5f%10.5f\n", empBaseFreqsAllPos[0], empBaseFreqsAllPos[1], empBaseFreqsAllPos[2], empBaseFreqsAllPos[3]);
 	}
 
 //
