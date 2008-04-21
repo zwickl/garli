@@ -88,11 +88,27 @@ float Tree::distanceSwapPrecalc[1000];
 
 Bipartition *Tree::outgroup = NULL;
 
+int Tree::siteToScore = -1;
+
 void InferStatesFromCla(char *states, FLOAT_TYPE *cla, int nchar);
 FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int nchar);
 void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree);
 FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar);
 inline FLOAT_TYPE CallBranchLike(TreeNode *thisnode, Tree *thistree, FLOAT_TYPE blen, bool brak);
+
+//basic function to deal with the odd data string format that I use for nuc data
+const char *AdvanceDataPointer(const char *arr, int num){
+	for(int a=0;a<num;a++){
+		if(*arr > -1 || *arr == -4) arr++;
+		else{
+			int states = -1 * *arr;
+			do{
+				arr++;
+				}while (states-- > 0);
+			}
+		}
+	return arr;
+	}
 
 void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const GeneralGamlConfig *conf){
 	Tree::claMan=claMan;
@@ -165,7 +181,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 //because by the time the internal node number would be read the treeNode structure would have already been created.
 //So, the internal node numbers will go just BEFORE the opening paren that represents that node
 //Example:  50(1:.05, 2:.02):.1 signifies a node numbered 50 that is ancestral to 1 and 2.
-Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
+Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, bool allowMissingTaxa /*=false*/){
 	//if we are using this constructor, we can't guarantee that the tree will be specified unrooted (with 
 	//a trifurcating root), so use an allocation function that is guaranteed to have enough room and then
 	//trifurcate and delete if necessary
@@ -346,12 +362,13 @@ Tree::Tree(const char* s, bool numericalTaxa , bool allowPolytomies /*=false*/){
 		}
 	assert(root->left->next!=root->right);
 
+	if((allowMissingTaxa == false) && (numTipsAdded != numTipsTotal)) 
+		throw ErrorException("Number of taxa in tree description (%d) not equal to number of taxa in dataset (%d)!", numTipsAdded, numTipsTotal);
+
 	root->CheckforLeftandRight();
 	if(allowPolytomies == false) root->CheckforPolytomies();
 	root->CheckTreeFormation();
-	
-	if(numTipsAdded != numTipsTotal) throw ErrorException("Number of taxa in tree description (%d) not equal to number of taxa in dataset (%d)!", numTipsAdded, numTipsTotal);
-
+	bipartCond = DIRTY;
 	} 
 
 //DZ 10-31-02
@@ -386,6 +403,7 @@ Tree::Tree(){
 	calcs=0;
 	numBranchesAdded=0;
 	taxtags=new int[numTipsTotal+1];
+	bipartCond = DIRTY;
 
 #ifdef EQUIV_CALCS
 	//need to do the root too, since that node is sometimes stolen
@@ -611,6 +629,7 @@ bool Tree::ArbitrarilyBifurcate(){
 				}
 			if((curNode != root && nodes.size() > 2) || (curNode == root && nodes.size() > 3)){
 				polytomiesFound = true;
+				bipartCond = DIRTY;
 				int first = rnd.random_int(nodes.size());
 				int second;
 				do{
@@ -708,17 +727,18 @@ void Tree::AddRandomNode(int nodenum , int &placeInAllNodes){
 	numBranchesAdded++;
 	numNodesAdded++;
 	numTipsAdded++;
+	bipartCond = DIRTY;
 	}
 
-void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition &mask){
+void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition *mask){
 	//the trick here with the constraints is that only a subset of the taxa will be in the
 	//growing tree.  To properly determine bipartition comptability a mask consisting of only
-	//the present taxa with need to be used
+	//the present taxa will need to be used
 
 	assert(nodenum>0 && nodenum<=numTipsTotal);  //should be adding a terminal
 	TreeNode* nd=allNodes[nodenum];
 	Bipartition temp;
-	mask += temp.TerminalBipart(nodenum);
+	*mask += temp.TerminalBipart(nodenum);
 	nd->dlen = Tree::exp_starting_brlen;
 #ifdef STOCHASTIC_STARTING_BLENS
 	nd->dlen *= rnd.gamma(1.0);
@@ -749,34 +769,21 @@ void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipar
 		int k;
 		TreeNode *otherDes;
 		bool compat;
-
-		CalcBipartitions();
-		nd->CalcBipartition();
-		nd->bipart->Standardize();
+		Bipartition proposed;
+		nd->CalcBipartition(false);
 
 		do{
 			k = rnd.random_int( numBranchesAdded ) + 1;
 			otherDes = root->FindNode( k );
 			compat=true;
+			CalcBipartitions(true);
+			proposed.FillWithXORComplement(*(nd->bipart), *(otherDes->bipart));
 			for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
-				//BACKBONE
-				if((*conit).IsBackbone()){
-					assert((*conit).IsPositive());
-					//if the taxon being added isn't in the backbone, it can go anywhere
-					if((*conit).GetBackboneMask()->ContainsTaxon(nd->nodeNum)){
-						compat=AllowedByPositiveBackboneConstraintWithMask(&(*conit), &mask, nd, otherDes);
-						//need to do this because we screw with the biparts while checking for their compatability
-						//with a backbone constraint
-						CalcBipartitions();
-						}
+				//if the taxon being added isn't in the backbone, it can go anywhere
+				if(((*conit).IsBackbone() == false) || (*conit).GetBackboneMask()->ContainsTaxon(nd->nodeNum)){
+					ReconNode broken(otherDes->nodeNum, 0, 0.0, false);
+					compat = SwapAllowedByConstraint((*conit), nd, &broken, proposed, mask);
 					if(compat == false) break;
-					}
-				else{
-					if((*conit).IsPositive())
-						compat=AllowedByPositiveConstraintWithMask(&(*conit), &mask, nd, otherDes);
-					else
-						compat=AllowedByNegativeConstraintWithMask(&(*conit), &mask, nd, otherDes);
-					if(compat==false) break;
 					}
 				}
 			}while(compat == false);
@@ -787,6 +794,7 @@ void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipar
 		//add otherDes back to the tree as the sister to the new tip
 		connector->AddDes(otherDes);
 		numBranchesAdded++;//numBranchesAdded needs to be incremented twice because a total of two branches have been added
+		bipartCond = DIRTY;
 		}
 	numBranchesAdded++;
 	numNodesAdded++;
@@ -899,12 +907,12 @@ void Tree::RecombineWith( Tree *t, bool sameModel, FLOAT_TYPE optPrecision ){
 	OptimizeBranchesAroundNode(connector, optPrecision, 0);
 	}
 
-TreeNode *Tree::ContainsBipartition(const Bipartition *bip){
+TreeNode *Tree::ContainsBipartition(const Bipartition &bip){
 	//note that this doesn't work for terminals (but there's no reason to call for them anyway)
 	//find a taxon that appears "on" in the bipartition
 
 	//turning this back on
-	int tax=bip->FirstPresentTaxon();
+	int tax=bip.FirstPresentTaxon();
 	
 	//now start moving down the tree from taxon 1 until a bipart that
 	//conflicts or a match is found
@@ -918,13 +926,23 @@ TreeNode *Tree::ContainsBipartition(const Bipartition *bip){
 	return NULL;
 	}
 
-TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition *bip){
+TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition &bip){
 	//this version will detect if the same bipartition exists in the trees, even
 	//if it is in different orientation, which could happen due to rooting
 	//differences
+	
+	//NOTE: This requires that the bipartitions are "standardized" meaning that
+	//the one bit is always "on".  In general in other places we do not need that
+	//to be the case
+	if(bipartCond != CLEAN_STANDARDIZED){
+		if(bipartCond == CLEAN_UNSTANDARDIZED)
+			root->StandardizeBipartition();
+		else
+			CalcBipartitions(true);		
+		}
 
 	//find a taxon that appears "on" in the bipartition
-	int tax=bip->FirstPresentTaxon();
+	int tax=bip.FirstPresentTaxon();
 	
 	//now start moving down the tree from that taxon until a bipart that
 	//conflicts or a match is found
@@ -938,7 +956,7 @@ TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition *bip){
 		}
 		
 	//find a taxon that is NOT "on" in the bipartition
-	tax=bip->FirstNonPresentTaxon();
+	tax=bip.FirstNonPresentTaxon();
 	
 	//now start moving down the tree from that taxon until a bipart that
 	//conflicts or a match is found
@@ -947,7 +965,7 @@ TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition *bip){
 	nd=allNodes[tax];
 	while(nd->anc){
 		//if(nd->bipart->ComplementIsASubsetOf(bip) == false){
-		if(bip->IsASubsetOf(nd->bipart) == false){
+		if(bip.IsASubsetOf(*nd->bipart) == false){
 			return NULL;
 			}
 		else if(nd->bipart->EqualsEquals(bip)) return nd;
@@ -957,28 +975,38 @@ TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition *bip){
 	return NULL;
 	}
 
-TreeNode *Tree::ContainsMaskedBipartitionOrComplement(const Bipartition *bip, const Bipartition *mask){
+TreeNode *Tree::ContainsMaskedBipartitionOrComplement(const Bipartition &bip, const Bipartition &mask){
 	//as in ContainsMaskedBipartitionOrComplement, but bits not on in the
 	//mask are ignored
 
+	//NOTE: This requires that the bipartitions are "standardized" meaning that
+	//the one bit is always "on".  In general in other places we do not want that
+	//to be the case
+	if(bipartCond != CLEAN_STANDARDIZED){
+		if(bipartCond == CLEAN_UNSTANDARDIZED)
+			root->StandardizeBipartition();
+		else
+			CalcBipartitions(true);		
+		}
+
 	//find a taxon that appears "on" in the bipartition and is on in the mask
-	Bipartition temp = *bip;
+	Bipartition temp = bip;
 	temp.AndEquals(mask);
 	int tax=temp.FirstPresentTaxon();
 	
 	//now start moving down the tree from that taxon until we find a
 	//match or reach the root
 	TreeNode *nd=allNodes[tax]->anc;
-	temp = *bip;
+	temp = bip;
 	temp.Complement();
 	while(nd->anc){
 		if(nd->bipart->MaskedEqualsEquals(bip, mask)) return nd;
-		if(nd->bipart->MaskedEqualsEquals(&temp, mask)) return nd;
+		if(nd->bipart->MaskedEqualsEquals(temp, mask)) return nd;
 		else nd=nd->anc;
 		}
 
 	//find a taxon that is NOT "on" in the bipartition
-	temp = *bip;
+	temp = bip;
 	temp.Complement();
 	temp.AndEquals(mask);
 	tax=temp.FirstPresentTaxon();
@@ -986,11 +1014,11 @@ TreeNode *Tree::ContainsMaskedBipartitionOrComplement(const Bipartition *bip, co
 	//now start moving down the tree from that taxon until we find a
 	//match or reach the root
 	nd=allNodes[tax]->anc;
-	temp = *bip;
+	temp = bip;
 	temp.Complement();
 	while(nd->anc){
 		if(nd->bipart->MaskedEqualsEquals(bip, mask)) return nd;
-		if(nd->bipart->MaskedEqualsEquals(&temp, mask)) return nd;
+		if(nd->bipart->MaskedEqualsEquals(temp, mask)) return nd;
 		else nd=nd->anc;
 		}
 		
@@ -1050,7 +1078,7 @@ bool Tree::IdenticalSubtreeTopology(const TreeNode *other){
 	
 	if(other->IsRoot() == false){
 		if(other->IsTerminal()) return true;
-		identical=(ContainsBipartition(other->bipart) != NULL);
+		identical=(ContainsBipartition(*other->bipart) != NULL);
 		if(identical==true){
 			identical=IdenticalSubtreeTopology(other->left);
 			if(identical==true)
@@ -1065,10 +1093,19 @@ bool Tree::IdenticalTopology(const TreeNode *other){
 	//this is intitially called with the root, it will detect any difference in the 
 	//overall topology, but assumes the same rooting
 	bool identical;
+	//NOTE: This requires that the bipartitions are "standardized" meaning that
+	//the one bit is always "on".  In general in other places we do not need that
+	//to be the case
+	if(bipartCond != CLEAN_STANDARDIZED){
+		if(bipartCond == CLEAN_UNSTANDARDIZED)
+			root->StandardizeBipartition();
+		else
+			CalcBipartitions(true);		
+		}
 	
 	if(other->IsRoot() == false){
 		if(other->IsTerminal()) return true;
-		identical= (ContainsBipartition(other->bipart) != NULL);
+		identical= (ContainsBipartition(*other->bipart) != NULL);
 		if(identical==true){
 			identical=IdenticalTopology(other->left);
 			if(identical==true)
@@ -1092,10 +1129,20 @@ bool Tree::IdenticalTopologyAllowingRerooting(const TreeNode *other){
 	//this is intitially called with the root, it will detect any difference in the 
 	//overall topology
 	bool identical;
+	//NOTE: This requires that the bipartitions are "standardized" meaning that
+	//the one bit is always "on".  In general in other places we do not need that
+	//to be the case
+	if(bipartCond != CLEAN_STANDARDIZED){
+		if(bipartCond == CLEAN_UNSTANDARDIZED)
+			root->StandardizeBipartition();
+		else
+			CalcBipartitions(true);		
+		}
+
 	
 	if(other->IsRoot() == false){
 		if(other->IsTerminal()) return true;
-		identical= (ContainsBipartitionOrComplement(other->bipart) != NULL);
+		identical= (ContainsBipartitionOrComplement(*other->bipart) != NULL);
 		if(identical==true){
 			identical=IdenticalTopologyAllowingRerooting(other->left);
 			if(identical==true)
@@ -1120,6 +1167,8 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 	TreeNode *tonode, *fromnode;
 	bool found=false;
 	int tries=0;
+	CalcBipartitions(true);
+	t->CalcBipartitions(true);
 	while(!found && (++tries<50)){
 		int i;
 		do{
@@ -1128,7 +1177,8 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 			}while((allNodes[i]->left->IsTerminal() && allNodes[i]->right->IsTerminal()));
 			//}while((t->allNodes[i]->left->IsTerminal() && t->allNodes[i]->right->IsTerminal()));
 		//fromnode=t->ContainsBipartition(allNodes[i]->bipart);
-		fromnode=t->ContainsBipartition(allNodes[i]->bipart);
+		//fromnode=t->ContainsBipartition(*allNodes[i]->bipart);
+		fromnode=t->ContainsBipartitionOrComplement(*allNodes[i]->bipart);
 		if(fromnode != NULL){
 			//OK the biparts match, but see if they share the same clas!!!!
 			//Not much point in scoring them then.
@@ -1187,6 +1237,7 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 		OptimizeBranchesWithinRadius(tonode, optPrecision, 0, NULL);
 
 		Score(tonode->nodeNum);
+		bipartCond = DIRTY;
 		}
 	else return -1;
 	return 1;
@@ -1261,7 +1312,8 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 			//nodes can be reconnected with an NNI such that the same topology results
 			bool unique=false;
 			Bipartition proposed;
-			proposed.FillWithXORComplement(cut->bipart, tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart);
+			CalcBipartitions(true);
+			proposed.FillWithXORComplement(*cut->bipart, *tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart);
 			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 
 			if(unique){
@@ -1389,7 +1441,8 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 			//nodes can be reconnected with an NNI such that the same topology results
 			bool unique=false;
 			Bipartition proposed;
-			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+			CalcBipartitions(true);
+			proposed.FillWithXORComplement(*cut->bipart, *allNodes[broken->nodeNum]->bipart);
 			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 
 			if(unique){
@@ -1456,7 +1509,7 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 	}
 
 void Tree::FillAllSwapsList(ReconList *cuts, int reconLim){
-	CalcBipartitions();
+	CalcBipartitions(true);
 	for(int i=1;i<numNodesTotal;i++) cuts[i].clear();
 	for(int i=1;i<numNodesTotal;i++){
 		GatherValidReconnectionNodes(cuts[i], reconLim, allNodes[i], NULL);
@@ -1545,7 +1598,8 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 		bool unique=false;
 		newBest = false;
 		Bipartition proposed;
-		proposed.FillWithXORComplement(cut->bipart, tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart);
+		CalcBipartitions(true);
+		proposed.FillWithXORComplement(*(cut->bipart), *(tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart));
 		unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 
 		if(unique){
@@ -1629,6 +1683,7 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 			//nodes can be reconnected with an NNI such that the same topology results
 			bool unique=false;
 			Bipartition proposed;
+			CalcBipartitions(true);
 			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
 			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 
@@ -1705,6 +1760,10 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 			if(!err){
 #else
 			if(1){
+				//this was a stupid bug.  Err was being paid attention by looping over the 
+				//outer do loop because it was not being reset below when returning from ReorientSubtreeSPR
+				//as it is with normal SPR
+				err = 0;
 #endif
 				sprRang.CalcProbsFromWeights();
 				broken = sprRang.ChooseNodeByWeight();
@@ -1719,10 +1778,16 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 			//log the swap about to be performed
 			if( ! ((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)){
 				Bipartition proposed;
-				proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+				CalcBipartitions(true);
+				proposed.FillWithXORComplement(*(cut->bipart), *(allNodes[broken->nodeNum]->bipart));
 				unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 				uniqueSwapTried = uniqueSwapTried || unique;
 				//uniqueSwapTried = uniqueSwapTried || attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+				}
+			//else if(! ((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) && range < 0)){
+			else{
+				//this means that we are doing an unlimited SPR, which we don't keep track of
+				unique = false;
 				}
 
 			if(broken->withinCutSubtree == true){
@@ -1759,24 +1824,20 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 		}while(err);
 
 #ifndef NDEBUG
-	CalcBipartitions();
-
 	for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
-		if((*conit).IsBackbone()){
-			assert((*conit).IsPositive());
-			assert(ContainsMaskedBipartitionOrComplement((*conit).GetBipartition(), (*conit).GetBackboneMask()) != NULL);
-			}
-		else{
-			if((*conit).IsPositive())
-				assert(ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL);
-			else assert(ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL);
-			}
+		TreeNode *check = NULL;
+		if((*conit).IsBackbone())
+			check = ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
+		else
+			check = ContainsBipartitionOrComplement(*(*conit).GetBipartition());
+		if((*conit).IsPositive()) assert(check != NULL);
+		else assert(check == NULL);
 		}
 #endif
 	return ret;
 	}
 
-void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNode *subtreeNode){
+void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNode *subtreeNode, Bipartition *partialMask /*=NULL*/){
 	/* 7/11/06 making this function more multipurpose
 	It now assumes that the cut branch has NOT YET BEEN DETACHED. This is important so that
 	when branches are chosen without a viable reconnection due to a constraint another cut
@@ -1874,31 +1935,32 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 //	if(maxDist != 1)
 //		sprRang.RemoveNodesOfDist(1); //remove branches equivalent to NNIs
 	
-	CalcBipartitions();
-
 #ifdef CONSTRAINTS
 	//now deal with constraints, if any
 	if(constraints.size() > 0){
-		Bipartition scratch;
-
-		for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
-			if(sprRang.size() != 0){
-				listIt it=sprRang.begin();
-				do{
-					TreeNode* broken=allNodes[it->nodeNum];
-					//if(AllowedByConstraint(&(*conit), cut, broken, scratch) == false) it=sprRang.RemoveElement(it);
-					if(AllowedByConstraint(&(*conit), cut, &*it, scratch) == false) it=sprRang.RemoveElement(it);
-					else it++;
-					}while(it != sprRang.end());
-				}
-			else return;
+		if(sprRang.size() != 0){
+			Bipartition proposed;
+			listIt it=sprRang.begin();
+			do{
+				TreeNode* broken=allNodes[it->nodeNum];
+				CalcBipartitions(true);
+				proposed.FillWithXORComplement(*(cut->bipart), *(allNodes[broken->nodeNum]->bipart));
+				bool allowed = true;
+				for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+					allowed = SwapAllowedByConstraint((*conit), cut, &*it, proposed, partialMask); 
+					if(!allowed) break;
+					}
+				if(!allowed) it=sprRang.RemoveElement(it);
+				else it++;
+				}while(it != sprRang.end());
 			}
+		else return;
 		}
 #endif
 	}
 
 //same as the normal GatherValidReconnectionNodes, but fills ReconList passed in, not the normal tree one
-void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNode *cut, const TreeNode *subtreeNode){
+void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNode *cut, const TreeNode *subtreeNode, Bipartition *partialMask /*=NULL*/){
 	const TreeNode *center=cut->anc;
 	
 	//add the descendent branches
@@ -1999,7 +2061,7 @@ void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNo
 				do{
 					TreeNode* broken=allNodes[it->nodeNum];
 					//if(AllowedByConstraint(&(*conit), cut, broken, scratch) == false) it=thisList.RemoveElement(it);
-					if(AllowedByConstraint(&(*conit), cut, &*it, scratch) == false) it=thisList.RemoveElement(it);
+					if(SwapAllowedByConstraint((*conit), cut, &*it, scratch, partialMask) == false) it=thisList.RemoveElement(it);
 					else it++;
 					}while(it != thisList.end());
 				}
@@ -2012,6 +2074,7 @@ void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNo
 bool Tree::AssignWeightsToSwaps(TreeNode *cut){
 	//Assign weights to each swap (reconnection node) based on 
 	//some criterion
+	CalcBipartitions(true);
 
 	Bipartition proposed;
 	list<Swap>::iterator thisSwap;
@@ -2019,7 +2082,8 @@ bool Tree::AssignWeightsToSwaps(TreeNode *cut){
 
 	for(listIt it = sprRang.begin();it != sprRang.end();it++){
 		bool found;
-		proposed.FillWithXORComplement(cut->bipart, allNodes[(*it).nodeNum]->bipart);
+		CalcBipartitions(true);
+		proposed.FillWithXORComplement(*(cut->bipart), *(allNodes[(*it).nodeNum]->bipart));
 		Swap tmp=Swap(proposed, cut->nodeNum, (*it).nodeNum, (*it).reconDist);
 		thisSwap = attemptedSwaps.FindSwap(tmp, found);
 
@@ -2230,6 +2294,7 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, int s
 		else 
 			OptimizeBranchesWithinRadius(connector, optPrecision, subtreeNode, NULL);
 		}
+	bipartCond = DIRTY;
 	return 0;
 }
 
@@ -2384,6 +2449,7 @@ void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, FLOAT_TYPE optP
 		if(nroot->reconDist > 1) OptimizeBranchesWithinRadius(oldroot, optPrecision, 0, prunePoint);
 		else OptimizeBranchesWithinRadius(oldroot, optPrecision, 0, NULL);
 		}
+	bipartCond = DIRTY;
 	}
 
 void Tree::LoadConstraints(ifstream &con, int nTaxa){
@@ -2406,13 +2472,15 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 		//might end with \r or \n
 		size_t len=temp.length();
 		char last=temp.c_str()[len-1];
-		if(last == '\r' || last == '\n'){
+		while(last == '\r' || last == '\n' || last == ' '){
 			temp.erase(len-1, 1);
 			len--;
+			last=temp.c_str()[len-1];
 			}
 		if(temp[0] != '\0'){
 			if(temp[0] != '+' && temp[0] != '-') throw ErrorException("constraint string must start with \'+\' (positive constraint) or \'-\' (negative constraint)");
 			if(temp[1] == '.' || temp[1] == '*'){//if individual biparts are specified in *. format
+				//while(temp[temp.length()-1] == ' ') temp.erase(temp.length()-1);//eat any spaces at the end
 				if(len != nTaxa+1) throw ErrorException("constraint # %d does not have the correct number of characters!\n(has %d) constraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format.  \nNote that backbone constraints cannot be specified in ...*** format.", conNum, len);
 				constr.ReadDotStarConstraint(temp.c_str());
 				constraints.push_back(constr);
@@ -2433,7 +2501,8 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 				//branch lengths (even though this tree is only temporary for the reading of the constraint),
 				//it will change the seed.  So, store and restore it
 				int seed = rnd.seed();
-				Tree contree(temp.c_str()+1, numericalTaxa, true);
+				//the last two arguments here specify that both polytomies and missing taxa (for backbone constraints) should be allowed
+				Tree contree(temp.c_str()+1, numericalTaxa, true, true);
 				//check if the tree is completely constrained - users try to do that to optimize on a fixed
 				//topology, but that should be done by specifying a starting tree and a topoweight of zero
 				if(contree.numNodesAdded == contree.numNodesTotal)
@@ -2441,9 +2510,10 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 
 				rnd.set_seed(seed);
 
-				contree.CalcBipartitions();
+				contree.CalcBipartitions(true);
 				vector<Bipartition> bip;
 				contree.root->GatherConstrainedBiparitions(bip);
+				if(bip.size() == 0) throw ErrorException("Specified constraint does not constrain any relationships.\n\tSee manual for constraint format");
 				if(pos==false && (bip.size() > 1)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch (bipartition):-(");
 				//BACKBONE - see if all taxa appear in this constraint or if its a backbone
 				if(contree.numTipsAdded < contree.numTipsTotal){
@@ -2477,7 +2547,7 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 			for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++){
 				if((*first).IsPositive() != (*sec).IsPositive()) throw ErrorException("cannot mix positive and negative constraints!");
 				if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
-				if((*first).IsCompatibleWithConstraint(&(*sec)) == false) throw ErrorException("constraints are not compatible with one another!");
+				if((*first).ConstraintIsCompatibleWithConstraint((*sec)) == false) throw ErrorException("constraints are not compatible with one another!");
 			}
 			}
 		}
@@ -2501,143 +2571,135 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 		}
 	}
 
-bool Tree::AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *broken, Bipartition &proposed) {
-	//Bipartition proposed;
-	proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
+//this just "fakes" the swapping of the subtree rooted at cut to a postition as the sister of broken by adjusting the 
+//biparts across the tree.  This should only be used for NORMAL SPR's not subtree reorient SPR's
+void Tree::AdjustBipartsForSwap(int cut, int broken){
+	//first be sure the biparts are current
+	CalcBipartitions(true);
+	if(allNodes[cut]->anc->IsNotRoot()) allNodes[cut]->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(*(allNodes[cut]->bipart));
+	if(allNodes[broken]->anc->IsNotRoot()) allNodes[broken]->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(*(allNodes[cut]->bipart));
+	bipartCond = TEMP_ADJUSTED;
+	}
 
-	if(constr->IsBackbone()){
-		if(constr->IsPositive()){
-			bool compat = constr->IsCompatibleWithConstraint(&proposed);
+//test whether the attachment of branch "cut" (subtree or tip) to branch "broken" (subtree or tip) is allowed by
+//any constraints.  The general purpose Constraint::BipartitionIsCompatibleWithConstraint function (which takes care of
+//positive and negative constraints, backbone or not) is called to check if the bipartition created by the union
+//of cut and broken is itself allowable.  Depending on the type of constraint, other checks may also need to be done.
+bool Tree::SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, ReconNode *broken, const Bipartition &proposed, const Bipartition *partialMask) {
+	//for a normal positive constraint with no mask we only need to check the bipartition about to be created
+	if(constr.IsPositive() && !constr.IsBackbone() && partialMask==NULL)
+		return constr.BipartitionIsCompatibleWithConstraint(proposed, NULL);
+	else{
+		//otherwise we need to check bipartitions across the tree
+		bool compat;
+		/*(check for meaningful intersection of constraint and partial/backbone mask here)*/
+		Bipartition jointMask;
+		bool meaningfulIntersection = jointMask.MakeJointMask(constr, partialMask);
+		if(!meaningfulIntersection) return true;
+
+		if(!broken->withinCutSubtree){
+			//if this is a normal SPR swap in which the cut subtree has the same orientation after the swap then we can 
+			//check the bipartition about to be created, and if that passes then adjust the bipartitions across the tree and
+			//recursively check the rest of the tree
+			compat = constr.BipartitionIsCompatibleWithConstraint(proposed, &jointMask);
 			if(compat == false) return compat;
 
 			//this screws up the biparitions, so they need to be recalculated before returning
-			if(cut->anc->IsNotRoot()) cut->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(cut->bipart);
-			if(allNodes[broken->nodeNum]->anc->IsNotRoot()) allNodes[broken->nodeNum]->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(cut->bipart);
+			AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
 			
-			if(root->left->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, constr->GetBackboneMask(), root->left);
-			if(compat == true) if(root->left->next->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, constr->GetBackboneMask(), root->left->next);
-			if(compat == true) if(root->right->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, constr->GetBackboneMask(), root->right);
-
-			CalcBipartitions();//fix the bipartitions
-			return compat;
+			compat = RecursiveAllowedByConstraintWithMask(constr, &jointMask, root);
 			}
 		else{
-			bool compat=constr->IsCompatibleWithConstraint(&proposed);
-			if(compat==false) return compat;
-			else{//here we need to check if the removal of the cut subtree would create the unallowed bipart
-				//I think this could happen about anywhere in the tree, so the cleanest way i see to check
-				//is to actually make the tree and verify that it doesn't have the constrained bipart
-				//this introduces a bit of overhead
-				Tree propTree;
-				propTree.MimicTopo(this);
+			Tree propTree;
+			propTree.MimicTopo(this);
+			propTree.ReorientSubtreeSPRMutate(cut->nodeNum, broken, -1.0);
 
-				if(broken->withinCutSubtree == false)  propTree.SPRMutate(cut->nodeNum, broken, -1.0, 0);
-				else propTree.ReorientSubtreeSPRMutate(cut->nodeNum, broken, -1.0);
-
-				propTree.CalcBipartitions();
-
-				bool containsBip = (propTree.ContainsMaskedBipartitionOrComplement(constr->GetBipartition(), constr->GetBackboneMask()) != NULL);
-				return (containsBip == false);
-				}
+			compat = (constr.IsPositive()) == (propTree.ContainsMaskedBipartitionOrComplement(*constr.GetBipartition(), jointMask) != NULL);
 			}
-		}
-
-	else{
-		if(constr->IsPositive())
-			return constr->IsCompatibleWithConstraint(&proposed);
-		else{//this is trickier with a negative constraint
-			bool compat=constr->IsCompatibleWithConstraint(&proposed);
-			if(compat==false) return compat;
-			else{//here we need to check if the removal of the cut subtree would create the unallowed bipart
-				//I think this could happen about anywhere in the tree, so the cleanest way i see to check
-				//is to actually make the tree and verify that it doesn't have the constrained bipart
-				//this introduces a bit of overhead
-				Tree propTree;
-				propTree.MimicTopo(this);
-
-				if(broken->withinCutSubtree == false)  propTree.SPRMutate(cut->nodeNum, broken, -1.0, 0);
-				else propTree.ReorientSubtreeSPRMutate(cut->nodeNum, broken, -1.0);
-
-				propTree.CalcBipartitions();
-
-				bool containsBip = (propTree.ContainsBipartitionOrComplement(constr->GetBipartition()) != NULL);
-				return (containsBip == false);
-				}
-			}
+		return compat;
 		}
 	}
-
-bool Tree::AllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken){
+/*
+bool Tree::TaxonAdditionAllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *toAdd, TreeNode *broken){
 	Bipartition proposed;
-	proposed.FillWithXORComplement(cut->bipart, broken->bipart);
-	bool compat = constr->IsCompatibleWithConstraintWithMask(&proposed, mask);
+	proposed.FillWithXORComplement(toAdd->bipart, broken->bipart);
+
+	bool compat = constr->BipartitionIsCompatibleWithConstraint(&proposed, mask);
+
 	if(compat==false) return compat;
-	//this is a little sneaky here.  Cut has not been added to the tree, but since we are going up from broken
+	//This is a little sneaky here.  Cut has not been added to the tree, but since we are going up from broken
 	//and it is present in the mask it will effectively appear in biparts in that direction
 	else if(broken->IsInternal()){
-		compat=RecursiveAllowedByPositiveConstraintWithMask(constr, mask, broken);
+		compat=RecursiveAllowedByConstraintWithMask(constr, mask, broken);
 		}
 	return compat;
 	}
 
-bool Tree::AllowedByPositiveBackboneConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken){
-	Bipartition jointMask=*(constr->GetBackboneMask());
-	jointMask.AndEquals(mask);
-
+bool Tree::TaxonAdditionAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *toAdd, TreeNode *broken){
 	Bipartition proposed;
-	proposed.FillWithXORComplement(cut->bipart, broken->bipart);
-	bool compat = constr->IsCompatibleWithConstraintWithMask(&proposed, &jointMask);
+	proposed.FillWithXORComplement(toAdd->bipart, broken->bipart);
+
+	bool compat = constr->BipartitionIsCompatibleWithConstraint(&proposed, mask);
+	if(compat==true) return compat;
+	else if(broken->IsInternal()) compat=RecursiveAllowedByConstraintWithMask(constr, mask, broken);
+	return compat;
+	}
+
+bool Tree::TaxonAdditionAllowedByPositiveBackboneConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *toAdd, TreeNode *broken){
+	Bipartition proposed;
+	proposed.FillWithXORComplement(toAdd->bipart, broken->bipart);
+
+	bool compat = constr->BipartitionIsCompatibleWithConstraint(&proposed, mask);
 	if(compat==false) return compat;
 	else{
-		if(broken->anc->IsNotRoot()) broken->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(cut->bipart);
+		if(broken->anc->IsNotRoot()) broken->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(toAdd->bipart);
+		bipartCond = TEMP_ADJUSTED;
 
-		if(root->left->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, &jointMask, root->left);
-		if(compat==false) return compat;
-		if(root->left->next->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, &jointMask, root->left->next);
-		if(compat==false) return compat;
-		if(root->right->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, &jointMask, root->right);
-		if(compat==false) return compat;
+		compat = RecursiveAllowedByConstraintWithMask(constr, mask, root);
+		CalcBipartitions(false);
 		}
 	return compat;
 	}
 
-bool Tree::AllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken){
+bool Tree::TaxonAdditionAllowedByNegativeBackboneConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *toAdd, TreeNode *broken){
+	//	Bipartition jointMask=*(constr->GetBackboneMask());
+//	jointMask.AndEquals(mask);
+
 	Bipartition proposed;
-	proposed.FillWithXORComplement(cut->bipart, broken->bipart);
-	bool compat = constr->IsCompatibleWithConstraintWithMask(&proposed, mask);
-	if(compat==true) return compat;
-	else if(broken->IsInternal()) compat=RecursiveAllowedByNegativeConstraintWithMask(constr, mask, broken);
+	proposed.FillWithXORComplement(toAdd->bipart, broken->bipart);
+	//bool compat = constr->IsCompatibleWithConstraintWithMask(&proposed, &jointMask);
+	bool compat = constr->BipartitionIsCompatibleWithConstraint(&proposed, mask);
+	if(compat==false) return compat;
+	else{
+		if(broken->anc->IsNotRoot()) broken->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(toAdd->bipart);
+		bipartCond = TEMP_ADJUSTED;
+
+		compat = RecursiveAllowedByConstraintWithMask(constr, mask, root);
+		CalcBipartitions(false);
+		}
 	return compat;
 	}
+*/
+//This can be called with the root, and it then recurces through the tree until it finds a bipartition that conflicts
+//with the constraint.  Unlike the ContainsBipartition functions, it doesn't actually require that the actual tree
+//to be checked has been made (i.e. that the swap has been done) - just that the bipartitions have been altered
+//as if it had.  It therefore has lower overhead when checking swaps and should be preferred.  The mask passed in should only be 
+//should include any backbone constraint and/or a mask containing those taxa present in a growing tree
+bool Tree::RecursiveAllowedByConstraintWithMask(const Constraint &constr, const Bipartition *jointMask, const TreeNode *nd){
+	bool compat = true;
+	if(nd->IsNotRoot())
+		compat = constr.BipartitionIsCompatibleWithConstraint(*nd->bipart, jointMask);
+	if(compat==false) return compat;
 
-bool Tree::RecursiveAllowedByPositiveConstraintWithMask(Constraint *constr, const Bipartition *mask, TreeNode *nd){
-	bool compat = constr->IsCompatibleWithConstraintWithMask(nd->bipart, mask);
+	if(nd->left->IsInternal()) compat=RecursiveAllowedByConstraintWithMask(constr, jointMask, nd->left);
 	if(compat==false) return compat;
-	else if(nd->left->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, mask, nd->left);
 
+	if(nd->left->next->IsInternal()) compat=RecursiveAllowedByConstraintWithMask(constr, jointMask, nd->left->next);
 	if(compat==false) return compat;
-	else if(nd->left->next->IsInternal()) compat=RecursiveAllowedByPositiveConstraintWithMask(constr, mask, nd->left->next);
-	
-	if(compat==false) return compat;
-	if(nd->left->next->next != NULL)
+
+	if(nd->left->next->next != NULL)//this would be the right dec of the root
 		if(nd->left->next->next->IsInternal())
-			compat=RecursiveAllowedByPositiveConstraintWithMask(constr, mask, nd->left->next);
-
-	return compat;
-	}
-
-bool Tree::RecursiveAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd){
-	bool compat = constr->IsCompatibleWithConstraintWithMask(nd->bipart, mask);
-	if(compat==true) return compat;
-	else if(nd->left->IsInternal()) compat=RecursiveAllowedByNegativeConstraintWithMask(constr, mask, nd->left);
-
-	if(compat==true) return compat;
-	else if(nd->left->next->IsInternal()) compat=RecursiveAllowedByNegativeConstraintWithMask(constr, mask, nd->left->next);
-	
-	if(compat==true) return compat;
-	if(nd->left->next->next != NULL)
-		if(nd->left->next->next->IsInternal())
-			compat=RecursiveAllowedByNegativeConstraintWithMask(constr, mask, nd->left->next);
+			compat=RecursiveAllowedByConstraintWithMask(constr, jointMask, nd->left->next->next);
 
 	return compat;
 	}
@@ -2745,6 +2807,7 @@ void Tree::SPRMutate(int cutnum, int broknum, FLOAT_TYPE optPrecision, const vec
 	opt << "SPR\n";
 #endif
 	OptimizeBranchesWithinRadius(connector, optPrecision, 0, NULL);
+	bipartCond = DIRTY;
 	}
 
 void Tree::MimicTopo(const Tree *source){
@@ -2777,6 +2840,7 @@ void Tree::MimicTopo(const Tree *source){
 	numNodesAdded=source->numNodesAdded;
 	numTipsAdded=source->numTipsAdded;
 	numBranchesAdded=source->numBranchesAdded;
+	bipartCond = DIRTY;
 	}
 
 //this version is used for just copying a subtree,
@@ -2829,6 +2893,7 @@ void Tree::MimicTopo(TreeNode *nd, bool firstNode, bool sameModel){
 		}
 */
 	mnd->dlen=nd->dlen;
+	bipartCond = DIRTY;
 }
 
 void Tree::CopyClaIndecesInSubtree(const TreeNode *from, bool remove){
@@ -2979,6 +3044,9 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 						}
 					}
 				destination+= 4*nRateCats;
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
+#endif
 				}
 			else{
 #ifdef OPEN_MP
@@ -3059,6 +3127,9 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 					}
 				}
 			destination+= nstates*nRateCats;
+#ifdef ALLOW_SINGLE_SITE
+			if(siteToScore > -1) break;
+#endif
 			}
 		else{
 #ifdef OPEN_MP
@@ -3080,9 +3151,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 	//the fuction will then return a pointer to the CLA
 
 	assert(this != NULL);
-
 	calcCount++;
-	
 	int nsites = data->NChar();
 
 	CondLikeArray *destCLA=NULL;
@@ -3106,12 +3175,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			if(Rchild->IsInternal())
 				RCLA=GetClaDown(Rchild);
 			
-	//		Rprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
-	//		Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
-
-	//		mod->CalcPmat(Lchild->dlen, &Lprmat[0], false);
-	//		mod->CalcPmat(Rchild->dlen, &Rprmat[0], false);
-	//		mod->CalcPmats(Lchild->dlen, Rchild->dlen, Lprmat, Rprmat);
 			blen1 = Lchild->dlen;
 			blen2 = Rchild->dlen;
 			}
@@ -3129,8 +3192,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 					//and right, but not the middle.  We will confusingly store this in the root's DOWN cla
 					LCLA=GetClaDown(Lchild);
 
-//				Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
-//				mod->CalcPmat(nd->dlen, &Lprmat[0], false);
 				blen1 = nd->dlen;
 			
 				if(direction==UPRIGHT) Rchild=nd->left;
@@ -3148,16 +3209,12 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 				if(Lchild->IsInternal())
 					LCLA=GetClaDown(Lchild);
 
-			//	Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
-			//	mod->CalcPmat(Lchild->dlen, &Lprmat[0], false);
 				blen1 = Lchild->dlen;
 				}
 			
 			if(Rchild->IsInternal())
 				RCLA=GetClaDown(Rchild);
 			
-//			Rprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
-//			mod->CalcPmat(Rchild->dlen, &Rprmat[0], false);
 			blen2 = Rchild->dlen;
 			}
 
@@ -3236,8 +3293,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			if(child->IsInternal()){
 				childCLA=GetClaDown(child, true);
 				}
-			//Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
-			//mod->CalcPmat(child->dlen, &Lprmat[0], false);
 			blen1 = child->dlen;
 			}
 		else if(claMan->IsDirty(nd->claIndexUR) == false){
@@ -3246,8 +3301,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			if(child->IsInternal()){
 				childCLA=GetClaDown(child, true);
 				}
-			//Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
-			//mod->CalcPmat(child->dlen, &Lprmat[0], false);
 			blen1 = child->dlen;
 			}
 		else{//both of the UP clas must be dirty.  We'll use the down one as the 
@@ -3269,8 +3322,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 					//direction is stored as the root DOWN direction
 					childCLA=GetClaDown(child);
 					}
-				//Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
-				//mod->CalcPmat(nd->dlen, &Lprmat[0], false);
 				blen1 = nd->dlen;
 				}
 			else{
@@ -3278,8 +3329,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 				if(child->IsInternal()){
 					childCLA=GetClaDown(child, true);
 					}
-				//Lprmat = new FLOAT_TYPE[mod->NStates() * mod->NStates() * mod->NRateCats()];
-				//mod->CalcPmat(child->dlen, &Lprmat[0], false);
 				blen1 = child->dlen;
 				}
 			}	
@@ -3366,7 +3415,7 @@ int Tree::Score(int rootNodeNum /*=0*/){
 				ofstream resc("rescale.log", ios::app);
 				resc << "rescale reduced to " << rescaleEvery << endl;
 				resc.close();
-				if(rescaleEvery<2) if(rescaleEvery<2) throw(ErrorException("Problem with rescaling in branchlength optimization.  Please report this error to zwickl@nescent.org."));
+				if(rescaleEvery<2) throw(ErrorException("Problem with rescaling during tree scoring.  Please report this error to zwickl@nescent.org."));
 				}
 		}while(scoreOK==false);
 
@@ -3607,8 +3656,7 @@ void Tree::EliminateNode(int nn){
 		}
 	allNodes[numNodesTotal-1]=NULL;
 	numNodesTotal--;
-	//DEBUG WTF was this needed for?
-//	numNodesAdded--;
+
 	//now make a new allNodes array of the proper length
 	TreeNode **newNodes=new TreeNode*[numNodesTotal];
 	memcpy(newNodes, allNodes, sizeof(TreeNode*)*numNodesTotal);
@@ -3672,6 +3720,7 @@ void Tree::RotateNodesAtRoot(TreeNode *newroot){
 	tempnode->nodeNum=root->nodeNum;
 	root->nodeNum=0;
 	allNodes[tempnode->nodeNum]=tempnode;
+	bipartCond = DIRTY;
 	//this form of setdirty won't shift every copy to a new topo, but will set them to dirty
 //	claMan->SetDirtyButDoNotMove(0, root->claIndex);
 //	claMan->SetDirtyButDoNotMove(tempnode->nodeNum, tempnode->claIndex);
@@ -3810,10 +3859,19 @@ void Tree::SwapAndFreeNodes(TreeNode *cop){
 	if(cop->right->left) SwapAndFreeNodes(cop->right);	
 	}
 
-void Tree::CalcBipartitions(bool standardize /*=true*/){
-	root->CalcBipartition();
-	if(standardize)
-		root->StandardizeBipartition();
+void Tree::CalcBipartitions(bool standardize){
+	if(!(bipartCond == CLEAN_STANDARDIZED && standardize == true) &&
+		!(bipartCond == CLEAN_UNSTANDARDIZED && standardize == false)){
+
+		if(bipartCond == CLEAN_UNSTANDARDIZED && standardize == true) 
+			root->StandardizeBipartition();
+		else
+			root->CalcBipartition(standardize);
+		if(standardize)	bipartCond = CLEAN_STANDARDIZED;
+		else bipartCond = CLEAN_UNSTANDARDIZED;
+		}
+	//DEBUG
+	root->VerifyBipartition(standardize);
 	}
 	
 void Tree::OutputBipartitions(){
@@ -4124,7 +4182,7 @@ void Tree::RerootHere(int newroot){
 	SwapNodeDataForReroot(nroot);
 
 	root->CheckTreeFormation();
-
+	bipartCond = DIRTY;
 //	MakeAllNodesDirty();
 //	Score();
 	}
@@ -4166,9 +4224,11 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	root->claIndexDown=tempnew.claIndexDown;
 	root->claIndexUL=tempnew.claIndexUL;
 	root->claIndexUR=tempnew.claIndexUR;
-	root->claIndexDown=claMan->SetDirty(root->claIndexDown);
-	root->claIndexUR=claMan->SetDirty(root->claIndexUR);
-	root->claIndexUL=claMan->SetDirty(root->claIndexUL);
+	//DEBUG why are we setting this and then dirtying it?
+	MakeNodeDirty(root);
+	//root->claIndexDown=claMan->SetDirty(root->claIndexDown);
+	//root->claIndexUR=claMan->SetDirty(root->claIndexUR);
+	//root->claIndexUL=claMan->SetDirty(root->claIndexUL);
 	
 	nroot->left=tempold.left;
 	nroot->left->anc=nroot;
@@ -4182,9 +4242,11 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	nroot->claIndexDown=tempold.claIndexDown;
 	nroot->claIndexUL=tempold.claIndexUL;
 	nroot->claIndexUR=tempold.claIndexUR;
-	nroot->claIndexDown=claMan->SetDirty(nroot->claIndexDown);
-	nroot->claIndexUR=claMan->SetDirty(nroot->claIndexUR);
-	nroot->claIndexUL=claMan->SetDirty(nroot->claIndexUL);
+	//DEBUG why are we setting this and then dirtying it?
+	MakeNodeDirty(nroot);
+//	nroot->claIndexDown=claMan->SetDirty(nroot->claIndexDown);
+//	nroot->claIndexUR=claMan->SetDirty(nroot->claIndexUR);
+//	nroot->claIndexUL=claMan->SetDirty(nroot->claIndexUL);
 	
 	if(nroot->anc->left==root){
 		nroot->anc->left=nroot;
@@ -4209,9 +4271,12 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 
 	
 void Tree::MakeNodeDirty(TreeNode *nd){
-	nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
-	nd->claIndexUL=claMan->SetDirty(nd->claIndexUL);
-	nd->claIndexUR=claMan->SetDirty(nd->claIndexUR);
+	if(nd->claIndexDown != -1)
+		nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
+	if(nd->claIndexUL != -1)
+		nd->claIndexUL=claMan->SetDirty(nd->claIndexUL);
+	if(nd->claIndexUR != -1)
+		nd->claIndexUR=claMan->SetDirty(nd->claIndexUR);
 	}
 	
 void Tree::RemoveTempClaReservations(){
@@ -4588,6 +4653,8 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	sit.precision(15);
 #endif
 
+	if(siteToScore > 0) Ldat += siteToScore;
+
 	if(nRateCats == 1){
 #ifdef OMP_TERMSCORE_NSTATE
 		#pragma omp parallel for private(partial, Ldata, siteL) reduction(+ : totallnL)
@@ -4626,26 +4693,33 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 					else 
 						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult[i]);
 					}
-				assert(siteL > 0.0);
-				totallnL += (countit[i] * (log(siteL) - underflow_mult[i]));
-				assert(totallnL < 0.0);
-				}
-			else{
+				FLOAT_TYPE unscaledlnL = (log(siteL) - underflow_mult[i]);
+				assert(siteL > ZERO_POINT_ZERO);//this should be positive
+				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
+				//rounding error in multiplying a site that is fully ambiguous across the tree
+				//(which might not have been removed from the data because we are only scoring a
+				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
+				//> zero.  If that is the case, just ignore it
+				if(unscaledlnL < ZERO_POINT_ZERO)
+					totallnL += (countit[i] * unscaledlnL);
 
-	#ifndef OUTPUT_SITELIKES
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
+#endif
+				}
+			else{//nothing needs to be done if the count for this site is 0
 				}
 			Ldata++;
+	#ifndef OUTPUT_SITELIKES
 			}
 	#else
-				}
-			Ldata++;
-			for(int q=0;q<countit[i];q++)
+//			for(int q=0;q<countit[i];q++)
 				sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
 			}
 		sit.close();
 	#endif
 		}
-	else{
+	else{//multiple rates
 		FLOAT_TYPE rateL;
 #ifdef OMP_TERMSCORE_NSTATE
 		#pragma omp parallel for private(partial, Ldata, siteL, rateL) reduction(+ : totallnL)
@@ -4660,35 +4734,6 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 #else
 			if(1){
 #endif
-/*
-				vector<FLOAT_TYPE> stateContrib(nstates);
-				for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
-				if(*Ldata < nstates){ //no ambiguity
-					for(int rate=0;rate<nRateCats;rate++){
-						for(int from=0;from<nstates;from++){
-							stateContrib[from] += prmat[rate*nstates*nstates + (*Ldata)+nstates*from] * partial[from] * rateProb[rate];
-							}
-						partial += nstates;
-						}
-					}
-					
-				else if(*Ldata == nstates){ //total ambiguity
-					for(int rate=0;rate<nRateCats;rate++){
-						for(int from=0;from<nstates;from++){
-							stateContrib[from] += partial[from] * rateProb[rate];
-							}
-						partial += nstates;
-						}
-					}
-
-				else{ //partial ambiguity
-					assert(0);
-					}
-
-				siteL = 0.0;
-				for(int from=0;from<nstates;from++)
-					siteL += stateContrib[from] * freqs[from];
-*/
 				siteL = ZERO_POINT_ZERO;
 				if(*Ldata < nstates){ //no ambiguity
 					for(int rate=0;rate<nRateCats;rate++){
@@ -4719,23 +4764,31 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 					else 
 						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult[i]);
 					}
-				assert(siteL > ZERO_POINT_ZERO);
 
+				FLOAT_TYPE unscaledlnL = (log(siteL) - underflow_mult[i]);
+				assert(siteL > ZERO_POINT_ZERO);//this should be positive
+				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
+				//rounding error in multiplying a site that is fully ambiguous across the tree
+				//(which might not have been removed from the data because we are only scoring a
+				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
+				//> zero.  If that is the case, just ignore it
+				if(unscaledlnL < ZERO_POINT_ZERO)
+					totallnL += (countit[i] * unscaledlnL);
 
-				totallnL += countit[i] * (log(siteL) - underflow_mult[i]);
-				assert(totallnL < ZERO_POINT_ZERO);
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
+#endif
 				}
 			Ldata++;
 	#ifndef OUTPUT_SITELIKES
 			}
 	#else
-			for(int q=0;q<*(countit-1);q++)
+//			for(int q=0;q<*(countit-1);q++)
 				sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
 			}
 		sit.close();
 	#endif
 		}
-
 
 	delete []freqs;
 	return totallnL;
@@ -4763,6 +4816,10 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 
 #ifdef UNIX
 	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+#ifdef ALLOW_SINGLE_SITE
+	if(siteToScore > 0) Ldata = AdvanceDataPointer(Ldata, siteToScore);
 #endif
 
 	FLOAT_TYPE siteL, totallnL=0.0;
@@ -4828,6 +4885,10 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
 
 			totallnL += (countit[i] * (log(siteL) - underflow_mult[i]));
+
+#ifdef ALLOW_SINGLE_SITE
+			if(siteToScore > -1) break;
+#endif
 			}
 		else{
 #ifdef OPEN_MP
@@ -4919,6 +4980,10 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));	
 			
 			totallnL += (countit[i] * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
+
+#ifdef ALLOW_SINGLE_SITE
+			if(siteToScore > -1) break;
+#endif
 			}
 		else{
 #ifdef OPEN_MP
@@ -4938,7 +5003,6 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 #endif
 	return totallnL;
 	}
-
 
 FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat){
 	//this function assumes that the pmat is arranged with nstates^2 entries for the
@@ -4977,7 +5041,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 
 	if(nRateCats == 1){
 #ifdef OMP_INTSCORE_NSTATE
-	#pragma omp parallel for private(partial, CL1) reduction(+ : totallnL)
+	#pragma omp parallel for private(partial, CL1, siteL) reduction(+ : totallnL)
 		for(int i=0;i<nchar;i++){
 			partial = &(partialCLA->arr[nstates*i]);
 			CL1		= &(childCLA->arr[nstates*i]);
@@ -5005,11 +5069,24 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 					else 
 						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
 					}
-				totallnL += (countit[i] * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
 				CL1 += nstates;
 				partial += nstates;
+
+				FLOAT_TYPE unscaledlnL = (log(siteL) - underflow_mult1[i] - underflow_mult2[i]);
+				assert(siteL > ZERO_POINT_ZERO);//this should be positive
+				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
+				//rounding error in multiplying a site that is fully ambiguous across the tree
+				//(which might not have been removed from the data because we are only scoring a
+				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
+				//> zero.  If that is the case, just ignore it
+				if(unscaledlnL < ZERO_POINT_ZERO)
+					totallnL += (countit[i] * unscaledlnL);
+
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
+#endif
 				}
-			else{
+			else{//nothing needs to be done if the count for this site is 0
 				}
 
 #ifndef OUTPUT_SITELIKES
@@ -5037,25 +5114,6 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 #else
 			if(1){
 #endif
-/*				FLOAT_TYPE siteL = 0.0;
-				vector<FLOAT_TYPE> stateContrib(nstates);
-				for(int f=0;f<nstates;f++) stateContrib[f] = 0.0;
-				for(int rate=0;rate<nRateCats;rate++){
-					for(int from=0;from<nstates;from++){
-						FLOAT_TYPE temp = 0.0;
-						for(int to=0;to<nstates;to++){
-							temp += prmat[rate*nstates*nstates + from*nstates + to]*CL1[to];
-							}
-						stateContrib[from] += temp * partial[from] * rateProb[rate];
-						}
-					CL1 += nstates;
-					partial += nstates;
-					}
-				siteL = 0.0;
-				for(int from=0;from<nstates;from++)
-					siteL += stateContrib[from] * freqs[from];
-*/
-
 				siteL = ZERO_POINT_ZERO;
 				for(int rate=0;rate<nRateCats;rate++){
 					rateL = ZERO_POINT_ZERO;
@@ -5079,19 +5137,28 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 					else 
 						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
 					}
-				assert(siteL == siteL);
-				assert(siteL != ZERO_POINT_ZERO);
-				totallnL += (countit[i] * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
-				assert(totallnL == totallnL);
+				FLOAT_TYPE unscaledlnL = (log(siteL) - underflow_mult1[i] - underflow_mult2[i]);
+				assert(siteL > ZERO_POINT_ZERO);//this should be positive
+				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
+				//rounding error in multiplying a site that is fully ambiguous across the tree
+				//(which might not have been removed from the data because we are only scoring a
+				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
+				//> zero.  If that is the case, just ignore it
+				if(unscaledlnL < ZERO_POINT_ZERO)
+					totallnL += (countit[i] * unscaledlnL);
+
 #ifdef OUTPUT_SITELIKES
-				for(int q=0;q<countit[i];q++)
-					sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
+	//			for(int q=0;q<countit[i];q++)
+					sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << unscaledlnL << "\t" << totallnL << "\n";
+#endif
+
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
 #endif
 				}
-			else{
+			else{ //nothing needs to be done if the count of this site is 0
 				}
 			}
-		
 		}
 #ifdef OUTPUT_SITELIKES
 	sit.close();
@@ -5591,6 +5658,94 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 	FLOAT_TYPE omegaImprove=ZERO_POINT_ZERO;
 	FLOAT_TYPE minVal = 1.0e-5;
 	int i=0;
+
+#define DEBUG_OMEGA_OPT
+
+	//limiting change in any one pass
+	double maxRateChangeProp = 0.5;
+	double maxProbChange = 0.10;
+	
+	//DEBUG - limiting here now too
+/*	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
+		max(minVal, mod->FlexRate(i)*maxRateChangeProp),
+		min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), 
+		&Model::SetFlexRate);
+
+	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
+		max(minVal, mod->FlexProb(i)-maxProbChange), 
+		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
+		&Model::SetFlexProb);
+*/
+	//DEBUG - limiting here now too
+	if(mod->NRateCats() == 1) //allow a bit more change for a single omega
+		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), 0, 
+			max(minVal, mod->Omega(0)*0.333),
+			min(9999.9, mod->Omega(0)+mod->Omega(0)*0.333),
+			&Model::SetOmega);
+	else{
+		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, 
+			max(minVal, mod->Omega(i)*maxRateChangeProp),
+			min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp),
+			&Model::SetOmega);
+
+#ifdef DEBUG_OMEGA_OPT
+		for(int j=0;j<mod->NRateCats();j++)
+			outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
+#endif
+		
+		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
+			max(minVal, mod->OmegaProb(i)-maxProbChange),
+			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange),
+			&Model::SetOmegaProb);
+
+#ifdef DEBUG_OMEGA_OPT
+		for(int j=0;j<mod->NRateCats();j++)
+			outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
+#endif
+
+		for(i=1;i < mod->NRateCats()-1;i++){
+			omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, 
+				max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
+				min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp),
+				&Model::SetOmega);
+
+#ifdef DEBUG_OMEGA_OPT
+			for(int j=0;j<mod->NRateCats();j++)
+				outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
+#endif
+
+			omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
+				max(minVal, mod->OmegaProb(i)-maxProbChange),
+				min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange),
+				&Model::SetOmegaProb);
+
+#ifdef DEBUG_OMEGA_OPT
+			for(int j=0;j<mod->NRateCats();j++)
+				outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
+#endif
+			}
+		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, 
+			max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
+			min(9999.9, mod->Omega(i)+mod->Omega(i)*maxRateChangeProp),
+			&Model::SetOmega);
+
+#ifdef DEBUG_OMEGA_OPT
+		for(int j=0;j<mod->NRateCats();j++)
+			outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
+#endif
+
+		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
+			max(minVal, mod->OmegaProb(i)-maxProbChange),
+			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange),
+			&Model::SetOmegaProb);
+
+#ifdef DEBUG_OMEGA_OPT
+		for(int j=0;j<mod->NRateCats();j++)
+			outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
+#endif
+		}
+
+/*
 	if(mod->NRateCats() == 1) 
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), 0, minVal, 9999.9, &Model::SetOmega);
 	else{
@@ -5615,7 +5770,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 //		for(int j=0;j<mod->NRateCats();j++)
 //			cout << mod->Omega(j) << "\t" << mod->OmegaProb(j) << endl;
 		}
-	return omegaImprove;
+*/	return omegaImprove;
 	}
 
 FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
@@ -5623,6 +5778,40 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 	FLOAT_TYPE minVal = 1.0e-5;
 	int i=0;
 
+	//limiting change in any one pass
+	double maxRateChangeProp = 0.75;
+	double maxProbChange = 0.20;
+	
+	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
+		max(minVal, mod->FlexRate(i)*maxRateChangeProp),
+		min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), 
+		&Model::SetFlexRate);
+
+	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
+		max(minVal, mod->FlexProb(i)-maxProbChange), 
+		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
+		&Model::SetFlexProb);
+	for(i=1;i < mod->NRateCats()-1;i++){
+		flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
+			max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp), 
+			min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),
+			&Model::SetFlexRate);
+		flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
+			max(minVal, mod->FlexProb(i)-maxProbChange), 
+			min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
+			&Model::SetFlexProb);
+		}
+	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
+		max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp),
+		min(999.9, mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),
+		&Model::SetFlexRate);
+	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
+		max(minVal, mod->FlexProb(i)-maxProbChange), 
+		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
+		&Model::SetFlexProb);
+
+
+/*
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, minVal, mod->FlexRate(i+1), &Model::SetFlexRate);
 
 //		for(int j=0;j<mod->NRateCats();j++)
@@ -5644,7 +5833,7 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetFlexProb);
 //		for(int j=0;j<mod->NRateCats();j++)
 //			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
-	
+*/	
 	return flexImprove;
 	}
 
@@ -5813,84 +6002,10 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 				LCL+=4;
 				RCL+=4;
 
-/*
-				L1=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
-				L2=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
-				L3=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
-				L4=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
-
-				R1=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-				R2=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-				R3=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
-				R4=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-								
-				dest[0] = L1 * R1;
-				dest[1] = L2 * R2;
-				dest[2] = L3 * R3;
-				dest[3] = L4 * R4;
-
-				assert(dest[0] > -1.0);
-				dest+=4;
-				LCL+=4;
-				RCL+=4;
-				
-				L1=( Lpr[16+0]*LCL[0]+Lpr[16+1]*LCL[1]+Lpr[16+2]*LCL[2]+Lpr[16+3]*LCL[3]);
-				L2=( Lpr[16+4]*LCL[0]+Lpr[16+5]*LCL[1]+Lpr[16+6]*LCL[2]+Lpr[16+7]*LCL[3]);
-				L3=( Lpr[16+8]*LCL[0]+Lpr[16+9]*LCL[1]+Lpr[16+10]*LCL[2]+Lpr[16+11]*LCL[3]);
-				L4=( Lpr[16+12]*LCL[0]+Lpr[16+13]*LCL[1]+Lpr[16+14]*LCL[2]+Lpr[16+15]*LCL[3]);
-
-				R1=(Rpr[16+0]*RCL[0]+Rpr[16+1]*RCL[1]+Rpr[16+2]*RCL[2]+Rpr[16+3]*RCL[3]);
-				R2=(Rpr[16+4]*RCL[0]+Rpr[16+5]*RCL[1]+Rpr[16+6]*RCL[2]+Rpr[16+7]*RCL[3]);
-				R3=(Rpr[16+8]*RCL[0]+Rpr[16+9]*RCL[1]+Rpr[16+10]*RCL[2]+Rpr[16+11]*RCL[3]);			
-				R4=(Rpr[16+12]*RCL[0]+Rpr[16+13]*RCL[1]+Rpr[16+14]*RCL[2]+Rpr[16+15]*RCL[3]);
-				
-				dest[0] = L1 * R1;
-				dest[1] = L2 * R2;
-				dest[2] = L3 * R3;
-				dest[3] = L4 * R4;
-
-				dest+=4;
-				LCL+=4;
-				RCL+=4;		
-
-				L1=( Lpr[32+0]*LCL[0]+Lpr[32+1]*LCL[1]+Lpr[32+2]*LCL[2]+Lpr[32+3]*LCL[3]);
-				L2=( Lpr[32+4]*LCL[0]+Lpr[32+5]*LCL[1]+Lpr[32+6]*LCL[2]+Lpr[32+7]*LCL[3]);
-				L3=( Lpr[32+8]*LCL[0]+Lpr[32+9]*LCL[1]+Lpr[32+10]*LCL[2]+Lpr[32+11]*LCL[3]);
-				L4=( Lpr[32+12]*LCL[0]+Lpr[32+13]*LCL[1]+Lpr[32+14]*LCL[2]+Lpr[32+15]*LCL[3]);
-
-				R1=(Rpr[32+0]*RCL[0]+Rpr[32+1]*RCL[1]+Rpr[32+2]*RCL[2]+Rpr[32+3]*RCL[3]);
-				R2=(Rpr[32+4]*RCL[0]+Rpr[32+5]*RCL[1]+Rpr[32+6]*RCL[2]+Rpr[32+7]*RCL[3]);
-				R3=(Rpr[32+8]*RCL[0]+Rpr[32+9]*RCL[1]+Rpr[32+10]*RCL[2]+Rpr[32+11]*RCL[3]);			
-				R4=(Rpr[32+12]*RCL[0]+Rpr[32+13]*RCL[1]+Rpr[32+14]*RCL[2]+Rpr[32+15]*RCL[3]);
-				
-				dest[0] = L1 * R1;
-				dest[1] = L2 * R2;
-				dest[2] = L3 * R3;
-				dest[3] = L4 * R4;
-
-				dest+=4;
-				LCL+=4;
-				RCL+=4;
-
-				L1=( Lpr[48+0]*LCL[0]+Lpr[48+1]*LCL[1]+Lpr[48+2]*LCL[2]+Lpr[48+3]*LCL[3]);
-				L2=( Lpr[48+4]*LCL[0]+Lpr[48+5]*LCL[1]+Lpr[48+6]*LCL[2]+Lpr[48+7]*LCL[3]);
-				L3=( Lpr[48+8]*LCL[0]+Lpr[48+9]*LCL[1]+Lpr[48+10]*LCL[2]+Lpr[48+11]*LCL[3]);
-				L4=( Lpr[48+12]*LCL[0]+Lpr[48+13]*LCL[1]+Lpr[48+14]*LCL[2]+Lpr[48+15]*LCL[3]);
-
-				R1=(Rpr[48+0]*RCL[0]+Rpr[48+1]*RCL[1]+Rpr[48+2]*RCL[2]+Rpr[48+3]*RCL[3]);
-				R2=(Rpr[48+4]*RCL[0]+Rpr[48+5]*RCL[1]+Rpr[48+6]*RCL[2]+Rpr[48+7]*RCL[3]);
-				R3=(Rpr[48+8]*RCL[0]+Rpr[48+9]*RCL[1]+Rpr[48+10]*RCL[2]+Rpr[48+11]*RCL[3]);			
-				R4=(Rpr[48+12]*RCL[0]+Rpr[48+13]*RCL[1]+Rpr[48+14]*RCL[2]+Rpr[48+15]*RCL[3]);
-				
-				dest[0] = L1 * R1;
-				dest[1] = L2 * R2;
-				dest[2] = L3 * R3;
-				dest[3] = L4 * R4;
-
-				dest+=4;
-				LCL+=4;
-				RCL+=4;
-	*/			}
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
+#endif
+				}
 			}
 		}
 
@@ -5913,33 +6028,6 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 			if(1){
 #endif
 				for(r=0;r<nRateCats;r++){
-#define NORM
-#ifdef ALT
-					//alt
-					dest[0] = ( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]) * (Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-					dest[1] = ( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]) * (Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-					dest[2] = ( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]) * (Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);
-					dest[3] = ( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]) * (Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-#endif
-					/*
-					dest[0] = ( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]) * (Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
-					dest[1] = ( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]) * (Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
-					dest[2] = ( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]) * (Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);
-					dest[3] = ( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]) * (Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
-*/
-#ifdef ALT2
-					//alt2
-					dest[0]=( Lpr[0]*LCL[0]+Lpr[1]*LCL[1]+Lpr[2]*LCL[2]+Lpr[3]*LCL[3]);
-					dest[1]=( Lpr[4]*LCL[0]+Lpr[5]*LCL[1]+Lpr[6]*LCL[2]+Lpr[7]*LCL[3]);
-					dest[2]=( Lpr[8]*LCL[0]+Lpr[9]*LCL[1]+Lpr[10]*LCL[2]+Lpr[11]*LCL[3]);
-					dest[3]=( Lpr[12]*LCL[0]+Lpr[13]*LCL[1]+Lpr[14]*LCL[2]+Lpr[15]*LCL[3]);
-
-					dest[0]*=(Rpr[0]*RCL[0]+Rpr[1]*RCL[1]+Rpr[2]*RCL[2]+Rpr[3]*RCL[3]);
-					dest[1]*=(Rpr[4]*RCL[0]+Rpr[5]*RCL[1]+Rpr[6]*RCL[2]+Rpr[7]*RCL[3]);
-					dest[2]*=(Rpr[8]*RCL[0]+Rpr[9]*RCL[1]+Rpr[10]*RCL[2]+Rpr[11]*RCL[3]);			
-					dest[3]*=(Rpr[12]*RCL[0]+Rpr[13]*RCL[1]+Rpr[14]*RCL[2]+Rpr[15]*RCL[3]);
-#endif
-#ifdef NORM
 					L1=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
 					L2=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
 					L3=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
@@ -5955,12 +6043,13 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 					dest[2] = L3 * R3;
 					dest[3] = L4 * R4;
 
-	//				assert(dest[0] == dest[0] && dest[0] > 0.0f && dest[0] < 1.0e20);
-#endif
 					dest+=4;
 					LCL+=4;
 					RCL+=4;
-					}
+					}			
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
+#endif
 				}
 			}
 		}
@@ -6024,6 +6113,10 @@ void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondL
 				}
 			assert(dest[-nstates*nRateCats] >= 0.0);
 			assert(dest[-nstates*nRateCats] == dest[-nstates*nRateCats]);
+
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
+#endif
 			}
 		}
 
@@ -6048,6 +6141,13 @@ void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE 
 
 #ifdef UNIX
 	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+#ifdef ALLOW_SINGLE_SITE
+	if(siteToScore > 0){
+		Ldata = AdvanceDataPointer(Ldata, siteToScore);
+		Rdata = AdvanceDataPointer(Rdata, siteToScore);
+		}
 #endif
 
 	for(int i=0;i<nchar;i++){
@@ -6121,7 +6221,6 @@ void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE 
 								*(dest+(r*4)+1) += Lpr[(*Ldata+4)+16*r];
 								*(dest+(r*4)+2) += Lpr[(*Ldata+8)+16*r];
 								*(dest+(r*4)+3) += Lpr[(*Ldata+12)+16*r];
-	//							assert(*(dest-1)>ZERO_POINT_ZERO);
 								}
 							Ldata++;
 							}
@@ -6133,7 +6232,6 @@ void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE 
 						*(dest++) *= Rpr[(*Rdata+4)+16*i];
 						*(dest++) *= Rpr[(*Rdata+8)+16*i];
 						*(dest++) *= Rpr[(*Rdata+12)+16*i];
-	//					assert(*(dest-1)>ZERO_POINT_ZERO);
 						}
 					Rdata++;		
 					}
@@ -6149,7 +6247,6 @@ void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE 
 							tempcla[(r*4)+1] += Rpr[(*Rdata+4)+16*r];
 							tempcla[(r*4)+2] += Rpr[(*Rdata+8)+16*r];
 							tempcla[(r*4)+3] += Rpr[(*Rdata+12)+16*r];
-	//						assert(*(dest-1)>ZERO_POINT_ZERO);
 							}
 						Rdata++;
 						}
@@ -6159,7 +6256,6 @@ void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE 
 						*(dest++) *= tempcla[(i*4)+1];
 						*(dest++) *= tempcla[(i*4)+2];
 						*(dest++) *= tempcla[(i*4)+3];
-	//					assert(*(dest-1)>ZERO_POINT_ZERO);
 						}
 					}
 				else{//fully ambiguous right
@@ -6167,8 +6263,11 @@ void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE 
 					Rdata++;
 					}
 				}
+#ifdef ALLOW_SINGLE_SITE
+			if(siteToScore > -1) break;
+#endif
 			}
-		else{
+		else{//if the count for this site is 0
 #ifdef OPEN_MP
 			//this is a little strange, but dest only needs to be advanced in the case of OMP
 			//because sections of the CLAs corresponding to sites with count=0 are skipped
@@ -6211,6 +6310,10 @@ void Tree::CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT
 #ifdef UNIX
 	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
+	if(siteToScore > 0){
+		Ldata += siteToScore;
+		Rdata += siteToScore;
+		}
 
 	for(int i=0;i<nchar;i++){
 #ifdef USE_COUNTS_IN_BOOT
@@ -6249,11 +6352,10 @@ void Tree::CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT
 				Ldata++;
 				Rdata++;
 				}
-
-//		assert(dest[i*nstates] > 0.0);
-//		assert(dest[i*nstates+19] < 1e10);
-//		assert(dest[i*nstates] == dest[i*nstates]);
 			dest += nRateCats*nstates;
+#ifdef ALLOW_SINGLE_SITE
+			if(siteToScore > -1) break;
+#endif
 			}
 		else{
 #ifdef OPEN_MP
@@ -6289,6 +6391,10 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 #ifdef UNIX	
 	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);	
+#endif
+
+#ifdef ALLOW_SINGLE_SITE
+	if(siteToScore > 0) data2 = AdvanceDataPointer(data2, siteToScore);
 #endif
 
 	if(nRateCats==4){//unrolled 4 rate version
@@ -6327,10 +6433,8 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 					dest[14] = ((pr1[56]*CL1[12]+pr1[57]*CL1[13])+(pr1[58]*CL1[14]+pr1[59]*CL1[15])) * pr2[*data2+8+48];
 					dest[15] = ((pr1[60]*CL1[12]+pr1[61]*CL1[13])+(pr1[62]*CL1[14]+pr1[63]*CL1[15])) * pr2[*data2+12+48];
 
-	#ifndef OMP_INTTERMCLA
 					dest+=16;
 					data2++;
-	#endif
 					}
 				else if(*data2 == -4){//total ambiguity
 					dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
@@ -6352,11 +6456,9 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 					dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
 					dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
 					dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-	//				assert(dest[0] > 0.0);
-	#ifndef OMP_INTTERMCLA
+
 					dest+=16;
 					data2++;
-	#endif
 					}
 				else {//partial ambiguity
 					//first figure in the ambiguous terminal
@@ -6392,22 +6494,14 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 					*(dest++) *= ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
 					*(dest++) *= ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
 					*(dest++) *= ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-					assert(dest[-16] >= 0.0);
 					}
-#ifndef OMP_INTTERMCLA		
 				CL1+=16;
-#endif			
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
+#endif
 				}
 			else{
-				//dest += 16;
-				//CL1+=16;
-				if(*data2 > -1 || *data2 == -4) data2++;
-				else{
-					int states = -1 * *data2;
-					do{
-						data2++;
-						}while (states-- > 0);
-					}
+				data2 = AdvanceDataPointer(data2, 1);
 				}
 			}
 		}
@@ -6426,7 +6520,6 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 #else
 			if(1){
 #endif
-
 				if(*data2 > -1){ //no ambiguity
 					for(int r=0;r<nRateCats;r++){
 						dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * pr2[(*data2)+16*r];
@@ -6460,7 +6553,6 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 							}
 						data2++;
 						}
-					
 					//now add the internal child
 					for(int r=0;r<nRateCats;r++){
 						*(dest++) *= ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
@@ -6469,20 +6561,13 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 						*(dest++) *= ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
 						}
 					}
-#ifndef OMP_INTTERMCLA	
 				CL1 += 4*nRateCats;
+#ifdef ALLOW_SINGLE_SITE
+				if(siteToScore > -1) break;
 #endif
 				}
 			else{
-				//dest += 16;
-				//CL1+=16;
-				if(*data2 > -1 || *data2 == -4) data2++;
-				else{
-					int states = -1 * *data2;
-					do{
-						data2++;
-						}while (states-- > 0);
-					}
+				data2 = AdvanceDataPointer(data2, 1);
 				}
 			}
 		}
@@ -6511,6 +6596,9 @@ void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondL
 	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);	
 #endif
+
+	if(siteToScore > 0) data2 += siteToScore;
+
 #ifdef OMP_INTTERMCLA_NSTATE
 	#pragma omp parallel for private(dest, CL1, data2)
 	for(int i=0;i<nchar;i++){
@@ -6538,6 +6626,9 @@ void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondL
 				CL1 += nstates;
 				}
 			data2++;
+#ifdef ALLOW_SINGLE_SITE
+			if(siteToScore > -1) break;
+#endif
 			}
 		else data2++;
 		}
@@ -6664,3 +6755,135 @@ void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondL
 	for(int i=0;i<nchar;i++)
 		destCLA->underflow_mult[i]=partialCLA->underflow_mult[i];
 }
+
+//SINGLE SITE FUNCTIONS
+
+pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPrecision){
+	//this is silly, but the site likelihood calculating function will do it for the 
+	//correct single site, but using the pattern count of the first character.  So, we'll
+	//need to divide by this count to get the proper site like
+	FLOAT_TYPE siteCount = (FLOAT_TYPE) data->Count(0);
+	Score();
+	FLOAT_TYPE start=lnL/siteCount;
+	FLOAT_TYPE prev=lnL/siteCount;
+	FLOAT_TYPE cur;
+	FLOAT_TYPE scale;
+	FLOAT_TYPE t;
+	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
+	FLOAT_TYPE effectiveScale = ONE_POINT_ZERO; //this measures the change in scale relative to what it began at.
+	FLOAT_TYPE upperBracket = FLT_MAX;   //the smallest value we know of with a negative d1 (relative to inital scale of 1.0!)
+	FLOAT_TYPE lowerBracket = FLT_MIN;   //the largest value we know of with a positive d1 (relative to inital scale of 1.0!)
+	FLOAT_TYPE incr;
+
+#ifdef DEBUG_SCALE_OPT
+	ofstream deb("scaleTrace.log");
+	deb.precision(20);
+	for(int s=0;s<50;s++){
+		FLOAT_TYPE scale=0.5 + s*.025;
+		ScaleWholeTree(scale);
+		Score();
+		deb << scale << "\t" << lnL << endl;
+		ScaleWholeTree(ONE_POINT_ZERO/scale);	
+		}
+	deb.close();
+#endif
+
+	if(FloatingPointEquals(lnL, ZERO_POINT_ZERO, 1e-8)){
+		return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, ZERO_POINT_ZERO);
+		}
+
+	int pass=1;
+	while(1){
+		//reversed this now so the reduction in scale is done first when getting the 
+		//derivs.  This works better if some blens are at DEF_MAX_BLEN because the 
+		//scaling up causes them to hit the max and the relative blens to change
+
+#ifdef SINGLE_PRECISION_FLOATS
+		incr=0.005f;
+#else
+		incr=0.005;
+#endif
+
+		scale=ONE_POINT_ZERO-incr;
+
+		ScaleWholeTree(scale);
+		Score();
+		cur=lnL/siteCount;
+		ScaleWholeTree(ONE_POINT_ZERO/scale);//return the tree to its original scale	
+		FLOAT_TYPE d12=(cur-prev)/-incr;
+
+		if(pass == 1 && fabs(d12) < 1.0e-8){
+			//The surface looks suspiciously flat.  Test if the likelihood
+			//is really invariant for different scales (which means that
+			//the site is all missing or only has an observed state for one taxon)
+			ScaleWholeTree(1.1);
+			Score();
+			FLOAT_TYPE s = lnL/siteCount;
+			ScaleWholeTree(1.0/1.1);
+			if(fabs(prev - s) < 1.0e-8) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, prev);
+			}
+
+		scale=ONE_POINT_ZERO + incr;
+		ScaleWholeTree(scale);
+		Score();
+		cur=lnL/siteCount;
+		ScaleWholeTree(ONE_POINT_ZERO/scale);//return the tree to its original scale
+		FLOAT_TYPE d11=(cur-prev)/incr;
+
+		FLOAT_TYPE d1=(d11+d12)*ZERO_POINT_FIVE;
+		FLOAT_TYPE d2=(d11-d12)/incr;
+		
+		FLOAT_TYPE est = -d1/d2;
+		FLOAT_TYPE estImprove = d1*est + d2*(est*est*ZERO_POINT_FIVE);
+
+		//return conditions
+		if(estImprove < optPrecision && d2 < ZERO_POINT_ZERO){
+			ScaleWholeTree(ONE_POINT_ZERO/effectiveScale);
+			//cout << pass << endl;
+			return make_pair<FLOAT_TYPE, FLOAT_TYPE>(effectiveScale, prev);
+			}
+		
+		if(d2 < ZERO_POINT_ZERO){
+			est = max(min((FLOAT_TYPE)0.5, est), (FLOAT_TYPE)-0.5);
+			t=ONE_POINT_ZERO + est;
+			}
+		else{
+			if(d1 > ZERO_POINT_ZERO) t=(FLOAT_TYPE)2.0;
+			else t=(FLOAT_TYPE)0.5;
+			}
+		
+		//update the brackets
+		if(d1 <= ZERO_POINT_ZERO && effectiveScale < upperBracket)
+			upperBracket = effectiveScale;
+		else if(d1 > ZERO_POINT_ZERO && effectiveScale > lowerBracket)
+			lowerBracket = effectiveScale;
+
+		//if the surface is wacky and we are going to shoot past one of our brackets
+		//take evasive action by going halfway to the bracket
+		if((effectiveScale * t) <= lowerBracket){
+			t = (lowerBracket + effectiveScale) * ZERO_POINT_FIVE / effectiveScale;
+			}
+		else if((effectiveScale * t) >= upperBracket){
+			t = (upperBracket + effectiveScale) * ZERO_POINT_FIVE / effectiveScale;
+			}
+
+		scale=t;
+		effectiveScale *= scale;
+		if(effectiveScale > 100.0) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(100.0, prev);
+		ScaleWholeTree(scale);
+		if(effectiveScale < 1e-4){
+			//The rate is essentially zero.  Invariant sites should be getting caught 
+			//before even calling this func, so this probably won't be visited
+			ScaleWholeTree(1.0/effectiveScale);
+			return make_pair<FLOAT_TYPE, FLOAT_TYPE>(effectiveScale, prev);
+			}
+		
+		Score();
+		cur=lnL/siteCount;
+		lastChange = cur - prev;
+		prev=cur;
+		pass++;
+		}
+	assert(0);
+	}
+

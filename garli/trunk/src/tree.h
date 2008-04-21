@@ -84,6 +84,8 @@ class Tree{
 
 		static Bipartition *outgroup;
 
+		static int siteToScore;
+
 		int calcs;
 
 	enum{//the directions for sweeping of CLAs
@@ -91,13 +93,20 @@ class Tree{
 		UPLEFT = 2,
 		UPRIGHT = 3,
 		ROOT = 4
-		};		
+		};
+
+	enum{
+		DIRTY = 0,
+		CLEAN_STANDARDIZED = 1,
+		CLEAN_UNSTANDARDIZED = 2,
+		TEMP_ADJUSTED = 3
+		}bipartCond;
 		
 	public: 
 		//construction and allocation functions
 		Tree();
 		Tree(NucleotideData*,CondLikeArray **sharedcl);
-		Tree(const char*, bool numericalTaxa, bool allowPolytomies=false);
+		Tree(const char*, bool numericalTaxa, bool allowPolytomies=false, bool allowMissingTaxa=false);
 		void AllocateTree();
 		void AssignCLAsFromMaster();
 	
@@ -106,7 +115,7 @@ class Tree{
 
 		//functions for manipulating and making trees
 		void AddRandomNode(int nodenum, int & );
-		void AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition &mask);
+		void AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition *mask);
 		void MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned);
 		bool ArbitrarilyBifurcate();
 		void SortAllNodesArray();
@@ -136,8 +145,8 @@ class Tree{
 		void DeterministicSwapperByDist(Individual *source, double optPrecision, int range, bool furthestFirst);
 		void DeterministicSwapperByCut(Individual *source, double optPrecision, int range, bool furthestFirst);
 		void DeterministicSwapperRandom(Individual *source, double optPrecision, int range);
-		void GatherValidReconnectionNodes(ReconList &list, int maxDist, TreeNode *cut, const TreeNode *subtreeNode);
-		void GatherValidReconnectionNodes(int maxRange, TreeNode *cut, const TreeNode *subtreeNode);
+		void GatherValidReconnectionNodes(ReconList &list, int maxDist, TreeNode *cut, const TreeNode *subtreeNode, Bipartition *partialMask=NULL);
+		void GatherValidReconnectionNodes(int maxRange, TreeNode *cut, const TreeNode *subtreeNode, Bipartition *partialMask=NULL);
 		void FillAllSwapsList(ReconList *cuts, int reconLim);
 		unsigned FillWeightsForAllSwaps(ReconList *cuts, double *);
 		bool AssignWeightsToSwaps(TreeNode *cut);
@@ -162,17 +171,24 @@ class Tree{
 
 		//functions for dealing with constraints and bipartitions
 		static void LoadConstraints(ifstream &con, int nTaxa);
-		bool AllowedByConstraint(Constraint *constr, TreeNode *cut, ReconNode *broken, Bipartition &proposed) ;
-		bool AllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
-		bool AllowedByPositiveBackboneConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
-		bool AllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *cut, TreeNode *broken);
-		bool RecursiveAllowedByPositiveConstraintWithMask(Constraint *constr, const Bipartition *mask, TreeNode *nd);
-		bool RecursiveAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
-		void CalcBipartitions(bool standardize=true);
+		bool SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, ReconNode *broken, const Bipartition &proposed, const Bipartition *partialMask);
+		
+		//functions for determining if adding a particular taxon to a particular place in a growing tree is allowed by any constraints
+		//this is used if the taxon to be added is NOT already in the tree (so not for testing the allowability of swaps)
+		//these depend on the bipartitions across the tree NOT being standardized (not all having the taxon 1 bit on)
+		bool TaxonAdditionAllowedByPositiveConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *toAdd, TreeNode *broken);
+		bool TaxonAdditionAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *toAdd, TreeNode *broken);
+		bool TaxonAdditionAllowedByPositiveBackboneConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *toAdd, TreeNode *broken);
+		bool TaxonAdditionAllowedByNegativeBackboneConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *toAdd, TreeNode *broken);
+		
+		bool RecursiveAllowedByConstraintWithMask(const Constraint &constr, const Bipartition *partialMask, const TreeNode *nd);
+		//bool RecursiveAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
+		void CalcBipartitions(bool standardize);
 		void OutputBipartitions();
-		TreeNode *ContainsBipartition(const Bipartition *bip);
-		TreeNode *ContainsBipartitionOrComplement(const Bipartition *bip);
-		TreeNode *ContainsMaskedBipartitionOrComplement(const Bipartition *bip, const Bipartition *mask);
+		TreeNode *ContainsBipartition(const Bipartition &bip);
+		TreeNode *ContainsBipartitionOrComplement(const Bipartition &bip);
+		TreeNode *ContainsMaskedBipartitionOrComplement(const Bipartition &bip, const Bipartition &mask);
+		void AdjustBipartsForSwap(int cut, int broken);
 
 		// functions for computing likelihood
 		bool ConditionalLikelihood(int direction, TreeNode* nd);	
@@ -228,6 +244,8 @@ class Tree{
 		void SetNodesUnoptimized();
 		void RescaleRateHet(CondLikeArray *destCLA);
 		void RescaleRateHetNState(CondLikeArray *destCLA);
+
+		pair<FLOAT_TYPE, FLOAT_TYPE> OptimizeSingleSiteTreeScale(FLOAT_TYPE optPrecision);
 
 		//functions for dealing with conditional likelihood arrays
 		void MarkUpwardClasToReclaim(int subtreeNode);
