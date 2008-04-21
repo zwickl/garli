@@ -44,21 +44,22 @@ MyNexusToken::MyNexusToken(
 void MyNexusToken::OutputComment(
   const NxsString &msg)	/* the output comment to be displayed */
 	{
-	string s = "GarliScore";
-	unsigned pos = msg.find(s);
+	unsigned pos;
+	string s;
+	//doing away with this - was problematic and not very useful
+/*	s = "GarliScore";
+	pos = msg.find(s);
 	if(pos != string::npos){
-		outman.UserMessageNoCR("This is apparently a tree inferred by Garli in a previous run.\n\tIts score was");
-		outman.UserMessage(msg.substr(s.length()));
+		outman.UserMessage("This is apparently a tree inferred by Garli in a previous run.  Its score was %s", msg.substr(s.length()).c_str());
 		return;
 		}
 	s = "GarliModel";
 	pos = msg.find(s);
 	if(pos != string::npos){
-		outman.UserMessageNoCR("Garli's model parameter values used in inferring this tree:\n\t");
-		outman.UserMessage(msg.substr(s.length()));
+		outman.UserMessage("Garli's model parameter values used in inferring this tree:\n\t%s", msg.substr(s.length()).c_str());
 		return;
 		}
-	s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
+*/s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
 					//they are only optimal for a certain tree. This is mainly for output when reading the trees in PAUP
 					//and we will just ignore them here
 	pos = msg.find(s);
@@ -66,6 +67,7 @@ void MyNexusToken::OutputComment(
 	
 	outman.UserMessage("\nCOMMENT FOUND IN NEXUS FILE (output verbatim):");
 	outman.UserMessage(msg);
+	outman.UserMessage("(END OF NEXUS COMMENT)");
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -90,6 +92,27 @@ GarliReader::GarliReader()
 	next_command	= NULL;
 
 	FactoryDefaults();
+	
+	//moved all of this allocation to FactoryDefaults
+	/*
+	taxa			= new NxsTaxaBlock();
+	trees			= new NxsTreesBlock(taxa);
+#if defined(NCL_MAJOR_VERSION) && (NCL_MAJOR_VERSION >= 2) && (NCL_MINOR_VERSION >= 1)
+	trees->SetAllowImplicitNames(true);
+#endif
+	assumptions		= new NxsAssumptionsBlock(taxa);
+	characters		= new NxsCharactersBlock(taxa, assumptions);
+	distances		= new NxsDistancesBlock(taxa);
+	data			= new NxsDataBlock(taxa, assumptions);
+
+	Add(taxa);
+	Add(trees);
+	Add(assumptions);
+	Add(characters);
+	Add(distances);
+	Add(data);
+	Add(this);
+*/
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -144,6 +167,11 @@ bool GarliReader::EnteringBlock(
 	else if(blockName.Equals("ASSUMPTIONS") && charBlocks.empty() == false){
 		outman.UserMessage("\n\nWARNING:Assumptions block found with multiple characters blocks.\n\tCheck output carefully to ensure that any excluded characters\n\twere applied to the correct characters block.\n\tThe correct exclusion format in an Assumptions block is this:\n\tEXSET * UNTITLED = 10-11;\n\tBut it will only be applied to the LAST characters block in the file.\n\tYou may want to comment out unused characters blocks.\n");
 		}
+	//3/25/08 if we already found a Garli block with a model (e.g. in the dataset file)
+	//we should crap out, since we don't know which one the user meant to use
+	//this is a change from previous behavior, in which I wanted the second to just override the first.
+	else if(blockName.Equals("GARLI") && FoundModelString())
+		throw ErrorException("Multiple GARLI blocks found (possibly in multiple files).\n\tRemove or comment out all but one.");
 
 	return true;
 	}
@@ -255,6 +283,28 @@ void GarliReader::FactoryDefaults()
 	if (next_command == NULL)
 		next_command = new char[COMMAND_MAXLEN + 1];
 	next_command[0] = '\0';
+
+	//moved all of this allocation to here from the constructor - otherwise calling FactoryDefaults
+	//just makes the GarliReader empty
+	taxa			= new NxsTaxaBlock();
+	trees			= new NxsTreesBlock(taxa);
+#if defined(NCL_MAJOR_VERSION) && (NCL_MAJOR_VERSION >= 2) && (NCL_MINOR_VERSION >= 1)
+	trees->SetAllowImplicitNames(true);
+#endif
+	assumptions		= new NxsAssumptionsBlock(taxa);
+	characters		= new NxsCharactersBlock(taxa, assumptions);
+	distances		= new NxsDistancesBlock(taxa);
+	data			= new NxsDataBlock(taxa, assumptions);
+
+	Add(taxa);
+	Add(trees);
+	Add(assumptions);
+	Add(characters);
+	Add(distances);
+	Add(data);
+	Add(this);
+
+	modelString = "";
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -405,7 +455,7 @@ void GarliReader::HandleExecute(
 		}
 	}
 
-int GarliReader::HandleExecute(const char *filename)	
+int GarliReader::HandleExecute(const char *filename, bool purge)	
 	{
 	// The filename to execute is passed in
 	//
@@ -415,7 +465,7 @@ int GarliReader::HandleExecute(const char *filename)
 
 	if (FileExists(fn.c_str()))
 		{
-		PurgeBlocks();
+		if(purge) PurgeBlocks();
 
 		ifstream inf(fn.c_str(), ios::binary | ios::in);
 
@@ -427,7 +477,12 @@ int GarliReader::HandleExecute(const char *filename)
 			Execute(ftoken);
 			}
 		catch(NxsException x){
-			NexusError(errormsg, x.pos, x.line, x.col);
+			//DJZ 3/24/08 this was a bug that I inherited from the NCL example BasicCmdLine
+			//the actual error message in x.msg was never getting printed because the empty
+			//errormsg member of NexusBlock was being passed instead of the error stored in the
+			//NxsException
+			//NexusError(errormsg, x.pos, x.line, x.col);
+			NexusError(x.msg, x.pos, x.line, x.col);
 			ret = 1;//error
 			}
 
@@ -884,6 +939,9 @@ void GarliReader::PurgeBlocks()
 
 	taxa		= new NxsTaxaBlock();
 	trees		= new NxsTreesBlock(taxa);
+#if defined(NCL_MAJOR_VERSION) && (NCL_MAJOR_VERSION >= 2) && (NCL_MINOR_VERSION >= 1)
+	trees->SetAllowImplicitNames(true);
+#endif
 	assumptions	= new NxsAssumptionsBlock(taxa);
 	distances	= new NxsDistancesBlock(taxa);
 	characters	= new NxsCharactersBlock(taxa, assumptions);
@@ -1005,6 +1063,7 @@ void GarliReader::Read(
 |	Overrides the NxsBlock virtual function. This function does nothing because the GarliReader block is simply a
 |	private command block and does not store any data.
 */
+
 void GarliReader::Reset()
 	{
 	}
@@ -1036,6 +1095,9 @@ void GarliReader::Run(
 	{
 	taxa			= new NxsTaxaBlock();
 	trees			= new NxsTreesBlock(taxa);
+#if defined(NCL_MAJOR_VERSION) && (NCL_MAJOR_VERSION >= 2) && (NCL_MINOR_VERSION >= 1)
+	trees->SetAllowImplicitNames(true);
+#endif
 	assumptions		= new NxsAssumptionsBlock(taxa);
 	characters		= new NxsCharactersBlock(taxa, assumptions);
 	distances		= new NxsDistancesBlock(taxa);
@@ -1198,8 +1260,11 @@ bool GarliReader::UserQuery(
 */
 inline void	GarliReader::OutputComment(const NxsString &msg)
 	{
-	string s = "GarliScore";
-	unsigned pos = msg.find(s);
+	unsigned pos;
+	string s;
+	//doing away with this - was problematic and not very useful
+/*	s = "GarliScore";
+	pos = msg.find(s);
 	if(pos != string::npos){
 		outman.UserMessage("This is apparently a tree inferred by Garli in a previous run.  Its score was %s", msg.substr(s.length()).c_str());
 		return;
@@ -1210,7 +1275,7 @@ inline void	GarliReader::OutputComment(const NxsString &msg)
 		outman.UserMessage("Garli's model parameter values used in inferring this tree:\n\t%s", msg.substr(s.length()).c_str());
 		return;
 		}
-	s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
+*/	s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
 					//they are only optimal for a certain tree. This is mainly for output when reading the trees in PAUP
 					//and we will just ignore them here
 	pos = msg.find(s);
@@ -1218,6 +1283,7 @@ inline void	GarliReader::OutputComment(const NxsString &msg)
 	
 	outman.UserMessage("\nCOMMENT FOUND IN NEXUS FILE (output verbatim):");
 	outman.UserMessage(msg);
+	outman.UserMessage("(END OF NEXUS COMMENT)");
 	}
 
 GarliReader & GarliReader::GetInstance()

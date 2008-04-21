@@ -158,12 +158,13 @@ class GarliReader
 		void HandleGarliReader(NxsToken &token);
 
 	public:
-		int				HandleExecute(const char *filename);
+		int				HandleExecute(const char *filename, bool purge);
 		const char*			GetModelString(){
 			return modelString.c_str();
 			}
 		bool FoundModelString() {return modelString.length() > 0;}
 		void ClearModelString() {modelString.clear();}
+		void ResetReader(){ FactoryDefaults();}
 		};
 
 /*----------------------------------------------------------------------------------------------------------------------
