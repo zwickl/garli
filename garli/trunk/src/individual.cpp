@@ -178,8 +178,8 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 
 	//be sure that we have an accurate score before any CLAs get invalidated
 	CalcFitness(0);
-	treeStruct->calcs=calcCount;
-	calcCount=0;
+//	treeStruct->calcs=calcCount;
+//	calcCount=0;
 }
 
 void Individual::CalcFitness(int subtreeNode){
@@ -226,23 +226,18 @@ void Individual::MakeRandomTree(int nTax){
 		for( int i = 0; i < n; i++ ) {
 			int pos = rnd.random_int( taxset.Size() );
 			int k = taxset[pos];
-			treeStruct->AddRandomNodeWithConstraints(k, placeInAllNodes, mask );
+			treeStruct->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
 			taxset -= k;
 			}
 #ifndef NDEBUG
-		treeStruct->CalcBipartitions();
 		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
-			//BACKBONE
-			if((*conit).IsBackbone()){
-				assert((*conit).IsPositive());
-				assert(treeStruct->ContainsMaskedBipartitionOrComplement((*conit).GetBipartition(), (*conit).GetBackboneMask()) != NULL);
-				}
-			else{
-				if((*conit).IsPositive() == true)
-					assert(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL);
-				else 
-					assert(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL);
-				}
+			TreeNode *check = NULL;
+			if((*conit).IsBackbone())
+				check = treeStruct->ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
+			else
+				check = treeStruct->ContainsBipartitionOrComplement(*(*conit).GetBipartition());
+			if((*conit).IsPositive()) assert(check != NULL);
+			else assert(check == NULL);
 			}
 #endif
 		}
@@ -275,7 +270,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		if(treeStruct->constraints.empty())
 			scratchT->AddRandomNode(k, placeInAllNodes  );
 		else
-			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, mask );
+			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
 		taxset -= k;
 		}
 	//use information on the similarity between sequences to choose first stepwise additions
@@ -332,7 +327,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		if(treeStruct->constraints.empty())
 			scratchT->AddRandomNode(k, placeInAllNodes  );
 		else
-			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, mask );
+			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
 		TreeNode *added = scratchT->allNodes[k];
 
 		scratchT->SweepDirtynessOverTree(added);
@@ -343,7 +338,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		FLOAT_TYPE bestScore = scratchT->lnL;
 		
 		//collect reconnection points - this will automatically filter for constraints
-		scratchT->GatherValidReconnectionNodes(scratchT->data->NTax()*2, added, NULL);
+		scratchT->GatherValidReconnectionNodes(scratchT->data->NTax()*2, added, NULL, &mask);
 		
 //			stepout << i << "\t" << k << "\t" << bestScore << "\t";
 
@@ -367,13 +362,19 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 			}
 		//now find the best score
 		ReconNode *best = NULL;
-		//for(list<ReconNode>::iterator b = scratchT->sprRang.begin();b != scratchT->sprRang.end();b++){
+		
+		//For debugging, add to random place, to check correct filtering of attachment points for constraints
+/*
+		if(attempted.size() != 0)
+			best = attempted.RandomReconNode();
+*/
 		for(list<ReconNode>::iterator b = attempted.begin();b != attempted.end();b++){
 			if((*b).chooseProb > bestScore){
 				best = &(*b);
 				bestScore = (*b).chooseProb;
 				}
 			}
+
 		//if we didn't find anything better than the initial random attachment we don't need to do anything
 		if(best != NULL){
 			scratchT->SPRMutate(added->nodeNum, best, optPrecision, 0);
@@ -396,11 +397,13 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 				if(modSpec.IsFlexRateHet()){//Flex rates
 					rateOptImprove = ZERO_POINT_ZERO;
 					//for the first pass, use gamma to get in the right ballpark
-					rateOptImprove = scratchT->OptimizeAlpha(optPrecision);
+					//rateOptImprove = scratchT->OptimizeAlpha(optPrecision);
+					rateOptImprove = treeStruct->OptimizeBoundedParameter(optPrecision, mod->Alpha(), 0, 0.1, 999.9, &Model::SetAlpha);
 					rateOptImprove += scratchT->OptimizeFlexRates(optPrecision);
 					}
 				else if(modSpec.fixAlpha == false){//normal gamma
-					rateOptImprove = scratchT->OptimizeAlpha(optPrecision);
+					//rateOptImprove = scratchT->OptimizeAlpha(optPrecision);
+					rateOptImprove = treeStruct->OptimizeBoundedParameter(optPrecision, mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 					}
 				}
 			outman.UserMessage("\nOptimizing parameters... improved %f lnL", rateOptImprove);
@@ -415,7 +418,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		}		
 
 //	stepout.close();
-	outman.UserMessage("%d calcs", calcCount);
+	outman.UserMessage("");
 	scratchI.treeStruct->RemoveTreeFromAllClas();
 	delete scratchI.treeStruct;
 	scratchI.treeStruct=NULL;
@@ -492,7 +495,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		c=stf.get();
 		do{
 			c=stf.get();	
-			}while(c!='\r' && c!='\n');
+			}while(c!='\r' && c!='\n' && !stf.eof());
 		while(stf.peek()=='\r' || stf.peek()=='\n') c=stf.get();
 		if(stf.eof() || stf.peek()==EOF){//we hit the end of the file, so we'll just start over.  Figure which tree we want
 			effectiveRank=rank%(r+1);
@@ -532,44 +535,50 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		//treeStruct=new Tree(treeString.c_str(), numericalTaxa);
 
 		//check that any defined constraints are present in the starting tree
-		treeStruct->CalcBipartitions();
 		int conNum=1;
 		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
-			if((*conit).IsPositive()){
-				if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
-			}
-			else if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
-			conNum++;
+			TreeNode *check = NULL;
+			if((*conit).IsBackbone())
+				check = treeStruct->ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
+			else
+				check = treeStruct->ContainsBipartitionOrComplement(*(*conit).GetBipartition());
+			if(((*conit).IsPositive() && check == NULL) || ((*conit).IsPositive() == false  && check != NULL))
+				throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
 			}
 		treeStruct->AssignCLAsFromMaster();
 		}
 
-	else MakeRandomTree(nTax);
+	//if no tree is found the making of the random tree will now be taken care of back in Population::SeedPopulationWithStartingTree
+	//else MakeRandomTree(nTax);
 
 	if(restart == false){
+		if(!foundTree && !foundModel) 
+			throw ErrorException("No starting tree or model was found in the specified starting conditions\n\tfile %s.\n\tIf it is a Nexus file it must start with #NEXUS\n\tOtherwise see manual for information on starting condition format.", fname);
+
 		if(foundTree==true)
 			outman.UserMessage("Obtained starting tree %d from file %s",  effectiveRank+1, fname);
 		else{
-			if(treeStruct->constraints.size() == 0)
+			outman.UserMessage("No starting tree found in file %s", fname);
+/*			if(treeStruct->constraints.size() == 0)
 				outman.UserMessage("No starting tree found in file %s, creating random tree", fname);
 			else 
 				outman.UserMessage("No starting tree found in file %s, creating random tree (compatible with constraint)", fname);
-			}
+*/			}
 
 		if(foundModel==true){
-			outman.UserMessage("Obtained starting or fixed model parameter values from file %s:", fname);
-			string m;
+			outman.UserMessage("Obtained starting or fixed model parameter values from file %s", fname);
+/*			string m;
 			mod->FillGarliFormattedModelString(m);
 			outman.UserMessage("%s", m.c_str());
-			}
+*/			}
 		else{
 			//this checks whether we have already gotten some parameter values from file, which might have come from a garli block in the datafile
-			if(!(modSpec.gotRmatFromFile || modSpec.gotStateFreqsFromFile || modSpec.gotAlphaFromFile || modSpec.gotFlexFromFile || modSpec.gotPinvFromFile || modSpec.gotOmegasFromFile)){
-				outman.UserMessage("No starting model parameter values found in %s\nUsing default parameter values:", fname);
-				string m;
+			if(!(modSpec.GotAnyParametersFromFile())){
+				outman.UserMessage("No starting model parameter values found in %s\nUsing default parameter values", fname);
+/*				string m;
 				mod->FillGarliFormattedModelString(m);
 				outman.UserMessage("%s", m.c_str());
-				}
+*/				}
 			}
 			
 		outman.UserMessage("");
@@ -580,7 +589,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	delete []temp;
 	}
 
-void Individual::GetStartingConditionsFromNCL(NxsTreesBlock *treesblock, int rank, int nTax, bool restart /*=false*/){
+void Individual::GetStartingTreeFromNCL(NxsTreesBlock *treesblock, int rank, int nTax, bool restart /*=false*/){
 	assert(treeStruct == NULL);
 
 	int totalTrees = treesblock->GetNumTrees();
@@ -595,14 +604,15 @@ void Individual::GetStartingConditionsFromNCL(NxsTreesBlock *treesblock, int ran
 	//treeStruct=new Tree(treesblock->GetTreeDescription(effectiveRank).c_str(), false);
 
 	//check that any defined constraints are present in the starting tree
-	treeStruct->CalcBipartitions();
 	int conNum=1;
 	for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
-		if((*conit).IsPositive()){
-			if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) == NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
-		}
-		else if(treeStruct->ContainsBipartitionOrComplement((*conit).GetBipartition()) != NULL) throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
-		conNum++;
+		TreeNode *check = NULL;
+		if((*conit).IsBackbone())
+			check = treeStruct->ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
+		else
+			check = treeStruct->ContainsBipartitionOrComplement(*(*conit).GetBipartition());
+		if(((*conit).IsPositive() && check == NULL) || ((*conit).IsPositive() == false  && check != NULL))
+			throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
 		}
 	treeStruct->AssignCLAsFromMaster();
 
@@ -642,9 +652,10 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			else if(mod->NRateCats() > 1){
 				if(modSpec.IsFlexRateHet()){//Flex rates
 					rateOptImprove = ZERO_POINT_ZERO;
-					//for the first pass, use gamma to get in the right ballpark
+					//no longer doing alpha first, it was too hard to know if the flex rates had been partially optimized
+					//already during making of a stepwise tree
 					//if(i == 1) rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
-					if(i == 1 && modSpec.gotFlexFromFile==false) rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 1.0e-8, 999.9, &Model::SetAlpha);
+					//if(i == 1 && modSpec.gotFlexFromFile==false) rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 1.0e-8, 999.9, &Model::SetAlpha);
 					rateOptImprove += treeStruct->OptimizeFlexRates(branchPrec);
 					}
 				else if(modSpec.fixAlpha == false){//normal gamma
@@ -659,20 +670,17 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			}
 		improve=scaleImprove + trueImprove + rateOptImprove + pinvOptImprove;
 		outman.precision(8);
-		outman.UserMessageNoCR("pass %-2d: +%10.4f (branch=%8.2f scale=%8.2f", i, improve, trueImprove, scaleImprove);
-		if(optModel && modSpec.IsCodon()) outman.UserMessageNoCR(" omega=%8.2f", rateOptImprove);
+		outman.UserMessageNoCR("pass %-2d: +%10.4f (branch=%7.2f scale=%6.2f", i, improve, trueImprove, scaleImprove);
+		if(optModel && modSpec.IsCodon()) outman.UserMessageNoCR(" omega=%6.2f", rateOptImprove);
 		else if(optModel && mod->NRateCats() > 1){
-			if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false) outman.UserMessageNoCR(" alpha=%8.2f", rateOptImprove);
-			else if(modSpec.IsFlexRateHet() && modSpec.gotFlexFromFile == false) outman.UserMessageNoCR(" flex rates=%8.2f", rateOptImprove);
+			if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false) outman.UserMessageNoCR(" alpha=%6.2f", rateOptImprove);
+			else if(modSpec.IsFlexRateHet() && modSpec.gotFlexFromFile == false) outman.UserMessageNoCR(" flex rates=%6.2f", rateOptImprove);
 			}
-		if(optModel && modSpec.includeInvariantSites && !modSpec.fixInvariantSites) outman.UserMessageNoCR(" pinv=%8.2f", pinvOptImprove);
+		if(optModel && modSpec.includeInvariantSites && !modSpec.fixInvariantSites) outman.UserMessageNoCR(" pinv=%6.2f", pinvOptImprove);
 		outman.UserMessage(")");
 		}
 
-	//DEBUG - don't think that this is necessary
-//	treeStruct->MakeAllNodesDirty();
 	treeStruct->nodeOptVector.clear();
-//	dirty=true;
 	}
 
 void Individual::ReadTreeFromFile(istream & inf)
