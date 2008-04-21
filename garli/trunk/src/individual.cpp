@@ -22,6 +22,7 @@ using namespace std;
 
 #include "defs.h"
 #include "set.h"
+#include "funcs.h"
 #include "adaptation.h"
 #include "model.h"
 #include "tree.h"
@@ -30,7 +31,6 @@ using namespace std;
 #include "sequencedata.h"
 #include "treenode.h"
 #include "individual.h"
-#include "funcs.h"
 #include "errorexception.h"
 #include "outputman.h"
 #include "reconnode.h"

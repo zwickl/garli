@@ -1751,7 +1751,7 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 			GatherValidReconnectionNodes(range, cut, NULL);
 			}while(sprRang.size()==0);
 
-		if((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)
+		if((FloatingPointEquals(uniqueSwapBias, 1.0, 1e-8) && FloatingPointEquals(distanceSwapBias, 1.0, 1e-8)) || range < 0)
 			broken = sprRang.RandomReconNode();
 		else{//only doing this on limSPR and NNI
 			err = AssignWeightsToSwaps(cut);

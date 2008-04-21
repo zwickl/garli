@@ -22,6 +22,7 @@
 using namespace std;
 
 #include "defs.h"
+#include "funcs.h"
 #include "adaptation.h"
 #include "math.h"
 #include "configoptions.h"
@@ -435,7 +436,7 @@ void Adaptation::UpdateProbs(){
 
 	//only update these probs if model mutations are turned off completely
 	//or if some model mutations have been done (ie not in subtree mode)
-	if(anyModelnum[0]!=0 || modWeight == 0.0){
+	if(anyModelnum[0]!=0 || FloatingPointEquals(modWeight, 0.0, 1e-10)){
 		brlenOnlyMut=perBrlen/tot;
 		modelMutateProb = perModel/tot;
 		topoMutateProb = perTopo/tot;

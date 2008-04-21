@@ -1433,13 +1433,13 @@ void Population::Run(){
 			//termination conditions
 			if(conf->enforceTermConditions == true
 #ifdef SWAP_BASED_TERMINATION
-				&& (gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || adap->topoMutateProb == ZERO_POINT_ZERO)) 
+				&& (gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, 1e-8))
 #else
-				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || adap->topoMutateProb == ZERO_POINT_ZERO) 
+				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, 1e-8))
 #endif
 				&& (gen > adap->intervalsToStore * adap->intervalLength)
 				&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
-				&& (adap->branchOptPrecision == adap->minOptPrecision || adap->numPrecReductions==0)){
+				&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, 1e-8) || adap->numPrecReductions==0)){
 				if(adap->topoMutateProb > ZERO_POINT_ZERO) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
 				else outman.UserMessage("Reached termination condition!\n");
 				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);

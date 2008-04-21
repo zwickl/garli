@@ -113,8 +113,8 @@ class Adaptation{
 	void OutputProbs(ofstream &plog, int gen);
 	void BeginProbLog(ofstream &plot, int gen);
 	bool ReducePrecision(){
-		if(branchOptPrecision==minOptPrecision || numPrecReductions == 0) return false;
-		if(topoMutateProb > .01 || topoWeight==0.0){
+		if(FloatingPointEquals(branchOptPrecision, minOptPrecision, 1e-10) || numPrecReductions == 0) return false;
+		if(topoMutateProb > .01 || FloatingPointEquals(topoWeight, 0.0, 1e-10)){
 			//changing this to a linear reduction in prec.  Geometric was too fast
 			//branchOptPrecision*=precReductionFactor;
 			branchOptPrecision -= precReductionFactor;

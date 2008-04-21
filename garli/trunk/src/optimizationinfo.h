@@ -63,7 +63,7 @@ class OptimizationInfo{
 	
 	bool IsMinAtMinAllowableLength(){
 		vector<pd>::iterator minEval = min_element(brakEvals.begin(),brakEvals.end(), IsEvalLess);
-		return (*minEval).first == 0.01;
+		return FloatingPointEquals((*minEval).first, 0.01, 1e-10);
 		}
 	};
 	

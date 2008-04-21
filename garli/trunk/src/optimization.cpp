@@ -294,7 +294,7 @@ FLOAT_TYPE Tree::OptimizeAlpha(FLOAT_TYPE optPrecision){
 			}
 
 		mod->SetAlpha(t, false);
-		assert((prevVal==0.05 && mod->Alpha()==0.05)==false);
+		//assert((prevVal==0.05 && mod->Alpha()==0.05)==false);
 		MakeAllNodesDirty();			
 		Score();
 		lastChange = lnL - prev;
