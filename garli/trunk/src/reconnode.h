@@ -21,6 +21,9 @@
 #include <list>
 #include <algorithm>
 #include "rng.h"
+#ifdef UNIX
+#include "unistd.h"
+#endif
 
 extern rng rnd;
 
@@ -51,21 +54,21 @@ class ReconNode{
 
 class DistEquals:public binary_function<ReconNode, int, bool>{
 	public:
-	const result_type operator()(first_argument_type i, second_argument_type j) const{
+	result_type operator()(first_argument_type i, second_argument_type j) const{
 		return (result_type) (i.reconDist==j);
 		}
 	};
 
 class DistEqualsWithinCutSubtree:public binary_function<ReconNode, int, bool>{
 	public:
-	const result_type operator()(first_argument_type i, second_argument_type j) const{
+	result_type operator()(first_argument_type i, second_argument_type j) const{
 		return (result_type) (i.reconDist==j && i.withinCutSubtree==true);
 		}
 	};
 
 class NodeEquals:public binary_function<ReconNode, int, bool>{
 	public:
-	const result_type operator()(first_argument_type i, second_argument_type j) const{
+	result_type operator()(first_argument_type i, second_argument_type j) const{
 		return (result_type) (i.nodeNum==j);
 		}
 	};
@@ -75,6 +78,10 @@ class ReconList{
 	list<ReconNode> l;
 
 	public:
+
+	ReconList(){
+		num = 0;
+		}
 
 	listIt begin(){
 		return l.begin();
@@ -293,7 +300,8 @@ public:
 		}
 
 	bool operator==(const Swap &rhs){
-		bool bipEqual = b.EqualsEquals(&rhs.b);
+		assert(rhs.b.ContainsTaxon(1));
+		bool bipEqual = b.EqualsEquals(rhs.b);
 		if(bipEqual == false) return false;
 		//if the bips are equal but the distances are different, the pre-swap topos must be different
 		//so we want to consider this a different swap
