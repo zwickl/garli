@@ -109,7 +109,7 @@ public:
 class StateFrequencies:public BaseParameter{
 
 public:
-	StateFrequencies(FLOAT_TYPE **dv, int numE):BaseParameter("Base frequencies", dv, STATEFREQS, numE, 0.0, 1.0){};
+	StateFrequencies(FLOAT_TYPE **dv, int numE):BaseParameter("Base frequencies", dv, STATEFREQS, numE, 1e-4, 0.999){};
 
 	void Mutator(FLOAT_TYPE mutationShape){
 		int freqToChange=int(rnd.uniform()*numElements);
@@ -128,13 +128,32 @@ public:
 	void Mutator(FLOAT_TYPE mutationShape){
 		if(numElements > 1){
 			int rateToChange=int(rnd.uniform()*(numElements));
-			
-			if(rateToChange<numElements-1){
+
+			//3/25/08 had to change this to allow arbitrary rate matrices mutation
+			//of a rate other than GT might actually alter GT, so we need to actually check
+			//whether it is 1.0 or not
+			//if(rateToChange<numElements-1){
+				*vals[rateToChange] *= rnd.gamma( mutationShape );
+				if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;
+				if(*vals[rateToChange]<minv) *vals[rateToChange]=minv;
+			//	}
+			if(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-12) == false){
+				FLOAT_TYPE scaler = ONE_POINT_ZERO / *vals[numElements-1];
+				for(int i=0;i<numElements-1;i++){
+					if(vals[i] != vals[numElements-1]){
+						*vals[i] *= scaler;
+						if(*vals[i]>maxv) *vals[i]=maxv;
+						if(*vals[i]<minv) *vals[i]=minv;
+						}
+					}
+				*vals[numElements - 1] *= scaler;
+				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-12));
+				}
+	/*		if(rateToChange<numElements-1){
 				*vals[rateToChange] *= rnd.gamma( mutationShape );
 				if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;
 				if(*vals[rateToChange]<minv) *vals[rateToChange]=minv;
 				}
-
 			else{//if we alter the reference rate, which we are assuming
 				//is the last one (GT for DNA models, fixed to 1.0)
 				//scale all of the other rates
@@ -145,7 +164,7 @@ public:
 					if(*vals[i]<minv) *vals[i]=minv;
 					}
 				}
-			}
+	*/		}
 		else {
 			*vals[0] *= rnd.gamma( mutationShape );
 			if(*vals[0]>maxv) *vals[0]=maxv;
@@ -156,7 +175,7 @@ public:
 
 class RateProportions:public BaseParameter{
 public:
-	RateProportions(FLOAT_TYPE **dv, int numE):BaseParameter("Rate props", dv, RATEPROPS, numE, 0.0, 1.0){};
+	RateProportions(FLOAT_TYPE **dv, int numE):BaseParameter("Rate props", dv, RATEPROPS, numE, 1e-5, 0.999){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
@@ -176,7 +195,7 @@ public:
 
 class RateMultipliers:public BaseParameter{
 public:
-	RateMultipliers(FLOAT_TYPE **dv, int numE):BaseParameter("Rate mults", dv, RATEMULTS, numE, (FLOAT_TYPE)0.0, (FLOAT_TYPE)999.9){};
+	RateMultipliers(FLOAT_TYPE **dv, int numE):BaseParameter("Rate mults", dv, RATEMULTS, numE, (FLOAT_TYPE)1e-5, (FLOAT_TYPE)999.9){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
@@ -186,7 +205,7 @@ public:
 
 class AlphaShape:public BaseParameter{
 public:
-	AlphaShape(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, ALPHASHAPE, 1, (FLOAT_TYPE)0.0, (FLOAT_TYPE)999.9){};
+	AlphaShape(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, ALPHASHAPE, 1, (FLOAT_TYPE)1e-5, (FLOAT_TYPE)999.9){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
 		}
@@ -210,6 +229,7 @@ public:
 
 	bool fixStateFreqs;
 	bool fixRelativeRates;
+	string arbitraryRateMatrixString;
 
 //	bool fixSubstitutionRates;
 	//bool flexRates;
@@ -242,6 +262,8 @@ public:
 		JONES = 5,
 		DAYHOFF = 6,
 		WAG = 8,
+		MTMAM = 9,
+		MTREV = 10,
 		USERSPECIFIED = 20
 		}stateFrequencies;
 
@@ -249,10 +271,13 @@ public:
 		NST1 = 0,
 		NST2 = 1,
 		NST6 = 2,
+		ARBITRARY = 3,
 		JONESMAT = 5,
 		DAYHOFFMAT = 6,
 		POISSON = 7,
 		WAGMAT = 8,
+		MTMAMMAT = 9,
+		MTREVMAT = 10,
 		USERSPECIFIEDMAT = 20
 		}rateMatrix;
 	
@@ -265,7 +290,8 @@ public:
 
 	enum{
 		STANDARD = 0,
-		VERTMITO = 1
+		VERTMITO = 1,
+		INVERTMITO = 2
 		}geneticCode;	
 
 	ModelSpecification(){
@@ -285,6 +311,9 @@ public:
 	bool IsNucleotide() {return (datatype == DNA || datatype == RNA);}
 	bool IsAminoAcid() {return (datatype == AMINOACID || datatype == CODONAMINOACID);}//for most purposes codon-aminoacid should be considered AA
 	bool IsCodonAminoAcid() {return datatype == CODONAMINOACID;}
+	bool GotAnyParametersFromFile(){
+		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile;
+		}
 	//A number of canned model setups
 	
 	void SetJC(){
@@ -326,7 +355,7 @@ public:
 		datatype = CODON;
 		rateMatrix = NST2;
 		stateFrequencies = EQUAL;
-		nstates = 61;
+		nstates = 61;//this might be overridden if a nonstandard code is set
 		numRateCats = 1;
 		fixRelativeRates=false;
 		}
@@ -444,6 +473,16 @@ public:
 		fixRelativeRates=true;
 		}	
 	
+	void SetMtMamAAMatrix(){
+		rateMatrix = MTMAMMAT;
+		fixRelativeRates=true;
+		}	
+
+	void SetMtRevAAMatrix(){
+		rateMatrix = MTREVMAT;
+		fixRelativeRates=true;
+		}	
+
 	void SetJonesAAFreqs(){
 		stateFrequencies = JONES;
 		fixStateFreqs=true;
@@ -457,6 +496,16 @@ public:
 		fixStateFreqs=true;
 		}
 
+	void SetMtMamAAFreqs(){
+		stateFrequencies = MTMAM;
+		fixStateFreqs=true;
+		}
+
+	void SetMtRevAAFreqs(){
+		stateFrequencies = MTREV;
+		fixStateFreqs=true;
+		}
+
 	void SetM3Model(){
 		rateHetType = NONSYN;
 		numRateCats = 3;
@@ -465,7 +514,7 @@ public:
 	int Nst() const {
 		if(rateMatrix == NST1) return 1;
 		else if(rateMatrix == NST2) return 2;
-		else if(rateMatrix == NST6) return 6;
+		else if(rateMatrix == NST6 || rateMatrix == ARBITRARY) return 6;
 		else if(rateMatrix == USERSPECIFIEDMAT && datatype != AMINOACID && datatype != CODONAMINOACID) return 6;
 		else assert(0);
 		return -1;
@@ -477,15 +526,23 @@ public:
 	bool IsDayhoffAAMatrix() {return (rateMatrix == DAYHOFFMAT);}
 	bool IsWAGAAFreqs() {return (stateFrequencies == WAG);}
 	bool IsWAGAAMatrix() {return (rateMatrix == WAGMAT);}
+	bool IsMtMamAAFreqs() {return (stateFrequencies == MTMAM);}
+	bool IsMtMamAAMatrix() {return (rateMatrix == MTMAMMAT);}
+	bool IsMtRevAAFreqs() {return (stateFrequencies == MTREV);}
+	bool IsMtRevAAMatrix() {return (rateMatrix == MTREVMAT);}
 	bool IsVertMitoCode() {return (geneticCode == VERTMITO);}
+	bool IsInvertMitoCode() {return (geneticCode == INVERTMITO);}
 	bool IsPoissonAAMatrix() {return (rateMatrix == POISSON);}
 	bool IsUserSpecifiedRateMatrix(){return rateMatrix == USERSPECIFIEDMAT;}
+	bool IsArbitraryRateMatrix() {return rateMatrix == ARBITRARY;}
+	const string GetArbitraryRateMatrixString(){return arbitraryRateMatrixString;}
 
 	bool IsEqualStateFrequencies(){return stateFrequencies == EQUAL;}
 	bool IsEmpiricalStateFrequencies(){return stateFrequencies == EMPIRICAL;}
 	bool IsUserSpecifiedStateFrequencies(){return stateFrequencies == USERSPECIFIED;}
 	bool IsF3x4StateFrequencies(){return stateFrequencies == F3X4;}
 	bool IsF1x4StateFrequencies(){return stateFrequencies == F1X4;}
+	bool IsPrecaledAAFreqs(){return (IsAminoAcid() && (stateFrequencies == DAYHOFF || stateFrequencies == JONES || stateFrequencies == WAG || stateFrequencies == MTMAM || stateFrequencies == MTREV));}
 
 	bool IsFlexRateHet(){return rateHetType == FLEX;}
 	bool IsGammaRateHet(){return rateHetType == GAMMA;}
@@ -505,7 +562,9 @@ public:
 		else if((datatype == AMINOACID || datatype == CODONAMINOACID) && _stricmp(str, "jones") == 0) SetJonesAAFreqs();
 		else if((datatype == AMINOACID || datatype == CODONAMINOACID) && _stricmp(str, "dayhoff") == 0) SetDayhoffAAFreqs();
 		else if((datatype == AMINOACID || datatype == CODONAMINOACID) && _stricmp(str, "wag") == 0) SetWAGAAFreqs();
-		else throw(ErrorException("Invalid setting for statefrequencies: %s\n\tOptions for all datatypes: equal, empirical, fixed\n\tFor all datatypes besides codon: estimate\n\tFor aminoacid datatype only: poisson, dayhoff, jones, wag\n\tFor codon datatype only: F1X4, F3X4", str));
+		else if((datatype == AMINOACID || datatype == CODONAMINOACID) && _stricmp(str, "mtmam") == 0) SetMtMamAAFreqs();
+		else if((datatype == AMINOACID || datatype == CODONAMINOACID) && _stricmp(str, "mtrev") == 0) SetMtRevAAFreqs();
+		else throw(ErrorException("Invalid setting for statefrequencies: %s\n\tOptions for all datatypes: equal, empirical, fixed\n\tFor all datatypes besides codon: estimate\n\tFor aminoacid datatype only: poisson, dayhoff, jones, wag, mtmam, mtrev\n\tFor codon datatype only: F1X4, F3X4", str));
 		}
 	void SetRateMatrix(const char *str){
 		if(datatype == AMINOACID || datatype == CODONAMINOACID){
@@ -513,13 +572,19 @@ public:
 			else if(_stricmp(str, "dayhoff") == 0) SetDayhoffAAMatrix();
 			else if(_stricmp(str, "poisson") == 0) SetPoissonAAMatrix();
 			else if(_stricmp(str, "wag") == 0) SetWAGAAMatrix();
-			else throw(ErrorException("Sorry, %s is not a valid aminoacid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag)", str));
+			else if(_stricmp(str, "mtmam") == 0) SetMtMamAAMatrix();
+			else if(_stricmp(str, "mtrev") == 0) SetMtRevAAMatrix();
+			else throw(ErrorException("Sorry, %s is not a valid aminoacid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag, mtmam, mtrev)", str));
 			}
 		else{
 			if(_stricmp(str, "6rate") == 0) rateMatrix = NST6;
 			else if(_stricmp(str, "2rate") == 0) rateMatrix = NST2;
 			else if(_stricmp(str, "1rate") == 0) rateMatrix = NST1;
 			else if(_stricmp(str, "fixed") == 0) SetUserSpecifiedRateMatrix();
+			else if(str[0] == '('){
+				rateMatrix = ARBITRARY;
+				arbitraryRateMatrixString = str;
+				}
 			else{
 				if(datatype == CODON) throw(ErrorException("Unknown setting for codon ratematrix: %s\n\t(options are: 6rate, 2rate, 1rate, fixed)", str));
 				else throw(ErrorException("Unknown setting for dna/rna ratematrix: %s\n\t(options are: 6rate, 2rate, 1rate, fixed)", str));
@@ -574,9 +639,18 @@ public:
 		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna)", str));
 		}
 	void SetGeneticCode(const char *str){
-		if(_stricmp(str, "standard") == 0) geneticCode = STANDARD;
-		else if(_stricmp(str, "vertmito") == 0) geneticCode = VERTMITO;
-		else throw(ErrorException("Unknown genetic code: %s\n\t(options are: standard, vertmito)", str));
+		if(datatype != DNA && datatype != RNA){
+			if(_stricmp(str, "standard") == 0) geneticCode = STANDARD;
+			else if(_stricmp(str, "vertmito") == 0){
+				geneticCode = VERTMITO;
+				if(datatype == CODON) nstates = 60;
+				}
+			else if(_stricmp(str, "invertmito") == 0){
+				geneticCode = INVERTMITO;
+				if(datatype == CODON) nstates = 62;
+				}
+			else throw(ErrorException("Unknown genetic code: %s\n\t(options are: standard, vertmito, invertmito)", str));
+			}
 		}
 
 	void SetupModSpec(const GeneralGamlConfig &conf){
@@ -600,6 +674,7 @@ class Model{
 
 	vector<FLOAT_TYPE*> stateFreqs;
 	vector<FLOAT_TYPE*> relNucRates;
+	int arbitraryMatrixIndeces[6];//this just keeps track of which rate parameters are aliased to single parameters
 	vector<FLOAT_TYPE*> omegas;
 	vector<FLOAT_TYPE*> omegaProbs;
 
@@ -621,7 +696,8 @@ class Model{
 	//Newton Raphson crap
 	FLOAT_TYPE ***deriv1, ***deriv2;
 
-	int *qmatLookup;
+	//this will be a little bigger than necessary with some codes, but dynamically allocating a static is a bit of a pain
+	static int qmatLookup[62*62];
 	static GeneticCode *code;
 
 	public:
@@ -649,7 +725,10 @@ class Model{
 	BaseParameter *SelectModelMutation();
 	int PerformModelMutation();
 	void CreateModelFromSpecification(int);
-	static void SetCode(GeneticCode *c){Model::code = c;}
+	static void SetCode(GeneticCode *c){
+		Model::code = c;
+		FillQMatLookup();
+		}
 
 	private:
 	void AllocateEigenVariables();
@@ -676,13 +755,18 @@ class Model{
 	void FillGarliFormattedModelString(string &s) const;
 	void OutputBinaryFormattedModel(OUTPUT_CLASS &) const;
 	void ReadGarliFormattedModelString(string &);
+	void OutputHumanReadableModelReportWithParams() const;
 
 	void ReadBinaryFormattedModel(FILE *);
-	void FillQMatLookup();
+	static void FillQMatLookup();
 	void SetJonesAAFreqs();
+	void SetMtMamAAFreqs();
+	void SetMtRevAAFreqs();
 	void SetDayhoffAAFreqs();
 	void SetWAGAAFreqs();
 	void MultiplyByJonesAAMatrix();
+	void MultiplyByMtMamAAMatrix();
+	void MultiplyByMtRevAAMatrix();
 	void MultiplyByDayhoffAAMatrix();
 	void MultiplyByWAGAAMatrix();
 
@@ -720,12 +804,22 @@ class Model{
 					FloatingPointEquals(r[4], r[5], 1.0e-5)) == false)
 					throw(ErrorException("Config file specifies ratematrix = 1rate, but starting model has nonequal rates!\n"));
 				}
-			if(nst==2){
+			else if(nst==2){
 				if((FloatingPointEquals(r[0], r[2], 1.0e-5) &&
 					FloatingPointEquals(r[2], r[3], 1.0e-5) &&
 					FloatingPointEquals(r[1], r[4], 1.0e-5) &&
 					FloatingPointEquals(r[3], r[5], 1.0e-5)) == false)
 					throw(ErrorException("Config file specifies ratematrix = 2rate, but starting model parameters do not match!\n"));
+				}
+			else if(nst==6 && modSpec.IsArbitraryRateMatrix()){
+				for(int rate1=0;rate1<6-1;rate1++){
+					for(int rate2=rate1+1;rate2<6;rate2++){
+						if(arbitraryMatrixIndeces[rate1] == arbitraryMatrixIndeces[rate2]){
+							if(!FloatingPointEquals(r[rate1], r[rate2], 1e-8))
+								throw(ErrorException("Provided relative rate parameters don't obey the ratematix specification!\n\tGiven this spec: %s, rates %d and %d should be equal.\n", modSpec.arbitraryRateMatrixString.c_str(), rate1+1, rate2+1));
+							}
+						}
+					}
 				}
 			}
 		if(FloatingPointEquals(r[5], ONE_POINT_ZERO, 1.0e-5) == false){
@@ -741,12 +835,14 @@ class Model{
 		//7/12/07 we'll now assume that all freqs have been passed in, rather than calcing the last
 		//from the others
 		if(checkValidity == true){
-			if(modSpec.IsNucleotide()){
+//			if(modSpec.IsNucleotide()){
 				if(modSpec.IsEqualStateFrequencies() && (FloatingPointEquals(b[0], b[1], 1.0e-5) && FloatingPointEquals(b[1], b[2], 1.0e-5)) == false) 
 					throw(ErrorException("Config file specifies equal statefrequencies,\nbut starting model has nonequal frequencies!\n"));
 				if(modSpec.IsEmpiricalStateFrequencies()) 
-					throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model specifies frequencies!\n"));
-				}
+					throw(ErrorException("Config file specifies empirical statefrequencies,\nbut starting model contains frequencies!\nTry statefrequencies = fixed or statefrequencies = estimate."));
+				if(modSpec.IsPrecaledAAFreqs())
+					throw(ErrorException("Config file specifies \"named\" amino acid statefrequencies,\nbut starting model contains frequencies!\nTry statefrequencies = fixed or statefrequencies = estimate."));
+//				}
 			}
 		FLOAT_TYPE freqTot = 0.0;
 		for(int i=0;i<nstates;i++){
@@ -759,11 +855,23 @@ class Model{
 		}
 
 	void SetFlexRates(FLOAT_TYPE *rates, FLOAT_TYPE *probs){
-		if(modSpec.IsFlexRateHet() == false) throw ErrorException("Error: Flex rate values specified in start file,\nbut ratehetmodel is not flex in conf file.");
+		if(modSpec.IsFlexRateHet() == false) throw ErrorException("Flex rate values specified in start file,\nbut ratehetmodel is not flex in conf file.");
 		for(int r=0;r<NRateCats();r++){
 			rateMults[r]=rates[r];
+			if(FloatingPointEquals(rateMults[r], ZERO_POINT_ZERO, 1e-8)){
+				outman.UserMessage("WARNING: Flex rate multipliers cannot be zero. Rate %d changed from zero to 1.0e-5", r);
+				rateMults[r] = 1.0e-5;
+				}
 			rateProbs[r]=probs[r];
-			}		
+			if(FloatingPointEquals(rateProbs[r], ZERO_POINT_ZERO, 1e-8)){
+				throw ErrorException("Flex rate proportion %d cannot be zero.", r);
+				}
+			}
+		FLOAT_TYPE tot = ZERO_POINT_ZERO;
+		for(int r=0;r<NRateCats();r++)
+			tot += rateProbs[r];
+		if(!FloatingPointEquals(tot, ONE_POINT_ZERO, 1e-8))
+			throw ErrorException("Specified Flex rate proportions don't add to 1.0!\n\tCorrect spec. is f rate1 prop1 rate2 prop2, etc.");
 		}
 
 	FLOAT_TYPE FlexRate(int which){
@@ -837,20 +945,24 @@ class Model{
 	void SetOmegas(const FLOAT_TYPE *rates, const FLOAT_TYPE *probs){
 		FLOAT_TYPE tot=0.0;
 		for(int r=0;r<NRateCats();r++){
-			*omegas[r]=rates[r];
+			if(FloatingPointEquals(rates[r], ZERO_POINT_ZERO, 1e-8)){
+				outman.UserMessage("WARNING: Omega parameter %d cannot be zero.  Setting to 1e-5", r);
+				*omegas[r] = 1.0e-5;
+				}
+			else *omegas[r]=rates[r];
 			*omegaProbs[r]=probs[r];
 			tot += *omegaProbs[r];
 			}
-		if(FloatingPointEquals(tot, ONE_POINT_ZERO, 1.0e-5) == false) throw ErrorException("omega category proportions add up to %f, not 1.0.", tot);
+		if(FloatingPointEquals(tot, ONE_POINT_ZERO, 1.0e-3) == false) throw ErrorException("omega category proportions add up to %f, not 1.0.", tot);
 		eigenDirty = true;
 		}
 
-	FLOAT_TYPE Omega(int which){
+	FLOAT_TYPE Omega(int which) const{
 		assert(which < NRateCats());
 		return *omegas[which];
 		}
 
-	FLOAT_TYPE OmegaProb(int which){
+	FLOAT_TYPE OmegaProb(int which) const{
 		assert(which < NRateCats());
 		return *omegaProbs[which];
 		}
@@ -945,6 +1057,15 @@ class Model{
 			}
 
 		sum=0.0;
+		
+		double toRemainConstantContrib;
+		if(toRemainConstant > -1){
+			toRemainConstantContrib = rateMults[toRemainConstant]*rateProbs[toRemainConstant];
+			//this means that it isn't possible to rescale and keep one of the rate/probs constant
+			if(toRemainConstantContrib > ONE_POINT_ZERO)
+				toRemainConstant = -1;
+			}
+			
 		for(int i=0;i<NRateCats();i++){
 			if(i != toRemainConstant) sum += rateMults[i]*rateProbs[i];
 			}
@@ -957,6 +1078,9 @@ class Model{
 		sum=0.0;
 		for(int i=0;i<NRateCats();i++){
 			sum += rateProbs[i];
+			assert(rateProbs[i] > ZERO_POINT_ZERO);
+			assert(rateProbs[i] < ONE_POINT_ZERO);
+			assert(rateMults[i] > ZERO_POINT_ZERO);
 			}		
 		sum += *propInvar;
 		assert(fabs(sum - 1.0) < 0.0001);

@@ -41,6 +41,7 @@ FLOAT_TYPE IncompleteGamma (FLOAT_TYPE x, FLOAT_TYPE alpha, FLOAT_TYPE LnGamma_a
 FLOAT_TYPE PointChi2 (FLOAT_TYPE prob, FLOAT_TYPE v);
 
 GeneticCode *Model::code = NULL;
+int Model::qmatLookup[62*62];
 
 Model::~Model(){
 	if(stateFreqs.empty() == false){
@@ -49,11 +50,18 @@ Model::~Model(){
 		}
 
 	if(relNucRates.empty() == false){
-		if(modSpec.IsCodon())
-			delete relNucRates[0];
-		else if(nst==6){
-			for(int i=0;i<(int)relNucRates.size();i++)
-				delete relNucRates[i];
+		if(nst==6){
+			//3/25/08 this needed to change a bit for arbitrary matrices
+			//since some of the elements might be aliased
+			for(int i=0;i<(int)relNucRates.size();i++){
+				if(relNucRates[i] != NULL){
+					for(int j=i+1;j<(int)relNucRates.size();j++){
+						if(relNucRates[j] == relNucRates[i]) relNucRates[j] = NULL;
+						}
+					delete relNucRates[i];
+					relNucRates[i] = NULL;
+					}
+				}
 			}
 		else if(nst==2){
 			delete relNucRates[0];
@@ -189,7 +197,7 @@ void Model::AllocateEigenVariables(){
 	}
 
 void Model::UpdateQMat(){
-	//recalculate the qmat from the basefreqs and rates
+	//recalculate the qmat from the statefreqs and rates
 
 	if(modSpec.IsCodon()){
 		UpdateQMatCodon();
@@ -214,7 +222,7 @@ void Model::UpdateQMat(){
 		qmat[0][3][1]=*relNucRates[4] * *stateFreqs[1];  //e * piC
 		qmat[0][3][2]=*stateFreqs[2]; 			//f(=1) * piG
 		}
-	else {
+	else {//this isn't being used - see UpdateQmatCodon and UpdateQmatAminoAcid
 		//general nstate x nstate method	
 		int rnum=0;
 		for(int i=0;i<nstates;i++){
@@ -235,6 +243,9 @@ void Model::UpdateQMat(){
 			}
 		qmat[0][x][x]=-sum;
 		}
+
+	//calculate the branch length rescaling factor
+	blen_multiplier[0]=(ZERO_POINT_FIVE/((qmat[0][0][1]**stateFreqs[0])+(qmat[0][0][2]**stateFreqs[0])+(qmat[0][0][3]**stateFreqs[0])+(qmat[0][1][2]**stateFreqs[1])+(qmat[0][1][3]**stateFreqs[1])+(qmat[0][2][3]**stateFreqs[2])));
 	}
 
 void Model::FillQMatLookup(){
@@ -249,11 +260,11 @@ void Model::FillQMatLookup(){
 	//bit 128 = C->T or T->C nuc change
 	//bit 256 = G->T or T->G nuc change
 	
-	//although it seems a little fucked up, I'm going to fill the 64x64 matrix, and then eliminate the
+	//although it seems a little wacky, I'm going to fill the 64x64 matrix, and then eliminate the
 	//rows and columns that are stop codons, since they differ for different codes and the following 
-	//stuff would be hell without regularity
+	//stuff would be hell without regularity.  The static qmatLookup is only calculated once anyway.
 	
-	int *tempqmatLookup=new int[64*64];
+	int tempqmatLookup[64*64];
 	for(int q=0;q<64*64;q++) tempqmatLookup[q]=0;
 	//its easier to do this in 4 x 4 blocks
 	for(int i=0;i<16;i++){
@@ -308,444 +319,71 @@ void Model::FillQMatLookup(){
 				}
 			}
 		}
-	//here are all of the NS changes for the universal code
-tempqmatLookup[	1	]|=4;
-tempqmatLookup[	3	]|=4;
-tempqmatLookup[	4	]|=4;
-tempqmatLookup[	8	]|=4;
-tempqmatLookup[	12	]|=4;
-tempqmatLookup[	16	]|=4;
-tempqmatLookup[	32	]|=4;
-tempqmatLookup[	64	]|=4;
-tempqmatLookup[	66	]|=4;
-tempqmatLookup[	69	]|=4;
-tempqmatLookup[	73	]|=4;
-tempqmatLookup[	77	]|=4;
-tempqmatLookup[	81	]|=4;
-tempqmatLookup[	97	]|=4;
-tempqmatLookup[	113	]|=4;
-tempqmatLookup[	129	]|=4;
-tempqmatLookup[	131	]|=4;
-tempqmatLookup[	134	]|=4;
-tempqmatLookup[	138	]|=4;
-tempqmatLookup[	142	]|=4;
-tempqmatLookup[	146	]|=4;
-tempqmatLookup[	162	]|=4;
-tempqmatLookup[	192	]|=4;
-tempqmatLookup[	194	]|=4;
-tempqmatLookup[	199	]|=4;
-tempqmatLookup[	203	]|=4;
-tempqmatLookup[	207	]|=4;
-tempqmatLookup[	211	]|=4;
-tempqmatLookup[	227	]|=4;
-tempqmatLookup[	243	]|=4;
-tempqmatLookup[	256	]|=4;
-tempqmatLookup[	264	]|=4;
-tempqmatLookup[	268	]|=4;
-tempqmatLookup[	276	]|=4;
-tempqmatLookup[	292	]|=4;
-tempqmatLookup[	308	]|=4;
-tempqmatLookup[	321	]|=4;
-tempqmatLookup[	329	]|=4;
-tempqmatLookup[	333	]|=4;
-tempqmatLookup[	341	]|=4;
-tempqmatLookup[	357	]|=4;
-tempqmatLookup[	373	]|=4;
-tempqmatLookup[	386	]|=4;
-tempqmatLookup[	394	]|=4;
-tempqmatLookup[	398	]|=4;
-tempqmatLookup[	406	]|=4;
-tempqmatLookup[	422	]|=4;
-tempqmatLookup[	438	]|=4;
-tempqmatLookup[	451	]|=4;
-tempqmatLookup[	459	]|=4;
-tempqmatLookup[	463	]|=4;
-tempqmatLookup[	471	]|=4;
-tempqmatLookup[	487	]|=4;
-tempqmatLookup[	503	]|=4;
-tempqmatLookup[	512	]|=4;
-tempqmatLookup[	516	]|=4;
-tempqmatLookup[	521	]|=4;
-tempqmatLookup[	523	]|=4;
-tempqmatLookup[	524	]|=4;
-tempqmatLookup[	552	]|=4;
-tempqmatLookup[	577	]|=4;
-tempqmatLookup[	581	]|=4;
-tempqmatLookup[	584	]|=4;
-tempqmatLookup[	586	]|=4;
-tempqmatLookup[	589	]|=4;
-tempqmatLookup[	601	]|=4;
-tempqmatLookup[	617	]|=4;
-tempqmatLookup[	633	]|=4;
-tempqmatLookup[	642	]|=4;
-tempqmatLookup[	646	]|=4;
-tempqmatLookup[	649	]|=4;
-tempqmatLookup[	651	]|=4;
-tempqmatLookup[	654	]|=4;
-tempqmatLookup[	682	]|=4;
-tempqmatLookup[	698	]|=4;
-tempqmatLookup[	707	]|=4;
-tempqmatLookup[	711	]|=4;
-tempqmatLookup[	712	]|=4;
-tempqmatLookup[	714	]|=4;
-tempqmatLookup[	719	]|=4;
-tempqmatLookup[	731	]|=4;
-tempqmatLookup[	747	]|=4;
-tempqmatLookup[	763	]|=4;
-tempqmatLookup[	768	]|=4;
-tempqmatLookup[	772	]|=4;
-tempqmatLookup[	776	]|=4;
-tempqmatLookup[	782	]|=4;
-tempqmatLookup[	796	]|=4;
-tempqmatLookup[	812	]|=4;
-tempqmatLookup[	828	]|=4;
-tempqmatLookup[	833	]|=4;
-tempqmatLookup[	837	]|=4;
-tempqmatLookup[	841	]|=4;
-tempqmatLookup[	846	]|=4;
-tempqmatLookup[	861	]|=4;
-tempqmatLookup[	877	]|=4;
-tempqmatLookup[	893	]|=4;
-tempqmatLookup[	898	]|=4;
-tempqmatLookup[	902	]|=4;
-tempqmatLookup[	906	]|=4;
-tempqmatLookup[	908	]|=4;
-tempqmatLookup[	909	]|=4;
-tempqmatLookup[	911	]|=4;
-tempqmatLookup[	926	]|=4;
-tempqmatLookup[	942	]|=4;
-tempqmatLookup[	958	]|=4;
-tempqmatLookup[	963	]|=4;
-tempqmatLookup[	967	]|=4;
-tempqmatLookup[	971	]|=4;
-tempqmatLookup[	974	]|=4;
-tempqmatLookup[	991	]|=4;
-tempqmatLookup[	1007	]|=4;
-tempqmatLookup[	1023	]|=4;
-tempqmatLookup[	1024	]|=4;
-tempqmatLookup[	1041	]|=4;
-tempqmatLookup[	1043	]|=4;
-tempqmatLookup[	1044	]|=4;
-tempqmatLookup[	1048	]|=4;
-tempqmatLookup[	1052	]|=4;
-tempqmatLookup[	1056	]|=4;
-tempqmatLookup[	1089	]|=4;
-tempqmatLookup[	1104	]|=4;
-tempqmatLookup[	1106	]|=4;
-tempqmatLookup[	1109	]|=4;
-tempqmatLookup[	1113	]|=4;
-tempqmatLookup[	1117	]|=4;
-tempqmatLookup[	1121	]|=4;
-tempqmatLookup[	1137	]|=4;
-tempqmatLookup[	1154	]|=4;
-tempqmatLookup[	1169	]|=4;
-tempqmatLookup[	1171	]|=4;
-tempqmatLookup[	1174	]|=4;
-tempqmatLookup[	1178	]|=4;
-tempqmatLookup[	1182	]|=4;
-tempqmatLookup[	1186	]|=4;
-tempqmatLookup[	1219	]|=4;
-tempqmatLookup[	1232	]|=4;
-tempqmatLookup[	1234	]|=4;
-tempqmatLookup[	1239	]|=4;
-tempqmatLookup[	1243	]|=4;
-tempqmatLookup[	1247	]|=4;
-tempqmatLookup[	1251	]|=4;
-tempqmatLookup[	1267	]|=4;
-tempqmatLookup[	1284	]|=4;
-tempqmatLookup[	1296	]|=4;
-tempqmatLookup[	1304	]|=4;
-tempqmatLookup[	1308	]|=4;
-tempqmatLookup[	1316	]|=4;
-tempqmatLookup[	1332	]|=4;
-tempqmatLookup[	1349	]|=4;
-tempqmatLookup[	1361	]|=4;
-tempqmatLookup[	1369	]|=4;
-tempqmatLookup[	1373	]|=4;
-tempqmatLookup[	1381	]|=4;
-tempqmatLookup[	1397	]|=4;
-tempqmatLookup[	1414	]|=4;
-tempqmatLookup[	1426	]|=4;
-tempqmatLookup[	1434	]|=4;
-tempqmatLookup[	1438	]|=4;
-tempqmatLookup[	1446	]|=4;
-tempqmatLookup[	1462	]|=4;
-tempqmatLookup[	1479	]|=4;
-tempqmatLookup[	1491	]|=4;
-tempqmatLookup[	1499	]|=4;
-tempqmatLookup[	1503	]|=4;
-tempqmatLookup[	1511	]|=4;
-tempqmatLookup[	1527	]|=4;
-tempqmatLookup[	1552	]|=4;
-tempqmatLookup[	1556	]|=4;
-tempqmatLookup[	1564	]|=4;
-tempqmatLookup[	1576	]|=4;
-tempqmatLookup[	1609	]|=4;
-tempqmatLookup[	1617	]|=4;
-tempqmatLookup[	1621	]|=4;
-tempqmatLookup[	1629	]|=4;
-tempqmatLookup[	1641	]|=4;
-tempqmatLookup[	1657	]|=4;
-tempqmatLookup[	1682	]|=4;
-tempqmatLookup[	1686	]|=4;
-tempqmatLookup[	1694	]|=4;
-tempqmatLookup[	1706	]|=4;
-tempqmatLookup[	1722	]|=4;
-tempqmatLookup[	1739	]|=4;
-tempqmatLookup[	1747	]|=4;
-tempqmatLookup[	1751	]|=4;
-tempqmatLookup[	1759	]|=4;
-tempqmatLookup[	1771	]|=4;
-tempqmatLookup[	1787	]|=4;
-tempqmatLookup[	1804	]|=4;
-tempqmatLookup[	1808	]|=4;
-tempqmatLookup[	1812	]|=4;
-tempqmatLookup[	1816	]|=4;
-tempqmatLookup[	1836	]|=4;
-tempqmatLookup[	1869	]|=4;
-tempqmatLookup[	1873	]|=4;
-tempqmatLookup[	1877	]|=4;
-tempqmatLookup[	1881	]|=4;
-tempqmatLookup[	1901	]|=4;
-tempqmatLookup[	1917	]|=4;
-tempqmatLookup[	1934	]|=4;
-tempqmatLookup[	1938	]|=4;
-tempqmatLookup[	1942	]|=4;
-tempqmatLookup[	1946	]|=4;
-tempqmatLookup[	1966	]|=4;
-tempqmatLookup[	1999	]|=4;
-tempqmatLookup[	2003	]|=4;
-tempqmatLookup[	2007	]|=4;
-tempqmatLookup[	2011	]|=4;
-tempqmatLookup[	2031	]|=4;
-tempqmatLookup[	2047	]|=4;
-tempqmatLookup[	2048	]|=4;
-tempqmatLookup[	2064	]|=4;
-tempqmatLookup[	2081	]|=4;
-tempqmatLookup[	2083	]|=4;
-tempqmatLookup[	2084	]|=4;
-tempqmatLookup[	2088	]|=4;
-tempqmatLookup[	2092	]|=4;
-tempqmatLookup[	2113	]|=4;
-tempqmatLookup[	2129	]|=4;
-tempqmatLookup[	2144	]|=4;
-tempqmatLookup[	2146	]|=4;
-tempqmatLookup[	2149	]|=4;
-tempqmatLookup[	2153	]|=4;
-tempqmatLookup[	2157	]|=4;
-tempqmatLookup[	2161	]|=4;
-tempqmatLookup[	2178	]|=4;
-tempqmatLookup[	2194	]|=4;
-tempqmatLookup[	2209	]|=4;
-tempqmatLookup[	2211	]|=4;
-tempqmatLookup[	2214	]|=4;
-tempqmatLookup[	2218	]|=4;
-tempqmatLookup[	2222	]|=4;
-tempqmatLookup[	2243	]|=4;
-tempqmatLookup[	2259	]|=4;
-tempqmatLookup[	2272	]|=4;
-tempqmatLookup[	2274	]|=4;
-tempqmatLookup[	2279	]|=4;
-tempqmatLookup[	2283	]|=4;
-tempqmatLookup[	2287	]|=4;
-tempqmatLookup[	2291	]|=4;
-tempqmatLookup[	2308	]|=4;
-tempqmatLookup[	2324	]|=4;
-tempqmatLookup[	2336	]|=4;
-tempqmatLookup[	2344	]|=4;
-tempqmatLookup[	2348	]|=4;
-tempqmatLookup[	2356	]|=4;
-tempqmatLookup[	2373	]|=4;
-tempqmatLookup[	2389	]|=4;
-tempqmatLookup[	2401	]|=4;
-tempqmatLookup[	2409	]|=4;
-tempqmatLookup[	2413	]|=4;
-tempqmatLookup[	2421	]|=4;
-tempqmatLookup[	2438	]|=4;
-tempqmatLookup[	2454	]|=4;
-tempqmatLookup[	2466	]|=4;
-tempqmatLookup[	2474	]|=4;
-tempqmatLookup[	2478	]|=4;
-tempqmatLookup[	2486	]|=4;
-tempqmatLookup[	2503	]|=4;
-tempqmatLookup[	2519	]|=4;
-tempqmatLookup[	2531	]|=4;
-tempqmatLookup[	2539	]|=4;
-tempqmatLookup[	2543	]|=4;
-tempqmatLookup[	2551	]|=4;
-tempqmatLookup[	2568	]|=4;
-tempqmatLookup[	2584	]|=4;
-tempqmatLookup[	2592	]|=4;
-tempqmatLookup[	2596	]|=4;
-tempqmatLookup[	2604	]|=4;
-tempqmatLookup[	2633	]|=4;
-tempqmatLookup[	2649	]|=4;
-tempqmatLookup[	2657	]|=4;
-tempqmatLookup[	2661	]|=4;
-tempqmatLookup[	2669	]|=4;
-tempqmatLookup[	2681	]|=4;
-tempqmatLookup[	2698	]|=4;
-tempqmatLookup[	2714	]|=4;
-tempqmatLookup[	2722	]|=4;
-tempqmatLookup[	2726	]|=4;
-tempqmatLookup[	2734	]|=4;
-tempqmatLookup[	2746	]|=4;
-tempqmatLookup[	2763	]|=4;
-tempqmatLookup[	2779	]|=4;
-tempqmatLookup[	2787	]|=4;
-tempqmatLookup[	2791	]|=4;
-tempqmatLookup[	2799	]|=4;
-tempqmatLookup[	2811	]|=4;
-tempqmatLookup[	2828	]|=4;
-tempqmatLookup[	2844	]|=4;
-tempqmatLookup[	2848	]|=4;
-tempqmatLookup[	2852	]|=4;
-tempqmatLookup[	2856	]|=4;
-tempqmatLookup[	2876	]|=4;
-tempqmatLookup[	2893	]|=4;
-tempqmatLookup[	2909	]|=4;
-tempqmatLookup[	2913	]|=4;
-tempqmatLookup[	2917	]|=4;
-tempqmatLookup[	2921	]|=4;
-tempqmatLookup[	2941	]|=4;
-tempqmatLookup[	2958	]|=4;
-tempqmatLookup[	2974	]|=4;
-tempqmatLookup[	2978	]|=4;
-tempqmatLookup[	2982	]|=4;
-tempqmatLookup[	2986	]|=4;
-tempqmatLookup[	3006	]|=4;
-tempqmatLookup[	3023	]|=4;
-tempqmatLookup[	3039	]|=4;
-tempqmatLookup[	3043	]|=4;
-tempqmatLookup[	3047	]|=4;
-tempqmatLookup[	3051	]|=4;
-tempqmatLookup[	3071	]|=4;
-tempqmatLookup[	3137	]|=4;
-tempqmatLookup[	3153	]|=4;
-tempqmatLookup[	3169	]|=4;
-tempqmatLookup[	3189	]|=4;
-tempqmatLookup[	3193	]|=4;
-tempqmatLookup[	3197	]|=4;
-tempqmatLookup[	3267	]|=4;
-tempqmatLookup[	3283	]|=4;
-tempqmatLookup[	3299	]|=4;
-tempqmatLookup[	3319	]|=4;
-tempqmatLookup[	3323	]|=4;
-tempqmatLookup[	3327	]|=4;
-tempqmatLookup[	3332	]|=4;
-tempqmatLookup[	3348	]|=4;
-tempqmatLookup[	3364	]|=4;
-tempqmatLookup[	3388	]|=4;
-tempqmatLookup[	3397	]|=4;
-tempqmatLookup[	3413	]|=4;
-tempqmatLookup[	3429	]|=4;
-tempqmatLookup[	3441	]|=4;
-tempqmatLookup[	3449	]|=4;
-tempqmatLookup[	3453	]|=4;
-tempqmatLookup[	3462	]|=4;
-tempqmatLookup[	3478	]|=4;
-tempqmatLookup[	3494	]|=4;
-tempqmatLookup[	3514	]|=4;
-tempqmatLookup[	3518	]|=4;
-tempqmatLookup[	3527	]|=4;
-tempqmatLookup[	3543	]|=4;
-tempqmatLookup[	3559	]|=4;
-tempqmatLookup[	3571	]|=4;
-tempqmatLookup[	3579	]|=4;
-tempqmatLookup[	3583	]|=4;
-tempqmatLookup[	3657	]|=4;
-tempqmatLookup[	3673	]|=4;
-tempqmatLookup[	3689	]|=4;
-tempqmatLookup[	3697	]|=4;
-tempqmatLookup[	3701	]|=4;
-tempqmatLookup[	3706	]|=4;
-tempqmatLookup[	3709	]|=4;
-tempqmatLookup[	3722	]|=4;
-tempqmatLookup[	3738	]|=4;
-tempqmatLookup[	3754	]|=4;
-tempqmatLookup[	3766	]|=4;
-tempqmatLookup[	3769	]|=4;
-tempqmatLookup[	3771	]|=4;
-tempqmatLookup[	3774	]|=4;
-tempqmatLookup[	3787	]|=4;
-tempqmatLookup[	3803	]|=4;
-tempqmatLookup[	3819	]|=4;
-tempqmatLookup[	3827	]|=4;
-tempqmatLookup[	3831	]|=4;
-tempqmatLookup[	3834	]|=4;
-tempqmatLookup[	3839	]|=4;
-tempqmatLookup[	3852	]|=4;
-tempqmatLookup[	3884	]|=4;
-tempqmatLookup[	3892	]|=4;
-tempqmatLookup[	3901	]|=4;
-tempqmatLookup[	3903	]|=4;
-tempqmatLookup[	3917	]|=4;
-tempqmatLookup[	3933	]|=4;
-tempqmatLookup[	3949	]|=4;
-tempqmatLookup[	3953	]|=4;
-tempqmatLookup[	3957	]|=4;
-tempqmatLookup[	3961	]|=4;
-tempqmatLookup[	3964	]|=4;
-tempqmatLookup[	3966	]|=4;
-tempqmatLookup[	3982	]|=4;
-tempqmatLookup[	4014	]|=4;
-tempqmatLookup[	4022	]|=4;
-tempqmatLookup[	4026	]|=4;
-tempqmatLookup[	4029	]|=4;
-tempqmatLookup[	4031	]|=4;
-tempqmatLookup[	4047	]|=4;
-tempqmatLookup[	4063	]|=4;
-tempqmatLookup[	4079	]|=4;
-tempqmatLookup[	4083	]|=4;
-tempqmatLookup[	4087	]|=4;
-tempqmatLookup[	4091	]|=4;
-tempqmatLookup[	4092	]|=4;
-tempqmatLookup[	4094	]|=4;
-	
-	int hskip, vskip=0;
-	for(int i=0;i<61;i++){
-		if(i==48||i+1==50||i+2==56) vskip++;
-		hskip=0;
-		for(int j=0;j<61;j++){
-			if(i==26&&j==47){
-				hskip=hskip+1 -1;
+
+	//mark the nonsynonymous changes with |4 and the stops with -1
+	for(int from=0;from<64;from++){
+		for(int to=0;to<64;to++){
+			int fromAA = code->CodonLookup(from);
+			int toAA = code->CodonLookup(to);
+			//if one of the codons is a stop
+			if(fromAA == 20 || toAA == 20)
+				tempqmatLookup[64*from + to] = -1;
+			//if this is a viable 1 nucleotide change
+			else if(tempqmatLookup[64*from + to] & 1){
+				//if this is a nonsynonymous change
+				if(fromAA != toAA) 
+					tempqmatLookup[64*from + to] |= 4;
 				}
-			if(j==48||j+1==50||j+2==56) hskip++;
-			qmatLookup[i*61+j]=tempqmatLookup[(i+vskip)*64+j+hskip];
 			}
 		}
-	}
+
+	//remove the columns and rows representing stops
+	int reducedCell = 0;
+	for(int fullCell=0;fullCell<64*64;fullCell++){
+		if(tempqmatLookup[fullCell] != -1)
+			qmatLookup[reducedCell++] = tempqmatLookup[fullCell];
+		}
+	//assert(reducedCell == nstates*nstates);
+
+/*	ofstream deb("debugQmat.log");
+	for(int from=0;from<nstates;from++){
+		for(int to=0;to<nstates;to++){
+			deb << qmatLookup[from*nstates + to] << "\t";
+			}
+		deb << endl;
+		}
+*/	}
 
 
 void Model::UpdateQMatCodon(){
 //	ofstream dout("AAdist.log");
 
-	double composition[61]={0.12, 0.484, 0.12, 0.484, 0.0727, 0.0727, 0.0727, 0.0727, 0.236, 0.516, 0.236, 0.516, 0, 0, 0, 0, 0.324, 0.211, 0.324, 0.211, 0.142, 0.142, 0.142, 0.142, 0.236, 0.236, 0.236, 0.236, 0, 0, 0, 0, 0.335, 0.502, 0.335, 0.502, 0, 0, 0, 0, 0.269, 0.269, 0.269, 0.269, 0, 0, 0, 0, 0.0727, 0.0727, 0.516, 0.516, 0.516, 0.516, 1, 0.0473, 1, 0, 0, 0, 0};
-	double polarity[61]={0.79, 0.827, 0.79, 0.827, 0.457, 0.457, 0.457, 0.457, 0.691, 0.531, 0.691, 0.531, 0.037, 0.037, 0.0988, 0.037, 0.691, 0.679, 0.691, 0.679, 0.383, 0.383, 0.383, 0.383, 0.691, 0.691, 0.691, 0.691, 0, 0, 0, 0, 0.914, 1, 0.914, 1, 0.395, 0.395, 0.395, 0.395, 0.506, 0.506, 0.506, 0.506, 0.123, 0.123, 0.123, 0.123, 0.16, 0.16, 0.531, 0.531, 0.531, 0.531, 0.0741, 0.0617, 0.0741, 0, 0, 0, 0};
-	double molvol[61]={0.695, 0.317, 0.695, 0.317, 0.347, 0.347, 0.347, 0.347, 0.725, 0.647, 0.725, 0.647, 0.647, 0.647, 0.611, 0.647, 0.491, 0.557, 0.491, 0.557, 0.177, 0.177, 0.177, 0.177, 0.725, 0.725, 0.725, 0.725, 0.647, 0.647, 0.647, 0.647, 0.479, 0.305, 0.479, 0.305, 0.168, 0.168, 0.168, 0.168, 0, 0, 0, 0, 0.485, 0.485, 0.485, 0.485, 0.796, 0.796, 0.647, 0.647, 0.647, 0.647, 0.311, 1, 0.311, 0.647, 0.772, 0.647, 0.772};
-
+//	double composition[61]={0.12, 0.484, 0.12, 0.484, 0.0727, 0.0727, 0.0727, 0.0727, 0.236, 0.516, 0.236, 0.516, 0, 0, 0, 0, 0.324, 0.211, 0.324, 0.211, 0.142, 0.142, 0.142, 0.142, 0.236, 0.236, 0.236, 0.236, 0, 0, 0, 0, 0.335, 0.502, 0.335, 0.502, 0, 0, 0, 0, 0.269, 0.269, 0.269, 0.269, 0, 0, 0, 0, 0.0727, 0.0727, 0.516, 0.516, 0.516, 0.516, 1, 0.0473, 1, 0, 0, 0, 0};
+//	double polarity[61]={0.79, 0.827, 0.79, 0.827, 0.457, 0.457, 0.457, 0.457, 0.691, 0.531, 0.691, 0.531, 0.037, 0.037, 0.0988, 0.037, 0.691, 0.679, 0.691, 0.679, 0.383, 0.383, 0.383, 0.383, 0.691, 0.691, 0.691, 0.691, 0, 0, 0, 0, 0.914, 1, 0.914, 1, 0.395, 0.395, 0.395, 0.395, 0.506, 0.506, 0.506, 0.506, 0.123, 0.123, 0.123, 0.123, 0.16, 0.16, 0.531, 0.531, 0.531, 0.531, 0.0741, 0.0617, 0.0741, 0, 0, 0, 0};
+//	double molvol[61]={0.695, 0.317, 0.695, 0.317, 0.347, 0.347, 0.347, 0.347, 0.725, 0.647, 0.725, 0.647, 0.647, 0.647, 0.611, 0.647, 0.491, 0.557, 0.491, 0.557, 0.177, 0.177, 0.177, 0.177, 0.725, 0.725, 0.725, 0.725, 0.647, 0.647, 0.647, 0.647, 0.479, 0.305, 0.479, 0.305, 0.168, 0.168, 0.168, 0.168, 0, 0, 0, 0, 0.485, 0.485, 0.485, 0.485, 0.796, 0.796, 0.647, 0.647, 0.647, 0.647, 0.311, 1, 0.311, 0.647, 0.772, 0.647, 0.772};
+	
 	for(int w=0;w<NRateCats();w++){
-		for(int i=0;i<61;i++){
-			for(int j=0;j<61;j++){
-				if(qmatLookup[i*61+j]==0){//if two codons are >1 appart
+		for(int i=0;i<nstates;i++){
+			for(int j=0;j<nstates;j++){
+				if(qmatLookup[i*nstates+j]==0){//if two codons are >1 appart
 					qmat[w][i][j]=0.0;
 					}
 				else{
 					qmat[w][i][j] = *stateFreqs[j];
 					if(nst == 2){
-						if(qmatLookup[i*61+j] & 2){//if the difference is a transition
+						if(qmatLookup[i*nstates+j] & 2){//if the difference is a transition
 							qmat[w][i][j] *= *relNucRates[1];
 							}
 						}
 					else if(nst == 6){
-						if(qmatLookup[i*61+j] & 8) qmat[w][i][j] *= *relNucRates[0];
-						else if(qmatLookup[i*61+j] & 16) qmat[w][i][j] *= *relNucRates[1];
-						else if(qmatLookup[i*61+j] & 32) qmat[w][i][j] *= *relNucRates[2];
-						else if(qmatLookup[i*61+j] & 64) qmat[w][i][j] *= *relNucRates[3];
-						else if(qmatLookup[i*61+j] & 128) qmat[w][i][j] *= *relNucRates[4];
-						else if(qmatLookup[i*61+j] & 256) qmat[w][i][j] *= *relNucRates[5];
+						if(qmatLookup[i*nstates+j] & 8) qmat[w][i][j] *= *relNucRates[0];
+						else if(qmatLookup[i*nstates+j] & 16) qmat[w][i][j] *= *relNucRates[1];
+						else if(qmatLookup[i*nstates+j] & 32) qmat[w][i][j] *= *relNucRates[2];
+						else if(qmatLookup[i*nstates+j] & 64) qmat[w][i][j] *= *relNucRates[3];
+						else if(qmatLookup[i*nstates+j] & 128) qmat[w][i][j] *= *relNucRates[4];
+						else if(qmatLookup[i*nstates+j] & 256) qmat[w][i][j] *= *relNucRates[5];
 						}
-					if(qmatLookup[i*61+j]&4){
+					if(qmatLookup[i*nstates+j]&4){
 						//this is where omega or AA property stuff will go
 						//double phi=pow(abs((composition[i]-scalerC->val)/(composition[j]-scalerC->val)),Vc->val);
 						//double phi=pow(abs((polarity[i]-scalerC->val)/(polarity[j]-scalerC->val)),Vc->val);
@@ -780,6 +418,7 @@ void Model::UpdateQMatCodon(){
 							pol=(1-scalerP->val*poldist);
 							vol=(1-scalerM->val*voldist);
 							qmat[i][j] *= comp;
+
 							qmat[i][j] *= omega->val; //overall omega type thing 
 							qmat[i][j] *= pol;
 							qmat[i][j] *= vol;
@@ -939,23 +578,33 @@ void Model::UpdateQMatCodon(){
 			}
 		}
 
-	//set diags to sum rows to 0
-	double sum;
+	//set diags to sum rows to 0 and calculate the branch length rescaling factor
+	//note the there is really only a single rescaler, but it is stored separately 
+	//for each omega model
+	double sum, weightedDiagSum;
+	blen_multiplier[0] = 0.0;
+
 	for(int w=0;w<NRateCats();w++){
+		weightedDiagSum = 0.0;
 		for(int x=0;x<nstates;x++){
-			sum=0.0;
+			sum = 0.0;
 			for(int y=0;y<nstates;y++){
 				if(x!=y) sum+=qmat[w][x][y];
 				}
 			qmat[w][x][x]=-sum;
+			weightedDiagSum += sum * *stateFreqs[x];
 			}
+		blen_multiplier[0] += weightedDiagSum * *omegaProbs[w];
 		}
+	//note that although there si one blen multiplier per matrix, they are all set to the same value
+	blen_multiplier[0] = ONE_POINT_ZERO / blen_multiplier[0];
+	for(int i=1;i<NRateCats();i++)
+		blen_multiplier[i] = blen_multiplier[0];
 	}
 
 
 void Model::UpdateQMatAminoAcid(){
 
-	//here's the JTT model
 	for(int from=0;from<20;from++)
 		for(int to=0;to<20;to++)
 			qmat[0][from][to] = *stateFreqs[to];
@@ -963,22 +612,30 @@ void Model::UpdateQMatAminoAcid(){
 	if(modSpec.IsJonesAAMatrix()) MultiplyByJonesAAMatrix();
 	else if(modSpec.IsDayhoffAAMatrix()) MultiplyByDayhoffAAMatrix();
 	else if(modSpec.IsWAGAAMatrix()) MultiplyByWAGAAMatrix();
+	else if(modSpec.IsMtMamAAMatrix()) MultiplyByMtMamAAMatrix();
+	else if(modSpec.IsMtRevAAMatrix()) MultiplyByMtRevAAMatrix();
 	
+	//set diags to sum rows to 0 and calculate the branch length rescaling factor
+	double sum, weightedDiagSum = 0.0;
+	blen_multiplier[0] = 0.0;
+
 	for(int from=0;from<20;from++){
-		qmat[0][from][from] = 0.0;
+		//qmat[0][from][from] = 0.0;
+		sum = 0.0;
 		for(int to=0;to<20;to++){
-			if(from != to) qmat[0][from][from] -= qmat[0][from][to];
+			if(from != to) sum += qmat[0][from][to];
 			}
+		qmat[0][from][from] = -sum;
+		weightedDiagSum += sum * *stateFreqs[from];
 		}
-				
-}
+	blen_multiplier[0] = ONE_POINT_ZERO / weightedDiagSum;
+	}
 
 void Model::CalcEigenStuff(){
 	ProfCalcEigen.Start();
-	//if rate params or basefreqs have been altered, requiring the recalculation of the eigenvectors and c_ijk
-	if(modSpec.IsCodon()) UpdateQMatCodon();
-	else if(modSpec.IsAminoAcid()) UpdateQMatAminoAcid();
-	else UpdateQMat();
+	//if rate params or statefreqs have been altered, requiring the recalculation of the eigenvectors and c_ijk
+	//NOTE that the calculation of the blen_multiplier (rate matrix scaler) now occurs in UpdateQMat()
+	UpdateQMat();
 	
 	int effectiveModels = modSpec.IsNonsynonymousRateHet() ? NRateCats() : 1;
 	memcpy(**tempqmat, **qmat, effectiveModels*nstates*nstates*sizeof(FLOAT_TYPE));
@@ -992,31 +649,14 @@ void Model::CalcEigenStuff(){
 		//I think) so don't bother doing it here.  In fact, don't even allocate it in the model
 		if(modSpec.IsCodon() == false)
 			CalcCijk(&c_ijk[m][0], nstates, (const FLOAT_TYPE**) eigvecs[m], (const FLOAT_TYPE**) inveigvecs[m]);
-
-		if(modSpec.IsNucleotide() == false){
-			double diagsum=0;
-			for(int i=0;i<nstates;i++)
-				diagsum+=qmat[m][i][i];
-			blen_multiplier[m]=-nstates/diagsum;
-			}
-		else
-			blen_multiplier[m]=(ZERO_POINT_FIVE/((qmat[m][0][1]**stateFreqs[0])+(qmat[m][0][2]**stateFreqs[0])+(qmat[m][0][3]**stateFreqs[0])+(qmat[m][1][2]**stateFreqs[1])+(qmat[m][1][3]**stateFreqs[1])+(qmat[m][2][3]**stateFreqs[2])));
-		}
-
-	//does this really need n separate blen_multipliers? - answer: NO, but this is easier
-	//to calculate the per model multipliers above, and then calculate the single global one here
-	if(NRateCats() > 1 && modSpec.IsNonsynonymousRateHet()){
-		double tot = 0.0;
-		for(int i=0;i<effectiveModels;i++)
-			tot += blen_multiplier[i] * *omegaProbs[i];
-		for(int i=0;i<effectiveModels;i++)
-			blen_multiplier[i] = tot;
 		}
 
 	eigenDirty=false;
 	ProfCalcEigen.Stop();
 	}
 
+//usually this will be called with 2 branch lengths to caluclate two pmats, but if only one 
+//is needed the other blen with be -1
 void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLOAT_TYPE *&mat2){
 	ProfCalcPmat.Start();
 //	if(NStates() > 4){
@@ -1030,8 +670,8 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 			}
 //		}
 
-/*		for(int i=0;i<61;i++)
-		for(int j=0;j<61;j++)
+/*		for(int i=0;i<nstates;i++)
+		for(int j=0;j<nstates;j++)
 			assert(FloatingPointEquals(metaPmat[i*nstates+j], pmat[0][i][j], 1e-5));
 */
 	ProfCalcPmat.Stop();
@@ -1205,8 +845,8 @@ void Model::CalcPmatNState(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat){
 	
 	//output pmat
 /*	ofstream pmd(filename);
-	for(int i=0;i<61;i++){
-		for(int j=0;j<61;j++){
+	for(int i=0;i<nstates;i++){
+		for(int j=0;j<nstates;j++){
 			pmd << p[i][j] << "\t";
 			}
 		pmd << endl;
@@ -1263,19 +903,19 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 			}
 		}
 
-	if(NStates() == 61){//using precalced eigvecs X inveigvecs (c_ijk) is less efficient for codon models, and I
+	if(NStates() > 59){//using precalced eigvecs X inveigvecs (c_ijk) is less efficient for codon models, and I
 					//don't want a conditional in the inner loop
 		for(int rate=0;rate<NRateCats();rate++){
 			int model=0;
 			if(modSpec.IsNonsynonymousRateHet())
 				model = rate;
 			const unsigned rateOffset = nstates*rate;
-			for (int i = 0; i < 61; i++){
-				for (int j = 0; j < 61; j++){
+			for (int i = 0; i < nstates; i++){
+				for (int j = 0; j < nstates; j++){
 					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
 					FLOAT_TYPE sum_d1p=ZERO_POINT_ZERO;
 					FLOAT_TYPE sum_d2p = ZERO_POINT_ZERO;
-					for (int k = 0; k < 61; k++){ 
+					for (int k = 0; k < nstates; k++){ 
 						const FLOAT_TYPE x = eigvecs[model][i][k]*inveigvecs[model][k][j];
 						sum_p   += x*EigValexp[k+rateOffset];
 						sum_d1p += x*EigValderiv[k+rateOffset];
@@ -1355,14 +995,14 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pmat){
 				}
 			}
 		}
-	else if(NStates()==61){
+	else if(NStates()>59){
 		for(int rate=0;rate<NRateCats();rate++){
 			int model=0;
 			if(modSpec.IsNonsynonymousRateHet())
 				model = rate;
-			const unsigned rateOffset = 61*rate;
-			for (int i = 0; i < 61; i++){
-				for (int j = 0; j < 61; j++){
+			const unsigned rateOffset = nstates*rate;
+			for (int i = 0; i < nstates; i++){
+				for (int j = 0; j < nstates; j++){
 					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
 
 /*					
@@ -1370,7 +1010,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pmat){
 					FLOAT_TYPE sum_pSmall=ZERO_POINT_ZERO;
 					FLOAT_TYPE sum_pBig2=ZERO_POINT_ZERO;
 					FLOAT_TYPE sum_pSmall2=ZERO_POINT_ZERO;
-					for (int k = 0; k < 61; k++){ 
+					for (int k = 0; k < nstates; k++){ 
 						const FLOAT_TYPE x = eigvecs[model][i][k]*inveigvecs[model][k][j];
 					
 						if(x < ZERO_POINT_ZERO){
@@ -1392,7 +1032,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pmat){
 					tot += (sum_pSmall2 + sum_pSmall);
 					sum_p = tot;
 */
-					for (int k = 0; k < 61; k++){ 
+					for (int k = 0; k < nstates; k++){ 
 						const FLOAT_TYPE x = eigvecs[model][i][k]*inveigvecs[model][k][j];
 						sum_p   += x*EigValexp[k+rateOffset];
 						}
@@ -1430,7 +1070,7 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 		}
 	if(modSpec.numRateCats > 1 && modSpec.IsNonsynonymousRateHet() == false) DiscreteGamma(rateMults, rateProbs, *alpha);
 
-	if((modSpec.IsEqualStateFrequencies() == false && modSpec.IsDayhoffAAFreqs() == false && modSpec.IsWAGAAFreqs() == false && modSpec.IsJonesAAFreqs() == false)
+	if((modSpec.IsEqualStateFrequencies() == false && modSpec.IsDayhoffAAFreqs() == false && modSpec.IsWAGAAFreqs() == false && modSpec.IsJonesAAFreqs() == false && modSpec.IsMtMamAAFreqs() == false && modSpec.IsMtRevAAFreqs() == false)
 		|| (modSpec.IsF3x4StateFrequencies() || modSpec.IsF1x4StateFrequencies())){
 		//if the state freqs aren't equal, they will either start at the empirical values 
 		//or be fixed at them
@@ -1615,11 +1255,25 @@ bool Model::IsModelEqual(const Model *other) const {
 	assert(0);
 	//this will need to be generalized if other models are introduced
 	for(int i=0;i<6;i++)
-		if(*relNucRates[i]!=*(other->relNucRates[i])) return false;
+		if(!FloatingPointEquals(*relNucRates[i], *(other->relNucRates[i]), 1e-15)) return false;
 	
 	for(int i=0;i<nstates;i++)
-		if(*stateFreqs[i]!=*(other->stateFreqs[i])) return false;
+		if(!FloatingPointEquals(*stateFreqs[i], *(other->stateFreqs[i]), 1e-15)) return false;
 
+	if(!modSpec.IsCodon() && NRateCats() > 1){
+		for(int i=0;i<this->NRateCats();i++){
+			if(!FloatingPointEquals(rateMults[i], other->rateMults[i], 1e-15)) return false;
+			if(!FloatingPointEquals(rateProbs[i], other->rateProbs[i], 1e-15)) return false;
+			}
+		}
+	else if(modSpec.IsCodon()){
+		for(int i=0;i<this->NRateCats();i++){
+			if(!FloatingPointEquals(Omega(i), other->Omega(i), 1e-15)) return false;
+			if(!FloatingPointEquals(OmegaProb(i), other->OmegaProb(i), 1e-15)) return false;
+			}
+		}
+
+/*
 	if(rateMults[0] != other->rateMults[0]) return false;
 	if(rateMults[1] != other->rateMults[1]) return false;
 	if(rateMults[2] != other->rateMults[2]) return false;
@@ -1629,9 +1283,11 @@ bool Model::IsModelEqual(const Model *other) const {
 	if(rateProbs[1] != other->rateProbs[1]) return false;
 	if(rateProbs[2] != other->rateProbs[2]) return false;
 	if(rateProbs[3] != other->rateProbs[3]) return false;
-
+*/
 	if(alpha!=other->alpha) return false;
 	if(propInvar!=other->propInvar) return false;
+
+	
 
 	return true;
 	}
@@ -1970,7 +1626,10 @@ void Model::OutputPaupBlockForModel(ofstream &outf, const char *treefname) const
 	outf << "begin paup;\nclear;\ngett file=" << treefname << " storebr;\nlset userbr ";
 	if(modSpec.Nst() == 2) outf << "nst=2 trat= " << TRatio();
 	else if(modSpec.Nst() == 1) outf << "nst=1 ";
-	else outf << "nst=6 rmat=(" << Rates(0) << " " << Rates(1) << " " << Rates(2) << " " << Rates(3) << " " << Rates(4) << ")";
+	else{
+		if(modSpec.IsArbitraryRateMatrix()) outf << "nst=6 rclass=" << modSpec.arbitraryRateMatrixString.c_str() << " rmat=(" << Rates(0) << " " << Rates(1) << " " << Rates(2) << " " << Rates(3) << " " << Rates(4) << ")";
+		else outf << "nst=6 rmat=(" << Rates(0) << " " << Rates(1) << " " << Rates(2) << " " << Rates(3) << " " << Rates(4) << ")";
+		}
 	
 	if(modSpec.IsEqualStateFrequencies() == true) outf << " base=eq ";
 	else if(modSpec.IsEmpiricalStateFrequencies() == true) outf << " base=emp ";
@@ -2004,7 +1663,10 @@ void Model::FillPaupBlockStringForModel(string &str, const char *treefname) cons
 		}
 	else if(modSpec.Nst() == 1) str += "nst=1 ";
 	else{
-		sprintf(temp,"nst=6 rmat=(%f %f %f %f %f)", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4));
+		if(modSpec.IsArbitraryRateMatrix())
+			sprintf(temp,"nst=6 rclass=%s rmat=(%f %f %f %f %f)", modSpec.arbitraryRateMatrixString.c_str(), Rates(0), Rates(1), Rates(2), Rates(3), Rates(4));
+		else
+			sprintf(temp,"nst=6 rmat=(%f %f %f %f %f)", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4));
 		str += temp;
 		}
 	if(modSpec.IsEqualStateFrequencies()) str +=" base=eq ";
@@ -2060,6 +1722,126 @@ void Model::OutputGarliFormattedModel(ostream &outf) const{
 		}
 	if(PropInvar()!=ZERO_POINT_ZERO) outf << " p " << PropInvar();
 	outf << " ";
+	}
+
+void Model::OutputHumanReadableModelReportWithParams() const{
+	//Report on the model setup and parameter values - like a beefed up version of Population::ModelReport
+	if(modSpec.IsCodon()){
+		if(modSpec.IsVertMitoCode()) outman.UserMessage("  Number of states = 60 (codon data, vertebrate mitochondrial code)");
+		else if(modSpec.IsInvertMitoCode()) outman.UserMessage("  Number of states = 62 (codon data, invertebrate mitochondrial code)");
+		else outman.UserMessage("  Number of states = 61 (codon data, standard code)");
+		}
+	else if(modSpec.IsAminoAcid())
+		outman.UserMessage("  Number of states = 20 (amino acid data)");
+	else 
+		outman.UserMessage("  Number of states = 4 (nucleotide data)");
+	
+	if(modSpec.IsAminoAcid() == false){
+		if(modSpec.IsCodon() && modSpec.numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega) = %f\n", Omega(0));
+		if(modSpec.IsCodon()) outman.UserMessage("  Nucleotide Relative Rate Matrix Assumed by Codon Model:     ");
+		else outman.UserMessage("  Nucleotide Relative Rate Matrix: ");
+		if(modSpec.Nst() == 6){
+			if(modSpec.IsArbitraryRateMatrix()) outman.UserMessageNoCR("    User specified matrix type: %s ", modSpec.arbitraryRateMatrixString.c_str());
+			else outman.UserMessageNoCR("    6 rates ");
+			if(modSpec.fixRelativeRates == true) outman.UserMessage(" values specified by user (fixed)");
+			else outman.UserMessage("");
+			outman.UserMessage("    AC = %.3f, AG = %.3f, AT = %.3f, CG = %.3f, CT = %.3f, GT = %.3f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
+			}
+		else if(modSpec.Nst() == 2){
+			outman.UserMessageNoCR("    2 rates (transition and transversion) K param = %.4f", Rates(1));
+			if(modSpec.IsCodon() == false) outman.UserMessage(" (ti/tv = %.4f)",  TRatio());
+			else outman.UserMessage("");
+			}
+		else outman.UserMessage("    1 rate");
+		}
+	else{
+		outman.UserMessageNoCR("  Amino Acid Rate Matrix: ");
+		if(modSpec.IsJonesAAMatrix()) outman.UserMessage("Jones");
+		else if(modSpec.IsDayhoffAAMatrix()) outman.UserMessage("Dayhoff");
+		else if(modSpec.IsPoissonAAMatrix()) outman.UserMessage("Poisson");
+		else if(modSpec.IsWAGAAMatrix()) outman.UserMessage("WAG");
+		else if(modSpec.IsMtMamAAMatrix()) outman.UserMessage("MtMam");
+		else if(modSpec.IsMtRevAAMatrix()) outman.UserMessage("MtRev");
+		}
+
+	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
+	if(modSpec.IsEqualStateFrequencies()){
+		if(modSpec.IsCodon()){
+			if(modSpec.IsVertMitoCode()) outman.UserMessage("equal (1/60 = 0.01667, fixed)");
+			else if(modSpec.IsInvertMitoCode()) outman.UserMessage("equal (1/62 = 0.01613, fixed)");
+			else outman.UserMessage("equal (1/61 = 0.01639, fixed)");
+			}
+		else if(modSpec.IsAminoAcid())
+			outman.UserMessage("equal (0.05, fixed)");
+		else 
+			outman.UserMessage("equal (0.25, fixed)");
+		}
+	else if(modSpec.IsF3x4StateFrequencies()) outman.UserMessage("\n    empirical values calculated by F3x4 method (fixed)");
+	else if(modSpec.IsF1x4StateFrequencies()) outman.UserMessage("\n    empirical values calculated by F1x4 method (fixed)");
+	else if(modSpec.IsEmpiricalStateFrequencies()){
+		if(modSpec.IsAminoAcid()) outman.UserMessage("empirical (observed) values (+F)");
+		else outman.UserMessage("empirical (observed) values, fixed:");
+		}
+	else if(modSpec.IsJonesAAFreqs()) outman.UserMessage("Jones");
+	else if(modSpec.IsWAGAAFreqs()) outman.UserMessage("WAG");
+	else if(modSpec.IsMtMamAAFreqs()) outman.UserMessage("MtMam");
+	else if(modSpec.IsMtRevAAFreqs()) outman.UserMessage("MtRev");
+	else if(modSpec.IsDayhoffAAFreqs()) outman.UserMessage("Dayhoff");
+	else if(modSpec.IsUserSpecifiedStateFrequencies()) outman.UserMessage("specified by user (fixed)");
+	else outman.UserMessage("estimated");
+		
+	if(!modSpec.IsEqualStateFrequencies()){
+		if(modSpec.IsCodon())  outman.UserMessageNoCR("    (AAA, AAC, AAG, AAT, ACA, ... etc)\n    ");
+		else if(modSpec.IsAminoAcid()) outman.UserMessageNoCR("    (ACDEFGHIKLMNPQRSTVWY)\n    ");
+		else outman.UserMessageNoCR("    (ACGT) ");
+		for(int i=0;i<nstates;i++){
+			outman.UserMessageNoCR("%.4f ", StateFreq(i));
+			if(i>0 && (i+1)!= nstates && !((i+1)%5)) outman.UserMessageNoCR("\n    ");
+			}
+		outman.UserMessage("");
+		}
+
+	outman.UserMessage("  Rate Heterogeneity Model:");
+	if(modSpec.numRateCats == 1){
+		if(modSpec.includeInvariantSites == false) outman.UserMessage("    no rate heterogeneity");
+		else{
+			if(modSpec.fixInvariantSites == true) outman.UserMessage("    only an invariant (invariable) site category,\n    proportion specified by user (fixed)\n    %.4f", PropInvar());
+			else outman.UserMessage("    only an invariant (invariable) site category, proportion estimated\n    %.4f", PropInvar());
+			}
+		}
+	else{
+		outman.UserMessageNoCR("    %d ", modSpec.numRateCats);
+		if(modSpec.IsNonsynonymousRateHet()){
+			outman.UserMessage("nonsynonymous rate categories, rate and proportion of each estimated\n     (this is effectively the M3 model of PAML)");
+			outman.UserMessage("      dN/dS\tProportion");
+			for(int i=0;i<modSpec.numRateCats;i++)
+				outman.UserMessage("      %5.4f\t%5.4f", Omega(i), OmegaProb(i));
+			}
+		else if(modSpec.IsFlexRateHet() == false){
+			if(modSpec.fixAlpha == true) outman.UserMessage("discrete gamma distributed rate categories,\n      alpha param specified by user (fixed)\n      %.4f", Alpha());
+			else outman.UserMessage("discrete gamma distributed rate categories, alpha param estimated\n      %.4f", Alpha());
+			if(modSpec.includeInvariantSites == true){
+				if(modSpec.fixInvariantSites == true) outman.UserMessage("    with an invariant (invariable) site category,\n    proportion specified by user (fixed)\n      %.4f", PropInvar());				
+				else outman.UserMessage("    with an invariant (invariable) site category, proportion estimated\n      %.4f", PropInvar());	
+				}
+			outman.UserMessage("    Substitution rate categories under this model:\n      rate\tproportion");
+			if(modSpec.includeInvariantSites == true) outman.UserMessage("      %5.4f\t%5.4f", 0.0, PropInvar());
+			for(int r=0;r<modSpec.numRateCats;r++)
+				outman.UserMessage("      %5.4f\t%5.4f", rateMults[r], rateProbs[r]);
+			}
+		else{
+			outman.UserMessage("FLEX rate categories, rate and proportion of each estimated");
+			if(modSpec.includeInvariantSites == true){
+				if(modSpec.fixInvariantSites == true) outman.UserMessage("    with an invariant (invariable) site category,\n    proportion specified by user (fixed)");				
+				else outman.UserMessage("    with an invariant (invariable) site category, proportion estimated");
+				}
+			outman.UserMessage("      Estimated substitution rate categories:\n      rate\tproportion");
+			for(int r=0;r<modSpec.numRateCats;r++)
+				outman.UserMessage("      %5.4f\t%5.4f", rateMults[r], rateProbs[r]);
+			}
+		}
+	outman.UserMessage("");
+
 	}
 
 void Model::FillGarliFormattedModelString(string &s) const{
@@ -2368,19 +2150,71 @@ void Model::CreateModelFromSpecification(int modnum){
 		if(modSpec.IsJonesAAFreqs()) SetJonesAAFreqs();
 		if(modSpec.IsDayhoffAAFreqs()) SetDayhoffAAFreqs();
 		if(modSpec.IsWAGAAFreqs()) SetWAGAAFreqs();
+		if(modSpec.IsMtMamAAFreqs()) SetMtMamAAFreqs();
+		if(modSpec.IsMtRevAAFreqs()) SetMtRevAAFreqs();
 		}
 
 	//deal with the relative rates
 
 	if(modSpec.IsAminoAcid() == false){
 		if(nst==6){
-			//make the transitions higher to begin with
-			for(int i=0;i<6;i++){
-				FLOAT_TYPE *d=new FLOAT_TYPE;
-				relNucRates.push_back(d);
+			if(modSpec.IsArbitraryRateMatrix()){
+				//user specified rate matrix type, like rclass = (a b c d e f) in paup
+				//trying to do this as generically as possible
+				string matrixSpec = modSpec.GetArbitraryRateMatrixString();
+				int pos = 0;
+				char characters[10];
+		//		int usedCharacters = 0;
+				FLOAT_TYPE **params = new FLOAT_TYPE*[6]; 
+
+				for(int r=0;r<6;r++){
+					while (pos < matrixSpec.size() && !isalnum(matrixSpec[pos])) pos++;
+					bool newChar = true;
+					char thisChar = matrixSpec[pos];
+					for(int c=0;c<r;c++){
+						if(thisChar == characters[c]){
+							params[r] = params[c];
+							newChar = false;
+							arbitraryMatrixIndeces[r] = c;
+							characters[r] = thisChar;
+							break;
+							}
+						}
+					if(newChar){
+						params[r] = new FLOAT_TYPE;
+						*params[r] = ONE_POINT_ZERO;
+						characters[r] = thisChar;
+						arbitraryMatrixIndeces[r] = r;
+	//					usedCharacters++;
+						}
+					pos++;
+					if(matrixSpec[pos] != ' ' && matrixSpec[pos] != '\t' && matrixSpec[pos] != ')') throw ErrorException("Problem parsing rate matrix specification.\n\tIt should look something like this (a b a c b c)");
+					}
+				while (pos < matrixSpec.size() && (matrixSpec[pos] == ' ' || matrixSpec[pos] == '\t')) pos++;
+				if(matrixSpec[pos] != ')') throw ErrorException("Problem parsing rate matrix specification.\n\tIt should look something like this (a b a c b c)");
+				for(int i=0;i<6;i++){
+					relNucRates.push_back(params[i]);
+					}
+
+				delete []params;
+				//it is hard to know what values to start the arbitrary matrix at, but try to make the transitions higher
+				//it doesn't really matter if some are aliased to one another
+				*relNucRates[1] = 4.0;
+				*relNucRates[4] = 4.0;
+				*relNucRates[5] = ONE_POINT_ZERO;
+				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 6);
+				r->SetWeight(6);
+				paramsToMutate.push_back(r);
 				}
-			*relNucRates[0]=*relNucRates[2]=*relNucRates[3]=*relNucRates[5] = ONE_POINT_ZERO;
-			*relNucRates[1]=*relNucRates[4] = 4.0;
+			else{//normal GTR
+				//make the transitions higher to begin with
+				for(int i=0;i<6;i++){
+					FLOAT_TYPE *d=new FLOAT_TYPE;
+					relNucRates.push_back(d);
+					}
+				*relNucRates[0]=*relNucRates[2]=*relNucRates[3]=*relNucRates[5] = ONE_POINT_ZERO;
+				*relNucRates[1]=*relNucRates[4] = 4.0;
+				}
 			if(modSpec.fixRelativeRates == false){
 				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 6);
 				r->SetWeight(6);
@@ -2398,6 +2232,7 @@ void Model::CreateModelFromSpecification(int modnum){
 			relNucRates.push_back(a);
 			relNucRates.push_back(b);
 			relNucRates.push_back(a);
+			
 			if(modSpec.fixRelativeRates == false){
 				RelativeRates *r=new RelativeRates("Rate matrix", &b, 1);
 				r->SetWeight(2);
@@ -2485,13 +2320,57 @@ void Model::CreateModelFromSpecification(int modnum){
 		o->SetWeight(2);
 		paramsToMutate.push_back(o);
 */
-		qmatLookup = new int[nstates * nstates];
-		FillQMatLookup();
 		UpdateQMatCodon();
 		}
 	else UpdateQMatAminoAcid();
 
 	eigenDirty=true;
+	}
+
+void Model::SetMtMamAAFreqs(){
+	*stateFreqs[0] 	=	0.0692	;
+	*stateFreqs[14]	=	0.0184	;
+	*stateFreqs[11]	=	0.0400	;
+	*stateFreqs[2]	=	0.0186	;
+	*stateFreqs[1]	=	0.0065	;
+	*stateFreqs[13]	=	0.0238	;
+	*stateFreqs[3]	=	0.0236	;
+	*stateFreqs[5]	=	0.0557	;
+	*stateFreqs[6]	=	0.0277	;
+	*stateFreqs[7]	=	0.0905	;
+	*stateFreqs[9]	=	0.1675	;
+	*stateFreqs[8]	=	0.0221	;
+	*stateFreqs[10]	=	0.0561	;
+	*stateFreqs[4]	=	0.0611	;
+	*stateFreqs[12]	=	0.0536	;
+	*stateFreqs[15]	=	0.0725	;
+	*stateFreqs[16]	=	0.0870	;
+	*stateFreqs[18]	=	0.0293	;
+	*stateFreqs[19]	=	0.0340	;
+	*stateFreqs[17]	=	0.0428	;
+	}
+
+void Model::SetMtRevAAFreqs(){
+	*stateFreqs[0] 	=	0.0720	;
+	*stateFreqs[14]	=	0.0190	;
+	*stateFreqs[11]	=	0.0390	;
+	*stateFreqs[2]	=	0.0190	;
+	*stateFreqs[1]	=	0.0060	;
+	*stateFreqs[13]	=	0.0250	;
+	*stateFreqs[3]	=	0.0240	;
+	*stateFreqs[5]	=	0.0560	;
+	*stateFreqs[6]	=	0.0280	;
+	*stateFreqs[7]	=	0.0880	;
+	*stateFreqs[9]	=	0.1690	;
+	*stateFreqs[8]	=	0.0230	;
+	*stateFreqs[10]	=	0.0540	;
+	*stateFreqs[4]	=	0.0610	;
+	*stateFreqs[12]	=	0.0540	;
+	*stateFreqs[15]	=	0.0720	;
+	*stateFreqs[16]	=	0.0860	;
+	*stateFreqs[18]	=	0.0290	;
+	*stateFreqs[19]	=	0.0330	;
+	*stateFreqs[17]	=	0.0430	;
 	}
 
 void Model::SetJonesAAFreqs(){
@@ -2594,7 +2473,7 @@ int Model::PerformModelMutation(){
 		retType=Individual::alpha;
 		}
 	else if(mut->Type() == RATEPROPS || mut->Type() == RATEMULTS){
-		//DEBUG - for now omega muts come through here too
+		//flex rates and omega muts come through here
 
 		//enforce an ordering of the rate multipliers, so that they can't "cross" one another
 		if(NRateCats() > 1) CheckAndCorrectRateOrdering();
@@ -2823,6 +2702,397 @@ void Model::MultiplyByJonesAAMatrix(){
 	qmatOffset[15][19] *= 0.063; qmatOffset[19][15] *= 0.063; qmatOffset[16][17] *= 0.112; qmatOffset[17][16] *= 0.112; qmatOffset[16][18] *= 0.012; qmatOffset[18][16] *= 0.012; 
 	qmatOffset[16][19] *= 0.021; qmatOffset[19][16] *= 0.021; qmatOffset[17][18] *= 0.025; qmatOffset[18][17] *= 0.025; qmatOffset[17][19] *= 0.016; qmatOffset[19][17] *= 0.016; 
 	qmatOffset[18][19] *= 0.071; qmatOffset[19][18] *= 0.071;
+	}
+
+void Model::MultiplyByMtMamAAMatrix(){
+	int modNum=0;
+	FLOAT_TYPE **qmatOffset = qmat[modNum];
+
+	qmatOffset [ 0 ][ 14 ] *= 0.0337 ; qmatOffset [ 14 ][ 0 ] *= 0.0337 ;
+	qmatOffset [ 0 ][ 11 ] *= 0.0021 ; qmatOffset [ 11 ][ 0 ] *= 0.0021 ;
+	qmatOffset [ 0 ][ 2 ] *= 0.0116 ; qmatOffset [ 2 ][ 0 ] *= 0.0116 ;
+	qmatOffset [ 0 ][ 1 ] *= 0.0000 ; qmatOffset [ 1 ][ 0 ] *= 0.0000 ;
+	qmatOffset [ 0 ][ 13 ] *= 0.0000 ; qmatOffset [ 13 ][ 0 ] *= 0.0000 ;
+	qmatOffset [ 0 ][ 3 ] *= 0.0000 ; qmatOffset [ 3 ][ 0 ] *= 0.0000 ;
+	qmatOffset [ 0 ][ 5 ] *= 0.0821 ; qmatOffset [ 5 ][ 0 ] *= 0.0821 ;
+	qmatOffset [ 0 ][ 6 ] *= 0.0084 ; qmatOffset [ 6 ][ 0 ] *= 0.0084 ;
+	qmatOffset [ 0 ][ 7 ] *= 0.0790 ; qmatOffset [ 7 ][ 0 ] *= 0.0790 ;
+	qmatOffset [ 0 ][ 9 ] *= 0.0221 ; qmatOffset [ 9 ][ 0 ] *= 0.0221 ;
+	qmatOffset [ 0 ][ 8 ] *= 0.0000 ; qmatOffset [ 8 ][ 0 ] *= 0.0000 ;
+	qmatOffset [ 0 ][ 10 ] *= 0.0800 ; qmatOffset [ 10 ][ 0 ] *= 0.0800 ;
+	qmatOffset [ 0 ][ 4 ] *= 0.0000 ; qmatOffset [ 4 ][ 0 ] *= 0.0000 ;
+	qmatOffset [ 0 ][ 12 ] *= 0.0558 ; qmatOffset [ 12 ][ 0 ] *= 0.0558 ;
+	qmatOffset [ 0 ][ 15 ] *= 0.3601 ; qmatOffset [ 15 ][ 0 ] *= 0.3601 ;
+	qmatOffset [ 0 ][ 16 ] *= 0.7170 ; qmatOffset [ 16 ][ 0 ] *= 0.7170 ;
+	qmatOffset [ 0 ][ 18 ] *= 0.0053 ; qmatOffset [ 18 ][ 0 ] *= 0.0053 ;
+	qmatOffset [ 0 ][ 19 ] *= 0.0000 ; qmatOffset [ 19 ][ 0 ] *= 0.0000 ;
+	qmatOffset [ 0 ][ 17 ] *= 0.4191 ; qmatOffset [ 17 ][ 0 ] *= 0.4191 ;
+	qmatOffset [ 14 ][ 11 ] *= 0.0042 ; qmatOffset [ 11 ][ 14 ] *= 0.0042 ;
+	qmatOffset [ 14 ][ 2 ] *= 0.0000 ; qmatOffset [ 2 ][ 14 ] *= 0.0000 ;
+	qmatOffset [ 14 ][ 1 ] *= 0.1958 ; qmatOffset [ 1 ][ 14 ] *= 0.1958 ;
+	qmatOffset [ 14 ][ 13 ] *= 0.2590 ; qmatOffset [ 13 ][ 14 ] *= 0.2590 ;
+	qmatOffset [ 14 ][ 3 ] *= 0.0000 ; qmatOffset [ 3 ][ 14 ] *= 0.0000 ;
+	qmatOffset [ 14 ][ 5 ] *= 0.0190 ; qmatOffset [ 5 ][ 14 ] *= 0.0190 ;
+	qmatOffset [ 14 ][ 6 ] *= 0.2443 ; qmatOffset [ 6 ][ 14 ] *= 0.2443 ;
+	qmatOffset [ 14 ][ 7 ] *= 0.0000 ; qmatOffset [ 7 ][ 14 ] *= 0.0000 ;
+	qmatOffset [ 14 ][ 9 ] *= 0.0063 ; qmatOffset [ 9 ][ 14 ] *= 0.0063 ;
+	qmatOffset [ 14 ][ 8 ] *= 0.0526 ; qmatOffset [ 8 ][ 14 ] *= 0.0526 ;
+	qmatOffset [ 14 ][ 10 ] *= 0.0000 ; qmatOffset [ 10 ][ 14 ] *= 0.0000 ;
+	qmatOffset [ 14 ][ 4 ] *= 0.0000 ; qmatOffset [ 4 ][ 14 ] *= 0.0000 ;
+	qmatOffset [ 14 ][ 12 ] *= 0.0095 ; qmatOffset [ 12 ][ 14 ] *= 0.0095 ;
+	qmatOffset [ 14 ][ 15 ] *= 0.0032 ; qmatOffset [ 15 ][ 14 ] *= 0.0032 ;
+	qmatOffset [ 14 ][ 16 ] *= 0.0000 ; qmatOffset [ 16 ][ 14 ] *= 0.0000 ;
+	qmatOffset [ 14 ][ 18 ] *= 0.0168 ; qmatOffset [ 18 ][ 14 ] *= 0.0168 ;
+	qmatOffset [ 14 ][ 19 ] *= 0.0000 ; qmatOffset [ 19 ][ 14 ] *= 0.0000 ;
+	qmatOffset [ 14 ][ 17 ] *= 0.0000 ; qmatOffset [ 17 ][ 14 ] *= 0.0000 ;
+	qmatOffset [ 11 ][ 2 ] *= 0.9097 ; qmatOffset [ 2 ][ 11 ] *= 0.9097 ;
+	qmatOffset [ 11 ][ 1 ] *= 0.0000 ; qmatOffset [ 1 ][ 11 ] *= 0.0000 ;
+	qmatOffset [ 11 ][ 13 ] *= 0.0084 ; qmatOffset [ 13 ][ 11 ] *= 0.0084 ;
+	qmatOffset [ 11 ][ 3 ] *= 0.0000 ; qmatOffset [ 3 ][ 11 ] *= 0.0000 ;
+	qmatOffset [ 11 ][ 5 ] *= 0.0495 ; qmatOffset [ 5 ][ 11 ] *= 0.0495 ;
+	qmatOffset [ 11 ][ 6 ] *= 0.4822 ; qmatOffset [ 6 ][ 11 ] *= 0.4822 ;
+	qmatOffset [ 11 ][ 7 ] *= 0.0200 ; qmatOffset [ 7 ][ 11 ] *= 0.0200 ;
+	qmatOffset [ 11 ][ 9 ] *= 0.0000 ; qmatOffset [ 9 ][ 11 ] *= 0.0000 ;
+	qmatOffset [ 11 ][ 8 ] *= 0.4296 ; qmatOffset [ 8 ][ 11 ] *= 0.4296 ;
+	qmatOffset [ 11 ][ 10 ] *= 0.0221 ; qmatOffset [ 10 ][ 11 ] *= 0.0221 ;
+	qmatOffset [ 11 ][ 4 ] *= 0.0063 ; qmatOffset [ 4 ][ 11 ] *= 0.0063 ;
+	qmatOffset [ 11 ][ 12 ] *= 0.0347 ; qmatOffset [ 12 ][ 11 ] *= 0.0347 ;
+	qmatOffset [ 11 ][ 15 ] *= 0.4696 ; qmatOffset [ 15 ][ 11 ] *= 0.4696 ;
+	qmatOffset [ 11 ][ 16 ] *= 0.1158 ; qmatOffset [ 16 ][ 11 ] *= 0.1158 ;
+	qmatOffset [ 11 ][ 18 ] *= 0.0063 ; qmatOffset [ 18 ][ 11 ] *= 0.0063 ;
+	qmatOffset [ 11 ][ 19 ] *= 0.1643 ; qmatOffset [ 19 ][ 11 ] *= 0.1643 ;
+	qmatOffset [ 11 ][ 17 ] *= 0.0000 ; qmatOffset [ 17 ][ 11 ] *= 0.0000 ;
+	qmatOffset [ 2 ][ 1 ] *= 0.0000 ; qmatOffset [ 1 ][ 2 ] *= 0.0000 ;
+	qmatOffset [ 2 ][ 13 ] *= 0.0516 ; qmatOffset [ 13 ][ 2 ] *= 0.0516 ;
+	qmatOffset [ 2 ][ 3 ] *= 0.5991 ; qmatOffset [ 3 ][ 2 ] *= 0.5991 ;
+	qmatOffset [ 2 ][ 5 ] *= 0.0832 ; qmatOffset [ 5 ][ 2 ] *= 0.0832 ;
+	qmatOffset [ 2 ][ 6 ] *= 0.0116 ; qmatOffset [ 6 ][ 2 ] *= 0.0116 ;
+	qmatOffset [ 2 ][ 7 ] *= 0.0000 ; qmatOffset [ 7 ][ 2 ] *= 0.0000 ;
+	qmatOffset [ 2 ][ 9 ] *= 0.0000 ; qmatOffset [ 9 ][ 2 ] *= 0.0000 ;
+	qmatOffset [ 2 ][ 8 ] *= 0.0000 ; qmatOffset [ 8 ][ 2 ] *= 0.0000 ;
+	qmatOffset [ 2 ][ 10 ] *= 0.0000 ; qmatOffset [ 10 ][ 2 ] *= 0.0000 ;
+	qmatOffset [ 2 ][ 4 ] *= 0.0053 ; qmatOffset [ 4 ][ 2 ] *= 0.0053 ;
+	qmatOffset [ 2 ][ 12 ] *= 0.0021 ; qmatOffset [ 12 ][ 2 ] *= 0.0021 ;
+	qmatOffset [ 2 ][ 15 ] *= 0.0168 ; qmatOffset [ 15 ][ 2 ] *= 0.0168 ;
+	qmatOffset [ 2 ][ 16 ] *= 0.0000 ; qmatOffset [ 16 ][ 2 ] *= 0.0000 ;
+	qmatOffset [ 2 ][ 18 ] *= 0.0000 ; qmatOffset [ 18 ][ 2 ] *= 0.0000 ;
+	qmatOffset [ 2 ][ 19 ] *= 0.0000 ; qmatOffset [ 19 ][ 2 ] *= 0.0000 ;
+	qmatOffset [ 2 ][ 17 ] *= 0.0105 ; qmatOffset [ 17 ][ 2 ] *= 0.0105 ;
+	qmatOffset [ 1 ][ 13 ] *= 0.0000 ; qmatOffset [ 13 ][ 1 ] *= 0.0000 ;
+	qmatOffset [ 1 ][ 3 ] *= 0.0000 ; qmatOffset [ 3 ][ 1 ] *= 0.0000 ;
+	qmatOffset [ 1 ][ 5 ] *= 0.0000 ; qmatOffset [ 5 ][ 1 ] *= 0.0000 ;
+	qmatOffset [ 1 ][ 6 ] *= 0.3211 ; qmatOffset [ 6 ][ 1 ] *= 0.3211 ;
+	qmatOffset [ 1 ][ 7 ] *= 0.0432 ; qmatOffset [ 7 ][ 1 ] *= 0.0432 ;
+	qmatOffset [ 1 ][ 9 ] *= 0.0284 ; qmatOffset [ 9 ][ 1 ] *= 0.0284 ;
+	qmatOffset [ 1 ][ 8 ] *= 0.0000 ; qmatOffset [ 8 ][ 1 ] *= 0.0000 ;
+	qmatOffset [ 1 ][ 10 ] *= 0.0000 ; qmatOffset [ 10 ][ 1 ] *= 0.0000 ;
+	qmatOffset [ 1 ][ 4 ] *= 0.0074 ; qmatOffset [ 4 ][ 1 ] *= 0.0074 ;
+	qmatOffset [ 1 ][ 12 ] *= 0.0000 ; qmatOffset [ 12 ][ 1 ] *= 0.0000 ;
+	qmatOffset [ 1 ][ 15 ] *= 0.3654 ; qmatOffset [ 15 ][ 1 ] *= 0.3654 ;
+	qmatOffset [ 1 ][ 16 ] *= 0.1200 ; qmatOffset [ 16 ][ 1 ] *= 0.1200 ;
+	qmatOffset [ 1 ][ 18 ] *= 0.0684 ; qmatOffset [ 18 ][ 1 ] *= 0.0684 ;
+	qmatOffset [ 1 ][ 19 ] *= 0.5580 ; qmatOffset [ 19 ][ 1 ] *= 0.5580 ;
+	qmatOffset [ 1 ][ 17 ] *= 0.0000 ; qmatOffset [ 17 ][ 1 ] *= 0.0000 ;
+	qmatOffset [ 13 ][ 3 ] *= 0.2885 ; qmatOffset [ 3 ][ 13 ] *= 0.2885 ;
+	qmatOffset [ 13 ][ 5 ] *= 0.0000 ; qmatOffset [ 5 ][ 13 ] *= 0.0000 ;
+	qmatOffset [ 13 ][ 6 ] *= 0.5791 ; qmatOffset [ 6 ][ 13 ] *= 0.5791 ;
+	qmatOffset [ 13 ][ 7 ] *= 0.0000 ; qmatOffset [ 7 ][ 13 ] *= 0.0000 ;
+	qmatOffset [ 13 ][ 9 ] *= 0.0211 ; qmatOffset [ 9 ][ 13 ] *= 0.0211 ;
+	qmatOffset [ 13 ][ 8 ] *= 0.2548 ; qmatOffset [ 8 ][ 13 ] *= 0.2548 ;
+	qmatOffset [ 13 ][ 10 ] *= 0.0232 ; qmatOffset [ 10 ][ 13 ] *= 0.0232 ;
+	qmatOffset [ 13 ][ 4 ] *= 0.0000 ; qmatOffset [ 4 ][ 13 ] *= 0.0000 ;
+	qmatOffset [ 13 ][ 12 ] *= 0.0537 ; qmatOffset [ 12 ][ 13 ] *= 0.0537 ;
+	qmatOffset [ 13 ][ 15 ] *= 0.0316 ; qmatOffset [ 15 ][ 13 ] *= 0.0316 ;
+	qmatOffset [ 13 ][ 16 ] *= 0.0000 ; qmatOffset [ 16 ][ 13 ] *= 0.0000 ;
+	qmatOffset [ 13 ][ 18 ] *= 0.0000 ; qmatOffset [ 18 ][ 13 ] *= 0.0000 ;
+	qmatOffset [ 13 ][ 19 ] *= 0.0569 ; qmatOffset [ 19 ][ 13 ] *= 0.0569 ;
+	qmatOffset [ 13 ][ 17 ] *= 0.0347 ; qmatOffset [ 17 ][ 13 ] *= 0.0347 ;
+	qmatOffset [ 3 ][ 5 ] *= 0.0232 ; qmatOffset [ 5 ][ 3 ] *= 0.0232 ;
+	qmatOffset [ 3 ][ 6 ] *= 0.0232 ; qmatOffset [ 6 ][ 3 ] *= 0.0232 ;
+	qmatOffset [ 3 ][ 7 ] *= 0.0000 ; qmatOffset [ 7 ][ 3 ] *= 0.0000 ;
+	qmatOffset [ 3 ][ 9 ] *= 0.0000 ; qmatOffset [ 9 ][ 3 ] *= 0.0000 ;
+	qmatOffset [ 3 ][ 8 ] *= 0.2264 ; qmatOffset [ 8 ][ 3 ] *= 0.2264 ;
+	qmatOffset [ 3 ][ 10 ] *= 0.0000 ; qmatOffset [ 10 ][ 3 ] *= 0.0000 ;
+	qmatOffset [ 3 ][ 4 ] *= 0.0000 ; qmatOffset [ 4 ][ 3 ] *= 0.0000 ;
+	qmatOffset [ 3 ][ 12 ] *= 0.0000 ; qmatOffset [ 12 ][ 3 ] *= 0.0000 ;
+	qmatOffset [ 3 ][ 15 ] *= 0.0221 ; qmatOffset [ 15 ][ 3 ] *= 0.0221 ;
+	qmatOffset [ 3 ][ 16 ] *= 0.0042 ; qmatOffset [ 16 ][ 3 ] *= 0.0042 ;
+	qmatOffset [ 3 ][ 18 ] *= 0.0000 ; qmatOffset [ 18 ][ 3 ] *= 0.0000 ;
+	qmatOffset [ 3 ][ 19 ] *= 0.0000 ; qmatOffset [ 19 ][ 3 ] *= 0.0000 ;
+	qmatOffset [ 3 ][ 17 ] *= 0.0211 ; qmatOffset [ 17 ][ 3 ] *= 0.0211 ;
+	qmatOffset [ 5 ][ 6 ] *= 0.0000 ; qmatOffset [ 6 ][ 5 ] *= 0.0000 ;
+	qmatOffset [ 5 ][ 7 ] *= 0.0000 ; qmatOffset [ 7 ][ 5 ] *= 0.0000 ;
+	qmatOffset [ 5 ][ 9 ] *= 0.0000 ; qmatOffset [ 9 ][ 5 ] *= 0.0000 ;
+	qmatOffset [ 5 ][ 8 ] *= 0.0000 ; qmatOffset [ 8 ][ 5 ] *= 0.0000 ;
+	qmatOffset [ 5 ][ 10 ] *= 0.0000 ; qmatOffset [ 10 ][ 5 ] *= 0.0000 ;
+	qmatOffset [ 5 ][ 4 ] *= 0.0000 ; qmatOffset [ 4 ][ 5 ] *= 0.0000 ;
+	qmatOffset [ 5 ][ 12 ] *= 0.0000 ; qmatOffset [ 12 ][ 5 ] *= 0.0000 ;
+	qmatOffset [ 5 ][ 15 ] *= 0.1179 ; qmatOffset [ 15 ][ 5 ] *= 0.1179 ;
+	qmatOffset [ 5 ][ 16 ] *= 0.0000 ; qmatOffset [ 16 ][ 5 ] *= 0.0000 ;
+	qmatOffset [ 5 ][ 18 ] *= 0.0000 ; qmatOffset [ 18 ][ 5 ] *= 0.0000 ;
+	qmatOffset [ 5 ][ 19 ] *= 0.0011 ; qmatOffset [ 19 ][ 5 ] *= 0.0011 ;
+	qmatOffset [ 5 ][ 17 ] *= 0.0053 ; qmatOffset [ 17 ][ 5 ] *= 0.0053 ;
+	qmatOffset [ 6 ][ 7 ] *= 0.0000 ; qmatOffset [ 7 ][ 6 ] *= 0.0000 ;
+	qmatOffset [ 6 ][ 9 ] *= 0.0274 ; qmatOffset [ 9 ][ 6 ] *= 0.0274 ;
+	qmatOffset [ 6 ][ 8 ] *= 0.0000 ; qmatOffset [ 8 ][ 6 ] *= 0.0000 ;
+	qmatOffset [ 6 ][ 10 ] *= 0.0000 ; qmatOffset [ 10 ][ 6 ] *= 0.0000 ;
+	qmatOffset [ 6 ][ 4 ] *= 0.0000 ; qmatOffset [ 4 ][ 6 ] *= 0.0000 ;
+	qmatOffset [ 6 ][ 12 ] *= 0.0558 ; qmatOffset [ 12 ][ 6 ] *= 0.0558 ;
+	qmatOffset [ 6 ][ 15 ] *= 0.0211 ; qmatOffset [ 15 ][ 6 ] *= 0.0211 ;
+	qmatOffset [ 6 ][ 16 ] *= 0.0011 ; qmatOffset [ 16 ][ 6 ] *= 0.0011 ;
+	qmatOffset [ 6 ][ 18 ] *= 0.0000 ; qmatOffset [ 18 ][ 6 ] *= 0.0000 ;
+	qmatOffset [ 6 ][ 19 ] *= 1.6057 ; qmatOffset [ 19 ][ 6 ] *= 1.6057 ;
+	qmatOffset [ 6 ][ 17 ] *= 0.0000 ; qmatOffset [ 17 ][ 6 ] *= 0.0000 ;
+	qmatOffset [ 7 ][ 9 ] *= 0.2443 ; qmatOffset [ 9 ][ 7 ] *= 0.2443 ;
+	qmatOffset [ 7 ][ 8 ] *= 0.0063 ; qmatOffset [ 8 ][ 7 ] *= 0.0063 ;
+	qmatOffset [ 7 ][ 10 ] *= 0.3980 ; qmatOffset [ 10 ][ 7 ] *= 0.3980 ;
+	qmatOffset [ 7 ][ 4 ] *= 0.0600 ; qmatOffset [ 4 ][ 7 ] *= 0.0600 ;
+	qmatOffset [ 7 ][ 12 ] *= 0.0053 ; qmatOffset [ 12 ][ 7 ] *= 0.0053 ;
+	qmatOffset [ 7 ][ 15 ] *= 0.0000 ; qmatOffset [ 15 ][ 7 ] *= 0.0000 ;
+	qmatOffset [ 7 ][ 16 ] *= 0.3790 ; qmatOffset [ 16 ][ 7 ] *= 0.3790 ;
+	qmatOffset [ 7 ][ 18 ] *= 0.0000 ; qmatOffset [ 18 ][ 7 ] *= 0.0000 ;
+	qmatOffset [ 7 ][ 19 ] *= 0.0168 ; qmatOffset [ 19 ][ 7 ] *= 0.0168 ;
+	qmatOffset [ 7 ][ 17 ] *= 2.3375 ; qmatOffset [ 17 ][ 7 ] *= 2.3375 ;
+	qmatOffset [ 9 ][ 8 ] *= 0.0042 ; qmatOffset [ 8 ][ 9 ] *= 0.0042 ;
+	qmatOffset [ 9 ][ 10 ] *= 0.6412 ; qmatOffset [ 10 ][ 9 ] *= 0.6412 ;
+	qmatOffset [ 9 ][ 4 ] *= 0.2590 ; qmatOffset [ 4 ][ 9 ] *= 0.2590 ;
+	qmatOffset [ 9 ][ 12 ] *= 0.0453 ; qmatOffset [ 12 ][ 9 ] *= 0.0453 ;
+	qmatOffset [ 9 ][ 15 ] *= 0.0779 ; qmatOffset [ 15 ][ 9 ] *= 0.0779 ;
+	qmatOffset [ 9 ][ 16 ] *= 0.0358 ; qmatOffset [ 16 ][ 9 ] *= 0.0358 ;
+	qmatOffset [ 9 ][ 18 ] *= 0.0126 ; qmatOffset [ 18 ][ 9 ] *= 0.0126 ;
+	qmatOffset [ 9 ][ 19 ] *= 0.0263 ; qmatOffset [ 19 ][ 9 ] *= 0.0263 ;
+	qmatOffset [ 9 ][ 17 ] *= 0.1053 ; qmatOffset [ 17 ][ 9 ] *= 0.1053 ;
+	qmatOffset [ 8 ][ 10 ] *= 0.0621 ; qmatOffset [ 10 ][ 8 ] *= 0.0621 ;
+	qmatOffset [ 8 ][ 4 ] *= 0.0000 ; qmatOffset [ 4 ][ 8 ] *= 0.0000 ;
+	qmatOffset [ 8 ][ 12 ] *= 0.0190 ; qmatOffset [ 12 ][ 8 ] *= 0.0190 ;
+	qmatOffset [ 8 ][ 15 ] *= 0.0684 ; qmatOffset [ 15 ][ 8 ] *= 0.0684 ;
+	qmatOffset [ 8 ][ 16 ] *= 0.0526 ; qmatOffset [ 16 ][ 8 ] *= 0.0526 ;
+	qmatOffset [ 8 ][ 18 ] *= 0.0000 ; qmatOffset [ 18 ][ 8 ] *= 0.0000 ;
+	qmatOffset [ 8 ][ 19 ] *= 0.0705 ; qmatOffset [ 19 ][ 8 ] *= 0.0705 ;
+	qmatOffset [ 8 ][ 17 ] *= 0.0000 ; qmatOffset [ 17 ][ 8 ] *= 0.0000 ;
+	qmatOffset [ 10 ][ 4 ] *= 0.0116 ; qmatOffset [ 4 ][ 10 ] *= 0.0116 ;
+	qmatOffset [ 10 ][ 12 ] *= 0.0000 ; qmatOffset [ 12 ][ 10 ] *= 0.0000 ;
+	qmatOffset [ 10 ][ 15 ] *= 0.0495 ; qmatOffset [ 15 ][ 10 ] *= 0.0495 ;
+	qmatOffset [ 10 ][ 16 ] *= 0.7276 ; qmatOffset [ 16 ][ 10 ] *= 0.7276 ;
+	qmatOffset [ 10 ][ 18 ] *= 0.0137 ; qmatOffset [ 18 ][ 10 ] *= 0.0137 ;
+	qmatOffset [ 10 ][ 19 ] *= 0.0000 ; qmatOffset [ 19 ][ 10 ] *= 0.0000 ;
+	qmatOffset [ 10 ][ 17 ] *= 0.8760 ; qmatOffset [ 17 ][ 10 ] *= 0.8760 ;
+	qmatOffset [ 4 ][ 12 ] *= 0.0179 ; qmatOffset [ 12 ][ 4 ] *= 0.0179 ;
+	qmatOffset [ 4 ][ 15 ] *= 0.0948 ; qmatOffset [ 15 ][ 4 ] *= 0.0948 ;
+	qmatOffset [ 4 ][ 16 ] *= 0.0084 ; qmatOffset [ 16 ][ 4 ] *= 0.0084 ;
+	qmatOffset [ 4 ][ 18 ] *= 0.0000 ; qmatOffset [ 18 ][ 4 ] *= 0.0000 ;
+	qmatOffset [ 4 ][ 19 ] *= 0.7181 ; qmatOffset [ 19 ][ 4 ] *= 0.7181 ;
+	qmatOffset [ 4 ][ 17 ] *= 0.0063 ; qmatOffset [ 17 ][ 4 ] *= 0.0063 ;
+	qmatOffset [ 12 ][ 15 ] *= 0.2127 ; qmatOffset [ 15 ][ 12 ] *= 0.2127 ;
+	qmatOffset [ 12 ][ 16 ] *= 0.0821 ; qmatOffset [ 16 ][ 12 ] *= 0.0821 ;
+	qmatOffset [ 12 ][ 18 ] *= 0.0074 ; qmatOffset [ 18 ][ 12 ] *= 0.0074 ;
+	qmatOffset [ 12 ][ 19 ] *= 0.0084 ; qmatOffset [ 19 ][ 12 ] *= 0.0084 ;
+	qmatOffset [ 12 ][ 17 ] *= 0.0000 ; qmatOffset [ 17 ][ 12 ] *= 0.0000 ;
+	qmatOffset [ 15 ][ 16 ] *= 0.6465 ; qmatOffset [ 16 ][ 15 ] *= 0.6465 ;
+	qmatOffset [ 15 ][ 18 ] *= 0.0179 ; qmatOffset [ 18 ][ 15 ] *= 0.0179 ;
+	qmatOffset [ 15 ][ 19 ] *= 0.1127 ; qmatOffset [ 19 ][ 15 ] *= 0.1127 ;
+	qmatOffset [ 15 ][ 17 ] *= 0.0000 ; qmatOffset [ 17 ][ 15 ] *= 0.0000 ;
+	qmatOffset [ 16 ][ 18 ] *= 0.0000 ; qmatOffset [ 18 ][ 16 ] *= 0.0000 ;
+	qmatOffset [ 16 ][ 19 ] *= 0.0000 ; qmatOffset [ 19 ][ 16 ] *= 0.0000 ;
+	qmatOffset [ 16 ][ 17 ] *= 0.2495 ; qmatOffset [ 17 ][ 16 ] *= 0.2495 ;
+	qmatOffset [ 18 ][ 19 ] *= 0.0147 ; qmatOffset [ 19 ][ 18 ] *= 0.0147 ;
+	qmatOffset [ 18 ][ 17 ] *= 0.0000 ; qmatOffset [ 17 ][ 18 ] *= 0.0000 ;
+	qmatOffset [ 19 ][ 17 ] *= 0.0000 ; qmatOffset [ 17 ][ 19 ] *= 0.0000 ;
+	}
+
+void Model::MultiplyByMtRevAAMatrix(){
+	int modNum=0;
+	FLOAT_TYPE **qmatOffset = qmat[modNum];
+	qmatOffset  [ 0 ][ 14 ] *= 23.18   ; qmatOffset [ 14 ][ 0 ] *= 23.18 ;
+	qmatOffset  [ 0 ][ 11 ] *= 26.95   ; qmatOffset [ 11 ][ 0 ] *= 26.95 ;
+	qmatOffset  [ 0 ][ 2 ] *= 17.67   ; qmatOffset [ 2 ][ 0 ] *= 17.67 ;
+	qmatOffset  [ 0 ][ 1 ] *= 59.93   ; qmatOffset [ 1 ][ 0 ] *= 59.93 ;
+	qmatOffset  [ 0 ][ 13 ] *= 1.9   ; qmatOffset [ 13 ][ 0 ] *= 1.9 ;
+	qmatOffset  [ 0 ][ 3 ] *= 9.77   ; qmatOffset [ 3 ][ 0 ] *= 9.77 ;
+	qmatOffset  [ 0 ][ 5 ] *= 120.71   ; qmatOffset [ 5 ][ 0 ] *= 120.71 ;
+	qmatOffset  [ 0 ][ 6 ] *= 13.9   ; qmatOffset [ 6 ][ 0 ] *= 13.9 ;
+	qmatOffset  [ 0 ][ 7 ] *= 96.49   ; qmatOffset [ 7 ][ 0 ] *= 96.49 ;
+	qmatOffset  [ 0 ][ 9 ] *= 25.46   ; qmatOffset [ 9 ][ 0 ] *= 25.46 ;
+	qmatOffset  [ 0 ][ 8 ] *= 8.36   ; qmatOffset [ 8 ][ 0 ] *= 8.36 ;
+	qmatOffset  [ 0 ][ 10 ] *= 141.88   ; qmatOffset [ 10 ][ 0 ] *= 141.88 ;
+	qmatOffset  [ 0 ][ 4 ] *= 6.37   ; qmatOffset [ 4 ][ 0 ] *= 6.37 ;
+	qmatOffset  [ 0 ][ 12 ] *= 54.31   ; qmatOffset [ 12 ][ 0 ] *= 54.31 ;
+	qmatOffset  [ 0 ][ 15 ] *= 387.86   ; qmatOffset [ 15 ][ 0 ] *= 387.86 ;
+	qmatOffset  [ 0 ][ 16 ] *= 480.72   ; qmatOffset [ 16 ][ 0 ] *= 480.72 ;
+	qmatOffset  [ 0 ][ 18 ] *= 1.9   ; qmatOffset [ 18 ][ 0 ] *= 1.9 ;
+	qmatOffset  [ 0 ][ 19 ] *= 6.48   ; qmatOffset [ 19 ][ 0 ] *= 6.48 ;
+	qmatOffset  [ 0 ][ 17 ] *= 195.06   ; qmatOffset [ 17 ][ 0 ] *= 195.06 ;
+	qmatOffset  [ 14 ][ 11 ] *= 13.24   ; qmatOffset [ 11 ][ 14 ] *= 13.24 ;
+	qmatOffset  [ 14 ][ 2 ] *= 1.9   ; qmatOffset [ 2 ][ 14 ] *= 1.9 ;
+	qmatOffset  [ 14 ][ 1 ] *= 103.33   ; qmatOffset [ 1 ][ 14 ] *= 103.33 ;
+	qmatOffset  [ 14 ][ 13 ] *= 220.99   ; qmatOffset [ 13 ][ 14 ] *= 220.99 ;
+	qmatOffset  [ 14 ][ 3 ] *= 1.9   ; qmatOffset [ 3 ][ 14 ] *= 1.9 ;
+	qmatOffset  [ 14 ][ 5 ] *= 23.03   ; qmatOffset [ 5 ][ 14 ] *= 23.03 ;
+	qmatOffset  [ 14 ][ 6 ] *= 165.23   ; qmatOffset [ 6 ][ 14 ] *= 165.23 ;
+	qmatOffset  [ 14 ][ 7 ] *= 1.9   ; qmatOffset [ 7 ][ 14 ] *= 1.9 ;
+	qmatOffset  [ 14 ][ 9 ] *= 15.58   ; qmatOffset [ 9 ][ 14 ] *= 15.58 ;
+	qmatOffset  [ 14 ][ 8 ] *= 141.4   ; qmatOffset [ 8 ][ 14 ] *= 141.4 ;
+	qmatOffset  [ 14 ][ 10 ] *= 1.9   ; qmatOffset [ 10 ][ 14 ] *= 1.9 ;
+	qmatOffset  [ 14 ][ 4 ] *= 4.69   ; qmatOffset [ 4 ][ 14 ] *= 4.69 ;
+	qmatOffset  [ 14 ][ 12 ] *= 23.64   ; qmatOffset [ 12 ][ 14 ] *= 23.64 ;
+	qmatOffset  [ 14 ][ 15 ] *= 6.04   ; qmatOffset [ 15 ][ 14 ] *= 6.04 ;
+	qmatOffset  [ 14 ][ 16 ] *= 2.08   ; qmatOffset [ 16 ][ 14 ] *= 2.08 ;
+	qmatOffset  [ 14 ][ 18 ] *= 21.95   ; qmatOffset [ 18 ][ 14 ] *= 21.95 ;
+	qmatOffset  [ 14 ][ 19 ] *= 1.9   ; qmatOffset [ 19 ][ 14 ] *= 1.9 ;
+	qmatOffset  [ 14 ][ 17 ] *= 7.64   ; qmatOffset [ 17 ][ 14 ] *= 7.64 ;
+	qmatOffset  [ 11 ][ 2 ] *= 794.38   ; qmatOffset [ 2 ][ 11 ] *= 794.38 ;
+	qmatOffset  [ 11 ][ 1 ] *= 58.94   ; qmatOffset [ 1 ][ 11 ] *= 58.94 ;
+	qmatOffset  [ 11 ][ 13 ] *= 173.56   ; qmatOffset [ 13 ][ 11 ] *= 173.56 ;
+	qmatOffset  [ 11 ][ 3 ] *= 63.05   ; qmatOffset [ 3 ][ 11 ] *= 63.05 ;
+	qmatOffset  [ 11 ][ 5 ] *= 53.3   ; qmatOffset [ 5 ][ 11 ] *= 53.3 ;
+	qmatOffset  [ 11 ][ 6 ] *= 496.13   ; qmatOffset [ 6 ][ 11 ] *= 496.13 ;
+	qmatOffset  [ 11 ][ 7 ] *= 27.1   ; qmatOffset [ 7 ][ 11 ] *= 27.1 ;
+	qmatOffset  [ 11 ][ 9 ] *= 15.16   ; qmatOffset [ 9 ][ 11 ] *= 15.16 ;
+	qmatOffset  [ 11 ][ 8 ] *= 608.7   ; qmatOffset [ 8 ][ 11 ] *= 608.7 ;
+	qmatOffset  [ 11 ][ 10 ] *= 65.41   ; qmatOffset [ 10 ][ 11 ] *= 65.41 ;
+	qmatOffset  [ 11 ][ 4 ] *= 15.2   ; qmatOffset [ 4 ][ 11 ] *= 15.2 ;
+	qmatOffset  [ 11 ][ 12 ] *= 73.31   ; qmatOffset [ 12 ][ 11 ] *= 73.31 ;
+	qmatOffset  [ 11 ][ 15 ] *= 494.39   ; qmatOffset [ 15 ][ 11 ] *= 494.39 ;
+	qmatOffset  [ 11 ][ 16 ] *= 238.46   ; qmatOffset [ 16 ][ 11 ] *= 238.46 ;
+	qmatOffset  [ 11 ][ 18 ] *= 10.68   ; qmatOffset [ 18 ][ 11 ] *= 10.68 ;
+	qmatOffset  [ 11 ][ 19 ] *= 191.36   ; qmatOffset [ 19 ][ 11 ] *= 191.36 ;
+	qmatOffset  [ 11 ][ 17 ] *= 1.9   ; qmatOffset [ 17 ][ 11 ] *= 1.9 ;
+	qmatOffset  [ 2 ][ 1 ] *= 1.9   ; qmatOffset [ 1 ][ 2 ] *= 1.9 ;
+	qmatOffset  [ 2 ][ 13 ] *= 55.28   ; qmatOffset [ 13 ][ 2 ] *= 55.28 ;
+	qmatOffset  [ 2 ][ 3 ] *= 583.55   ; qmatOffset [ 3 ][ 2 ] *= 583.55 ;
+	qmatOffset  [ 2 ][ 5 ] *= 56.77   ; qmatOffset [ 5 ][ 2 ] *= 56.77 ;
+	qmatOffset  [ 2 ][ 6 ] *= 113.99   ; qmatOffset [ 6 ][ 2 ] *= 113.99 ;
+	qmatOffset  [ 2 ][ 7 ] *= 4.34   ; qmatOffset [ 7 ][ 2 ] *= 4.34 ;
+	qmatOffset  [ 2 ][ 9 ] *= 1.9   ; qmatOffset [ 9 ][ 2 ] *= 1.9 ;
+	qmatOffset  [ 2 ][ 8 ] *= 2.31   ; qmatOffset [ 8 ][ 2 ] *= 2.31 ;
+	qmatOffset  [ 2 ][ 10 ] *= 1.9   ; qmatOffset [ 10 ][ 2 ] *= 1.9 ;
+	qmatOffset  [ 2 ][ 4 ] *= 4.98   ; qmatOffset [ 4 ][ 2 ] *= 4.98 ;
+	qmatOffset  [ 2 ][ 12 ] *= 13.43   ; qmatOffset [ 12 ][ 2 ] *= 13.43 ;
+	qmatOffset  [ 2 ][ 15 ] *= 69.02   ; qmatOffset [ 15 ][ 2 ] *= 69.02 ;
+	qmatOffset  [ 2 ][ 16 ] *= 28.01   ; qmatOffset [ 16 ][ 2 ] *= 28.01 ;
+	qmatOffset  [ 2 ][ 18 ] *= 19.86   ; qmatOffset [ 18 ][ 2 ] *= 19.86 ;
+	qmatOffset  [ 2 ][ 19 ] *= 21.21   ; qmatOffset [ 19 ][ 2 ] *= 21.21 ;
+	qmatOffset  [ 2 ][ 17 ] *= 1.9   ; qmatOffset [ 17 ][ 2 ] *= 1.9 ;
+	qmatOffset  [ 1 ][ 13 ] *= 75.24   ; qmatOffset [ 13 ][ 1 ] *= 75.24 ;
+	qmatOffset  [ 1 ][ 3 ] *= 1.9   ; qmatOffset [ 3 ][ 1 ] *= 1.9 ;
+	qmatOffset  [ 1 ][ 5 ] *= 30.71   ; qmatOffset [ 5 ][ 1 ] *= 30.71 ;
+	qmatOffset  [ 1 ][ 6 ] *= 141.49   ; qmatOffset [ 6 ][ 1 ] *= 141.49 ;
+	qmatOffset  [ 1 ][ 7 ] *= 62.73   ; qmatOffset [ 7 ][ 1 ] *= 62.73 ;
+	qmatOffset  [ 1 ][ 9 ] *= 25.65   ; qmatOffset [ 9 ][ 1 ] *= 25.65 ;
+	qmatOffset  [ 1 ][ 8 ] *= 1.9   ; qmatOffset [ 8 ][ 1 ] *= 1.9 ;
+	qmatOffset  [ 1 ][ 10 ] *= 6.18   ; qmatOffset [ 10 ][ 1 ] *= 6.18 ;
+	qmatOffset  [ 1 ][ 4 ] *= 70.8   ; qmatOffset [ 4 ][ 1 ] *= 70.8 ;
+	qmatOffset  [ 1 ][ 12 ] *= 31.26   ; qmatOffset [ 12 ][ 1 ] *= 31.26 ;
+	qmatOffset  [ 1 ][ 15 ] *= 277.05   ; qmatOffset [ 15 ][ 1 ] *= 277.05 ;
+	qmatOffset  [ 1 ][ 16 ] *= 179.97   ; qmatOffset [ 16 ][ 1 ] *= 179.97 ;
+	qmatOffset  [ 1 ][ 18 ] *= 33.6   ; qmatOffset [ 18 ][ 1 ] *= 33.6 ;
+	qmatOffset  [ 1 ][ 19 ] *= 254.77   ; qmatOffset [ 19 ][ 1 ] *= 254.77 ;
+	qmatOffset  [ 1 ][ 17 ] *= 1.9   ; qmatOffset [ 17 ][ 1 ] *= 1.9 ;
+	qmatOffset  [ 13 ][ 3 ] *= 313.56   ; qmatOffset [ 3 ][ 13 ] *= 313.56 ;
+	qmatOffset  [ 13 ][ 5 ] *= 6.75   ; qmatOffset [ 5 ][ 13 ] *= 6.75 ;
+	qmatOffset  [ 13 ][ 6 ] *= 582.4   ; qmatOffset [ 6 ][ 13 ] *= 582.4 ;
+	qmatOffset  [ 13 ][ 7 ] *= 8.34   ; qmatOffset [ 7 ][ 13 ] *= 8.34 ;
+	qmatOffset  [ 13 ][ 9 ] *= 39.7   ; qmatOffset [ 9 ][ 13 ] *= 39.7 ;
+	qmatOffset  [ 13 ][ 8 ] *= 465.58   ; qmatOffset [ 8 ][ 13 ] *= 465.58 ;
+	qmatOffset  [ 13 ][ 10 ] *= 47.37   ; qmatOffset [ 10 ][ 13 ] *= 47.37 ;
+	qmatOffset  [ 13 ][ 4 ] *= 19.11   ; qmatOffset [ 4 ][ 13 ] *= 19.11 ;
+	qmatOffset  [ 13 ][ 12 ] *= 137.29   ; qmatOffset [ 12 ][ 13 ] *= 137.29 ;
+	qmatOffset  [ 13 ][ 15 ] *= 54.11   ; qmatOffset [ 15 ][ 13 ] *= 54.11 ;
+	qmatOffset  [ 13 ][ 16 ] *= 94.93   ; qmatOffset [ 16 ][ 13 ] *= 94.93 ;
+	qmatOffset  [ 13 ][ 18 ] *= 1.9   ; qmatOffset [ 18 ][ 13 ] *= 1.9 ;
+	qmatOffset  [ 13 ][ 19 ] *= 38.82   ; qmatOffset [ 19 ][ 13 ] *= 38.82 ;
+	qmatOffset  [ 13 ][ 17 ] *= 19   ; qmatOffset [ 17 ][ 13 ] *= 19 ;
+	qmatOffset  [ 3 ][ 5 ] *= 28.28   ; qmatOffset [ 5 ][ 3 ] *= 28.28 ;
+	qmatOffset  [ 3 ][ 6 ] *= 49.12   ; qmatOffset [ 6 ][ 3 ] *= 49.12 ;
+	qmatOffset  [ 3 ][ 7 ] *= 3.31   ; qmatOffset [ 7 ][ 3 ] *= 3.31 ;
+	qmatOffset  [ 3 ][ 9 ] *= 1.9   ; qmatOffset [ 9 ][ 3 ] *= 1.9 ;
+	qmatOffset  [ 3 ][ 8 ] *= 313.86   ; qmatOffset [ 8 ][ 3 ] *= 313.86 ;
+	qmatOffset  [ 3 ][ 10 ] *= 1.9   ; qmatOffset [ 10 ][ 3 ] *= 1.9 ;
+	qmatOffset  [ 3 ][ 4 ] *= 2.67   ; qmatOffset [ 4 ][ 3 ] *= 2.67 ;
+	qmatOffset  [ 3 ][ 12 ] *= 12.83   ; qmatOffset [ 12 ][ 3 ] *= 12.83 ;
+	qmatOffset  [ 3 ][ 15 ] *= 54.71   ; qmatOffset [ 15 ][ 3 ] *= 54.71 ;
+	qmatOffset  [ 3 ][ 16 ] *= 14.82   ; qmatOffset [ 16 ][ 3 ] *= 14.82 ;
+	qmatOffset  [ 3 ][ 18 ] *= 1.9   ; qmatOffset [ 18 ][ 3 ] *= 1.9 ;
+	qmatOffset  [ 3 ][ 19 ] *= 13.12   ; qmatOffset [ 19 ][ 3 ] *= 13.12 ;
+	qmatOffset  [ 3 ][ 17 ] *= 21.14   ; qmatOffset [ 17 ][ 3 ] *= 21.14 ;
+	qmatOffset  [ 5 ][ 6 ] *= 1.9   ; qmatOffset [ 6 ][ 5 ] *= 1.9 ;
+	qmatOffset  [ 5 ][ 7 ] *= 5.98   ; qmatOffset [ 7 ][ 5 ] *= 5.98 ;
+	qmatOffset  [ 5 ][ 9 ] *= 2.41   ; qmatOffset [ 9 ][ 5 ] *= 2.41 ;
+	qmatOffset  [ 5 ][ 8 ] *= 22.73   ; qmatOffset [ 8 ][ 5 ] *= 22.73 ;
+	qmatOffset  [ 5 ][ 10 ] *= 1.9   ; qmatOffset [ 10 ][ 5 ] *= 1.9 ;
+	qmatOffset  [ 5 ][ 4 ] *= 1.9   ; qmatOffset [ 4 ][ 5 ] *= 1.9 ;
+	qmatOffset  [ 5 ][ 12 ] *= 1.9   ; qmatOffset [ 12 ][ 5 ] *= 1.9 ;
+	qmatOffset  [ 5 ][ 15 ] *= 125.93   ; qmatOffset [ 15 ][ 5 ] *= 125.93 ;
+	qmatOffset  [ 5 ][ 16 ] *= 11.17   ; qmatOffset [ 16 ][ 5 ] *= 11.17 ;
+	qmatOffset  [ 5 ][ 18 ] *= 10.92   ; qmatOffset [ 18 ][ 5 ] *= 10.92 ;
+	qmatOffset  [ 5 ][ 19 ] *= 3.21   ; qmatOffset [ 19 ][ 5 ] *= 3.21 ;
+	qmatOffset  [ 5 ][ 17 ] *= 2.53   ; qmatOffset [ 17 ][ 5 ] *= 2.53 ;
+	qmatOffset  [ 6 ][ 7 ] *= 12.26   ; qmatOffset [ 7 ][ 6 ] *= 12.26 ;
+	qmatOffset  [ 6 ][ 9 ] *= 11.49   ; qmatOffset [ 9 ][ 6 ] *= 11.49 ;
+	qmatOffset  [ 6 ][ 8 ] *= 127.67   ; qmatOffset [ 8 ][ 6 ] *= 127.67 ;
+	qmatOffset  [ 6 ][ 10 ] *= 11.97   ; qmatOffset [ 10 ][ 6 ] *= 11.97 ;
+	qmatOffset  [ 6 ][ 4 ] *= 48.16   ; qmatOffset [ 4 ][ 6 ] *= 48.16 ;
+	qmatOffset  [ 6 ][ 12 ] *= 60.97   ; qmatOffset [ 12 ][ 6 ] *= 60.97 ;
+	qmatOffset  [ 6 ][ 15 ] *= 77.46   ; qmatOffset [ 15 ][ 6 ] *= 77.46 ;
+	qmatOffset  [ 6 ][ 16 ] *= 44.78   ; qmatOffset [ 16 ][ 6 ] *= 44.78 ;
+	qmatOffset  [ 6 ][ 18 ] *= 7.08   ; qmatOffset [ 18 ][ 6 ] *= 7.08 ;
+	qmatOffset  [ 6 ][ 19 ] *= 670.14   ; qmatOffset [ 19 ][ 6 ] *= 670.14 ;
+	qmatOffset  [ 6 ][ 17 ] *= 1.9   ; qmatOffset [ 17 ][ 6 ] *= 1.9 ;
+	qmatOffset  [ 7 ][ 9 ] *= 329.09   ; qmatOffset [ 9 ][ 7 ] *= 329.09 ;
+	qmatOffset  [ 7 ][ 8 ] *= 19.57   ; qmatOffset [ 8 ][ 7 ] *= 19.57 ;
+	qmatOffset  [ 7 ][ 10 ] *= 517.98   ; qmatOffset [ 10 ][ 7 ] *= 517.98 ;
+	qmatOffset  [ 7 ][ 4 ] *= 84.67   ; qmatOffset [ 4 ][ 7 ] *= 84.67 ;
+	qmatOffset  [ 7 ][ 12 ] *= 20.63   ; qmatOffset [ 12 ][ 7 ] *= 20.63 ;
+	qmatOffset  [ 7 ][ 15 ] *= 47.7   ; qmatOffset [ 15 ][ 7 ] *= 47.7 ;
+	qmatOffset  [ 7 ][ 16 ] *= 368.43   ; qmatOffset [ 16 ][ 7 ] *= 368.43 ;
+	qmatOffset  [ 7 ][ 18 ] *= 1.9   ; qmatOffset [ 18 ][ 7 ] *= 1.9 ;
+	qmatOffset  [ 7 ][ 19 ] *= 25.01   ; qmatOffset [ 19 ][ 7 ] *= 25.01 ;
+	qmatOffset  [ 7 ][ 17 ] *= 1222.94   ; qmatOffset [ 17 ][ 7 ] *= 1222.94 ;
+	qmatOffset  [ 9 ][ 8 ] *= 14.88   ; qmatOffset [ 8 ][ 9 ] *= 14.88 ;
+	qmatOffset  [ 9 ][ 10 ] *= 537.53   ; qmatOffset [ 10 ][ 9 ] *= 537.53 ;
+	qmatOffset  [ 9 ][ 4 ] *= 216.06   ; qmatOffset [ 4 ][ 9 ] *= 216.06 ;
+	qmatOffset  [ 9 ][ 12 ] *= 40.1   ; qmatOffset [ 12 ][ 9 ] *= 40.1 ;
+	qmatOffset  [ 9 ][ 15 ] *= 73.61   ; qmatOffset [ 15 ][ 9 ] *= 73.61 ;
+	qmatOffset  [ 9 ][ 16 ] *= 126.4   ; qmatOffset [ 16 ][ 9 ] *= 126.4 ;
+	qmatOffset  [ 9 ][ 18 ] *= 32.44   ; qmatOffset [ 18 ][ 9 ] *= 32.44 ;
+	qmatOffset  [ 9 ][ 19 ] *= 44.15   ; qmatOffset [ 19 ][ 9 ] *= 44.15 ;
+	qmatOffset  [ 9 ][ 17 ] *= 91.67   ; qmatOffset [ 17 ][ 9 ] *= 91.67 ;
+	qmatOffset  [ 8 ][ 10 ] *= 91.37   ; qmatOffset [ 10 ][ 8 ] *= 91.37 ;
+	qmatOffset  [ 8 ][ 4 ] *= 6.44   ; qmatOffset [ 4 ][ 8 ] *= 6.44 ;
+	qmatOffset  [ 8 ][ 12 ] *= 50.1   ; qmatOffset [ 12 ][ 8 ] *= 50.1 ;
+	qmatOffset  [ 8 ][ 15 ] *= 105.79   ; qmatOffset [ 15 ][ 8 ] *= 105.79 ;
+	qmatOffset  [ 8 ][ 16 ] *= 136.33   ; qmatOffset [ 16 ][ 8 ] *= 136.33 ;
+	qmatOffset  [ 8 ][ 18 ] *= 24   ; qmatOffset [ 18 ][ 8 ] *= 24 ;
+	qmatOffset  [ 8 ][ 19 ] *= 51.17   ; qmatOffset [ 19 ][ 8 ] *= 51.17 ;
+	qmatOffset  [ 8 ][ 17 ] *= 1.9   ; qmatOffset [ 17 ][ 8 ] *= 1.9 ;
+	qmatOffset  [ 10 ][ 4 ] *= 90.82   ; qmatOffset [ 4 ][ 10 ] *= 90.82 ;
+	qmatOffset  [ 10 ][ 12 ] *= 18.84   ; qmatOffset [ 12 ][ 10 ] *= 18.84 ;
+	qmatOffset  [ 10 ][ 15 ] *= 111.16   ; qmatOffset [ 15 ][ 10 ] *= 111.16 ;
+	qmatOffset  [ 10 ][ 16 ] *= 528.17   ; qmatOffset [ 16 ][ 10 ] *= 528.17 ;
+	qmatOffset  [ 10 ][ 18 ] *= 21.71   ; qmatOffset [ 18 ][ 10 ] *= 21.71 ;
+	qmatOffset  [ 10 ][ 19 ] *= 39.96   ; qmatOffset [ 19 ][ 10 ] *= 39.96 ;
+	qmatOffset  [ 10 ][ 17 ] *= 387.54   ; qmatOffset [ 17 ][ 10 ] *= 387.54 ;
+	qmatOffset  [ 4 ][ 12 ] *= 17.31   ; qmatOffset [ 12 ][ 4 ] *= 17.31 ;
+	qmatOffset  [ 4 ][ 15 ] *= 64.29   ; qmatOffset [ 15 ][ 4 ] *= 64.29 ;
+	qmatOffset  [ 4 ][ 16 ] *= 33.85   ; qmatOffset [ 16 ][ 4 ] *= 33.85 ;
+	qmatOffset  [ 4 ][ 18 ] *= 7.84   ; qmatOffset [ 18 ][ 4 ] *= 7.84 ;
+	qmatOffset  [ 4 ][ 19 ] *= 465.58   ; qmatOffset [ 19 ][ 4 ] *= 465.58 ;
+	qmatOffset  [ 4 ][ 17 ] *= 6.35   ; qmatOffset [ 17 ][ 4 ] *= 6.35 ;
+	qmatOffset  [ 12 ][ 15 ] *= 169.9   ; qmatOffset [ 15 ][ 12 ] *= 169.9 ;
+	qmatOffset  [ 12 ][ 16 ] *= 128.22   ; qmatOffset [ 16 ][ 12 ] *= 128.22 ;
+	qmatOffset  [ 12 ][ 18 ] *= 4.21   ; qmatOffset [ 18 ][ 12 ] *= 4.21 ;
+	qmatOffset  [ 12 ][ 19 ] *= 16.21   ; qmatOffset [ 19 ][ 12 ] *= 16.21 ;
+	qmatOffset  [ 12 ][ 17 ] *= 8.23   ; qmatOffset [ 17 ][ 12 ] *= 8.23 ;
+	qmatOffset  [ 15 ][ 16 ] *= 597.21   ; qmatOffset [ 16 ][ 15 ] *= 597.21 ;
+	qmatOffset  [ 15 ][ 18 ] *= 38.58   ; qmatOffset [ 18 ][ 15 ] *= 38.58 ;
+	qmatOffset  [ 15 ][ 19 ] *= 64.92   ; qmatOffset [ 19 ][ 15 ] *= 64.92 ;
+	qmatOffset  [ 15 ][ 17 ] *= 1.9   ; qmatOffset [ 17 ][ 15 ] *= 1.9 ;
+	qmatOffset  [ 16 ][ 18 ] *= 9.99   ; qmatOffset [ 18 ][ 16 ] *= 9.99 ;
+	qmatOffset  [ 16 ][ 19 ] *= 38.73   ; qmatOffset [ 19 ][ 16 ] *= 38.73 ;
+	qmatOffset  [ 16 ][ 17 ] *= 204.54   ; qmatOffset [ 17 ][ 16 ] *= 204.54 ;
+	qmatOffset  [ 18 ][ 19 ] *= 26.25   ; qmatOffset [ 19 ][ 18 ] *= 26.25 ;
+	qmatOffset  [ 18 ][ 17 ] *= 5.37   ; qmatOffset [ 17 ][ 18 ] *= 5.37 ;
+	qmatOffset  [ 19 ][ 17 ] *= 1.9   ; qmatOffset [ 17 ][ 19 ] *= 1.9 ;
 	}
 
 void Model::MultiplyByDayhoffAAMatrix(){
