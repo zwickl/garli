@@ -15,6 +15,10 @@
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 
+#define PROGRAM_NAME "GARLI"
+#define MAJOR_VERSION 0.96
+#define MINOR_VERSION 0
+
 //allocation monitoring stuff from Paul, Mark and Dave
 #undef INSTANTIATE_MEMCHK
 #include "defs.h"
@@ -34,6 +38,7 @@
 #include "individual.h"
 #include "adaptation.h"
 #include "sequencedata.h"
+#include "garlireader.h"
 
 #include "funcs.h"
 #include "mpifuncs.h"
@@ -65,6 +70,23 @@ int CheckRestartNumber(const string str){
 	return num;
 	}
 
+void UsageMessage(char *execName){
+#ifndef SUBROUTINE_GARLI	
+	outman.UserMessage("Usage: %s [OPTION] [config filename]", execName);
+#else
+	outman.UserMessage("Usage: The syntax for launching MPI jobs varies between systems");
+	outman.UserMessage("Most likely it will look something like the following:");
+	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
+#endif
+	outman.UserMessage("Options:");
+	outman.UserMessage("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
+	outman.UserMessage("  -b, --batch		batch mode (do not expect user input)");
+	outman.UserMessage("  -v, --version		print version information and exit");
+	outman.UserMessage("  -h, --help		print this help and exit");
+	outman.UserMessage("  -t			run internal tests (requires dataset and config file)");
+	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"");
+	}
 #ifdef BOINC
 int boinc_garli_main( int argc, char* argv[] );
 
@@ -83,9 +105,14 @@ int boinc_garli_main( int argc, char* argv[] )	{
 	outman.SetNoOutput(true);
 
 #elif defined( SUBROUTINE_GARLI )
-int SubGarliMain(int rank)	{
+int SubGarliMain(int rank)	
+	{
 	int argc=1;
 	char **argv=NULL;
+	//clear out whatever is in the reader already - it might be full if a single
+	//process has called SubGarliMain multiple times
+	GarliReader &reader = GarliReader::GetInstance();
+	reader.ResetReader();
 #else
 int main( int argc, char* argv[] )	{
 #endif
@@ -119,9 +146,10 @@ int main( int argc, char* argv[] )	{
         while(curarg<argc){
 				if(argv[curarg][0]=='-'){
 					//command line arguments with a dash
-					if(argv[curarg][1]=='b') interactive=false;
-					else if(argv[curarg][1]=='i') interactive=true;
-#ifdef MAC_FRONTEND
+					if(!_stricmp(argv[curarg], "-b") || !_stricmp(argv[curarg], "--batch")) interactive=false;
+#ifndef MAC_FRONTEND
+					else if(!_stricmp(argv[curarg], "-i") || !_stricmp(argv[curarg], "--interactive")) interactive=true;
+#else
 					else if (argv[curarg][1] == 'i') {
 						NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 						NSString *arg = [[[NSProcessInfo processInfo] arguments] objectAtIndex:curarg];
@@ -132,11 +160,24 @@ int main( int argc, char* argv[] )	{
 							EXIT_FAILURE;
 						}
 						[pool release];
-					}
 #endif				
 					else if(argv[curarg][1]=='t') runTests = true;
+					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
+						outman.UserMessage("%s Version %.2f.%d", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION);
+#ifdef SUBROUTINE_GARLI
+						outman.UserMessage("MPI run distributing version");
+#endif
+#ifdef OPEN_MP
+						outman.UserMessage("OpenMP multithreaded version");
+#endif
+						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2008");
+						outman.UserMessage("zwickl@nescent.org");
+						exit(0);
+						}
+					else if(!_stricmp(argv[curarg], "-h") || !_stricmp(argv[curarg], "--help")) UsageMessage(argv[0]);
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
+						UsageMessage(argv[0]);
 						exit(0);
 						}
 					}
@@ -158,8 +199,6 @@ int main( int argc, char* argv[] )	{
 			MasterGamlConfig conf;
 			bool confOK;
 			confOK = ((conf.Read(conf_name.c_str()) < 0) == false);
-
-
 
 #ifdef SUBROUTINE_GARLI
 			//override the ofprefix here, tacking .runXX onto it 
@@ -235,10 +274,11 @@ int main( int argc, char* argv[] )	{
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
 #ifdef SUBROUTINE_GARLI
-			outman.UserMessage("Running GARLI, version 0.96beta8 (March 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.\nIt is not the multipopulation parallel Garli algorithm."); 
+			outman.UserMessage("Running GARLI, version 0.96beta8 (April 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
+			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
 #else	//nonMPI version
-			outman.UserMessage("Running serial GARLI, version 0.96beta8 (March 2008)\n");
+			outman.UserMessage("Running serial GARLI, version 0.96beta8 (April 2008)\n");
 #endif
 
 #endif  //not BOINC
@@ -246,7 +286,7 @@ int main( int argc, char* argv[] )	{
 #ifdef OPEN_MP
 			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
 #endif
-			outman.UserMessage("THIS IS A BETA VERSION - Please check results carefully!");
+			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
 			outman.UserMessage("Compiled %s %s\n", __DATE__, __TIME__); 
 #ifdef NCL_NAME_AND_VERSION
@@ -273,8 +313,9 @@ int main( int argc, char* argv[] )	{
 				pop.rawData = data;
 				data = d;
 				//this probably shouldn't go here, but...
-				if(modSpec.IsF1x4StateFrequencies()) d->SetEmpType(1);
-				if(modSpec.IsF3x4StateFrequencies()) d->SetEmpType(2);
+				if(modSpec.IsF1x4StateFrequencies()) d->SetF1X4Freqs();
+				else if(modSpec.IsF3x4StateFrequencies()) d->SetF3X4Freqs();
+				else if(modSpec.IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
 				}
 			else if(modSpec.IsCodonAminoAcid()){
 				AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
@@ -289,15 +330,16 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
 			outman.UserMessage(" %d autapomorphic characters.", data->NAutapomorphic());
 			int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
-			outman.UserMessage(" %d total characters.", total);
-
-			if(data->NMissing() > 0)
+			if(data->NMissing() > 0){
 				outman.UserMessage(" %d characters were completely missing or ambiguous (removed).", data->NMissing());
+				outman.UserMessage(" %d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
+				}
+			else outman.UserMessage(" %d total characters.", total);
 
 			outman.flush();
 
 			data->Collapse();
-			outman.UserMessage("%d columns in compressed data matrix.\n", data->NChar());
+			outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
 
 			//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 			data->ReserveOriginalCounts();
@@ -356,7 +398,11 @@ int main( int argc, char* argv[] )	{
 				NSString *messageForInterface = [NSString stringWithUTF8String:err.message];
 				[[MFEInterfaceClient sharedClient] didEncounterError:messageForInterface];
 				[pool release];
-#endif				
+#endif
+				if(interactive==true){
+					outman.UserMessage("\n-Press enter to close program.-");
+					char d=getchar();
+					}
 				return 1;
 				}
 			catch(int error){
