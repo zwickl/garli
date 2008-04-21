@@ -62,3 +62,33 @@ void Bipartition::SetPartialBlockMask(){
 			}
 		if(ntax%blockBits == 0) partialBlockMask=allBitsOn;
 		}
+
+//this function does 2 things
+//1. Fills this bipartition with the bitwise intersection of a backbone mask and a mask
+//representing a subset of taxa in a growing tree.  Note that it is safe to call this when the
+//constraint is not a backbone and/or when the partialMask is NULL.  In that case it will fill
+//the bipartition with one or the other, or with all bits on if their if neither 
+//2. Checks if there is a meaningful intersection between the created joint mask and 
+//the constraint.  That means at least 2 bits are "on" on each site of the constrained bipartition
+bool Bipartition::MakeJointMask(const Constraint &constr, const Bipartition *partialMask){
+	if(constr.IsBackbone()){
+		//this just uses Bipartition::Operator=()
+		*this = *(constr.GetBackboneMask());
+		if(partialMask != NULL)
+			this->AndEquals(*partialMask);
+		}
+	else if(partialMask != NULL){
+		*this = *(partialMask);
+		}
+	else FillAllBits();
+
+	Bipartition temp;
+	temp = constr.GetBipartition();
+	temp.AndEquals(*this);
+	if(temp.CountOnBits() < 2) return false;
+	temp = constr.GetBipartition();
+	temp.Complement();
+	temp.AndEquals(*this);
+	if(temp.CountOnBits() < 2) return false;
+	return true;
+	}
