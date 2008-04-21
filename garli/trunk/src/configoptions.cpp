@@ -110,6 +110,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	//optional analyses
 	inferInternalStateProbs = false;
 	bootstrapReps = 0;
+	resampleProportion = 1.0;
 
 	sendInterval = 60.0;
 
@@ -210,6 +211,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetDoubleOption("treerejectionthreshold", treeRejectionThreshold, true);
 
 	cr.GetUnsignedOption("bootstrapreps", bootstrapReps, true);
+	cr.GetPositiveNonZeroDoubleOption("resampleproportion", resampleProportion, true);
 #ifdef MPI_VERSION
 	if(bootstrapReps != 0) throw ErrorException("Sorry, Bootstrap not yet implemented in parallel GARLI!");
 #endif

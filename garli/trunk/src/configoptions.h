@@ -107,6 +107,7 @@ class GeneralGamlConfig{
 	
 	//optional analyses
 	unsigned bootstrapReps;
+	FLOAT_TYPE resampleProportion;
 	bool inferInternalStateProbs;
 
 #ifdef INCLUDE_PERTURBATION
