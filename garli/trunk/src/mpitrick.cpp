@@ -1,3 +1,6 @@
+
+#ifdef SUBROUTINE_GARLI
+
 #include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
@@ -112,3 +115,4 @@ void jobloop(int mytid,int ntids,MPI_Comm comm, int numJobs)
 		}
 	return;
 }
+#endif
