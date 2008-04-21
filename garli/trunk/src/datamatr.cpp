@@ -1692,11 +1692,14 @@ void DataMatrix::Reweight(FLOAT_TYPE prob){
 		}
 	}
 
-long DataMatrix::BootstrapReweight(int restartSeed){
+//4-15-08 adding the option to specify a resample proportion, for jackknifing and what Cecile Ane called
+//the "multidimentional bootstrap"
+long DataMatrix::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportion){
 	//allow for a seed to be passed in and used for the reweighting - Used for bootstrap restarting.
 	//Either way we'll save the seed at the end of the reweighting as the DataMatrix currentBootstrapSeed,
 	//which allows exactly the same bootstraped datasets to be used in multiple runs, but with different
 	//settings for the actual search
+	if(resampleProportion >= 5.0) outman.UserMessage("WARNING: The resampleproportion setting is the proportion to resample,\nNOT the percentage (1.0 = 100%%).\nThe value you specified (%.2f) is a very large proportion.", resampleProportion);
 	if(currentBootstrapSeed == 0) currentBootstrapSeed = rnd.seed();
 
 	int originalSeed = rnd.seed();
@@ -1719,7 +1722,11 @@ long DataMatrix::BootstrapReweight(int restartSeed){
 
 //	ofstream deb("counts.log", ios::app);
 
-	for(int c=0;c<totalNChar;c++){
+	//round to nearest int
+	int numToSample = (int) (((FLOAT_TYPE)totalNChar * resampleProportion) + 0.5);
+	if(numToSample != totalNChar) outman.UserMessage("Resampling %d characters (%.2f%%).\n", numToSample, resampleProportion*100);
+
+	for(int c=0;c<numToSample;c++){
 		FLOAT_TYPE p=rnd.uniform();
 		int pat=0; 
 		while(p > cumProbs[pat]) pat++;
