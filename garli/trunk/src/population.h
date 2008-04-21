@@ -332,6 +332,7 @@ private:
 		int error;
 	bool usedNCL;
 	bool startingTreeInNCL;
+	bool startingModelInNCL;
 
 	enum output_details {
 		DONT_OUTPUT = 0,
@@ -378,8 +379,8 @@ private:
 	Individual *bestSinceRestart;
 #endif
 
-	public:
-		Population() : error(0), conf(NULL), usedNCL(false), startingTreeInNCL(false),
+	public:	
+		Population() : error(0), conf(NULL), usedNCL(false), startingTreeInNCL(false), startingModelInNCL(false),
 			bestFitness(-(FLT_MAX)), bestIndiv(0), currentSearchRep(1), 
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
@@ -440,8 +441,9 @@ private:
 		void PerformMutation(int indNum);
 		void UpdateFractionDone();
 		bool OutgroupRoot(Individual *ind, int indnum);
-		void LoadNexusStartingTrees();
+		void LoadNexusStartingConditions();
 		void VariableStartingTreeOptimization();
+		void OptimizeSiteRates();
 
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );
@@ -521,6 +523,7 @@ private:
 		void OutputClaReport(Individual *arr);
 		void OutputFilesForScoreDebugging(Individual *ind=NULL, int num=0);
 		void RunTests();
+		void GenerateTreesOnly(int nTrees);
 		void ApplyNSwaps(int numSwaps);
 		void SwapToCompletion(FLOAT_TYPE optPrecision);
 		void CheckForIncompatibleConfigEntries();

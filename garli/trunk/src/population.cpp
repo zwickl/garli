@@ -88,6 +88,7 @@ FLOAT_TYPE globalBest;
 
 #undef PERIODIC_SCORE_DEBUG
 
+#undef DEBUG_SCORES
 
 #undef NNI_SPECTRUM
 
@@ -385,6 +386,12 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	if(rank == 0) total_size = conf->nindivs + nprocs-1;
 	else total_size = conf->nindivs;
 
+	//set two model statics
+	Model::mutationShape = conf->gammaShapeModel;
+	if(modSpec.IsCodon()){
+		Model::SetCode(static_cast<CodonData*>(data)->GetCode());
+		}
+
 #ifdef INPUT_RECOMBINATION
 	total_size = conf->nindivs + NUM_INPUT;
 #endif
@@ -400,9 +407,6 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 		MasterGamlConfig *mastConf = (MasterGamlConfig*) (conf);
 		paraMan = new ParallelManager(data->NTax(), nprocs, mastConf);
 		}
-
-	//process the data
-	data->CalcEmpiricalFreqs();
 
 	if(modSpec.IsNucleotide()) dynamic_cast<NucleotideData *>(data)->MakeAmbigStrings();	
 
@@ -445,12 +449,15 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 
 	//instantiate the clamanager and figure out how much memory to snatch
 	FLOAT_TYPE memToUse;
+	outman.UserMessage("NOTE: Unlike many programs, the amount of system memory that Garli will\nuse can be controlled by the user.");
 	if(conf->availableMemory > 0){
-		outman.UserMessage("\nTotal system memory specified as %.1f megs", conf->availableMemory);
+		outman.UserMessage("(This comes from the availablememory setting in the configuration file.");
+		outman.UserMessage("Availablememory should NOT be set to more than the actual amount of ");
+		outman.UserMessage("physical memory that your computer has installed)");
 		memToUse=(FLOAT_TYPE)0.8*conf->availableMemory;
 		}
 	else{
-		outman.UserMessage("\nMemory to be used for conditional likelihood arrays specified as %.1f megs", conf->megsClaMemory);
+		outman.UserMessage("\nMemory to be used for conditional likelihood arrays specified as %.1f MB", conf->megsClaMemory);
 		memToUse=conf->megsClaMemory;
 		}
 		
@@ -482,15 +489,43 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 		}
 
 	outman.precision(4);
-	outman.UserMessage("allocating memory...\nusing %.1f megs for conditional likelihood arrays.  Memlevel= %d", (FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB, memLevel);
+	outman.UserMessage("\nFor this dataset:");
+	outman.UserMessage(" Mem level		availablememory setting");
+	outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNode/(FLOAT_TYPE)MB)) * 1.25);
+	outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
+	outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
+	outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
+	outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 );
+
+	outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
+
+	outman.UserMessage("\nGarli will actually use approx. %.1f MB of memory", (1.0/0.8)*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB);
+	if(memLevel == 0)
+		outman.UserMessage("**Your memory level is: great (you don't need to change anything)**");
+	else if(memLevel == 1)
+		outman.UserMessage("**Your memory level is: good (you don't need to change anything)**");
+	else if(memLevel == 2)
+		outman.UserMessage("**Your memory level is: low\n\t(you may want to increase the availablememory setting)**");
+	else if(memLevel == 3)
+		outman.UserMessage("**Your memory level is: very low\n\t(if possible, you should increase the availablememory setting)**");
+	else if(memLevel == -1)
+		outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
+	outman.UserMessage("");
+
+/*
+	outman.precision(4);
+	outman.UserMessage("allocating memory...\nusing %.1f MB for conditional likelihood arrays.  Memlevel= %d", (FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB, memLevel);
 	outman.UserMessage("For this dataset:");
 	outman.UserMessage("level 0: >= %.0f megs", ceil(L0 * (claSizePerNode/(FLOAT_TYPE)MB)));
 	outman.UserMessage("level 1: %.0f megs to %.0f megs", ceil(L0 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)));
 	outman.UserMessage("level 2: %.0f megs to %.0f megs", ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)));
 	outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)));
 	outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB))-1);
+*/
+	if(memLevel==-1) throw ErrorException("Not enough memory specified in config file (availablememory)!");
 
-	if(memLevel==-1) throw ErrorException("Not enough memory specified in config file (megsclamemory)!");
+	//process the data a bit
+	data->CalcEmpiricalFreqs();
 
 	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 	//if we do tons of recombination 
@@ -503,44 +538,42 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	//set the tree statics
 	Tree::SetTreeStatics(claMan, data, conf);
 
-	//set one model static
-	Model::mutationShape = conf->gammaShapeModel;
-	if(modSpec.IsCodon()) Model::SetCode(static_cast<CodonData*>(data)->GetCode());
-
 	//load any constraints
 	GetConstraints();
 
 	//try to get nexus starting tree/trees from file, which we don't want to do within the PerformSearch loop
 	if((_stricmp(conf->streefname.c_str(), "random") != 0)  && (_stricmp(conf->streefname.c_str(), "stepwise") != 0))
-		if(FileIsNexus(conf->streefname.c_str()))
-			LoadNexusStartingTrees();
+		if(FileIsNexus(conf->streefname.c_str())){
+			LoadNexusStartingConditions();
+			}
 	}
 
-void Population::LoadNexusStartingTrees(){
+void Population::LoadNexusStartingConditions(){
+	GarliReader & reader = GarliReader::GetInstance();
+	NxsTreesBlock *treesblock = reader.GetTreesBlock();
+
 	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
 		//in this case we should have already read in the tree when getting the data, so check
-		GarliReader & reader = GarliReader::GetInstance();
-		NxsTreesBlock *treesblock = reader.GetTreesBlock();
 		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting trees", conf->streefname.c_str());
 		}
 	else{
 		//use NCL to get trees from the specified file
-		GarliReader & reader = GarliReader::GetInstance();
 		outman.UserMessage("Loading starting model and/or tree from file %s", conf->streefname.c_str());
-		NxsTreesBlock *treesblock = reader.GetTreesBlock();
-		if(treesblock != NULL && treesblock->GetNumTrees() > 0)//if we already had trees loaded, toss them
-			treesblock->Reset();
-		//If a model string was already read it will be cleared when the 
-		//new one is encountered, so a block in the nexus start file will have precedence.
-//		if(reader.FoundModelString())
-//			reader.ClearModelString();
-		reader.HandleExecute(conf->streefname.c_str());
+		if(treesblock != NULL){
+			if(treesblock->GetNumTrees() > 0)//if we already had trees loaded, toss them
+				treesblock->Reset();
+			}
+
+		//3/25/08 Made a change such that if a gblock was already read with the data and another
+		//is found with the following execute, an exception will be thrown in GarliReader::EnteringBlock
+		reader.HandleExecute(conf->streefname.c_str(), false);
 		treesblock = reader.GetTreesBlock();
 		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
-			throw ErrorException("No nexus trees block or Garli block wasfound in file %s,\n     which was specified\n\tas source of starting model and/or tree", conf->streefname.c_str());
+			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting model and/or tree", conf->streefname.c_str());
 		}
-	startingTreeInNCL = true;
+	if(treesblock->GetNumTrees() > 0) startingTreeInNCL = true;
+	if(reader.FoundModelString()) startingModelInNCL = true;
 	}
 
 //return population more or less to what it looked like just after Setup()
@@ -622,15 +655,51 @@ void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
 */	outman.UserMessage("final score: %f, %d sec", indiv[0].treeStruct->lnL, stopwatch.SplitTime());
 	}
 
+//this is mainly for debugging purposes, to ensure that we are able to make all trees or all trees 
+//compatible with any constraints
+void Population::GenerateTreesOnly(int nTrees){
+	SeedPopulationWithStartingTree(0);
+	InitializeOutputStreams();
+	if((_stricmp(conf->streefname.c_str(), "random") == 0)){
+		outman.UserMessageNoCR("Making random trees compatible with constraints... ");
+		for(int i=0;i<nTrees;i++){
+			indiv[0].MakeRandomTree(data->NTax());
+			AppendTreeToTreeLog(-1, 0);
+			indiv[0].treeStruct->RemoveTreeFromAllClas();
+			delete indiv[0].treeStruct;
+			indiv[0].treeStruct=NULL;
+			if(!(i % 100)) outman.UserMessageNoCR("%d ", i);
+			}
+		}
+	else if((_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
+		outman.UserMessageNoCR("Making stepwise trees compatible with constraints... ");
+		for(int i=0;i<nTrees;i++){
+			indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
+			AppendTreeToTreeLog(-1, 0);
+			indiv[0].treeStruct->RemoveTreeFromAllClas();
+			delete indiv[0].treeStruct;
+			indiv[0].treeStruct=NULL;
+			if(!(i % 100)) outman.UserMessageNoCR("%d ", i);
+			}
+		}
+	FinalizeOutputStreams(0);
+	}
+
 void Population::RunTests(){
 	//test a number of functions to ensure that any code changes haven't broken anything
 	//it assumes that Setup has been called
+	//DEBUG
+	//SeedPopulationWithStartingTree(0);
+//	InitializeOutputStreams();
 
 #ifdef NDEBUG
 	outman.UserMessage("WARNING: You are running internal tests with NDEBUG defined!\nIt should not be defined for full error checking.");
 #endif
 
-	if(conf->bootstrapReps > 0) data->BootstrapReweight(0);
+	if(conf->bootstrapReps > 0){
+		outman.UserMessage("bootstrap reweighting with seed %d", rnd.seed());
+		data->BootstrapReweight(0, conf->resampleProportion);
+		}
 
 	Individual *ind0 = &newindiv[0];
 	Individual *ind1 = &newindiv[1];
@@ -679,9 +748,10 @@ void Population::RunTests(){
 		ind0->treeStruct->RerootHere(ind0->treeStruct->GetRandomInternalNode());
 		ind1->treeStruct->RerootHere(ind1->treeStruct->GetRandomInternalNode());
 
+		ind0->treeStruct->CalcBipartitions(true);
+		ind1->treeStruct->CalcBipartitions(true);
+
 		//check rerooting and bipartition comparisons
-		ind0->treeStruct->CalcBipartitions();
-		ind1->treeStruct->CalcBipartitions();
 		assert(ind0->treeStruct->IdenticalTopologyAllowingRerooting(ind1->treeStruct->root));
 
 		ind0->SetDirty();
@@ -738,74 +808,109 @@ void Population::GetConstraints(){
 	}
 
 void Population::SeedPopulationWithStartingTree(int rep){
-	
 	for(unsigned i=0;i<total_size;i++){
 		if(indiv[i].treeStruct != NULL) indiv[i].treeStruct->RemoveTreeFromAllClas();
 		if(newindiv[i].treeStruct != NULL) newindiv[i].treeStruct->RemoveTreeFromAllClas();
 		}
 
-	//if starting from a treefile, use the treestring
-	//to create the first indiv, and then copy the tree and clas
+	//create the first indiv, and then copy the tree and clas
 	indiv[0].mod->SetDefaultModelParameters(data);
 
-	if(conf->bootstrapReps == 0 || currentBootstrapRep == 1){
-		OutputModelReport();
-		}
+	//This is getting very complicated.  Here are the allowable combinations.
+	//streefname not specified (random or stepwise)
+		//Case 1 - no gblock in datafile	
+		//Case 2 - found gblock in datafile
+	//streefname specified
+		//specified file is same as datafile
+			//Case 3 - Found trees block only
+			//Case 4 - Found gblock only (create random tree)
+			//Case 5 - Found both
+		//specified file not same as datafile
+			//NOTE that all of these are also possible with a gblock found in the datafile
+			//3/25/08 Change - a second gblock is not allowed (it will throw an exception
+			//upon reading the second in GarliReader::EnteringBlock), nor are both a garli block
+			//with the data and model params in the old format in the streefname
+			//specified streefname is Nexus
+				//Case 6 - Found trees block only
+				//Case 7 - Found gblock only (create random tree) (if a gblock was already read it will crap out)
+				//Case 8 - Found both (if a gblock was already read it will crap out)
+			//specified streefname is not Nexus
+				//Case 9 - found a tree
+				//Case 10 - found a model (create random tree) (if a gblock was already read it will crap out)
+				//Case 11 - found both (if a gblock was already read it will crap out)
 
 	GarliReader & reader = GarliReader::GetInstance();
-	if(reader.FoundModelString()){//model string from garli block, which could have come either
-							//in starting condition file or in file with Nexus dataset
-		string modString = reader.GetModelString();
-		indiv[0].mod->ReadGarliFormattedModelString(modString);
-		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
-		string m;
-		indiv[0].mod->FillGarliFormattedModelString(m);
-		outman.UserMessage(m);
-		}
 
 #ifdef INPUT_RECOMBINATION
 	if(0){
 #else
 	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0)){
-		//some starting file has been specified
+		//some starting file has been specified - Cases 3-11
 #endif
-		//we already checked in Setup whether NCL has trees for us
-		if(startingTreeInNCL){
+		//we already checked in Setup whether NCL has trees for us.  A starting model in Garli block will
+		//be handled below, although both a garli block (in the data) and an old style model specification
+		//are not allowed
+		if(startingTreeInNCL){//cases 3, 5, 6 and 8
 			NxsTreesBlock *treesblock = reader.GetTreesBlock();
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
 				int treeNum = (rank+rep-1) % numTrees;
-				indiv[0].GetStartingConditionsFromNCL(treesblock, (rank + rep - 1), data->NTax());
+				indiv[0].GetStartingTreeFromNCL(treesblock, (rank + rep - 1), data->NTax());
 				outman.UserMessage("Obtained starting tree %d from Nexus", treeNum+1);
 				}
+			else throw ErrorException("Problem getting tree(s) from NCL!");
 			}
-		else{//use the old garli starting model/tree format
+		else if(strcmp(conf->streefname.c_str(), conf->datafname.c_str()) != 0 && !FileIsNexus(conf->streefname.c_str())){
+			//cases 9-11 if the streef file is not the same as the datafile, and it isn't Nexus
+			//use the old garli starting model/tree format
 			outman.UserMessage("Obtaining starting conditions from file %s", conf->streefname.c_str());
 			indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank + rep - 1, data->NTax());
 			}
 		indiv[0].SetDirty();
 		}
-	else{//either random or stepwise tree specified
-		if(_stricmp(conf->streefname.c_str(), "random") ==0){
-			if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
-			else outman.UserMessage("creating random starting tree (compatible with constraints)...");
-			indiv[0].MakeRandomTree(data->NTax());
-			indiv[0].SetDirty();
-			}
-		else{
-			if(Tree::constraints.empty()) outman.UserMessage("creating likelihood stepwise addition starting tree...");
-			else outman.UserMessage("creating likelihood stepwise addition starting tree (compatible with constraints)...");
-			indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
-			}
+
+	if(reader.FoundModelString()) startingModelInNCL = true;
+	if(startingModelInNCL){
+		//crap out if we already got some parameters above in an old style starting conditions file
+#ifndef SUBROUTINE_GARLI
+		if(modSpec.GotAnyParametersFromFile() && (currentSearchRep == 1 && (conf->bootstrapReps == 0 || currentBootstrapRep == 1)))
+			throw ErrorException("Found model parameters specified in a Nexus GARLI block with the dataset,\n\tand in the starting condition file (streefname).\n\tPlease use one or the other.");
+#endif
+		//model string from garli block, which could have come either in starting condition file
+		//or in file with Nexus dataset.  Cases 2, 4, 5, 7 and 8 come through here.
+		string modString = reader.GetModelString();
+		indiv[0].mod->ReadGarliFormattedModelString(modString);
+		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
+		}
+
+	//The model params should be set to their initial values by now, so report them
+	if(conf->bootstrapReps == 0 || (currentBootstrapRep == 1 && currentSearchRep == 1)){
+		outman.UserMessage("MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)");
+		indiv[0].mod->OutputHumanReadableModelReportWithParams();
+		}
+
+	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
+
+	//A random tree specified, or a starting file was specified but contained no tree
+	if(_stricmp(conf->streefname.c_str(), "stepwise") == 0){
+		if(Tree::constraints.empty()) outman.UserMessage("creating likelihood stepwise addition starting tree...");
+		else outman.UserMessage("creating likelihood stepwise addition starting tree (compatible with constraints)...");
+		indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
+		}
+	else if(_stricmp(conf->streefname.c_str(), "random") == 0 || indiv[0].treeStruct == NULL){
+		if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
+		else outman.UserMessage("creating random starting tree (compatible with constraints)...");
+		indiv[0].MakeRandomTree(data->NTax());
+		indiv[0].SetDirty();
 		}
 		
 	//Here we'll error out if something was fixed but didn't appear
 	if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
 		//if no streefname file was specified, the param values should be in a garli block with the dataset
-		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found!!"));
-		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found!!"));
-		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found!!"));
-		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found!!"));
+		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 		}
 	else{
 		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
@@ -814,6 +919,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 		}
 		
+	assert(indiv[0].treeStruct != NULL);
 	bool foundPolytomies = indiv[0].treeStruct->ArbitrarilyBifurcate();
 	if(foundPolytomies) outman.UserMessage("WARNING: Polytomies found in start tree.  These were arbitrarily resolved.");
 	
@@ -839,9 +945,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	[[MFEInterfaceClient sharedClient] didBeginInitializingSearch];
 	[pool release];
 #endif		
-	
-	indiv[0].treeStruct->CalcBipartitions();	
-	
+
 	if(conf->refineStart==true){
 		//12/26/07 now only passing the first argument here ("optModel") as false if no model muts are used
 		//if single parameters are fixed that will be checked in the Refine function itself
@@ -882,10 +986,13 @@ void Population::SeedPopulationWithStartingTree(int rep){
 void Population::OutputModelReport(){
 	//Report on the model setup
 	outman.UserMessage("MODEL REPORT:");
-	if(modSpec.IsCodon())
-		outman.UserMessage("  Number of states = 61 (codon data)");
+	if(modSpec.IsCodon()){
+		if(modSpec.IsVertMitoCode()) outman.UserMessage("  Number of states = 60 (codon data, vertebrate mitochondrial code)");
+		else if(modSpec.IsInvertMitoCode()) outman.UserMessage("  Number of states = 62 (codon data, invertebrate mitochondrial code)");
+		else outman.UserMessage("  Number of states = 61 (codon data, standard code)");
+		}
 	else if(modSpec.IsAminoAcid())
-		outman.UserMessage("  Number of states = 20 (aminoacid data)");
+		outman.UserMessage("  Number of states = 20 (amino acid data)");
 	else 
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
@@ -893,8 +1000,11 @@ void Population::OutputModelReport(){
 		if(modSpec.IsCodon() && modSpec.numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega)\n");
 		if(modSpec.IsCodon()) outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model:\n     ");
 		else outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix: ");
-		if(modSpec.Nst() == 6 && modSpec.fixRelativeRates == false) outman.UserMessage("6 rates");
-		else if(modSpec.Nst() == 6 && modSpec.fixRelativeRates == true) outman.UserMessage("specified by user (fixed)");
+		if(modSpec.Nst() == 6){
+			if(modSpec.IsArbitraryRateMatrix()) outman.UserMessage("User specified matrix type: %s", modSpec.arbitraryRateMatrixString.c_str());
+			else outman.UserMessage("6 rates");
+			if(modSpec.fixRelativeRates == true) outman.UserMessage("values specified by user (fixed)");
+			}
 		else if(modSpec.Nst() == 2) outman.UserMessage("2 rates (transition and transversion)");
 		else outman.UserMessage("1 rate");
 		}
@@ -904,12 +1014,17 @@ void Population::OutputModelReport(){
 		else if(modSpec.IsDayhoffAAMatrix()) outman.UserMessage("Dayhoff");
 		else if(modSpec.IsPoissonAAMatrix()) outman.UserMessage("Poisson");
 		else if(modSpec.IsWAGAAMatrix()) outman.UserMessage("WAG");
+		else if(modSpec.IsMtMamAAMatrix()) outman.UserMessage("MtMam");
+		else if(modSpec.IsMtRevAAMatrix()) outman.UserMessage("MtRev");
 		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
 	if(modSpec.IsEqualStateFrequencies()){
-		if(modSpec.IsCodon())
-			outman.UserMessage("equal (0.01639, fixed)");
+		if(modSpec.IsCodon()){
+			if(modSpec.IsVertMitoCode()) outman.UserMessage("equal (1/60 = 0.01667, fixed)");
+			else if(modSpec.IsInvertMitoCode()) outman.UserMessage("equal (1/62 = 0.01613, fixed)");
+			else outman.UserMessage("equal (1/61 = 0.01639, fixed)");
+			}
 		else if(modSpec.IsAminoAcid())
 			outman.UserMessage("equal (0.05, fixed)");
 		else 
@@ -920,6 +1035,8 @@ void Population::OutputModelReport(){
 	else if(modSpec.IsEmpiricalStateFrequencies()) outman.UserMessage("empirical values (fixed)");
 	else if(modSpec.IsJonesAAFreqs()) outman.UserMessage("Jones");
 	else if(modSpec.IsWAGAAFreqs()) outman.UserMessage("WAG");
+	else if(modSpec.IsMtMamAAFreqs()) outman.UserMessage("MtMam");
+	else if(modSpec.IsMtRevAAFreqs()) outman.UserMessage("MtRev");
 	else if(modSpec.IsDayhoffAAFreqs()) outman.UserMessage("Dayhoff");
 	else if(modSpec.IsUserSpecifiedStateFrequencies()) outman.UserMessage("specified by user (fixed)");
 	else outman.UserMessage("estimated");
@@ -938,7 +1055,7 @@ void Population::OutputModelReport(){
 			outman.UserMessage("nonsynonymous rate categories, rate and proportion of each estimated\n     (this is effectively the M3 model of PAML)");
 			}
 		else if(modSpec.IsFlexRateHet() == false){
-			if(modSpec.fixAlpha == true) outman.UserMessage("discrete gamma distributed rate cats, alpha param specified by user (fixed)");
+			if(modSpec.fixAlpha == true) outman.UserMessage("discrete gamma distributed rate cats,\n    alpha param specified by user (fixed)");
 			else outman.UserMessage("discrete gamma distributed rate cats, alpha param estimated");
 			if(modSpec.includeInvariantSites == true){
 				if(modSpec.fixInvariantSites == true) outman.UserMessage("    with an invariant (invariable) site category,\n    proportion specified by user (fixed)");				
@@ -1145,7 +1262,7 @@ void Population::ReadPopulationCheckpoint(){
 	//if were restarting a bootstrap run we need to change to the bootstrapped data
 	//now, so that scoring below is correct
 	if(conf->bootstrapReps > 0){
-		data->BootstrapReweight(lastBootstrapSeed);
+		data->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
 		}
 
 	if(gen == UINT_MAX) finishedRep = true;
@@ -1187,7 +1304,7 @@ void Population::ReadPopulationCheckpoint(){
 	}
 
 void Population::Run(){
-	calcCount=0;
+//	calcCount=0;
 	optCalcs=0;
 
 #ifdef VARIABLE_OPTIMIZATION
@@ -1236,8 +1353,8 @@ void Population::Run(){
 #endif
 		keepTrack();
 		if(conf->outputMostlyUselessFiles) OutputFate();
-		if(!(gen % conf->logevery)) OutputLog();
-		if(!(gen % conf->saveevery)){
+		if(conf->logevery > 0 && !(gen % conf->logevery)) OutputLog();
+		if(conf->saveevery > 0 && !(gen % conf->saveevery)){
 			if(best_output & WRITE_CONTINUOUS){
 				string outname = besttreefile;
 				outname += ".current";
@@ -1456,11 +1573,20 @@ void Population::FinalOptimization(){
 	int pass=1;
 	FLOAT_TYPE incr;
 
+	double paramOpt, paramTot;
+	paramTot = ZERO_POINT_ZERO;
+	do{
+		paramOpt = ZERO_POINT_ZERO;
+		if(modSpec.IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(max(adap->branchOptPrecision*0.1, 0.001));
+		else if(modSpec.IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(max(adap->branchOptPrecision*0.1, 0.001));
+		paramTot += paramOpt;
+		}while(paramOpt > ZERO_POINT_ZERO);
+
 	if(modSpec.IsFlexRateHet()){
-		outman.UserMessage("Flex optimization: %f", indiv[bestIndiv].treeStruct->OptimizeFlexRates(adap->branchOptPrecision));
+		outman.UserMessage("Flex optimization: %f", paramTot);
 		}
 	else if(modSpec.IsCodon()){
-		outman.UserMessage("Omega optimization: %f", indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision));
+		outman.UserMessage("Omega optimization: %f", paramTot);
 		}
 	do{
 		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10));
@@ -1545,6 +1671,7 @@ int Population::EvaluateStoredTrees(bool report){
 	int bestRep;
 	if(report) outman.UserMessage("\nCompleted %d replicate runs (of %d).\nResults:", storedTrees.size(), conf->searchReps);
 	for(unsigned r=0;r<storedTrees.size();r++){
+		storedTrees[r]->treeStruct->CalcBipartitions(true);	
 		if(storedTrees[r]->Fitness() > bestL){
 			bestL = storedTrees[r]->Fitness();
 			bestRep = r;
@@ -1552,8 +1679,18 @@ int Population::EvaluateStoredTrees(bool report){
 		}
 	if(report){
 		for(unsigned r=0;r<storedTrees.size();r++){
-			if(r == bestRep) outman.UserMessage("Replicate %d : %f (best)", r+1, storedTrees[r]->Fitness());
-			else outman.UserMessage("Replicate %d : %f", r+1, storedTrees[r]->Fitness());
+			unsigned r2;
+			for(r2=0;r2<r;r2++){
+				if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)) break;
+				}
+			if(r == bestRep) outman.UserMessageNoCR("Replicate %d : %.4f (best)", r+1, storedTrees[r]->Fitness());
+			else outman.UserMessageNoCR("Replicate %d : %.4f       ", r+1, storedTrees[r]->Fitness());
+			if(r2 < r) outman.UserMessage(" (same topology as %d)", r2+1);
+			else outman.UserMessage("");
+			}
+		if(conf->bootstrapReps == 0){
+			outman.UserMessage("Final result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
+			outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
 			}
 		}
 	return bestRep;
@@ -1583,7 +1720,7 @@ void Population::Bootstrap(){
 		[pool release];
 #endif
 		if(conf->restart == false){
-			lastBootstrapSeed = data->BootstrapReweight(0);
+			lastBootstrapSeed = data->BootstrapReweight(0, conf->resampleProportion);
 			outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
 			}
 		
@@ -1667,15 +1804,15 @@ void Population::PerformSearch(){
 
 	for(;currentSearchRep<=conf->searchReps;currentSearchRep++){
 		string s;
-#ifndef BOINC
-		CatchInterrupt();
-#endif		
 		if(conf->restart == false && currentSearchRep > 1) Reset();
+		
+		//ensure that the user can ctrl-c kill the program during creation of each stepwise addition tree
+		//the signal handling will be returned to the custom message below
+		signal( SIGINT, SIG_DFL );
 
 		GetRepNums(s);
 		if(conf->restart == false){
 			if(s.length() > 0) outman.UserMessage("\n>>>%s<<<", s.c_str());
-			outman.UserMessage("Starting with seed=%d\n", rnd.seed());
 			SeedPopulationWithStartingTree(currentSearchRep);
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
 			if(conf->checkpoint) WriteStateFiles();
@@ -1685,13 +1822,21 @@ void Population::PerformSearch(){
 			if(currentSearchRep > conf->searchReps) throw ErrorException("rep number in checkpoint (%d) is larger than total rep specified in config (%d)", currentSearchRep, conf->searchReps);
 			outman.UserMessage("%s generation %d, seed %d, best lnL %.3f", s.c_str(), gen, rnd.init_seed(), indiv[bestIndiv].Fitness());
 			}
-		
+
+#ifndef BOINC
+		//3/24/08 moving this after SeedPop, since it disallows normal ctrl-c killing of runs during stepwise
+		CatchInterrupt();
+#endif				
 		InitializeOutputStreams();
 		Run();
 
 		//this rep is over
 		if(prematureTermination == false){
 			if(s.length() > 0) outman.UserMessage(">>>Completed %s<<<\n", s.c_str());
+			//not sure where this should best go
+			outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
+			indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
+			if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
 			Individual *repResult = new Individual(&indiv[bestIndiv]);
 			storedTrees.push_back(repResult);
 			}
@@ -1702,8 +1847,48 @@ void Population::PerformSearch(){
 
 		int best=0;
 		if((currentSearchRep == conf->searchReps) || prematureTermination){
-			if(storedTrees.size() > 1)
+			if(storedTrees.size() > 1){
 				best=EvaluateStoredTrees(true);
+				//recombine final trees
+	/*			if(total_size > 2){
+					for(int i=0;i<storedTrees.size();i++)
+						if(storedTrees[i]->treeStruct->root->claIndexDown == -1)
+							storedTrees[i]->treeStruct->AssignCLAsFromMaster();
+					for(int i=0;i<this->total_size;i++){
+						//only the best indiv has clas assigned at this point
+						if(i != bestIndiv) indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, storedTrees[best], false);
+						else indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, storedTrees[best], true);
+						}
+					int holdover = 2;
+					for(int rounds=0;rounds<10;rounds++){
+						for(int i=holdover;i<total_size;i++){
+							int partner = rnd.random_int(storedTrees.size());
+							indiv[i].CrossOverWith(*storedTrees[partner], 0.01);
+							}
+						this->CalcAverageFitness();
+						for(int i=holdover;i<total_size;i++){
+							if(indiv[i].Fitness() > indiv[0].Fitness()){
+								indiv[1].CopySecByRearrangingNodesOfFirst(indiv[1].treeStruct, &indiv[0], true);
+								indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, &indiv[i], true);
+								}
+							else if(indiv[i].Fitness() > indiv[1].Fitness()){
+								indiv[1].CopySecByRearrangingNodesOfFirst(indiv[1].treeStruct, &indiv[i], true);
+								}
+							}
+						for(int i=holdover;i<total_size;i++){
+							int parent = rnd.random_int(holdover);
+							indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[parent], true);
+							}
+						this->CalcAverageFitness();
+						}
+					}
+				string s = "recom.";
+				s += besttreefile;
+				this->WriteTreeFile(s.c_str());
+				Individual *repResult = new Individual(&indiv[0]);
+				storedTrees.push_back(repResult);
+				outman.UserMessage("Best topology created by recombination: %f", indiv[0].Fitness());
+	*/			}
 			}
 
 		if( (prematureTermination == false && (all_best_output & WRITE_REP_TERM)) ||
@@ -1744,8 +1929,7 @@ void Population::PerformSearch(){
 				outman.UserMessage(">>>Internal state probabilities not inferred due to premature termination<<<");
 				}
 			}
-				
-/*
+/*				
 		//the entire set of replicate searches is over, or was terminated early
 		if(currentSearchRep == conf->searchReps || prematureTermination){
 			int best=0;
@@ -1838,7 +2022,7 @@ void Population::VariableStartingTreeOptimization(){
 			do{
 				if(pass==0) prec1 = 1.0;
 				else prec1 = max(prec[p], prec1 * 0.7);
-				optCalcs = 0;
+//				optCalcs = 0;
 /*				double start = indiv[0].Fitness();
 				for(int b=1;b<997;b++){
 					double len = indiv[0].treeStruct->allNodes[b]->dlen;
@@ -2294,8 +2478,8 @@ void Population::PerformMutation(int indNum){
 			//remote nodes
 			recomPerformed=SubtreeRecombination(indNum);
 			if(recomPerformed==false) ind->mutation_type=0;
-			ind->treeStruct->calcs=calcCount;
-			calcCount=0;
+//			ind->treeStruct->calcs=calcCount;
+//			calcCount=0;
 			ind->CalcFitness(0);
 			break;
 			
@@ -2307,8 +2491,8 @@ void Population::PerformMutation(int indNum){
 				recompar->treeStruct->CalcBipartitions(false);
 				ind->CrossOverWith( *recompar, adap->branchOptPrecision);
 				ind->accurateSubtrees=false;
-				ind->treeStruct->calcs=calcCount;
-				calcCount=0;
+//				ind->treeStruct->calcs=calcCount;
+//				calcCount=0;
 				}
 			if(ind->recombinewith==-1){//all types of "normal" mutation that occur at the inidividual level
 				if(rank==0){//if we are the master
@@ -2582,12 +2766,9 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 
 	Individual *ind;
 	int i = (indNum >= 0 ? indNum : bestIndiv);
-//	if(indNum==-1) ind=&indiv[bestIndiv];
-//	else ind=&indiv[indNum];
+
 	ind=&indiv[i];
 
-	//DEBUG - why was this > 0 rather than >=?
-	//if(Tree::outgroup != NULL) OutgroupRoot(&indiv[indNum > 0 ? indNum : bestIndiv], indNum);
 	if(Tree::outgroup != NULL) OutgroupRoot(ind, i);
 		
 	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
@@ -2622,7 +2803,7 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 	ind->treeStruct->CalcBipartitions(true);
 	Bipartition b = *(Tree::outgroup);
 	b.Standardize();
-	TreeNode *r = ind->treeStruct->ContainsBipartitionOrComplement(&b);
+	TreeNode *r = ind->treeStruct->ContainsBipartitionOrComplement(b);
 	
 	if(r == NULL){
 		//this means that there isn't a bipartition separating the outgroup and ingroup
@@ -2635,7 +2816,11 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 	if(Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal()) r = r->anc;
 	if(r->IsNotRoot()){
 		ind->treeStruct->RerootHere(r->nodeNum);
-		if(indnum != -1) AssignNewTopology(indiv, indnum);
+		if(indnum != -1){
+			AssignNewTopology(indiv, indnum);
+			ind->SetDirty();
+			ind->CalcFitness(0);
+			}
 		return true;
 		}
 	else return false;
@@ -2802,6 +2987,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 
 		outf.setf( ios::floatfield, ios::fixed );
 		outf.setf( ios::showpoint );
+		if(Tree::outgroup != NULL) OutgroupRoot(storedTrees[r], -1);
 		storedTrees[r]->treeStruct->root->MakeNewick(treeString, false, true);
 		outf << treeString << ";\n";
 
@@ -2843,7 +3029,7 @@ void Population::WritePhylipTree(ofstream &phytree){
 			temp="";
 			}
 		}
-	phytree << ";\n";
+	phytree << ";" << endl;
 	}
 
 
@@ -3733,8 +3919,8 @@ void Population::keepTrack(){
 					if(typ&Individual::anyTopo){
 						if(i == bestIndiv && scoreDif > significantTopoChange){
 							indiv[0].treeStruct->attemptedSwaps.ClearAttemptedSwaps();
-							indiv[0].treeStruct->CalcBipartitions();
-							indiv[i].treeStruct->CalcBipartitions();
+							indiv[0].treeStruct->CalcBipartitions(true);
+							indiv[i].treeStruct->CalcBipartitions(true);
 							if(indiv[0].treeStruct->IdenticalTopology(indiv[i].treeStruct->root)==false){
 								lastTopoImprove=gen;
 								if(i == bestIndiv){
@@ -3757,8 +3943,8 @@ void Population::keepTrack(){
 					if(typ&Individual::anyTopo || adap->topoWeight==ZERO_POINT_ZERO){
 						//clearing of the swaps records needs to be done for _any_ new best topo, not
 						//just ones that are significantly better
-						indiv[0].treeStruct->CalcBipartitions();
-						indiv[i].treeStruct->CalcBipartitions();
+						indiv[0].treeStruct->CalcBipartitions(true);
+						indiv[i].treeStruct->CalcBipartitions(true);
 						bool sameTopo = indiv[0].treeStruct->IdenticalTopologyAllowingRerooting(indiv[i].treeStruct->root);
 						//if this is a new best and isn't the same topology, clear the swaplist
 						if(i == bestIndiv && sameTopo == false)
@@ -4866,7 +5052,9 @@ void Population::SetOutputDetails(){
 			if(conf->searchReps == 1){
 				all_best_output = (output_details) DONT_OUTPUT;
 #ifndef BOINC
-				treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
+				//4/18/08 - changing this to append to treelog on restart
+				//treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
+				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
 #else
 				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM ) : DONT_OUTPUT);
 #endif
@@ -4875,7 +5063,9 @@ void Population::SetOutputDetails(){
 			else if(conf->bootstrapReps == 0 && conf->searchReps > 1){
 				all_best_output = (output_details) (REPLACE | WRITE_REP_TERM | WARN_PREMATURE);
 #ifndef BOINC
-				treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
+				//4/18/08 - changing this to append to treelog on restart
+				//treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
+				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
 #else
 				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM | NEWNAME_PER_REP) : DONT_OUTPUT);
 #endif
@@ -4883,7 +5073,9 @@ void Population::SetOutputDetails(){
 			}
 		else {//restarted bootstrap, 1 OR multiple search reps per bootstrap rep
 #ifndef BOINC
-			bootlog_output = (output_details) (NEWNAME | WRITE_REPSET_TERM | FINALIZE_FULL_TERM | FINALIZE_PREMATURE);
+			//4/18/08 - just going to append here too
+			//bootlog_output = (output_details) (NEWNAME | WRITE_REPSET_TERM | FINALIZE_FULL_TERM | FINALIZE_PREMATURE);
+			bootlog_output = (output_details) (APPEND | WRITE_REPSET_TERM | FINALIZE_FULL_TERM | FINALIZE_PREMATURE);
 #else
 			bootlog_output = (output_details) (APPEND | WRITE_REPSET_TERM | FINALIZE_FULL_TERM);
 #endif
@@ -5373,8 +5565,8 @@ void Population::LogNewBestFromRemote(FLOAT_TYPE scorediff, int ind){
         adap->bestFromRemoteNum[0]++;
         adap->bestFromRemote[0]+=scorediff;
         
-        indiv[0].treeStruct->CalcBipartitions();
-        indiv[ind].treeStruct->CalcBipartitions();
+        indiv[0].treeStruct->CalcBipartitions(true);
+        indiv[ind].treeStruct->CalcBipartitions(true);
         
         //check if this is a new topology
         if(indiv[0].treeStruct->IdenticalTopology(indiv[ind].treeStruct->root) == false){
@@ -5824,3 +6016,49 @@ void Population::CheckPerturbSerial(){
 		}
 	}
 */
+
+//SINGLE SITE FUNCTIONS
+void Population::OptimizeSiteRates(){
+	SeedPopulationWithStartingTree(1);
+
+	//store a backup of the exisiting tree and blens
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &indiv[0]);	
+
+	char filename[100];
+	sprintf(filename, "%s.siterates.log", conf->ofprefix.c_str());
+	ofstream out(filename);
+
+	Tree::min_brlen = 1.0e-20;
+	Tree::max_brlen = 1.0e10;
+
+	const int lastConst=data->LastConstant();
+
+	FLOAT_TYPE siteRate;
+	typedef pair<FLOAT_TYPE, FLOAT_TYPE> float_pair;
+	float_pair rateAndScore;
+	vector<float_pair> allRates;
+
+	for(int i=0;i<data->NChar();i++){
+		if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].mod->StateFreq((data->GetConstStates())[i]));
+		else{
+			indiv[0].treeStruct->MakeAllNodesDirty();
+			Tree::siteToScore = i;
+			rateAndScore = indiv[0].treeStruct->OptimizeSingleSiteTreeScale(adap->branchOptPrecision);
+			//restore the original blens
+			indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, &tempIndiv, true);
+			}
+		allRates.push_back(rateAndScore);
+		}
+	out << "site#\tsiteRate\tsitelnL" << endl;
+	for(int i=0;i<data->GapsIncludedNChar();i++){
+		int packedColumn = data->Number(i);
+		assert(packedColumn < (int)allRates.size());
+		out << i+1 << "\t";
+		if(packedColumn == -1) out << "NA\tNA" << endl;
+		else out << allRates[packedColumn].first << "\t" << allRates[packedColumn].second << endl;
+		}
+	out.close();
+	outman.UserMessage("Site-rate estimation complete.");
+	}
