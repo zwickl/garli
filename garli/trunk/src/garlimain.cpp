@@ -20,14 +20,8 @@
 #define MINOR_VERSION 0
 
 //allocation monitoring stuff from Paul, Mark and Dave
-#undef INSTANTIATE_MEMCHK
-#include "defs.h"
-#include "memchk.h"
 #define WRITE_MEM_REPORT_TO_FILE
-
-#ifdef MONITORING_ALLOCATION
-	#define INSTANTIATE_MEMCHK
-#endif
+#define INSTANTIATE_MEMCHK
 
 #ifdef WIN32
 #include <conio.h>
@@ -352,7 +346,8 @@ int main( int argc, char* argv[] )	{
 			if(runTests){
 				outman.UserMessage("starting internal tests...");
 				pop.RunTests();
-				throw ErrorException("(not actually an error!) Successfully completed tests.");
+				outman.UserMessage("******Successfully completed tests.******");
+				return 0;
 				}
 			
 			if(conf.runmode != 0){

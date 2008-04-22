@@ -47,8 +47,10 @@
 
 #undef OPT_DEBUG
 
-//#define MONITORING_ALLOCATION
-//#include "memchk.h"
+//The ONLY thing that should need to be done to turn on memcheck leak detection
+//should be defining MONITORING_ALLOCATION here
+#undef MONITORING_ALLOCATION
+#include "memchk.h"
 
 #define CONSTRAINTS
 #define STOCHASTIC_STARTING_BLENS
