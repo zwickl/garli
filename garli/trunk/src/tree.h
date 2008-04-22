@@ -79,8 +79,8 @@ class Tree{
 		static unsigned rescaleEvery;
 		static list<TreeNode *> nodeOptVector;
 		
-		static float uniqueSwapPrecalc[500];
-		static float distanceSwapPrecalc[1000];
+		static FLOAT_TYPE uniqueSwapPrecalc[500];
+		static FLOAT_TYPE distanceSwapPrecalc[1000];
 
 		static Bipartition *outgroup;
 

@@ -70,6 +70,13 @@ Model::~Model(){
 		else if(nst==1) delete relNucRates[0];
 		}
 
+	if(modSpec.IsCodon()){
+		for(int r=0;r<NRateCats();r++){
+			delete omegas[r];
+			delete omegaProbs[r];
+			}
+		}
+
 	if(propInvar != NULL) delete propInvar;
 
 	if(alpha != NULL) delete alpha;

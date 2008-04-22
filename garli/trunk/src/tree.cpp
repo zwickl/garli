@@ -83,8 +83,8 @@ AttemptedSwapList Tree::attemptedSwaps;
 FLOAT_TYPE Tree::uniqueSwapBias;
 FLOAT_TYPE Tree::distanceSwapBias;
 
-float Tree::uniqueSwapPrecalc[500];
-float Tree::distanceSwapPrecalc[1000];
+FLOAT_TYPE Tree::uniqueSwapPrecalc[500];
+FLOAT_TYPE Tree::distanceSwapPrecalc[1000];
 
 Bipartition *Tree::outgroup = NULL;
 
@@ -115,18 +115,26 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 	Tree::data=data;
 #ifdef SINGLE_PRECISION_FLOATS
 	Tree::rescaleEvery=6;
+	FLOAT_TYPE minVal = 1.0e-10f;
+	FLOAT_TYPE maxVal = 1.0e10f;
 #else
 	Tree::rescaleEvery=16;
+	FLOAT_TYPE minVal = 1.0e-20;
+	FLOAT_TYPE maxVal = 1.0e20;
 #endif
 	Tree::uniqueSwapBias = conf->uniqueSwapBias;
 	Tree::distanceSwapBias = conf->distanceSwapBias;
 	for(int i=0;i<500;i++){
-		Tree::uniqueSwapPrecalc[i] = (float) pow(Tree::uniqueSwapBias, i);
-		if(Tree::uniqueSwapPrecalc[i] != Tree::uniqueSwapPrecalc[i]) Tree::uniqueSwapPrecalc[i]=0.0f;
+		Tree::uniqueSwapPrecalc[i] = (FLOAT_TYPE) pow(Tree::uniqueSwapBias, i);
+		//if(Tree::uniqueSwapPrecalc[i] != Tree::uniqueSwapPrecalc[i]) Tree::uniqueSwapPrecalc[i]=0.0f;
+		if(Tree::uniqueSwapPrecalc[i] < minVal) Tree::uniqueSwapPrecalc[i] = minVal;
+		if(Tree::uniqueSwapPrecalc[i] > maxVal) Tree::uniqueSwapPrecalc[i] = maxVal;
 		}
 	for(int i=0;i<1000;i++){
-		Tree::distanceSwapPrecalc[i] = (float) pow(Tree::distanceSwapBias, i);
-		if(Tree::distanceSwapPrecalc[i] != Tree::distanceSwapPrecalc[i]) Tree::distanceSwapPrecalc[i]=0.0f;	
+		Tree::distanceSwapPrecalc[i] = (FLOAT_TYPE) pow(Tree::distanceSwapBias, i);
+		//if(Tree::distanceSwapPrecalc[i] != Tree::distanceSwapPrecalc[i]) Tree::distanceSwapPrecalc[i]=0.0f;	
+		if(Tree::distanceSwapPrecalc[i] < minVal) Tree::distanceSwapPrecalc[i] = minVal;	
+		if(Tree::distanceSwapPrecalc[i] > maxVal) Tree::distanceSwapPrecalc[i] = maxVal;	
 		}
 
 	Tree::meanBrlenMuts	= conf->meanBrlenMuts;
@@ -2091,13 +2099,22 @@ bool Tree::AssignWeightsToSwaps(TreeNode *cut){
 			someUnique = true;
 			if((*it).reconDist - 1 < 1000)
 				(*it).weight = distanceSwapPrecalc[(*it).reconDist - 1];
-			else (*it).weight = 0.0;
+			else 
+				(*it).weight = distanceSwapPrecalc[999];
 			}
 		else{
-			if((*it).reconDist - 1 < 1000 && (*thisSwap).Count() < 500)
+			if((*thisSwap).Count() < 500)
+				(*it).weight = uniqueSwapPrecalc[(*thisSwap).Count()];
+			else 
+				(*it).weight = uniqueSwapPrecalc[499];
+			if((*it).reconDist - 1 < 1000)
+				(*it).weight *= distanceSwapPrecalc[(*it).reconDist - 1];
+			else 
+				(*it).weight *= distanceSwapPrecalc[999];
+/*			if((*it).reconDist - 1 < 1000 && (*thisSwap).Count() < 500)
 				(*it).weight = uniqueSwapPrecalc[(*thisSwap).Count()] * distanceSwapPrecalc[(*it).reconDist - 1];
 			else (*it).weight = 0.0;
-			}
+*/			}
 		}
 	return someUnique==false;
 	}
