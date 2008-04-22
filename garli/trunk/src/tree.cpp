@@ -315,6 +315,8 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 							assert(*s);
 							name += *++s;
 							}
+						//its possible that the treestring has spaces in the names rather than underscores
+						name.BlanksToUnderscores();
 						taxonnodeNum = data->TaxonNameToNumber(name);
 						if(taxonnodeNum < 0) throw ErrorException("Unknown taxon \"%s\" encountered in tree description!", name.c_str());
 						}
@@ -4239,11 +4241,8 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	root->claIndexDown=tempnew.claIndexDown;
 	root->claIndexUL=tempnew.claIndexUL;
 	root->claIndexUR=tempnew.claIndexUR;
-	//DEBUG why are we setting this and then dirtying it?
+
 	MakeNodeDirty(root);
-	//root->claIndexDown=claMan->SetDirty(root->claIndexDown);
-	//root->claIndexUR=claMan->SetDirty(root->claIndexUR);
-	//root->claIndexUL=claMan->SetDirty(root->claIndexUL);
 	
 	nroot->left=tempold.left;
 	nroot->left->anc=nroot;
@@ -4257,11 +4256,8 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	nroot->claIndexDown=tempold.claIndexDown;
 	nroot->claIndexUL=tempold.claIndexUL;
 	nroot->claIndexUR=tempold.claIndexUR;
-	//DEBUG why are we setting this and then dirtying it?
+
 	MakeNodeDirty(nroot);
-//	nroot->claIndexDown=claMan->SetDirty(nroot->claIndexDown);
-//	nroot->claIndexUR=claMan->SetDirty(nroot->claIndexUR);
-//	nroot->claIndexUL=claMan->SetDirty(nroot->claIndexUL);
 	
 	if(nroot->anc->left==root){
 		nroot->anc->left=nroot;

@@ -310,7 +310,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 
 	assert(prevVal > lowBound - epsilon && prevVal < highBound + epsilon);
 
-	//DEBUG - if the initial value is already very near or equal to a bound, bump it off a tad so the emirical derivs below work right.
+	//if the initial value is already very near or equal to a bound, bump it off a tad so the emirical derivs below work right.
 	if(prevVal - lowBound < epsilon){
 		prevVal = lowBound + epsilon;
 		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);

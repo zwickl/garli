@@ -688,7 +688,6 @@ void Population::GenerateTreesOnly(int nTrees){
 void Population::RunTests(){
 	//test a number of functions to ensure that any code changes haven't broken anything
 	//it assumes that Setup has been called
-	//DEBUG
 	//SeedPopulationWithStartingTree(0);
 //	InitializeOutputStreams();
 

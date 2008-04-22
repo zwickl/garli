@@ -71,6 +71,7 @@ void UsageMessage(char *execName){
 	outman.UserMessage("Usage: The syntax for launching MPI jobs varies between systems");
 	outman.UserMessage("Most likely it will look something like the following:");
 	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
+	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.")
 	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
 #endif
 	outman.UserMessage("Options:");
