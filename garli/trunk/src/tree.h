@@ -1,5 +1,5 @@
-// GARLI version 0.952b2 source code
-// Copyright  2005-2006 by Derrick J. Zwickl
+// GARLI version 0.96b8 source code
+// Copyright  2005-2008 by Derrick J. Zwickl
 // All rights reserved.
 //
 // This code may be used and modified for non-commercial purposes
