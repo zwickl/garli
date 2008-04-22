@@ -365,8 +365,6 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 		}
 	else	{
 		EliminateNode(2*data->NTax()-2);
-		//DEBUG WTF was this being done?
-		//numBranchesAdded--;
 		}
 	assert(root->left->next!=root->right);
 
@@ -610,7 +608,6 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 		SortAllNodesArray();
 		EliminateNode(removedNode->nodeNum);
 		numBranchesAdded--;
-		//DEBUG
 		numNodesAdded--;
 		}
 	}
@@ -2088,11 +2085,13 @@ bool Tree::AssignWeightsToSwaps(TreeNode *cut){
 	list<Swap>::iterator thisSwap;
 	bool someUnique = false;
 
+	Swap tmp;
+
 	for(listIt it = sprRang.begin();it != sprRang.end();it++){
 		bool found;
 		CalcBipartitions(true);
 		proposed.FillWithXORComplement(*(cut->bipart), *(allNodes[(*it).nodeNum]->bipart));
-		Swap tmp=Swap(proposed, cut->nodeNum, (*it).nodeNum, (*it).reconDist);
+		tmp.Setup(proposed, cut->nodeNum, (*it).nodeNum, (*it).reconDist);
 		thisSwap = attemptedSwaps.FindSwap(tmp, found);
 
 		if(found == false){
@@ -3887,8 +3886,7 @@ void Tree::CalcBipartitions(bool standardize){
 		if(standardize)	bipartCond = CLEAN_STANDARDIZED;
 		else bipartCond = CLEAN_UNSTANDARDIZED;
 		}
-	//DEBUG
-	root->VerifyBipartition(standardize);
+//	root->VerifyBipartition(standardize);
 	}
 	
 void Tree::OutputBipartitions(){
@@ -5676,23 +5674,12 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 	FLOAT_TYPE minVal = 1.0e-5;
 	int i=0;
 
-#define DEBUG_OMEGA_OPT
+#undef DEBUG_OMEGA_OPT
 
 	//limiting change in any one pass
 	double maxRateChangeProp = 0.5;
 	double maxProbChange = 0.10;
 	
-	//DEBUG - limiting here now too
-/*	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
-		max(minVal, mod->FlexRate(i)*maxRateChangeProp),
-		min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), 
-		&Model::SetFlexRate);
-
-	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
-		max(minVal, mod->FlexProb(i)-maxProbChange), 
-		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
-		&Model::SetFlexProb);
-*/
 	//DEBUG - limiting here now too
 	if(mod->NRateCats() == 1) //allow a bit more change for a single omega
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), 0, 

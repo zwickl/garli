@@ -228,6 +228,8 @@ class Swap{
 	unsigned short reconDist;
 
 public:
+	//default constructor does not initialize the bipart, since there would be some overhead
+	Swap() : count(0), cutnum(0), brokenum(0), reconDist(0){}
 	Swap(Bipartition &swap, int cut, int broke, int dist){
 		b=&swap;
 		count=1;
@@ -235,6 +237,24 @@ public:
 		brokenum=broke;
 		reconDist=dist;
 		}
+	//copy constructor
+	Swap(const Swap &s){
+		b=s.b;
+		count=s.count;
+		cutnum=s.cutnum;
+		brokenum=s.brokenum;
+		reconDist=s.reconDist;
+		}
+	//this is just like the constructor, but doesn't require the bipartition
+	//to be allocated every time
+	void Setup(Bipartition &swap, int cut, int broke, int dist){
+		b=&swap;
+		count=1;
+		cutnum=cut;
+		brokenum=broke;
+		reconDist=dist;
+		}
+
 	Swap(FILE* &in){
 		b.BinaryInput(in);
 		intptr_t scalarSize = (intptr_t) &(reconDist) - (intptr_t) &(count) + sizeof(reconDist);
@@ -414,16 +434,17 @@ public:
 		//if so, increment the count, otherwise add it
 		assert(bip.ContainsTaxon(1));
 
-		Swap *swap = new Swap(bip, cut, broke, dist);
+		Swap swap;
+		swap.Setup(bip, cut, broke, dist);
 
 		bool found;
-		list<Swap>::iterator it = FindSwap(*swap, found);
+		list<Swap>::iterator it = FindSwap(swap, found);
 
 		if(found == false){
 			bool reindex=false;
 			//if we're adding this before the first index, be sure to reindex
 			if(it == swaps.begin() && indeces.empty()==false) reindex=true;
-			swaps.insert(it, *swap);
+			swaps.insert(it, swap);
 			unique++;
 			total++;
 			if(unique==100 || (unique % 1000)==0 || reindex==true) IndexSwaps(); 
@@ -433,7 +454,6 @@ public:
 			total++;
 			}
 		assert(swaps.size() == unique);
-		delete swap;
 		return (found == false);//return value is true if the swap is _unique_
 		}
 
