@@ -1,5 +1,5 @@
 s: 
-	make -f Makefile.ser Garli0.96b6.r226
+	make -f Makefile.ser Garli0.96b8
 
 p:
 	@echo '****Sorry, parallel compilation for version 0.96 is not yet available. ****'

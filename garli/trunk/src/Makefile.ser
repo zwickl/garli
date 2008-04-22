@@ -34,8 +34,8 @@ MPI_RUN_SPLITTER = no
 ifeq ($(COMPILE_TYPE),gcc_any)
 	CC = g++
 	CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops \
-		 -fsigned-char -DUNIX -DNDEBUG  -I$(NCL_INCLUDES)
-	OK = 1
+		 -fsigned-char -DNDEBUG -DUNIX  -I$(NCL_INCLUDES)
+
 endif
 
 #gcc: gnu compiler 
@@ -66,7 +66,7 @@ ifeq ($(MPI_RUN_SPLITTER), yes)
 endif
 
 
-EXEC     = Garli0.96b6.r226
+EXEC     = Garli0.96b8
 
 OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		population.o rng.o set.o\
@@ -79,14 +79,13 @@ ifeq ($(MPI_RUN_SPLITTER), yes)
 	OBJECT_LIST += mpitrick.o
 endif
 
-Garli0.96b6.r226 : $(OBJECT_LIST) garlimain.o
+Garli0.96b8 : $(OBJECT_LIST) garlimain.o
 	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) $(LIB_NCL) garlimain.o
 
-garlimain.o:	mlhky.h tree.h population.h \
-		individual.h mlhky.h garlimain.cpp adaptation.h \
-		hashdefines.h defs.h
+#this forces garlimain.cpp to always be recompiled, which ensures that the
+#"compiled on XXX" message will be current
+garlimain.o::
 	$(CC) $(CC_FLAGS) -c -I. garlimain.cpp
-
 .cpp.o: 
 	$(CC) -c $(CC_FLAGS)  -I.  $*.cpp
 
