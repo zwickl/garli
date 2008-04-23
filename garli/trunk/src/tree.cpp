@@ -3050,7 +3050,7 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 					if(large1 < 1e-150){
 						throw(1);
 						}
-					int incr=((int) -log(large1))+5;
+					int incr=((int) -log(large1))+4;
 					underflow_mult[i]+=incr;
 					FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
 					for(int r=0;r<nRateCats;r++){
@@ -3135,7 +3135,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 				if(large1 < 1e-150){
 					throw(1);
 					}
-				int incr=((int) -log(large1))+5;
+				int incr=((int) -log(large1))+4;
 				underflow_mult[i]+=incr;
 				FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
 				for(int q=0;q<nstates*nRateCats;q++){
