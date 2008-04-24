@@ -14,6 +14,7 @@ using namespace std;
 
 void SubGarliMain(int);
 void jobloop(int, int, MPI_Comm, int numJobs);
+void UsageMessage(char *execName);
 
 int main(int argc,char **argv){
 
@@ -39,6 +40,7 @@ int main(int argc,char **argv){
 
 	if(argc == 1 || (argv[1][0] != '-' && !isdigit(argv[1][0]))){
 		cout << "ERROR:\nGarli is expecting the number of jobs to be run to follow\nthe executable name on the command line" << endl;
+		UsageMessage(argv[0]);
 		}
 	else{
 		if(argv[1][0] == '-') numJobsTotal = atoi(&argv[1][1]);

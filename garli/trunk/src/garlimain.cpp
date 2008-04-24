@@ -67,20 +67,23 @@ int CheckRestartNumber(const string str){
 void UsageMessage(char *execName){
 #ifndef SUBROUTINE_GARLI	
 	outman.UserMessage("Usage: %s [OPTION] [config filename]", execName);
-#else
-	outman.UserMessage("Usage: The syntax for launching MPI jobs varies between systems");
-	outman.UserMessage("Most likely it will look something like the following:");
-	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
-	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.")
-	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
-#endif
 	outman.UserMessage("Options:");
 	outman.UserMessage("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
+	if(interactive) outman.UserMessage("        (interactive is the default for the version you are running)");
 	outman.UserMessage("  -b, --batch		batch mode (do not expect user input)");
+	if(!interactive) outman.UserMessage("        (batch is the default for the version you are running)");
 	outman.UserMessage("  -v, --version		print version information and exit");
 	outman.UserMessage("  -h, --help		print this help and exit");
 	outman.UserMessage("  -t			run internal tests (requires dataset and config file)");
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"");
+#else
+	outman.UserMessage("Usage: The syntax for launching MPI jobs varies between systems");
+	outman.UserMessage("Most likely it will look something like the following:");
+	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
+	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.");
+	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
+#endif
 	}
 #ifdef BOINC
 int boinc_garli_main( int argc, char* argv[] );
@@ -169,7 +172,10 @@ int main( int argc, char* argv[] )	{
 						outman.UserMessage("zwickl@nescent.org");
 						exit(0);
 						}
-					else if(!_stricmp(argv[curarg], "-h") || !_stricmp(argv[curarg], "--help")) UsageMessage(argv[0]);
+					else if(!_stricmp(argv[curarg], "-h") || !_stricmp(argv[curarg], "--help")){
+						UsageMessage(argv[0]);
+						exit(0);
+						}
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						UsageMessage(argv[0]);
@@ -283,7 +289,18 @@ int main( int argc, char* argv[] )	{
 #endif
 			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
-			outman.UserMessage("Compiled %s %s\n", __DATE__, __TIME__); 
+			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__); 
+
+#if defined (_MSC_VER)
+			outman.UserMessage(" using Microsoft C++ compiler version %.2f", _MSC_VER/100.0);
+#elif defined(__INTEL_COMPILER)
+			outman.UserMessage(" using Intel icc compiler version %.2f", __INTEL_COMPILER/100.0);
+#elif defined(__GNUC__)
+			outman.UserMessage(" using GNU gcc compiler version %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+#else	
+			outman.UserMessage("");
+#endif
+
 #ifdef NCL_NAME_AND_VERSION
 			outman.UserMessage("Using %s\n", NCL_NAME_AND_VERSION);
 #endif
@@ -382,8 +399,10 @@ int main( int argc, char* argv[] )	{
 				pop.FinalizeOutputStreams(2);
 				}
 			}catch(ErrorException err){
-				if(outman.IsLogSet() == false)
+				if(outman.IsLogSet() == false){
 					outman.SetLogFile("ERROR.log");
+					if(interactive == false) UsageMessage(argv[0]);
+					}
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
 				pop.FinalizeOutputStreams(0);
 				pop.FinalizeOutputStreams(1);
