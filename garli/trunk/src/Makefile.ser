@@ -1,5 +1,8 @@
 #GARLI version 0.96b6 makefile
 
+#NOTE - this is from the poor make system of version 0.951 and earlier.  The configure
+#	script mechanism should now be used instead if possible
+
 #to use, follow steps 1, 2 and optionally 3
 
 #(1) choose one of these compile types

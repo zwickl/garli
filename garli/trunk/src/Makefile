@@ -1,3 +1,7 @@
+
+#NOTE - this is from the poor make system of version 0.951 and earlier.  The configure
+#	script mechanism should now be used instead if possible
+
 s: 
 	make -f Makefile.ser Garli0.96b8
 
