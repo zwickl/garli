@@ -5007,7 +5007,7 @@ void Population::SetOutputDetails(){
 			bootlog_output = (output_details) (DONT_OUTPUT);
 #ifndef BOINC
 			
-			if(conf->outputCurrentBestTree) 
+			if(conf->outputCurrentBestTopology) 
 				best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 			else
 				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
@@ -5043,7 +5043,7 @@ void Population::SetOutputDetails(){
 		if(conf->bootstrapReps == 0){
 			bootlog_output = (output_details) (DONT_OUTPUT);
 #ifndef BOINC
-			if(conf->outputCurrentBestTree)
+			if(conf->outputCurrentBestTopology)
 				best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 			else 
 				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);

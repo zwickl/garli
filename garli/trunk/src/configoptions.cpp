@@ -40,7 +40,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	outputTreelog = false;
 	outputMostlyUselessFiles = false;
 	outputPhylipTree = false;
-	outputCurrentBestTree = false;
+	outputCurrentBestTopology = false;
 
 	//starting the run
 	randseed = -1;
@@ -154,7 +154,13 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
-	cr.GetBoolOption("outputcurrentbesttree", outputCurrentBestTree, true);
+
+	//changed the wording of this from besttree to besttopology, to match outputeachbettertopology
+	//still allow besttree, since that is what I told Maddison, and I think has already been incorporated
+	//into Mesquite
+	int ret = cr.GetBoolOption("outputcurrentbesttopology", outputCurrentBestTopology, true);
+	if(ret < 0)
+		cr.GetBoolOption("outputcurrentbesttree", outputCurrentBestTopology, true);
 
 	cr.GetBoolOption("restart", restart, true);
 	cr.GetBoolOption("writecheckpoints", checkpoint, true);

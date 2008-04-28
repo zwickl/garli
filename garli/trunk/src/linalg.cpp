@@ -35,7 +35,16 @@ using namespace std;
 
 #include "defs.h"
 #include "linalg.h"
-#include "jph.h"
+
+#undef NO_ERROR
+#undef ERROR
+#define NO_ERROR	0
+#define ERROR		1
+
+#undef FALSE
+#undef TRUE
+#define FALSE		0
+#define TRUE		1
 
 static void     LUBackSubst (FLOAT_TYPE **a, int n, int *indx, FLOAT_TYPE *b);
 static int      EigenRG (int n, FLOAT_TYPE **a, FLOAT_TYPE *wr, FLOAT_TYPE *wi, FLOAT_TYPE **z, int *iv1, FLOAT_TYPE *fv1);
