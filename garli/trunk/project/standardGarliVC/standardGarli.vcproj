@@ -480,15 +480,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\src\mpitrick.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\src\optimization.cpp"
 				>
 			</File>
 			<File
 				RelativePath="..\..\src\population.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\src\reconnode.h"
 				>
 			</File>
 			<File
@@ -578,10 +578,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\jph.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\src\linalg.h"
 				>
 			</File>
@@ -607,6 +603,10 @@
 			</File>
 			<File
 				RelativePath="..\..\src\population.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\src\reconnode.h"
 				>
 			</File>
 			<File

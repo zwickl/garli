@@ -561,10 +561,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\jph.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\src\linalg.h"
 				>
 			</File>
