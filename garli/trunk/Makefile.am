@@ -5,7 +5,6 @@ EXTRA_DIST =					\
 	doc	\
 	example \
 	project \
-	src/mlhky.cpp \
 	src/mpitrick.cpp \
 	src/threadfunc.cpp
 

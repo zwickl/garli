@@ -18,10 +18,8 @@ noinst_HEADERS = \
 	garlireader.h \
 	hashdefines.h \
 	individual.h \
-	jph.h \
 	linalg.h \
 	memchk.h \
-	mlhky.h \
 	model.h \
 	mpifuncs.h \
 	optimizationinfo.h \
