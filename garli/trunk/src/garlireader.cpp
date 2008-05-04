@@ -66,20 +66,21 @@ void MyNexusToken::OutputComment(
 	{
 	unsigned pos;
 	string s;
-	//doing away with this - was problematic and not very useful
-/*	s = "GarliScore";
+	//changing this again - just eating the Garli output comments
+	s = "GarliScore";
 	pos = msg.find(s);
 	if(pos != string::npos){
-		outman.UserMessage("This is apparently a tree inferred by Garli in a previous run.  Its score was %s", msg.substr(s.length()).c_str());
+		//outman.UserMessage("This is apparently a tree inferred by Garli in a previous run.  Its score was %s", msg.substr(s.length()).c_str());
 		return;
 		}
 	s = "GarliModel";
 	pos = msg.find(s);
 	if(pos != string::npos){
-		outman.UserMessage("Garli's model parameter values used in inferring this tree:\n\t%s", msg.substr(s.length()).c_str());
+		//outman.UserMessage("Garli's model parameter values used in inferring this tree:\n\t%s", msg.substr(s.length()).c_str());
 		return;
 		}
-*/s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
+	
+	s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
 					//they are only optimal for a certain tree. This is mainly for output when reading the trees in PAUP
 					//and we will just ignore them here
 	pos = msg.find(s);
@@ -1282,20 +1283,20 @@ inline void	GarliReader::OutputComment(const NxsString &msg)
 	{
 	unsigned pos;
 	string s;
-	//doing away with this - was problematic and not very useful
-/*	s = "GarliScore";
+	//changing this again - just eating the Garli output comments
+	s = "GarliScore";
 	pos = msg.find(s);
 	if(pos != string::npos){
-		outman.UserMessage("This is apparently a tree inferred by Garli in a previous run.  Its score was %s", msg.substr(s.length()).c_str());
+		//outman.UserMessage("This is apparently a tree inferred by Garli in a previous run.  Its score was %s", msg.substr(s.length()).c_str());
 		return;
 		}
 	s = "GarliModel";
 	pos = msg.find(s);
 	if(pos != string::npos){
-		outman.UserMessage("Garli's model parameter values used in inferring this tree:\n\t%s", msg.substr(s.length()).c_str());
+		//outman.UserMessage("Garli's model parameter values used in inferring this tree:\n\t%s", msg.substr(s.length()).c_str());
 		return;
 		}
-*/	s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
+	s =	"****NOTE";//this is a note about the parameter values either being from a run that was terimated early or that 
 					//they are only optimal for a certain tree. This is mainly for output when reading the trees in PAUP
 					//and we will just ignore them here
 	pos = msg.find(s);
