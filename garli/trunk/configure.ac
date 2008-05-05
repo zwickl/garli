@@ -62,7 +62,7 @@ AC_CHECK_FUNCS([floor memmove memset pow sqrt strchr strdup strtol])
 #--------------------------------------------------------------------------------------------------#
 
 # Initialize CXXFLAGS to prevent it from defaulting to "-g -O2"
-CXXFLAGS="-DUNIX"
+CXXFLAGS="$CXXFLAGS -DUNIX"
 
 # Check for debugging mode.
 AC_ARG_ENABLE(debugging,
