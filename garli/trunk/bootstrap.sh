@@ -6,7 +6,7 @@
 #		whenever an Makefile.am changes.
 
 set -x
-aclocal -I config/m4 || exit
+aclocal -I config || exit
 autoheader || exit
 automake || exit
 autoconf
