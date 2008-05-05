@@ -27,7 +27,11 @@ AM_INIT_AUTOMAKE([1.9 foreign dist-tarZ tar-ustar filename-length-max=299])
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_CPP
+INP_CXXFLAGS="$CXXFLAGS"
 AC_PROG_CXX
+
+# Initialize CXXFLAGS to prevent it from defaulting to "-g -O2"
+CXXFLAGS="$INP_CXXFLAGS -DUNIX"
 
 # required because we are building a library 
 AC_PROG_RANLIB
@@ -61,8 +65,6 @@ AC_CHECK_FUNCS([floor memmove memset pow sqrt strchr strdup strtol])
 #  Set CXXFLAGS                                                                                    #
 #--------------------------------------------------------------------------------------------------#
 
-# Initialize CXXFLAGS to prevent it from defaulting to "-g -O2"
-CXXFLAGS="$CXXFLAGS -DUNIX"
 
 # Check for debugging mode.
 AC_ARG_ENABLE(debugging,
