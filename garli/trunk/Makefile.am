@@ -4,10 +4,7 @@ EXTRA_DIST = \
 	config \
 	doc	\
 	example \
-	project \
-	src/mpitrick.cpp \
-	src/threadfunc.cpp
-
+	project 
 	
 
 SUBDIRS = src

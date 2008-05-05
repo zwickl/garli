@@ -3,6 +3,9 @@ AM_LDFLAGS  = @LDFLAGS@
  
 bin_PROGRAMS = Garli@VERSION@
 
+EXTRA_DIST = mpitrick.cpp \
+	threadfunc.cpp
+
 noinst_HEADERS = \
 	adaptation.h \
 	bipartition.h \
