@@ -160,13 +160,15 @@ elif test "x$GCC" = "xyes" ; then
 	esac	
 fi
 
+ACX_MPI
+
 #MPI run forker
 if test  "$enable_mpi" = yes; then
-		CXXFLAGS="$CXXFLAGS -DSUBROUTINE_GARLI"
-	CC="mpiCC"
-	CXX="mpiCC"
-
-	fi
+	CXXFLAGS="$CXXFLAGS -DSUBROUTINE_GARLI"
+	CC="MPICC"
+	CXX="MPICXX"
+	LIBS="$MPILIBS $LIBS"
+fi
 CXXFLAGS="$CXXFLAGS $CXXFLAGS_OPTIM_SPEED"
 
 
