@@ -1,7 +1,6 @@
 ACLOCAL_AMFLAGS = -I config/m4
 
-EXTRA_DIST =					\
-	README.txt	\
+EXTRA_DIST = \
 	doc	\
 	example \
 	project \
