@@ -38,7 +38,7 @@ AC_PROG_RANLIB
 
 
 AC_PROG_INSTALL
-AC_PROG_LIBTOOL
+#AC_PROG_LIBTOOL
 
 # Checks for libraries.
 
