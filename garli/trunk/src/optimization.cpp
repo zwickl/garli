@@ -589,9 +589,9 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 	//rare, but hard to detect when it is happening.  So, raise the blens
 	//before all of the optimization if they are very small
 	if(modSpec.IsCodon()){
-		if(nd->left->blen < 1e-4) SetBranchLength(nd->left, 1e-4);
-		if(nd->right->blen < 1e-4) SetBranchLength(nd->right, 1e-4);
-		if(nd->blen < 1e-4) SetBranchLength(nd, 1e-4);
+		if(nd->left->dlen < 1e-4) SetBranchLength(nd->left, 1e-4);
+		if(nd->right->dlen < 1e-4) SetBranchLength(nd->right, 1e-4);
+		if(nd->dlen < 1e-4) SetBranchLength(nd, 1e-4);
 		}
 
 #ifdef CHECK_LNL_BEFORE_RAD
