@@ -583,6 +583,17 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 
 	FLOAT_TYPE totalIncrease=ZERO_POINT_ZERO, prunePointIncrease=ZERO_POINT_ZERO, thisIncr, pruneRadIncrease=ZERO_POINT_ZERO;
 	
+	//DEBUG
+	//for codon models, numerical instability can cause problems if a 
+	//branch length is super short and its MLE is large.  This is very
+	//rare, but hard to detect when it is happening.  So, raise the blens
+	//before all of the optimization if they are very small
+	if(modSpec.IsCodon()){
+		if(nd->left->blen < 1e-4) SetBranchLength(nd->left, 1e-4);
+		if(nd->right->blen < 1e-4) SetBranchLength(nd->right, 1e-4);
+		if(nd->blen < 1e-4) SetBranchLength(nd, 1e-4);
+		}
+
 #ifdef CHECK_LNL_BEFORE_RAD
 	FLOAT_TYPE leftIncrease=ZERO_POINT_ZERO, rightIncrease=ZERO_POINT_ZERO, ancIncrease=ZERO_POINT_ZERO;
 	leftIncrease = OptimizeBranchLength(optPrecision, nd->left, false);
@@ -1151,7 +1162,7 @@ if(nd->nodeNum == 8){
 		else if(d1 > ZERO_POINT_ZERO && nd->dlen > knownMin) knownMin = nd->dlen;
 
 														#ifdef OPT_DEBUG			
-														opt << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
+														opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
 														#endif
 		FLOAT_TYPE abs_d1 = fabs(d1);
 		if (d2 >= ZERO_POINT_ZERO){//curvature is wrong for NR use 
