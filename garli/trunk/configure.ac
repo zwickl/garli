@@ -177,7 +177,8 @@ CXXFLAGS="$CXXFLAGS $CXXFLAGS_OPTIM_SPEED"
 #	By default, use the bundled ncl code from source, 
 #		but let the --with-ncl argument override this.
 ################################################################################
-MAYBE_NCL=""
+NCL_INC_DIR="/usr/local/include"
+NCL_LIB_DIR="/usr/local/lib"
 AC_ARG_WITH(
 	[ncl],
 	AC_HELP_STRING(
@@ -185,35 +186,31 @@ AC_ARG_WITH(
 		[Specify the root directory for ncl library (parent of the include/ncl and lib directories). Omit this flag to build and use the bundled version of ncl.]
 		),
 	[
-	if test "$withval" = "no"; then
-		AC_MSG_ERROR([The ncl library is a prerequisite.  The --with-ncl option should be used to specify the parent of the include directory where ncl was installed])
-	elif ! test "$withval" = "yes"; then
+	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
 		NCL_INC_DIR="$withval/include"
 		NCL_LIB_DIR="$withval/lib"
 	fi
-	],
-	[
-	MAYBE_NCL="ncl"
-	AC_MSG_ERROR([The ncl library is a prerequisite.  The --with-ncl option should be used to specify the parent of the include directory where ncl was installed.])
-	]
-	)
+	])
 
 if ! test -d "$NCL_INC_DIR/ncl" ; then
-	AC_MSG_ERROR([Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct. You may need to manually make the directory $NCL_INC_DIR/ncl copy all of the ncl headers into that directory if you are using NCL 2.0])
-fi
-if ! test -d "$NCL_LIB_DIR" ; then
-	AC_MSG_ERROR([Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
-fi
-
-if test -z "$MAYBE_NCL" ; 
-then
-	INCLUDE="$INCLUDE -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
-	if test -d "$NCL_LIB_DIR/ncl" ; then
-		LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR/ncl"
-	else
-		LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR"
+	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct. You may need to manually make the directory $NCL_INC_DIR/ncl copy all of the ncl headers into that directory if you are using NCL 2.0])
+else
+	if ! test -f "$NCL_INC_DIR/ncl/nxsdefs.h" ; then
+		AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct. You may need to manually make the directory $NCL_INC_DIR/ncl copy all of the ncl headers into that directory if you are using NCL 2.0])
 	fi
 fi
+
+if ! test -d "$NCL_LIB_DIR" ; then
+	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
+fi
+
+INCLUDE="$INCLUDE -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
+if test -d "$NCL_LIB_DIR/ncl" ; then
+	LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR/ncl"
+else
+	LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR"
+fi
+
 GARLI_LIBS="-lncl"
 
 
