@@ -2934,7 +2934,7 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	
 	if(conf->outputPhylipTree){//output a phylip formatted tree if desired
 		char phyname[85];
-		sprintf(phyname, "%s.tre.phy", treefname);
+		sprintf(phyname, "%s.phy", treefname);
 		ofstream phytree(phyname);
 		phytree.precision(8);
 		WritePhylipTree(phytree);
