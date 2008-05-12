@@ -1,9 +1,9 @@
 [general]
-datafname = rana.nex
+datafname = zakonEtAl2006.11tax.nex
 constraintfile = none
 streefname = stepwise
 attachmentspertaxon = 50
-ofprefix = rana.nuc.GTRIG
+ofprefix = nuc.GTRIG
 randseed = -1
 availablememory = 512
 logevery = 10
