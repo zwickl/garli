@@ -19,11 +19,17 @@ A very short guide to using non-graphical versions of GARLI:
 
 You can find sample configuration files in the example directory,
 including one already named garli.conf that is all set up to analyze
-the included 64 taxon rana.nex dataset (this should take < 30 minutes).
+the included 64 taxon rana.nex dataset (this should take between
+10 and 30 minutes, depending on the speed of your computer).
 
 You can specify configuration files to use that are not named
 garli.conf by passing them on the command line:
 ./GarliXXX myconfigurationfilename
+
+To avoid having to copy the executable into each run directory
+you can either put it somewhere in your path (OS X or linux),
+make a shortcut in the directory (Windows) or make a symbolic
+to the executable in the directory (OS X or linux)
 
 For further details, see the GARLI Manual or visit the Garli
 support webpage: http://www.nescent.org/wg/garli
