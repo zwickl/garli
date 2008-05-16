@@ -46,7 +46,7 @@ New in version 0.96
  a single config file, writing output to different output files (for example, to do
  25 bootstrap replicates simultaneously on each of 8 processors).
 9.Ability to perform nucleotide inference using any sub-model of the General
- Time-Reversible model (GTR), in addition to all of the common “named” models (K2P, HKY, etc).
+ Time-Reversible model (GTR), in addition to all of the common "named" models (K2P, HKY, etc).
 10.Speed increases for non-parametric bootstrapping
 
 Condensed summary of new model settings (for more detailed descriptions and 
