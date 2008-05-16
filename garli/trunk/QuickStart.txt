@@ -1,0 +1,34 @@
+
+A very short guide to using non-graphical versions of GARLI:
+
+1. Place the GARLI executable in the same directory as a
+ GARLI configuration file named garli.conf and a dataset to 
+ be analyzed (in Nexus, Pylip or Fasta format).
+
+2. Edit the garli.conf file in a text editor and enter the
+ name of the dataset to be analyzed on the datafname line.
+ The other lines in the configuration file can be ignored 
+ for now.
+
+3. On Windows you can then double-click the executable.  On
+ other OS's you will need to start the program from the command
+ line.  In a terminal window, get to the directory with the
+ files in it.  Start the program with 
+ ./GarliXXX
+ where the XXX will depend on the exact version of the program.
+
+You can find sample configuration files in the example directory,
+including one already named garli.conf that is all set up to analyze
+the included 64 taxon rana.nex dataset (this should take < 30 minutes).
+
+You can specify configuration files to use that are not named
+garli.conf by passing them on the command line:
+./GarliXXX myconfigurationfilename
+
+For further details, see the GARLI Manual or visit the Garli
+support webpage: http://www.nescent.org/wg/garli
+
+Have fun, and let me know of any questions, problems or feedback:
+Derrick Zwickl
+garli.support@gmail.com
+
