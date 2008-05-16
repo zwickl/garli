@@ -1,7 +1,8 @@
 
 A very short guide to using non-graphical versions of GARLI:
 
-1. Place the GARLI executable in the same directory as a
+1. Move or copy the GARLI executable (in the bin directory
+ for precompiled versions) into the same directory as a
  GARLI configuration file named garli.conf and a dataset to 
  be analyzed (in Nexus, Pylip or Fasta format).
 
@@ -16,6 +17,10 @@ A very short guide to using non-graphical versions of GARLI:
  files in it.  Start the program with 
  ./GarliXXX
  where the XXX will depend on the exact version of the program.
+
+4. Look through the output files that have been created.  They
+ contain a variety of information about the search itself as well
+ as the details of the inferred tree and model of substition.
 
 You can find sample configuration files in the example directory,
 including one already named garli.conf that is all set up to analyze
