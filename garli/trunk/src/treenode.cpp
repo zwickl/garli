@@ -515,7 +515,7 @@ void TreeNode::OutputNodeConnections(){
 			cout << nd->nodeNum << "\t";
 			nd = nd->next;
 			}
-		cout << endl;
+		cout << dlen << "\t" << endl;
 		nd = left;
 		while(nd){
 			if(nd->IsInternal())
@@ -797,4 +797,25 @@ void TreeNode::OutputBinaryNodeInfo(OUTPUT_CLASS &out) const{
 	else out.WRITE_TO_FILE(&(anc->nodeNum), sizeof(int), 1);
 	
 	out.WRITE_TO_FILE(&dlen, sizeof(FLOAT_TYPE), 1);
+	}
+
+void TreeNode::CollapseMinLengthBranches(){
+	
+	if(this->IsInternal()){
+		TreeNode *nd = left;
+		do{
+			if(FloatingPointEquals(nd->dlen, DEF_MIN_BRLEN, 1e-8) && nd->IsInternal()){
+				TreeNode *childNode = nd->left;
+				childNode->Prune();
+				AddDes(childNode);
+				//this resets the node checking to the left des of the current node
+				//when a branch is removed.  This duplicates some effort but is safe. 
+				nd = left; 
+				}
+			else 
+				nd = nd->next;
+			}while(nd);
+		left->CollapseMinLengthBranches();
+		}
+	if(next) next->CollapseMinLengthBranches();
 	}

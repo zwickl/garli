@@ -167,6 +167,9 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetBoolOption("restart", restart, true);
 	cr.GetBoolOption("writecheckpoints", checkpoint, true);
 
+	if((restart || checkpoint) && collapseBranches)
+		throw ErrorException("Sorry, the collapsebranches option can not currently be used with checkpointing");
+
 	cr.GetUnsignedNonZeroOption("searchreps", searchReps, true);
 	cr.GetUnsignedOption("runmode", runmode, true);
 

@@ -75,6 +75,7 @@ class TreeNode{
 		void FlipBlensToRoot(TreeNode *from);
 		void FlipBlensToNode(TreeNode *from, TreeNode *stopNode);
 		void RecursivelyAddOrRemoveSubtreeFromBipartitions(const Bipartition &subtree);
+		void CollapseMinLengthBranches();
 
 		//misc functions
 		char *MakeNewick(char *s, bool internalNodes, bool branchLengths, bool highPrec=false) const;
