@@ -897,6 +897,13 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	if(_stricmp(conf->streefname.c_str(), "stepwise") == 0){
 		if(Tree::constraints.empty()) outman.UserMessage("creating likelihood stepwise addition starting tree...");
 		else outman.UserMessage("creating likelihood stepwise addition starting tree (compatible with constraints)...");
+		//5/20/08 If we're making a stepwise tree, we depend on the extern globalBest being zero to keep the optimization
+		//during the stepwise creation to be localized to just the three branches (the radius optimization only happens if
+		//the lnL of created tree is within a threshold of the global best).  Having global best = zero effectively turns
+		//off all radius opt.  There was a bug here because it wasn't getting reset before starting search reps after the 
+		//first.  This caused the stepwise to be slow, and to not be reproducible when the seed from a rep > 1 was specified
+		//as the initial seed for a new run
+		globalBest = ZERO_POINT_ZERO;
 		indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 		}
 	else if(_stricmp(conf->streefname.c_str(), "random") == 0 || indiv[0].treeStruct == NULL){
@@ -1683,7 +1690,17 @@ int Population::EvaluateStoredTrees(bool report){
 		for(unsigned r=0;r<storedTrees.size();r++){
 			unsigned r2;
 			for(r2=0;r2<r;r2++){
-				if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)) break;
+				if(conf->collapseBranches){
+					//DEBUG **** I don't think that this is working right currently 5/20/08 ****
+					//The IdenticalTopologyAllowingRerooting function really expects fully bifurcating trees, so
+					//if one tree contains all of the branches of the other plus some extra then it will return
+					//true.  Just doing the reverse comparison should take care of that
+					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)
+						&& storedTrees[r2]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r]->treeStruct->root))
+						break;
+					}
+				else
+					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)) break;
 				}
 			if(r == bestRep) outman.UserMessageNoCR("Replicate %d : %.4f (best)", r+1, storedTrees[r]->Fitness());
 			else outman.UserMessageNoCR("Replicate %d : %.4f       ", r+1, storedTrees[r]->Fitness());
@@ -1840,6 +1857,8 @@ void Population::PerformSearch(){
 			indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
 			if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
 			Individual *repResult = new Individual(&indiv[bestIndiv]);
+			if(conf->collapseBranches)
+				repResult->treeStruct->root->CollapseMinLengthBranches();
 			storedTrees.push_back(repResult);
 			}
 		else{
