@@ -501,6 +501,22 @@ void Tree::RandomizeBranchLengths(FLOAT_TYPE lowLimit, FLOAT_TYPE highLimit){
 	MakeAllNodesDirty();
 	}
 
+void Tree::RandomizeBranchLengthsExponential(FLOAT_TYPE lambda){
+
+	for(int i=1;i<numNodesTotal;i++){
+		allNodes[i]->dlen = rnd.exponential(lambda);
+		}
+/*
+	FLOAT_TYPE low = log(lowLimit);
+	FLOAT_TYPE high = log(highLimit);
+	FLOAT_TYPE range = high - low;
+	for(int i=1;i<numNodesTotal;i++){
+		allNodes[i]->dlen = exp(low + rnd.uniform() * range);
+		}
+*/
+	MakeAllNodesDirty();
+	}
+
 void Tree::ScaleWholeTree(FLOAT_TYPE factor/*=-1.0*/){
 	if(factor==-1.0) factor = rnd.gamma( Tree::alpha );
 	//9-12-06 Stupid!  Why the hell was this only scaling the internals?

@@ -74,6 +74,14 @@ class rng
 			assert(g > 0.0);
 			return g;
 			}
+		FLOAT_TYPE gamma_two_param(FLOAT_TYPE alpha, FLOAT_TYPE beta){
+			FLOAT_TYPE g=-1;
+			do{
+				g = (FLOAT_TYPE)( ppchi2( uniform(), (FLOAT_TYPE)2.0*alpha ) / (FLOAT_TYPE)(2.0*beta) );
+				}while( g < 0.0);
+			assert(g > 0.0);
+			return g;
+			}
 		//DZ 11-3-02 addition
 		int random_binomial(int n, FLOAT_TYPE p);
 		void DirichletRandomVariable (FLOAT_TYPE *alp, FLOAT_TYPE *z, int n);

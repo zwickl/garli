@@ -288,6 +288,7 @@ class Tree{
 		//odds and ends
 		void PerturbAllBranches();
 		void RandomizeBranchLengths(FLOAT_TYPE lowLimit, FLOAT_TYPE highLimit);
+		void RandomizeBranchLengthsExponential(FLOAT_TYPE lambda);
 		int NodeToNodeDistance(int num1, int num2);
 		int NodesToRoot(TreeNode *nd);
 		void SampleBlenCurve(TreeNode *nd, ofstream &out);

@@ -373,8 +373,10 @@ int main( int argc, char* argv[] )	{
 			if(conf.runmode != 0){
 				if(conf.runmode == 1)
 					pop.ApplyNSwaps(10);
-				if(conf.runmode == 7)
-					pop.VariableStartingTreeOptimization();
+				else if(conf.runmode == 7)
+					pop.VariableStartingTreeOptimization(false);
+				else if(conf.runmode == 9)
+					pop.VariableStartingTreeOptimization(true);
 				else if(conf.runmode == 8){
 #ifdef OPEN_MP
 					throw ErrorException("can't estimate site rates in openmp version!");
