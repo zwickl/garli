@@ -540,7 +540,6 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 	//improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, goodGuess);
 	//abandoning use of goodGuess.  Doesn't seem to be reducing opt passes, which
 	//was the point.
-	//optCalcs++;
 	ProfNewton.Start();
 	improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, true);
 	ProfNewton.Stop();
@@ -1118,6 +1117,7 @@ if(nd->nodeNum == 8){
 			try{
 				scoreOK=true;
 				derivs = CalcDerivativesRateHet(nd->anc, nd);
+				optCalcs++;
 				if(iter == 0) initialL = lnL;
 				}catch(int err){
 				scoreOK=false;
@@ -1298,6 +1298,17 @@ if(nd->nodeNum == 8){
 														opt << "IgnoreNRUp\t";
 														#endif
 							}
+						else if(iter == 30){
+							//another annoying special case (only for codon models I think)
+							//it is possible for the derivs to apparently be
+							//correct but for the NR estimate to still be so conservative that it takes forever
+							//to converge.  The above code can take care of that if we've never been to the right
+							//of the peak (knownMax == max_brlen), but this can also happen if we were to right 
+							//of the peak at one point and jumped all the way to the min length.  In that case,
+							//try a one time jump to the midpoint of the bracket or 100x the current length, 
+							//whichever is less
+							v = min((v + knownMax)*0.5, v*100.0);
+							}
 						}
 					else{
 						if(FloatingPointEquals(knownMin, min_brlen, 1e-8)){
@@ -1463,7 +1474,7 @@ opt.flush();
 			deb.close();
 */
 			if(iter == 51) outman.UserMessage("Notice: possible problem with branchlength optimization.\nIf you see this message frequently, please report it to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum);	
-			if(iter > 75)
+			if(iter > 100)
 				throw(ErrorException("Problem with branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
 /*
 				ofstream scr("NRcurve.log");

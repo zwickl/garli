@@ -97,11 +97,11 @@ FLOAT_TYPE globalBest;
 
 #undef MASTER_DOES_SUBTREE
 
-#undef VARIABLE_OPTIMIZATION
+//#undef VARIABLE_OPTIMIZATION
 
 #undef DETAILED_SWAP_REPORT
 
-#undef NO_EVOLUTION
+#define NO_EVOLUTION
 
 bool output_tree=false;
 
@@ -1317,7 +1317,7 @@ void Population::Run(){
 	optCalcs=0;
 
 #ifdef VARIABLE_OPTIMIZATION
-	var << "type\tdist\tinitlnL\tnoBail.01\tnoBail.5\t3B.01\t3B.5\tdef.01\tdefdef\n";
+//	var << "type\tdist\tinitlnL\tnoBail.01\tnoBail.5\t3B.01\t3B.5\tdef.01\tdefdef\n";
 #endif
 
 /*	if(conf->restart == false){
@@ -2005,95 +2005,182 @@ void Population::PerformSearch(){
 	ClearStoredTrees();
 	}
 
-void Population::VariableStartingTreeOptimization(){
+void Population::VariableStartingTreeOptimization(bool reducing){
 	currentSearchRep = 1;
 	SeedPopulationWithStartingTree(currentSearchRep);
 	InitializeOutputStreams();
 	
-	ofstream out("variable.log");
-	out << "rep\t";
+	string filename = conf->ofprefix + ".var.log";
+	ofstream out(filename.c_str());
+	out.precision(10);
+
+	filename = conf->ofprefix + ".randblens.tre";
+	ofstream randTrees(filename.c_str());
+	data->BeginNexusTreesBlock(randTrees);
+
+	filename = conf->ofprefix + ".optblens.tre";
+	ofstream optTrees(filename.c_str());
+	data->BeginNexusTreesBlock(optTrees);
 
 	typedef vector<double> doubvec;
-	vector<doubvec> scores;
+	//this is a vector of vectors, with each entry in the higher level vector being a vector
+	//with all of the final rep scores for a given precision 
+	vector<doubvec> finalScores;
 
 	typedef vector<int> intvec;
-	vector<intvec> passes;
+	//vector of vectors, number of passes per rep per prec
+	vector<intvec> numPasses;
 
-	double prec[12] = {0.0001, 0.0, 0.4, 0.3, 0.2, 0.1, 0.05, 0.025, 0.01, 0.005, 0.001, 0.0};
-	//double prec[4] = {0.00125, -1.0, -1.0, -1.0};
-	int numReps = 5;
+	vector<intvec> numDerivCalcs;
+
+	//a triple vector, with the branch lengths for each branch, rep and prec
+	typedef vector<doubvec> doubdoubvec;
+	vector<doubdoubvec> allBlens;
+
+	vector<double> prec;
+
+	//get the precision values to use from the arbitrarystring entry in the config file
+	stringstream s;
+	s.str(conf->arbitraryString);
+	string p;
+	while(!s.eof()){
+		s >> p;
+		double x = atof(p.c_str());
+		prec.push_back(x);
+		}
+
+	int numReps = conf->searchReps;
 	double prec1;
+	int numNodes = indiv[0].treeStruct->getNumNodesTotal();
+	for(int rep = 0;rep < numReps;rep++){
+		//for each rep, rerandomize the branch lengths and output the tree
+		indiv[0].treeStruct->RandomizeBranchLengthsExponential(conf->gammaShapeBrlen);
+		indiv[0].treeStruct->root->MakeNewick(treeString, false, true, false);
+		randTrees << "tree r" << rep << " = [&U] " << treeString << ";\n";
+		//store this randomization
+		indiv[1].CopySecByRearrangingNodesOfFirst(indiv[1].treeStruct, &indiv[0], true);
 
-	//indiv[0].treeStruct->RandomizeBranchLengths(1.0e-8, .5);
-	Individual tempIndiv;
-	tempIndiv.treeStruct=new Tree();
-	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &indiv[0]);	
+		indiv[0].SetDirty();
+		indiv[0].CalcFitness(0);
+		double imp = 999.9;
+		double prevScore = indiv[0].Fitness();
+//		outman.UserMessage("%f\t%f\t", prec[p], indiv[0].Fitness());
 
-	for(int p=0;prec[p] > 0.0;p++){
-		doubvec thisPrec;
-		intvec thisPasses;
-		for(int rep = 0;rep < numReps;rep++){
-			indiv[0].treeStruct->RandomizeBranchLengths(1.0e-8, .5);
-			indiv[0].SetDirty();
-			indiv[0].CalcFitness(0);
-			double imp = 999.9;
-			double prevScore = indiv[0].Fitness();
-			cout << prec[p] << "\t" << indiv[0].Fitness() << "\t" ;
+		for(int precNum=0;precNum < prec.size() && (!reducing || (reducing && precNum < 1)) ;precNum++){
+			prec1 = prec[precNum];
+
 			int pass=0;
+			prevScore = indiv[0].Fitness();
+			outman.UserMessage("%f\t%d", indiv[0].Fitness(), pass);
 			do{
-				if(pass==0) prec1 = 1.0;
-				else prec1 = max(prec[p], prec1 * 0.7);
-//				optCalcs = 0;
-/*				double start = indiv[0].Fitness();
-				for(int b=1;b<997;b++){
-					double len = indiv[0].treeStruct->allNodes[b]->dlen;
-					indiv[0].treeStruct->SetBranchLength(indiv[0].treeStruct->allNodes[b], 1.0);
-					indiv[0].treeStruct->NewtonRaphsonOptimizeBranchLength(0.0001, indiv[0].treeStruct->allNodes[b], false);
-					indiv[0].SetDirty();
-					indiv[0].CalcFitness(0);					
-					out << b << "\t" << indiv[0].Fitness() - start << endl;
-					indiv[0].treeStruct->SetBranchLength(indiv[0].treeStruct->allNodes[b], len);
-					}
-*/				indiv[0].treeStruct->OptimizeAllBranches(prec1);
+				if(reducing) prec1 = prec[min(pass, prec.size()-1)];
+				indiv[0].treeStruct->OptimizeAllBranches(prec1);
 				indiv[0].SetDirty();
 				indiv[0].CalcFitness(0);
-//				out.close();
-				indiv[0].treeStruct->OptimizeTreeScale(prec1);
-				indiv[0].SetDirty();
-				indiv[0].CalcFitness(0);
+//				indiv[0].treeStruct->OptimizeTreeScale(prec1);
+
 				imp = indiv[0].Fitness() - prevScore;
 				prevScore = indiv[0].Fitness();
-//				out << indiv[0].Fitness() << "\t" << prec1 << "\t" << optCalcs << endl;
-				cout << indiv[0].Fitness() << "\t" << prec1 << "\t" << optCalcs << endl;
+				outman.UserMessage("%f\t%f\t%d", indiv[0].Fitness(), prec1, optCalcs);
 				pass++;
-				AppendTreeToTreeLog(0, 0);
-				out << indiv[0].Fitness() << endl;
-				for(int b=1;b<997;b++) out << b << "\t" << indiv[0].treeStruct->allNodes[b]->dlen << endl;
-				out << endl;
-			}while(imp > prec[p] || prec1 > prec[p]);
-			cout << "\n" << indiv[0].Fitness() << "\t" << pass << endl;
-			//AppendTreeToTreeLog(0, 0);
-			thisPrec.push_back(indiv[0].Fitness());
-			thisPasses.push_back(pass);
-			indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, &tempIndiv, true);
+				}while(imp > prec1 || pass < prec.size());
+			outman.UserMessage("%f\t%d\n", indiv[0].Fitness(), pass);
+			if(rep == 0){
+				doubvec scoreTemp;
+				scoreTemp.push_back(indiv[0].Fitness());
+				finalScores.push_back(scoreTemp);
+				intvec passTemp;
+				passTemp.push_back(pass);
+				numPasses.push_back(passTemp);
+				intvec calcsTemp;
+				calcsTemp.push_back(optCalcs);
+				numDerivCalcs.push_back(calcsTemp);
+				doubvec tempBlens;
+				doubdoubvec tempBlens2;
+				for(int b=1;b<numNodes;b++) tempBlens.push_back(indiv[0].treeStruct->allNodes[b]->dlen);
+				tempBlens2.push_back(tempBlens);
+				allBlens.push_back(tempBlens2);
+				}
+			else{
+				finalScores[precNum].push_back(indiv[0].Fitness());
+				numPasses[precNum].push_back(pass);
+				numDerivCalcs[precNum].push_back(optCalcs);
+				doubvec tempBlens;
+				for(int b=1;b<numNodes;b++) tempBlens.push_back(indiv[0].treeStruct->allNodes[b]->dlen);
+				allBlens[precNum].push_back(tempBlens);
+				}
+			indiv[0].treeStruct->root->MakeNewick(treeString, false, true, false);
+			optTrees << "tree p" << prec1 << ".r" << rep << " = [&U] " << treeString << ";\n";
+			//restore the randomization
+			indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, &indiv[1], true);
+			indiv[0].SetDirty();
+			indiv[0].CalcFitness(0);
+	//		scoresThisPrec.push_back(indiv[0].Fitness());
+//			passesThisPrec.push_back(pass);
+//			derivCalcsThisPrec.push_back(optCalcs);
+//			for(int b=1;b<numNodes;b++) blensThisRep.push_back(indiv[0].treeStruct->allNodes[b]->dlen);
+//			blensThisPrec.push_back(blensThisRep);
+//			blensThisRep.clear();
+			optCalcs = 0;
+			//indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, &tempIndiv, true);
 			}
-		scores.push_back(thisPrec);
-		passes.push_back(thisPasses);
-		thisPrec.clear();
-		thisPasses.clear();
-		out << prec[p] << "\t";
+//		finalScores.push_back(scoresThisPrec);
+//		numPasses.push_back(passesThisPrec);
+//		numDerivCalcs.push_back(derivCalcsThisPrec);
+//		allBlens.push_back(blensThisPrec);
+//		AppendTreeToTreeLog(0, 0);
+//		scoresThisPrec.clear();
+//		passesThisPrec.clear();
+//		derivCalcsThisPrec.clear();
+//		blensThisPrec.clear();
+//		out << prec[p] << "\t";
 		}
-	out << "\n";
-	for(int rep = 0;rep < numReps;rep++){
-		out << "rep" << rep << "\t";
-		for(vector<doubvec>::iterator it = scores.begin();it != scores.end();it++){
-			out << (*it)[rep] << "\t";
-			}
-		for(vector<intvec>::iterator it = passes.begin();it != passes.end();it++){
-			out << (*it)[rep] << "\t";
-			}
-		out << "\n";
+//	out << "\n";
+	for(int precNum = 0;precNum < finalScores.size();precNum++){
+		for(int rep = 0;rep < finalScores[precNum].size();rep++){
+//			for(vector<doubvec>::iterator it = finalScores.begin();it != scores.end();it++){
+			
+			out << prec[precNum] << "\t" << rep << "\t" << finalScores[precNum][rep] << "\t" << numPasses[precNum][rep] << "\t" << numDerivCalcs[precNum][rep] << endl;
+
+/*			for(vector<doubvec>::iterator it = scores.begin();it != scores.end();it++){
+				out << (*it)[rep] << "\t";
+				}
+			for(vector<intvec>::iterator it = passes.begin();it != passes.end();it++){
+				out << (*it)[rep] << "\t";
+				}
+			out << "\n";
+*/			}
 		}
+
+
+	ofstream blens;
+	for(int precNum = 0;precNum < finalScores.size();precNum++){
+		char filename[100];
+		if(reducing)
+			sprintf(filename, "blens.%s.final.log", conf->ofprefix.c_str());
+		else
+			sprintf(filename, "blens.%s.%f.log", conf->ofprefix.c_str(), prec[precNum]);
+		blens.open(filename);
+		blens << "branch#\tfullyOpt\treps...\n";
+		//careful here - the number of nodes includes the root, which has no blen and wasn't put into the 
+		//blen vector. So, the indexing is [actualNodeNum - 1]
+		for(int bnum=0;bnum<numNodes - 1;bnum++){
+			blens << bnum+1 << "\t";
+			//toss in the blens for one of the reps for the final prec, which we assume will be fully optimal
+			blens << allBlens[allBlens.size()-1][0][bnum] << "\t";
+			for(int rep = 0;rep < finalScores[precNum].size();rep++){
+				blens << allBlens[precNum][rep][bnum] << "\t";
+				}
+			blens << endl;
+			}
+		blens.close();
+		}
+
+	randTrees << "end;\n";
+	optTrees << "end;\n";
+	randTrees.close();
+	optTrees.close();
+
 	FinalizeOutputStreams(0);
 	FinalizeOutputStreams(1);
 	FinalizeOutputStreams(2);
