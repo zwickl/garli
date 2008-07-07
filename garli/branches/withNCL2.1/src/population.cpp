@@ -2073,7 +2073,7 @@ void Population::VariableStartingTreeOptimization(bool reducing){
 			prevScore = indiv[0].Fitness();
 			outman.UserMessage("%f\t%d", indiv[0].Fitness(), pass);
 			do{
-				if(reducing) prec1 = prec[min(pass, prec.size()-1)];
+				if(reducing) prec1 = prec[min(pass, (int)prec.size()-1)];
 				indiv[0].treeStruct->OptimizeAllBranches(prec1);
 				indiv[0].SetDirty();
 				indiv[0].CalcFitness(0);
