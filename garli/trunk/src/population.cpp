@@ -101,7 +101,7 @@ FLOAT_TYPE globalBest;
 
 #undef DETAILED_SWAP_REPORT
 
-#define NO_EVOLUTION
+#undef NO_EVOLUTION
 
 bool output_tree=false;
 
