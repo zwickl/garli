@@ -375,7 +375,6 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 		if((d11 - d12) == ZERO_POINT_ZERO || (d11 > ZERO_POINT_ZERO && d12 < ZERO_POINT_ZERO) || (d11 < ZERO_POINT_ZERO && d12 > ZERO_POINT_ZERO)){
 			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);;
 			MakeAllNodesDirty();
-			double poo = prev - start;
 			lnL = prev;
 			return prev-start;
 			}
@@ -825,7 +824,6 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 	//nd1 and nd2 are the nodes on either side of the branch of interest
 	//nd1 will always be the "lower" one, and will always be internal, while
 	//nd2 can be internal or terminal
-	int nsites=data->NChar();
 	const CondLikeArray *claOne;
 	if(nd1->left == nd2)
 		claOne=GetClaUpLeft(nd1, true);

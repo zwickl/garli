@@ -356,7 +356,6 @@ FLOAT_TYPE RandomDouble(FLOAT_TYPE lb, FLOAT_TYPE ub)	{
 //This version takes a node pointer and optimizes blens
 int mnbrak(FLOAT_TYPE *ax, FLOAT_TYPE *bx, FLOAT_TYPE *cx, FLOAT_TYPE *fa, FLOAT_TYPE *fb, FLOAT_TYPE *fc, FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE), TreeNode *thisnode, Tree *thistree){
 	FLOAT_TYPE ulim, u, r, q, fu;
-	bool limited=false;
 	
 //	ofstream brak("brakdebug.log", ios::app);
 //	brak.precision(10);
@@ -554,8 +553,7 @@ FLOAT_TYPE brent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE (*f)(Tr
 int DZbrak(FLOAT_TYPE *worstOuter, FLOAT_TYPE *mid, FLOAT_TYPE *bestOuter, FLOAT_TYPE *worstOuterL, FLOAT_TYPE *midL, FLOAT_TYPE *bestOuterL, FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree){
 	//points are always passed in such that worstOuter < mid < bestOuter
 	FLOAT_TYPE nextTry, r, q, nextTryL, dum;
-	bool tryPara=true, possibleZeroMLE=false;
-	int numAttemptsWithBestAtMin=0;
+	bool possibleZeroMLE=false;
 
 	*worstOuterL=(*func)(thisnode, thistree, *worstOuter, true);
 	if(*midL<0)
