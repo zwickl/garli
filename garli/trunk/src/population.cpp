@@ -611,7 +611,6 @@ void Population::Reset(){
 	}
 
 void Population::ApplyNSwaps(int numSwaps){
-	double optPrecision = 0.01;
 
 	Individual *ind0 = &newindiv[0];
 
@@ -1635,7 +1634,6 @@ void Population::FinalOptimization(){
 		}while(incr > .00001 || pass < 10);
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	unsigned totalSecs = stopwatch.SplitTime();
-	unsigned s = totalSecs;
 	unsigned secs = totalSecs % 60;
 	totalSecs -= secs;
 	unsigned min = (totalSecs % 3600)/60;

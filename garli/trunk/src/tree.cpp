@@ -1292,7 +1292,6 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 
 	TreeNode *cut;
 	int swapNum=0;
-	double bestScore = -FLT_MAX;
 	
 	Individual tempIndiv;
 	tempIndiv.treeStruct=new Tree();
@@ -1577,7 +1576,6 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 
 	TreeNode *cut;
 	int swapNum=0;
-	double bestScore = -FLT_MAX;
 	
 	Individual tempIndiv;
 	tempIndiv.treeStruct=new Tree();
@@ -2101,7 +2099,6 @@ void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNo
 			if(thisList.size() != 0){
 				listIt it=thisList.begin();
 				do{
-					TreeNode* broken=allNodes[it->nodeNum];
 					//if(AllowedByConstraint(&(*conit), cut, broken, scratch) == false) it=thisList.RemoveElement(it);
 					if(SwapAllowedByConstraint((*conit), cut, &*it, scratch, partialMask) == false) it=thisList.RemoveElement(it);
 					else it++;
@@ -2237,7 +2234,6 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, int s
 	TreeNode* cut = allNodes[cutnum];
 	TreeNode *broken = allNodes[broke->nodeNum];
 	TreeNode *connector=NULL;
-	TreeNode* prunePoint=NULL;
 	TreeNode *sib;
 	//note that this assignment of the sib can be overridden below if cut is attached to the root or the subtreeNode
 	if(cut->next!=NULL) sib=cut->next;
@@ -2995,7 +2991,7 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 		madvise(destination, sizeof(FLOAT_TYPE)*4*nRateCats*nsites, MADV_SEQUENTIAL);
 		madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
 #endif
-		FLOAT_TYPE small1, large1, small2, large2;
+		FLOAT_TYPE large1, large2;
 		for(int i=0;i<nsites;i++){
 #ifdef USE_COUNTS_IN_BOOT
 			if(c[i] > 0){
@@ -3008,13 +3004,9 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 				small1 = FLT_MAX;
 				large1 = FLT_MIN;
 				for(int r=0;r<nRateCats;r++){
-					small2 = min(destination[4*r+0] , destination[4*r+1]);
 					large2= max(destination[4*r+0] , destination[4*r+1]);
-					small2 = min(small2 , destination[4*r+2]);
 					large2 = max(large2 , destination[4*r+2]);
-					small2 = min(small2 , destination[4*r+3]);
 					large2 = max(large2 , destination[4*r+3]);
-					small1 = min(small1, small2);
 					large1 = max(large1, large2);
 					}
 
@@ -3037,31 +3029,22 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 						}
 					}
 	#else
-
-//				small1= (destination[0] < destination[2] ? destination[0] : destination[2]);
 				large1= (destination[0] > destination[2] ? destination[0] : destination[2]);
-//				small2= (destination[1] < destination[3] ? destination[1] : destination[3]);
 				large2= (destination[1] > destination[3] ? destination[1] : destination[3]);
-//				small1 = (small1 < small2 ? small1 : small2);
 				large1= (large1 > large2 ? large1 : large2);
 
 				for(int r=1;r<nRateCats;r++){
-//					small2= (destination[0 + r*4] < destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
 					large2= (destination[0 + r*4] > destination[2 + r*4] ? destination[0 + r*4] : destination[2 + r*4]);
-//					small1 = (small1 < small2 ? small1 : small2);
 					large1= (large1 > large2 ? large1 : large2);				
-//					small2= (destination[1 + r*4] < destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
 					large2= (destination[1 + r*4] > destination[3 + r*4] ? destination[1 + r*4] : destination[3 + r*4]);
-//					small1 = (small1 < small2 ? small1 : small2);
 					large1= (large1 > large2 ? large1 : large2);	
-					}			
-//				assert(FloatingPointEquals(l1, large1, 1e-8));
+					}
 	#endif
 #endif
 #ifdef SINGLE_PRECISION_FLOATS
 				assert(large1 < 1e5);
 				if(large1 < rescaleBelow){
-					if(large1 < 1e-30f){
+					if(large1 < 1e-30f){//DEBUG
 						outman.UserMessage("RESCALE REDUCED");
 						throw(1);
 						}
@@ -3143,8 +3126,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 	madvise(destination, sizeof(FLOAT_TYPE)*nstates*nRateCats*nsites, MADV_SEQUENTIAL);
 	madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
 #endif
-	bool reduceRescale=false;
-	FLOAT_TYPE small1, large1;
+	FLOAT_TYPE large1;
 	for(int i=0;i<nsites;i++){
 #ifdef USE_COUNTS_IN_BOOT
 		if(c[i] > 0){
@@ -3171,10 +3153,8 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 				}
 #else
 			
-	//		small1 = (destination[0] < destination[1]) ? destination[0] :  destination[1];
 			large1 = (destination[0] > destination[1]) ? destination[0] :  destination[1];
 			for(int s=2;s<nstates*nRateCats;s++){
-	//			small1 = (destination[s] < small1) ? destination[s] : small1;
 				large1 = (destination[s] > large1) ? destination[s] : large1;
 				}
 #endif
@@ -3253,7 +3233,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 
 	assert(this != NULL);
 	calcCount++;
-	int nsites = data->NChar();
 
 	CondLikeArray *destCLA=NULL;
 
@@ -3386,7 +3365,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		//only change one of the branches again and again.
 		TreeNode *child;
 		CondLikeArray *childCLA=NULL;
-		int *childUnderMult=NULL;
 		
 		if(claMan->IsDirty(nd->claIndexUL) == false){
 			partialCLA=GetClaUpLeft(nd, false);
@@ -6847,7 +6825,6 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 	//need to divide by this count to get the proper site like
 	FLOAT_TYPE siteCount = (FLOAT_TYPE) data->Count(0);
 	Score();
-	FLOAT_TYPE start=lnL/siteCount;
 	FLOAT_TYPE prev=lnL/siteCount;
 	FLOAT_TYPE cur;
 	FLOAT_TYPE scale;

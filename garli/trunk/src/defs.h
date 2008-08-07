@@ -74,7 +74,7 @@
 
 #undef EQUIV_CALCS
 
-typedef double MODEL_FLOAT
+typedef double MODEL_FLOAT;
 
 #ifdef SINGLE_PRECISION_FLOATS
 	typedef float FLOAT_TYPE;

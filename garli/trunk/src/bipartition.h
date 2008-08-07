@@ -469,7 +469,6 @@ class Bipartition{
 		string left = "(";
 		string right = "(";
 		char temp[100];
-		int lastLeft=-1, lastRight=-1;
 		if(mask != NULL){
 			for(int i=0;i<nBlocks;i++){
 				unsigned int t=rep[i];
