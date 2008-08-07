@@ -109,6 +109,13 @@ Model::~Model(){
 	Delete3DArray(tempqmat);
 	Delete3DArray(deriv1);
 	Delete3DArray(deriv2);
+
+	#ifdef SINGLE_PRECISION_FLOATS
+	Delete3DArray(fpmat1);
+	Delete3DArray(fpmat2);	
+	Delete3DArray(fderiv1);
+	Delete3DArray(fderiv2);
+	#endif
 #else
 	Delete2DAlignedArray(eigvecs);
 	Delete2DAlignedArray(teigvecs);
@@ -124,32 +131,41 @@ Model::~Model(){
 void Model::AllocateEigenVariables(){
 #ifndef ALIGN_MODEL
 	//a bunch of allocation here for all of the qmatrix->eigenvector->pmatrix related variables
-	eigvalsimag=new FLOAT_TYPE[nstates];
+	eigvalsimag=new MODEL_FLOAT[nstates];
 	iwork=new int[nstates];
-	work=new FLOAT_TYPE[nstates];
-	col=new FLOAT_TYPE[nstates];
+	work=new MODEL_FLOAT[nstates];
+	col=new MODEL_FLOAT[nstates];
 	indx=new int[nstates];
-	EigValexp=new FLOAT_TYPE[nstates*NRateCats()];
-	EigValderiv=new FLOAT_TYPE[nstates*NRateCats()];
-	EigValderiv2=new FLOAT_TYPE[nstates*NRateCats()];
+	EigValexp=new MODEL_FLOAT[nstates*NRateCats()];
+	EigValderiv=new MODEL_FLOAT[nstates*NRateCats()];
+	EigValderiv2=new MODEL_FLOAT[nstates*NRateCats()];
 
 	//create the matrix for the eigenvectors
-	eigvecs=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	eigvecs=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
 
 	//create a temporary matrix to hold the eigenvectors that will be destroyed during the invertization
-	teigvecs=New2DArray<FLOAT_TYPE>(nstates,nstates);
+	teigvecs=New2DArray<MODEL_FLOAT>(nstates,nstates);
 
 	//create the matrix for the inverse eigenvectors
-	inveigvecs=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);	
+	inveigvecs=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);	
 
 	//allocate the pmats
-	pmat1=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
-	pmat2=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	pmat1=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
+	pmat2=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
+	
+#ifdef SINGLE_PRECISION_FLOATS
+	//allocate single precision versions of the matrices
+	fpmat1=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	fpmat2=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	fderiv1=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	fderiv2=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+
+#endif
 	
 	//it is actually less efficient to precalc the c_ijk for codon models due to the immense
 	//size of the matrix.  So don't allocate it at all.
 	if(modSpec.IsCodon() == false){
-		c_ijk=New2DArray<FLOAT_TYPE>(1,nstates*nstates*nstates);
+		c_ijk=New2DArray<MODEL_FLOAT>(1,nstates*nstates*nstates);
 		}
 	else c_ijk = NULL;
 
@@ -157,50 +173,50 @@ void Model::AllocateEigenVariables(){
 	//if this is a model with multiple qmats (like multi-omega models or mixtures)
 	//it needs to be bigger
 	if(modSpec.IsNonsynonymousRateHet() == false){
-		qmat=New3DArray<FLOAT_TYPE>(1, nstates,nstates);
-		tempqmat=New3DArray<FLOAT_TYPE>(1, nstates,nstates);
+		qmat=New3DArray<MODEL_FLOAT>(1, nstates,nstates);
+		tempqmat=New3DArray<MODEL_FLOAT>(1, nstates,nstates);
 		blen_multiplier = new FLOAT_TYPE[1];
-		eigvals=New2DArray<FLOAT_TYPE>(1, nstates);//eigenvalues
+		eigvals=New2DArray<MODEL_FLOAT>(1, nstates);//eigenvalues
 		}
 	else{
-		qmat=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
-		tempqmat=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+		qmat=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
+		tempqmat=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
 		blen_multiplier = new FLOAT_TYPE[NRateCats()];
-		eigvals=New2DArray<FLOAT_TYPE>(NRateCats(), nstates);//eigenvalues
+		eigvals=New2DArray<MODEL_FLOAT>(NRateCats(), nstates);//eigenvalues
 		}
 
-	deriv1=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
-	deriv2=New3DArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	deriv1=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
+	deriv2=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
 #else
 
 	//a bunch of allocation here for all of the qmatrix->eigenvector->pmatrix related variables
-	eigvals=new FLOAT_TYPE[nstates];//eigenvalues
-	eigvalsimag=new FLOAT_TYPE[nstates];
+	eigvals=new MODEL_FLOAT[nstates];//eigenvalues
+	eigvalsimag=new MODEL_FLOAT[nstates];
 	iwork=new int[nstates];
-	work=new FLOAT_TYPE[nstates];
-	col=new FLOAT_TYPE[nstates];
+	work=new MODEL_FLOAT[nstates];
+	col=new MODEL_FLOAT[nstates];
 	indx=new int[nstates];
-	c_ijk=new FLOAT_TYPE[nstates*nstates*nstates];	
-	EigValexp=new FLOAT_TYPE[nstates*NRateCats()];	
+	c_ijk=new MODEL_FLOAT[nstates*nstates*nstates];	
+	EigValexp=new MODEL_FLOAT[nstates*NRateCats()];	
 
 	//create the matrix for the eigenvectors
-	eigvecs=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);
+	eigvecs=New2DAlignedArray<MODEL_FLOAT>(nstates,nstates);
 
 	//create a temporary matrix to hold the eigenvectors that will be destroyed during the invertization
-	teigvecs=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);
+	teigvecs=New2DAlignedArray<MODEL_FLOAT>(nstates,nstates);
 
 	//create the matrix for the inverse eigenvectors
-	inveigvecs=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);	
+	inveigvecs=New2DAlignedArray<MODEL_FLOAT>(nstates,nstates);	
 
 	//allocate the pmat
-	pmat=New3DAlignedArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	pmat=New3DAlignedArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
 
 	//allocate qmat and tempqmat
-	qmat=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);
-	tempqmat=New2DAlignedArray<FLOAT_TYPE>(nstates,nstates);
+	qmat=New2DAlignedArray<MODEL_FLOAT>(nstates,nstates);
+	tempqmat=New2DAlignedArray<MODEL_FLOAT>(nstates,nstates);
 
-	deriv1=New3DAlignedArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
-	deriv2=New3DAlignedArray<FLOAT_TYPE>(NRateCats(), nstates, nstates);
+	deriv1=New3DAlignedArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
+	deriv2=New3DAlignedArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
 #endif
 	}
 
@@ -243,7 +259,7 @@ void Model::UpdateQMat(){
 		}
 		
 	//set diags to sum rows to 0
-	FLOAT_TYPE sum;
+	MODEL_FLOAT sum;
 	for(int x=0;x<nstates;x++){
 		sum=ZERO_POINT_ZERO;
 		for(int y=0;y<nstates;y++){
@@ -646,21 +662,27 @@ void Model::CalcEigenStuff(){
 	UpdateQMat();
 	
 	int effectiveModels = modSpec.IsNonsynonymousRateHet() ? NRateCats() : 1;
-	memcpy(**tempqmat, **qmat, effectiveModels*nstates*nstates*sizeof(FLOAT_TYPE));
+	memcpy(**tempqmat, **qmat, effectiveModels*nstates*nstates*sizeof(MODEL_FLOAT));
 	for(int m=0;m<effectiveModels;m++){
 		EigenRealGeneral(nstates, tempqmat[m], &eigvals[m][0], eigvalsimag, eigvecs[m], iwork, work);
 
-		memcpy(*teigvecs, *eigvecs[m], nstates*nstates*sizeof(FLOAT_TYPE));
+		memcpy(*teigvecs, *eigvecs[m], nstates*nstates*sizeof(MODEL_FLOAT));
 		InvertMatrix(teigvecs, nstates, col, indx, inveigvecs[m]);
 		
 		//For codon models using this precalculation actually makes things things slower in CalcPmat (cache thrashing,
 		//I think) so don't bother doing it here.  In fact, don't even allocate it in the model
 		if(modSpec.IsCodon() == false)
-			CalcCijk(&c_ijk[m][0], nstates, (const FLOAT_TYPE**) eigvecs[m], (const FLOAT_TYPE**) inveigvecs[m]);
+			CalcCijk(&c_ijk[m][0], nstates, (const MODEL_FLOAT**) eigvecs[m], (const MODEL_FLOAT**) inveigvecs[m]);
 		}
 
 	eigenDirty=false;
 	ProfCalcEigen.Stop();
+	}
+
+//this just copies elements from a double precision matrix into a single precision one
+void ChangeMatrixPrecision(int elements, double ***pmat, float ***fpmat){
+	for(int e=0;e<elements;e++)
+		fpmat[0][0][e] = (float) pmat[0][0][e];
 	}
 
 //usually this will be called with 2 branch lengths to caluclate two pmats, but if only one 
@@ -670,11 +692,21 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 //	if(NStates() > 4){
 		if(!(blen1 < ZERO_POINT_ZERO)){
 			AltCalcPmat(blen1, pmat1);
+#ifdef SINGLE_PRECISION_FLOATS
+			ChangeMatrixPrecision(modSpec.nstates * modSpec.nstates * modSpec.numRateCats, pmat1, fpmat1);
+			mat1 = **fpmat1;
+#else
 			mat1 = **pmat1;
+#endif
 			}
 		if(!(blen2 < ZERO_POINT_ZERO)){
 			AltCalcPmat(blen2, pmat2);
+#ifdef SINGLE_PRECISION_FLOATS
+			ChangeMatrixPrecision(modSpec.nstates * modSpec.nstates * modSpec.numRateCats, pmat2, fpmat2);
+			mat2 = **fpmat2;
+#else
 			mat2 = **pmat2;
+#endif
 			}
 //		}
 
@@ -687,8 +719,7 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 	
 	}
 
-
-void Model::CalcPmat(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat, bool flip /*=false*/){
+void Model::CalcPmat(MODEL_FLOAT blen, MODEL_FLOAT *metaPmat, bool flip /*=false*/){
 	assert(0);
 	/*
 	ProfCalcPmat.Start();
@@ -807,7 +838,7 @@ void Model::CalcPmat(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat, bool flip /*=false*/
 */
 	}	
 
-void Model::CalcPmatNState(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat){
+void Model::CalcPmatNState(FLOAT_TYPE blen, MODEL_FLOAT *metaPmat){
 	assert(0);
 /*
 	if(eigenDirty==true)
@@ -894,7 +925,7 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 	for(int rate=0;rate<NRateCats();rate++){
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
-			FLOAT_TYPE scaledEigVal;
+			MODEL_FLOAT scaledEigVal;
 			if(modSpec.IsNonsynonymousRateHet() == false){
 				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
@@ -920,11 +951,11 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 			const unsigned rateOffset = nstates*rate;
 			for (int i = 0; i < nstates; i++){
 				for (int j = 0; j < nstates; j++){
-					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
-					FLOAT_TYPE sum_d1p=ZERO_POINT_ZERO;
-					FLOAT_TYPE sum_d2p = ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d1p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d2p = ZERO_POINT_ZERO;
 					for (int k = 0; k < nstates; k++){ 
-						const FLOAT_TYPE x = eigvecs[model][i][k]*inveigvecs[model][k][j];
+						const MODEL_FLOAT x = eigvecs[model][i][k]*inveigvecs[model][k][j];
 						sum_p   += x*EigValexp[k+rateOffset];
 						sum_d1p += x*EigValderiv[k+rateOffset];
 						sum_d2p += x*EigValderiv2[k+rateOffset];
@@ -941,11 +972,11 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 			const unsigned rateOffset = nstates*rate;
 			for (int i = 0; i < nstates; i++){
 				for (int j = 0; j < nstates; j++){
-					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
-					FLOAT_TYPE sum_d1p=ZERO_POINT_ZERO;
-					FLOAT_TYPE sum_d2p = ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d1p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d2p = ZERO_POINT_ZERO;
 					for (int k = 0; k < nstates; k++){ 
-						FLOAT_TYPE x = c_ijk[0][i*nstates*nstates + j*nstates +k];
+						MODEL_FLOAT x = c_ijk[0][i*nstates*nstates + j*nstates +k];
 						sum_p   += x*EigValexp[k+rateOffset];
 						sum_d1p += x*EigValderiv[k+rateOffset];
 						sum_d2p += x*EigValderiv2[k+rateOffset];
@@ -957,22 +988,32 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 				}
 			}
 		}
+#ifdef SINGLE_PRECISION_FLOATS
+	ChangeMatrixPrecision(nstates * nstates * NRateCats(), deriv1, fderiv1);
+	ChangeMatrixPrecision(nstates * nstates * NRateCats(), deriv2, fderiv2);
+	ChangeMatrixPrecision(nstates * nstates * NRateCats(), pmat1, fpmat1);
+
+	one=fderiv1;
+	two=fderiv2;
+	pr=fpmat1;
+#else
 	one=deriv1;
 	two=deriv2;
 	pr=pmat1;
+#endif
 	}
 
 
 bool DoubleAbsLessThan(double &first, double &sec){return fabs(first) <= fabs(sec);}
 
-void Model::AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pmat){
+void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 	if(eigenDirty==true)
 		CalcEigenStuff();
 
 	for(int rate=0;rate<NRateCats();rate++){
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
-			FLOAT_TYPE scaledEigVal;
+			MODEL_FLOAT scaledEigVal;
 			if(modSpec.IsNonsynonymousRateHet() == false){
 				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
@@ -993,9 +1034,9 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pmat){
 			const unsigned rateOffset = 20*rate;
 			for (int i = 0; i < 20; i++){
 				for (int j = 0; j < 20; j++){
-					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
 					for (int k = 0; k < 20; k++){ 
-						const FLOAT_TYPE x = c_ijk[0][model*20*20*20 + i*20*20 + j*20 +k];
+						const MODEL_FLOAT x = c_ijk[0][model*20*20*20 + i*20*20 + j*20 +k];
 						sum_p   += x*EigValexp[k+rateOffset];
 						}
 					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
@@ -1011,7 +1052,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pmat){
 			const unsigned rateOffset = nstates*rate;
 			for (int i = 0; i < nstates; i++){
 				for (int j = 0; j < nstates; j++){
-					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
 
 /*					
 					FLOAT_TYPE sum_pBig=ZERO_POINT_ZERO;
@@ -1041,7 +1082,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pmat){
 					sum_p = tot;
 */
 					for (int k = 0; k < nstates; k++){ 
-						const FLOAT_TYPE x = eigvecs[model][i][k]*inveigvecs[model][k][j];
+						const MODEL_FLOAT x = eigvecs[model][i][k]*inveigvecs[model][k][j];
 						sum_p   += x*EigValexp[k+rateOffset];
 						}
 					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
@@ -1055,9 +1096,9 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pmat){
 			const unsigned rateOffset = 4*rate;
 			for (int i = 0; i < 4; i++){
 				for (int j = 0; j < 4; j++){
-					FLOAT_TYPE sum_p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
 					for (int k = 0; k < 4; k++){ 
-						const FLOAT_TYPE x = c_ijk[0][model*4*4*4 + i*4*4 + j*4 +k];
+						const MODEL_FLOAT x = c_ijk[0][model*4*4*4 + i*4*4 + j*4 +k];
 						sum_p   += x*EigValexp[k+rateOffset];
 						}
 					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
@@ -1227,14 +1268,14 @@ void Model::CopyModel(const Model *from){
 
 void Model::CopyEigenVariables(const Model *from){
 	int effectiveModels = modSpec.IsNonsynonymousRateHet() ? NRateCats() : 1;
-	memcpy(**qmat, **from->qmat, effectiveModels*nstates*nstates*sizeof(FLOAT_TYPE));
-	memcpy(**eigvecs, **from->eigvecs, NRateCats()*nstates*nstates*sizeof(FLOAT_TYPE));
-	memcpy(**inveigvecs, **from->inveigvecs, NRateCats()*nstates*nstates*sizeof(FLOAT_TYPE));
-	memcpy(*eigvals, *from->eigvals, effectiveModels * nstates * sizeof(FLOAT_TYPE));
+	memcpy(**qmat, **from->qmat, effectiveModels*nstates*nstates*sizeof(MODEL_FLOAT));
+	memcpy(**eigvecs, **from->eigvecs, NRateCats()*nstates*nstates*sizeof(MODEL_FLOAT));
+	memcpy(**inveigvecs, **from->inveigvecs, NRateCats()*nstates*nstates*sizeof(MODEL_FLOAT));
+	memcpy(*eigvals, *from->eigvals, effectiveModels * nstates * sizeof(MODEL_FLOAT));
 	memcpy(blen_multiplier, from->blen_multiplier, effectiveModels * sizeof(FLOAT_TYPE));
 	//c_ijk isn't allocated or used for codon models
 	if(c_ijk != NULL)
-		memcpy(*c_ijk, *from->c_ijk, effectiveModels*nstates*nstates*nstates*sizeof(FLOAT_TYPE));	
+		memcpy(*c_ijk, *from->c_ijk, effectiveModels*nstates*nstates*nstates*sizeof(MODEL_FLOAT));	
 	}
 
 void Model::SetModel(FLOAT_TYPE *model_string){
@@ -2644,7 +2685,7 @@ void Model::ReadBinaryFormattedModel(FILE *in){
 
 void Model::MultiplyByJonesAAMatrix(){
 	int modNum=0;
-	FLOAT_TYPE **qmatOffset = qmat[modNum];
+	MODEL_FLOAT **qmatOffset = qmat[modNum];
 
 	qmatOffset[0][1] *= 0.056; qmatOffset[1][0] *= 0.056; qmatOffset[0][2] *= 0.081; qmatOffset[2][0] *= 0.081; qmatOffset[0][3] *= 0.105; qmatOffset[3][0] *= 0.105; 
 	qmatOffset[0][4] *= 0.015; qmatOffset[4][0] *= 0.015; qmatOffset[0][5] *= 0.179; qmatOffset[5][0] *= 0.179; qmatOffset[0][6] *= 0.027; qmatOffset[6][0] *= 0.027; 
@@ -2714,7 +2755,7 @@ void Model::MultiplyByJonesAAMatrix(){
 
 void Model::MultiplyByMtMamAAMatrix(){
 	int modNum=0;
-	FLOAT_TYPE **qmatOffset = qmat[modNum];
+	MODEL_FLOAT **qmatOffset = qmat[modNum];
 
 	qmatOffset [ 0 ][ 14 ] *= 0.0337 ; qmatOffset [ 14 ][ 0 ] *= 0.0337 ;
 	qmatOffset [ 0 ][ 11 ] *= 0.0021 ; qmatOffset [ 11 ][ 0 ] *= 0.0021 ;
@@ -2910,7 +2951,7 @@ void Model::MultiplyByMtMamAAMatrix(){
 
 void Model::MultiplyByMtRevAAMatrix(){
 	int modNum=0;
-	FLOAT_TYPE **qmatOffset = qmat[modNum];
+	MODEL_FLOAT **qmatOffset = qmat[modNum];
 	qmatOffset  [ 0 ][ 14 ] *= 23.18   ; qmatOffset [ 14 ][ 0 ] *= 23.18 ;
 	qmatOffset  [ 0 ][ 11 ] *= 26.95   ; qmatOffset [ 11 ][ 0 ] *= 26.95 ;
 	qmatOffset  [ 0 ][ 2 ] *= 17.67   ; qmatOffset [ 2 ][ 0 ] *= 17.67 ;
@@ -3105,7 +3146,7 @@ void Model::MultiplyByMtRevAAMatrix(){
 
 void Model::MultiplyByDayhoffAAMatrix(){
 	int modNum=0;
-	FLOAT_TYPE **qmatOffset = qmat[modNum];
+	MODEL_FLOAT **qmatOffset = qmat[modNum];
 
 	qmatOffset[0][1] *= 0.036; qmatOffset[0][2] *= 0.12; qmatOffset[0][3] *= 0.198; qmatOffset[0][4] *= 0.018; qmatOffset[0][5] *= 0.24; qmatOffset[0][6] *= 0.023;
 	qmatOffset[0][7] *= 0.065; qmatOffset[0][8] *= 0.026; qmatOffset[0][9] *= 0.041; qmatOffset[0][10] *= 0.072; qmatOffset[0][11] *= 0.098; qmatOffset[0][12] *= 0.25;
@@ -3199,7 +3240,7 @@ void Model::MultiplyByDayhoffAAMatrix(){
 
 void Model::MultiplyByWAGAAMatrix(){
 	int modNum=0;
-	FLOAT_TYPE **qmatOffset = qmat[modNum];
+	MODEL_FLOAT **qmatOffset = qmat[modNum];
 
 	qmatOffset[14][0] *= 1.75252;
 	qmatOffset[0][14] *= 1.75252;

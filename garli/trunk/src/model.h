@@ -149,7 +149,12 @@ public:
 						}
 					}
 				*vals[numElements - 1] *= scaler;
+#ifdef SINGLE_PRECISION_FLOATS
+				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-6));
+#else
 				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-12));
+#endif
+
 				}
 	/*		if(rateToChange<numElements-1){
 				*vals[rateToChange] *= rnd.gamma( mutationShape );
@@ -691,12 +696,19 @@ class Model{
 
 	//variables used for the eigen process if nst=6
 	int *iwork, *indx;
-	FLOAT_TYPE **eigvals, *eigvalsimag, ***eigvecs, ***inveigvecs, **teigvecs, *work, *temp, *col, **c_ijk, *EigValexp, *EigValderiv, *EigValderiv2;
-	FLOAT_TYPE ***qmat, ***pmat1, ***pmat2;
-	FLOAT_TYPE ***tempqmat;
+	MODEL_FLOAT **eigvals, *eigvalsimag, ***eigvecs, ***inveigvecs, **teigvecs, *work, *temp, *col, **c_ijk, *EigValexp, *EigValderiv, *EigValderiv2;
+	MODEL_FLOAT ***qmat, ***pmat1, ***pmat2;
+	MODEL_FLOAT ***tempqmat;
+	
+	#ifdef SINGLE_PRECISION_FLOATS
+	//these are used so that the transition matrices can be computed in double precision and
+	//then copied to sinlge precision for use in the CLA/Deriv functions
+	FLOAT_TYPE ***fpmat1, ***fpmat2;
+	FLOAT_TYPE ***fderiv1, ***fderiv2;
+	#endif
 	
 	//Newton Raphson crap
-	FLOAT_TYPE ***deriv1, ***deriv2;
+	MODEL_FLOAT ***deriv1, ***deriv2;
 
 	//this will be a little bigger than necessary with some codes, but dynamically allocating a static is a bit of a pain
 	static int qmatLookup[62*62];
@@ -737,12 +749,12 @@ class Model{
 	void CalcEigenStuff();
 
 	public:
-	void CalcPmat(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat, bool flip =false);
+	void CalcPmat(MODEL_FLOAT blen, MODEL_FLOAT *metaPmat, bool flip =false);
 	void CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLOAT_TYPE *&mat2);
-	void CalcPmatNState(FLOAT_TYPE blen, FLOAT_TYPE *metaPmat);
+	void CalcPmatNState(FLOAT_TYPE blen, MODEL_FLOAT *metaPmat);
 	void CalcDerivatives(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
 	void OutputPmats(ofstream &deb);
-	void AltCalcPmat(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr);
+	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pr);
 	void UpdateQMat();
 	void UpdateQMatCodon();
 	void UpdateQMatAminoAcid();

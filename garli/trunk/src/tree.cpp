@@ -45,9 +45,11 @@ Profiler ProfScoreInt ("ScoreInt      ");
 Profiler ProfScoreTerm("ScoreTerm     ");
 Profiler ProfEQVectors("EQVectors     ");
 
+/*
 FLOAT_TYPE precalcThresh[30];
 FLOAT_TYPE precalcMult[30];
 int precalcIncr[30] = {1, 3, 5, 7, 10, 12, 14, 17, 19, 21, 24, 26, 28, 30, 33, 35, 37, 40, 42, 44, 47, 49, 51, 53, 56, 58, 60, 63, 65, 67};
+*/
 
 extern rng rnd;
 extern bool output_tree;
@@ -80,6 +82,7 @@ ClaManager *Tree::claMan;
 list<TreeNode *> Tree::nodeOptVector;
 const SequenceData *Tree::data;
 unsigned Tree::rescaleEvery;
+FLOAT_TYPE Tree::rescaleBelow;
 FLOAT_TYPE Tree::treeRejectionThreshold;
 vector<Constraint> Tree::constraints;
 AttemptedSwapList Tree::attemptedSwaps;
@@ -88,6 +91,10 @@ FLOAT_TYPE Tree::distanceSwapBias;
 
 FLOAT_TYPE Tree::uniqueSwapPrecalc[500];
 FLOAT_TYPE Tree::distanceSwapPrecalc[1000];
+
+FLOAT_TYPE Tree::rescalePrecalcThresh[30];
+FLOAT_TYPE Tree::rescalePrecalcMult[30];
+int Tree::rescalePrecalcIncr[30];
 
 Bipartition *Tree::outgroup = NULL;
 
@@ -117,11 +124,25 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 	Tree::claMan=claMan;
 	Tree::data=data;
 #ifdef SINGLE_PRECISION_FLOATS
-	Tree::rescaleEvery=6;
+	Tree::rescaleEvery = 6;
+	Tree::rescaleBelow = exp(-11); //this is 1.67e-5
+	for(int i=0;i<30;i++){
+		Tree::rescalePrecalcIncr[i] = i*3 - (int) log(rescaleBelow);
+		Tree::rescalePrecalcThresh[i] = exp((FLOAT_TYPE)(-rescalePrecalcIncr[i]));
+		Tree::rescalePrecalcMult[i] =  exp((FLOAT_TYPE)(rescalePrecalcIncr[i]));
+		}
+		
 	FLOAT_TYPE minVal = 1.0e-10f;
 	FLOAT_TYPE maxVal = 1.0e10f;
 #else
 	Tree::rescaleEvery=16;
+	Tree::rescaleBelow = exp(-24); //this is 1.026e-10	
+	for(int i=0;i<30;i++){
+		Tree::rescalePrecalcIncr[i] = i*7 - (int) log(rescaleBelow);
+		Tree::rescalePrecalcThresh[i] = exp((FLOAT_TYPE)(-rescalePrecalcIncr[i]));
+		Tree::rescalePrecalcMult[i] =  exp((FLOAT_TYPE)(rescalePrecalcIncr[i]));
+		}	
+		
 	FLOAT_TYPE minVal = 1.0e-20;
 	FLOAT_TYPE maxVal = 1.0e20;
 #endif
@@ -146,12 +167,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 	Tree::min_brlen = conf->minBrlen;
 	Tree::max_brlen = conf->maxBrlen;
 	Tree::exp_starting_brlen = conf->startingBrlen;
-#ifdef SINGLE_PRECISION_FLOATS
-	for(int i=0;i<30;i++){
-		precalcThresh[i] = exp((FLOAT_TYPE)(-precalcIncr[i] - 1));
-		precalcMult[i] =  exp((FLOAT_TYPE)(precalcIncr[i]));
-		}
-#endif
+
 	//deal with the outgroup specification, if there is one
 	if(conf->outgroupString.length() > 0){
 		//NxsString s(conf->outgroupString.c_str());
@@ -1276,7 +1292,7 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 
 	TreeNode *cut;
 	int swapNum=0;
-	double bestScore = -DBL_MAX;
+	double bestScore = -FLT_MAX;
 	
 	Individual tempIndiv;
 	tempIndiv.treeStruct=new Tree();
@@ -1561,7 +1577,7 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 
 	TreeNode *cut;
 	int swapNum=0;
-	double bestScore = -DBL_MAX;
+	double bestScore = -FLT_MAX;
 	
 	Individual tempIndiv;
 	tempIndiv.treeStruct=new Tree();
@@ -2989,8 +3005,8 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 //for some reason optimzation in gcc 2.95 breaks the more optimal version of this code
 //this version is safer
 #if defined(__GNUC__) && __GNUC__ < 3 
-				small1 = DBL_MAX;
-				large1 = DBL_MIN;
+				small1 = FLT_MAX;
+				large1 = FLT_MIN;
 				for(int r=0;r<nRateCats;r++){
 					small2 = min(destination[4*r+0] , destination[4*r+1]);
 					large2= max(destination[4*r+0] , destination[4*r+1]);
@@ -3003,7 +3019,7 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 					}
 
 #else
-#if (defined(_MSC_VER) || defined(__INTEL_COMPILER))
+	#if (defined(_MSC_VER) || defined(__INTEL_COMPILER)) && !defined(SINGLE_PRECISION_FLOATS)
 			//This is a neat trick for quickly finding the approximately largest
 			//value of an array of doubles, but it only works on littleendian
 			//systems.  There's no easy way of detecting endianness at compile
@@ -3020,7 +3036,7 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 						large1 = destination[j];
 						}
 					}
-#else
+	#else
 
 //				small1= (destination[0] < destination[2] ? destination[0] : destination[2]);
 				large1= (destination[0] > destination[2] ? destination[0] : destination[2]);
@@ -3040,39 +3056,51 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 					large1= (large1 > large2 ? large1 : large2);	
 					}			
 //				assert(FloatingPointEquals(l1, large1, 1e-8));
-#endif
 	#endif
-	#ifdef SINGLE_PRECISION_FLOATS
-				if(large1< 1.0f){
+#endif
+#ifdef SINGLE_PRECISION_FLOATS
+				assert(large1 < 1e5);
+				if(large1 < rescaleBelow){
 					if(large1 < 1e-30f){
+						outman.UserMessage("RESCALE REDUCED");
 						throw(1);
 						}
 					int index=0;
-					while(precalcThresh[index] > large1){
+					while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
 						index++;
 						}
-					int incr = precalcIncr[index];
-					int incr2=((int) -log(large1));
+					int incr = Tree::rescalePrecalcIncr[index];
 					underflow_mult[i]+=incr;
-					FLOAT_TYPE mult=precalcMult[index];
-					//FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
+					FLOAT_TYPE mult=Tree::rescalePrecalcMult[index];
+					assert(large1 * mult < 1.0f);
+					assert(large1 * mult > 0.01f);
 					for(int r=0;r<nRateCats;r++){
 						for(int q=0;q<4;q++){
 							destination[r*4 + q]*=mult;
 							assert(destination[r*4 +q] == destination[r*4 +q]);
-							assert(destination[r*4 +q] < 1e10);
+							assert(destination[r*4 +q] < 1);
 							}
 						}
 					}
-	#else
-				if(large1< 1e-5){
+#else	//double precison
+				if(large1< rescaleBelow){
 					if(large1 < 1e-150){
 						throw(1);
 						}
-					int incr=((int) -log(large1))+2;
+					int index = 0;
+					while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
+						index++;
+						}
+					int incr = Tree::rescalePrecalcIncr[index];
+					underflow_mult[i]+=incr;
+					FLOAT_TYPE mult=Tree::rescalePrecalcMult[index];
+					assert(large1 * mult < 1.0);
+					assert(large1 * mult > 0.0008);
+		
+		/*			int incr=((int) -log(large1))+2;
 					underflow_mult[i]+=incr;
 					FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
-					for(int r=0;r<nRateCats;r++){
+		*/			for(int r=0;r<nRateCats;r++){
 						for(int q=0;q<4;q++){
 							destination[r*4 + q]*=mult;
 							assert(destination[r*4 +q] == destination[r*4 +q]);
@@ -3080,20 +3108,21 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 							}
 						}
 					}
+#endif //end of ifdef(SINGLE_PRECISION_FLOATS)
+
 				destination+= 4*nRateCats;
-#ifdef ALLOW_SINGLE_SITE
+	#ifdef ALLOW_SINGLE_SITE
 				if(siteToScore > -1) break;
-#endif
+	#endif
 				}
 			else{
-#ifdef OPEN_MP
+	#ifdef OPEN_MP
 			//this is a little strange, but dest only needs to be advanced in the case of OMP
 			//because sections of the CLAs corresponding to sites with count=0 are skipped
 			//over in OMP instead of being eliminated
 				destination += 4 * nRateCats;
-#endif
-				}
 	#endif
+				}
 			}
 
 		destCLA->rescaleRank=0;
@@ -3123,7 +3152,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 		if(1){
 #endif
 
-#if (defined(_MSC_VER) || defined(__INTEL_COMPILER))
+#if (defined(_MSC_VER) || defined(__INTEL_COMPILER)) && !defined(SINGLE_PRECISION_FLOATS)
 			//This is a neat trick for quickly finding the approximately largest
 			//value of an array of doubles, but it only works on littleendian
 			//systems.  There's no easy way of detecting endianness at compile
@@ -3149,20 +3178,55 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 				large1 = (destination[s] > large1) ? destination[s] : large1;
 				}
 #endif
+
+#ifdef SINGLE_PRECISION_FLOATS
+			assert(large1 < 1.0e10f);
+			if(large1< rescaleBelow){
+				if(large1 < 1e-30f){
+					outman.UserMessage("RESCALE REDUCED");
+					throw(1);
+					}
+				int index=0;
+				while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
+					index++;
+					}
+				int incr = Tree::rescalePrecalcIncr[index];
+				underflow_mult[i]+=incr;
+				FLOAT_TYPE mult= Tree::rescalePrecalcMult[index];
+				assert(large1 * mult < 1.0f);
+				assert(large1 * mult > 0.01f);
+				for(int q=0;q<nstates*nRateCats;q++){
+					destination[q]*=mult;
+					assert(destination[q] == destination[q]);
+					}
+				}
+#else
 			assert(large1 < 1.0e15);
-			if(large1< 1e-5){
+			if(large1< rescaleBelow){
 				if(large1 < 1e-150){
 					throw(1);
 					}
+				int index = 0;
+				while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
+					index++;
+					}
+				int incr = Tree::rescalePrecalcIncr[index];
+				underflow_mult[i]+=incr;
+				FLOAT_TYPE mult=Tree::rescalePrecalcMult[index];
+				assert(large1 * mult < 1.0);
+				assert(large1 * mult > 0.0008);						
+/*					
 				int incr=((int) -log(large1))+2;
 				underflow_mult[i]+=incr;
 				FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
+*/
 				for(int q=0;q<nstates*nRateCats;q++){
 					destination[q]*=mult;
 					assert(destination[q] == destination[q]);
 					assert(destination[q] < 1.0e50);
 					}
 				}
+#endif
 			destination+= nstates*nRateCats;
 #ifdef ALLOW_SINGLE_SITE
 			if(siteToScore > -1) break;

@@ -588,7 +588,7 @@ void Population::Reset(){
 	//move on to another it should be false
 	conf->restart = false;
 	finishedRep = false;
-	bestFitness = prevBestFitness = -(DBL_MAX);
+	bestFitness = prevBestFitness = -(FLT_MAX);
 
 	for(unsigned i=0;i<total_size;i++){
 		if(indiv[i].treeStruct != NULL){
@@ -722,6 +722,11 @@ void Population::RunTests(){
 	assert(ind0->treeStruct->lnL > scr);
 	assert(ind0->treeStruct->lnL * 2 < scr);
 
+#ifdef SINGLE_PRECISION_FLOATS
+	int sigFigs = ceil(log10(-ind0->treeStruct->lnL));
+	double eps = pow(10.0f, sigFigs-7) * 2.0;
+#endif
+
 	//test rescaling
 	scr = ind0->treeStruct->lnL;
 	int r = Tree::rescaleEvery;
@@ -729,7 +734,18 @@ void Population::RunTests(){
 	ind0->treeStruct->MakeAllNodesDirty();
 	ind0->SetDirty();
 	ind0->CalcFitness(0);
-	assert(FloatingPointEquals(ind0->Fitness(), scr, 0.001));
+	#ifdef SINGLE_PRECISION_FLOATS
+	if(FloatingPointEquals(ind0->Fitness(), scr, eps) == false){
+		outman.UserMessage("Failed rescaling test: freq %d=%f, freq 2=%f", r, scr, ind0->Fitness());
+		assert(FloatingPointEquals(ind0->Fitness(), scr, eps));
+		}
+	#else
+	if(FloatingPointEquals(ind0->Fitness(), scr, 0.001) == false){
+		outman.UserMessage("Failed rescaling test: freq %d=%f, freq 2=%f", r, scr, ind0->Fitness());
+		assert(FloatingPointEquals(ind0->Fitness(), scr, 0.001));
+		}
+	#endif
+	
 	Tree::rescaleEvery = r;
 
 	ind1->treeStruct=new Tree();
@@ -762,14 +778,28 @@ void Population::RunTests(){
 		//check minimal recalculation scoring (proper readjustment of CLAs during rerooting)
 		ind0->treeStruct->Score(ind0->treeStruct->GetRandomInternalNode());
 		ind1->treeStruct->Score(ind1->treeStruct->GetRandomInternalNode());
+#ifdef SINGLE_PRECISION_FLOATS
+		if(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps) == false){
+			outman.UserMessage("failed min recalc test: %f diff vs %f allowed",  ind0->treeStruct->lnL - ind1->treeStruct->lnL, eps);
+			assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps));
+			}
+#else
 		assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, 0.001));
+#endif
 
 		//check full rescoring from arbitrary nodes in the trees		
 		ind0->treeStruct->MakeAllNodesDirty();
 		ind1->treeStruct->MakeAllNodesDirty();
 		ind0->treeStruct->Score(ind0->treeStruct->GetRandomInternalNode());
 		ind1->treeStruct->Score(ind1->treeStruct->GetRandomInternalNode());
+#ifdef SINGLE_PRECISION_FLOATS
+		if(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps) == false){
+			outman.UserMessage("failed score at arbitrary node test: %f diff vs %f allowed",  ind0->treeStruct->lnL - ind1->treeStruct->lnL, eps);
+			assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps ));
+			}
+#else
 		assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, 0.001));
+#endif
 		}
 	}
 
@@ -1676,7 +1706,7 @@ void Population::FinalOptimization(){
 */	}
 
 int Population::EvaluateStoredTrees(bool report){
-	double bestL=-DBL_MAX;
+	double bestL=-FLT_MAX;
 	int bestRep;
 	if(report) outman.UserMessage("\nCompleted %d replicate runs (of %d).\nResults:", storedTrees.size(), conf->searchReps);
 	for(unsigned r=0;r<storedTrees.size();r++){

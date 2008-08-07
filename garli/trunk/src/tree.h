@@ -80,10 +80,15 @@ class Tree{
 		static FLOAT_TYPE uniqueSwapBias;
 		static FLOAT_TYPE distanceSwapBias;
 		static unsigned rescaleEvery;
+		static FLOAT_TYPE rescaleBelow;
 		static list<TreeNode *> nodeOptVector;
 		
 		static FLOAT_TYPE uniqueSwapPrecalc[500];
 		static FLOAT_TYPE distanceSwapPrecalc[1000];
+		
+		static FLOAT_TYPE rescalePrecalcThresh[30];
+		static FLOAT_TYPE rescalePrecalcMult[30];
+		static int rescalePrecalcIncr[30];
 
 		static Bipartition *outgroup;
 

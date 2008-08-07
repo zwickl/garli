@@ -11,12 +11,12 @@
 
 #define RC_COMPLEX_EVAL 2	/* code that complex eigenvalue obtained */
 
-extern int  InvertMatrix (FLOAT_TYPE **a, int n, FLOAT_TYPE *col, int *indx, FLOAT_TYPE **a_inv);
-extern int  LUDecompose (FLOAT_TYPE **a, int n, FLOAT_TYPE *vv, int *indx, FLOAT_TYPE *pd);
-int  EigenRealGeneral (int n, FLOAT_TYPE **a, FLOAT_TYPE *v, FLOAT_TYPE *vi, FLOAT_TYPE **u, int *iwork, FLOAT_TYPE *work);
+extern int  InvertMatrix (MODEL_FLOAT **a, int n, MODEL_FLOAT *col, int *indx, MODEL_FLOAT **a_inv);
+extern int  LUDecompose (MODEL_FLOAT **a, int n, MODEL_FLOAT *vv, int *indx, MODEL_FLOAT *pd);
+int  EigenRealGeneral (int n, MODEL_FLOAT **a, MODEL_FLOAT *v, MODEL_FLOAT *vi, MODEL_FLOAT **u, int *iwork, MODEL_FLOAT *work);
 
 
 //these are actually from John's MCMC.c file
-void CalcCijk (FLOAT_TYPE *c_ijk, int n, const FLOAT_TYPE **u,  const FLOAT_TYPE **v);
-void CalcPij (const FLOAT_TYPE *c_ijk, int n, const FLOAT_TYPE *eigenValues, FLOAT_TYPE v, FLOAT_TYPE r, FLOAT_TYPE **p, FLOAT_TYPE *EigValexp);
+void CalcCijk (MODEL_FLOAT *c_ijk, int n, const MODEL_FLOAT **u,  const MODEL_FLOAT **v);
+void CalcPij (const MODEL_FLOAT *c_ijk, int n, const MODEL_FLOAT *eigenValues, MODEL_FLOAT v, MODEL_FLOAT r, MODEL_FLOAT **p, MODEL_FLOAT *EigValexp);
 

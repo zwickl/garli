@@ -55,6 +55,16 @@ class InternalState{
 
 bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
 
+#ifdef SINGLE_PRECISION_FLOATS
+//Overloaded versions of min and max that take different types for the two arguments
+//This should not be used in hot code when possible, and conditional comp should
+//be used to make two different versions of the code
+float min(const double first, const float second);
+float min(const float first, const double second);
+float max(const double first, const float second);
+float max(const float first, const double second);
+#endif
+
 int FileExists(const char* s);
 bool FileIsFasta(const char *name);
 bool FileIsNexus(const char *name);

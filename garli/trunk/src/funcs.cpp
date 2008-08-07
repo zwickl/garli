@@ -75,6 +75,16 @@ void  Product4 (::brook::stream des1,
 
 //a variety of functions that don't belong to any class
 
+#ifdef SINGLE_PRECISION_FLOATS
+//Overloaded versions of min and max that take different types for the two arguments
+//This should not be used in hot code when possible, and conditional comp should
+//be used to make two different versions of the code
+float min(const double first, const float second) {return min((float) first, second);}
+float min(const float first, const double second) {return min(first, (float) second);}
+float max(const double first, const float second) {return max((float) first, second);}
+float max(const float first, const double second) {return max(first, (float) second);}
+#endif
+
 int FileExists( const char* s )
 {
 
