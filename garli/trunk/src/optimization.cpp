@@ -1181,6 +1181,13 @@ if(nd->nodeNum == 8){
 			if(d1 <= ZERO_POINT_ZERO){//if d1 is negative, try shortening arbitrarily, or go halfway to the knownMin
 				FLOAT_TYPE proposed;
 #ifdef SINGLE_PRECISION_FLOATS
+				if(FloatingPointEquals(nd->dlen, min_brlen, 1.0e-8f)){
+					#ifdef OPT_DEBUG
+					opt << "already at min, return\n"; 
+					#endif
+					return totalEstImprove;
+					}
+					
 				if(knownMin == min_brlen){
 					if(nd->dlen <= 1.0e-4f) proposed = min_brlen;
 					else if(nd->dlen <= 0.005f) proposed = 1.0e-4f;
@@ -2058,16 +2065,20 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			assert(La > 0.0f || Lc > 0.0f || Lg > 0.0f || Lt > 0.0f);
 			assert(La < 1.0e30 && Lc < 1.0e30 && Lg < 1.0e30 && Lt < 1.0e30);
 
-#ifdef SINGLE_PRECISION_FLOATS
 			FLOAT_TYPE tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
+#ifdef SINGLE_PRECISION_FLOATS
 			if(fabs(tempD1) < 1.0e8f){
-				tot1+= countit[i] * tempD1;
+				totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];	
+				tot1+= countit[i] * tempD1;			
 				FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
 				tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
 				}
+			//DEBUG
+			else{
+				outman.UserMessage("tempD1 = %f", tempD1);
+				}
 #else
 			totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];
-			FLOAT_TYPE tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
 			tot1+= countit[i] * tempD1;
 			FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
@@ -2505,6 +2516,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 			if(fabs(tempD1) < 1.0e8f){
 				assert(d1Tot == d1Tot);
 				FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
+				totL += (log(siteL) - childCLA->underflow_mult[i] - partialCLA->underflow_mult[i]) * countit[i];				
 				tot1 += countit[i] * tempD1;
 				tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
 				}

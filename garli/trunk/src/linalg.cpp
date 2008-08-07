@@ -46,16 +46,16 @@ using namespace std;
 #define FALSE		0
 #define TRUE		1
 
-static void     LUBackSubst (FLOAT_TYPE **a, int n, int *indx, FLOAT_TYPE *b);
-static int      EigenRG (int n, FLOAT_TYPE **a, FLOAT_TYPE *wr, FLOAT_TYPE *wi, FLOAT_TYPE **z, int *iv1, FLOAT_TYPE *fv1);
-static void     Balanc (int n, FLOAT_TYPE **a, int *pLow, int *pHigh, FLOAT_TYPE *scale);
-static void     Exchange (int j, int k, int l, int m, int n, FLOAT_TYPE **a, FLOAT_TYPE *scale);
-static void     ElmHes (int n, int low, int high, FLOAT_TYPE **a, int *intchg);
-static void     ElTran (int n, int low, int high, FLOAT_TYPE **a, int *intchg, FLOAT_TYPE **z);
-static int      Hqr2 (int n, int low, int high, FLOAT_TYPE **h, FLOAT_TYPE *wr, FLOAT_TYPE *wi, FLOAT_TYPE **z);
-static void     BalBak (int n, int low, int high, FLOAT_TYPE *scale, int m, FLOAT_TYPE **z);
-static void     CDiv (FLOAT_TYPE ar, FLOAT_TYPE ai, FLOAT_TYPE br, FLOAT_TYPE bi, FLOAT_TYPE *cr, FLOAT_TYPE *ci);
-//inline static FLOAT_TYPE   D_sign (FLOAT_TYPE a, FLOAT_TYPE b);
+static void     LUBackSubst (MODEL_FLOAT **a, int n, int *indx, MODEL_FLOAT *b);
+static int      EigenRG (int n, MODEL_FLOAT **a, MODEL_FLOAT *wr, MODEL_FLOAT *wi, MODEL_FLOAT **z, int *iv1, MODEL_FLOAT *fv1);
+static void     Balanc (int n, MODEL_FLOAT **a, int *pLow, int *pHigh, MODEL_FLOAT *scale);
+static void     Exchange (int j, int k, int l, int m, int n, MODEL_FLOAT **a, MODEL_FLOAT *scale);
+static void     ElmHes (int n, int low, int high, MODEL_FLOAT **a, int *intchg);
+static void     ElTran (int n, int low, int high, MODEL_FLOAT **a, int *intchg, MODEL_FLOAT **z);
+static int      Hqr2 (int n, int low, int high, MODEL_FLOAT **h, MODEL_FLOAT *wr, MODEL_FLOAT *wi, MODEL_FLOAT **z);
+static void     BalBak (int n, int low, int high, MODEL_FLOAT *scale, int m, MODEL_FLOAT **z);
+static void     CDiv (MODEL_FLOAT ar, MODEL_FLOAT ai, MODEL_FLOAT br, MODEL_FLOAT bi, MODEL_FLOAT *cr, MODEL_FLOAT *ci);
+//inline static MODEL_FLOAT   D_sign (MODEL_FLOAT a, MODEL_FLOAT b);
 
 #ifdef SINGLE_PRECISION_FLOATS
 #define TINY		1.0e-20f
@@ -79,8 +79,8 @@ static void     CDiv (FLOAT_TYPE ar, FLOAT_TYPE ai, FLOAT_TYPE br, FLOAT_TYPE bi
 */
 
 
-inline static FLOAT_TYPE D_sign (FLOAT_TYPE a, FLOAT_TYPE b){
-	FLOAT_TYPE x = (a >= 0 ? a : -a);
+inline static MODEL_FLOAT D_sign (MODEL_FLOAT a, MODEL_FLOAT b){
+	MODEL_FLOAT x = (a >= 0 ? a : -a);
 	return (b >= 0 ? x : -x);
 	}
 
@@ -92,7 +92,7 @@ inline static FLOAT_TYPE D_sign (FLOAT_TYPE a, FLOAT_TYPE b){
 |	is destroyed.  Returns ERROR if matrix is singular, NO_ERROR otherwise.
 */
 
-int InvertMatrix (FLOAT_TYPE **a, int n, FLOAT_TYPE *col, int *indx, FLOAT_TYPE **a_inv)
+int InvertMatrix (MODEL_FLOAT **a, int n, MODEL_FLOAT *col, int *indx, MODEL_FLOAT **a_inv)
 	/*     **a = matrix represented as vector of row pointers      */
 	/*       n = order of matrix                                   */
 	/*    *col = work vector of size n                             */
@@ -101,7 +101,7 @@ int InvertMatrix (FLOAT_TYPE **a, int n, FLOAT_TYPE *col, int *indx, FLOAT_TYPE 
 {
 	int			rc, i, j;
 	
-	rc = LUDecompose(a, n, col, indx, (FLOAT_TYPE *)NULL);
+	rc = LUDecompose(a, n, col, indx, (MODEL_FLOAT *)NULL);
 	if (rc == FALSE)
 		{
 		for (j = 0; j < n; j++)
@@ -125,7 +125,7 @@ int InvertMatrix (FLOAT_TYPE **a, int n, FLOAT_TYPE *col, int *indx, FLOAT_TYPE 
 |	otherwise.
 */
 
-int LUDecompose (FLOAT_TYPE **a, int n, FLOAT_TYPE *vv, int *indx, FLOAT_TYPE *pd)
+int LUDecompose (MODEL_FLOAT **a, int n, MODEL_FLOAT *vv, int *indx, MODEL_FLOAT *pd)
 	/*   **a = the matrix whose LU-decomposition is wanted                    */
 	/*     n = order of a                                                     */
 	/*   *vv = work vector of size n (stores implicit scaling of each row)    */
@@ -133,7 +133,7 @@ int LUDecompose (FLOAT_TYPE **a, int n, FLOAT_TYPE *vv, int *indx, FLOAT_TYPE *p
 	/*   *pd => 1 if number of row interchanges was even, -1 if odd (NULL OK) */
 {
 	int			i, imax, j, k;
-	FLOAT_TYPE		big, dum, sum, temp, d;
+	MODEL_FLOAT		big, dum, sum, temp, d;
 
 	d = 1.0;
 	for (i = 0; i < n; i++)
@@ -208,12 +208,12 @@ int LUDecompose (FLOAT_TYPE **a, int n, FLOAT_TYPE *vv, int *indx, FLOAT_TYPE *p
 |	Perform back-substition into LU-decomposed matrix in order to obtain inverse.
 */
 
-void LUBackSubst (FLOAT_TYPE **a, int n, int *indx, FLOAT_TYPE *b)
+void LUBackSubst (MODEL_FLOAT **a, int n, int *indx, MODEL_FLOAT *b)
 
 {
 	int			i, ip, j,
 				ii = -1;
-	FLOAT_TYPE		sum;
+	MODEL_FLOAT		sum;
 
 	for (i = 0; i < n; i++)
 		{
@@ -246,7 +246,7 @@ void LUBackSubst (FLOAT_TYPE **a, int n, int *indx, FLOAT_TYPE *b)
 |	are real, using routines from the public domain EISPACK package.
 */
 
-int EigenRealGeneral (int n, FLOAT_TYPE **a, FLOAT_TYPE *v, FLOAT_TYPE *vi, FLOAT_TYPE **u, int *iwork, FLOAT_TYPE *work)
+int EigenRealGeneral (int n, MODEL_FLOAT **a, MODEL_FLOAT *v, MODEL_FLOAT *vi, MODEL_FLOAT **u, int *iwork, MODEL_FLOAT *work)
 	/*      n = order of a                                                      */
 	/*    **a = input matrix in row-ptr representation; will be destroyed       */
 	/*     *v = array of size 'n' to receive eigenvalues                        */
@@ -306,7 +306,7 @@ int EigenRealGeneral (int n, FLOAT_TYPE **a, FLOAT_TYPE *v, FLOAT_TYPE *vi, FLOA
 |		iv1  and  fv1  are temporary storage vectors of size n
 */
 
-int EigenRG (int n, FLOAT_TYPE **a, FLOAT_TYPE *wr, FLOAT_TYPE *wi, FLOAT_TYPE **z, int *iv1, FLOAT_TYPE *fv1)
+int EigenRG (int n, MODEL_FLOAT **a, MODEL_FLOAT *wr, MODEL_FLOAT *wi, MODEL_FLOAT **z, int *iv1, MODEL_FLOAT *fv1)
 
 {
 	static int	is1, is2;
@@ -361,10 +361,10 @@ int EigenRG (int n, FLOAT_TYPE **a, FLOAT_TYPE *wr, FLOAT_TYPE *wi, FLOAT_TYPE *
 |	Note that 1 is returned for high if high is zero formally.
 */
 
-void Balanc (int n, FLOAT_TYPE **a, int *pLow, int *pHigh, FLOAT_TYPE *scale)
+void Balanc (int n, MODEL_FLOAT **a, int *pLow, int *pHigh, MODEL_FLOAT *scale)
 
 {
-	FLOAT_TYPE		c, f, g, r, s, b2;
+	MODEL_FLOAT		c, f, g, r, s, b2;
 	int			i, j, k, l, m, noconv;
 
 	b2 = FLT_RADIX * FLT_RADIX;
@@ -494,13 +494,13 @@ void Balanc (int n, FLOAT_TYPE **a, int *pLow, int *pHigh, FLOAT_TYPE *scale)
 |	Support function for EISPACK routine Balanc.
 */
 
-void Exchange (int j, int k, int l, int m, int n, FLOAT_TYPE **a, FLOAT_TYPE *scale)
+void Exchange (int j, int k, int l, int m, int n, MODEL_FLOAT **a, MODEL_FLOAT *scale)
 
 {
 	int			i;
-	FLOAT_TYPE		f;
+	MODEL_FLOAT		f;
 
-	scale[m] = (FLOAT_TYPE)j;
+	scale[m] = (MODEL_FLOAT)j;
 	if (j != m)
 		{
 		for (i = 0; i <= l; i++)
@@ -549,11 +549,11 @@ void Exchange (int j, int k, int l, int m, int n, FLOAT_TYPE **a, FLOAT_TYPE *sc
 |		elements low through high are used.
 */
 
-void ElmHes (int n, int low, int high, FLOAT_TYPE **a, int *intchg)
+void ElmHes (int n, int low, int high, MODEL_FLOAT **a, int *intchg)
 
 {
 	int			i, j, m;
-	FLOAT_TYPE		x, y;
+	MODEL_FLOAT		x, y;
 	int			la, mm1, kp1, mp1;
 	
 	la = high - 1;
@@ -646,7 +646,7 @@ void ElmHes (int n, int low, int high, FLOAT_TYPE **a, int *intchg)
 |	   z contains the transformation matrix produced in the reduction by ElmHes.
 */
 
-void ElTran (int n, int low, int high, FLOAT_TYPE **a, int *intchg, FLOAT_TYPE **z)
+void ElTran (int n, int low, int high, MODEL_FLOAT **a, int *intchg, MODEL_FLOAT **z)
 
 {
 	int			i, j, mp;
@@ -733,11 +733,11 @@ void ElTran (int n, int low, int high, FLOAT_TYPE **a, int *intchg, FLOAT_TYPE *
 #if (defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 1000)
 #pragma intel optimization_level 1
 #endif
-int Hqr2 (int n, int low, int high, FLOAT_TYPE **h, FLOAT_TYPE *wr, FLOAT_TYPE *wi, FLOAT_TYPE **z)
+int Hqr2 (int n, int low, int high, MODEL_FLOAT **h, MODEL_FLOAT *wr, MODEL_FLOAT *wi, MODEL_FLOAT **z)
 
 {
 	int			i, j, k, l, m, na, en, notlas, mp2, itn, its, enm2, twoRoots;
-	FLOAT_TYPE		norm, p, q, r, s, t, w, x, y, ra, sa, vi, vr, zz, tst1, tst2;
+	MODEL_FLOAT		norm, p, q, r, s, t, w, x, y, ra, sa, vi, vr, zz, tst1, tst2;
 
 	/* store roots isolated by Balanc and compute matrix norm */
 	norm = 0.0;
@@ -809,9 +809,9 @@ int Hqr2 (int n, int low, int high, FLOAT_TYPE **h, FLOAT_TYPE *wr, FLOAT_TYPE *
 					h[i][i] -= x;
 			
 				s = fabs(h[en][na]) + fabs(h[na][enm2]);
-				x = s * (FLOAT_TYPE) 0.75;
+				x = s * (MODEL_FLOAT) 0.75;
 				y = x;
-				w = s * (FLOAT_TYPE)-0.4375 * s;
+				w = s * (MODEL_FLOAT)-0.4375 * s;
 				}
 	
 			its++;
@@ -846,7 +846,7 @@ int Hqr2 (int n, int low, int high, FLOAT_TYPE **h, FLOAT_TYPE *wr, FLOAT_TYPE *
 					h[i][i-3] = 0.0;
 				}
 	
-			/* FLOAT_TYPE qr step involving rows l to en and columns m to en */
+			/* MODEL_FLOAT qr step involving rows l to en and columns m to en */
 			for (k = m; k <= na; k++)
 				{
 				notlas = (k != na);
@@ -937,7 +937,7 @@ int Hqr2 (int n, int low, int high, FLOAT_TYPE **h, FLOAT_TYPE *wr, FLOAT_TYPE *
 		if (twoRoots)
 			{
 			/* two roots found */
-			p = (y - x) / (FLOAT_TYPE) 2.0;
+			p = (y - x) / (MODEL_FLOAT) 2.0;
 			q = p * p + w;
 			zz = sqrt(fabs(q));
 			h[en][en] = x + t;
@@ -1063,13 +1063,13 @@ int Hqr2 (int n, int low, int high, FLOAT_TYPE **h, FLOAT_TYPE *wr, FLOAT_TYPE *
 							x = h[i][i+1];
 							y = h[i+1][i];
 							vr = (wr[i] - p) * (wr[i] - p) + wi[i] * wi[i] - q * q;
-							vi = (wr[i] - p) * (FLOAT_TYPE)2.0 * q;
+							vi = (wr[i] - p) * (MODEL_FLOAT)2.0 * q;
 							if ((vr == 0.0) && (vi == 0.0))
 								{
 								tst1 = norm * (fabs(w) + fabs(q) + fabs(x) + fabs(y) + fabs(zz));
 								vr = tst1;
 								do	{
-									vr *= (FLOAT_TYPE) 0.01;
+									vr *= (MODEL_FLOAT) 0.01;
 									tst2 = tst1 + vr;
 									}
 									while (tst2 > tst1);
@@ -1138,7 +1138,7 @@ int Hqr2 (int n, int low, int high, FLOAT_TYPE **h, FLOAT_TYPE *wr, FLOAT_TYPE *
 								tst1 = norm;
 								t = tst1;
 								do	{
-									t *= (FLOAT_TYPE) 0.01;
+									t *= (MODEL_FLOAT) 0.01;
 									tst2 = norm + t;
 									}
 									while (tst2 > tst1);
@@ -1237,11 +1237,11 @@ int Hqr2 (int n, int low, int high, FLOAT_TYPE **h, FLOAT_TYPE *wr, FLOAT_TYPE *
 |		columns.
 */
 
-void BalBak (int n, int low, int high, FLOAT_TYPE *scale, int m, FLOAT_TYPE **z)
+void BalBak (int n, int low, int high, MODEL_FLOAT *scale, int m, MODEL_FLOAT **z)
 
 {
 	int			i, j, k, ii;
-	FLOAT_TYPE		s;
+	MODEL_FLOAT		s;
 
 	if (m != 0)
 		{
@@ -1284,10 +1284,10 @@ void BalBak (int n, int low, int high, FLOAT_TYPE *scale, int m, FLOAT_TYPE **z)
 |	Complex division, (cr,ci) = (ar,ai)/(br,bi)
 */
 
-void CDiv (FLOAT_TYPE ar, FLOAT_TYPE ai, FLOAT_TYPE br, FLOAT_TYPE bi, FLOAT_TYPE *cr, FLOAT_TYPE *ci)
+void CDiv (MODEL_FLOAT ar, MODEL_FLOAT ai, MODEL_FLOAT br, MODEL_FLOAT bi, MODEL_FLOAT *cr, MODEL_FLOAT *ci)
 
 {
-	FLOAT_TYPE		s, ais, bis, ars, brs;
+	MODEL_FLOAT		s, ais, bis, ars, brs;
 
 	s = fabs(br) + fabs(bi);
 	ars = ar / s;
@@ -1301,11 +1301,11 @@ void CDiv (FLOAT_TYPE ar, FLOAT_TYPE ai, FLOAT_TYPE br, FLOAT_TYPE bi, FLOAT_TYP
 
 
 //these are from John's MCMC.c file
-void CalcCijk (FLOAT_TYPE *c_ijk, int n, const FLOAT_TYPE **u, const FLOAT_TYPE **v)
+void CalcCijk (MODEL_FLOAT *c_ijk, int n, const MODEL_FLOAT **u, const MODEL_FLOAT **v)
 
 {
 		/* precalculate values for faster matrix mult in GTRChangeMatrix and GTRDerivatives */
-		FLOAT_TYPE *pc = c_ijk;
+		MODEL_FLOAT *pc = c_ijk;
 		for (int i=0; i<n; i++)
 			for (int j=0; j<n; j++)
 				for (int k=0; k<n; k++){
@@ -1315,16 +1315,16 @@ void CalcCijk (FLOAT_TYPE *c_ijk, int n, const FLOAT_TYPE **u, const FLOAT_TYPE 
 }
 
 
-void CalcPij (const FLOAT_TYPE *c_ijk, int n, const FLOAT_TYPE *eigenValues, FLOAT_TYPE v, FLOAT_TYPE r, FLOAT_TYPE **p, FLOAT_TYPE *EigValexp)
+void CalcPij (const MODEL_FLOAT *c_ijk, int n, const MODEL_FLOAT *eigenValues, MODEL_FLOAT v, MODEL_FLOAT r, MODEL_FLOAT **p, MODEL_FLOAT *EigValexp)
 
 {
 
 	register int		nsq = n * n;
-	FLOAT_TYPE				sum;
-	const FLOAT_TYPE *ptr;
-	FLOAT_TYPE *pMat = p[0];
-	FLOAT_TYPE vr = v * r;
-	FLOAT_TYPE *g = EigValexp;
+	MODEL_FLOAT				sum;
+	const MODEL_FLOAT *ptr;
+	MODEL_FLOAT *pMat = p[0];
+	MODEL_FLOAT vr = v * r;
+	MODEL_FLOAT *g = EigValexp;
 	for (int k=0; k<n; k++)
 		*g++ = exp(*eigenValues++ * vr);
 
@@ -1336,7 +1336,8 @@ void CalcPij (const FLOAT_TYPE *c_ijk, int n, const FLOAT_TYPE *eigenValues, FLO
 		for(int k=0; k<n; k++)
 			sum += (*ptr++) * (*g++);
 	//	assert(sum > 0.0f);
-#ifdef SINGLE_PRECISION_FLOATS
+//DEBUG
+#ifdef _SINGLE_PRECISION_FLOATS
 		*pMat++ = (sum < ZERO_POINT_ZERO) ? FLT_MIN : sum;
 #else
 		*pMat++ = (sum < ZERO_POINT_ZERO) ? ZERO_POINT_ZERO : sum;
