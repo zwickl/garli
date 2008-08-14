@@ -77,7 +77,8 @@ class Individual
 		int mutated_brlen;//the number of brlen muts
 		bool accurateSubtrees;
 
-		Model *mod;
+		//Model *mod;
+		ModelPartition modPart;
 		
 		Tree *treeStruct;
 
@@ -141,7 +142,7 @@ inline void Individual::CrossOverWith( Individual& so , FLOAT_TYPE optPrecision)
 	#ifdef BIPART_BASED_RECOM
 	//this will return -1 if no recombination actually occured
 	int x=-1;
-	x=treeStruct->BipartitionBasedRecombination(so.treeStruct, mod->IsModelEqual(so.mod), optPrecision);
+	x=treeStruct->BipartitionBasedRecombination(so.treeStruct, modPart.IsModelPartitionEqual(&so.modPart), optPrecision);
 	//if we don't find a bipart based recom that does much good, do a normal one
 	if(x==-1){
 		/*

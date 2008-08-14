@@ -68,14 +68,14 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	}
 
 
-	CondLikeArray* ClaManager::AssignFreeCla(){
+	CondLikeArraySet* ClaManager::AssignFreeCla(){
 		#ifdef CLA_DEBUG
 		ofstream deb("cladebug.log", ios::app);
 		#endif
 
 		if(claStack.empty() == true) RecycleClas();
 		
-		CondLikeArray *arr=claStack[claStack.size()-1];
+		CondLikeArraySet *arr=claStack[claStack.size()-1];
 		
 		assert(arr != NULL);
 		claStack.pop_back();
@@ -87,11 +87,11 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	void ClaManager::RecycleClas(){
 		int numReclaimed=0;
 		for(int i=0;i<numHolders;i++){
-			if(holders[i].theArray != NULL){
+			if(holders[i].theSet != NULL){
 				if(holders[i].GetReclaimLevel() == 2 && holders[i].tempReserved == false && holders[i].reserved == false){
-					claStack.push_back(holders[i].theArray);
+					claStack.push_back(holders[i].theSet);
 					holders[i].SetReclaimLevel(0);
-					holders[i].theArray=NULL;
+					holders[i].theSet=NULL;
 					numReclaimed++;
 					}
 				}
@@ -99,11 +99,11 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 			}
 		if(numReclaimed>10) return;
 		for(int i=0;i<numHolders;i++){
-			if(holders[i].theArray != NULL){
+			if(holders[i].theSet != NULL){
 				if((holders[i].GetReclaimLevel() == 1 && holders[i].tempReserved == false && holders[i].reserved == false)){
-					claStack.push_back(holders[i].theArray);
+					claStack.push_back(holders[i].theSet);
 					holders[i].SetReclaimLevel(0);
-					holders[i].theArray=NULL;
+					holders[i].theSet=NULL;
 					numReclaimed++;
 					}
 				}

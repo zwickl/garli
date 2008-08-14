@@ -298,6 +298,10 @@ public:
 	Adaptation *adap;
 	Individual* indiv;
 
+	//PARTITION
+	//hacking this in for now
+	ModelSpecification *modSpec;
+
 private:
 
 	Individual* newindiv;
@@ -370,10 +374,13 @@ private:
 	FLOAT_TYPE** cumfit;//allocated in setup, deleted in dest
 		
 	TopologyList **topologies;//allocated in Setup(), deleted in dest
-			
-	SequenceData* data;
-	SequenceData* rawData;//this will hold the original data as read in, before it might be converted
+	
+	//PARTITION
+	//SequenceData* data;
+	//SequenceData* rawData;//this will hold the original data as read in, before it might be converted
 					//to codons or aminoacid
+	DataPartition *dataPart;
+	DataPartition *rawPart;
 
 	Stopwatch stopwatch;
 
@@ -389,7 +396,7 @@ private:
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			treeString(NULL), adap(NULL), fraction_done(ZERO_POINT_ZERO),
 			topologies(NULL), prematureTermination(false), currentBootstrapRep(0),
-			finishedRep(false), lastBootstrapSeed(0), data(NULL), rawData(NULL)
+			finishedRep(false), lastBootstrapSeed(0), dataPart(NULL), rawPart(NULL)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
 #endif
@@ -432,7 +439,7 @@ private:
 		void WriteTreeFile( const char* treefname, int indnum = -1);
 		void WritePhylipTree(ofstream &phytree);
 
-		void Setup(GeneralGamlConfig *conf, SequenceData *, int nprocs = 1, int rank = 0);
+		void Setup(GeneralGamlConfig *conf, DataPartition *, DataPartition *, int nprocs = 1, int rank = 0);
 		void Reset();
 		int Restart(int type, int rank, int nprocs, int restart_count);
 		void SeedPopulationWithStartingTree(int rep);//mult rep change

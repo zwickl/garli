@@ -53,8 +53,8 @@ using namespace std;
 //******************************************************************************
 //  CondLikeArray
 //
-class CondLikeArray
-{
+class CondLikeArray{
+	//this is a CLA for a single model
 	friend class CondLikeArrayIterator;
 
 	unsigned nsites, nrates, nstates;
@@ -62,13 +62,53 @@ class CondLikeArray
 		FLOAT_TYPE* arr;
 		int* underflow_mult;
 		unsigned rescaleRank;
+		unsigned dataIndex;
+		CondLikeArray(int nsit, int nsta, int nrat, int datind)
+			: nsites(nsit), nrates(nrat), nstates(nsta), arr(NULL), underflow_mult(NULL), rescaleRank(1), dataIndex(datind){}
 		CondLikeArray()
-			: nsites(0), nrates(0), nstates(0), arr(0), underflow_mult(0), rescaleRank(1){}
+			: nsites(0), nrates(0), nstates(0), arr(0), underflow_mult(0), rescaleRank(1), dataIndex(0){}
 		~CondLikeArray();
-		int NStates() {return nstates;}
-		int NSites() {return nsites;}
+		int NStates() {
+			return nstates;
+			}
+		int NChar() {return nsites;}
+		int NRateCats() {return nrates;}
+		int RequiredSize() {return nsites * nstates * nrates;}
+		void Assign(FLOAT_TYPE *alloc, int * under) {arr = alloc; underflow_mult = under;}
 
 		void Allocate( int nk, int ns, int nr = 1 );
+	};
+
+class CondLikeArraySet{
+	//this is a set of CLAs, one for each model
+public:
+		vector<CondLikeArray *> theSets;
+		FLOAT_TYPE *rawAllocation;
+		int *rawUnder;
+
+		CondLikeArraySet() : rawAllocation(NULL), rawUnder(NULL){};
+		~CondLikeArraySet() {theSets.clear();delete []rawAllocation;delete []rawUnder;}
+		void Allocate() {
+			unsigned size = 0, usize = 0;
+			for(vector<CondLikeArray *>::iterator cit = theSets.begin();cit != theSets.end();cit++){
+				size += (*cit)->RequiredSize();
+				usize += (*cit)->NChar();
+				}
+			rawAllocation = new FLOAT_TYPE[size];
+			rawUnder = new int[usize];
+			unsigned offset = 0, uoffset = 0;
+			for(vector<CondLikeArray *>::iterator cit = theSets.begin();cit != theSets.end();cit++){
+				(*cit)->Assign(&rawAllocation[offset], &rawUnder[uoffset]);
+				offset += (*cit)->RequiredSize();
+				uoffset += (*cit)->NChar();
+				}
+			}
+		void AddCLA(CondLikeArray *cla ){
+			theSets.push_back(cla);
+			}
+		CondLikeArray *GetCLA(int index){
+			return theSets[index];
+			}
 	};
 
 class CondLikeArrayHolder{
@@ -77,12 +117,13 @@ class CondLikeArrayHolder{
 	short reclaimLevel;
 	bool tempReserved;
 	bool reserved;
-	CondLikeArray *theArray;
-	CondLikeArrayHolder() : theArray(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){}
+	//CondLikeArray *theArray;
+	CondLikeArraySet *theSet;
+	CondLikeArrayHolder() : theSet(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){}
 	~CondLikeArrayHolder() {};
 	int GetReclaimLevel() {return reclaimLevel;}
 	void SetReclaimLevel(int lvl) {reclaimLevel = lvl;}
-	void Reset(){reclaimLevel=0;numAssigned=0,tempReserved=false;reserved=false;theArray=NULL;}
+	void Reset(){reclaimLevel=0;numAssigned=0,tempReserved=false;reserved=false;theSet=NULL;}
 	};
 #endif
 

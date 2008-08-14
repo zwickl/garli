@@ -608,4 +608,27 @@ public:
 
 	};
 
+class DataPartition {
+private:
+	vector<SequenceData *> dataSubsets;
+	int nTax;
+public:
+	void AddSubset(SequenceData* sub){
+		dataSubsets.push_back(sub);
+		nTax = sub->NTax();
+		}
+	SequenceData *GetSubset(int num) const{
+		if(num < 0 || (num < dataSubsets.size()) == false) throw ErrorException("Tried to access invalid subset number");
+		return dataSubsets[num];
+		}
+	void Delete(){
+		for(vector<SequenceData *>::iterator it = dataSubsets.begin();it != dataSubsets.end(); it++)
+			delete *it;
+		}
+	int NTax() const {return nTax;}
+	void BeginNexusTreesBlock(ofstream &out) const {dataSubsets[0]->BeginNexusTreesBlock(out);}
+	NxsString TaxonLabel(int t) const {return dataSubsets[0]->TaxonLabel(t);}
+	int TaxonNameToNumber(NxsString name) const{return dataSubsets[0]->TaxonNameToNumber(name);}
+	};
+
 #endif

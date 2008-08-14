@@ -33,7 +33,7 @@ using namespace std;
 #include "model.h"
 #include "garlireader.h"
 
-extern ModelSpecification modSpec;
+//extern ModelSpecification modSpec;
 
 #define MAX_TAXON_LABEL		100
 
@@ -781,6 +781,10 @@ int DataMatrix::GetToken( FILE *in, char* tokenbuf, int maxlen){
 // Read reads in data from a file
 
 int DataMatrix::ReadPhylip( const char* infname){
+
+	//PARTITION
+	ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
+
 	char ch;
 	bool isNexus=false;
 
@@ -865,7 +869,7 @@ int DataMatrix::ReadPhylip( const char* infname){
 						}
 					}
 	 			else{ 
-					if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid() == false)
+					if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
 						datum = CharToDatum(ch);
 					else 
 						datum = CharToBitwiseRepresentation(ch);
@@ -928,6 +932,9 @@ int DataMatrix::ReadFasta( const char* infname){
 	char ch;
 	bool isNexus=false;
 
+	//PARTITION
+	ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
+
 	FILE *inf;
 #ifdef BOINC
 	char input_path[512];
@@ -974,7 +981,7 @@ int DataMatrix::ReadFasta( const char* infname){
 			do{
 				ch = getc(inf);
 				}while(isspace(ch));
-			if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid() == false)
+			if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
 				datum = CharToDatum(ch);
 			else 
 				datum = CharToBitwiseRepresentation(ch);
