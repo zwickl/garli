@@ -34,7 +34,7 @@
 #include "individual.h"
 #include "adaptation.h"
 #include "sequencedata.h"
-#include "garlireader.h"
+//#include "garlireader.h"
 
 #include "funcs.h"
 #include "mpifuncs.h"
@@ -196,8 +196,11 @@ int main( int argc, char* argv[] )	{
 
 		//create the population object
 		Population pop;
+		//PARTITION
+		DataPartition dataPart;
+		DataPartition rawPart;
 		SequenceData *data = NULL;
-		
+
 		try{
 			MasterGamlConfig conf;
 			bool confOK;
@@ -315,31 +318,45 @@ int main( int argc, char* argv[] )	{
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
 			//set up the model specification
-			modSpec.SetupModSpec(conf);
-
+			//PARTITION
+			//modSpec.SetupModSpec(conf);
+			modSpecSet.AddModSpec(conf);
+			//Can add another ModSpec here to fake partitions (multiple models, 1 matrix)
+//			modSpecSet.AddModSpec(conf);
+			const ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
+			
 			// Create the data object
-			if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid() == false)
+			if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
 				data = new AminoacidData();
 			else //all data besides AA will be read into a DNA matrix and
 				//then converted if necessary
 				data = new NucleotideData();
 
 			pop.usedNCL = ReadData(datafile.c_str(), data);
-			
-			if(modSpec.IsCodon()){
-				CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
-				pop.rawData = data;
-				data = d;
+
+			//PARTITION			
+			if(modSpec->IsCodon()){
+				rawPart.AddSubset(data);
+				CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec->geneticCode);
+				//PARTITION
+				//pop.rawData = data;
+				dataPart.AddSubset(d);
+				//data = d;
 				//this probably shouldn't go here, but...
-				if(modSpec.IsF1x4StateFrequencies()) d->SetF1X4Freqs();
-				else if(modSpec.IsF3x4StateFrequencies()) d->SetF3X4Freqs();
-				else if(modSpec.IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
+				if(modSpec->IsF1x4StateFrequencies()) d->SetF1X4Freqs();
+				else if(modSpec->IsF3x4StateFrequencies()) d->SetF3X4Freqs();
+				else if(modSpec->IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
 				}
-			else if(modSpec.IsCodonAminoAcid()){
-				AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
-				pop.rawData = data;
-				data = d;				
+			else if(modSpec->IsCodonAminoAcid()){
+				rawPart.AddSubset(data);
+				AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec->geneticCode);
+				//pop.rawData = data;
+				//PARTITION
+				//pop.rawData = data;
+				dataPart.AddSubset(d);
+				//data = d;				
 				}
+			else dataPart.AddSubset(data);
 
 			data->Summarize();
 			outman.UserMessage("\nSummary of dataset:");
@@ -364,7 +381,10 @@ int main( int argc, char* argv[] )	{
 
 			data->DetermineConstantSites();
 
-			pop.Setup(&conf, data, 1, 0);
+			//PARTITION
+			//dataPart.AddSubset(data);
+
+			pop.Setup(&conf, &dataPart, &rawPart, 1, 0);
 			pop.SetOutputDetails();
 
 			if(runTests){

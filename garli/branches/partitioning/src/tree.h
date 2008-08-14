@@ -42,7 +42,7 @@ class SequenceData;
 class NucleotideData;
 class ClaManager;
 class GeneralGamlConfig;
-class Model;
+class ModelPartition;
 class Individual;
 extern rng rnd;
 
@@ -58,7 +58,7 @@ class Tree{
 
 	public:
 		FLOAT_TYPE lnL;	// holds likelihood score
-		Model *mod;
+		ModelPartition *modPart;
 		TreeNode *root;
 		TreeNode **allNodes;
 		ReconList sprRang;
@@ -73,7 +73,7 @@ class Tree{
 		static FLOAT_TYPE max_brlen;
 		static FLOAT_TYPE exp_starting_brlen;
 		static ClaManager *claMan;
-		static const SequenceData *data;
+		static const DataPartition *dataPart;
 		static FLOAT_TYPE treeRejectionThreshold;
 		static vector<Constraint> constraints;
 		static AttemptedSwapList attemptedSwaps;
@@ -201,10 +201,10 @@ class Tree{
 		// functions for computing likelihood
 		bool ConditionalLikelihood(int direction, TreeNode* nd);	
 		int ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA=false);
-		FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata);
-		FLOAT_TYPE GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata);
-		FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat);
-		FLOAT_TYPE GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat);
+		FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, Model *mod);
+		FLOAT_TYPE GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, Model *mod);
+		FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, Model *mod);
+		FLOAT_TYPE GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, Model *mod);
 		int Score(int rootNodeNum =0);
 	
 		//functions to optimize blens and params
@@ -213,26 +213,29 @@ class Tree{
 #ifdef OPT_DEBUG
 		FLOAT_TYPE NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool goodGuess);
 #endif
-		void GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, const unsigned *ambigMap =NULL);
-		void GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot);
-		void GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot);
-		void GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2);
-		void GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2);
-		void GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot);
-		void GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, char *equiv);
-		void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr);
-		void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata);
-		void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, const unsigned *ambigMap);
+		void GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod, const unsigned *ambigMap =NULL);
+		void GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod);
+		void GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod);
+		void GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, Model *mod);
+		void GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, Model *mod);
+		void GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod);
+		void GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, char *equiv, Model *mod);
+		void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, Model *mod);
+		void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, Model *mod);
+		void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, const unsigned *ambigMap, Model *mod);
 
-		void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr,const char *leftEQ, const char *rightEQ);
+		void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr,const char *leftEQ, const char *rightEQ, Model *mod);
 
-		void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA);
-		void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata);
+		void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA, Model *mod);
+		void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata, Model *mod);
 
-		void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr);
-		void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2);
-		void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata);
+		void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, Model *mod);
+		void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, Model *mod);
+		void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, Model *mod);
 		
+		void UpdateCLAs(CondLikeArraySet *destCLA, CondLikeArraySet *firstCLA, CondLikeArraySet *secCLA, TreeNode *firstChild, TreeNode *secChild, FLOAT_TYPE blen1, FLOAT_TYPE blen2);
+		void GetTotalScore(CondLikeArraySet *partialCLA, CondLikeArraySet *childCLA, TreeNode *child, FLOAT_TYPE blen1);
+
 		FLOAT_TYPE OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, bool goodGuess);
 		FLOAT_TYPE OptimizeAllBranches(FLOAT_TYPE optPrecision);
 		void OptimizeBranchesAroundNode(TreeNode *nd, FLOAT_TYPE optPrecision, int subtreeNode);
@@ -245,12 +248,12 @@ class Tree{
 		FLOAT_TYPE OptimizeAlpha(FLOAT_TYPE);
 		FLOAT_TYPE OptimizeOmegaParameters(FLOAT_TYPE prec);
 		FLOAT_TYPE OptimizeFlexRates(FLOAT_TYPE prec);
-		FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE));
+		FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, int modnum, void (Model::*SetParam)(int, FLOAT_TYPE));
 		FLOAT_TYPE OptimizeTreeScale(FLOAT_TYPE);
 		FLOAT_TYPE OptimizePinv();
 		void SetNodesUnoptimized();
-		void RescaleRateHet(CondLikeArray *destCLA);
-		void RescaleRateHetNState(CondLikeArray *destCLA);
+		void RescaleRateHet(CondLikeArray *destCLA, int dataIndex);
+		void RescaleRateHetNState(CondLikeArray *destCLA, int dataIndex);
 
 		pair<FLOAT_TYPE, FLOAT_TYPE> OptimizeSingleSiteTreeScale(FLOAT_TYPE optPrecision);
 
@@ -260,9 +263,9 @@ class Tree{
 		void MarkClasNearTipsToReclaim(int subtreeNode);
 		void ProtectClas();
 		void UnprotectClas();
-		inline CondLikeArray *GetClaDown(TreeNode *nd, bool calc=true);
-		inline CondLikeArray *GetClaUpLeft(TreeNode *nd, bool calc=true);
-		inline CondLikeArray *GetClaUpRight(TreeNode *nd, bool calc=true);
+		inline CondLikeArraySet *GetClaDown(TreeNode *nd, bool calc=true);
+		inline CondLikeArraySet *GetClaUpLeft(TreeNode *nd, bool calc=true);
+		inline CondLikeArraySet *GetClaUpRight(TreeNode *nd, bool calc=true);
 		void OutputValidClaIndeces();
 		void OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site);
 		void ClaReport(ofstream &cla);
@@ -284,6 +287,7 @@ class Tree{
 
 		//accessor funcs
 		bool IsGood() const {return root->IsGood();}
+		int NTax() const {return numTipsTotal;}
 		int getNumTipsTotal() const {return numTipsTotal;}
 		int getNumNodesTotal() const {return numNodesTotal;}
 		int GetRandomInternalNode() const {return numTipsTotal+rnd.random_int(numTipsTotal-3)+1;}
@@ -306,7 +310,7 @@ class Tree{
 		void RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out);	
 		void InferAllInternalStateProbs(const char *ofprefix);
 
-		static void SetTreeStatics(ClaManager *, const SequenceData *, const GeneralGamlConfig *);
+		static void SetTreeStatics(ClaManager *, const DataPartition *, const GeneralGamlConfig *);
 		};
 
 
@@ -435,7 +439,7 @@ inline void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len){
 	SweepDirtynessOverTree(nd);
 	}
 
-inline CondLikeArray *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){
+inline CondLikeArraySet *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){
 	if(claMan->IsDirty(nd->claIndexDown)){
 		if(calc==true){
 			ConditionalLikelihoodRateHet(DOWN, nd);
@@ -446,7 +450,7 @@ inline CondLikeArray *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){
 	return claMan->GetCla(nd->claIndexDown);
 	}
 	
-inline CondLikeArray *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
+inline CondLikeArraySet *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
 	if(claMan->IsDirty(nd->claIndexUL)){
 		if(calc==true){
 			ConditionalLikelihoodRateHet(UPLEFT, nd);
@@ -457,7 +461,7 @@ inline CondLikeArray *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
 	return claMan->GetCla(nd->claIndexUL);
 	}
 	
-inline CondLikeArray *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/){
+inline CondLikeArraySet *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/){
 	if(claMan->IsDirty(nd->claIndexUR)){
 		if(calc==true){
 			ConditionalLikelihoodRateHet(UPRIGHT, nd);

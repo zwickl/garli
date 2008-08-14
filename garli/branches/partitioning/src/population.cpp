@@ -81,7 +81,9 @@ extern bool interactive;
 int memLevel;
 int calcCount=0;
 int optCalcs;
-ModelSpecification modSpec;
+//PARTITION
+//ModelSpecification modSpec;
+ModelSpecificationSet modSpecSet;
 
 ofstream outf, paupf;
 int tempGlobal=1;
@@ -333,7 +335,10 @@ Population::~Population()
 
 	Tree::attemptedSwaps.ClearAttemptedSwaps();
 
-	if(rawData != NULL) delete rawData;
+	//PARTITION
+	//if(rawData != NULL) delete rawData;
+	if(rawPart != NULL)
+		rawPart->Delete();
 		
 }
 
@@ -360,25 +365,34 @@ void Population::CheckForIncompatibleConfigEntries(){
 
 	//if no model mutations will be performed, parameters cannot be estimated.
 	if(conf->modWeight == ZERO_POINT_ZERO){
-		if(modSpec.fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
-		if(modSpec.includeInvariantSites == true && modSpec.fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
-		if(modSpec.Nst() > 1 && modSpec.fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
-		if(modSpec.numRateCats > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
+		for(int ms = 0;ms < modSpecSet.NumSpecSets();ms++){
+			ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
+			if(modSpec->fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
+			if(modSpec->includeInvariantSites == true && modSpec->fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
+			if(modSpec->Nst() > 1 && modSpec->fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
+			if(modSpec->numRateCats > 1 && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
+			if(conf->inferInternalStateProbs && (modSpec->IsNucleotide() == false))
+				throw ErrorException("Sorry, internal state reconstruction not yet implemented for non-nucleotide models.\nPAML does a good job of this with fixed trees, so you might try using your best GARLI tree there.");
+			}
 		}
 
-	if(conf->inferInternalStateProbs && (modSpec.IsNucleotide() == false))
-		throw ErrorException("Sorry, internal state reconstruction not yet implemented for non-nucleotide models.\nPAML does a good job of this with fixed trees, so you might try using your best GARLI tree there.");
 	if(conf->inferInternalStateProbs && conf->bootstrapReps > 0) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
 	}
 
-void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r){
+void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *rawD, int nprocs, int r){
 	stopwatch.Start();
 
 	//most of the allocation occurs here or in children
 	//set various things
 	rank=r;
 	conf=c;
-	data=d;
+	//data=d;
+	dataPart = d;
+	rawPart = rawD;
+
+	//PARTITION
+	SequenceData *curData = dataPart->GetSubset(0);
+	modSpec = modSpecSet.GetModSpec(0);
 
 	subtreeNode=0;
 
@@ -391,8 +405,10 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 
 	//set two model statics
 	Model::mutationShape = conf->gammaShapeModel;
-	if(modSpec.IsCodon()){
-		Model::SetCode(static_cast<CodonData*>(data)->GetCode());
+	if(modSpec->IsCodon()){
+		//PARTITION
+		//Model::SetCode(static_cast<CodonData*>(data)->GetCode());
+		Model::SetCode(static_cast<CodonData*>(curData)->GetCode());
 		}
 
 #ifdef INPUT_RECOMBINATION
@@ -408,15 +424,15 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	//instantiate the ParallelManager
 	if(rank==0){
 		MasterGamlConfig *mastConf = (MasterGamlConfig*) (conf);
-		paraMan = new ParallelManager(data->NTax(), nprocs, mastConf);
+		paraMan = new ParallelManager(dataPart->NTax(), nprocs, mastConf);
 		}
 
-	if(modSpec.IsNucleotide()) dynamic_cast<NucleotideData *>(data)->MakeAmbigStrings();	
+	if(modSpec->IsNucleotide()) dynamic_cast<NucleotideData *>(curData)->MakeAmbigStrings();	
 
 	//allocate the treeString
 	//remember that we also encode internal node numbers sometimes
-	FLOAT_TYPE taxsize=log10((FLOAT_TYPE) ((FLOAT_TYPE)data->NTax())*data->NTax()*2);
-	stringSize=(int)((data->NTax()*2)*(10+DEF_PRECISION)+taxsize);
+	FLOAT_TYPE taxsize=log10((FLOAT_TYPE) ((FLOAT_TYPE)dataPart->NTax())*dataPart->NTax()*2);
+	stringSize=(int)((dataPart->NTax()*2)*(10+DEF_PRECISION)+taxsize);
 	treeString=new char[stringSize];
 	treeString[stringSize - 1]='\0';
 
@@ -465,10 +481,11 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 		}
 		
 	const int MB = 1024 * 1024;
-	int sites = data->NChar();
+	int sites = curData->NChar();
 
-	int claSizePerNode = (modSpec.nstates * modSpec.numRateCats * sites * sizeof(FLOAT_TYPE)) + (sites * sizeof(int));
-	int numNodesPerIndiv = data->NTax()-2;
+	//int claSizePerNode = (modSpec->nstates * modSpec->numRateCats * sites * sizeof(FLOAT_TYPE)) + (sites * sizeof(int));
+	int claSizePerNode = indiv[0].modPart.CalcRequiredCLAsize(dataPart);
+	int numNodesPerIndiv = dataPart->NTax()-2;
 	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
 	int maxClas = (int)((memToUse*MB)/ claSizePerNode);
@@ -528,18 +545,18 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	if(memLevel==-1) throw ErrorException("Not enough memory specified in config file (availablememory)!");
 
 	//process the data a bit
-	data->CalcEmpiricalFreqs();
+	curData->CalcEmpiricalFreqs();
 
 	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 	//if we do tons of recombination 
 	idealClas *= 2;
-	claMan=new ClaManager(data->NTax()-2, numClas, idealClas, sites, modSpec.numRateCats);
+	claMan=new ClaManager(dataPart->NTax()-2, numClas, idealClas, &indiv[0].modPart, dataPart);
 
 	//setup the bipartition statics
-	Bipartition::SetBipartitionStatics(data->NTax());
+	Bipartition::SetBipartitionStatics(dataPart->NTax());
 
 	//set the tree statics
-	Tree::SetTreeStatics(claMan, data, conf);
+	Tree::SetTreeStatics(claMan, dataPart, conf);
 
 	//load any constraints
 	GetConstraints();
@@ -614,8 +631,8 @@ void Population::ApplyNSwaps(int numSwaps){
 
 	Individual *ind0 = &newindiv[0];
 
-	ind0->GetStartingConditionsFromFile(conf->streefname.c_str(), 0, data->NTax());
-	ind0->treeStruct->mod = ind0->mod;
+	ind0->GetStartingConditionsFromFile(conf->streefname.c_str(), 0, dataPart->NTax());
+	ind0->treeStruct->modPart = &ind0->modPart;
 	//ind0->GetStartingConditionsFromNCL(	File(conf->streefname.c_str(), 0, data->NTax());
 	
 	Individual *repResult = new Individual(ind0);
@@ -629,6 +646,7 @@ void Population::ApplyNSwaps(int numSwaps){
 		}
 
 	WriteStoredTrees("swapped.tre");		
+
 	}
 
 void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
@@ -665,7 +683,7 @@ void Population::GenerateTreesOnly(int nTrees){
 	if((_stricmp(conf->streefname.c_str(), "random") == 0)){
 		outman.UserMessageNoCR("Making random trees compatible with constraints... ");
 		for(int i=0;i<nTrees;i++){
-			indiv[0].MakeRandomTree(data->NTax());
+			indiv[0].MakeRandomTree(dataPart->NTax());
 			AppendTreeToTreeLog(-1, 0);
 			indiv[0].treeStruct->RemoveTreeFromAllClas();
 			delete indiv[0].treeStruct;
@@ -676,7 +694,7 @@ void Population::GenerateTreesOnly(int nTrees){
 	else if((_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
 		outman.UserMessageNoCR("Making stepwise trees compatible with constraints... ");
 		for(int i=0;i<nTrees;i++){
-			indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
+			indiv[0].MakeStepwiseTree(dataPart->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 			AppendTreeToTreeLog(-1, 0);
 			indiv[0].treeStruct->RemoveTreeFromAllClas();
 			delete indiv[0].treeStruct;
@@ -693,6 +711,8 @@ void Population::RunTests(){
 	//SeedPopulationWithStartingTree(0);
 //	InitializeOutputStreams();
 
+	SequenceData *data = dataPart->GetSubset(0);
+
 #ifdef NDEBUG
 	outman.UserMessage("WARNING: You are running internal tests with NDEBUG defined!\nIt should not be defined for full error checking.");
 #endif
@@ -707,7 +727,7 @@ void Population::RunTests(){
 
 	//ind0->MakeRandomTree(data->NTax());
 	ind0->MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
-	ind0->treeStruct->mod=ind0->mod;
+	ind0->treeStruct->modPart=&ind0->modPart;
 
 	//check that the score was correct coming out of MakeStepwiseTree
 	FLOAT_TYPE scr = ind0->treeStruct->lnL;
@@ -749,7 +769,7 @@ void Population::RunTests(){
 
 	ind1->treeStruct=new Tree();
 	ind1->CopySecByRearrangingNodesOfFirst(ind1->treeStruct, &newindiv[0]);
-	ind1->treeStruct->mod=ind1->mod;
+	ind1->treeStruct->modPart=&ind1->modPart;
 
 	ind0->SetDirty();
 	ind0->CalcFitness(0);
@@ -803,6 +823,9 @@ void Population::RunTests(){
 	}
 
 void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
+	assert(0);
+	//Deprecated
+/*
 	const int KB = 1024;
 	const int MB = KB*KB;
 	
@@ -822,6 +845,7 @@ void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
 	else if(numClas >= L3) memLevel = 3;
 	else memLevel=-1;
 	assert(memLevel >= 0);
+*/
 	}
 
 
@@ -833,19 +857,27 @@ void Population::GetConstraints(){
 		if(con.good() == false) throw ErrorException("Could not open constraint file %s!", conf->constraintfile.c_str());
 		if(con.good()){
 			outman.UserMessage("Loading constraints from file %s", conf->constraintfile.c_str());
-			Tree::LoadConstraints(con, data->NTax());
+			Tree::LoadConstraints(con, dataPart->NTax());
 			}
 		}
 	}
 
 void Population::SeedPopulationWithStartingTree(int rep){
+
+	//SequenceData *curData = dataPart->GetSubset(0);
+
 	for(unsigned i=0;i<total_size;i++){
 		if(indiv[i].treeStruct != NULL) indiv[i].treeStruct->RemoveTreeFromAllClas();
 		if(newindiv[i].treeStruct != NULL) newindiv[i].treeStruct->RemoveTreeFromAllClas();
 		}
 
 	//create the first indiv, and then copy the tree and clas
-	indiv[0].mod->SetDefaultModelParameters(data);
+	//PARTITION
+	//indiv[0].mod->SetDefaultModelParameters(curData);
+	for(int m=0;m<indiv[0].modPart.NumModels();m++){
+		Model *thisMod = indiv[0].modPart.GetModel(m);
+		thisMod->SetDefaultModelParameters(dataPart->GetSubset(thisMod->dataIndex));
+		}
 
 	//This is getting very complicated.  Here are the allowable combinations.
 	//streefname not specified (random or stepwise)
@@ -886,7 +918,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
 				int treeNum = (rank+rep-1) % numTrees;
-				indiv[0].GetStartingTreeFromNCL(treesblock, (rank + rep - 1), data->NTax());
+				indiv[0].GetStartingTreeFromNCL(treesblock, (rank + rep - 1), dataPart->NTax());
 				outman.UserMessage("Obtained starting tree %d from Nexus", treeNum+1);
 				}
 			else throw ErrorException("Problem getting tree(s) from NCL!");
@@ -895,7 +927,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			//cases 9-11 if the streef file is not the same as the datafile, and it isn't Nexus
 			//use the old garli starting model/tree format
 			outman.UserMessage("Obtaining starting conditions from file %s", conf->streefname.c_str());
-			indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank + rep - 1, data->NTax());
+			indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank + rep - 1, dataPart->NTax());
 			}
 		indiv[0].SetDirty();
 		}
@@ -904,20 +936,26 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	if(startingModelInNCL){
 		//crap out if we already got some parameters above in an old style starting conditions file
 #ifndef SUBROUTINE_GARLI
-		if(modSpec.GotAnyParametersFromFile() && (currentSearchRep == 1 && (conf->bootstrapReps == 0 || currentBootstrapRep == 1)))
+		if(modSpec->GotAnyParametersFromFile() && (currentSearchRep == 1 && (conf->bootstrapReps == 0 || currentBootstrapRep == 1)))
 			throw ErrorException("Found model parameters specified in a Nexus GARLI block with the dataset,\n\tand in the starting condition file (streefname).\n\tPlease use one or the other.");
 #endif
 		//model string from garli block, which could have come either in starting condition file
 		//or in file with Nexus dataset.  Cases 2, 4, 5, 7 and 8 come through here.
+		//PARTITION
+		//need to figure out how the hell this will work
 		string modString = reader.GetModelString();
-		indiv[0].mod->ReadGarliFormattedModelString(modString);
+		indiv[0].modPart.GetModel(0)->ReadGarliFormattedModelString(modString);
 		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
 		}
 
 	//The model params should be set to their initial values by now, so report them
 	if(conf->bootstrapReps == 0 || (currentBootstrapRep == 1 && currentSearchRep == 1)){
 		outman.UserMessage("MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)");
-		indiv[0].mod->OutputHumanReadableModelReportWithParams();
+		for(int m=0;m<indiv[0].modPart.NumModels();m++){
+			outman.UserMessage("Model %d", m);
+			Model *thisMod = indiv[0].modPart.GetModel(m);
+			thisMod->OutputHumanReadableModelReportWithParams();
+			}
 		}
 
 	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
@@ -933,28 +971,28 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		//first.  This caused the stepwise to be slow, and to not be reproducible when the seed from a rep > 1 was specified
 		//as the initial seed for a new run
 		globalBest = ZERO_POINT_ZERO;
-		indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
+		indiv[0].MakeStepwiseTree(dataPart->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 		}
 	else if(_stricmp(conf->streefname.c_str(), "random") == 0 || indiv[0].treeStruct == NULL){
 		if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
 		else outman.UserMessage("creating random starting tree (compatible with constraints)...");
-		indiv[0].MakeRandomTree(data->NTax());
+		indiv[0].MakeRandomTree(dataPart->NTax());
 		indiv[0].SetDirty();
 		}
 		
 	//Here we'll error out if something was fixed but didn't appear
 	if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
 		//if no streefname file was specified, the param values should be in a garli block with the dataset
-		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 		}
 	else{
-		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 		}
 		
 	assert(indiv[0].treeStruct != NULL);
@@ -965,11 +1003,12 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].treeStruct->root->CheckforPolytomies();
 	
 	indiv[0].treeStruct->CheckBalance();
-	indiv[0].treeStruct->mod=indiv[0].mod;
+	indiv[0].treeStruct->modPart=&indiv[0].modPart;
 	indiv[0].CalcFitness(0);
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
-	if(indiv[0].mod->NumMutatableParams() == 0) {
+	//if(indiv[0].mod->NumMutatableParams() == 0) {
+	if(indiv[0].modPart.NumMutableParams()) {
 		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
 			outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
 		adap->modelMutateProb=ZERO_POINT_ZERO;
@@ -998,21 +1037,21 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	for(unsigned i=1;i<total_size;i++){
 		if(indiv[i].treeStruct==NULL) indiv[i].treeStruct=new Tree();
 		indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].treeStruct->modPart=&indiv[i].modPart;
 		}
 #else
 	for(unsigned i=1;i<conf->nindivs;i++){
 		if(indiv[i].treeStruct==NULL) indiv[i].treeStruct=new Tree();
 		indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].treeStruct->modPart=&indiv[i].modPart;
 		}
 	
 	//string inputs="sphinx.input6000.goodmod.tre";
 	for(unsigned i=conf->nindivs;i<total_size;i++){
-		indiv[i].GetStartingConditionsFromFile(conf->streefname.c_str(), i-conf->nindivs, data->NTax());
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].GetStartingConditionsFromFile(conf->streefname.c_str(), i-conf->nindivs, dataPart->NTax());
+		indiv[i].treeStruct->modPart=&indiv[i].modPart;
 		indiv[i].SetDirty();
-		//indiv[i].RefineStartingConditions((adap->modWeight == ZERO_POINT_ZERO || modSpec.fixAlpha == true) == false, adap->branchOptPrecision);
+		//indiv[i].RefineStartingConditions((adap->modWeight == ZERO_POINT_ZERO || modSpec->fixAlpha == true) == false, adap->branchOptPrecision);
 		indiv[i].CalcFitness(0);
 		}
 #endif
@@ -1024,86 +1063,86 @@ void Population::SeedPopulationWithStartingTree(int rep){
 void Population::OutputModelReport(){
 	//Report on the model setup
 	outman.UserMessage("MODEL REPORT:");
-	if(modSpec.IsCodon()){
-		if(modSpec.IsVertMitoCode()) outman.UserMessage("  Number of states = 60 (codon data, vertebrate mitochondrial code)");
-		else if(modSpec.IsInvertMitoCode()) outman.UserMessage("  Number of states = 62 (codon data, invertebrate mitochondrial code)");
+	if(modSpec->IsCodon()){
+		if(modSpec->IsVertMitoCode()) outman.UserMessage("  Number of states = 60 (codon data, vertebrate mitochondrial code)");
+		else if(modSpec->IsInvertMitoCode()) outman.UserMessage("  Number of states = 62 (codon data, invertebrate mitochondrial code)");
 		else outman.UserMessage("  Number of states = 61 (codon data, standard code)");
 		}
-	else if(modSpec.IsAminoAcid())
+	else if(modSpec->IsAminoAcid())
 		outman.UserMessage("  Number of states = 20 (amino acid data)");
 	else 
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
-	if(modSpec.IsAminoAcid() == false){
-		if(modSpec.IsCodon() && modSpec.numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega)\n");
-		if(modSpec.IsCodon()) outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model:\n     ");
+	if(modSpec->IsAminoAcid() == false){
+		if(modSpec->IsCodon() && modSpec->numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega)\n");
+		if(modSpec->IsCodon()) outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model:\n     ");
 		else outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix: ");
-		if(modSpec.Nst() == 6){
-			if(modSpec.IsArbitraryRateMatrix()) outman.UserMessage("User specified matrix type: %s", modSpec.arbitraryRateMatrixString.c_str());
+		if(modSpec->Nst() == 6){
+			if(modSpec->IsArbitraryRateMatrix()) outman.UserMessage("User specified matrix type: %s", modSpec->arbitraryRateMatrixString.c_str());
 			else outman.UserMessage("6 rates");
-			if(modSpec.fixRelativeRates == true) outman.UserMessage("values specified by user (fixed)");
+			if(modSpec->fixRelativeRates == true) outman.UserMessage("values specified by user (fixed)");
 			}
-		else if(modSpec.Nst() == 2) outman.UserMessage("2 rates (transition and transversion)");
+		else if(modSpec->Nst() == 2) outman.UserMessage("2 rates (transition and transversion)");
 		else outman.UserMessage("1 rate");
 		}
 	else{
 		outman.UserMessageNoCR("  Amino Acid Rate Matrix: ");
-		if(modSpec.IsJonesAAMatrix()) outman.UserMessage("Jones");
-		else if(modSpec.IsDayhoffAAMatrix()) outman.UserMessage("Dayhoff");
-		else if(modSpec.IsPoissonAAMatrix()) outman.UserMessage("Poisson");
-		else if(modSpec.IsWAGAAMatrix()) outman.UserMessage("WAG");
-		else if(modSpec.IsMtMamAAMatrix()) outman.UserMessage("MtMam");
-		else if(modSpec.IsMtRevAAMatrix()) outman.UserMessage("MtRev");
+		if(modSpec->IsJonesAAMatrix()) outman.UserMessage("Jones");
+		else if(modSpec->IsDayhoffAAMatrix()) outman.UserMessage("Dayhoff");
+		else if(modSpec->IsPoissonAAMatrix()) outman.UserMessage("Poisson");
+		else if(modSpec->IsWAGAAMatrix()) outman.UserMessage("WAG");
+		else if(modSpec->IsMtMamAAMatrix()) outman.UserMessage("MtMam");
+		else if(modSpec->IsMtRevAAMatrix()) outman.UserMessage("MtRev");
 		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
-	if(modSpec.IsEqualStateFrequencies()){
-		if(modSpec.IsCodon()){
-			if(modSpec.IsVertMitoCode()) outman.UserMessage("equal (1/60 = 0.01667, fixed)");
-			else if(modSpec.IsInvertMitoCode()) outman.UserMessage("equal (1/62 = 0.01613, fixed)");
+	if(modSpec->IsEqualStateFrequencies()){
+		if(modSpec->IsCodon()){
+			if(modSpec->IsVertMitoCode()) outman.UserMessage("equal (1/60 = 0.01667, fixed)");
+			else if(modSpec->IsInvertMitoCode()) outman.UserMessage("equal (1/62 = 0.01613, fixed)");
 			else outman.UserMessage("equal (1/61 = 0.01639, fixed)");
 			}
-		else if(modSpec.IsAminoAcid())
+		else if(modSpec->IsAminoAcid())
 			outman.UserMessage("equal (0.05, fixed)");
 		else 
 			outman.UserMessage("equal (0.25, fixed)");
 		}
-	else if(modSpec.IsF3x4StateFrequencies()) outman.UserMessage("empirical values calculated by F3x4 method (fixed)");
-	else if(modSpec.IsF1x4StateFrequencies()) outman.UserMessage("empirical values calculated by F1x4 method (fixed)");
-	else if(modSpec.IsEmpiricalStateFrequencies()) outman.UserMessage("empirical values (fixed)");
-	else if(modSpec.IsJonesAAFreqs()) outman.UserMessage("Jones");
-	else if(modSpec.IsWAGAAFreqs()) outman.UserMessage("WAG");
-	else if(modSpec.IsMtMamAAFreqs()) outman.UserMessage("MtMam");
-	else if(modSpec.IsMtRevAAFreqs()) outman.UserMessage("MtRev");
-	else if(modSpec.IsDayhoffAAFreqs()) outman.UserMessage("Dayhoff");
-	else if(modSpec.IsUserSpecifiedStateFrequencies()) outman.UserMessage("specified by user (fixed)");
+	else if(modSpec->IsF3x4StateFrequencies()) outman.UserMessage("empirical values calculated by F3x4 method (fixed)");
+	else if(modSpec->IsF1x4StateFrequencies()) outman.UserMessage("empirical values calculated by F1x4 method (fixed)");
+	else if(modSpec->IsEmpiricalStateFrequencies()) outman.UserMessage("empirical values (fixed)");
+	else if(modSpec->IsJonesAAFreqs()) outman.UserMessage("Jones");
+	else if(modSpec->IsWAGAAFreqs()) outman.UserMessage("WAG");
+	else if(modSpec->IsMtMamAAFreqs()) outman.UserMessage("MtMam");
+	else if(modSpec->IsMtRevAAFreqs()) outman.UserMessage("MtRev");
+	else if(modSpec->IsDayhoffAAFreqs()) outman.UserMessage("Dayhoff");
+	else if(modSpec->IsUserSpecifiedStateFrequencies()) outman.UserMessage("specified by user (fixed)");
 	else outman.UserMessage("estimated");
 
 	outman.UserMessage("  Rate Heterogeneity Model:");
-	if(modSpec.numRateCats == 1){
-		if(modSpec.includeInvariantSites == false) outman.UserMessage("    no rate heterogeneity");
+	if(modSpec->numRateCats == 1){
+		if(modSpec->includeInvariantSites == false) outman.UserMessage("    no rate heterogeneity");
 		else{
-			if(modSpec.fixInvariantSites == true) outman.UserMessage("    only an invariant (invariable) site category,\n    proportion specified by user (fixed)");
+			if(modSpec->fixInvariantSites == true) outman.UserMessage("    only an invariant (invariable) site category,\n    proportion specified by user (fixed)");
 			else outman.UserMessage("    only an invariant (invariable) site category,\n    proportion estimated");
 			}
 		}
 	else{
-		outman.UserMessageNoCR("    %d ", modSpec.numRateCats);
-		if(modSpec.IsNonsynonymousRateHet()){
+		outman.UserMessageNoCR("    %d ", modSpec->numRateCats);
+		if(modSpec->IsNonsynonymousRateHet()){
 			outman.UserMessage("nonsynonymous rate categories, rate and proportion of each estimated\n     (this is effectively the M3 model of PAML)");
 			}
-		else if(modSpec.IsFlexRateHet() == false){
-			if(modSpec.fixAlpha == true) outman.UserMessage("discrete gamma distributed rate cats,\n    alpha param specified by user (fixed)");
+		else if(modSpec->IsFlexRateHet() == false){
+			if(modSpec->fixAlpha == true) outman.UserMessage("discrete gamma distributed rate cats,\n    alpha param specified by user (fixed)");
 			else outman.UserMessage("discrete gamma distributed rate cats, alpha param estimated");
-			if(modSpec.includeInvariantSites == true){
-				if(modSpec.fixInvariantSites == true) outman.UserMessage("    with an invariant (invariable) site category,\n    proportion specified by user (fixed)");				
+			if(modSpec->includeInvariantSites == true){
+				if(modSpec->fixInvariantSites == true) outman.UserMessage("    with an invariant (invariable) site category,\n    proportion specified by user (fixed)");				
 				else outman.UserMessage("    with an invariant (invariable) site category, proportion estimated");
 				}
 			}
 		else{
 			outman.UserMessage("FLEX rate categories, rate and proportion of each estimated");
-			if(modSpec.includeInvariantSites == true){
-				if(modSpec.fixInvariantSites == true) outman.UserMessage("    with an invariant (invariable) site category,\n    proportion specified by user (fixed)");				
+			if(modSpec->includeInvariantSites == true){
+				if(modSpec->fixInvariantSites == true) outman.UserMessage("    with an invariant (invariable) site category,\n    proportion specified by user (fixed)");				
 				else outman.UserMessage("    with an invariant (invariable) site category, proportion estimated");
 				}
 			}
@@ -1256,13 +1295,18 @@ void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 
 	//save the current members of the population
 	for(unsigned i=0;i<total_size;i++){
-		indiv[i].mod->OutputBinaryFormattedModel(out);
+		//PARTITION
+		//need to work this out
+		//indiv[i].mod->OutputBinaryFormattedModel(out);
+		indiv[i].modPart.GetModel(0)->OutputBinaryFormattedModel(out);
 		indiv[i].treeStruct->OutputBinaryFormattedTree(out);
 		}
 
 	//write any individuals that we may have stored from previous search reps
 	for(vector<Individual*>::iterator it = storedTrees.begin(); it < storedTrees.end() ; it++){
-		(*it)->mod->OutputBinaryFormattedModel(out);
+		//PARTITION
+		//(*it)->mod->OutputBinaryFormattedModel(out);
+		(*it)->modPart.GetModel(0)->OutputBinaryFormattedModel(out);
 		(*it)->treeStruct->OutputBinaryFormattedTree(out);
 		}
 	}
@@ -1272,6 +1316,8 @@ void Population::ReadPopulationCheckpoint(){
 	char str[100];
 	sprintf(str, "%s.pop.check", conf->ofprefix.c_str());
 	if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
+
+	SequenceData *curData = dataPart->GetSubset(0);
 
 #ifdef BOINC
 	char physical_name[100];
@@ -1300,18 +1346,21 @@ void Population::ReadPopulationCheckpoint(){
 	//if were restarting a bootstrap run we need to change to the bootstrapped data
 	//now, so that scoring below is correct
 	if(conf->bootstrapReps > 0){
-		data->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
+		curData->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
 		}
 
 	if(gen == UINT_MAX) finishedRep = true;
 
 	for(unsigned i=0;i<total_size;i++){
-		indiv[i].mod->SetDefaultModelParameters(data);
-		indiv[i].mod->ReadBinaryFormattedModel(pin);
+		//PARTITION
+		//indiv[i].mod->SetDefaultModelParameters(curData);
+		//indiv[i].mod->ReadBinaryFormattedModel(pin);
+		indiv[i].modPart.GetModel(0)->SetDefaultModelParameters(curData);
+		indiv[i].modPart.GetModel(0)->ReadBinaryFormattedModel(pin);
 		indiv[i].treeStruct = new Tree();
 		indiv[i].treeStruct->ReadBinaryFormattedTree(pin);
 		indiv[i].treeStruct->AssignCLAsFromMaster();
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].treeStruct->modPart=&indiv[i].modPart;
 		indiv[i].SetDirty();
 		indiv[i].treeStruct->root->CheckTreeFormation();
 		indiv[i].CalcFitness(0);
@@ -1321,12 +1370,15 @@ void Population::ReadPopulationCheckpoint(){
 	//remember that currentSearchRep starts at 1
 	for(int i=1;i<(finishedRep == false ? currentSearchRep : currentSearchRep+1);i++){
 		Individual *ind = new Individual;
-		ind->mod->SetDefaultModelParameters(data);
-		ind->mod->ReadBinaryFormattedModel(pin);
+		//PARTITION
+		//ind->mod->SetDefaultModelParameters(curData);
+		//ind->mod->ReadBinaryFormattedModel(pin);
+		ind->modPart.GetModel(0)->SetDefaultModelParameters(curData);
+		ind->modPart.GetModel(0)->ReadBinaryFormattedModel(pin);
 		ind->treeStruct = new Tree();
 		ind->treeStruct->ReadBinaryFormattedTree(pin);
 		ind->treeStruct->AssignCLAsFromMaster();
-		ind->treeStruct->mod=ind->mod;
+		ind->treeStruct->modPart=&ind->modPart;
 		ind->SetDirty();
 		ind->treeStruct->root->CheckTreeFormation();
 		ind->CalcFitness(0);
@@ -1449,7 +1501,7 @@ void Population::Run(){
 				CalcAverageFitness();
 				outman.UserMessage("opt. precision reduced, optimizing branchlengths:%.4f -> %.4f", before, bestFitness);
 
-/*				if(modSpec.IsCodon()){
+/*				if(modSpec->IsCodon()){
 					before=bestFitness;
 					indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
 					indiv[bestIndiv].SetDirty();
@@ -1615,15 +1667,15 @@ void Population::FinalOptimization(){
 	paramTot = ZERO_POINT_ZERO;
 	do{
 		paramOpt = ZERO_POINT_ZERO;
-		if(modSpec.IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(max(adap->branchOptPrecision*0.1, 0.001));
-		else if(modSpec.IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(max(adap->branchOptPrecision*0.1, 0.001));
+		if(modSpec->IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(max(adap->branchOptPrecision*0.1, 0.001));
+		else if(modSpec->IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(max(adap->branchOptPrecision*0.1, 0.001));
 		paramTot += paramOpt;
 		}while(paramOpt > ZERO_POINT_ZERO);
 
-	if(modSpec.IsFlexRateHet()){
+	if(modSpec->IsFlexRateHet()){
 		outman.UserMessage("Flex optimization: %f", paramTot);
 		}
-	else if(modSpec.IsCodon()){
+	else if(modSpec->IsCodon()){
 		outman.UserMessage("Omega optimization: %f", paramTot);
 		}
 	do{
@@ -1754,6 +1806,8 @@ void Population::ClearStoredTrees(){
 
 void Population::Bootstrap(){
 
+	SequenceData *curData = dataPart->GetSubset(0);
+
 	//if we're not restarting
 	if(conf->restart == false) currentBootstrapRep=1;
 
@@ -1767,7 +1821,7 @@ void Population::Bootstrap(){
 		[pool release];
 #endif
 		if(conf->restart == false){
-			lastBootstrapSeed = data->BootstrapReweight(0, conf->resampleProportion);
+			lastBootstrapSeed = curData->BootstrapReweight(0, conf->resampleProportion);
 			outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
 			}
 		
@@ -1882,7 +1936,14 @@ void Population::PerformSearch(){
 			if(s.length() > 0) outman.UserMessage(">>>Completed %s<<<\n", s.c_str());
 			//not sure where this should best go
 			outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
-			indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
+
+		
+			for(int m=0;m<indiv[bestIndiv].modPart.NumModels();m++){
+				outman.UserMessage("Model %d", m);
+				Model *thisMod = indiv[bestIndiv].modPart.GetModel(m);
+				thisMod->OutputHumanReadableModelReportWithParams();
+				}
+
 			if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
 			Individual *repResult = new Individual(&indiv[bestIndiv]);
 			if(conf->collapseBranches)
@@ -1971,7 +2032,8 @@ void Population::PerformSearch(){
 			if(prematureTermination == false && currentSearchRep == conf->searchReps){
 				if(storedTrees.size() > 0){//careful here, the trees in the storedTrees array don't have clas assigned
 					outman.UserMessage("Inferring internal state probabilities on best tree....");
-					storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
+//PARTITION
+		//			storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
 					}
 				}
 			else if(prematureTermination){
@@ -2044,11 +2106,11 @@ void Population::VariableStartingTreeOptimization(bool reducing){
 
 	filename = conf->ofprefix + ".randblens.tre";
 	ofstream randTrees(filename.c_str());
-	data->BeginNexusTreesBlock(randTrees);
+	dataPart->BeginNexusTreesBlock(randTrees);
 
 	filename = conf->ofprefix + ".optblens.tre";
 	ofstream optTrees(filename.c_str());
-	data->BeginNexusTreesBlock(optTrees);
+	dataPart->BeginNexusTreesBlock(optTrees);
 
 	typedef vector<double> doubvec;
 	//this is a vector of vectors, with each entry in the higher level vector being a vector
@@ -2638,7 +2700,9 @@ void Population::PerformMutation(int indNum){
 
 						if(output_tree){
 							treeLog << "  tree gen" << gen <<  "." << indNum << "= [&U] [" << ind->Fitness() << "][ ";
-							ind->mod->OutputGarliFormattedModel(treeLog);
+							//PARTITION
+							//ind->mod->OutputGarliFormattedModel(treeLog);
+							ind->modPart.GetModel(0)->OutputGarliFormattedModel(treeLog);
 							ind->treeStruct->root->MakeNewick(treeString, false, true);
 							treeLog << "]" << treeString << ";" << endl;
 							output_tree=false;
@@ -2824,11 +2888,7 @@ if(rank > 0) return;
 #endif
 
 	if(gen==1 && ind==NULL || num==1){
-	
-		outf << "#nexus" << endl << endl;
-		outf << "begin trees;" << endl;
-		TranslateTable tt( data );
-		outf << tt << endl;
+		dataPart->BeginNexusTreesBlock(outf);
 		
 		paupf << "#nexus\n\n";
 		paupf << "begin paup;\n";
@@ -2848,8 +2908,9 @@ if(rank > 0) return;
 			outf << treeString << ";\n";
 			
 			paupf << "lset userbr ";
-			if(modSpec.Nst()==2) paupf << "nst=2 trat=" << indiv[i].mod->Rates(0) << " base=(" << indiv[i].mod->StateFreq(0) << " " << indiv[i].mod->StateFreq(1) << " " << indiv[i].mod->StateFreq(2) << ");\n" << "lsc " << (gen-1)*conf->nindivs+i+1;
-			
+			//PARTITION
+/*			if(modSpec.Nst()==2) paupf << "nst=2 trat=" << indiv[i].mod->Rates(0) << " base=(" << indiv[i].mod->StateFreq(0) << " " << indiv[i].mod->StateFreq(1) << " " << indiv[i].mod->StateFreq(2) << ");\n" << "lsc " << (gen-1)*conf->nindivs+i+1;
+
 			else paupf << "nst=6 rmat=(" << indiv[i].mod->Rates(0) << " " << indiv[i].mod->Rates(1) << " " << indiv[i].mod->Rates(2) << " " << indiv[i].mod->Rates(3) << " " << indiv[i].mod->Rates(4) << ") " << " base=(" << indiv[i].mod->StateFreq(0) << " " << indiv[i].mod->StateFreq(1) << " " << indiv[i].mod->StateFreq(2) << ") ";
 			
 #ifdef FLEX_RATES			
@@ -2857,6 +2918,18 @@ if(rank > 0) return;
 #else
 			if(indiv[i].mod->NRateCats()>1) paupf << "rates=gamma shape=" << indiv[i].mod->Alpha() << " ";
 			paupf << "pinv=" << indiv[i].mod->PropInvar() << " "; 
+#endif
+
+*/
+			if(modSpec->Nst()==2) paupf << "nst=2 trat=" << indiv[i].modPart.GetModel(0)->Rates(0) << " base=(" << indiv[i].modPart.GetModel(0)->StateFreq(0) << " " << indiv[i].modPart.GetModel(0)->StateFreq(1) << " " << indiv[i].modPart.GetModel(0)->StateFreq(2) << ");\n" << "lsc " << (gen-1)*conf->nindivs+i+1;
+
+			else paupf << "nst=6 rmat=(" << indiv[i].modPart.GetModel(0)->Rates(0) << " " << indiv[i].modPart.GetModel(0)->Rates(1) << " " << indiv[i].modPart.GetModel(0)->Rates(2) << " " << indiv[i].modPart.GetModel(0)->Rates(3) << " " << indiv[i].modPart.GetModel(0)->Rates(4) << ") " << " base=(" << indiv[i].modPart.GetModel(0)->StateFreq(0) << " " << indiv[i].modPart.GetModel(0)->StateFreq(1) << " " << indiv[i].modPart.GetModel(0)->StateFreq(2) << ") ";
+			
+#ifdef FLEX_RATES			
+			paupf << "[FLEX RATES] ";
+#else
+			if(indiv[i].modPart.GetModel(0)->NRateCats()>1) paupf << "rates=gamma shape=" << indiv[i].modPart.GetModel(0)->Alpha() << " ";
+			paupf << "pinv=" << indiv[i].modPart.GetModel(0)->PropInvar() << " "; 
 #endif
 
 			if(gen==1 && i==0) paupf << ";\n" << "lsc " << (gen-1)*total_size+i+1 << "/scorefile=paupscores.txt replace;\n";
@@ -2867,9 +2940,10 @@ if(rank > 0) return;
 		outf << "  utree " << num << "= ";
 		ind->treeStruct->root->MakeNewick(treeString, false, true);
 		outf << treeString << ";\n";
-		
-		paupf << "lset userbr ";
-		if(modSpec.Nst()==2) paupf << "nst=2 trat=" << ind->mod->Rates(0) << " base=(" << ind->mod->StateFreq(0) << " " << ind->mod->StateFreq(1) << " " << ind->mod->StateFreq(2) << ");\nlsc ";
+
+		//PARTITION
+/*		paupf << "lset userbr ";
+		if(modSpec->Nst()==2) paupf << "nst=2 trat=" << ind->mod->Rates(0) << " base=(" << ind->mod->StateFreq(0) << " " << ind->mod->StateFreq(1) << " " << ind->mod->StateFreq(2) << ");\nlsc ";
 		
 		else paupf << "nst=6 rmat=(" << ind->mod->Rates(0) << " " << ind->mod->Rates(1) << " " << ind->mod->Rates(2) << " " << ind->mod->Rates(3) << " " << ind->mod->Rates(4) << ") " << " base=(" << ind->mod->StateFreq(0) << " " << ind->mod->StateFreq(1) << " " << ind->mod->StateFreq(2) << ") ";
 
@@ -2878,6 +2952,18 @@ if(rank > 0) return;
 #else	
 		if(ind->mod->NRateCats()>1) paupf << "rates=gamma shape=" << ind->mod->Alpha() << " ";
 		paupf << "pinv=" << ind->mod->PropInvar() << " "; 
+#endif
+*/
+		paupf << "lset userbr ";
+		if(modSpec->Nst()==2) paupf << "nst=2 trat=" << ind->modPart.GetModel(0)->Rates(0) << " base=(" << ind->modPart.GetModel(0)->StateFreq(0) << " " << ind->modPart.GetModel(0)->StateFreq(1) << " " << ind->modPart.GetModel(0)->StateFreq(2) << ");\nlsc ";
+		
+		else paupf << "nst=6 rmat=(" << ind->modPart.GetModel(0)->Rates(0) << " " << ind->modPart.GetModel(0)->Rates(1) << " " << ind->modPart.GetModel(0)->Rates(2) << " " << ind->modPart.GetModel(0)->Rates(3) << " " << ind->modPart.GetModel(0)->Rates(4) << ") " << " base=(" << ind->modPart.GetModel(0)->StateFreq(0) << " " << ind->modPart.GetModel(0)->StateFreq(1) << " " << ind->modPart.GetModel(0)->StateFreq(2) << ") ";
+
+#ifdef FLEX_RATES			
+			paupf << "[FLEX RATES] ";
+#else	
+		if(ind->modPart.GetModel(0)->NRateCats()>1) paupf << "rates=gamma shape=" << ind->modPart.GetModel(0)->Alpha() << " ";
+		paupf << "pinv=" << ind->modPart.GetModel(0)->PropInvar() << " "; 
 #endif
 
 #ifndef NNI_SPECTRUM
@@ -2909,7 +2995,9 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 		
 	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
 	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
-	ind->mod->OutputGarliFormattedModel(treeLog);
+	//PARTITION
+	//ind->mod->OutputGarliFormattedModel(treeLog);
+	ind->modPart.GetModel(0)->OutputGarliFormattedModel(treeLog);
 	ind->treeStruct->root->MakeNewick(treeString, false, true);
 	treeLog << "]" << treeString << ";" << endl;
 	}
@@ -2923,7 +3011,9 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 
 	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << ind->Fitness() << " ";
 	
-	ind->mod->OutputGarliFormattedModel(bootLog);
+	//PARTITION
+	//ind->mod->OutputGarliFormattedModel(bootLog);
+	ind->modPart.GetModel(0)->OutputGarliFormattedModel(bootLog);
 
 	ind->treeStruct->root->MakeNewick(treeString, false, true);
 	bootLog << "] " << treeString << ";" << endl;
@@ -3003,10 +3093,10 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	char temp[101];//the max taxon name is 100 (defined as MAX_TAXON_LABEL in datamatr.cpp)
 	str = "#nexus\n\n";
 
-	int ntaxa = data->NTax();
+	int ntaxa = dataPart->NTax();
 	str += "begin trees;\ntranslate\n";
 	for(k=0;k<ntaxa;k++){
-		NxsString tnstr = data->TaxonLabel(k);
+		NxsString tnstr = dataPart->TaxonLabel(k);
 		tnstr.BlanksToUnderscores();
 		sprintf(temp, " %d %s", k+1, tnstr.c_str());
 		str += temp;
@@ -3025,7 +3115,9 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	else sprintf(temp, "tree bestREP%d = [&U][!GarliScore %f][!GarliModel ", indnum+1, ind->Fitness()); 
 	str += temp;
 	string modstr;
-	ind->mod->FillGarliFormattedModelString(modstr);
+	//PARTITION
+	//ind->mod->FillGarliFormattedModelString(modstr);
+	ind->modPart.GetModel(0)->FillGarliFormattedModelString(modstr);
 	str += modstr;
 	str += "]";
 
@@ -3048,8 +3140,10 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 #endif	
 	//add a paup block setting the model params
 	str = "";
-	if(modSpec.IsNucleotide()){
-		ind->mod->FillPaupBlockStringForModel(str, filename.c_str());
+	if(modSpec->IsNucleotide()){
+		//PARTITION
+		//ind->mod->FillPaupBlockStringForModel(str, filename.c_str());
+		ind->modPart.GetModel(0)->FillPaupBlockStringForModel(str, filename.c_str());
 		}
 #ifdef BOINC
 	s = str.c_str();
@@ -3091,20 +3185,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 	ofstream outf( name.c_str() );
 	outf.precision(8);
 
-	outf << "#nexus" << endl << endl;
-
-	int ntaxa = data->NTax();
-	outf << "begin trees;\ntranslate\n";
-	for(int k=0;k<ntaxa;k++){
-		outf << "  " << (k+1);
-		NxsString tnstr = data->TaxonLabel(k);
-		tnstr.BlanksToUnderscores();
-		outf << "  " << tnstr.c_str();
-		if(k < ntaxa-1) 
-			outf << ",\n";
-		}		
-
-	outf << ";\n";
+	dataPart->BeginNexusTreesBlock(outf);
 
 	ofstream phytree;
 	if(conf->outputPhylipTree){
@@ -3118,7 +3199,9 @@ void Population::WriteStoredTrees( const char* treefname ){
 	for(unsigned r=0;r<storedTrees.size();r++){
 		if(r == bestRep) outf << "tree rep" << r+1 << "BEST = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
 		else outf << "tree rep" << r+1 << " = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
-		storedTrees[r]->mod->OutputGarliFormattedModel(outf);
+		//PARTITION
+		//storedTrees[r]->mod->OutputGarliFormattedModel(outf);
+		storedTrees[r]->modPart.GetModel(0)->OutputGarliFormattedModel(outf);
 		outf << "]";
 
 		outf.setf( ios::floatfield, ios::fixed );
@@ -3132,9 +3215,11 @@ void Population::WriteStoredTrees( const char* treefname ){
 			}
 		}
 	outf << "end;\n";
-	if(modSpec.IsNucleotide()){
+	if(modSpec->IsNucleotide()){
 		//add a paup block setting the model params
-		storedTrees[bestRep]->mod->OutputPaupBlockForModel(outf, name.c_str());
+		//PARTITION
+		//storedTrees[bestRep]->mod->OutputPaupBlockForModel(outf, name.c_str());
+		storedTrees[bestRep]->modPart.GetModel(0)->OutputPaupBlockForModel(outf, name.c_str());
 		outf << "[!****NOTE: The model parameters loaded are the final model estimates****\n****from GARLI for the best scoring search replicate (#" << bestRep + 1 << ").****\n****The best model parameters for other trees may vary.****]" << endl;
 		}
 	outf.close();
@@ -3161,7 +3246,7 @@ void Population::WritePhylipTree(ofstream &phytree){
 		else{
 			while(isdigit(*loc))
 				temp += *loc++;
-			phytree << data->TaxonLabel(atoi(temp.c_str())-1);
+			phytree << dataPart->TaxonLabel(atoi(temp.c_str())-1);
 			temp="";
 			}
 		}
@@ -3377,6 +3462,8 @@ int Population::SwapIndividuals(int n, const char* tree_strings_in, FLOAT_TYPE* 
 	return 0;
 }
 */
+
+/* This is all old parallel stuff not currently being used
 int Population::ReplaceSpecifiedIndividuals(int count, int* which_array, const char* tree_strings, FLOAT_TYPE* model_string)	{
 	//assert(count < CountTreeStrings(tree_strings)); // sanity check
 	int which;
@@ -3392,11 +3479,11 @@ int Population::ReplaceSpecifiedIndividuals(int count, int* which_array, const c
 		ind->treeStruct = new Tree(tree_strings, true);
 		ind->treeStruct->AssignCLAsFromMaster();
 		ind->mod->SetModel(model_string);
-		ind->treeStruct->mod=ind->mod;
+		ind->treeStruct->modPart=&ind->modPart;
 
 		ind->SetDirty();
 		tree_strings += strlen(tree_strings)+1;
-		ind->treeStruct->mod=ind->mod;
+		ind->treeStruct->modPart=&ind->modPart;
 		}
 	CompactTopologiesList();
 	UpdateTopologyList(indiv);
@@ -3439,7 +3526,7 @@ int Population::GetSpecifiedModels(FLOAT_TYPE** model_string, int n, int* indiv_
 	FLOAT_TYPE *&model = *model_string;
 	int string_size=0;
 	//first calculate the appropriate size of the string and allocate it
-	int nrates=modSpec.Nst()-1;
+	int nrates=modSpec->Nst()-1;
 	string_size+=n*nrates;
 	string_size+=n*4;//the pi's
 	if(indiv[indiv_list[0]].mod->NRateCats()>1) string_size+=1*n;
@@ -3474,6 +3561,7 @@ int Population::GetSpecifiedModels(FLOAT_TYPE** model_string, int n, int* indiv_
 		}
 	return slot;
 	}
+*/
 
 void Population::OutputLog()	{
 	//log << gen << "\t" << bestFitness << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
@@ -3491,7 +3579,7 @@ void Population::OutputLog()	{
 		log << "Final\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
 		}
 	}
-
+/*
 int Population::ReplicateSpecifiedIndividuals(int count, int* which, const char* tree_string, FLOAT_TYPE *model_string){
 	assert(count > 0 && count <= (int)total_size);
 	for (int i = 0; i < count; ++i)	{
@@ -3500,16 +3588,16 @@ int Population::ReplicateSpecifiedIndividuals(int count, int* which, const char*
 		indiv[which[i]].treeStruct = new Tree(tree_string, true);
 		indiv[which[i]].treeStruct->AssignCLAsFromMaster();
 		indiv[which[i]].mod->SetModel(model_string);
-		indiv[which[i]].treeStruct->mod=indiv[which[i]].mod;
+		indiv[which[i]].treeStruct->modPart=&indiv[which[i]].modPart;
 		indiv[which[i]].SetDirty();
-		indiv[which[i]].treeStruct->mod=indiv[which[i]].mod;
+		indiv[which[i]].treeStruct->modPart=&indiv[which[i]].modPart;
 		}
 	return 0;
 }
-
+*/
 void Population::UpdateTreeModels(){
 	for(unsigned ind=0;ind<total_size;ind++){
-		newindiv[ind].treeStruct->mod=newindiv[ind].mod;
+		newindiv[ind].treeStruct->modPart=&newindiv[ind].modPart;
 //		indiv[ind].treeStruct->mod=indiv[ind].mod;
 		}
 	}
@@ -3522,8 +3610,8 @@ void Population::OutputModelAddresses(){
 	ofstream mods("modeldeb.log", ios::app);
 	
 	for(unsigned i=0;i<total_size;i++){
-		mods << "indiv " << i << "\t" << indiv[i].mod << "\t" << indiv[i].treeStruct->mod << "\n";
-		mods << "newindiv " << i << "\t" << newindiv[i].mod << "\t" << newindiv[i].treeStruct->mod << "\n";
+		mods << "indiv " << i << "\t" << &indiv[i].modPart << "\t" << indiv[i].treeStruct->modPart << "\n";
+		mods << "newindiv " << i << "\t" << &newindiv[i].modPart << "\t" << newindiv[i].treeStruct->modPart << "\n";
 		}
 	mods << endl;
 	}
@@ -4741,7 +4829,7 @@ void Population::CheckSubtrees(){
 void Population::FillPopWithClonesOfBest(){
 	UpdateTopologyList(indiv);
 	Individual *best=&indiv[bestIndiv];
-	best->treeStruct->mod=best->mod;
+	best->treeStruct->modPart=&best->modPart;
 	for(unsigned i=0;i<conf->nindivs;i++){
 		if(&indiv[i]!=best){
 			indiv[i].treeStruct->RemoveTreeFromAllClas();
@@ -4750,7 +4838,7 @@ void Population::FillPopWithClonesOfBest(){
 			topologies[indiv[bestIndiv].topo]->AddInd(i);
 			indiv[i].mutation_type=-1;
 			}
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].treeStruct->modPart=&indiv[i].modPart;
 		}
 	UpdateTopologyList(indiv);
 	CalcAverageFitness();
@@ -4766,7 +4854,7 @@ void Population::AssignSubtree(int st, int indNum){
 		newindiv[i].accurateSubtrees=false;
 		indiv[i].treeStruct->UnprotectClas();
 		}
-	ResetMemLevel(data->NTax()-2,claMan->NumClas());
+	ResetMemLevel(dataPart->NTax()-2,claMan->NumClas());
 	indiv[bestIndiv].treeStruct->ProtectClas();
 
 	subtreeMemberNodes.clear();
@@ -5344,7 +5432,7 @@ void Population::InitializeOutputStreams(){
 		if((conf->restart == false && conf->searchReps == 1) ||
 			(conf->restart == false && (treelog_output & NEWNAME_PER_REP)) ||
 			(conf->restart && (treelog_output & NEWNAME)))
-			data->BeginNexusTreesBlock(treeLog);
+			dataPart->BeginNexusTreesBlock(treeLog);
 		AppendTreeToTreeLog(-1, -1);
 		}
 	
@@ -5363,12 +5451,12 @@ void Population::InitializeOutputStreams(){
 					}
 				else{
 					bootLog.open(temp_buf, ios::app);
-					data->BeginNexusTreesBlock(bootLog);
+					dataPart->BeginNexusTreesBlock(bootLog);
 					}
 				}
 			else{
 				bootLog.open(temp_buf);
-				data->BeginNexusTreesBlock(bootLog);
+				dataPart->BeginNexusTreesBlock(bootLog);
 				}
 			bootLog.precision(10);
 			}
@@ -5666,7 +5754,7 @@ void Population::FinalizeOutputStreams(){
 */
 
 void Population::FindLostClas(){
-	vector<CondLikeArray *> arr;
+	vector<CondLikeArraySet *> arr;
 	
 	for(unsigned i=0;i<total_size;i++){
 		Tree *t=indiv[i].treeStruct;
@@ -5686,7 +5774,7 @@ void Population::FindLostClas(){
 			}
 		}
 	sort(arr.begin(), arr.end());
-	for(vector<CondLikeArray*>::iterator vit=arr.begin();vit!=arr.end();){
+	for(vector<CondLikeArraySet*>::iterator vit=arr.begin();vit!=arr.end();){
 		if(*(vit)==*(vit+1)) arr.erase(vit+1);
 		else vit++;
 		if((vit+1)==arr.end()){
@@ -6157,6 +6245,8 @@ void Population::CheckPerturbSerial(){
 void Population::OptimizeSiteRates(){
 	SeedPopulationWithStartingTree(1);
 
+	const SequenceData *data = dataPart->GetSubset(0);
+
 	//store a backup of the exisiting tree and blens
 	Individual tempIndiv;
 	tempIndiv.treeStruct=new Tree();
@@ -6177,7 +6267,9 @@ void Population::OptimizeSiteRates(){
 	vector<float_pair> allRates;
 
 	for(int i=0;i<data->NChar();i++){
-		if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].mod->StateFreq((data->GetConstStates())[i]));
+		//PARTITION
+		//if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].mod->StateFreq((data->GetConstStates())[i]));
+		if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].modPart.GetModel(0)->StateFreq((data->GetConstStates())[i]));
 		else{
 			indiv[0].treeStruct->MakeAllNodesDirty();
 			Tree::siteToScore = i;
