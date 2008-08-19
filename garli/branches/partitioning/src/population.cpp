@@ -365,7 +365,7 @@ void Population::CheckForIncompatibleConfigEntries(){
 
 	//if no model mutations will be performed, parameters cannot be estimated.
 	if(conf->modWeight == ZERO_POINT_ZERO){
-		for(int ms = 0;ms < modSpecSet.NumSpecSets();ms++){
+		for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
 			ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
 			if(modSpec->fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
 			if(modSpec->includeInvariantSites == true && modSpec->fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
@@ -391,7 +391,9 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	rawPart = rawD;
 
 	//PARTITION
-	SequenceData *curData = dataPart->GetSubset(0);
+//	SequenceData *curData = dataPart->GetSubset(0);
+	//DEBUG
+	//this modspec in Population is a hack, but doesn't affect the important computation
 	modSpec = modSpecSet.GetModSpec(0);
 
 	subtreeNode=0;
@@ -405,12 +407,17 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 
 	//set two model statics
 	Model::mutationShape = conf->gammaShapeModel;
+
+	//DEBUG
+	//PARTITION
+/*	
 	if(modSpec->IsCodon()){
 		//PARTITION
 		//Model::SetCode(static_cast<CodonData*>(data)->GetCode());
 		Model::SetCode(static_cast<CodonData*>(curData)->GetCode());
 		}
-
+*/
+ 
 #ifdef INPUT_RECOMBINATION
 	total_size = conf->nindivs + NUM_INPUT;
 #endif
@@ -426,9 +433,16 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		MasterGamlConfig *mastConf = (MasterGamlConfig*) (conf);
 		paraMan = new ParallelManager(dataPart->NTax(), nprocs, mastConf);
 		}
-
-	if(modSpec->IsNucleotide()) dynamic_cast<NucleotideData *>(curData)->MakeAmbigStrings();	
-
+	
+	//DEBUG - this should really be elsewhere, and it assumes that all models are the same type
+	if(modSpecSet.GetModSpec(0)->IsNucleotide()){
+		for(int ds = 0;ds < dataPart->NumSubsets();ds++)
+			dynamic_cast<NucleotideData *>(dataPart->GetSubset(ds))->MakeAmbigStrings();
+		}
+	
+	for(int ds = 0;ds < dataPart->NumSubsets();ds++)
+		dataPart->GetSubset(ds)->CalcEmpiricalFreqs();
+		
 	//allocate the treeString
 	//remember that we also encode internal node numbers sometimes
 	FLOAT_TYPE taxsize=log10((FLOAT_TYPE) ((FLOAT_TYPE)dataPart->NTax())*dataPart->NTax()*2);
@@ -481,7 +495,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		}
 		
 	const int MB = 1024 * 1024;
-	int sites = curData->NChar();
+//	int sites = curData->NChar();
 
 	//int claSizePerNode = (modSpec->nstates * modSpec->numRateCats * sites * sizeof(FLOAT_TYPE)) + (sites * sizeof(int));
 	int claSizePerNode = indiv[0].modPart.CalcRequiredCLAsize(dataPart);
@@ -544,9 +558,6 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 */
 	if(memLevel==-1) throw ErrorException("Not enough memory specified in config file (availablememory)!");
 
-	//process the data a bit
-	curData->CalcEmpiricalFreqs();
-
 	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 	//if we do tons of recombination 
 	idealClas *= 2;
@@ -570,7 +581,10 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 
 void Population::LoadNexusStartingConditions(){
 	GarliReader & reader = GarliReader::GetInstance();
-	NxsTreesBlock *treesblock = reader.GetTreesBlock();
+//DEBUG FACTORY
+	//	NxsTreesBlock *treesblock = reader.GetTreesBlock();
+	NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
+	NxsTreesBlock *treesblock = reader.GetTreesBlock(tax, 0);
 
 	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
 		//in this case we should have already read in the tree when getting the data, so check
@@ -588,7 +602,9 @@ void Population::LoadNexusStartingConditions(){
 		//3/25/08 Made a change such that if a gblock was already read with the data and another
 		//is found with the following execute, an exception will be thrown in GarliReader::EnteringBlock
 		reader.HandleExecute(conf->streefname.c_str(), false);
-		treesblock = reader.GetTreesBlock();
+		//FACTORY
+		//treesblock = reader.GetTreesBlock();
+		treesblock = reader.GetTreesBlock(tax, 0);
 		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting model and/or tree", conf->streefname.c_str());
 		}
@@ -914,7 +930,11 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		//be handled below, although both a garli block (in the data) and an old style model specification
 		//are not allowed
 		if(startingTreeInNCL){//cases 3, 5, 6 and 8
-			NxsTreesBlock *treesblock = reader.GetTreesBlock();
+			//DEBUG FACTORY
+			//NxsTreesBlock *treesblock = reader.GetTreesBlock();
+			NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
+			NxsTreesBlock *treesblock = reader.GetTreesBlock(tax, 0);
+			
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
 				int treeNum = (rank+rep-1) % numTrees;

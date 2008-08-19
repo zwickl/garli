@@ -593,7 +593,9 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 		outman.UserMessage("");
 		}
 
-	modPart.GetModelSet(0)->GetModel(0)->UpdateQMat();
+	for(int m=0;m < modPart.NumModels();m++){
+		modPart.GetModel(m)->UpdateQMat();
+		}
 	stf.close();
 	delete []temp;
 	}
@@ -625,7 +627,9 @@ void Individual::GetStartingTreeFromNCL(NxsTreesBlock *treesblock, int rank, int
 		}
 	treeStruct->AssignCLAsFromMaster();
 
-	modPart.GetModelSet(0)->GetModel(0)->UpdateQMat();
+	for(int m=0;m < modPart.NumModels();m++){
+		modPart.GetModel(m)->UpdateQMat();
+		}
 	}
 
 void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){

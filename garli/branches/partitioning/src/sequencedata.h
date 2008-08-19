@@ -48,7 +48,7 @@ protected:
 	virtual int	NumStates(int) const { return 4; }
 
 public:
-	virtual void CreateMatrixFromNCL(GarliReader &reader) = 0;
+	virtual void CreateMatrixFromNCL(NxsCharactersBlock *) = 0;
 	virtual void CalcEmpiricalFreqs() = 0;
 	virtual void GetEmpiricalFreqs(FLOAT_TYPE *f) const{
 		assert(empStateFreqs);
@@ -184,7 +184,7 @@ public:
 
 	unsigned char CharToDatum(char d);
 	void CalcEmpiricalFreqs();
-	void CreateMatrixFromNCL(GarliReader &reader);
+	void CreateMatrixFromNCL(NxsCharactersBlock *);
 	void MakeAmbigStrings();
 	char *GetAmbigString(int i) const{
 		return ambigStrings[i];
@@ -563,7 +563,7 @@ public:
 		assert(0);
 		return 0;
 		}
-	void CreateMatrixFromNCL(GarliReader &reader){
+	void CreateMatrixFromNCL(NxsCharactersBlock *){
 
 		//this also should not be getting called.  The codon matrix
 		//is created from a DNA matrix that has been read in, possibly
@@ -604,7 +604,7 @@ public:
 	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code);
 	void CalcEmpiricalFreqs();
 	unsigned char CharToDatum(char d);
-	void CreateMatrixFromNCL(GarliReader &reader);
+	void CreateMatrixFromNCL(NxsCharactersBlock *);
 
 	};
 
@@ -626,6 +626,7 @@ public:
 			delete *it;
 		}
 	int NTax() const {return nTax;}
+	int NumSubsets() const {return dataSubsets.size();}
 	void BeginNexusTreesBlock(ofstream &out) const {dataSubsets[0]->BeginNexusTreesBlock(out);}
 	NxsString TaxonLabel(int t) const {return dataSubsets[0]->TaxonLabel(t);}
 	int TaxonNameToNumber(NxsString name) const{return dataSubsets[0]->TaxonNameToNumber(name);}

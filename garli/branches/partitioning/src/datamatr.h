@@ -191,8 +191,10 @@ protected:
 			}
 
 		void BeginNexusTreesBlock(ofstream &treeout) const;
-		virtual void CreateMatrixFromNCL(GarliReader &reader) {};
-		
+		//FACTORY
+		//virtual void CreateMatrixFromNCL(GarliReader &reader) {};
+		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *) {};
+	
 		virtual unsigned char Matrix( int i, int j ) const {
 			assert( matrix );
 			assert( i >= 0 );

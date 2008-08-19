@@ -402,10 +402,6 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 //separating general tree construction stuff from CLA assignment/allocation
 //which will happend differently if the CLAs are shared or not
 Tree::Tree(){
-	//PARTITION
-	modPart = NULL;
-	SequenceData *curData = dataPart->GetSubset(0);
-	ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
 
 	allNodes=new TreeNode*[2*dataPart->NTax()-2];
 	for(int i=0;i<2*dataPart->NTax()-2;i++){
@@ -415,15 +411,28 @@ Tree::Tree(){
 	root=allNodes[0];
 	root->attached=true;
 	//assign data to tips
-	for(int i=1;i<=dataPart->NTax();i++){
-		if(modSpec->IsNucleotide()){
-			allNodes[i]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(i-1);
-#ifdef OPEN_MP
-			allNodes[i]->ambigMap=static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(i-1);
-#endif
+
+	//PARTITION
+	modPart = NULL;
+	//this assumes that num specs = num data subsets
+	//ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
+	bool isNucleotide = modSpecSet.GetModSpec(0)->IsNucleotide();
+	
+	for(int m = 0;m < dataPart->NumSubsets();m++){
+		SequenceData *curData = dataPart->GetSubset(m);
+		for(int t=1;t<=dataPart->NTax();t++){
+			if(isNucleotide){
+				//allNodes[t]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1);
+				allNodes[t]->tipData.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1));
+	#ifdef OPEN_MP
+				//allNodes[t]->ambigMap=static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1);
+				allNodes[t]->ambigMap.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1));
+	#endif
+				}
+			else
+				//allNodes[t]->tipData=(char *)(curData)->GetRow(t-1);
+				allNodes[t]->tipData.push_back((char *)(curData)->GetRow(t-1));
 			}
-		else
-			allNodes[i]->tipData=(char *)(curData)->GetRow(i-1);
 		}
 	
 	numTipsAdded=0;
@@ -448,10 +457,6 @@ Tree::Tree(){
 	}
 
 void Tree::AllocateTree(){
-	//PARTITION
-	modPart = NULL;
-	SequenceData *curData = dataPart->GetSubset(0);
-	ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
 
 	calcs=0;
 	allNodes=new TreeNode*[2*dataPart->NTax()-1];
@@ -460,16 +465,30 @@ void Tree::AllocateTree(){
 		allNodes[i]->bipart=new Bipartition();
 		}
 	root=allNodes[0];
-	for(int i=1;i<=dataPart->NTax();i++){
-		if(modSpec->IsNucleotide()){
-			allNodes[i]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(i-1);
+	
+	
+	//PARTITION
+	modPart = NULL;
+	//this assumes that num specs = num data subsets
+	//ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
+	bool isNucleotide = modSpecSet.GetModSpec(0)->IsNucleotide();
+	
+	for(int m = 0;m < dataPart->NumSubsets();m++){
+		SequenceData *curData = dataPart->GetSubset(m);
+		for(int t=1;t<=dataPart->NTax();t++){
+			if(isNucleotide){
+				//allNodes[t]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1);
+				allNodes[t]->tipData.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1));
 #ifdef OPEN_MP
-			allNodes[i]->ambigMap=static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(i-1);
+				//allNodes[t]->ambigMap=static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1);
+				allNodes[t]->ambigMap.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1));
 #endif
 			}
-		else
-			allNodes[i]->tipData=(char *)(curData)->GetRow(i-1);
+			else
+				//allNodes[t]->tipData=(char *)(curData)->GetRow(t-1);
+				allNodes[t]->tipData.push_back((char *)(curData)->GetRow(t-1));
 		}
+	}
 	
 	numTipsAdded=0;
 	numNodesAdded=1;//root
@@ -3516,9 +3535,9 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 		else{
 			ProfScoreTerm.Start();
 			if(isNucleotide)
-				modlnL = GetScorePartialTerminalRateHet(partialCLA, &Lprmat[0], child->tipData, mod);
+				modlnL = GetScorePartialTerminalRateHet(partialCLA, &Lprmat[0], child->tipData[mod->dataIndex], mod);
 			else
-				modlnL = GetScorePartialTerminalNState(partialCLA, &Lprmat[0], child->tipData, mod);
+				modlnL = GetScorePartialTerminalNState(partialCLA, &Lprmat[0], child->tipData[mod->dataIndex], mod);
 
 			ProfScoreTerm.Stop();
 			}
@@ -3558,9 +3577,9 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 			//two terminal children
 			ProfTermTerm.Start();
 			if(isNucleotide == false)
-				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData, secChild->tipData, mod);
+				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[mod->dataIndex], secChild->tipData[mod->dataIndex], mod);
 			else
-				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData, secChild->tipData, mod);
+				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[mod->dataIndex], secChild->tipData[mod->dataIndex], mod);
 			ProfTermTerm.Stop();
 			}
 
@@ -3570,9 +3589,9 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 
 			if(isNucleotide == false){
 				if(firstCLAset==NULL)
-					CalcFullCLAInternalTerminalNState(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData, mod);
+					CalcFullCLAInternalTerminalNState(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[mod->dataIndex], mod);
 				else 
-					CalcFullCLAInternalTerminalNState(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData, mod);
+					CalcFullCLAInternalTerminalNState(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[mod->dataIndex], mod);
 				}
 			else{
 	#ifdef OPEN_MP
@@ -3583,9 +3602,9 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 				}
 	#else
 				if(firstCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData, NULL, mod);
+					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[mod->dataIndex], NULL, mod);
 				else 
-					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData, NULL, mod);
+					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[mod->dataIndex], NULL, mod);
 				}
 	#endif
 			ProfIntTerm.Stop();

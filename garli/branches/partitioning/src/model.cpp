@@ -1233,6 +1233,7 @@ void Model::MutatePropInvar(){
 	}
 */
 void Model::CopyModel(const Model *from){
+	assert(stateFreqs[0] != NULL);
 	if(modSpec->IsCodon()){
 		for(int i=0;i<omegas.size();i++)
 			*omegas[i]=*(from->omegas[i]);
@@ -2128,8 +2129,8 @@ void Model::CreateModelFromSpecification(int modnum){
 	//PARTITION
 	//for now, model # = dataIndex (i.e., no mixing)
 	//DEBUG
-	//dataIndex = modnum;
-	dataIndex = 0;
+	dataIndex = modnum;
+	//dataIndex = 0;
 
 	nstates = modSpec->nstates;
 	if(modSpec->IsNucleotide() || modSpec->IsCodon())
@@ -3643,3 +3644,27 @@ void Model::MultiplyByWAGAAMatrix(){
 	qmatOffset[17][19] *= 1;
 	qmatOffset[19][17] *= 1;
 	}
+
+ModelPartition::ModelPartition()	{
+	 for(int i=0;i<modSpecSet.NumSpecs();i++){
+		 ModelSet * ms = new ModelSet(i);
+		 modSets.push_back(ms);
+		 for(int m=0;m<ms->NumModels();m++)
+			 models.push_back(modSets[i]->GetModel(m));
+		}
+	 //DEBUG linking hack
+/*	 if(modSpecSet.NumSpecs() == 2){
+		 Model *first = GetModel(0);
+		 Model *sec = GetModel(1);
+		 for(vector<FLOAT_TYPE *>::iterator it = first->stateFreqs.begin();it != first->stateFreqs.end();it++){
+			 delete *it;
+			}
+		 first->stateFreqs.clear();
+		 for(vector<FLOAT_TYPE *>::iterator it = sec->stateFreqs.begin();it != sec->stateFreqs.end();it++){
+			 first->stateFreqs.push_back(*it);
+			}
+		}
+*/	assert(GetModel(0)->stateFreqs[0] != NULL);
+	assert(GetModel(1)->stateFreqs[0] != NULL);
+	 CollectMutableParameters();
+	 }

@@ -825,9 +825,14 @@ unsigned char AminoacidData::CharToDatum(char d){
 	return ch;
 	}
 
-void NucleotideData::CreateMatrixFromNCL(GarliReader &reader){
-	NxsCharactersBlock *charblock;
+void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
+//	NxsCharactersBlock *charblock;
 
+	
+//	NxsTaxaBlock *taxablock = reader.GetTaxaBlock(0);
+	
+//	int numC = reader.GetNumCharactersBlocks(taxablock);
+/*	
 	int num=0, numNuc = -1;
 	do{
 		charblock = reader.GetCharactersBlock(num);
@@ -844,7 +849,7 @@ void NucleotideData::CreateMatrixFromNCL(GarliReader &reader){
 		}while(num < reader.NumCharBlocks());
 	if(numNuc < 0) throw ErrorException("No characters/data blocks containing nucleotide data found in Nexus datafile!");
 	charblock = reader.GetCharactersBlock(numNuc);
-
+*/
 	if(charblock->GetNumActiveChar() < charblock->GetNChar()){
 		outman.UserMessageNoCR("Excluded characters:\n\t");
 		for(int c=0;c<charblock->GetNCharTotal();c++)
@@ -853,7 +858,7 @@ void NucleotideData::CreateMatrixFromNCL(GarliReader &reader){
 		}
 
 //	vector<unsigned> reducedToOrigCharMap = charblock->GetOrigIndexVector();
-	NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
+	//NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
 	
 	int numOrigTaxa = charblock->GetNTax();
 	int numActiveTaxa = charblock->GetNumActiveTaxa();
@@ -869,7 +874,9 @@ void NucleotideData::CreateMatrixFromNCL(GarliReader &reader){
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
 			//internally, blanks in taxon names will be stored as underscores
-			NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			//FACTORY
+			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
 			tlabel.BlanksToUnderscores();
 			SetTaxonLabel( i, tlabel.c_str());
 			
@@ -892,9 +899,10 @@ void NucleotideData::CreateMatrixFromNCL(GarliReader &reader){
 			}
 		}
 	}
-void AminoacidData::CreateMatrixFromNCL(GarliReader &reader){
-	NxsCharactersBlock *charblock;
-	int num=0, numNuc = -1;
+void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
+//FACTORY
+	//	NxsCharactersBlock *charblock;
+/*	int num=0, numNuc = -1;
 	do{
 		charblock = reader.GetCharactersBlock(num);
 		if(charblock->GetDataType() == NxsCharactersBlock::protein){
@@ -908,7 +916,7 @@ void AminoacidData::CreateMatrixFromNCL(GarliReader &reader){
 		}while(num < reader.NumCharBlocks());
 	if(numNuc < 0) throw ErrorException("No characters/data blocks containing protein data found in Nexus datafile!");
 	charblock = reader.GetCharactersBlock(numNuc);
-
+*/
 	if(charblock->GetNumActiveChar() < charblock->GetNChar()){
 		outman.UserMessageNoCR("Excluded characters:\n\t");
 		for(int c=0;c<charblock->GetNCharTotal();c++)
@@ -917,7 +925,7 @@ void AminoacidData::CreateMatrixFromNCL(GarliReader &reader){
 		}
 
 //	vector<unsigned> reducedToOrigCharMap = charblock->GetOrigIndexVector();
-	NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
+//	NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
 	
 	int numOrigTaxa = charblock->GetNTax();
 	int numActiveTaxa = charblock->GetNumActiveTaxa();
@@ -933,7 +941,9 @@ void AminoacidData::CreateMatrixFromNCL(GarliReader &reader){
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
 			//internally, blanks in taxon names will be stored as underscores
-			NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			//FACTORY
+			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
 			tlabel.BlanksToUnderscores();
 			SetTaxonLabel( i, tlabel.c_str());
 			

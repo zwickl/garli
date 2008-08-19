@@ -196,7 +196,7 @@ bool FileIsFasta(const char *name){
 	return fasta;
 	}
 
-bool ReadData(const char* filename, SequenceData* data)	{
+bool ReadData(const char* filename)	{
 	bool usedNCL = false;
 
 	if (!FileExists(filename))	{
@@ -206,16 +206,23 @@ bool ReadData(const char* filename, SequenceData* data)	{
 	if(FileIsNexus(filename)){
 		outman.UserMessage("Attempting to read data file in Nexus format (using NCL): %s ...", filename);
 		GarliReader &reader = GarliReader::GetInstance();
+#ifdef FACTORY
+		reader.ReadFilepath(filename, MultiFormatReader::NEXUS_FORMAT);
+#else
 		int err = reader.HandleExecute(filename, true);
 		if(err) throw ErrorException("Problem reading nexus datafile");
+#endif
 		//moving error checking and finding of correct char block into individual CreateMatrix functions
 	//	NxsCharactersBlock *chars = reader.GetCharactersBlock();
 	//	if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid()==false && chars->GetDataType() != NxsCharactersBlock::protein)
 	//		throw ErrorException("protein data specified, but nexus file does not contain protein data!");
-		data->CreateMatrixFromNCL(reader);
+		//FACTORY
+		//		data->CreateMatrixFromNCL(reader);
 		usedNCL = true;
 		}
-	else if(FileIsFasta(filename)){
+	else if(1)
+		assert(0);
+/*	else if(FileIsFasta(filename)){
 		outman.UserMessage("Attempting to read data file in Fasta format: %s ...", filename);
 		data->ReadFasta(filename);
 		}
@@ -223,7 +230,7 @@ bool ReadData(const char* filename, SequenceData* data)	{
 		outman.UserMessage("Attempting to read data file in Phylip format: %s ...", filename);
 		data->ReadPhylip(filename);
 		}
-
+*/
 /*
 	if(modSpec.IsCodon()){
 		assert(0);
