@@ -74,6 +74,8 @@
 
 #undef EQUIV_CALCS
 
+#define FACTORY
+
 typedef double MODEL_FLOAT;
 
 #ifdef SINGLE_PRECISION_FLOATS

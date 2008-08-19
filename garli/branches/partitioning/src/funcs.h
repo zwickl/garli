@@ -69,7 +69,7 @@ int FileExists(const char* s);
 bool FileIsFasta(const char *name);
 bool FileIsNexus(const char *name);
 int ReadData(GeneralGamlConfig *, SequenceData* data);
-bool ReadData(const char* filename, SequenceData* data);
+bool ReadData(const char* filename);
 //void GetRestartParams(Parameters& params);
 int RandomInt(int lb, int ub);
 FLOAT_TYPE RandomFrac();

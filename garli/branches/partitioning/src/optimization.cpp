@@ -862,7 +862,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 		bool isNucleotide = (claOne->NStates() == 4);
 
 		if(nd2->left == NULL){
-			char *childData=nd2->tipData;
+			char *childData=nd2->tipData[mod->dataIndex];
 			ProfTermDeriv.Start();
 
 			if(isNucleotide == false){
@@ -877,7 +877,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 	#else
 				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, mod);
 	#endif
-
+			assert(d1 == d1);
 			ProfTermDeriv.Stop();
 			}
 		else {
@@ -896,10 +896,13 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 	#endif
 			ProfIntDeriv.Stop();
 			}
+		assert(d1 == d1);
 		d1tot += d1;
 		d2tot += d2;
 		}
 
+	assert(d1 == d1);
+	assert(d2 == d2);
 	return pair<FLOAT_TYPE, FLOAT_TYPE>(d1tot, d2tot);
 }
 
@@ -2018,6 +2021,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			if(*Ldata > -1){ //no ambiguity
 				for(int r=0;r<nRateCats;r++){
 					La  += prmat[(*Ldata)+16*r] * partial[0] * rateProb[r];
+					assert(La < 1.0);
 					D1a += d1mat[(*Ldata)+16*r] * partial[0] * rateProb[r];
 					D2a += d2mat[(*Ldata)+16*r] * partial[0] * rateProb[r];
 					Lc  += prmat[(*Ldata+4)+16*r] * partial[1]* rateProb[r];
@@ -2080,7 +2084,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			else
 				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
 
-			assert(La > 0.0f || Lc > 0.0f || Lg > 0.0f || Lt > 0.0f);
+			assert(La > 0.0f && Lc > 0.0f && Lg > 0.0f && Lt > 0.0f);
 			assert(La < 1.0e30 && Lc < 1.0e30 && Lg < 1.0e30 && Lt < 1.0e30);
 
 			FLOAT_TYPE tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
@@ -2100,6 +2104,9 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			tot1+= countit[i] * tempD1;
 			FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
+			assert(siteL == siteL);
+			assert(tempD1 == tempD1);
+			assert(siteD2 == siteD2);			
 #endif
 //			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
 			}

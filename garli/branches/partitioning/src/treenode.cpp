@@ -684,7 +684,7 @@ void TreeNode::RecursivelyAddOrRemoveSubtreeFromBipartitions(const Bipartition &
 	}
 
 //unsigned MATCH_II=0, MATCH_TT=0, MATCH_IT=0, TOT_II=0, TOT_IT=0, TOT_TT=0;
-
+/*
 void TreeNode::SetEquivalentConditionalVectors(const SequenceData *data){
 	if(nodeNum == 0){
 		if(left->IsInternal()) left->SetEquivalentConditionalVectors(data);
@@ -759,7 +759,8 @@ void TreeNode::SetEquivalentConditionalVectors(const SequenceData *data){
 			}
 		}
 	}
-/*
+*/
+ /*
 void TreeNode::OutputBinaryNodeInfo(ofstream &out) const{
 	int zero = 0;
 

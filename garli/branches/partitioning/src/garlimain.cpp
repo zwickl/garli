@@ -34,7 +34,7 @@
 #include "individual.h"
 #include "adaptation.h"
 #include "sequencedata.h"
-//#include "garlireader.h"
+#include "garlireader.h"
 
 #include "funcs.h"
 #include "mpifuncs.h"
@@ -317,69 +317,83 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
+			//read the datafile with the GarliReader - requiring Nexus at the moment
+			pop.usedNCL = ReadData(datafile.c_str());
+			
 			//set up the model specification
 			//PARTITION
+			//need to figure out how this will work in general
 			//modSpec.SetupModSpec(conf);
 			modSpecSet.AddModSpec(conf);
 			//Can add another ModSpec here to fake partitions (multiple models, 1 matrix)
-//			modSpecSet.AddModSpec(conf);
-			const ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
+			modSpecSet.AddModSpec(conf);
 			
-			// Create the data object
-			if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
-				data = new AminoacidData();
-			else //all data besides AA will be read into a DNA matrix and
-				//then converted if necessary
-				data = new NucleotideData();
-
-			pop.usedNCL = ReadData(datafile.c_str(), data);
-
-			//PARTITION			
-			if(modSpec->IsCodon()){
-				rawPart.AddSubset(data);
-				CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec->geneticCode);
-				//PARTITION
-				//pop.rawData = data;
-				dataPart.AddSubset(d);
-				//data = d;
-				//this probably shouldn't go here, but...
-				if(modSpec->IsF1x4StateFrequencies()) d->SetF1X4Freqs();
-				else if(modSpec->IsF3x4StateFrequencies()) d->SetF3X4Freqs();
-				else if(modSpec->IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
+			GarliReader &reader = GarliReader::GetInstance();
+			//assuming a single taxa block
+			NxsTaxaBlock *taxblock = reader.GetTaxaBlock(0);
+			
+			for(int m=0;m<modSpecSet.NumSpecs();m++){
+				const ModelSpecification *modSpec = modSpecSet.GetModSpec(m);
+				//assuming number of specs = num matrices
+				assert(reader.GetNumCharactersBlocks(taxblock) > m);
+				NxsCharactersBlock *charblock = reader.GetCharactersBlock(taxblock, m);
+				
+				// Create the data object
+				if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
+					data = new AminoacidData();
+				else //all data besides AA will be read into a DNA matrix and
+					//then converted if necessary
+					data = new NucleotideData();
+				
+				data->CreateMatrixFromNCL(charblock);
+				
+				//PARTITION			
+				if(modSpec->IsCodon()){
+					rawPart.AddSubset(data);
+					CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec->geneticCode);
+					//PARTITION
+					//pop.rawData = data;
+					dataPart.AddSubset(d);
+					//data = d;
+					//this probably shouldn't go here, but...
+					if(modSpec->IsF1x4StateFrequencies()) d->SetF1X4Freqs();
+					else if(modSpec->IsF3x4StateFrequencies()) d->SetF3X4Freqs();
+					else if(modSpec->IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
+					}
+				else if(modSpec->IsCodonAminoAcid()){
+					rawPart.AddSubset(data);
+					AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec->geneticCode);
+					//pop.rawData = data;
+					//PARTITION
+					//pop.rawData = data;
+					dataPart.AddSubset(d);
+					//data = d;				
+					}
+				else dataPart.AddSubset(data);
+				
+				data->Summarize();
+				outman.UserMessage("\nSummary of dataset:");
+				outman.UserMessage(" %d sequences.", data->NTax());
+				outman.UserMessage(" %d constant characters.", data->NConstant());
+				outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
+				outman.UserMessage(" %d autapomorphic characters.", data->NAutapomorphic());
+				int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
+				if(data->NMissing() > 0){
+					outman.UserMessage(" %d characters were completely missing or ambiguous (removed).", data->NMissing());
+					outman.UserMessage(" %d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
 				}
-			else if(modSpec->IsCodonAminoAcid()){
-				rawPart.AddSubset(data);
-				AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec->geneticCode);
-				//pop.rawData = data;
-				//PARTITION
-				//pop.rawData = data;
-				dataPart.AddSubset(d);
-				//data = d;				
+				else outman.UserMessage(" %d total characters.", total);
+				
+				outman.flush();
+				
+				data->Collapse();
+				outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
+				
+				//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
+				data->ReserveOriginalCounts();
+				
+				data->DetermineConstantSites();
 				}
-			else dataPart.AddSubset(data);
-
-			data->Summarize();
-			outman.UserMessage("\nSummary of dataset:");
-			outman.UserMessage(" %d sequences.", data->NTax());
-			outman.UserMessage(" %d constant characters.", data->NConstant());
-			outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
-			outman.UserMessage(" %d autapomorphic characters.", data->NAutapomorphic());
-			int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
-			if(data->NMissing() > 0){
-				outman.UserMessage(" %d characters were completely missing or ambiguous (removed).", data->NMissing());
-				outman.UserMessage(" %d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
-				}
-			else outman.UserMessage(" %d total characters.", total);
-
-			outman.flush();
-
-			data->Collapse();
-			outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
-
-			//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
-			data->ReserveOriginalCounts();
-
-			data->DetermineConstantSites();
 
 			//PARTITION
 			//dataPart.AddSubset(data);

@@ -175,7 +175,8 @@ bool GarliReader::EnteringBlock(
 	message += blockName;
 	message += " block...";
 	PrintMessage(false);
-
+#ifndef FACTORY
+		
 	if(blockName.Equals("CHARACTERS")){
 		if(characters->IsEmpty() == false){
 			charBlocks.push_back(characters);
@@ -193,7 +194,7 @@ bool GarliReader::EnteringBlock(
 	//this is a change from previous behavior, in which I wanted the second to just override the first.
 	else if(blockName.Equals("GARLI") && FoundModelString())
 		throw ErrorException("Multiple GARLI blocks found (possibly in multiple files).\n\tRemove or comment out all but one.");
-
+#endif
 	return true;
 	}
 
@@ -304,7 +305,31 @@ void GarliReader::FactoryDefaults()
 	if (next_command == NULL)
 		next_command = new char[COMMAND_MAXLEN + 1];
 	next_command[0] = '\0';
-
+		
+#ifdef FACTORY 
+		//not sure what will need to be done here in the factory case
+		/*
+		//moved all of this allocation to here from the constructor - otherwise calling FactoryDefaults
+		//just makes the GarliReader empty
+		taxa			= new NxsTaxaBlock();
+		trees			= new NxsTreesBlock(taxa);
+#if defined(NCL_MAJOR_VERSION) && (NCL_MAJOR_VERSION >= 2) && (NCL_MINOR_VERSION >= 1)
+		trees->SetAllowImplicitNames(true);
+#endif
+		assumptions		= new NxsAssumptionsBlock(taxa);
+		characters		= new NxsCharactersBlock(taxa, assumptions);
+		distances		= new NxsDistancesBlock(taxa);
+		data			= new NxsDataBlock(taxa, assumptions);
+		
+		Add(taxa);
+		Add(trees);
+		Add(assumptions);
+		Add(characters);
+		Add(distances);
+		Add(data);
+		Add(this);		
+*/
+ #else
 	//moved all of this allocation to here from the constructor - otherwise calling FactoryDefaults
 	//just makes the GarliReader empty
 	taxa			= new NxsTaxaBlock();
@@ -324,7 +349,8 @@ void GarliReader::FactoryDefaults()
 	Add(distances);
 	Add(data);
 	Add(this);
-
+#endif
+		
 	modelString = "";
 	}
 
@@ -486,8 +512,10 @@ int GarliReader::HandleExecute(const char *filename, bool purge)
 
 	if (FileExists(fn.c_str()))
 		{
+#ifndef FACTORY
 		if(purge) PurgeBlocks();
-
+#endif
+			
 		ifstream inf(fn.c_str(), ios::binary | ios::in);
 
 		inf_open = true;

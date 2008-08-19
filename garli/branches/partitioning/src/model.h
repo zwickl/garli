@@ -693,7 +693,7 @@ public:
 		return modSpecs[num];
 		}
 	bool IsSetup(int num){return GetModSpec(num)->isSetup;}
-	int NumSpecSets() const {return modSpecs.size();}
+	int NumSpecs() const {return modSpecs.size();}
 	};
 
 class Model{
@@ -1185,6 +1185,7 @@ public:
 		}
 	unsigned NumModels(){return mods.size();}
 	void CopyModelSet(const ModelSet *m){
+		assert(GetModel(0)->stateFreqs[0] != NULL);
 		unsigned num = 0;
 		for(vector<Model*>::const_iterator modit = m->mods.begin();modit != m->mods.end();modit++){
 			Model *mod;
@@ -1225,17 +1226,12 @@ class ModelPartition{
 	vector<Model *> models;
 	vector<BaseParameter *> allParamsToMutate;
 public:
-	ModelPartition(){
-		for(int i=0;i<modSpecSet.NumSpecSets();i++){
-			ModelSet * ms = new ModelSet(i);
-			modSets.push_back(ms);
-			for(int m=0;m<ms->NumModels();m++)
-				models.push_back(modSets[i]->GetModel(m));
-			}
-		CollectMutableParameters();
-		}
+	ModelPartition();
+
 	void CopyModelPartition(const ModelPartition *mp){
 		unsigned num = 0;
+		assert(GetModel(0)->stateFreqs[0] != NULL);
+		assert(GetModel(1)->stateFreqs[0] != NULL);
 		for(vector<ModelSet*>::const_iterator setit = mp->modSets.begin();setit != mp->modSets.end();setit++){
 			ModelSet *modSet;
 			if(num >= modSets.size()){

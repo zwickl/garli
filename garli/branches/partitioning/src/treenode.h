@@ -46,7 +46,7 @@ class TreeNode{
 		bool attached;
 		bool alreadyOptimized;
 		Bipartition *bipart;
-		char *tipData;
+		vector<char *> tipData;
 #ifdef OPEN_MP
 		unsigned *ambigMap;
 #endif

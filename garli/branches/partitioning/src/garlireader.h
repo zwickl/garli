@@ -43,6 +43,7 @@
 #define COMMAND_MAXLEN  255
 
 #include "ncl.h"
+#include "nxsmultiformat.h"
 
 /*----------------------------------------------------------------------------------------------------------------------
 |	GarliReader provides a template for creating a program that reads NEXUS data files and provides a basic command 
@@ -92,7 +93,7 @@
 
 class GarliReader
   : public NxsBlock,
-  public NxsReader
+  public MultiFormatReader
 	{
 	public:
 		static GarliReader & GetInstance();
@@ -123,8 +124,9 @@ class GarliReader
 		void				SkippingDisabledBlock(NxsString blockName);
 		virtual bool		UserQuery(NxsString mb_message, NxsString mb_title, GarliReader::UserQueryEnum mb_choices = GarliReader::uq_ok);
 
-		NxsTaxaBlock	*GetTaxaBlock(){return taxa;}
-		NxsTreesBlock	*GetTreesBlock(){return trees;}
+		//FACTORY
+	//	NxsTaxaBlock	*GetTaxaBlock(){return taxa;}
+	//	NxsTreesBlock	*GetTreesBlock(){return trees;}
 
 		//I've added the charBlocks vector of characters blocks below, which 
 		//acts as storage for multiple char blocks.  Normally muliple blocks
@@ -134,7 +136,8 @@ class GarliReader
 		//which is probably not the ideal place to put it).  When the GetCharacterBlock
 		//function is called it will return the blocks in the order that they were read,
 		//which means that the one is the "characters" field is actually last
-		NxsCharactersBlock	*GetCharactersBlock(int i){
+//FACTORY
+	/*		NxsCharactersBlock	*GetCharactersBlock(int i){
 			assert(i < charBlocks.size() + 1);
 			if(charBlocks.size() > 0){
 				if(i < charBlocks.size()) return charBlocks[i];
@@ -143,7 +146,7 @@ class GarliReader
 			return characters;
 			}
 		int NumCharBlocks() {return charBlocks.size() + 1;}
-
+*/
 	protected:
 
 		bool				inf_open;			/* true if `inf' is currently open */
