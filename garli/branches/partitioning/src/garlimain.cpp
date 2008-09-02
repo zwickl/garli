@@ -55,6 +55,9 @@
 OutputManager outman;
 bool interactive;
 
+vector<ClaSpecifier> claSpecs;
+vector<DataSubsetInfo> dataSubInfo;
+
 int CheckRestartNumber(const string str){
 	int num=1;
 	char temp_buf[100];
@@ -204,7 +207,11 @@ int main( int argc, char* argv[] )	{
 		try{
 			MasterGamlConfig conf;
 			bool confOK;
+			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			confOK = ((conf.Read(conf_name.c_str()) < 0) == false);
+			if(confOK == false) throw ErrorException("Error in config file...aborting");
+
+			string datafile = conf.datafname;
 
 #ifdef SUBROUTINE_GARLI
 			//override the ofprefix here, tacking .runXX onto it 
@@ -224,8 +231,6 @@ int main( int argc, char* argv[] )	{
 			rnd.set_seed(randomSeed);
 			
 			char temp_buf[100];
-
-			string datafile = conf.datafname;
 
 #ifdef BOINC
 			//deal with stdout and stderr, although I don't think that anything is being
@@ -269,6 +274,7 @@ int main( int argc, char* argv[] )	{
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
 			datafile = buffer;
 #else	//not BOINC
+			//set up the screen log file
 			if(confOK == true){
 				//changing this to always append to the .screen.log after a restart
 				sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
@@ -279,15 +285,16 @@ int main( int argc, char* argv[] )	{
 
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
-#ifdef SUBROUTINE_GARLI
+	#ifdef SUBROUTINE_GARLI
+			//MPI search forking version
 			outman.UserMessage("Running GARLI, version 0.96beta8 r315 (Aug 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
-#else	//nonMPI version
+	#else	//nonMPI version
 			outman.UserMessage("Running serial GARLI, version 0.96beta8 r315 (Aug 2008)\n");
-#endif
+	#endif
 
-#endif  //not BOINC
+#endif //end of BOINC / nonBOINC
 
 #ifdef OPEN_MP
 			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
@@ -314,30 +321,138 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("Single precision floating point version\n");
 #endif
 
-			outman.UserMessage("Reading config file %s", conf_name.c_str());
-			if(confOK == false) throw ErrorException("Error in config file...aborting");
+			//This is pretty hacky.  Create one modSpec now because it is needed
+			//to read the data (to identify the expected type of sequence for phylip and
+			//fasta files), then add more later if there are multiple char blocks or CharPartitions
+			//in the case of a Nexus datafile, we actually don't need to know the datatype
+			//in advance, and can handle data subsets with different datatypes
+			modSpecSet.AddModSpec(conf.configModelSets[0]);
 
-			//read the datafile with the GarliReader - requiring Nexus at the moment
-			pop.usedNCL = ReadData(datafile.c_str());
-			
-			//set up the model specification
-			//PARTITION
-			//need to figure out how this will work in general
-			//modSpec.SetupModSpec(conf);
-			modSpecSet.AddModSpec(conf);
-			//Can add another ModSpec here to fake partitions (multiple models, 1 matrix)
-			modSpecSet.AddModSpec(conf);
-			
+			//read the datafile with the NCL-based GarliReader - should allow nexus, phylip and fasta
+			outman.UserMessage("###################################################\nREADING OF DATA");
 			GarliReader &reader = GarliReader::GetInstance();
-			//assuming a single taxa block
-			NxsTaxaBlock *taxblock = reader.GetTaxaBlock(0);
+			reader.ReadData(datafile.c_str(), *modSpecSet.GetModSpec(0));
 			
-			for(int m=0;m<modSpecSet.NumSpecs();m++){
-				const ModelSpecification *modSpec = modSpecSet.GetModSpec(m);
-				//assuming number of specs = num matrices
-				assert(reader.GetNumCharactersBlocks(taxblock) > m);
-				NxsCharactersBlock *charblock = reader.GetCharactersBlock(taxblock, m);
+			//assuming a single taxa block
+			if(reader.GetNumTaxaBlocks() > 1) throw ErrorException("Expecting only one taxa block in datafile");
+			NxsTaxaBlock *taxblock = reader.GetTaxaBlock(0);
+
+			//currently data subsets will be created for each separate characters block, and/or for each
+			//part of a char partition within a characters block
+			int numCharBlocks = reader.GetNumCharactersBlocks(taxblock);
+			if(numCharBlocks == 0) throw ErrorException("No character data (in characters/data blocks) found in datafile");
+			vector<pair<NxsCharactersBlock *, NxsUnsignedSet>> effectiveMatrices;
+
+			outman.UserMessage("\n###################################################\nPARTITIONING OF DATA AND MODELS");
+			//loop over characters blocks
+			for(int c = 0;c < numCharBlocks;c++){
+				NxsCharactersBlock *charblock = reader.GetCharactersBlock(taxblock, c);
+				string cbName = charblock->GetTitle();
+				NxsAssumptionsBlock *assblock = NULL;
+				NxsUnsignedSet charSet;
+				bool foundCharPart = false;
+
+				int numAssBlocks = reader.GetNumAssumptionsBlocks(charblock);
+				if(numAssBlocks > 0){
+					//loop over assumptions blocks for this charblock
+					for(int a = 0;a < numAssBlocks;a++){
+						assblock = reader.GetAssumptionsBlock(charblock, a);
+						int numParts = assblock->GetNumCharPartitions();
+						if(numParts > 1) 
+							throw ErrorException("Found more than one CHARPARTITION referring to CHARACTERS block %s in a single ASSUMPTIONS or SETS blocks", charblock->GetTitle());
+						else if(numParts == 1){
+							if(foundCharPart == true)
+								throw ErrorException("Found more than one CHARPARTITION referring to CHARACTERS block %s in multiple ASSUMPTIONS or SETS blocks", charblock->GetTitle());\
+							else 
+								foundCharPart = true;
+							//get the name of the charpartition
+							vector<std::string> charPartNames;
+							assblock->GetCharPartitionNames(charPartNames);
+							const NxsPartition *part = assblock->GetCharPartition(charPartNames[0]);
+							int numSubsets = part->size();
+							int subsetNum = 0;
+							//loop over the partition subsets, each of which creates a data subset in GARLI
+							for(NxsPartition::const_iterator subit = part->begin();subit != part->end();subit++){
+								charSet = (*subit).second;
+								dataSubInfo.push_back(DataSubsetInfo(effectiveMatrices.size(), c, cbName, subsetNum, (*subit).first, DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE));
+								effectiveMatrices.push_back(make_pair(charblock, charSet));
+								subsetNum++;
+								}
+							}
+						}
+					if(foundCharPart == false){//no charpart found 
+						dataSubInfo.push_back(DataSubsetInfo(effectiveMatrices.size(), c, cbName, -1, "", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE));
+						effectiveMatrices.push_back(make_pair(charblock, charSet));
+						}
+					}
+				else{ //no assumptions block found,  
+					dataSubInfo.push_back(DataSubsetInfo(effectiveMatrices.size(), c, cbName, -1, "", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE));
+					effectiveMatrices.push_back(make_pair(charblock, charSet));
+					}
+				}
+
+			//report on how data and models line up, and deal with a few unsupported possibilites
+			if(conf.linkModels && conf.configModelSets.size() > 1)
+				throw ErrorException("Multiple model subsets specified, but linkmodels = 1");
+			if(effectiveMatrices.size() > 1){
+				if(conf.configModelSets.size() == 1){//only one model description found
+					if(conf.linkModels)
+						outman.UserMessage("\nCHECK: ONE MODEL APPLIES TO ALL DATA SUBSETS\n\t(full linkage, all parameters shared)\n");
+					else
+						outman.UserMessage("\nCHECK: ONE MODEL TYPE APPLIES TO ALL DATA SUBSETS,\n\tBUT WITH INDEPENDENT MODEL PARAMETERS (no linkage)\n");
+					}
+				else{//mulitple model descriptions found
+					if(conf.configModelSets.size() != effectiveMatrices.size())
+						throw ErrorException("Multiple data subsets and model subsets specified, but numbers don't match");
+					else outman.UserMessage("\nCHECK: DIFFERENT MODEL TYPES AND MODEL PARAMETERS APPLY\n\tTO EACH DATA SUBSET (no linkage)\n");
+					}
+				}
+			else if(conf.configModelSets.size() != 1)
+				throw ErrorException("Multiple models specified, but only one data subset found");
+
+			//set this
+			modSpecSet.SetInferSubsetRates(conf.subsetSpecificRates && effectiveMatrices.size() > 1);
+
+			//now create a datamatrix object for each effective matrix
+			//because of exsets some subsets of a charpart could contain no characters,
+			//but I'm not going to deal with that right now, and will crap out
+			for(int d = 0;d < effectiveMatrices.size();d++){
+				const ModelSpecification *modSpec = NULL;
 				
+				if(d > 0){
+					if(conf.linkModels){//linkage means that all clas/matrices point to the same model/modSpec
+						claSpecs.push_back(ClaSpecifier(d,0,d));
+						modSpec = modSpecSet.GetModSpec(0);
+						}
+					else{//models are not linked ...
+						if(conf.configModelSets.size() == 1)//but are all described by the same settings in the config file
+							modSpecSet.AddModSpec(conf.configModelSets[0]);
+						else{ //each has its own description in the config
+							modSpecSet.AddModSpec(conf.configModelSets[d]);
+							}
+						claSpecs.push_back(ClaSpecifier(d,d,d));
+						modSpec = modSpecSet.GetModSpec(d);
+						}
+					}
+				else{ //if this is the first model, it must correspond to the first modSpec
+					modSpec = modSpecSet.GetModSpec(0);
+					claSpecs.push_back(ClaSpecifier(0,0,0));
+					}
+
+				//defaults here are NUCLEOTIDE, so make changes as necessary
+				if(modSpec->IsCodon()) 
+					dataSubInfo[d].usedAs = DataSubsetInfo::CODON;
+				else if(modSpec->IsCodonAminoAcid())
+					dataSubInfo[d].usedAs = DataSubsetInfo::AMINOACID;
+				else if(modSpec->IsAminoAcid())
+					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::AMINOACID;
+
+				dataSubInfo[d].Report();
+				outman.UserMessage("");
+
+				if(modSpecSet.GetModSpec(0)->datatype != modSpec->datatype)
+					throw ErrorException("Partitioned models with different datatypes are not yet implemented");
+
 				// Create the data object
 				if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
 					data = new AminoacidData();
@@ -345,62 +460,71 @@ int main( int argc, char* argv[] )	{
 					//then converted if necessary
 					data = new NucleotideData();
 				
-				data->CreateMatrixFromNCL(charblock);
+				if(effectiveMatrices[d].second.empty())//no charpartition specified
+					data->CreateMatrixFromNCL(effectiveMatrices[d].first);
+				else//with charpartition
+					data->CreateMatrixFromNCL(effectiveMatrices[d].first, effectiveMatrices[d].second);
 				
-				//PARTITION			
 				if(modSpec->IsCodon()){
 					rawPart.AddSubset(data);
-					CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec->geneticCode);
-					//PARTITION
-					//pop.rawData = data;
-					dataPart.AddSubset(d);
-					//data = d;
+					const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
+					CodonData *d;
+					if(nuc != NULL)
+						d = new CodonData(nuc, modSpec->geneticCode);
+					else throw ErrorException("Attempted to create codon matrix from non-nucleotide data");
+
 					//this probably shouldn't go here, but...
 					if(modSpec->IsF1x4StateFrequencies()) d->SetF1X4Freqs();
 					else if(modSpec->IsF3x4StateFrequencies()) d->SetF3X4Freqs();
 					else if(modSpec->IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
+
+					data = d;
 					}
 				else if(modSpec->IsCodonAminoAcid()){
 					rawPart.AddSubset(data);
-					AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec->geneticCode);
-					//pop.rawData = data;
-					//PARTITION
-					//pop.rawData = data;
-					dataPart.AddSubset(d);
-					//data = d;				
+					const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
+					AminoacidData *d;
+					if(nuc != NULL)
+						d = new AminoacidData(nuc, modSpec->geneticCode);
+					else throw ErrorException("Attempted to translate to amino acids from non-nucleotide data");
+
+					data = d;
 					}
-				else dataPart.AddSubset(data);
 				
+				dataPart.AddSubset(data);
+
 				data->Summarize();
-				outman.UserMessage("\nSummary of dataset:");
-				outman.UserMessage(" %d sequences.", data->NTax());
-				outman.UserMessage(" %d constant characters.", data->NConstant());
-				outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
-				outman.UserMessage(" %d autapomorphic characters.", data->NAutapomorphic());
+				outman.UserMessage("\tSummary of data or data subset:");
+				outman.UserMessage("\t%5d sequences.", data->NTax());
+				outman.UserMessage("\t%5d constant characters.", data->NConstant());
+				outman.UserMessage("\t%5d parsimony-informative characters.", data->NInformative());
+				outman.UserMessage("\t%5d autapomorphic characters.", data->NAutapomorphic());
 				int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
 				if(data->NMissing() > 0){
-					outman.UserMessage(" %d characters were completely missing or ambiguous (removed).", data->NMissing());
-					outman.UserMessage(" %d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
+					outman.UserMessage("\t%5d characters were completely missing or ambiguous (removed).", data->NMissing());
+					outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
 				}
-				else outman.UserMessage(" %d total characters.", total);
+				else outman.UserMessage("\t%5d total characters.", total);
 				
 				outman.flush();
 				
 				data->Collapse();
-				outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
-				
+				outman.UserMessage("\t%5d unique patterns in compressed data matrix.\n", data->NChar());
+
+				dataSubInfo[d].totalCharacters = data->TotalNChar();
+				dataSubInfo[d].uniqueCharacters = data->NChar();
+
 				//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 				data->ReserveOriginalCounts();
 				
 				data->DetermineConstantSites();
 				}
 
-			//PARTITION
-			//dataPart.AddSubset(data);
-
+			outman.UserMessage("\n###################################################");
 			pop.Setup(&conf, &dataPart, &rawPart, 1, 0);
 			pop.SetOutputDetails();
 
+			outman.UserMessage("###################################################\nSTARTING RUN");
 			if(runTests){
 				outman.UserMessage("starting internal tests...");
 				pop.RunTests();

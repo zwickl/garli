@@ -18,6 +18,7 @@
 #include <string.h>
 #include <cassert>
 #include <iostream>
+#include <vector>
 
 using namespace std;
 
@@ -69,14 +70,8 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	stopgen = UINT_MAX;
 	stoptime = UINT_MAX;
 
-	//default model is GTR+I+G
-	stateFrequencies = "estimate";
-	rateMatrix = "6rate";
-	proportionInvariant = "estimate";
-	rateHetModel = "gamma";
-	numRateCats = 4;
-	datatype = "dna";
-	geneticCode = "standard";
+	linkModels = false;
+	subsetSpecificRates = true;
 
 	//general population stuff
 	nindivs = 4;
@@ -175,15 +170,25 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetUnsignedNonZeroOption("searchreps", searchReps, true);
 	cr.GetUnsignedOption("runmode", runmode, true);
 
-	//cr.GetBoolOption("useflexrates", useflexrates, true);
-	//cr.GetBoolOption("dontinferproportioninvariant", dontInferProportionInvariant, true);
-	cr.GetStringOption("ratehetmodel", rateHetModel, true);
-	cr.GetUnsignedOption("numratecats", numRateCats, true);	
-	cr.GetStringOption("statefrequencies", stateFrequencies, true);
-	cr.GetStringOption("ratematrix", rateMatrix, true);
-	cr.GetStringOption("invariantsites", proportionInvariant, true);
-	cr.GetStringOption("datatype", datatype, true);
-	cr.GetStringOption("geneticcode", geneticCode, true);
+	bool multipleModelsFound = ReadPossibleModelPartition(cr);
+
+	if(!multipleModelsFound){//if we didn't find multiple models in separate model sections, look for them in 
+		ConfigModelSettings configModSet;
+		int settingsFound = 0;
+		settingsFound += cr.GetStringOption("ratehetmodel", configModSet.rateHetModel, true);
+		settingsFound += cr.GetUnsignedOption("numratecats", configModSet.numRateCats, true);	
+		settingsFound += cr.GetStringOption("statefrequencies", configModSet.stateFrequencies, true);
+		settingsFound += cr.GetStringOption("ratematrix", configModSet.rateMatrix, true);
+		settingsFound += cr.GetStringOption("invariantsites", configModSet.proportionInvariant, true);
+		settingsFound += cr.GetStringOption("datatype", configModSet.datatype, true);
+		settingsFound += cr.GetStringOption("geneticcode", configModSet.geneticCode, true);
+		if(settingsFound == -7)
+			throw ErrorException("No model descriptions found in config file.  Proper setup is either:\n\t1. Model settings found somewhere under [general] heading,\n\t   applying to all data subsets\n\t2. Separate model settings for each partition subset\n\t   found under different headings [model0], [model1]. etc");
+		configModelSets.push_back(configModSet);
+		}
+
+	cr.GetBoolOption("linkmodels", linkModels, true);
+	cr.GetBoolOption("subsetspecificrates", subsetSpecificRates, true);
 
 	cr.GetStringOption("outgroup", outgroupString, true);
 
@@ -277,6 +282,34 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 #endif
 	return errors;
 }
+
+bool GeneralGamlConfig::ReadPossibleModelPartition(ConfigReader &cr){
+	string origSection = cr.GetCurrentSection();
+	bool foundAnyModels = false;
+	for(int modelNum = 0; ;modelNum++){
+		char modName[10];
+		sprintf(modName, "model%d", modelNum);
+		int found = cr.SetSection(modName);
+		if(found < 0){
+			cr.SetSection(origSection.c_str());
+			return foundAnyModels;
+			}
+		else{
+			foundAnyModels = true;
+			ConfigModelSettings configModSet;
+			cr.GetStringOption("ratehetmodel", configModSet.rateHetModel, true);
+			cr.GetUnsignedOption("numratecats", configModSet.numRateCats, true);	
+			cr.GetStringOption("statefrequencies", configModSet.stateFrequencies, true);
+			cr.GetStringOption("ratematrix", configModSet.rateMatrix, true);
+			cr.GetStringOption("invariantsites", configModSet.proportionInvariant, true);
+			cr.GetStringOption("datatype", configModSet.datatype, true);
+			cr.GetStringOption("geneticcode", configModSet.geneticCode, true);
+			configModelSets.push_back(configModSet);
+			}
+		}
+	//we shouldn't be getting to here
+	return false;
+	}
 
 int GeneralGamlConfig::Serialize(char** buf_, int* size_) const	{
 	int& size = *size_;

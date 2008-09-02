@@ -826,46 +826,27 @@ unsigned char AminoacidData::CharToDatum(char d){
 	}
 
 void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
-//	NxsCharactersBlock *charblock;
 
-	
-//	NxsTaxaBlock *taxablock = reader.GetTaxaBlock(0);
-	
-//	int numC = reader.GetNumCharactersBlocks(taxablock);
-/*	
-	int num=0, numNuc = -1;
-	do{
-		charblock = reader.GetCharactersBlock(num);
-		if(charblock->GetDataType() == NxsCharactersBlock::nucleotide ||
-			charblock->GetDataType() == NxsCharactersBlock::dna ||
-			charblock->GetDataType() == NxsCharactersBlock::rna){
-			if(numNuc < 0) numNuc = num;
-			else{
-				throw ErrorException("Multiple characters/data blocks containing nucleotide data found in Nexus datafile!\n\tEither combine the blocks or comment one out.");
-				}
-			}
-		else outman.UserMessage("Ignoring non-nucleotide characters block from Nexus datafile");
-		num++;
-		}while(num < reader.NumCharBlocks());
-	if(numNuc < 0) throw ErrorException("No characters/data blocks containing nucleotide data found in Nexus datafile!");
-	charblock = reader.GetCharactersBlock(numNuc);
-*/
+	if(charblock->GetDataType() != NxsCharactersBlock::dna 
+		&& charblock->GetDataType() != NxsCharactersBlock::rna 
+		&& charblock->GetDataType() != NxsCharactersBlock::nucleotide )
+		throw ErrorException("Tried to create nucleotide matrix from non-amino acid data.\n\t(Check your datatype setting.)");
+
 	if(charblock->GetNumActiveChar() < charblock->GetNChar()){
+		NxsUnsignedSet excluded = charblock->GetExcludedIndexSet();
+		ofstream poo;
+		//NxsSetReader::WriteAsNexusValue(excluded, poo);
+		//string exset = NxsSetReader::GetSetAsNexusValue(excluded, poo);
 		outman.UserMessageNoCR("Excluded characters:\n\t");
 		for(int c=0;c<charblock->GetNCharTotal();c++)
 			if(charblock->IsExcluded(c)) outman.UserMessageNoCR("%d ", c+1);
 		outman.UserMessage("");
 		}
 
-//	vector<unsigned> reducedToOrigCharMap = charblock->GetOrigIndexVector();
-	//NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
-	
 	int numOrigTaxa = charblock->GetNTax();
 	int numActiveTaxa = charblock->GetNumActiveTaxa();
 	int numOrigChar = charblock->GetNChar();
 	int numActiveChar = charblock->GetNumActiveChar();
-	//int num_chars = reducedToOrigCharMap.size();
-	//cout << num_chars << endl;
 
 	NewMatrix( numActiveTaxa, numActiveChar );
 
@@ -899,40 +880,76 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
 			}
 		}
 	}
-void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
-//FACTORY
-	//	NxsCharactersBlock *charblock;
-/*	int num=0, numNuc = -1;
-	do{
-		charblock = reader.GetCharactersBlock(num);
-		if(charblock->GetDataType() == NxsCharactersBlock::protein){
-			if(numNuc < 0) numNuc = num;
-			else{
-				throw ErrorException("Multiple characters/data blocks containing protein data found in Nexus datafile!\n\tEither combine the blocks or comment one out.");
+
+void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
+	
+	if(charblock->GetDataType() != NxsCharactersBlock::dna 
+		&& charblock->GetDataType() != NxsCharactersBlock::rna 
+		&& charblock->GetDataType() != NxsCharactersBlock::nucleotide )
+		throw ErrorException("Tried to create nucleotide matrix from non-amino acid data.\n\t(Check your datatype setting.)");
+
+	int numOrigTaxa = charblock->GetNTax();
+	int numActiveTaxa = charblock->GetNumActiveTaxa();
+
+	NxsUnsignedSet excluded = charblock->GetExcludedIndexSet();
+	NxsUnsignedSet charsetMinusExcluded;
+	set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
+
+	int numOrigChar = charset.size();
+	int numActiveChar = charsetMinusExcluded.size();
+
+	if(numActiveChar == 0){
+		throw ErrorException("Sorry, fully excluded characters blocks or partition subsets are not currently supported.");
+		}
+
+	NewMatrix( numActiveTaxa, numActiveChar );
+
+	// read in the data, including taxon names
+	int i=0;
+	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+		if(charblock->IsActiveTaxon(origTaxIndex)){
+			//internally, blanks in taxon names will be stored as underscores
+			//FACTORY
+			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
+			tlabel.BlanksToUnderscores();
+			SetTaxonLabel( i, tlabel.c_str());
+			
+			int j = 0;
+
+			for(NxsUnsignedSet::iterator cit = charsetMinusExcluded.begin(); cit != charsetMinusExcluded.end();cit++){	
+				unsigned char datum = '\0';
+				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 15;
+				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
+				else{
+					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+					for(int s=0;s<nstates;s++){
+						datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
+						}
+					}
+				SetMatrix( i, j++, datum );
 				}
+			i++;
 			}
-		else outman.UserMessage("Ignoring non-protein characters block from Nexus datafile");
-		num++;
-		}while(num < reader.NumCharBlocks());
-	if(numNuc < 0) throw ErrorException("No characters/data blocks containing protein data found in Nexus datafile!");
-	charblock = reader.GetCharactersBlock(numNuc);
-*/
+		}
+	}
+
+void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
+
+	if(charblock->GetDataType() != NxsCharactersBlock::protein)
+		throw ErrorException("Tried to create amino acid matrix from non-amino acid data.\n\t(Did you mean to use datatype = codon-aminoacid?)");
+
 	if(charblock->GetNumActiveChar() < charblock->GetNChar()){
 		outman.UserMessageNoCR("Excluded characters:\n\t");
 		for(int c=0;c<charblock->GetNCharTotal();c++)
 			if(charblock->IsExcluded(c)) outman.UserMessageNoCR("%d ", c+1);
 		outman.UserMessage("");
 		}
-
-//	vector<unsigned> reducedToOrigCharMap = charblock->GetOrigIndexVector();
-//	NxsTaxaBlock *taxablock = reader.GetTaxaBlock();
 	
 	int numOrigTaxa = charblock->GetNTax();
 	int numActiveTaxa = charblock->GetNumActiveTaxa();
 	int numOrigChar = charblock->GetNChar();
 	int numActiveChar = charblock->GetNumActiveChar();
-	//int num_chars = reducedToOrigCharMap.size();
-	//cout << num_chars << endl;
 
 	NewMatrix( numActiveTaxa, numActiveChar );
 
@@ -972,6 +989,69 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
 						}
 					SetMatrix( i, j++, datum );
 					}
+				}
+			if(firstAmbig == false) outman.UserMessage("");
+			i++;
+			}
+		}
+	}
+
+void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
+
+	if(charblock->GetDataType() != NxsCharactersBlock::protein)
+		throw ErrorException("Tried to create amino acid matrix from non-amino acid data.\n\t(Did you mean to use datatype = codon-aminoacid?)");
+
+	int numOrigTaxa = charblock->GetNTax();
+	int numActiveTaxa = charblock->GetNumActiveTaxa();
+
+	NxsUnsignedSet excluded = charblock->GetExcludedIndexSet();
+	NxsUnsignedSet charsetMinusExcluded;
+	set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
+
+	int numOrigChar = charset.size();
+	int numActiveChar = charsetMinusExcluded.size();
+
+	if(numActiveChar == 0){
+		throw ErrorException("Sorry, fully excluded characters blocks or partition subsets are not currently supported.");
+		}
+
+	NewMatrix( numActiveTaxa, numActiveChar );
+
+	// read in the data, including taxon names
+	int i=0;
+	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+		if(charblock->IsActiveTaxon(origTaxIndex)){
+			//internally, blanks in taxon names will be stored as underscores
+			//FACTORY
+			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
+			tlabel.BlanksToUnderscores();
+			SetTaxonLabel( i, tlabel.c_str());
+			
+			int j = 0;
+			bool firstAmbig = true;
+//			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
+			for(NxsUnsignedSet::iterator cit = charsetMinusExcluded.begin(); cit != charsetMinusExcluded.end();cit++){	
+				unsigned char datum = '\0';
+				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 20;
+				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 20;
+				else{
+					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+					//assert(nstates == 1);
+					//need to deal with the possibility of multiple states represented in matrix
+					//just convert to full ambiguity
+					if(nstates == 1)
+						datum = CharToDatum(charblock->GetState(origTaxIndex, *cit, 0));
+					else{
+						if(firstAmbig){
+							outman.UserMessageNoCR("Partially ambiguous characters of taxon %s converted to full ambiguity:\n\t", TaxonLabel(origTaxIndex));
+							firstAmbig = false;
+							}
+						outman.UserMessageNoCR("%d ", *cit+1);
+						datum = CharToDatum('?');
+						}
+					}
+				SetMatrix( i, j++, datum );
 				}
 			if(firstAmbig == false) outman.UserMessage("");
 			i++;

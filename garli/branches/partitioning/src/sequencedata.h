@@ -49,6 +49,7 @@ protected:
 
 public:
 	virtual void CreateMatrixFromNCL(NxsCharactersBlock *) = 0;
+	virtual void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
 	virtual void CalcEmpiricalFreqs() = 0;
 	virtual void GetEmpiricalFreqs(FLOAT_TYPE *f) const{
 		assert(empStateFreqs);
@@ -185,6 +186,7 @@ public:
 	unsigned char CharToDatum(char d);
 	void CalcEmpiricalFreqs();
 	void CreateMatrixFromNCL(NxsCharactersBlock *);
+	void CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset);
 	void MakeAmbigStrings();
 	char *GetAmbigString(int i) const{
 		return ambigStrings[i];
@@ -564,7 +566,12 @@ public:
 		return 0;
 		}
 	void CreateMatrixFromNCL(NxsCharactersBlock *){
-
+		//this also should not be getting called.  The codon matrix
+		//is created from a DNA matrix that has been read in, possibly
+		//by the NCL
+		assert(0);
+		}
+	void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset){
 		//this also should not be getting called.  The codon matrix
 		//is created from a DNA matrix that has been read in, possibly
 		//by the NCL
@@ -605,7 +612,7 @@ public:
 	void CalcEmpiricalFreqs();
 	unsigned char CharToDatum(char d);
 	void CreateMatrixFromNCL(NxsCharactersBlock *);
-
+	void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
 	};
 
 class DataPartition {
@@ -630,6 +637,36 @@ public:
 	void BeginNexusTreesBlock(ofstream &out) const {dataSubsets[0]->BeginNexusTreesBlock(out);}
 	NxsString TaxonLabel(int t) const {return dataSubsets[0]->TaxonLabel(t);}
 	int TaxonNameToNumber(NxsString name) const{return dataSubsets[0]->TaxonNameToNumber(name);}
+	};
+
+class DataSubsetInfo{
+public:
+	int garliSubsetNum;
+	int charblockNum;
+	string charblockName;
+	int partitionSubsetNum;
+	string partitionSubsetName;
+	enum type{
+		NUCLEOTIDE = 0,
+		AMINOACID = 1,
+		CODON = 2
+		}readAs, usedAs;
+	int totalCharacters;
+	int uniqueCharacters;
+	string outputNames[3];//{"Nucleotide data", "Amino acid data", "Codon data"};
+	DataSubsetInfo(int gssNum, int cbNum, string cbName, int psNum, string psName, type rAs, type uAs) :
+		garliSubsetNum(gssNum), charblockNum(cbNum), charblockName(cbName), partitionSubsetNum(psNum), partitionSubsetName(psName), readAs(rAs), usedAs(uAs){
+			outputNames[0]="Nucleotide data";
+			outputNames[1]="Amino acid data";
+			outputNames[2]="Codon data";
+			}
+	void Report(){
+		outman.UserMessage("GARLI partition subset %d", garliSubsetNum+1);
+		outman.UserMessage("\tCHARACTERS block #%d (\"%s\")", charblockNum+1, charblockName.c_str());
+		if(partitionSubsetNum >= 0) outman.UserMessage("\tCHARPARTITION subset #%d (\"%s\")", partitionSubsetNum+1, partitionSubsetName.c_str());
+		outman.UserMessage("\tData read as %s, modeled as %s", outputNames[readAs].c_str(), outputNames[usedAs].c_str());
+
+		}
 	};
 
 #endif

@@ -45,6 +45,8 @@
 #include "ncl.h"
 #include "nxsmultiformat.h"
 
+class ModelSpecification;
+
 /*----------------------------------------------------------------------------------------------------------------------
 |	GarliReader provides a template for creating a program that reads NEXUS data files and provides a basic command 
 |	line. After compiling GarliReader, you will already have a program that understands the following commands, either 
@@ -124,7 +126,8 @@ class GarliReader
 		void				SkippingDisabledBlock(NxsString blockName);
 		virtual bool		UserQuery(NxsString mb_message, NxsString mb_title, GarliReader::UserQueryEnum mb_choices = GarliReader::uq_ok);
 
-		//FACTORY
+		//all of the following hacky stuff went by the wayside when moving to the new Reader than internally handles multiple
+		//char blocks
 	//	NxsTaxaBlock	*GetTaxaBlock(){return taxa;}
 	//	NxsTreesBlock	*GetTreesBlock(){return trees;}
 
@@ -166,7 +169,10 @@ class GarliReader
 		NxsString			modelString;
 
 		unsigned			CharLabelToNumber(NxsString s);
-		bool				FileExists(const char* fn);
+		bool				FileExists(const char* fn) const;
+		bool				FileIsNexus(const char *name) const;
+		bool				FileIsFasta(const char *name) const;
+		int					GetToken( FILE *in, char* tokenbuf, int maxlen) const;
 		NxsString			GetFileName(NxsToken& token);
 		void				FactoryDefaults();
 		void				HandleEndblock(NxsToken& token);
@@ -188,6 +194,7 @@ class GarliReader
 		bool FoundModelString() {return modelString.length() > 0;}
 		void ClearModelString() {modelString.clear();}
 		void ResetReader(){ FactoryDefaults();}
+		void ReadData(const char* filename, const ModelSpecification &modspec);
 		};
 
 /*----------------------------------------------------------------------------------------------------------------------

@@ -201,10 +201,10 @@ class Tree{
 		// functions for computing likelihood
 		bool ConditionalLikelihood(int direction, TreeNode* nd);	
 		int ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA=false);
-		FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, Model *mod);
-		FLOAT_TYPE GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, Model *mod);
-		FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, Model *mod);
-		FLOAT_TYPE GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, Model *mod);
+		FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, int modIndex, int dataIndex);
+		FLOAT_TYPE GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, int modIndex, int dataIndex);
+		FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, int modIndex, int dataIndex);
+		FLOAT_TYPE GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, int modIndex, int dataIndex);
 		int Score(int rootNodeNum =0);
 	
 		//functions to optimize blens and params
@@ -213,25 +213,25 @@ class Tree{
 #ifdef OPT_DEBUG
 		FLOAT_TYPE NewtonRaphsonSpoof(FLOAT_TYPE precision1, TreeNode *nd, bool goodGuess);
 #endif
-		void GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod, const unsigned *ambigMap =NULL);
-		void GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod);
-		void GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod);
-		void GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, Model *mod);
-		void GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, Model *mod);
-		void GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod);
-		void GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, char *equiv, Model *mod);
-		void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, Model *mod);
-		void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, Model *mod);
-		void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, const unsigned *ambigMap, Model *mod);
+		void GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex, const unsigned *ambigMap =NULL);
+		void GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex);
+		void GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldata, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex);
+		void GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, int modIndex, int dataIndex);
+		void GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, int modIndex, int dataIndex);
+		void GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex);
+		void GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1, FLOAT_TYPE &d2, char *equiv, int modIndex, int dataIndex);
+		void CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, int modIndex, int dataIndex);
+		void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex);
+		void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, const unsigned *ambigMap, int modIndex, int dataIndex);
 
-		void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr,const char *leftEQ, const char *rightEQ, Model *mod);
+		void CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr,const char *leftEQ, const char *rightEQ, int modIndex, int dataIndex);
 
-		void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA, Model *mod);
-		void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata, Model *mod);
+		void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA, int modIndex, int dataIndex);
+		void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata, int modIndex, int dataIndex);
 
-		void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, Model *mod);
-		void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, Model *mod);
-		void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, Model *mod);
+		void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, int modIndex, int dataIndex);
+		void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, int modIndex, int dataIndex);
+		void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex);
 		
 		void UpdateCLAs(CondLikeArraySet *destCLA, CondLikeArraySet *firstCLA, CondLikeArraySet *secCLA, TreeNode *firstChild, TreeNode *secChild, FLOAT_TYPE blen1, FLOAT_TYPE blen2);
 		void GetTotalScore(CondLikeArraySet *partialCLA, CondLikeArraySet *childCLA, TreeNode *child, FLOAT_TYPE blen1);
@@ -245,10 +245,13 @@ class Tree{
 		FLOAT_TYPE RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledFrom, FLOAT_TYPE optPrecision, int subtreeNode, int radius, FLOAT_TYPE scoreIncrease);
 		FLOAT_TYPE BrentOptimizeBranchLength(FLOAT_TYPE accuracy_cutoff, TreeNode *here, bool firstPass);
 		FLOAT_TYPE BranchLike(TreeNode *optNode);
-		FLOAT_TYPE OptimizeAlpha(FLOAT_TYPE);
-		FLOAT_TYPE OptimizeOmegaParameters(FLOAT_TYPE prec);
-		FLOAT_TYPE OptimizeFlexRates(FLOAT_TYPE prec);
+		FLOAT_TYPE OptimizeAlpha(FLOAT_TYPE, int modnum);
+		FLOAT_TYPE OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum);
+		FLOAT_TYPE OptimizeFlexRates(FLOAT_TYPE prec, int modnum);
+		FLOAT_TYPE OptimizeSubsetRates(FLOAT_TYPE prec);
 		FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, int modnum, void (Model::*SetParam)(int, FLOAT_TYPE));
+		template<class T> FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, T *obj, void (T::*SetParam)(int, FLOAT_TYPE));
+
 		FLOAT_TYPE OptimizeTreeScale(FLOAT_TYPE);
 		FLOAT_TYPE OptimizePinv();
 		void SetNodesUnoptimized();
@@ -527,6 +530,156 @@ inline int Tree::NodesToRoot(TreeNode *nd){
 		i++;
 		}
 	return i;
+	}
+
+
+//a templated version
+template<class T>
+FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, T *obj, void (T::*SetParam)(int, FLOAT_TYPE)){
+
+	FLOAT_TYPE epsilon = min(optPrecision, 1.0e-5);
+
+	assert(prevVal > lowBound - epsilon && prevVal < highBound + epsilon);
+
+	//if the initial value is already very near or equal to a bound, bump it off a tad so the emirical derivs below work right.
+	if(prevVal - lowBound < epsilon){
+		prevVal = lowBound + epsilon;
+		CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal);
+		MakeAllNodesDirty();
+		}
+	else if(highBound - prevVal < epsilon){
+		prevVal = highBound - epsilon;
+		CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal);
+		MakeAllNodesDirty();
+		}
+
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1e-8)) Score();
+	FLOAT_TYPE start, prev, cur;
+	prev = start = cur = lnL;
+	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
+	FLOAT_TYPE upperBracket = highBound;   //the smallest value we know of with a negative d1, or the minimum allowed value
+	FLOAT_TYPE lowerBracket = lowBound;   //the largest value we know of with a positive d1 , or the maximum allowed value
+	FLOAT_TYPE incr;
+	int lowBoundOvershoot = 0;
+	int upperBoundOvershoot = 0;
+	int positiveD2Num = 0;
+	int pass = 0;
+
+/*	ofstream curves("lcurve.log");
+	curves.precision(8);
+	curves << endl;
+	for(double c = max(prevVal - 0.01, lowBound); c < min(prevVal + 0.01, highBound) ; c += 0.001){
+		CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, c);
+		MakeAllNodesDirty();
+		Score();
+		curves << c << "\t" << lnL << endl;;
+		}
+	curves.close();
+
+	CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal);
+	MakeAllNodesDirty();
+	Score();
+*/
+	while(1){
+#ifdef SINGLE_PRECISION_FLOATS
+		incr=0.005f;
+#else
+		incr=min(0.0001*optPrecision, min(prevVal - lowerBracket, upperBracket - prevVal));
+		//incr=min(0.0001, min(prevVal - lowerBracket, upperBracket - prevVal));
+#endif
+		CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal+incr);
+		MakeAllNodesDirty();
+		Score();
+		cur=lnL;
+		FLOAT_TYPE d11=(cur-prev)/incr;
+		
+		CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal-incr);
+		MakeAllNodesDirty();
+		Score();
+		cur=lnL;
+		FLOAT_TYPE d12=(cur-prev)/-incr;
+		
+		FLOAT_TYPE d1=(d11+d12)*ZERO_POINT_FIVE;
+		//if the evaluation points straddle the optimum, leave now
+		if((d11 - d12) == ZERO_POINT_ZERO || (d11 > ZERO_POINT_ZERO && d12 < ZERO_POINT_ZERO) || (d11 < ZERO_POINT_ZERO && d12 > ZERO_POINT_ZERO)){
+			CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal);;
+			MakeAllNodesDirty();
+			lnL = prev;
+			return prev-start;
+			}
+		
+		FLOAT_TYPE d2=(d11-d12)/incr;
+		
+		FLOAT_TYPE est=-d1/d2;
+		
+		FLOAT_TYPE proposed = prevVal + est;
+
+	//	outman.UserMessage("%f\t%f\t%f\t%f\t%f", d1, d2, prevVal, est, proposed);
+
+		if(d2 > ZERO_POINT_ZERO){
+			positiveD2Num++;
+			if(d1 > ZERO_POINT_ZERO) proposed=prevVal*(FLOAT_TYPE)(ONE_POINT_ZERO+0.01*positiveD2Num);
+			else proposed=prevVal*(FLOAT_TYPE)(ONE_POINT_ZERO-0.01*positiveD2Num);
+			}
+		if(d1 < ZERO_POINT_ZERO && proposed < (lowerBracket + epsilon)){
+			if(prevVal - lowerBracket - epsilon < epsilon * ZERO_POINT_FIVE){
+				CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal);;
+				MakeAllNodesDirty();			
+				lnL = prev;
+				return prev-start;
+				}
+			lowBoundOvershoot++;
+			if(lowBoundOvershoot > 1)
+				proposed = lowerBracket + epsilon;
+			else
+				proposed = (prevVal + lowerBracket) * ZERO_POINT_FIVE;
+			}
+		else if(d1 > ZERO_POINT_ZERO && proposed > upperBracket - epsilon){
+			if(upperBracket - epsilon - prevVal < epsilon * ZERO_POINT_FIVE){
+				CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal);;
+				MakeAllNodesDirty();
+				lnL = prev;
+				return prev-start;
+				}
+			upperBoundOvershoot++;
+			if(upperBoundOvershoot > 1)
+				proposed = upperBracket - epsilon;
+			else
+				proposed = (prevVal + upperBracket) * ZERO_POINT_FIVE;
+			}
+
+		FLOAT_TYPE estImprove;
+		if(d2 < ZERO_POINT_ZERO) estImprove = d1*(proposed - prevVal) + (d2 * (proposed - prevVal) * (proposed - prevVal)) * ZERO_POINT_FIVE;
+		else estImprove = 9999.9;
+
+		//require that we didn't significantly worsen the likelihood 
+		if(estImprove < optPrecision && prev >= start - 1.0e-6){
+			CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal);;
+			MakeAllNodesDirty();			
+			lnL = prev;
+			return prev-start;
+			}
+
+		//don't allow infinite looping if something goes wrong
+		if(pass > 1000){
+			throw ErrorException("too many passes in OptimizeBoundedParameter");
+			}
+		
+		//update the brackets
+		if(d1 <= ZERO_POINT_ZERO && prevVal < upperBracket)
+			upperBracket = prevVal;
+		else if(d1 > ZERO_POINT_ZERO && prevVal > lowerBracket)
+			lowerBracket = prevVal;
+
+		CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, proposed);;
+		MakeAllNodesDirty();			
+		Score();
+		lastChange = lnL - prev;
+		prev=lnL;
+		prevVal=proposed;
+		pass++;
+		}
+	return -1;
 	}
 
 #endif

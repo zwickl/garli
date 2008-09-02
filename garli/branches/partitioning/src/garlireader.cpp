@@ -42,6 +42,7 @@
 #include "garlireader.h"
 #include "outputman.h"
 #include "errorexception.h"
+#include "model.h"
 #include <sstream>
 
 int GARLI_main( int argc, char* argv[] );
@@ -189,12 +190,13 @@ bool GarliReader::EnteringBlock(
 	else if(blockName.Equals("ASSUMPTIONS") && charBlocks.empty() == false){
 		outman.UserMessage("\n\nWARNING:Assumptions block found with multiple characters blocks.\n\tCheck output carefully to ensure that any excluded characters\n\twere applied to the correct characters block.\n\tThe correct exclusion format in an Assumptions block is this:\n\tEXSET * UNTITLED = 10-11;\n\tBut it will only be applied to the LAST characters block in the file.\n\tYou may want to comment out unused characters blocks.\n");
 		}
+#endif
 	//3/25/08 if we already found a Garli block with a model (e.g. in the dataset file)
 	//we should crap out, since we don't know which one the user meant to use
 	//this is a change from previous behavior, in which I wanted the second to just override the first.
-	else if(blockName.Equals("GARLI") && FoundModelString())
+	if(blockName.Equals("GARLI") && FoundModelString())
 		throw ErrorException("Multiple GARLI blocks found (possibly in multiple files).\n\tRemove or comment out all but one.");
-#endif
+
 	return true;
 	}
 
@@ -354,11 +356,46 @@ void GarliReader::FactoryDefaults()
 	modelString = "";
 	}
 
+	//DJZ this is my function, replacing an old one that appeared in funcs.cpp
+	//simpler now, since it uses NxsMultiFormatReader
+void GarliReader::ReadData(const char* filename, const ModelSpecification &modspec){
+	//first use a few of my crappy functions to try to diagnose the type of file and data
+	//then call the NxsMultiFormatReader functions to process it
+	if (!FileExists(filename))	{
+		throw ErrorException("data file not found: %s!", filename);
+		}
+	//if it is Nexus, don't need to specify anything else in advance
+	if(FileIsNexus(filename)){
+		outman.UserMessage("Attempting to read data file in Nexus format (using NCL):\n\t%s ...", filename);
+		ReadFilepath(filename, NEXUS_FORMAT);
+		}
+	else if(FileIsFasta(filename)){
+		if(modspec.IsAminoAcid()){
+			outman.UserMessage("Attempting to read data file as Fasta amino acid sequence (using NCL):\n\t%s ...", filename);
+			ReadFilepath(filename, FASTA_AA_FORMAT);
+			}
+		else{ //DEBUG not sure how this will behave in the case of RNA
+			outman.UserMessage("Attempting to read data file as Fasta DNA sequence (using NCL):\n\t%s ...", filename);
+			ReadFilepath(filename, FASTA_DNA_FORMAT);
+			}
+		}
+	else{//DEBUG assuming that otherwise the file is phylip format, and for the moment with relaxed names and non-interleaved
+		if(modspec.IsAminoAcid()){
+			outman.UserMessage("Attempting to read data file as Phylip amino acid sequence (using NCL):\n]t%s ...", filename);
+			ReadFilepath(filename, RELAXED_PHYLIP_AA_FORMAT);
+			}
+		else{
+			outman.UserMessage("Attempting to read data file as Phylip dna sequence (using NCL):\n\t%s ...", filename);
+			ReadFilepath(filename, RELAXED_PHYLIP_DNA_FORMAT);
+			}
+		}
+	}
+
 /*----------------------------------------------------------------------------------------------------------------------
 |	Returns true if file named `fn' already exists, false otherwise.
 */
 bool GarliReader::FileExists(
-  const char *fn)	/* the name of the file to check */
+  const char *fn) const	/* the name of the file to check */
 	{
 	bool exists = false;
 
@@ -371,6 +408,78 @@ bool GarliReader::FileExists(
 
 	return exists;
 	}
+
+//DJZ there are my crappy functions to try to diagnose file type
+bool GarliReader::FileIsNexus(const char *name) const{
+	if (!FileExists(name))	{
+		throw ErrorException("could not open file: %s!", name);
+		}
+
+	bool nexus = false;
+	FILE *inf;
+#ifdef BOINC
+	inf = boinc_fopen(name, "r");
+#else
+	inf = fopen(name, "r");
+#endif
+	char buf[1024];
+	GetToken(inf, buf, 1024);
+	if(!(_stricmp(buf, "#NEXUS"))) nexus = true;
+
+	fclose(inf);
+	return nexus;
+	}
+
+bool GarliReader::FileIsFasta(const char *name) const{
+	if (!FileExists(name))	{
+		throw ErrorException("could not open file: %s!", name);
+		}
+
+	bool fasta = false;
+	FILE *inf;
+#ifdef BOINC
+	inf = boinc_fopen(name, "r");
+#else
+	inf = fopen(name, "r");
+#endif
+	char buf[1024];
+	GetToken(inf, buf, 1024);
+	if(buf[0] == '>') fasta = true;
+
+	fclose(inf);
+	return fasta;
+	}
+
+int GarliReader::GetToken( FILE *in, char* tokenbuf, int maxlen) const{
+	int ok = 1;
+
+	int i;
+	char ch = ' ';
+
+	// skip leading whitespace
+	while( in && ( isspace(ch) || ch == '[' ) ){
+		ch = getc(in);
+		}
+	if( !in ) return 0;
+
+	tokenbuf[0] = ch;
+	tokenbuf[1] = '\0';
+	tokenbuf[maxlen-1] = '\0';
+		
+	for( i = 1; i < maxlen-1; i++ ) {
+		ch = getc(in);
+		if( isspace(ch) || ch == ']' )
+			break;
+		tokenbuf[i] = ch;
+		tokenbuf[i+1] = '\0';
+	}
+
+	if( i >= maxlen-1 )
+		ok = 0;
+
+	return ok;
+}
+
 
 /*----------------------------------------------------------------------------------------------------------------------
 |	Called whenever a file name needs to be read from either the command line or a file. Expects next token to be "=" 

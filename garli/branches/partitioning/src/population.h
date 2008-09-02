@@ -298,14 +298,9 @@ public:
 	Adaptation *adap;
 	Individual* indiv;
 
-	//PARTITION
-	//hacking this in for now
-	ModelSpecification *modSpec;
-
 private:
 
 	Individual* newindiv;
-
 	vector<int> subtreeMemberNodes;
 
 #ifdef INCLUDE_PERTURBATION
@@ -375,12 +370,9 @@ private:
 		
 	TopologyList **topologies;//allocated in Setup(), deleted in dest
 	
-	//PARTITION
-	//SequenceData* data;
-	//SequenceData* rawData;//this will hold the original data as read in, before it might be converted
-					//to codons or aminoacid
 	DataPartition *dataPart;
-	DataPartition *rawPart;
+	DataPartition *rawPart;//this will hold the original data as read in, before it might be converted
+					//to codons or aminoacid
 
 	Stopwatch stopwatch;
 

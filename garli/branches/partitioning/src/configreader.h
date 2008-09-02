@@ -40,6 +40,7 @@ public:
 	int AddSection(const char*);
 	int RemoveSection(const char*);
 	int SetSection(const char*);
+	const string GetCurrentSection();
 
 	int SetOption(const char*, const char*);
 	int RemoveOption(const char*);
