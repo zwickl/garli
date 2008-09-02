@@ -81,8 +81,7 @@ extern bool interactive;
 int memLevel;
 int calcCount=0;
 int optCalcs;
-//PARTITION
-//ModelSpecification modSpec;
+
 ModelSpecificationSet modSpecSet;
 
 ofstream outf, paupf;
@@ -335,8 +334,6 @@ Population::~Population()
 
 	Tree::attemptedSwaps.ClearAttemptedSwaps();
 
-	//PARTITION
-	//if(rawData != NULL) delete rawData;
 	if(rawPart != NULL)
 		rawPart->Delete();
 		
@@ -363,6 +360,27 @@ void Population::ErrorMsg( char* msgstr, int len )
 void Population::CheckForIncompatibleConfigEntries(){
 	//DEBUG - fill this in better
 
+	//PARTITION - disallow a number of things that aren't implemented/tested with partitioned models
+	if(dataPart->NumSubsets() > 1){
+		if(conf->linkModels && modSpecSet.GetModSpec(0)->IsEmpiricalStateFrequencies())
+			throw ErrorException("Sorry, empirical state frequencies can't be used with partitioned models when models are linked");
+		if(conf->inferInternalStateProbs)
+			throw ErrorException("Sorry, internal state reconstruction is not yet implemented for partitioned models");
+		if(conf->checkpoint)
+			throw ErrorException("Sorry, checkpointing is not yet implemented for partitioned models");
+		if(conf->linkModels == false){
+			for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
+				if(modSpecSet.GetModSpec(ms)->IsUserSpecifiedRateMatrix())
+					throw ErrorException("Sorry, rate matrix parameters cannot currently be provided and fixed for partitioned models");
+				if(modSpecSet.GetModSpec(ms)->IsUserSpecifiedStateFrequencies())
+					throw ErrorException("Sorry, state frequency parameters cannot currently be provided and fixed for partitioned models");
+				if(modSpecSet.GetModSpec(ms)->fixAlpha)
+					throw ErrorException("Sorry, the alpha shape parameter cannot currently be provided and fixed for partitioned models");
+				if(modSpecSet.GetModSpec(ms)->fixInvariantSites)
+					throw ErrorException("Sorry, the prop. invar. parameters cannot currently be provided and fixed for partitioned models");
+				}
+			}
+		}
 	//if no model mutations will be performed, parameters cannot be estimated.
 	if(conf->modWeight == ZERO_POINT_ZERO){
 		for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
@@ -386,15 +404,8 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	//set various things
 	rank=r;
 	conf=c;
-	//data=d;
 	dataPart = d;
 	rawPart = rawD;
-
-	//PARTITION
-//	SequenceData *curData = dataPart->GetSubset(0);
-	//DEBUG
-	//this modspec in Population is a hack, but doesn't affect the important computation
-	modSpec = modSpecSet.GetModSpec(0);
 
 	subtreeNode=0;
 
@@ -408,15 +419,12 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	//set two model statics
 	Model::mutationShape = conf->gammaShapeModel;
 
-	//DEBUG
-	//PARTITION
-/*	
-	if(modSpec->IsCodon()){
+	if(modSpecSet.GetModSpec(0)->IsCodon()){
 		//PARTITION
 		//Model::SetCode(static_cast<CodonData*>(data)->GetCode());
-		Model::SetCode(static_cast<CodonData*>(curData)->GetCode());
+		//DEBUG - code won't be able to be static anymore, since it might vary among model/partition subsets
+		Model::SetCode(static_cast<CodonData*>(dataPart->GetSubset(0))->GetCode());
 		}
-*/
  
 #ifdef INPUT_RECOMBINATION
 	total_size = conf->nindivs + NUM_INPUT;
@@ -434,10 +442,11 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		paraMan = new ParallelManager(dataPart->NTax(), nprocs, mastConf);
 		}
 	
-	//DEBUG - this should really be elsewhere, and it assumes that all models are the same type
-	if(modSpecSet.GetModSpec(0)->IsNucleotide()){
-		for(int ds = 0;ds < dataPart->NumSubsets();ds++)
-			dynamic_cast<NucleotideData *>(dataPart->GetSubset(ds))->MakeAmbigStrings();
+	//use RTTI to check if the data subsets are nuclotide, and if so make ambig strings
+	for(int ds = 0;ds < dataPart->NumSubsets();ds++){
+		NucleotideData *nuc = dynamic_cast<NucleotideData *>(dataPart->GetSubset(ds));
+		if(nuc != NULL)
+			nuc->MakeAmbigStrings();
 		}
 	
 	for(int ds = 0;ds < dataPart->NumSubsets();ds++)
@@ -581,9 +590,10 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 
 void Population::LoadNexusStartingConditions(){
 	GarliReader & reader = GarliReader::GetInstance();
-//DEBUG FACTORY
-	//	NxsTreesBlock *treesblock = reader.GetTreesBlock();
-	NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
+ 	NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
+	if(reader.GetNumTreesBlocks(tax) > 1){
+		throw ErrorException("Expecting only one trees block (not sure which to use)");
+		}
 	NxsTreesBlock *treesblock = reader.GetTreesBlock(tax, 0);
 
 	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
@@ -601,7 +611,11 @@ void Population::LoadNexusStartingConditions(){
 
 		//3/25/08 Made a change such that if a gblock was already read with the data and another
 		//is found with the following execute, an exception will be thrown in GarliReader::EnteringBlock
+#ifdef FACTORY
+		reader.ReadFilepath(conf->streefname.c_str(), MultiFormatReader::NEXUS_FORMAT);
+#else
 		reader.HandleExecute(conf->streefname.c_str(), false);
+#endif
 		//FACTORY
 		//treesblock = reader.GetTreesBlock();
 		treesblock = reader.GetTreesBlock(tax, 0);
@@ -735,7 +749,8 @@ void Population::RunTests(){
 
 	if(conf->bootstrapReps > 0){
 		outman.UserMessage("bootstrap reweighting with seed %d", rnd.seed());
-		data->BootstrapReweight(0, conf->resampleProportion);
+		for(int d = 0;d < dataPart->NumSubsets();d++)
+			dataPart->GetSubset(d)->BootstrapReweight(0, conf->resampleProportion);
 		}
 
 	Individual *ind0 = &newindiv[0];
@@ -888,11 +903,18 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		}
 
 	//create the first indiv, and then copy the tree and clas
-	//PARTITION
-	//indiv[0].mod->SetDefaultModelParameters(curData);
-	for(int m=0;m<indiv[0].modPart.NumModels();m++){
-		Model *thisMod = indiv[0].modPart.GetModel(m);
-		thisMod->SetDefaultModelParameters(dataPart->GetSubset(thisMod->dataIndex));
+	//this is very annoying with partitioning because a single model can apply to multiple
+	//partitions.  So, just use the first cla set that refers to this model
+	for(int m = 0;m < indiv[0].modPart.NumModels();m++){
+		for(vector<ClaSpecifier>::iterator c = claSpecs.begin();c != claSpecs.end();c++){
+			if((*c).modelIndex == m){
+				indiv[0].modPart.GetModel(m)->SetDefaultModelParameters(dataPart->GetSubset((*c).dataIndex));
+				//DEBUG - need to stick this in somewhere more natural so that it gets reset after a rep completes
+				indiv[0].modPart.Reset();
+				break;
+				}
+			assert(c != (claSpecs.end()-1));
+			}
 		}
 
 	//This is getting very complicated.  Here are the allowable combinations.
@@ -930,8 +952,6 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		//be handled below, although both a garli block (in the data) and an old style model specification
 		//are not allowed
 		if(startingTreeInNCL){//cases 3, 5, 6 and 8
-			//DEBUG FACTORY
-			//NxsTreesBlock *treesblock = reader.GetTreesBlock();
 			NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
 			NxsTreesBlock *treesblock = reader.GetTreesBlock(tax, 0);
 			
@@ -953,15 +973,17 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		}
 
 	if(reader.FoundModelString()) startingModelInNCL = true;
+	if(indiv[0].modPart.NumModels() > 1 && (startingModelInNCL || modSpecSet.GotAnyParametersFromFile()))
+		throw ErrorException("Sorry, parameter values cannot currently be provided for unlinked partitioned models");
 	if(startingModelInNCL){
 		//crap out if we already got some parameters above in an old style starting conditions file
 #ifndef SUBROUTINE_GARLI
-		if(modSpec->GotAnyParametersFromFile() && (currentSearchRep == 1 && (conf->bootstrapReps == 0 || currentBootstrapRep == 1)))
+		if(modSpecSet.GotAnyParametersFromFile() && (currentSearchRep == 1 && (conf->bootstrapReps == 0 || currentBootstrapRep == 1)))
 			throw ErrorException("Found model parameters specified in a Nexus GARLI block with the dataset,\n\tand in the starting condition file (streefname).\n\tPlease use one or the other.");
 #endif
 		//model string from garli block, which could have come either in starting condition file
 		//or in file with Nexus dataset.  Cases 2, 4, 5, 7 and 8 come through here.
-		//PARTITION
+		//DEBUG PARTITION
 		//need to figure out how the hell this will work
 		string modString = reader.GetModelString();
 		indiv[0].modPart.GetModel(0)->ReadGarliFormattedModelString(modString);
@@ -975,6 +997,12 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			outman.UserMessage("Model %d", m);
 			Model *thisMod = indiv[0].modPart.GetModel(m);
 			thisMod->OutputHumanReadableModelReportWithParams();
+			}
+		if(modSpecSet.InferSubsetRates()){
+			outman.UserMessageNoCR("Subset rate multipliers:\n  ");
+			for(int d = 0;d < dataPart->NumSubsets();d++)
+				outman.UserMessageNoCR("%6.2f", indiv[0].modPart.SubsetRate(d));
+			outman.UserMessage("");
 			}
 		}
 
@@ -1001,18 +1029,21 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		}
 		
 	//Here we'll error out if something was fixed but didn't appear
-	if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
-		//if no streefname file was specified, the param values should be in a garli block with the dataset
-		if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		}
-	else{
-		if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+	for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
+		const ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
+		if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
+			//if no streefname file was specified, the param values should be in a garli block with the dataset
+			if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			}
+		else{
+			if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			}
 		}
 		
 	assert(indiv[0].treeStruct != NULL);
@@ -1028,7 +1059,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	//if(indiv[0].mod->NumMutatableParams() == 0) {
-	if(indiv[0].modPart.NumMutableParams()) {
+	if(indiv[0].modPart.NumMutableParams() == 0) {
 		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
 			outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
 		adap->modelMutateProb=ZERO_POINT_ZERO;
@@ -1080,6 +1111,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	CalcAverageFitness();
 	}
 
+/* This is deprecated in favor of model based function
 void Population::OutputModelReport(){
 	//Report on the model setup
 	outman.UserMessage("MODEL REPORT:");
@@ -1169,7 +1201,8 @@ void Population::OutputModelReport(){
 		}
 	outman.UserMessage("");
 	}
-/*
+*/
+	/*
 void Population::WriteStateFiles(){
 	char str[100];
 
@@ -1315,7 +1348,7 @@ void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 
 	//save the current members of the population
 	for(unsigned i=0;i<total_size;i++){
-		//PARTITION
+		//DEBUG PARTITION
 		//need to work this out
 		//indiv[i].mod->OutputBinaryFormattedModel(out);
 		indiv[i].modPart.GetModel(0)->OutputBinaryFormattedModel(out);
@@ -1324,7 +1357,7 @@ void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 
 	//write any individuals that we may have stored from previous search reps
 	for(vector<Individual*>::iterator it = storedTrees.begin(); it < storedTrees.end() ; it++){
-		//PARTITION
+		//DEBUG PARTITION
 		//(*it)->mod->OutputBinaryFormattedModel(out);
 		(*it)->modPart.GetModel(0)->OutputBinaryFormattedModel(out);
 		(*it)->treeStruct->OutputBinaryFormattedTree(out);
@@ -1372,7 +1405,7 @@ void Population::ReadPopulationCheckpoint(){
 	if(gen == UINT_MAX) finishedRep = true;
 
 	for(unsigned i=0;i<total_size;i++){
-		//PARTITION
+		//DEBUG PARTITION
 		//indiv[i].mod->SetDefaultModelParameters(curData);
 		//indiv[i].mod->ReadBinaryFormattedModel(pin);
 		indiv[i].modPart.GetModel(0)->SetDefaultModelParameters(curData);
@@ -1390,7 +1423,7 @@ void Population::ReadPopulationCheckpoint(){
 	//remember that currentSearchRep starts at 1
 	for(int i=1;i<(finishedRep == false ? currentSearchRep : currentSearchRep+1);i++){
 		Individual *ind = new Individual;
-		//PARTITION
+		//DEBUG PARTITION
 		//ind->mod->SetDefaultModelParameters(curData);
 		//ind->mod->ReadBinaryFormattedModel(pin);
 		ind->modPart.GetModel(0)->SetDefaultModelParameters(curData);
@@ -1512,14 +1545,39 @@ void Population::Run(){
 				}
 			if(reduced){
 				lastPrecisionReduction=gen;
+				outman.UserMessage("Optimization precision reduced ");
+				//Added in this optimization of rate het params at prec reduction,
+				//mainly to help with optimization in partitioned models
+				FLOAT_TYPE improve = 0.0;
+				for(int modnum = 0;modnum < indiv[bestIndiv].modPart.NumModels();modnum++){
+					Model *mod = indiv[bestIndiv].modPart.GetModel(modnum);
+					const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
+					if(modSpec->IsCodon())//optimize omega even if there is only 1
+						improve += indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision, modnum);
+					else if(mod->NRateCats() > 1){
+						if(modSpec->IsFlexRateHet()){//Flex rates
+							improve += indiv[bestIndiv].treeStruct->OptimizeFlexRates(adap->branchOptPrecision, modnum);
+							}
+						else if(modSpec->fixAlpha == false){//normal gamma
+							improve += indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(adap->branchOptPrecision, mod->Alpha(), 0, 0.05, 999.9, modnum, &Model::SetAlpha);
+							}
+						}
+					if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
+						improve += indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(adap->branchOptPrecision, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, modnum, &Model::SetPinv);
+					}
+				if(modSpecSet.InferSubsetRates()){
+					improve += indiv[bestIndiv].treeStruct->OptimizeSubsetRates(adap->branchOptPrecision);
+					}
+				outman.UserMessage("   Optimizing parameters...    improved %8.3f lnL", improve);
+				/////
+
 				FLOAT_TYPE before=bestFitness;
 				//under some conditions (very steep lopsided likelihood curve for branch lengths)
 				//the blen opt can actually make the score worse
-
 				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
 				indiv[bestIndiv].SetDirty();
 				CalcAverageFitness();
-				outman.UserMessage("opt. precision reduced, optimizing branchlengths:%.4f -> %.4f", before, bestFitness);
+				outman.UserMessage("   Optimizing branchlengths... improved %8.3f lnL", bestFitness - before);
 
 /*				if(modSpec->IsCodon()){
 					before=bestFitness;
@@ -1683,21 +1741,29 @@ void Population::FinalOptimization(){
 	int pass=1;
 	FLOAT_TYPE incr;
 
-	double paramOpt, paramTot;
+	double paramOpt, subRateOpt, paramTot;
 	paramTot = ZERO_POINT_ZERO;
 	do{
 		paramOpt = ZERO_POINT_ZERO;
-		if(modSpec->IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(max(adap->branchOptPrecision*0.1, 0.001));
-		else if(modSpec->IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(max(adap->branchOptPrecision*0.1, 0.001));
-		paramTot += paramOpt;
+		for(int m = 0;m < indiv[bestIndiv].modPart.NumModels();m++){
+			const ModelSpecification *modSpec = indiv[bestIndiv].modPart.GetModel(m)->GetCorrespondingSpec();
+			if(modSpec->IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(max(adap->branchOptPrecision*0.1, 0.001), m);
+			else if(modSpec->IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(max(adap->branchOptPrecision*0.1, 0.001), m);
+			paramTot += paramOpt;
+			if(modSpec->IsFlexRateHet()){
+				outman.UserMessage("Flex optimization: %f", paramTot);
+				}
+			else if(modSpec->IsCodon()){
+				outman.UserMessage("Omega optimization: %f", paramTot);
+				}
+			}
+		if(modSpecSet.InferSubsetRates()){
+			subRateOpt = indiv[bestIndiv].treeStruct->OptimizeSubsetRates(max(adap->branchOptPrecision*0.1, 0.001));
+			outman.UserMessage("Subset rate optimization: %f", subRateOpt);
+			paramOpt += subRateOpt;
+			}
 		}while(paramOpt > ZERO_POINT_ZERO);
 
-	if(modSpec->IsFlexRateHet()){
-		outman.UserMessage("Flex optimization: %f", paramTot);
-		}
-	else if(modSpec->IsCodon()){
-		outman.UserMessage("Omega optimization: %f", paramTot);
-		}
 	do{
 		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10));
 
@@ -1786,7 +1852,14 @@ int Population::EvaluateStoredTrees(bool report){
 			bestRep = r;
 			}
 		}
+
 	if(report){
+		if(conf->collapseBranches){
+			outman.UserMessage("\nNOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");
+			outman.UserMessage("     If any were collapsed, the following tests for whether the topologies from each search");
+			outman.UserMessage("     replicate were identical may not be accurate.  Check the screen output above to see");
+			outman.UserMessage("     if branches were actually collapsed, and if necessary compare the trees in another program.");
+			}
 		for(unsigned r=0;r<storedTrees.size();r++){
 			unsigned r2;
 			for(r2=0;r2<r;r2++){
@@ -1807,8 +1880,33 @@ int Population::EvaluateStoredTrees(bool report){
 			if(r2 < r) outman.UserMessage(" (same topology as %d)", r2+1);
 			else outman.UserMessage("");
 			}
+
+		if(storedTrees[0]->modPart.NumModels() > 1){
+			outman.UserMessage("\nParameter estimates:");
+			for(int part = 0;part < storedTrees[0]->modPart.NumModels();part++){
+				outman.UserMessage("\nPartition subset %d:", part);
+				string s;
+				storedTrees[0]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, false);
+				outman.UserMessage("       %s", s.c_str());
+				for(unsigned i=0;i<storedTrees.size();i++){
+					storedTrees[i]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, true);
+				//	storedTrees[i]->modPart.GetModel(part)->FillRateMatrixString(s);
+					outman.UserMessage("rep%2d: %s", i+1, s.c_str());
+					}
+				}
+			if(modSpecSet.InferSubsetRates()){
+				outman.UserMessage("\nSubset rate multipliers:");
+				for(unsigned i=0;i<storedTrees.size();i++){
+					outman.UserMessageNoCR("rep%2d:", i+1);
+					for(int d = 0;d < dataPart->NumSubsets();d++){
+						outman.UserMessageNoCR("%6.3f ", storedTrees[i]->modPart.SubsetRate(d));
+						}
+					outman.UserMessage("");
+					}
+				}
+			}
 		if(conf->bootstrapReps == 0){
-			outman.UserMessage("Final result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
+			outman.UserMessage("\nFinal result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
 			outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
 			}
 		}
@@ -1825,9 +1923,6 @@ void Population::ClearStoredTrees(){
 	}
 
 void Population::Bootstrap(){
-
-	SequenceData *curData = dataPart->GetSubset(0);
-
 	//if we're not restarting
 	if(conf->restart == false) currentBootstrapRep=1;
 
@@ -1841,8 +1936,12 @@ void Population::Bootstrap(){
 		[pool release];
 #endif
 		if(conf->restart == false){
-			lastBootstrapSeed = curData->BootstrapReweight(0, conf->resampleProportion);
-			outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
+			outman.UserMessage("\nBootstrap reweighting...");
+			for(int ss = 0;ss < dataPart->NumSubsets();ss++){
+				SequenceData *curData = dataPart->GetSubset(ss);
+				lastBootstrapSeed = curData->BootstrapReweight(0, conf->resampleProportion);
+				outman.UserMessage("\tSubset %d: Random seed for bootstrap reweighting: %d", ss, lastBootstrapSeed);
+				}
 			}
 		
 		PerformSearch();
@@ -1963,11 +2062,24 @@ void Population::PerformSearch(){
 				Model *thisMod = indiv[bestIndiv].modPart.GetModel(m);
 				thisMod->OutputHumanReadableModelReportWithParams();
 				}
+			if(modSpecSet.InferSubsetRates()){
+				outman.UserMessageNoCR("Subset rate multipliers:\n  ");
+				for(int d = 0;d < dataPart->NumSubsets();d++)
+					outman.UserMessageNoCR("%6.3f", indiv[bestIndiv].modPart.SubsetRate(d));
+				outman.UserMessage("");
+				}
 
 			if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
 			Individual *repResult = new Individual(&indiv[bestIndiv]);
-			if(conf->collapseBranches)
-				repResult->treeStruct->root->CollapseMinLengthBranches();
+			if(conf->collapseBranches){
+				int numCollapsed = 0;
+				repResult->treeStruct->root->CollapseMinLengthBranches(numCollapsed);
+				outman.UserMessage("\nNOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");\
+				if(numCollapsed == 0)
+					outman.UserMessage("    No branches were short enough to be collapsed.");
+				else 
+					outman.UserMessage("    %d branches were collapsed.", numCollapsed);
+				}
 			storedTrees.push_back(repResult);
 			}
 		else{
@@ -2052,7 +2164,7 @@ void Population::PerformSearch(){
 			if(prematureTermination == false && currentSearchRep == conf->searchReps){
 				if(storedTrees.size() > 0){//careful here, the trees in the storedTrees array don't have clas assigned
 					outman.UserMessage("Inferring internal state probabilities on best tree....");
-//PARTITION
+					//DEBUG PARTITION
 		//			storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
 					}
 				}
@@ -2720,7 +2832,7 @@ void Population::PerformMutation(int indNum){
 
 						if(output_tree){
 							treeLog << "  tree gen" << gen <<  "." << indNum << "= [&U] [" << ind->Fitness() << "][ ";
-							//PARTITION
+							//DEBUG PARTITION
 							//ind->mod->OutputGarliFormattedModel(treeLog);
 							ind->modPart.GetModel(0)->OutputGarliFormattedModel(treeLog);
 							ind->treeStruct->root->MakeNewick(treeString, false, true);
@@ -2928,7 +3040,7 @@ if(rank > 0) return;
 			outf << treeString << ";\n";
 			
 			paupf << "lset userbr ";
-			//PARTITION
+			//DEBUG PARTITION
 /*			if(modSpec.Nst()==2) paupf << "nst=2 trat=" << indiv[i].mod->Rates(0) << " base=(" << indiv[i].mod->StateFreq(0) << " " << indiv[i].mod->StateFreq(1) << " " << indiv[i].mod->StateFreq(2) << ");\n" << "lsc " << (gen-1)*conf->nindivs+i+1;
 
 			else paupf << "nst=6 rmat=(" << indiv[i].mod->Rates(0) << " " << indiv[i].mod->Rates(1) << " " << indiv[i].mod->Rates(2) << " " << indiv[i].mod->Rates(3) << " " << indiv[i].mod->Rates(4) << ") " << " base=(" << indiv[i].mod->StateFreq(0) << " " << indiv[i].mod->StateFreq(1) << " " << indiv[i].mod->StateFreq(2) << ") ";
@@ -2941,7 +3053,7 @@ if(rank > 0) return;
 #endif
 
 */
-			if(modSpec->Nst()==2) paupf << "nst=2 trat=" << indiv[i].modPart.GetModel(0)->Rates(0) << " base=(" << indiv[i].modPart.GetModel(0)->StateFreq(0) << " " << indiv[i].modPart.GetModel(0)->StateFreq(1) << " " << indiv[i].modPart.GetModel(0)->StateFreq(2) << ");\n" << "lsc " << (gen-1)*conf->nindivs+i+1;
+			if(modSpecSet.GetModSpec(0)->Nst()==2) paupf << "nst=2 trat=" << indiv[i].modPart.GetModel(0)->Rates(0) << " base=(" << indiv[i].modPart.GetModel(0)->StateFreq(0) << " " << indiv[i].modPart.GetModel(0)->StateFreq(1) << " " << indiv[i].modPart.GetModel(0)->StateFreq(2) << ");\n" << "lsc " << (gen-1)*conf->nindivs+i+1;
 
 			else paupf << "nst=6 rmat=(" << indiv[i].modPart.GetModel(0)->Rates(0) << " " << indiv[i].modPart.GetModel(0)->Rates(1) << " " << indiv[i].modPart.GetModel(0)->Rates(2) << " " << indiv[i].modPart.GetModel(0)->Rates(3) << " " << indiv[i].modPart.GetModel(0)->Rates(4) << ") " << " base=(" << indiv[i].modPart.GetModel(0)->StateFreq(0) << " " << indiv[i].modPart.GetModel(0)->StateFreq(1) << " " << indiv[i].modPart.GetModel(0)->StateFreq(2) << ") ";
 			
@@ -2961,7 +3073,7 @@ if(rank > 0) return;
 		ind->treeStruct->root->MakeNewick(treeString, false, true);
 		outf << treeString << ";\n";
 
-		//PARTITION
+		//DEBUG PARTITION
 /*		paupf << "lset userbr ";
 		if(modSpec->Nst()==2) paupf << "nst=2 trat=" << ind->mod->Rates(0) << " base=(" << ind->mod->StateFreq(0) << " " << ind->mod->StateFreq(1) << " " << ind->mod->StateFreq(2) << ");\nlsc ";
 		
@@ -2975,7 +3087,7 @@ if(rank > 0) return;
 #endif
 */
 		paupf << "lset userbr ";
-		if(modSpec->Nst()==2) paupf << "nst=2 trat=" << ind->modPart.GetModel(0)->Rates(0) << " base=(" << ind->modPart.GetModel(0)->StateFreq(0) << " " << ind->modPart.GetModel(0)->StateFreq(1) << " " << ind->modPart.GetModel(0)->StateFreq(2) << ");\nlsc ";
+		if(modSpecSet.GetModSpec(0)->Nst()==2) paupf << "nst=2 trat=" << ind->modPart.GetModel(0)->Rates(0) << " base=(" << ind->modPart.GetModel(0)->StateFreq(0) << " " << ind->modPart.GetModel(0)->StateFreq(1) << " " << ind->modPart.GetModel(0)->StateFreq(2) << ");\nlsc ";
 		
 		else paupf << "nst=6 rmat=(" << ind->modPart.GetModel(0)->Rates(0) << " " << ind->modPart.GetModel(0)->Rates(1) << " " << ind->modPart.GetModel(0)->Rates(2) << " " << ind->modPart.GetModel(0)->Rates(3) << " " << ind->modPart.GetModel(0)->Rates(4) << ") " << " base=(" << ind->modPart.GetModel(0)->StateFreq(0) << " " << ind->modPart.GetModel(0)->StateFreq(1) << " " << ind->modPart.GetModel(0)->StateFreq(2) << ") ";
 
@@ -3015,7 +3127,7 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 		
 	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
 	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
-	//PARTITION
+	//DEBUG PARTITION
 	//ind->mod->OutputGarliFormattedModel(treeLog);
 	ind->modPart.GetModel(0)->OutputGarliFormattedModel(treeLog);
 	ind->treeStruct->root->MakeNewick(treeString, false, true);
@@ -3031,7 +3143,7 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 
 	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << ind->Fitness() << " ";
 	
-	//PARTITION
+	//DEBUG PARTITION
 	//ind->mod->OutputGarliFormattedModel(bootLog);
 	ind->modPart.GetModel(0)->OutputGarliFormattedModel(bootLog);
 
@@ -3137,8 +3249,21 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	string modstr;
 	//PARTITION
 	//ind->mod->FillGarliFormattedModelString(modstr);
-	ind->modPart.GetModel(0)->FillGarliFormattedModelString(modstr);
-	str += modstr;
+	if(ind->modPart.NumModels() == 1){
+		ind->modPart.GetModel(0)->FillGarliFormattedModelString(modstr);
+		str += modstr;
+		modstr.clear();
+		}
+	else{
+		for(int m = 0;m < ind->modPart.NumModels();m++){
+			ind->modPart.GetModel(m)->FillGarliFormattedModelString(modstr);
+			char mStr[20];
+			sprintf(mStr, " mod%d", m);
+			str += mStr;
+			str += modstr;
+			modstr.clear();
+			}
+		}
 	str += "]";
 
 #ifdef BOINC
@@ -3160,10 +3285,21 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 #endif	
 	//add a paup block setting the model params
 	str = "";
-	if(modSpec->IsNucleotide()){
-		//PARTITION
-		//ind->mod->FillPaupBlockStringForModel(str, filename.c_str());
-		ind->modPart.GetModel(0)->FillPaupBlockStringForModel(str, filename.c_str());
+	if(modSpecSet.GetModSpec(0)->IsNucleotide()){
+		if(ind->modPart.NumModels() == 1){
+			ind->modPart.GetModel(0)->FillPaupBlockStringForModel(str, filename.c_str());
+			}
+		else{
+			for(int m = 0;m < ind->modPart.NumModels();m++){
+				char mStr[20];
+				sprintf(mStr, "[model%d\n", m);
+				str += mStr;
+				ind->modPart.GetModel(m)->FillGarliFormattedModelString(modstr);
+				str += modstr;
+				str += "\n]";
+				modstr.clear();
+				}
+			}
 		}
 #ifdef BOINC
 	s = str.c_str();
@@ -3235,12 +3371,23 @@ void Population::WriteStoredTrees( const char* treefname ){
 			}
 		}
 	outf << "end;\n";
-	if(modSpec->IsNucleotide()){
+	if(modSpecSet.GetModSpec(0)->IsNucleotide()){
 		//add a paup block setting the model params
 		//PARTITION
 		//storedTrees[bestRep]->mod->OutputPaupBlockForModel(outf, name.c_str());
-		storedTrees[bestRep]->modPart.GetModel(0)->OutputPaupBlockForModel(outf, name.c_str());
-		outf << "[!****NOTE: The model parameters loaded are the final model estimates****\n****from GARLI for the best scoring search replicate (#" << bestRep + 1 << ").****\n****The best model parameters for other trees may vary.****]" << endl;
+		if(storedTrees[bestRep]->modPart.NumModels() == 1){
+			storedTrees[bestRep]->modPart.GetModel(0)->OutputPaupBlockForModel(outf, name.c_str());
+			outf << "[!****NOTE: The model parameters loaded are the final model estimates****\n****from GARLI for the best scoring search replicate (#" << bestRep + 1 << ").****\n****The best model parameters for other trees may vary.****]" << endl;
+			}
+		else{
+			for(int m = 0;m < storedTrees[bestRep]->modPart.NumModels();m++){
+				char mStr[20];
+				sprintf(mStr, "[model%d\n", m);
+				outf << mStr;
+				storedTrees[bestRep]->modPart.GetModel(m)->OutputPaupBlockForModel(outf, name.c_str());
+				outf << "\n]";
+				}
+			}
 		}
 	outf.close();
 	if(conf->outputPhylipTree) phytree.close();

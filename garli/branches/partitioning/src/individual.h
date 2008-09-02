@@ -54,6 +54,7 @@ class Individual
 			 	pi			= 0x0200,  //512
 			 	alpha		= 0x0400,  //1024
 			 	pinv		= 0x0800,  //2048
+				subsetRate	= 0x4000,	//16384
 			 	muScale		= 0x10000, //65536
 	#ifdef GANESH
                 randPECR    = 0x4000,  //16384                
@@ -72,7 +73,7 @@ class Individual
 			 	anyTopo		= (randNNI | randSPRCon | randSPR | limSPR 
 			 		 | limSPRCon | randRecom | bipartRecom | taxonSwap | subtreeRecom ) ,
 #endif
-			 	anyModel	= rates | pi | alpha | pinv | muScale
+			 	anyModel	= rates | pi | alpha | pinv | muScale | subsetRate
 			 	};
 		int mutated_brlen;//the number of brlen muts
 		bool accurateSubtrees;

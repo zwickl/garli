@@ -62,11 +62,10 @@ class CondLikeArray{
 		FLOAT_TYPE* arr;
 		int* underflow_mult;
 		unsigned rescaleRank;
-		unsigned dataIndex;
-		CondLikeArray(int nsit, int nsta, int nrat, int datind)
-			: nsites(nsit), nrates(nrat), nstates(nsta), arr(NULL), underflow_mult(NULL), rescaleRank(1), dataIndex(datind){}
+		CondLikeArray(int nsit, int nsta, int nrat)
+			: nsites(nsit), nrates(nrat), nstates(nsta), arr(NULL), underflow_mult(NULL), rescaleRank(1){}
 		CondLikeArray()
-			: nsites(0), nrates(0), nstates(0), arr(0), underflow_mult(0), rescaleRank(1), dataIndex(0){}
+			: nsites(0), nrates(0), nstates(0), arr(0), underflow_mult(0), rescaleRank(1){}
 		~CondLikeArray();
 		int NStates() {
 			return nstates;

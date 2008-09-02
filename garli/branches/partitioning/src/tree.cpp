@@ -416,12 +416,16 @@ Tree::Tree(){
 	modPart = NULL;
 	//this assumes that num specs = num data subsets
 	//ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
-	bool isNucleotide = modSpecSet.GetModSpec(0)->IsNucleotide();
+	//bool isNucleotide = modSpecSet.GetModSpec(0)->IsNucleotide();
 	
-	for(int m = 0;m < dataPart->NumSubsets();m++){
-		SequenceData *curData = dataPart->GetSubset(m);
+	//DEBUG
+	//for(int m = 0;m < dataPart->NumSubsets();m++){
+	//TODO FOR MIXING - this assumes that 1 data subset = one cla
+	for(int c = 0;c < claSpecs.size();c++){
+		SequenceData *curData = dataPart->GetSubset(c);
 		for(int t=1;t<=dataPart->NTax();t++){
-			if(isNucleotide){
+			//if(isNucleotide){
+			if(modSpecSet.GetModSpec(claSpecs[c].modelIndex)->IsNucleotide()){
 				//allNodes[t]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1);
 				allNodes[t]->tipData.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1));
 	#ifdef OPEN_MP
@@ -3514,30 +3518,30 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 	FLOAT_TYPE modlnL;
 	lnL = ZERO_POINT_ZERO;
 
-	for(int m = 0; m < modPart->NumModels();m++){
-		Model *mod = modPart->GetModel(m);
-		mod->CalcPmats(blen1, -1.0, Lprmat, Rprmat);
+	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
+		Model *mod = modPart->GetModel((*specs).modelIndex);
+		mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
 
-		partialCLA = partialCLAset->GetCLA(m);
+		partialCLA = partialCLAset->GetCLA((*specs).claIndex);
 		bool isNucleotide = (partialCLA->NStates() == 4);
 		if(childCLAset != NULL)
-			childCLA = childCLAset->GetCLA(m);
+			childCLA = childCLAset->GetCLA((*specs).claIndex);
 
 		if(childCLA!=NULL){//if child is internal
 			ProfScoreInt.Start();
 			if(isNucleotide)
-				modlnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &Lprmat[0], mod);
+				modlnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
 			else
-				modlnL = GetScorePartialInternalNState(partialCLA, childCLA, &Lprmat[0], mod);
+				modlnL = GetScorePartialInternalNState(partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
 				
 			ProfScoreInt.Stop();
 			}	
 		else{
 			ProfScoreTerm.Start();
 			if(isNucleotide)
-				modlnL = GetScorePartialTerminalRateHet(partialCLA, &Lprmat[0], child->tipData[mod->dataIndex], mod);
+				modlnL = GetScorePartialTerminalRateHet(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 			else
-				modlnL = GetScorePartialTerminalNState(partialCLA, &Lprmat[0], child->tipData[mod->dataIndex], mod);
+				modlnL = GetScorePartialTerminalNState(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 
 			ProfScoreTerm.Stop();
 			}
@@ -3546,30 +3550,29 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 	}
 
 void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAset, CondLikeArraySet *secCLAset, TreeNode *firstChild, TreeNode *secChild, FLOAT_TYPE blen1, FLOAT_TYPE blen2){
-	//CALC PMATS HERE
 
 	FLOAT_TYPE *Rprmat = NULL, *Lprmat = NULL;
 	CondLikeArray *destCLA=NULL, *firstCLA=NULL, *secCLA=NULL;
 
-	for(int m = 0; m < modPart->NumModels();m++){
-		Model *mod = modPart->GetModel(m);
-		mod->CalcPmats(blen1, blen2, Lprmat, Rprmat);
+	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
+		Model *mod = modPart->GetModel((*specs).modelIndex);
+		mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), blen2 * modPart->SubsetRate((*specs).dataIndex), Lprmat, Rprmat);
 
-		destCLA = destCLAset->GetCLA(m);
+		destCLA = destCLAset->GetCLA((*specs).claIndex);
 		bool isNucleotide = (destCLA->NStates() == 4);
 		if(firstCLAset != NULL)
-			firstCLA = firstCLAset->GetCLA(m);
+			firstCLA = firstCLAset->GetCLA((*specs).claIndex);
 		if(secCLAset != NULL)
-			secCLA = secCLAset->GetCLA(m);
+			secCLA = secCLAset->GetCLA((*specs).claIndex);
 
 		if(firstCLAset!=NULL && secCLAset!=NULL){
 			//two internal children
 			ProfIntInt.Start();
 
 			if(isNucleotide == false)
-				CalcFullCLAInternalInternalNState(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], mod);
+				CalcFullCLAInternalInternalNState(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], (*specs).modelIndex, (*specs).dataIndex);
 			else
-				CalcFullCLAInternalInternal(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], mod);
+				CalcFullCLAInternalInternal(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], (*specs).modelIndex, (*specs).dataIndex);
 			ProfIntInt.Stop();
 			}
 
@@ -3577,9 +3580,9 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 			//two terminal children
 			ProfTermTerm.Start();
 			if(isNucleotide == false)
-				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[mod->dataIndex], secChild->tipData[mod->dataIndex], mod);
+				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 			else
-				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[mod->dataIndex], secChild->tipData[mod->dataIndex], mod);
+				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 			ProfTermTerm.Stop();
 			}
 
@@ -3589,22 +3592,22 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 
 			if(isNucleotide == false){
 				if(firstCLAset==NULL)
-					CalcFullCLAInternalTerminalNState(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[mod->dataIndex], mod);
+					CalcFullCLAInternalTerminalNState(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 				else 
-					CalcFullCLAInternalTerminalNState(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[mod->dataIndex], mod);
+					CalcFullCLAInternalTerminalNState(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 				}
 			else{
 	#ifdef OPEN_MP
 				if(firstCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData, firstChild->ambigMap, mod);
+					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData, firstChild->ambigMap, (*specs).modelIndex, (*specs).dataIndex););
 				else
-					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData, secChild->ambigMap, mod);
+					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData, secChild->ambigMap, (*specs).modelIndex, (*specs).dataIndex););
 				}
 	#else
 				if(firstCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[mod->dataIndex], NULL, mod);
+					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
 				else 
-					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[mod->dataIndex], NULL, mod);
+					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
 				}
 	#endif
 			ProfIntTerm.Stop();
@@ -3612,9 +3615,9 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 		if(destCLA->rescaleRank >= rescaleEvery){
 			ProfRescale.Start();
 			if(isNucleotide)
-				RescaleRateHet(destCLA, mod->dataIndex);
+				RescaleRateHet(destCLA, (*specs).dataIndex);
 			else
-				RescaleRateHetNState(destCLA, mod->dataIndex);
+				RescaleRateHetNState(destCLA, (*specs).dataIndex);
 
 			ProfRescale.Stop();
 			}
@@ -4853,14 +4856,15 @@ FLOAT_TYPE Tree::CountClasInUse(){
 	return inUse;
 	}
 	
-FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldat, Model *mod){
+FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldat, int modIndex, int dataIndex){
 
 	//this function assumes that the pmat is arranged with the nstates^2 entries for the
 	//first rate, followed by nstates^2 for the second, etc.
 	const FLOAT_TYPE *partial=partialCLA->arr;
 	const int *underflow_mult=partialCLA->underflow_mult;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nstates = mod->NStates();
 	const int nRateCats = mod->NRateCats();
@@ -5030,14 +5034,15 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	return totallnL;
 	}
 
-FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, Model *mod){
+FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	const FLOAT_TYPE *partial=partialCLA->arr;
 	const int *underflow_mult=partialCLA->underflow_mult;
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 	const int nRateCats=mod->NRateCats();
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
 	const int nchar=data->NChar();
 
 	const int *countit=data->GetCounts();
@@ -5152,7 +5157,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	return totallnL;
 	}
 	
-FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, Model *mod){
+FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	const FLOAT_TYPE *CL1=childCLA->arr;
@@ -5160,7 +5165,8 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	const int *underflow_mult1=partialCLA->underflow_mult;
 	const int *underflow_mult2=childCLA->underflow_mult;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nchar=data->NChar();
 	const int nRateCats=mod->NRateCats();
@@ -5243,7 +5249,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	return totallnL;
 	}
 
-FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, Model *mod){
+FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with nstates^2 entries for the
 	//first rate, followed by nstate^2 for the second, etc.
 	const FLOAT_TYPE *CL1=childCLA->arr;
@@ -5251,7 +5257,8 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	const int *underflow_mult1=partialCLA->underflow_mult;
 	const int *underflow_mult2=childCLA->underflow_mult;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nchar=data->NChar();
 	const int *countit=data->GetCounts();
@@ -5895,14 +5902,12 @@ void Tree::ReadBinaryFormattedTree(FILE *in){
 		}
 	}
 
-FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
+FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 	FLOAT_TYPE omegaImprove=ZERO_POINT_ZERO;
 	FLOAT_TYPE minVal = 1.0e-5;
 	int i=0;
 
-	//PARTITION
-	Model *mod = modPart->GetModel(0);
-	int modNum = 0;
+	Model *mod = modPart->GetModel(modnum);
 
 #undef DEBUG_OMEGA_OPT
 
@@ -5910,16 +5915,16 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 	double maxRateChangeProp = 0.5;
 	double maxProbChange = 0.10;
 	
-	//DEBUG - limiting here now too
+	//limiting here now too
 	if(mod->NRateCats() == 1) //allow a bit more change for a single omega
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), 0, 
 			max(minVal, mod->Omega(0)*0.333),
-			min(9999.9, mod->Omega(0)+mod->Omega(0)*0.333), modNum,
+			min(9999.9, mod->Omega(0)+mod->Omega(0)*0.333), modnum,
 			&Model::SetOmega);
 	else{
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, 
 			max(minVal, mod->Omega(i)*maxRateChangeProp),
-			min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), modNum,
+			min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), modnum,
 			&Model::SetOmega);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -5929,7 +5934,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 		
 		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
 			max(minVal, mod->OmegaProb(i)-maxProbChange),
-			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange), modNum,
+			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange), modnum,
 			&Model::SetOmegaProb);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -5940,7 +5945,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 		for(i=1;i < mod->NRateCats()-1;i++){
 			omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, 
 				max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
-				min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), modNum,
+				min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), modnum,
 				&Model::SetOmega);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -5950,7 +5955,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 
 			omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
 				max(minVal, mod->OmegaProb(i)-maxProbChange),
-				min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange), modNum,
+				min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange), modnum,
 				&Model::SetOmegaProb);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -5960,7 +5965,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 			}
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, 
 			max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
-			min(9999.9, mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), modNum,
+			min(9999.9, mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), modnum,
 			&Model::SetOmega);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -5970,7 +5975,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 
 		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
 			max(minVal, mod->OmegaProb(i)-maxProbChange),
-			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange), modNum,
+			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange), modnum,
 			&Model::SetOmegaProb);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6007,14 +6012,13 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 */	return omegaImprove;
 	}
 
-FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
+FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec, int modnum){
 	FLOAT_TYPE flexImprove=ZERO_POINT_ZERO;
 	FLOAT_TYPE minVal = 1.0e-5;
 	int i=0;
 
 	//PARTITION
-	int modNum = 0;
-	Model *mod = modPart->GetModel(modNum);
+	Model *mod = modPart->GetModel(modnum);
 
 	//limiting change in any one pass
 	double maxRateChangeProp = 0.75;
@@ -6022,30 +6026,30 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 	
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
 		max(minVal, mod->FlexRate(i)*maxRateChangeProp),
-		min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),  modNum,
+		min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),  modnum,
 		&Model::SetFlexRate);
 
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
 		max(minVal, mod->FlexProb(i)-maxProbChange), 
-		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), modNum,
+		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), modnum,
 		&Model::SetFlexProb);
 	for(i=1;i < mod->NRateCats()-1;i++){
 		flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
 			max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp), 
-			min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), modNum,
+			min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), modnum,
 			&Model::SetFlexRate);
 		flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
 			max(minVal, mod->FlexProb(i)-maxProbChange), 
-			min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), modNum,
+			min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), modnum,
 			&Model::SetFlexProb);
 		}
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
 		max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp),
-		min(999.9, mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), modNum,
+		min(999.9, mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), modnum,
 		&Model::SetFlexRate);
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
 		max(minVal, mod->FlexProb(i)-maxProbChange), 
-		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), modNum,
+		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), modnum,
 		&Model::SetFlexProb);
 
 
@@ -6075,7 +6079,47 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 	return flexImprove;
 	}
 
-void Tree::CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *leftEQ, const char *rightEQ, Model *mod){
+FLOAT_TYPE Tree::OptimizeSubsetRates(FLOAT_TYPE prec){
+	FLOAT_TYPE subrateImprove=ZERO_POINT_ZERO;
+	FLOAT_TYPE minVal = 1.0e-5;
+	int i=0;
+
+	//DEBUG
+	//store the current values in case we end up making the lnL worse
+	Score();
+	FLOAT_TYPE start = lnL;
+	vector<FLOAT_TYPE> initVals;
+	for(int i = 0;i < modPart->NumModelSets();i++)
+		initVals.push_back(modPart->SubsetRate(i));
+
+	//limiting change in any one pass
+	double maxRateChangeProp = 0.75;
+	for(i=0;i < modPart->NumModelSets();i++){
+		subrateImprove += OptimizeBoundedParameter<ModelPartition>(prec, modPart->SubsetRate(i), i, 
+			max(minVal, modPart->SubsetRate(i)*maxRateChangeProp),
+			modPart->SubsetRate(i)+modPart->SubsetRate(i)*maxRateChangeProp,
+			modPart,
+			&ModelPartition::SetSubsetRate);
+		if(subrateImprove < 0.0){
+			int poo = 2;
+			}
+		}
+
+	Score();
+	FLOAT_TYPE after = lnL;
+	if(after < start){
+		modPart->SetSubsetRates(initVals);
+		MakeAllNodesDirty();
+		Score();
+		after = lnL;
+		assert(FloatingPointEquals(after, start, 1e-6));
+		}
+
+	assert(after - start + 1e-6> 0.0);
+	return subrateImprove;
+	}
+
+void Tree::CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *leftEQ, const char *rightEQ, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *dest=destCLA->arr;
@@ -6083,7 +6127,8 @@ void Tree::CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLi
 	const FLOAT_TYPE *RCL=RCLA->arr;
 	FLOAT_TYPE L1, L2, L3, L4, R1, R2, R3, R4;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nRateCats = mod->NRateCats();
 	const int nchar = data->NChar();
@@ -6132,7 +6177,7 @@ void Tree::CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLi
 	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
 	}
 
-void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, Model *mod){
+void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *dest=destCLA->arr;
@@ -6140,10 +6185,10 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 	const FLOAT_TYPE *RCL=RCLA->arr;
 	FLOAT_TYPE L1, L2, L3, L4, R1, R2, R3, R4;
 
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
+
 	const int nRateCats = mod->NRateCats();
-
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
-
 	const int nchar = data->NChar();
 	const int *counts = data->GetCounts();
 
@@ -6307,7 +6352,7 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
 	}
 
-void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, Model *mod){
+void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *dest=destCLA->arr;
@@ -6315,7 +6360,8 @@ void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondL
 	const FLOAT_TYPE *RCL=RCLA->arr;
 	FLOAT_TYPE L1, R1;
 	
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nRateCats = mod->NRateCats();
 	const int nstates = mod->NStates();
@@ -6375,12 +6421,13 @@ void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondL
 	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
 	}
 
-void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, Model *mod){
+void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *dest=destCLA->arr;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nRateCats = mod->NRateCats();
 	const int nchar = data->NChar();
@@ -6544,12 +6591,13 @@ void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE 
 		destCLA->rescaleRank=2;
 	}
 
-void Tree::CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, Model *mod){
+void Tree::CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *dest=destCLA->arr;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nRateCats = mod->NRateCats();
 	const int nstates = mod->NStates();
@@ -6624,7 +6672,7 @@ void Tree::CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT
 	}
 
 
-void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const unsigned *ambigMap, Model *mod){
+void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const unsigned *ambigMap, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *des=destCLA->arr;
@@ -6633,7 +6681,8 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 	const FLOAT_TYPE *CL1=CL;
 	const char *data2=dat2;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);	
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);	
 
 	const int nchar = data->NChar();
 	const int nRateCats = mod->NRateCats();
@@ -6829,7 +6878,7 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 	destCLA->rescaleRank=LCLA->rescaleRank+2;
 	} 
 
-void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, Model *mod){
+void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *des=destCLA->arr;
@@ -6838,7 +6887,8 @@ void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondL
 	const FLOAT_TYPE *CL1=CL;
 	const char *data2=dat2;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nchar = data->NChar();
 	const int nRateCats = mod->NRateCats();
@@ -6892,14 +6942,15 @@ void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondL
 	destCLA->rescaleRank=LCLA->rescaleRank+2;
 	} 
 
-void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA, Model *mod){
+void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *dest=destCLA->arr;
 	FLOAT_TYPE *CL1=LCLA->arr;
 	FLOAT_TYPE *partial=partialCLA->arr;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nchar = data->NChar();
 	const int nRateCats = mod->NRateCats();
@@ -6953,13 +7004,14 @@ void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondL
 		}
 	}
 
-void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata, Model *mod){
+void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *dest=destCLA->arr;
 	FLOAT_TYPE *partial=partialCLA->arr;
 
-	SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nchar = data->NChar();
 	const int nRateCats = mod->NRateCats();

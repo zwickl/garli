@@ -457,6 +457,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 	return -1;
 	}
 
+
 /*
 FLOAT_TYPE Tree::OptimizePinv(){
 */
@@ -575,7 +576,7 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 	nodeOptVector.clear();
 	SetNodesUnoptimized();
 
-	//PARTITION
+	//DEBUG PARTITION - this assumes that all subsets are the same datatype
 	ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
 
 #ifdef EQUIV_CALCS
@@ -589,7 +590,6 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 
 	FLOAT_TYPE totalIncrease=ZERO_POINT_ZERO, prunePointIncrease=ZERO_POINT_ZERO, thisIncr, pruneRadIncrease=ZERO_POINT_ZERO;
 	
-	//DEBUG
 	//for codon models, numerical instability can cause problems if a 
 	//branch length is super short and its MLE is large.  This is very
 	//rare, but hard to detect when it is happening.  So, raise the blens
@@ -851,31 +851,33 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 
 	//zero out lnL here, since the looping over the various models below will just add to it
 	lnL = ZERO_POINT_ZERO;
-	for(int modIndex=0;modIndex<modPart->NumModels();modIndex++){
-		Model *mod = modPart->GetModel(modIndex);
+	//for(int modIndex=0;modIndex<modPart->NumModels();modIndex++){
+	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
+		Model *mod = modPart->GetModel((*specs).modelIndex);
 		ProfModDeriv.Start();
-		mod->CalcDerivatives(nd2->dlen, prmat, deriv1, deriv2);
+		//mod->CalcDerivatives(nd2->dlen * mod->ModelSpecificRate() * modPart->GlobalRateScaler(), prmat, deriv1, deriv2);
+		mod->CalcDerivatives(nd2->dlen * modPart->SubsetRate((*specs).dataIndex), prmat, deriv1, deriv2);
 		ProfModDeriv.Stop();
-		claOne = setOne->GetCLA(modIndex);
+		claOne = setOne->GetCLA((*specs).claIndex);
 		if(setTwo != NULL)
-			claTwo = setTwo->GetCLA(modIndex);
+			claTwo = setTwo->GetCLA((*specs).claIndex);
 		bool isNucleotide = (claOne->NStates() == 4);
 
 		if(nd2->left == NULL){
-			char *childData=nd2->tipData[mod->dataIndex];
+			char *childData=nd2->tipData[(*specs).dataIndex];
 			ProfTermDeriv.Start();
 
 			if(isNucleotide == false){
 				if(mod->NRateCats() > 1)
-					GetDerivsPartialTerminalNStateRateHet(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, mod);
+					GetDerivsPartialTerminalNStateRateHet(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
 				else
-					GetDerivsPartialTerminalNState(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, mod);
+					GetDerivsPartialTerminalNState(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
 				}
 			else
 	#ifdef OPEN_MP
-				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, modIndex, nd2->ambigMap, mod);
+				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, modIndex, nd2->ambigMap, (*specs).modelIndex, (*specs).dataIndex);
 	#else
-				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, mod);
+				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
 	#endif
 			assert(d1 == d1);
 			ProfTermDeriv.Stop();
@@ -883,22 +885,25 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 		else {
 			ProfIntDeriv.Start();
 	#ifdef EQUIV_CALCS
-			GetDerivsPartialInternalEQUIV(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, nd2->tipData, mod);
+			GetDerivsPartialInternalEQUIV(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, nd2->tipData, (*specs).modelIndex, (*specs).dataIndex);
 	#else
 			if(isNucleotide == false){
 				if(mod->NRateCats() > 1)
-					GetDerivsPartialInternalNStateRateHet(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, mod);
+					GetDerivsPartialInternalNStateRateHet(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
 				else
-					GetDerivsPartialInternalNState(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, mod);
+					GetDerivsPartialInternalNState(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
 				}
 			else
-				GetDerivsPartialInternal(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, mod);
+				GetDerivsPartialInternal(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
 	#endif
 			ProfIntDeriv.Stop();
 			}
 		assert(d1 == d1);
-		d1tot += d1;
-		d2tot += d2;
+		//account for the different rate scaling factors here
+//		d1tot += d1 ;
+//		d2tot += d2;
+		d1tot += d1 * modPart->SubsetRate((*specs).dataIndex);
+		d2tot += d2 * modPart->SubsetRate((*specs).dataIndex) * modPart->SubsetRate((*specs).dataIndex);
 		}
 
 	assert(d1 == d1);
@@ -1104,13 +1109,20 @@ if(nd->nodeNum == 8){
 //	ofstream log("optimization.log", ios::app);
 //	log.precision(10);
 
+	opt.precision(8);
 	opt << nd->nodeNum << "\t" << nd->dlen << "\t" << lnL <<endl;
 	
 //	ofstream scr("impVSd1.log", ios::app);
-	if(lnL > -2){
+
+/*	if(lnL > -2){
 		Score(nd->anc->nodeNum);
 		}
+	FLOAT_TYPE poo = lnL;
 
+	MakeAllNodesDirty();
+	Score(nd->anc->nodeNum);
+	assert(FloatingPointEquals(poo, lnL, 1e-4));
+*/
 	FLOAT_TYPE delta;
 	
 #endif
@@ -1128,17 +1140,21 @@ if(nd->nodeNum == 8){
 	FLOAT_TYPE d1, d2, estScoreDelta, estDeltaNR;
 
 	FLOAT_TYPE initialL;
+
 	do{
 		bool scoreOK;
 		int sweeps=0;
+#undef EMPERICAL_DERIVS
+
+#ifndef EMPERICAL_DERIVS
 		pair<FLOAT_TYPE, FLOAT_TYPE> derivs;
 		do{		//this part just catches the exception that could be thrown by the rescaling 
 				//function if it decides that the current rescaleEvery is too large
 			try{
 				scoreOK=true;
 				derivs = CalcDerivativesRateHet(nd->anc, nd);
-				optCalcs++;
 				if(iter == 0) initialL = lnL;
+				optCalcs++;
 				}catch(int err){
 				scoreOK=false;
 				if(err==1){
@@ -1162,6 +1178,14 @@ if(nd->nodeNum == 8){
 		
 		d1=derivs.first;
 		d2=derivs.second;
+#else
+		if(iter == 0){
+			if(lnL > -2)
+				Score(nd->anc->nodeNum);
+			initialL = lnL;
+			}
+		CalcEmpiricalDerivatives(nd, d1, d2);
+#endif
 
 #ifdef OPT_DEBUG
 		FLOAT_TYPE empD1, empD2;
@@ -1975,11 +1999,12 @@ if(here->anc){
 	return initialScore - minScore;
 	}
 
-void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod, const unsigned *ambigMap /*=NULL*/){
+void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex, const unsigned *ambigMap /*=NULL*/){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	const FLOAT_TYPE *partial=partialCLA->arr;
-	const SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 	const int nchar=data->NChar();
 	const int nRateCats=mod->NRateCats();
 
@@ -2089,13 +2114,13 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 
 			FLOAT_TYPE tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
 #ifdef SINGLE_PRECISION_FLOATS
+			//I'm not sure why this was added.  I think just for debugging purposes
 			if(fabs(tempD1) < 1.0e8f){
 				totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];	
 				tot1+= countit[i] * tempD1;			
 				FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
 				tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
 				}
-			//DEBUG
 			else{
 				outman.UserMessage("tempD1 = %f", tempD1);
 				}
@@ -2133,11 +2158,12 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	assert(FloatingPointEquals(lnL, poo, 1e-8));
 */	}
 	
-void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod){
+void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with nstates^2 entries for the
 	//first rate, followed by nstates^2 for the second, etc.
 	const FLOAT_TYPE *partial=partialCLA->arr;
-	const SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 	const int nRateCats=mod->NRateCats();
 
 	const int nchar = data->NChar();
@@ -2328,11 +2354,12 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	assert(FloatingPointEquals(lnL, poo, 1e-8));
 */	}
 
-void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod){
+void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with nstates^2 entries for the
 	//first rate, followed by nstates^2 for the second, etc.
 	const FLOAT_TYPE *partial=partialCLA->arr;
-	const SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 	const int nRateCats=mod->NRateCats();
 
 	const int nchar = data->NChar();
@@ -2462,13 +2489,14 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 */
 	}
 
-void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod){
+void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	const FLOAT_TYPE *CL1=childCLA->arr;
 	const FLOAT_TYPE *partial=partialCLA->arr;
 
-	const SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nchar=data->NChar();
 	const int nRateCats=mod->NRateCats();
@@ -2577,12 +2605,13 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	assert(FloatingPointEquals(lnL, poo, 1e-8));
 */	}
 
-void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod){
+void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the nstates^2 entries for the
 	//first rate, followed by nstates^2 for the second, etc.
 	const FLOAT_TYPE *CL1=childCLA->arr;
 	const FLOAT_TYPE *partial=partialCLA->arr;
-	const SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nchar = data->NChar();
 	const int *countit = data->GetCounts();
@@ -2668,13 +2697,14 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	assert(FloatingPointEquals(lnL, poo, 1e-8));
 */	}
 
-void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, Model *mod){
+void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the nstates^2 entries for the
 	//first rate, followed by nstates^2 for the second, etc.
 	const FLOAT_TYPE *CL1=childCLA->arr;
 	const FLOAT_TYPE *partial=partialCLA->arr;
 
-	const SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 
 	const int nchar = data->NChar();
 	const int *countit = data->GetCounts();
@@ -2755,7 +2785,7 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	assert(FloatingPointEquals(lnL, poo, 1e-8));
 */	}
 
-void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, char *equiv, Model *mod){
+void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, char *equiv, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 
@@ -2764,7 +2794,8 @@ void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const 
 	FLOAT_TYPE *CL1=childCLA->arr;
 	FLOAT_TYPE *partial=partialCLA->arr;
 
-	const SequenceData *data = dataPart->GetSubset(mod->dataIndex);
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
 	
 	const int nchar=data->NChar();
 	const int nRateCats=mod->NRateCats();

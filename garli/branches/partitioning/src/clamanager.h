@@ -33,6 +33,16 @@ extern int memLevel;
 
 #undef CLA_DEBUG
 
+class ClaSpecifier{
+	public:
+	int claIndex; //this is just the number of the corresponding cla - there is a 1 to 1 correspondence
+	int modelIndex;
+	int dataIndex;
+	ClaSpecifier(int c, int m, int d):claIndex(c), modelIndex(m), dataIndex(d){};
+	};
+
+extern vector<ClaSpecifier> claSpecs;
+
 class ClaManager{
 	int numNodes;//the number of nodes in each tree
 	int numRates;
@@ -51,7 +61,7 @@ class ClaManager{
 	public:	
 	//PARTITION	
 	//ClaManager(int nnod, int nClas, int nHolders, int nchar, int nrates) : numNodes(nnod), numClas(nClas), numHolders(nHolders), numRates(nrates){
-	ClaManager(int nnod, int numClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numHolders(nHolders){
+/*	ClaManager(int nnod, int numClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numHolders(nHolders){
 		maxUsed=0;
 		allClas=new CondLikeArraySet*[numClas];
 		claStack.reserve(numClas);
@@ -64,6 +74,28 @@ class ClaManager{
 				allClas[i]->AddCLA(thisCLA);
 				allClas[i]->Allocate();
 				}
+			claStack.push_back(allClas[i]);
+			}
+		holders = new CondLikeArrayHolder[numHolders];
+		holderStack.reserve(numHolders);
+		for(int i=numHolders-1;i>=0;i--)
+			holderStack.push_back(i);
+		}
+*/
+	ClaManager(int nnod, int numClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numHolders(nHolders){
+		maxUsed=0;
+		allClas=new CondLikeArraySet*[numClas];
+		claStack.reserve(numClas);
+		for(int i=numClas-1;i>=0;i--){
+			allClas[i]=new CondLikeArraySet;
+			//for(vector<Model *>::iterator modit = mods->models.begin();modit != mods->models.end();modit++){
+			//for(int m = 0;m < mods->NumModels();m++){
+			for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
+				const Model *thisMod = mods->GetModel((*specs).modelIndex);
+				CondLikeArray *thisCLA = new CondLikeArray(data->GetSubset((*specs).dataIndex)->NChar(), thisMod->NStates(), thisMod->NRateCats());
+				allClas[i]->AddCLA(thisCLA);
+				}
+			allClas[i]->Allocate();
 			claStack.push_back(allClas[i]);
 			}
 		holders = new CondLikeArrayHolder[numHolders];

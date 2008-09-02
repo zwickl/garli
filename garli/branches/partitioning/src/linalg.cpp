@@ -1336,7 +1336,7 @@ void CalcPij (const MODEL_FLOAT *c_ijk, int n, const MODEL_FLOAT *eigenValues, M
 		for(int k=0; k<n; k++)
 			sum += (*ptr++) * (*g++);
 	//	assert(sum > 0.0f);
-//DEBUG
+
 #ifdef _SINGLE_PRECISION_FLOATS
 		*pMat++ = (sum < ZERO_POINT_ZERO) ? FLT_MIN : sum;
 #else

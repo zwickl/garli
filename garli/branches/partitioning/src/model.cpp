@@ -33,9 +33,8 @@ Profiler ProfCalcPmat("CalcPmat      ");
 Profiler ProfCalcEigen("CalcEigen     ");
 					 
 extern rng rnd;
+extern vector<DataSubsetInfo> dataSubInfo;
 FLOAT_TYPE Model::mutationShape;
-
-FLOAT_TYPE Model::maxPropInvar;
 
 FLOAT_TYPE PointNormal (FLOAT_TYPE prob);
 FLOAT_TYPE IncompleteGamma (FLOAT_TYPE x, FLOAT_TYPE alpha, FLOAT_TYPE LnGamma_alpha);
@@ -1234,6 +1233,7 @@ void Model::MutatePropInvar(){
 */
 void Model::CopyModel(const Model *from){
 	assert(stateFreqs[0] != NULL);
+
 	if(modSpec->IsCodon()){
 		for(int i=0;i<omegas.size();i++)
 			*omegas[i]=*(from->omegas[i]);
@@ -1256,6 +1256,7 @@ void Model::CopyModel(const Model *from){
 	if(modSpec->IsGammaRateHet())
 		*alpha=*(from->alpha);
 	*propInvar=*(from->propInvar);
+	maxPropInvar = from->maxPropInvar;
 
 	if(from->eigenDirty == false){
 		//copy the already calculated eigen variables, which are nontrivial to 
@@ -1304,6 +1305,7 @@ FLOAT_TYPE Model::TRatio() const{
 bool Model::IsModelEqual(const Model *other) const {
 	assert(0);
 	//this will need to be generalized if other models are introduced
+	
 	for(int i=0;i<6;i++)
 		if(!FloatingPointEquals(*relNucRates[i], *(other->relNucRates[i]), 1e-15)) return false;
 	
@@ -1774,6 +1776,112 @@ void Model::OutputGarliFormattedModel(ostream &outf) const{
 	outf << " ";
 	}
 
+void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{	
+	s.clear();
+	char cStr[500];
+	if(modSpec->IsCodon()){
+		for(int i=0;i<omegas.size();i++){
+			if(model){
+				sprintf(cStr,"%5.3f %5.3f", *omegas[i], *omegaProbs[i]);
+				s += cStr;
+				}
+			else{
+				char oStr[50];
+				sprintf(oStr, "w(%d) ", i);
+				sprintf(cStr,"%5s ", oStr);
+				s += cStr;
+				sprintf(oStr, "p(%d) ", i);
+				sprintf(cStr,"%5s ", oStr);
+				s += cStr;
+				}
+			}
+		}
+	if(modSpec->IsAminoAcid() == false){
+		if(model){
+			sprintf(cStr, "%5.2f %5.2f %5.2f %5.2f %5.2f %5.2f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
+			s += cStr;
+			}
+		else{
+			char rStr[50];
+			sprintf(rStr, "r(AC)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(AG)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(AT)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(CG)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(CT)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(GT)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			}
+		}
+	if(modSpec->IsNucleotide()){
+		if(model){
+			sprintf(cStr," %5.3f %5.3f %5.3f %5.3f ", StateFreq(0), StateFreq(1), StateFreq(2), StateFreq(3));
+			s += cStr;
+			}
+		else{
+			char pStr[50];
+			sprintf(pStr, "pi(A)");
+			sprintf(cStr,"%5s ", pStr);
+			s += cStr;
+			sprintf(pStr, "pi(C)");
+			sprintf(cStr,"%5s ", pStr);
+			s += cStr;
+			sprintf(pStr, "pi(G)");
+			sprintf(cStr,"%5s ", pStr);
+			s += cStr;
+			sprintf(pStr, "pi(T)");
+			sprintf(cStr,"%5s ", pStr);
+			s += cStr;
+			}
+		}
+
+	if(modSpec->IsFlexRateHet()){
+		for(int i=0;i<NRateCats();i++){
+			if(model){
+				sprintf(cStr, "%5.3f %5.3f", rateMults[i], rateProbs[i]);
+				s += cStr;
+				}
+			else{
+				char fStr[50];
+				sprintf(fStr, "fr(%d)", i);
+				sprintf(cStr,"%5s ", fStr);
+				s += cStr;
+				sprintf(fStr, "p(%d)", i);
+				sprintf(cStr,"%5s ", fStr);
+				s += cStr;
+				}
+			}
+		}
+	else{
+		if(modSpec->IsGammaRateHet()){
+			if(model)
+				sprintf(cStr, "%5.3f ", Alpha());
+			else{
+				sprintf(cStr, "%5s ", "alpha");
+				}
+			s += cStr;
+			}
+		}
+	if(PropInvar()!=ZERO_POINT_ZERO){
+		if(model)
+			sprintf(cStr, "%5.3f", PropInvar());
+		else{
+			sprintf(cStr, "%5s ", "pinv");
+			}
+		s += cStr;
+		}
+	}
+
 void Model::OutputHumanReadableModelReportWithParams() const{
 	//Report on the model setup and parameter values - like a beefed up version of Population::ModelReport
 	if(modSpec->IsCodon()){
@@ -1788,17 +1896,17 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 	
 	if(modSpec->IsAminoAcid() == false){
 		if(modSpec->IsCodon() && modSpec->numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega) = %f\n", Omega(0));
-		if(modSpec->IsCodon()) outman.UserMessage("  Nucleotide Relative Rate Matrix Assumed by Codon Model:     ");
-		else outman.UserMessage("  Nucleotide Relative Rate Matrix: ");
+		if(modSpec->IsCodon()) outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model:     ");
+		else outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix: ");
 		if(nst == 6){
-			if(modSpec->IsArbitraryRateMatrix()) outman.UserMessageNoCR("    User specified matrix type: %s ", modSpec->arbitraryRateMatrixString.c_str());
-			else outman.UserMessageNoCR("    6 rates ");
-			if(modSpec->fixRelativeRates == true) outman.UserMessage(" values specified by user (fixed)");
-			else outman.UserMessage("");
+			if(modSpec->IsArbitraryRateMatrix()) outman.UserMessage("\n    User specified matrix type: %s ", modSpec->arbitraryRateMatrixString.c_str());
+			else outman.UserMessage("    6 rates ");
+			if(modSpec->fixRelativeRates == true) outman.UserMessage("\n    Values specified by user (fixed)");
+			//else outman.UserMessage("");
 			outman.UserMessage("    AC = %.3f, AG = %.3f, AT = %.3f, CG = %.3f, CT = %.3f, GT = %.3f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
 			}
 		else if(nst == 2){
-			outman.UserMessageNoCR("    2 rates (transition and transversion) K param = %.4f", Rates(1));
+			outman.UserMessageNoCR("\n    2 rates (transition and transversion) K param = %.4f", Rates(1));
 			if(modSpec->IsCodon() == false) outman.UserMessage(" (ti/tv = %.4f)",  TRatio());
 			else outman.UserMessage("");
 			}
@@ -2126,12 +2234,6 @@ void Model::ReadGarliFormattedModelString(string &modString){
 void Model::CreateModelFromSpecification(int modnum){
 	modSpec = modSpecSet.GetModSpec(modnum);
 
-	//PARTITION
-	//for now, model # = dataIndex (i.e., no mixing)
-	//DEBUG
-	dataIndex = modnum;
-	//dataIndex = 0;
-
 	nstates = modSpec->nstates;
 	if(modSpec->IsNucleotide() || modSpec->IsCodon())
 		nst = modSpec->Nst();
@@ -2148,7 +2250,7 @@ void Model::CreateModelFromSpecification(int modnum){
 		assert(modSpec->IsCodon() == false);
 		*propInvar=(FLOAT_TYPE)0.2;
 		if(modSpec->fixInvariantSites == false){
-			ProportionInvariant *pi = new ProportionInvariant("proportion invariant", (FLOAT_TYPE **) &propInvar, modnum);
+			ProportionInvariant *pi = new ProportionInvariant((FLOAT_TYPE **) &propInvar, modnum);
 			pi->SetWeight(1);
 			paramsToMutate.push_back(pi);
 			}			
@@ -2163,7 +2265,7 @@ void Model::CreateModelFromSpecification(int modnum){
 		if(modSpec->IsFlexRateHet() == false){
 			DiscreteGamma(rateMults, rateProbs, *alpha);
 			if(modSpec->fixAlpha == false){
-				AlphaShape *a= new AlphaShape("alpha", &alpha, modnum);
+				AlphaShape *a= new AlphaShape(&alpha, modnum);
 				a->SetWeight(1);
 				paramsToMutate.push_back(a);
 				}
@@ -2264,7 +2366,7 @@ void Model::CreateModelFromSpecification(int modnum){
 				*relNucRates[1] = 4.0;
 				*relNucRates[4] = 4.0;
 				*relNucRates[5] = ONE_POINT_ZERO;
-				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 6, modnum);
+				RelativeRates *r=new RelativeRates(&relNucRates[0], 6, modnum);
 				r->SetWeight(6);
 				paramsToMutate.push_back(r);
 				}
@@ -2278,7 +2380,7 @@ void Model::CreateModelFromSpecification(int modnum){
 				*relNucRates[1]=*relNucRates[4] = 4.0;
 				}
 			if(modSpec->fixRelativeRates == false){
-				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 6, modnum);
+				RelativeRates *r=new RelativeRates(&relNucRates[0], 6, modnum);
 				r->SetWeight(6);
 				paramsToMutate.push_back(r);
 				}
@@ -2296,7 +2398,7 @@ void Model::CreateModelFromSpecification(int modnum){
 			relNucRates.push_back(a);
 			
 			if(modSpec->fixRelativeRates == false){
-				RelativeRates *r=new RelativeRates("Rate matrix", &b, 1, modnum);
+				RelativeRates *r=new RelativeRates(&b, 1, modnum);
 				r->SetWeight(2);
 				paramsToMutate.push_back(r);
 				}
@@ -3645,26 +3747,136 @@ void Model::MultiplyByWAGAAMatrix(){
 	qmatOffset[19][17] *= 1;
 	}
 
-ModelPartition::ModelPartition()	{
-	 for(int i=0;i<modSpecSet.NumSpecs();i++){
-		 ModelSet * ms = new ModelSet(i);
-		 modSets.push_back(ms);
-		 for(int m=0;m<ms->NumModels();m++)
-			 models.push_back(modSets[i]->GetModel(m));
+ModelPartition::ModelPartition(){
+	for(int i=0;i<modSpecSet.NumSpecs();i++){
+		ModelSet * ms = new ModelSet(i);
+		modSets.push_back(ms);
+		for(int m=0;m<ms->NumModels();m++)
+			models.push_back(modSets[i]->GetModel(m));
 		}
-	 //DEBUG linking hack
-/*	 if(modSpecSet.NumSpecs() == 2){
-		 Model *first = GetModel(0);
-		 Model *sec = GetModel(1);
-		 for(vector<FLOAT_TYPE *>::iterator it = first->stateFreqs.begin();it != first->stateFreqs.end();it++){
-			 delete *it;
+
+	//numSubsetRates will be = # specs in the case of no linkage
+	//but in the case of linkage with different subset rates #specs will be 1 and numSubsetRates > 1
+	//separate subset rates will always be stored for each data subset, but they won't be changed if 
+	//they aren't actually being estiamted
+	if(dataSubInfo.size() > 1){
+		int totalCharacters = 0;
+		for(int d = 0;d < dataSubInfo.size();d++){
+			totalCharacters += dataSubInfo[d].totalCharacters;
 			}
-		 first->stateFreqs.clear();
-		 for(vector<FLOAT_TYPE *>::iterator it = sec->stateFreqs.begin();it != sec->stateFreqs.end();it++){
-			 first->stateFreqs.push_back(*it);
+		for(int d = 0;d < dataSubInfo.size();d++){
+			subsetRates.push_back(1.0);
+			subsetProportions.push_back(dataSubInfo[d].totalCharacters / (FLOAT_TYPE) totalCharacters);
+			}
+		if(modSpecSet.InferSubsetRates()){
+			vector<FLOAT_TYPE*> dummy;
+			for(int d = 0;d < dataSubInfo.size();d++)
+				dummy.push_back(&subsetRates[d]);
+			SubsetRates *rm = new SubsetRates(&dummy[0], dataSubInfo.size(), -1);
+			rm->SetWeight(dataSubInfo.size() * 2);
+			allParamsToMutate.push_back(rm);
 			}
 		}
-*/	assert(GetModel(0)->stateFreqs[0] != NULL);
-	assert(GetModel(1)->stateFreqs[0] != NULL);
-	 CollectMutableParameters();
-	 }
+	else{
+		subsetRates.push_back(1.0);
+		subsetProportions.push_back(1.0);
+		}
+
+	CollectMutableParameters();
+	}
+
+//this is the size in BYTES not elements
+unsigned ModelPartition::CalcRequiredCLAsize(const DataPartition *dat){
+	unsigned size = 0;
+	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
+		const Model *thisMod = GetModel((*specs).modelIndex);
+		size += (thisMod->NStates() * thisMod->NRateCats() * dat->GetSubset((*specs).dataIndex)->NChar()) * sizeof(FLOAT_TYPE);
+		size += dat->GetSubset((*specs).dataIndex)->NChar() * sizeof(int);
+		}
+	return size;
+	}
+
+//these are just stolen directly from the corresponding Model:: functions for now
+BaseParameter *ModelPartition::SelectModelMutation(){
+	CalcMutationProbsFromWeights();
+	if(allParamsToMutate.empty() == true) return NULL;
+	FLOAT_TYPE r=rnd.uniform();
+	vector<BaseParameter*>::iterator it;
+	for(it=allParamsToMutate.begin();it!=allParamsToMutate.end();it++){
+		if((*it)->GetProb() > r) return *it;
+		}
+	it--;
+	return *it;
+	}
+
+void ModelPartition::CalcMutationProbsFromWeights(){
+	FLOAT_TYPE tot=ZERO_POINT_ZERO, running=ZERO_POINT_ZERO;
+	for(vector<BaseParameter*>::iterator it=allParamsToMutate.begin();it!=allParamsToMutate.end();it++){
+		tot += (*it)->GetWeight();
+		}
+	for(vector<BaseParameter*>::iterator it=allParamsToMutate.begin();it!=allParamsToMutate.end();it++){
+		running += (*it)->GetWeight() / tot;
+		(*it)->SetProb(running);
+		}
+	}
+
+int ModelPartition::PerformModelMutation(){
+	if(allParamsToMutate.empty()) return 0;
+	BaseParameter *mut = SelectModelMutation();
+	assert(mut != NULL);
+	mut->Mutator(Model::mutationShape);
+	int retType;
+
+	if(mut->Type() == RELATIVERATES){
+		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){
+			models[*mit]->UpdateQMat();
+			models[*mit]->eigenDirty=true;
+			}
+		retType=Individual::rates;
+		}
+	else if(mut->Type() == STATEFREQS){
+		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){
+			models[*mit]->UpdateQMat();
+			models[*mit]->eigenDirty=true;
+			}
+		retType=Individual::pi;
+		}
+	
+	else if(mut->Type() == PROPORTIONINVARIANT){
+		//this max checking should really be rolled into the parameter class
+//DEBUG PARTITION - need to put this check somewhere
+//		*propInvar = (*propInvar > maxPropInvar ? maxPropInvar : *propInvar);
+		//the non invariant rates need to be rescaled even if there is only 1
+		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){
+			*(models[*mit]->propInvar) = (*(models[*mit]->propInvar) > (models[*mit]->maxPropInvar) ? (models[*mit]->maxPropInvar) : *(models[*mit]->propInvar));
+			if(modSpecSet.GetModSpec(*mit)->IsFlexRateHet() == false) models[*mit]->AdjustRateProportions();
+			else models[*mit]->NormalizeRates();
+			}
+		retType=Individual::pinv;
+		}
+	else if(mut->Type() == ALPHASHAPE){
+		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++)
+			models[*mit]->DiscreteGamma(models[*mit]->rateMults, models[*mit]->rateProbs, *models[*mit]->alpha);
+		retType=Individual::alpha;
+		}
+	else if(mut->Type() == RATEPROPS || mut->Type() == RATEMULTS){
+		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){
+			//flex rates and omega muts come through here
+
+			//enforce an ordering of the rate multipliers, so that they can't "cross" one another
+			if(models[*mit]->NRateCats() > 1) models[*mit]->CheckAndCorrectRateOrdering();
+
+			if(modSpecSet.GetModSpec(*mit)->IsFlexRateHet() == true)
+				models[*mit]->NormalizeRates();
+			else if(modSpecSet.GetModSpec(*mit)->IsCodon())
+				//eigen stuff needs to be recalced for changes to nonsynonymous rates
+				models[*mit]->eigenDirty = true;
+			}
+			retType=Individual::alpha;
+		}
+	else if(mut->Type() == SUBSETRATE){
+		NormalizeSubsetRates();
+		retType=Individual::subsetRate;
+		}
+	return retType;
+	}

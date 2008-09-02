@@ -38,11 +38,14 @@ class ModelSpecification;
 class ModelSpecificationSet;
 class MFILE;
 class Individual;
+class ClaSpecifier;
 
 extern rng rnd;
 //extern ModelSpecification modSpec;
 extern ModelSpecificationSet modSpecSet;
 extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
+
+extern vector<ClaSpecifier> claSpecs;
 
 	enum{//the types
 		STATEFREQS = 1,
@@ -50,7 +53,8 @@ extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, co
 		ALPHASHAPE = 3,
 		RATEMULTS = 4,
 		RATEPROPS = 5,
-		PROPORTIONINVARIANT = 6
+		PROPORTIONINVARIANT = 6,
+		SUBSETRATE = 7
 		};
 
 class BaseParameter {
@@ -67,7 +71,7 @@ protected:
 	vector<FLOAT_TYPE> default_vals;
 
 public:
-	vector<int> modelsThatInclude;
+	vector<int> modelsThatInclude;//this isn't currently being used, but will eventually be used to only dirty models that changed
 
 	BaseParameter()	{
 		numElements=1;
@@ -132,7 +136,7 @@ public:
 class RelativeRates:public BaseParameter{
 public:
 	// 5/9/06 now enforcing non-zero minimum relative rate to avoid problems in the linear algebra functions
-	RelativeRates(const char *c, FLOAT_TYPE **dv, int numE, int modnum):BaseParameter(c, dv, RELATIVERATES, numE, (FLOAT_TYPE)1.0e-6, (FLOAT_TYPE)999.9, modnum){};
+	RelativeRates(FLOAT_TYPE **dv, int numE, int modnum):BaseParameter("Rate matrix", dv, RELATIVERATES, numE, (FLOAT_TYPE)1.0e-6, (FLOAT_TYPE)999.9, modnum){};
 
 	void Mutator(FLOAT_TYPE mutationShape){
 		if(numElements > 1){
@@ -219,7 +223,7 @@ public:
 
 class AlphaShape:public BaseParameter{
 public:
-	AlphaShape(const char *c, FLOAT_TYPE **dv, int modnum):BaseParameter(c, dv, ALPHASHAPE, 1, (FLOAT_TYPE)1e-5, (FLOAT_TYPE)999.9, modnum){};
+	AlphaShape(FLOAT_TYPE **dv, int modnum):BaseParameter("Alpha shape", dv, ALPHASHAPE, 1, (FLOAT_TYPE)1e-5, (FLOAT_TYPE)999.9, modnum){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
 		}
@@ -227,9 +231,19 @@ public:
 
 class ProportionInvariant:public BaseParameter{
 public:
-	ProportionInvariant(const char *c, FLOAT_TYPE **dv, int modnum):BaseParameter(c, dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0, (FLOAT_TYPE)1.0, modnum){};
+	ProportionInvariant(FLOAT_TYPE **dv, int modnum):BaseParameter("Prop. invar.", dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0, (FLOAT_TYPE)1.0, modnum){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
+		}
+	};
+
+class SubsetRates:public BaseParameter{
+public:
+	SubsetRates(FLOAT_TYPE **dv, int numE, int modnum):BaseParameter("Subset rate", dv, SUBSETRATE, numE, (FLOAT_TYPE)0.0, (FLOAT_TYPE)1.0, modnum){};
+	void Mutator(FLOAT_TYPE mutationShape){
+		int rateToChange=int(rnd.uniform()*(numElements));
+		*vals[rateToChange] *= rnd.gamma( mutationShape );
+		if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;
 		}
 	};
 
@@ -666,7 +680,18 @@ public:
 			else throw(ErrorException("Unknown genetic code: %s\n\t(options are: standard, vertmito, invertmito)", str));
 			}
 		}
-
+	//PARTITION
+	void SetupModSpec(const ConfigModelSettings &conf){
+		SetDataType(conf.datatype.c_str());
+		SetGeneticCode(conf.geneticCode.c_str());
+		SetStateFrequencies(conf.stateFrequencies.c_str());
+		SetRateMatrix(conf.rateMatrix.c_str());
+		SetProportionInvariant(conf.proportionInvariant.c_str());
+		SetRateHetModel(conf.rateHetModel.c_str());
+		SetNumRateCats(conf.numRateCats, true);
+		isSetup = true;
+		}
+/*
 	void SetupModSpec(const GeneralGamlConfig &conf){
 		SetDataType(conf.datatype.c_str());
 		SetGeneticCode(conf.geneticCode.c_str());
@@ -677,13 +702,18 @@ public:
 		SetNumRateCats(conf.numRateCats, true);
 		isSetup = true;
 		}
+*/
 	};
 
 class ModelSpecificationSet{
 	//a set of ModelSpecifications, each corresponding to a data subset/modelset
 	vector<ModelSpecification*> modSpecs;
+	bool inferSubsetRates;
 public:
-	void AddModSpec(const GeneralGamlConfig &conf){
+	ModelSpecificationSet(){
+		inferSubsetRates = true;
+		}
+	void AddModSpec(const ConfigModelSettings &conf){
 		ModelSpecification * mod = new ModelSpecification;
 		mod->SetupModSpec(conf);
 		modSpecs.push_back(mod);
@@ -694,6 +724,13 @@ public:
 		}
 	bool IsSetup(int num){return GetModSpec(num)->isSetup;}
 	int NumSpecs() const {return modSpecs.size();}
+	void SetInferSubsetRates(bool i){inferSubsetRates = i;}
+	bool InferSubsetRates(){return inferSubsetRates;}
+	bool GotAnyParametersFromFile() {
+		for(vector<ModelSpecification *>::iterator msit = modSpecs.begin();msit != modSpecs.end();msit++)
+			if((*msit)->GotAnyParametersFromFile()) return true;
+		return false;
+		}
 	};
 
 class Model{
@@ -717,8 +754,8 @@ class Model{
 	vector<FLOAT_TYPE*> omegaProbs;
 
 	bool eigenDirty;
-	FLOAT_TYPE *blen_multiplier;
-	
+	FLOAT_TYPE *blen_multiplier; //this is the rescaling factor to make the mean rate in the qmat = 1
+
 	FLOAT_TYPE rateMults[20];
 	FLOAT_TYPE rateProbs[20];
 	
@@ -750,8 +787,7 @@ class Model{
 //	static bool useFlexRates;
 //	static int nRateCats;
 	static FLOAT_TYPE mutationShape;
-	static FLOAT_TYPE maxPropInvar;
-	int dataIndex;
+	FLOAT_TYPE maxPropInvar;
 
 	vector<BaseParameter*> paramsToMutate;
 
@@ -777,6 +813,7 @@ class Model{
 		Model::code = c;
 		FillQMatLookup();
 		}
+	const ModelSpecification *GetCorrespondingSpec() const {return modSpec;}
 		
 	private:
 	void AllocateEigenVariables();
@@ -804,6 +841,7 @@ class Model{
 	void OutputBinaryFormattedModel(OUTPUT_CLASS &) const;
 	void ReadGarliFormattedModelString(string &);
 	void OutputHumanReadableModelReportWithParams() const;
+	void FillModelOrHeaderStringForTable(string &s, bool m) const;
 
 	void ReadBinaryFormattedModel(FILE *);
 	static void FillQMatLookup();
@@ -1035,7 +1073,7 @@ class Model{
 			}
 		}
 	void SetMaxPinv(FLOAT_TYPE p){
-		Model::maxPropInvar=p;
+		maxPropInvar=p;
 		}
 	void SetDirty(bool tf){
 		if(tf) eigenDirty=true;
@@ -1180,7 +1218,7 @@ public:
 		CopyModelSet(&m);
 		}
 	Model *GetModel(int m) const{
-		if(m < 0 || m < mods.size() == false) throw ErrorException("Attemped to access invalid Model number");
+		if(m < 0 || (m < mods.size()) == false) throw ErrorException("Attemped to access invalid Model number");
 		return mods[m];
 		}
 	unsigned NumModels(){return mods.size();}
@@ -1225,13 +1263,16 @@ class ModelPartition{
 	//hierarchy is to calculate things as the model level (ie, pmats, CLAs etc)
 	vector<Model *> models;
 	vector<BaseParameter *> allParamsToMutate;
+//	FLOAT_TYPE globalRateScaler;
+
+	vector<FLOAT_TYPE> subsetRates;
+	vector<FLOAT_TYPE> subsetProportions;
+
 public:
 	ModelPartition();
 
 	void CopyModelPartition(const ModelPartition *mp){
 		unsigned num = 0;
-		assert(GetModel(0)->stateFreqs[0] != NULL);
-		assert(GetModel(1)->stateFreqs[0] != NULL);
 		for(vector<ModelSet*>::const_iterator setit = mp->modSets.begin();setit != mp->modSets.end();setit++){
 			ModelSet *modSet;
 			if(num >= modSets.size()){
@@ -1242,26 +1283,44 @@ public:
 			modSet->CopyModelSet(*setit);
 			num++;
 			}
+		//subsetProportions are just proportional to the number of total chars in each data subset, so they won't vary
+		for(int d = 0;d < subsetRates.size();d++){
+			subsetRates[d] = mp->subsetRates[d];
+			}
 		}
 	unsigned NumModelSets()const {return modSets.size();}
 	unsigned NumModels()const {return models.size();}
 	unsigned NumMutableParams() const {return allParamsToMutate.size();}
-
-	//this is the size in BYTES not elements
-	unsigned CalcRequiredCLAsize(const DataPartition *dat){
-		unsigned size = 0;
-		for(vector<Model*>::iterator mit = models.begin();mit != models.end();mit++){
-			size += ((*mit)->NStates() * (*mit)->NRateCats() * dat->GetSubset((*mit)->dataIndex)->NChar()) * sizeof(FLOAT_TYPE);
-			size += dat->GetSubset((*mit)->dataIndex)->NChar() * sizeof(int);
+	FLOAT_TYPE SubsetRate(int i){return subsetRates[i];}
+	//can't think of anything else that really needs to get reset here
+	void Reset(){
+		for(int d = 0;d < subsetRates.size();d++){
+			subsetRates[d] = 1.0;
 			}
-		return size;
 		}
+	void SetSubsetRate(int which, FLOAT_TYPE val){
+		assert(which < subsetRates.size());
+		subsetRates[which] = val;
+		NormalizeSubsetRates(which);
+		}
+	void SetSubsetRates(const vector<FLOAT_TYPE> vals){
+		subsetRates.clear();
+		for(int i = 0;i < vals.size();i++)
+			subsetRates.push_back(vals[i]);
+		}
+
+	int PerformModelMutation();
+	BaseParameter *SelectModelMutation();
+	void CalcMutationProbsFromWeights();
+	unsigned CalcRequiredCLAsize(const DataPartition *dat); //this is the size in BYTES not elements
+
 	const ModelSet *GetModelSet(int ms) const{
 		if(ms < 0 || ms < modSets.size() == false) throw ErrorException("Attemped to access invalid ModelSet number");
 		return modSets[ms];
 		}
 	Model *GetModel(int m) const{
-		if(m < 0 || m < models.size() == false) throw ErrorException("Attemped to access invalid Model number");
+		if(m < 0 || (m < models.size()) == false) 
+			throw ErrorException("Attemped to access invalid Model number");
 		return models[m];
 		}
 	bool IsModelPartitionEqual(const ModelPartition *other) const{
@@ -1281,88 +1340,34 @@ public:
 			setParams.clear();
 			}
 		}
-	//these are just stolen directly from the corresponding Model:: functions for now
-	BaseParameter *SelectModelMutation(){
-		CalcMutationProbsFromWeights();
-		if(allParamsToMutate.empty() == true) return NULL;
-		FLOAT_TYPE r=rnd.uniform();
-		vector<BaseParameter*>::iterator it;
-		for(it=allParamsToMutate.begin();it!=allParamsToMutate.end();it++){
-			if((*it)->GetProb() > r) return *it;
-			}
-		it--;
-		return *it;
-		}
+	void NormalizeSubsetRates(int toRemainConstant = -1){
+		//optionally, pass the number of one of the rates to hold constant
 
-	void CalcMutationProbsFromWeights(){
-		FLOAT_TYPE tot=ZERO_POINT_ZERO, running=ZERO_POINT_ZERO;
-		for(vector<BaseParameter*>::iterator it=allParamsToMutate.begin();it!=allParamsToMutate.end();it++){
-			tot += (*it)->GetWeight();
-			}
-		for(vector<BaseParameter*>::iterator it=allParamsToMutate.begin();it!=allParamsToMutate.end();it++){
-			running += (*it)->GetWeight() / tot;
-			(*it)->SetProb(running);
-			}
-		}
-
-	int PerformModelMutation(){
-		if(allParamsToMutate.empty()) return 0;
-		BaseParameter *mut = SelectModelMutation();
-		assert(mut != NULL);
-		mut->Mutator(Model::mutationShape);
-		int retType;
-
-		//PARTITION hacking all ret types the same for the moment
-		retType = 256;
-
-		if(mut->Type() == RELATIVERATES){
-			for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){
-				models[*mit]->UpdateQMat();
-				models[*mit]->eigenDirty=true;
-				}
-			//retType=Individual::rates;
-			}
-		else if(mut->Type() == STATEFREQS){
-			for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){
-				models[*mit]->UpdateQMat();
-				models[*mit]->eigenDirty=true;
-				}
-			//retType=Individual::pi;
-			}
+		//the proportions don't change, so this is simpler than flex rates
 		
-		else if(mut->Type() == PROPORTIONINVARIANT){
-			//this max checking should really be rolled into the parameter class
-	//PARTITION - need to put this check somewhere
-	//		*propInvar = (*propInvar > maxPropInvar ? maxPropInvar : *propInvar);
-			//the non invariant rates need to be rescaled even if there is only 1
-			for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){
-				*(models[*mit]->propInvar) = (*(models[*mit]->propInvar) > (models[*mit]->maxPropInvar) ? (models[*mit]->maxPropInvar) : *(models[*mit]->propInvar));
-				if(modSpecSet.GetModSpec(*mit)->IsFlexRateHet() == false) models[*mit]->AdjustRateProportions();
-				else models[*mit]->NormalizeRates();
-				}
-			//retType=Individual::pinv;
+		double toRemainConstantContrib;
+		if(toRemainConstant > -1){
+			toRemainConstantContrib = subsetRates[toRemainConstant]*subsetProportions[toRemainConstant];
+			//this means that it isn't possible to rescale and keep one of the rate/probs constant
+			if(toRemainConstantContrib > ONE_POINT_ZERO)
+				toRemainConstant = -1;
 			}
-		else if(mut->Type() == ALPHASHAPE){
-			for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++)
-				models[*mit]->DiscreteGamma(models[*mit]->rateMults, models[*mit]->rateProbs, *models[*mit]->alpha);
-			//retType=Individual::alpha;
+		FLOAT_TYPE sum = 0.0;
+		for(int i=0;i<subsetRates.size();i++){
+			if(i != toRemainConstant) sum += subsetRates[i]*subsetProportions[i];
 			}
-		else if(mut->Type() == RATEPROPS || mut->Type() == RATEMULTS){
-			for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){
-				//flex rates and omega muts come through here
+		if(toRemainConstant > -1) sum /= (ONE_POINT_ZERO - (subsetRates[toRemainConstant] * subsetProportions[toRemainConstant]));
+		for(int i=0;i<subsetRates.size();i++){
+			if(i != toRemainConstant) subsetRates[i] /= sum;
+			}
 
-				//enforce an ordering of the rate multipliers, so that they can't "cross" one another
-				if(models[*mit]->NRateCats() > 1) models[*mit]->CheckAndCorrectRateOrdering();
-
-				if(modSpecSet.GetModSpec(*mit)->IsFlexRateHet() == true)
-					models[*mit]->NormalizeRates();
-				else if(modSpecSet.GetModSpec(*mit)->IsCodon())
-					//eigen stuff needs to be recalced for changes to nonsynonymous rates
-					models[*mit]->eigenDirty = true;
-				}
-				//retType=Individual::alpha;
+#ifndef NDEBUG
+		sum = 0.0;
+		for(int i=0;i<subsetRates.size();i++){
+			sum += subsetProportions[i] * subsetRates[i];
 			}
-		return retType;
+		assert(FloatingPointEquals(sum, 1.0, 1e-6));
+#endif
 		}
 	};
 
