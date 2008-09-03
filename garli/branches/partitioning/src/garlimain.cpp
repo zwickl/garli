@@ -268,7 +268,7 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC GARLI, version 0.96 Partitioning Branch r323 (Sept 2008)\n");
+			outman.UserMessage("Running BOINC GARLI, version 0.96 (Partitioning Branch) r326 (Sept 2008)\n");
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -287,11 +287,11 @@ int main( int argc, char* argv[] )	{
 			else outman.SetLogFile(temp_buf);
 	#ifdef SUBROUTINE_GARLI
 			//MPI search forking version
-			outman.UserMessage("Running GARLI, version 0.96 Partitioning Branch r323 (Sept 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
+			outman.UserMessage("Running GARLI, version 0.96 (Partitioning Branch) r326 (Sept 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
 	#else	//nonMPI version
-			outman.UserMessage("\nRunning serial GARLI, version 0.96 Partitioning Branch r323 (Sept 2008)\n");
+			outman.UserMessage("\nRunning serial GARLI, version 0.96 (Partitioning Branch) r326 (Sept 2008)\n");
 	#endif
 
 #endif //end of BOINC / nonBOINC
