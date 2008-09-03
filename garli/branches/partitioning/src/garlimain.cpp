@@ -599,6 +599,7 @@ int main( int argc, char* argv[] )	{
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
 				}
 		dataPart.Delete();
+		modSpecSet.Delete();
 	
 		if(interactive==true){
 			outman.UserMessage("\n-Press enter to close program.-");

@@ -70,7 +70,8 @@ Model::~Model(){
 		else if(nst==1) delete relNucRates[0];
 		}
 
-	if(modSpec->IsCodon()){
+	//if(modSpec->IsCodon()){
+	if(omegas.size() > 0){
 		for(int r=0;r<NRateCats();r++){
 			delete omegas[r];
 			delete omegaProbs[r];

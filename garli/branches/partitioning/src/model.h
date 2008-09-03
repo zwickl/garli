@@ -718,6 +718,11 @@ public:
 			delete modSpecs[i];
 		modSpecs.clear();
 		}
+	void Delete(){
+		for(int i = 0;i < modSpecs.size();i++)
+			delete modSpecs[i];
+		modSpecs.clear();
+		}
 	void AddModSpec(const ConfigModelSettings &conf){
 		ModelSpecification * mod = new ModelSpecification;
 		mod->SetupModSpec(conf);
@@ -1218,6 +1223,11 @@ public:
 			Model *mod = new Model(m);
 			mods.push_back(mod);
 			}
+		}
+	~ModelSet(){
+		for(int i=0;i<mods.size();i++)
+			delete mods[i];
+		mods.clear();
 		}
 	ModelSet(const ModelSet &m){
 		CopyModelSet(&m);
