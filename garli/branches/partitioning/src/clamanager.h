@@ -82,7 +82,7 @@ class ClaManager{
 			holderStack.push_back(i);
 		}
 */
-	ClaManager(int nnod, int numClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numHolders(nHolders){
+	ClaManager(int nnod, int nClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numClas(nClas), numHolders(nHolders){
 		maxUsed=0;
 		allClas=new CondLikeArraySet*[numClas];
 		claStack.reserve(numClas);
@@ -327,9 +327,9 @@ class ClaManager{
 	void CheckAssignedNumber(int chk, int node, int index){
 		assert(chk==assignedClaArray[node*numCopies+index]);
 		}
-*.		
+*/		
 //	int NumCopies(){ return numCopies;}
-	int NumNodes(){return numNodes;}
+//	int NumNodes(){return numNodes;}
 /*	
 	void OutputAssignedClaArray(){
 		static int count = 0;
