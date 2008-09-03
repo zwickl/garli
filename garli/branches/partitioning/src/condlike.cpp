@@ -26,9 +26,11 @@
 #define CLA_ALIGNMENT 32
 
 CondLikeArray::~CondLikeArray(){
-	//don't want to delete shared CL from nodes.  Should only
-	//be called from Population level if CONDLIKE SHARED is defined
-	if( arr ){
+	//with partitioning, the entire allocation is managed and deleted by the
+	//condlikearrayset, so don't delete anything here
+	arr = NULL;
+	underflow_mult = NULL;
+/*	if( arr ){
 #ifndef ALIGN_CLAS
 		delete []arr;
 #else
@@ -37,6 +39,7 @@ CondLikeArray::~CondLikeArray(){
 		arr=NULL;
 		 }
 	if(underflow_mult!=NULL) delete []underflow_mult;
+*/
 }
 
 void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){

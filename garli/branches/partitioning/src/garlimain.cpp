@@ -598,7 +598,7 @@ int main( int argc, char* argv[] )	{
 			catch(int error){
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
 				}
-		if(data != NULL) delete data;
+		dataPart.Delete();
 	
 		if(interactive==true){
 			outman.UserMessage("\n-Press enter to close program.-");

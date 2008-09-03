@@ -86,7 +86,13 @@ public:
 		int *rawUnder;
 
 		CondLikeArraySet() : rawAllocation(NULL), rawUnder(NULL){};
-		~CondLikeArraySet() {theSets.clear();delete []rawAllocation;delete []rawUnder;}
+		~CondLikeArraySet() {
+			for(int i = 0;i < theSets.size();i++)
+				delete theSets[i];
+			theSets.clear();
+			delete []rawAllocation;
+			delete []rawUnder;
+			}
 		void Allocate() {
 			unsigned size = 0, usize = 0;
 			for(vector<CondLikeArray *>::iterator cit = theSets.begin();cit != theSets.end();cit++){
@@ -119,7 +125,7 @@ class CondLikeArrayHolder{
 	//CondLikeArray *theArray;
 	CondLikeArraySet *theSet;
 	CondLikeArrayHolder() : theSet(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){}
-	~CondLikeArrayHolder() {};
+	~CondLikeArrayHolder() {theSet = NULL;}
 	int GetReclaimLevel() {return reclaimLevel;}
 	void SetReclaimLevel(int lvl) {reclaimLevel = lvl;}
 	void Reset(){reclaimLevel=0;numAssigned=0,tempReserved=false;reserved=false;theSet=NULL;}

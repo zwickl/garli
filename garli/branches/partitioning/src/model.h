@@ -713,6 +713,11 @@ public:
 	ModelSpecificationSet(){
 		inferSubsetRates = true;
 		}
+	~ModelSpecificationSet(){
+		for(int i = 0;i < modSpecs.size();i++)
+			delete modSpecs[i];
+		modSpecs.clear();
+		}
 	void AddModSpec(const ConfigModelSettings &conf){
 		ModelSpecification * mod = new ModelSpecification;
 		mod->SetupModSpec(conf);
@@ -1270,6 +1275,14 @@ class ModelPartition{
 
 public:
 	ModelPartition();
+	~ModelPartition(){
+		for(int i = 0;i < modSets.size();i++)
+			delete modSets[i];
+		modSets.clear();
+		//these are just pulled from the modsets, so don't need to be deleted
+		models.clear();
+		allParamsToMutate.clear();
+		}
 
 	void CopyModelPartition(const ModelPartition *mp){
 		unsigned num = 0;
