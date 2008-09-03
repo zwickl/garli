@@ -1343,20 +1343,6 @@ void GarliReader::SkippingDisabledBlock(
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
-|	The code here is identical to the base class version (simply returns 0), so the code here should either be modified 
-|	or this derived version eliminated altogether. Under what circumstances would you need to modify the default code, 
-|	you ask? This function should be modified to something meaningful if this derived class needs to construct and run 
-|	a NxsSetReader object to read a set involving taxa. The NxsSetReader object may need to use this function to look 
-|	up a taxon label encountered in the set. A class that overrides this method should return the taxon index in the 
-|	range [1..ntax]; i.e., add one to the 0-offset index.
-*/
-unsigned GarliReader::TaxonLabelToNumber(
-  NxsString )	/* the taxon label to be translated to a taxon number */
-	{
-	return 0;
-	}
-
-/*----------------------------------------------------------------------------------------------------------------------
 |	Returns true if response is either "ok" or "yes", and returns false if response is either "no" or "cancel".
 |	This is a general query function that can handle many situations. The possible responses are enumerated in 
 |	GarliReader::UserQueryEnum: uq_cancel, uq_ok, uq_yes, and uq_no. Not yet fully implemented: only handles uq_ok

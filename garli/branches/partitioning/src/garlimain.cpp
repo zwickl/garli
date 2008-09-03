@@ -268,7 +268,7 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC GARLI, version 0.96beta8 r315 (Aug 2008)\n");
+			outman.UserMessage("Running BOINC GARLI, version 0.96 Partitioning Branch r323 (Sept 2008)\n");
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -287,11 +287,11 @@ int main( int argc, char* argv[] )	{
 			else outman.SetLogFile(temp_buf);
 	#ifdef SUBROUTINE_GARLI
 			//MPI search forking version
-			outman.UserMessage("Running GARLI, version 0.96beta8 r315 (Aug 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
+			outman.UserMessage("Running GARLI, version 0.96 Partitioning Branch r323 (Sept 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
 	#else	//nonMPI version
-			outman.UserMessage("Running serial GARLI, version 0.96beta8 r315 (Aug 2008)\n");
+			outman.UserMessage("\nRunning serial GARLI, version 0.96 Partitioning Branch r323 (Sept 2008)\n");
 	#endif
 
 #endif //end of BOINC / nonBOINC
@@ -299,6 +299,15 @@ int main( int argc, char* argv[] )	{
 #ifdef OPEN_MP
 			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
 #endif
+			outman.UserMessage("###################################################");
+			outman.UserMessage("THIS IS A TESTING VERSION FOR PARTITIONED MODELS.  IT APPEARS TO BE WORKING");
+			outman.UserMessage("PROPERLY BUT PLEASE LET ME KNOW OF ANY PROBLEMS AT garli.support@gmail.com");
+			outman.UserMessage("            see this hidden page for details on using it:");
+			outman.UserMessage("      https://www.nescent.org/wg_garli/Partition_testing_version");
+			outman.UserMessage("             CHECK WITH ME BEFORE PUBLISHING WITH IT");
+			outman.UserMessage("                         !!!!THANKS!!!\n");
+			outman.UserMessage("###################################################");
+
 			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
 			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__); 
@@ -341,7 +350,7 @@ int main( int argc, char* argv[] )	{
 			//part of a char partition within a characters block
 			int numCharBlocks = reader.GetNumCharactersBlocks(taxblock);
 			if(numCharBlocks == 0) throw ErrorException("No character data (in characters/data blocks) found in datafile");
-			vector<pair<NxsCharactersBlock *, NxsUnsignedSet>> effectiveMatrices;
+			vector<pair<NxsCharactersBlock *, NxsUnsignedSet> > effectiveMatrices;
 
 			outman.UserMessage("\n###################################################\nPARTITIONING OF DATA AND MODELS");
 			//loop over characters blocks
@@ -359,10 +368,10 @@ int main( int argc, char* argv[] )	{
 						assblock = reader.GetAssumptionsBlock(charblock, a);
 						int numParts = assblock->GetNumCharPartitions();
 						if(numParts > 1) 
-							throw ErrorException("Found more than one CHARPARTITION referring to CHARACTERS block %s in a single ASSUMPTIONS or SETS blocks", charblock->GetTitle());
+							throw ErrorException("Found more than one CHARPARTITION referring to CHARACTERS block %s in a single ASSUMPTIONS or SETS blocks", charblock->GetTitle().c_str());
 						else if(numParts == 1){
 							if(foundCharPart == true)
-								throw ErrorException("Found more than one CHARPARTITION referring to CHARACTERS block %s in multiple ASSUMPTIONS or SETS blocks", charblock->GetTitle());\
+								throw ErrorException("Found more than one CHARPARTITION referring to CHARACTERS block %s in multiple ASSUMPTIONS or SETS blocks", charblock->GetTitle().c_str());\
 							else 
 								foundCharPart = true;
 							//get the name of the charpartition

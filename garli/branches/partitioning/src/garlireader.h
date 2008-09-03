@@ -183,7 +183,6 @@ class GarliReader
 		void				PurgeBlocks();
 		virtual void		Read(NxsToken& token);
 		virtual void		Reset();
-		unsigned			TaxonLabelToNumber(NxsString s);
 		void HandleGarliReader(NxsToken &token);
 
 	public:
