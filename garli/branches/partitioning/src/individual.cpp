@@ -429,14 +429,15 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 			if(modSpecSet.InferSubsetRates()){
 				improve += scratchT->OptimizeSubsetRates(optPrecision);
 				}
-			outman.UserMessage("\n   Optimizing parameters...    improved %8.3f lnL", improve);
-			if(improve > 0.0){
+			if(!FloatingPointEquals(improve, 0.0, 1e-8)) outman.UserMessage("\n   Optimizing parameters...    improved %8.3f lnL", improve);
+			//DEBUG - why should this depend on param improve?
+		//	if(improve > 0.0){
 				scratchT->Score();
 				FLOAT_TYPE start=scratchT->lnL;
 				scratchT->OptimizeAllBranches(optPrecision);
 				FLOAT_TYPE bimprove = scratchT->lnL - start;
 				outman.UserMessage("   Optimizing branchlengths... improved %8.3f lnL", bimprove);
-				}
+		//		}
 			}
 		}		
 

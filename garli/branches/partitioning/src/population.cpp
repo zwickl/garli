@@ -1872,10 +1872,11 @@ int Population::EvaluateStoredTrees(bool report){
 			else outman.UserMessage("");
 			}
 
-		if(storedTrees[0]->modPart.NumModels() > 1){
+//		if(storedTrees[0]->modPart.NumModels() > 1){
 			outman.UserMessage("\nParameter estimates:");
 			for(int part = 0;part < storedTrees[0]->modPart.NumModels();part++){
-				outman.UserMessage("\nPartition subset %d:", part);
+				if(storedTrees[0]->modPart.NumModels() > 1)
+					outman.UserMessage("\nPartition subset %d:", part);
 				string s;
 				storedTrees[0]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, false);
 				outman.UserMessage("       %s", s.c_str());
@@ -1895,7 +1896,7 @@ int Population::EvaluateStoredTrees(bool report){
 					outman.UserMessage("");
 					}
 				}
-			}
+//			}
 		if(conf->bootstrapReps == 0){
 			outman.UserMessage("\nFinal result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
 			outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
