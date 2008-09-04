@@ -1392,6 +1392,19 @@ public:
 		assert(FloatingPointEquals(sum, 1.0, 1e-6));
 #endif
 		}
+	void OutputHumanReadableModelReportWithParams(){
+		for(int m = 0;m < NumModels();m++){
+			outman.UserMessage("Model %d", m);
+			models[m]->OutputHumanReadableModelReportWithParams();
+			}
+		if(modSpecSet.InferSubsetRates()){
+			outman.UserMessageNoCR("Subset rate multipliers:\n  ");
+			for(int d = 0;d < subsetRates.size();d++)
+				outman.UserMessageNoCR("%6.2f", SubsetRate(d));
+			outman.UserMessage("");
+			}
+		}
+
 	};
 
 typedef void (Model::*SetParamFunc) (int, FLOAT_TYPE);
