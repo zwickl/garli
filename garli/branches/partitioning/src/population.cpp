@@ -738,10 +738,8 @@ void Population::GenerateTreesOnly(int nTrees){
 void Population::RunTests(){
 	//test a number of functions to ensure that any code changes haven't broken anything
 	//it assumes that Setup has been called
-	//SeedPopulationWithStartingTree(0);
+	SeedPopulationWithStartingTree(0);
 //	InitializeOutputStreams();
-
-	SequenceData *data = dataPart->GetSubset(0);
 
 #ifdef NDEBUG
 	outman.UserMessage("WARNING: You are running internal tests with NDEBUG defined!\nIt should not be defined for full error checking.");
@@ -753,12 +751,15 @@ void Population::RunTests(){
 			dataPart->GetSubset(d)->BootstrapReweight(0, conf->resampleProportion);
 		}
 
-	Individual *ind0 = &newindiv[0];
-	Individual *ind1 = &newindiv[1];
+	//DEBUG
+//	Individual *ind0 = &newindiv[0];
+//	Individual *ind1 = &newindiv[1];
+	Individual *ind0 = &indiv[0];
+	Individual *ind1 = &indiv[1];
 
 	//ind0->MakeRandomTree(data->NTax());
-	ind0->MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
-	ind0->treeStruct->modPart=&ind0->modPart;
+	//ind0->MakeStepwiseTree(dataPart->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
+	//ind0->treeStruct->modPart=&ind0->modPart;
 
 	//check that the score was correct coming out of MakeStepwiseTree
 	FLOAT_TYPE scr = ind0->treeStruct->lnL;
@@ -769,7 +770,7 @@ void Population::RunTests(){
 	//this only really tests for major scoring problems in the optimization functions
 	scr = ind0->treeStruct->lnL;
 	ind0->treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-	assert(ind0->treeStruct->lnL > scr);
+	assert(ind0->treeStruct->lnL + 1.0e-6 > scr);
 	assert(ind0->treeStruct->lnL * 2 < scr);
 
 #ifdef SINGLE_PRECISION_FLOATS
@@ -799,7 +800,7 @@ void Population::RunTests(){
 	Tree::rescaleEvery = r;
 
 	ind1->treeStruct=new Tree();
-	ind1->CopySecByRearrangingNodesOfFirst(ind1->treeStruct, &newindiv[0]);
+	ind1->CopySecByRearrangingNodesOfFirst(ind1->treeStruct, ind0);
 	ind1->treeStruct->modPart=&ind1->modPart;
 
 	ind0->SetDirty();
@@ -993,17 +994,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	//The model params should be set to their initial values by now, so report them
 	if(conf->bootstrapReps == 0 || (currentBootstrapRep == 1 && currentSearchRep == 1)){
 		outman.UserMessage("MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)");
-		for(int m=0;m<indiv[0].modPart.NumModels();m++){
-			outman.UserMessage("Model %d", m);
-			Model *thisMod = indiv[0].modPart.GetModel(m);
-			thisMod->OutputHumanReadableModelReportWithParams();
-			}
-		if(modSpecSet.InferSubsetRates()){
-			outman.UserMessageNoCR("Subset rate multipliers:\n  ");
-			for(int d = 0;d < dataPart->NumSubsets();d++)
-				outman.UserMessageNoCR("%6.2f", indiv[0].modPart.SubsetRate(d));
-			outman.UserMessage("");
-			}
+		indiv[0].modPart.OutputHumanReadableModelReportWithParams();
 		}
 
 	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
@@ -2055,19 +2046,7 @@ void Population::PerformSearch(){
 			if(s.length() > 0) outman.UserMessage(">>>Completed %s<<<\n", s.c_str());
 			//not sure where this should best go
 			outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
-
-		
-			for(int m=0;m<indiv[bestIndiv].modPart.NumModels();m++){
-				outman.UserMessage("Model %d", m);
-				Model *thisMod = indiv[bestIndiv].modPart.GetModel(m);
-				thisMod->OutputHumanReadableModelReportWithParams();
-				}
-			if(modSpecSet.InferSubsetRates()){
-				outman.UserMessageNoCR("Subset rate multipliers:\n  ");
-				for(int d = 0;d < dataPart->NumSubsets();d++)
-					outman.UserMessageNoCR("%6.3f", indiv[bestIndiv].modPart.SubsetRate(d));
-				outman.UserMessage("");
-				}
+			indiv[bestIndiv].modPart.OutputHumanReadableModelReportWithParams();
 
 			if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
 			Individual *repResult = new Individual(&indiv[bestIndiv]);
