@@ -921,7 +921,7 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsig
 			
 			int j = 0;
 
-			for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 15;
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
@@ -1014,8 +1014,7 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsign
 	if (!excluded.empty()) {
 		set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
 		realCharSet = &charsetMinusExcluded;
-	}
-		
+	}	
 
 	int numOrigChar = charset.size();
 	int numActiveChar = realCharSet->size();
@@ -1040,7 +1039,7 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsign
 			int j = 0;
 			bool firstAmbig = true;
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
-			for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 20;
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 20;
