@@ -892,12 +892,15 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsig
 	int numActiveTaxa = charblock->GetNumActiveTaxa();
 
 	NxsUnsignedSet excluded = charblock->GetExcludedIndexSet();
+	const NxsUnsignedSet *realCharSet = & charset;
 	NxsUnsignedSet charsetMinusExcluded;
-	if (exc
-	set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
+	if (!excluded.empty()) {
+		set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
+		realCharSet = &charsetMinusExcluded;
+	}
 
 	int numOrigChar = charset.size();
-	int numActiveChar = charsetMinusExcluded.size();
+	int numActiveChar = realCharSet->size();
 
 	if(numActiveChar == 0){
 		throw ErrorException("Sorry, fully excluded characters blocks or partition subsets are not currently supported.");
@@ -918,7 +921,7 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsig
 			
 			int j = 0;
 
-			for(NxsUnsignedSet::iterator cit = charsetMinusExcluded.begin(); cit != realCharSet.end();cit++){	
+			for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 15;
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
@@ -1037,7 +1040,7 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsign
 			int j = 0;
 			bool firstAmbig = true;
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
-			for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != charsetMinusExcluded->end();cit++){	
+			for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 20;
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 20;
