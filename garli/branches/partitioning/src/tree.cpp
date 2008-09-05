@@ -6089,12 +6089,12 @@ FLOAT_TYPE Tree::OptimizeSubsetRates(FLOAT_TYPE prec){
 	Score();
 	FLOAT_TYPE start = lnL;
 	vector<FLOAT_TYPE> initVals;
-	for(int i = 0;i < modPart->NumModelSets();i++)
+	for(int i = 0;i < modPart->NumSubsetRates();i++)
 		initVals.push_back(modPart->SubsetRate(i));
 
 	//limiting change in any one pass
 	double maxRateChangeProp = 0.75;
-	for(i=0;i < modPart->NumModelSets();i++){
+	for(i=0;i < modPart->NumSubsetRates();i++){
 		subrateImprove += OptimizeBoundedParameter<ModelPartition>(prec, modPart->SubsetRate(i), i, 
 			max(minVal, modPart->SubsetRate(i)*maxRateChangeProp),
 			modPart->SubsetRate(i)+modPart->SubsetRate(i)*maxRateChangeProp,
