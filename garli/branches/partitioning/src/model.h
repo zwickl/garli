@@ -1307,6 +1307,7 @@ public:
 			num++;
 			}
 		//subsetProportions are just proportional to the number of total chars in each data subset, so they won't vary
+		assert(NumSubsetRates() == mp->NumSubsetRates());
 		for(int d = 0;d < subsetRates.size();d++){
 			subsetRates[d] = mp->subsetRates[d];
 			}
@@ -1314,6 +1315,7 @@ public:
 	unsigned NumModelSets()const {return modSets.size();}
 	unsigned NumModels()const {return models.size();}
 	unsigned NumMutableParams() const {return allParamsToMutate.size();}
+	unsigned NumSubsetRates() const {return subsetRates.size();}
 	FLOAT_TYPE SubsetRate(int i){return subsetRates[i];}
 	//can't think of anything else that really needs to get reset here
 	void Reset(){
@@ -1327,6 +1329,7 @@ public:
 		NormalizeSubsetRates(which);
 		}
 	void SetSubsetRates(const vector<FLOAT_TYPE> vals){
+		assert(NumSubsetRates() == vals.size());
 		subsetRates.clear();
 		for(int i = 0;i < vals.size();i++)
 			subsetRates.push_back(vals[i]);
