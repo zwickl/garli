@@ -1,6 +1,14 @@
 #!/bin/sh
 set -x
-nclv="ncl-2.1.04"
+nl=`ls -l ncl*z | wc -l`
+if ! test $nl = 1
+then
+	echo "You have more than one ncl version..."
+	nclv=`ls ncl*gz | tail -n1 | sed -E 's/.tar.gz//'`
+	echo "Using most recent:  $nclv"
+else
+	nclv=`ls ncl*z`
+fi
 if ! test -d ${nclv}
 then
 	tar xfvz ${nclv}.tar.gz || exit
