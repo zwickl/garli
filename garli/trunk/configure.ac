@@ -204,7 +204,7 @@ if ! test -d "$NCL_LIB_DIR" ; then
 	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
 fi
 
-INCLUDE="$INCLUDE -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
+CPPFLAGS="$CPPFLAGS -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
 if test -d "$NCL_LIB_DIR/ncl" ; then
 	LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR/ncl"
 else
@@ -216,7 +216,7 @@ GARLI_LIBS="-lncl"
 
 AC_SUBST([GARLI_LIBS])
 
-AC_SUBST([INCLUDE])
+AC_SUBST([CPPFLAGS])
 AC_SUBST([LDFLAGS])
 
 
