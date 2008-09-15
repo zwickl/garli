@@ -1303,16 +1303,21 @@ if(nd->nodeNum == 8){
 														opt << "IgnoreNRUp\t";
 														#endif
 							}
-						else if(iter == 30){
+//DEBUG
+	//					else if(iter == 30){
+						else if(((iter - 20) > 0) && ((iter - 20) % 10 == 0)){
 							//another annoying special case (only for codon models I think)
 							//it is possible for the derivs to apparently be
 							//correct but for the NR estimate to still be so conservative that it takes forever
 							//to converge.  The above code can take care of that if we've never been to the right
 							//of the peak (knownMax == max_brlen), but this can also happen if we were to right 
 							//of the peak at one point and jumped all the way to the min length.  In that case,
-							//try a one time jump to the midpoint of the bracket or 100x the current length, 
+							//try a jump to the midpoint of the bracket or 100x the current length, 
 							//whichever is less
 							v = min((v + knownMax)*0.5, v*100.0);
+														#ifdef OPT_DEBUG			
+														opt << "IgnoreNRUp2\t";
+														#endif
 							}
 						}
 					else{
