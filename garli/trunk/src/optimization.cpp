@@ -1270,7 +1270,7 @@ if(nd->nodeNum == 8){
 			//12/9/07 now requiring the actual likelihood to improve.  Single optimization passes with AA and Codon
 			//models were fairly often moving to worse likelihoods but indicating that the function should return
 			//since the deriv calculations are now calculating the true likelihood, this has no real overhead		
-			if(estScoreDelta < precision1 && (iter == 0 || lnL >= initialL)){
+			if(estScoreDelta < precision1 && (iter == 0 || lnL + 1.0e-8 >= initialL)){
 														#ifdef OPT_DEBUG			
 														opt << "delta < prec, return\n";
 														if(curScore==-ONE_POINT_ZERO){
