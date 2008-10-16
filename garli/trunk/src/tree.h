@@ -268,6 +268,7 @@ class Tree{
 		void ClaReport(ofstream &cla);
 		FLOAT_TYPE CountClasInUse();
 		void OutputSiteLikelihoods(vector<double> &likes, const int *under1, const int *under2, ofstream &ordered, ofstream &packed);
+		void OutputSiteDerivatives(vector<double> &likes, vector<double> &d1s, vector<double> &d2s, const int *under1, const int *under2, ofstream &ordered, ofstream &packed);
 		void CountNumReservedClas(int &, int &, int&);
 		void CheckClaAssignments(TreeNode *nd);
 		void RemoveTempClaReservations();

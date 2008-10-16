@@ -4719,6 +4719,34 @@ void Tree::OutputSiteLikelihoods(vector<double> &likes, const int *under1, const
 		}
 	}
 
+void Tree::OutputSiteDerivatives(vector<double> &likes, vector<double> &d1s, vector<double> &d2s, const int *under1, const int *under2, ofstream &ordered, ofstream &packed){
+	assert(likes.size() == data->NChar());
+	ordered << "site#\ttruelnL\td1\td2\tunder1\tunder2" << endl;
+	packed << "packedIndex\ttruelnL\td1\td2\tunder1\tunder2" << endl;
+	ordered.precision(10);
+	packed.precision(10);
+	
+	for(int site = 0;site < data->GapsIncludedNChar();site++){
+		int col = data->Number(site);
+		if(col == -1)
+			ordered << site+1 << "\tgap\t-\t-\t-\t-";
+		else{
+			ordered << site+1 << "\t" << likes[col] << "\t" << d1s[col] << "\t" << d2s[col] << "\t" << under1[col];
+			if(under2 != NULL)
+				ordered << "\t" << under2[col] << endl;
+			else
+				ordered << "\t-" << endl;
+			}
+		}
+	for(int c = 0;c < data->NChar();c++){
+		packed << c << "\t" << likes[c] << "\t" << d1s[c] << "\t" << d2s[c] << "\t" << under1[c];
+		if(under2 != NULL)
+			packed << "\t" << under2[c] << endl;
+		else
+			packed << "\t-" << endl;
+		}
+	}
+
 FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldat){
 
 	//this function assumes that the pmat is arranged with the nstates^2 entries for the
