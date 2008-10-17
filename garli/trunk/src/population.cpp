@@ -1469,13 +1469,13 @@ void Population::Run(){
 			//termination conditions
 			if(conf->enforceTermConditions == true
 #ifdef SWAP_BASED_TERMINATION
-				&& (gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2)))
+				&& (gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
 #else
-				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2)))
+				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
 #endif
 				&& (gen > adap->intervalsToStore * adap->intervalLength)
 				&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
-				&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2)) || adap->numPrecReductions==0)){
+				&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)){
 				if(adap->topoMutateProb > ZERO_POINT_ZERO) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
 				else outman.UserMessage("Reached termination condition!\n");
 				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);

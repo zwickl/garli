@@ -75,7 +75,7 @@ void  Product4 (::brook::stream des1,
 
 //a variety of functions that don't belong to any class
 
-#ifdef SINGLE_PRECISION_FLOATS
+#if defined(SINGLE_PRECISION_FLOATS) && !defined(_MSC_VER)
 //Overloaded versions of min and max that take different types for the two arguments
 //This should not be used in hot code when possible, and conditional comp should
 //be used to make two different versions of the code

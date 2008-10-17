@@ -130,7 +130,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 	Tree::data=data;
 #ifdef SINGLE_PRECISION_FLOATS
 	Tree::rescaleEvery = 6;
-	Tree::rescaleBelow = exp(-11); //this is 1.67e-5
+	Tree::rescaleBelow = exp(-1.0f); //this is 0.368
 	for(int i=0;i<30;i++){
 		Tree::rescalePrecalcIncr[i] = i*3 - (int) log(rescaleBelow);
 		Tree::rescalePrecalcThresh[i] = exp((FLOAT_TYPE)(-rescalePrecalcIncr[i]));
@@ -142,8 +142,6 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 #else
 	Tree::rescaleEvery=16;
 	Tree::rescaleBelow = exp(-24.0); //this is 1.026e-10	
-//DEBUG
-//	for(int i=0;i<30;i++){
 	for(int i=0;i<RESCALE_ARRAY_LENGTH;i++){
 		Tree::rescalePrecalcIncr[i] = i*7 - (int) log(rescaleBelow);
 		Tree::rescalePrecalcThresh[i] = exp((FLOAT_TYPE)(-rescalePrecalcIncr[i]));
@@ -1798,7 +1796,7 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 			GatherValidReconnectionNodes(range, cut, NULL);
 			}while(sprRang.size()==0);
 
-		if((FloatingPointEquals(uniqueSwapBias, 1.0, max(1.0e-8, GARLI_FP_EPS * 2)) && FloatingPointEquals(distanceSwapBias, 1.0, max(1.0e-8, GARLI_FP_EPS * 2))) || range < 0)
+		if((FloatingPointEquals(uniqueSwapBias, 1.0, max(1.0e-8, GARLI_FP_EPS * 2.0)) && FloatingPointEquals(distanceSwapBias, 1.0, max(1.0e-8, GARLI_FP_EPS * 2))) || range < 0)
 			broken = sprRang.RandomReconNode();
 		else{//only doing this on limSPR and NNI
 			err = AssignWeightsToSwaps(cut);
@@ -3181,20 +3179,14 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 					}
 				int index=0;
 
-
-//DEBUG
-//				while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
-				while(((index + 1) < RESCALE_ARRAY_LENGTH) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
+				while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
 					index++;
 					}
-//DEBUG
-				if(index > 40){
-					cout << "index = " << index;
-					}
+
 				int incr = Tree::rescalePrecalcIncr[index];
 				underflow_mult[i]+=incr;
 				FLOAT_TYPE mult= Tree::rescalePrecalcMult[index];
-				assert(large1 * mult < 1.0f);
+				assert(large1 * mult < 10.0f);
 				assert(large1 * mult > 0.01f);
 				for(int q=0;q<nstates*nRateCats;q++){
 					destination[q]*=mult;
@@ -3205,26 +3197,18 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 			assert(large1 < 1.0e15);
 			if(large1< rescaleBelow){
 				if(large1 < 1e-170){
-					ofstream deb("claDeb.log");
-					OutputNthClaAcrossTree(deb, root, i);
-					deb.close();
 					throw(1);
 					}
 				int index = 0;
-//DEBUG
-//				while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
 				while(((index + 1) < RESCALE_ARRAY_LENGTH) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
 					index++;
 					}
-//DEBUG
-				if(index > 50){
-					cout << "index = " << index;
-					}
+
 				int incr = Tree::rescalePrecalcIncr[index];
 				underflow_mult[i]+=incr;
 				FLOAT_TYPE mult=Tree::rescalePrecalcMult[index];
 				assert(large1 * mult < 1.0);
-//				assert(large1 * mult > 0.0008);						
+				assert(large1 * mult > 0.0008);						
 /*					
 				int incr=((int) -log(large1))+2;
 				underflow_mult[i]+=incr;
@@ -6959,7 +6943,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 	deb.close();
 #endif
 
-	if(FloatingPointEquals(lnL, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2))){
+	if(FloatingPointEquals(lnL, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
 		return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, ZERO_POINT_ZERO);
 		}
 
@@ -6983,7 +6967,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 		ScaleWholeTree(ONE_POINT_ZERO/scale);//return the tree to its original scale	
 		FLOAT_TYPE d12=(cur-prev)/-incr;
 
-		if(pass == 1 && fabs(d12) < max(1.0e-8, GARLI_FP_EPS * 2)){
+		if(pass == 1 && fabs(d12) < max(1.0e-8, GARLI_FP_EPS * 2.0)){
 			//The surface looks suspiciously flat.  Test if the likelihood
 			//is really invariant for different scales (which means that
 			//the site is all missing or only has an observed state for one taxon)
@@ -6991,7 +6975,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 			Score();
 			FLOAT_TYPE s = lnL/siteCount;
 			ScaleWholeTree(1.0/1.1);
-			if(fabs(prev - s) < max(1.0e-8, GARLI_FP_EPS * 2)) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, prev);
+			if(fabs(prev - s) < max(1.0e-8, GARLI_FP_EPS * 2.0)) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, prev);
 			}
 
 		scale=ONE_POINT_ZERO + incr;
