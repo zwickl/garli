@@ -46,6 +46,8 @@ class Model;
 class Individual;
 extern rng rnd;
 
+#define RESCALE_ARRAY_LENGTH 60
+
 class Tree{
 	protected:
 		int numTipsTotal;
@@ -85,10 +87,14 @@ class Tree{
 		
 		static FLOAT_TYPE uniqueSwapPrecalc[500];
 		static FLOAT_TYPE distanceSwapPrecalc[1000];
-		
-		static FLOAT_TYPE rescalePrecalcThresh[30];
-		static FLOAT_TYPE rescalePrecalcMult[30];
-		static int rescalePrecalcIncr[30];
+//DEBUG		
+//		static FLOAT_TYPE rescalePrecalcThresh[30];
+//		static FLOAT_TYPE rescalePrecalcMult[30];
+//		static int rescalePrecalcIncr[30];
+
+		static FLOAT_TYPE rescalePrecalcThresh[RESCALE_ARRAY_LENGTH];
+		static FLOAT_TYPE rescalePrecalcMult[RESCALE_ARRAY_LENGTH];
+		static int rescalePrecalcIncr[RESCALE_ARRAY_LENGTH];
 
 		static Bipartition *outgroup;
 
