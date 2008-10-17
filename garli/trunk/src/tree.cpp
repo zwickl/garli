@@ -1791,7 +1791,7 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 			GatherValidReconnectionNodes(range, cut, NULL);
 			}while(sprRang.size()==0);
 
-		if((FloatingPointEquals(uniqueSwapBias, 1.0, 1e-8) && FloatingPointEquals(distanceSwapBias, 1.0, 1e-8)) || range < 0)
+		if((FloatingPointEquals(uniqueSwapBias, 1.0, max(1.0e-8, GARLI_FP_EPS * 2)) && FloatingPointEquals(distanceSwapBias, 1.0, max(1.0e-8, GARLI_FP_EPS * 2))) || range < 0)
 			broken = sprRang.RandomReconNode();
 		else{//only doing this on limSPR and NNI
 			err = AssignWeightsToSwaps(cut);
@@ -6929,7 +6929,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 	deb.close();
 #endif
 
-	if(FloatingPointEquals(lnL, ZERO_POINT_ZERO, 1e-8)){
+	if(FloatingPointEquals(lnL, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2))){
 		return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, ZERO_POINT_ZERO);
 		}
 
@@ -6953,7 +6953,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 		ScaleWholeTree(ONE_POINT_ZERO/scale);//return the tree to its original scale	
 		FLOAT_TYPE d12=(cur-prev)/-incr;
 
-		if(pass == 1 && fabs(d12) < 1.0e-8){
+		if(pass == 1 && fabs(d12) < max(1.0e-8, GARLI_FP_EPS * 2)){
 			//The surface looks suspiciously flat.  Test if the likelihood
 			//is really invariant for different scales (which means that
 			//the site is all missing or only has an observed state for one taxon)
@@ -6961,7 +6961,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 			Score();
 			FLOAT_TYPE s = lnL/siteCount;
 			ScaleWholeTree(1.0/1.1);
-			if(fabs(prev - s) < 1.0e-8) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, prev);
+			if(fabs(prev - s) < max(1.0e-8, GARLI_FP_EPS * 2)) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, prev);
 			}
 
 		scale=ONE_POINT_ZERO + incr;

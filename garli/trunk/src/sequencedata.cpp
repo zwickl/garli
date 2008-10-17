@@ -122,7 +122,7 @@ void NucleotideData::CalcEmpiricalFreqs(){
 			FLOAT_TYPE tempFreqs[4] = {0.0, 0.0, 0.0, 0.0};
 			for(int j=0;j<4;j++){
 				tempFreqs[j] = (freqSumNoAmbig[j] + freqSumAmbig[j]) / (nonAmbigTotal + ambigTotal);
-				if(fabs(tempFreqs[j] - empStateFreqs[j]) > 1.0e-8) continueIterations = true;
+				if(fabs(tempFreqs[j] - empStateFreqs[j]) >  max(1.0e-8, GARLI_FP_EPS * 2)) continueIterations = true;
 				empStateFreqs[j] = tempFreqs[j];
 				}
 			}while(continueIterations);

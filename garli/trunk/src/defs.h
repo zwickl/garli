@@ -84,6 +84,7 @@ typedef double MODEL_FLOAT;
 	#define DEF_MIN_BRLEN 1e-8f
 	#define DEF_MAX_BRLEN 100.0f
 	#define DEF_STARTING_BRLEN 0.05f
+	#define GARLI_FP_EPS FLT_EPSILON
 #else
 	typedef double FLOAT_TYPE;
 	#define ONE_POINT_ZERO 1.0
@@ -92,6 +93,7 @@ typedef double MODEL_FLOAT;
 	#define DEF_MIN_BRLEN 1e-8
 	#define DEF_MAX_BRLEN 100.0
 	#define DEF_STARTING_BRLEN 0.05
+	#define GARLI_FP_EPS DBL_EPSILON
 #endif
 
 #define MAXPATH   		256

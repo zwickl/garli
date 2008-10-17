@@ -98,7 +98,7 @@ FLOAT_TYPE Tree::OptimizeAllBranches(FLOAT_TYPE optPrecision){
 	}
 
 FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1e-8)) Score();
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2))) Score();
 	Score();
 	FLOAT_TYPE start=lnL;
 	FLOAT_TYPE prev=lnL;
@@ -227,7 +227,7 @@ FLOAT_TYPE Tree::OptimizeAlpha(FLOAT_TYPE optPrecision){
 	Score();	
 #endif
 
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1e-8)) Score();
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2))) Score();
 	FLOAT_TYPE start, prev, cur;
 	prev = start = cur = lnL;
 	FLOAT_TYPE prevVal=mod->Alpha();
@@ -324,7 +324,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 		MakeAllNodesDirty();
 		}
 
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1e-8)) Score();
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2))) Score();
 	FLOAT_TYPE start, prev, cur;
 	prev = start = cur = lnL;
 	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
@@ -1270,7 +1270,7 @@ if(nd->nodeNum == 8){
 			//12/9/07 now requiring the actual likelihood to improve.  Single optimization passes with AA and Codon
 			//models were fairly often moving to worse likelihoods but indicating that the function should return
 			//since the deriv calculations are now calculating the true likelihood, this has no real overhead		
-			if(estScoreDelta < precision1 && (iter == 0 || lnL + 1.0e-8 >= initialL)){
+			if(estScoreDelta < precision1 && (iter == 0 || lnL + max(1.0e-7, GARLI_FP_EPS * 10) >= initialL)){
 														#ifdef OPT_DEBUG			
 														opt << "delta < prec, return\n";
 														if(curScore==-ONE_POINT_ZERO){
