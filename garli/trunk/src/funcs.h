@@ -55,7 +55,7 @@ class InternalState{
 
 bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
 
-#ifdef SINGLE_PRECISION_FLOATS
+#if defined(SINGLE_PRECISION_FLOATS) && !defined(_MSC_VER)
 //Overloaded versions of min and max that take different types for the two arguments
 //This should not be used in hot code when possible, and conditional comp should
 //be used to make two different versions of the code
