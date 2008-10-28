@@ -231,6 +231,10 @@ void Model::UpdateQMat(){
 		UpdateQMatAminoAcid();
 		return;
 		}
+	else if(modSpec->IsBinary() || modSpec->IsNState()){
+		UpdateQMatNState();
+		return;
+		}
 	
 	if(nstates==4){
 		qmat[0][0][1]=*relNucRates[0] * *stateFreqs[1];  //a * piC
@@ -647,6 +651,27 @@ void Model::UpdateQMatAminoAcid(){
 		//qmat[0][from][from] = 0.0;
 		sum = 0.0;
 		for(int to=0;to<20;to++){
+			if(from != to) sum += qmat[0][from][to];
+			}
+		qmat[0][from][from] = -sum;
+		weightedDiagSum += sum * *stateFreqs[from];
+		}
+	blen_multiplier[0] = ONE_POINT_ZERO / weightedDiagSum;
+	}
+
+void Model::UpdateQMatNState(){
+	for(int from=0;from<nstates;from++)
+		for(int to=0;to<nstates;to++)
+			qmat[0][from][to] = *stateFreqs[to];
+
+	//set diags to sum rows to 0 and calculate the branch length rescaling factor
+	double sum, weightedDiagSum = 0.0;
+	blen_multiplier[0] = 0.0;
+
+	for(int from=0;from<nstates;from++){
+		//qmat[0][from][from] = 0.0;
+		sum = 0.0;
+		for(int to=0;to<nstates;to++){
 			if(from != to) sum += qmat[0][from][to];
 			}
 		qmat[0][from][from] = -sum;
@@ -1090,6 +1115,22 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 				}
 			}
 		}
+	else if(modSpec->IsNState()){
+		for(int rate=0;rate<NRateCats();rate++){
+			int model=0;
+			const unsigned rateOffset = nstates*rate;
+			for (int i = 0; i < nstates; i++){
+				for (int j = 0; j < nstates; j++){
+					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
+					for (int k = 0; k < nstates; k++){ 
+						const MODEL_FLOAT x = c_ijk[0][model*nstates*nstates*nstates + i*nstates*nstates + j*nstates +k];
+						sum_p   += x*EigValexp[k+rateOffset];
+						}
+					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					}
+				}
+			}	
+		}
 	else{
 		for(int rate=0;rate<NRateCats();rate++){
 			int model=0;
@@ -1242,7 +1283,7 @@ void Model::CopyModel(const Model *from){
 			*omegaProbs[i]=*(from->omegaProbs[i]);
 		}
 
-	if(modSpec->IsAminoAcid() == false)
+	if(modSpec->IsCodon() || modSpec->IsNucleotide())
 		for(int i=0;i<6;i++)
 			*relNucRates[i]=*(from->relNucRates[i]);
 	
@@ -1797,7 +1838,7 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 				}
 			}
 		}
-	if(modSpec->IsAminoAcid() == false){
+	if(modSpec->IsNucleotide() || modSpec->IsCodon()){
 		if(model){
 			sprintf(cStr, "%5.2f %5.2f %5.2f %5.2f %5.2f %5.2f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
 			s += cStr;
@@ -1892,10 +1933,14 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		}
 	else if(modSpec->IsAminoAcid())
 		outman.UserMessage("  Number of states = 20 (amino acid data)");
-	else 
+	else if(modSpec->IsNState())
+		outman.UserMessage("  Number of states = %d (discrete data)", nstates);
+	else if(modSpec->IsBinary())
+		outman.UserMessage("  Number of states = 2 (discrete binary data)");
+	else
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
-	if(modSpec->IsAminoAcid() == false){
+	if(modSpec->IsNucleotide() || modSpec->IsCodon()){
 		if(modSpec->IsCodon() && modSpec->numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega) = %f\n", Omega(0));
 		if(modSpec->IsCodon()) outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model:     ");
 		else outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix: ");
@@ -1913,7 +1958,7 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 			}
 		else outman.UserMessage("    1 rate");
 		}
-	else{
+	else if(modSpec->IsAminoAcid()){
 		outman.UserMessageNoCR("  Amino Acid Rate Matrix: ");
 		if(modSpec->IsJonesAAMatrix()) outman.UserMessage("Jones");
 		else if(modSpec->IsDayhoffAAMatrix()) outman.UserMessage("Dayhoff");
@@ -1921,6 +1966,9 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		else if(modSpec->IsWAGAAMatrix()) outman.UserMessage("WAG");
 		else if(modSpec->IsMtMamAAMatrix()) outman.UserMessage("MtMam");
 		else if(modSpec->IsMtRevAAMatrix()) outman.UserMessage("MtRev");
+		}
+	else if(modSpec->IsNState() || modSpec->IsBinary()){
+		outman.UserMessage("  Character change matrix:\n    One rate (symmetric one rate Mkv model)");
 		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
@@ -1932,6 +1980,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 			}
 		else if(modSpec->IsAminoAcid())
 			outman.UserMessage("equal (0.05, fixed)");
+		else if(modSpec->IsBinary() || modSpec->IsNState())
+			outman.UserMessage("equal (%.2f, fixed)", 1.0/nstates);
 		else 
 			outman.UserMessage("equal (0.25, fixed)");
 		}
@@ -2012,7 +2062,7 @@ void Model::FillGarliFormattedModelString(string &s) const{
 			s += temp;
 			}
 		}
-	if(modSpec->IsAminoAcid() == false){
+	if(modSpec->IsNucleotide() || modSpec->IsCodon()){
 		sprintf(temp," r %f %f %f %f %f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4));
 		s += temp;
 		}
@@ -2418,6 +2468,9 @@ void Model::CreateModelFromSpecification(int modnum){
 		//require the Eigen stuff	
 
 	if(modSpec->IsNucleotide()) UpdateQMat();
+	else if(modSpec->IsBinary() || modSpec->IsNState()){
+		//NSTATE
+		}
 	else if(modSpec->IsCodon()){
 		FLOAT_TYPE *d;
 		for(int i=0;i<NRateCats();i++){
@@ -3845,7 +3898,9 @@ int ModelPartition::PerformModelMutation(){
 	
 	else if(mut->Type() == PROPORTIONINVARIANT){
 		//this max checking should really be rolled into the parameter class
-//DEBUG PARTITION - need to put this check somewhere
+//DEBUG PARTITION - need to put this check somewhere - since the pinv value can be shared
+		//across subsets with different obs numbers of invariants, not sure how it should be
+		//limited
 //		*propInvar = (*propInvar > maxPropInvar ? maxPropInvar : *propInvar);
 		//the non invariant rates need to be rescaled even if there is only 1
 		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){

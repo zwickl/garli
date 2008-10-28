@@ -358,7 +358,7 @@ void GarliReader::FactoryDefaults()
 
 	//DJZ this is my function, replacing an old one that appeared in funcs.cpp
 	//simpler now, since it uses NxsMultiFormatReader
-void GarliReader::ReadData(const char* filename, const ModelSpecification &modspec){
+bool GarliReader::ReadData(const char* filename, const ModelSpecification &modspec){
 	//first use a few of my crappy functions to try to diagnose the type of file and data
 	//then call the NxsMultiFormatReader functions to process it
 	if (!FileExists(filename))	{
@@ -389,6 +389,7 @@ void GarliReader::ReadData(const char* filename, const ModelSpecification &modsp
 			ReadFilepath(filename, RELAXED_PHYLIP_DNA_FORMAT);
 			}
 		}
+	return true;
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------

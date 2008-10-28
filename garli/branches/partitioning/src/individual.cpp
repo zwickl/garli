@@ -430,14 +430,14 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 				improve += scratchT->OptimizeSubsetRates(optPrecision);
 				}
 			if(!FloatingPointEquals(improve, 0.0, 1e-8)) outman.UserMessage("\n   Optimizing parameters...    improved %8.3f lnL", improve);
-			//DEBUG - why should this depend on param improve?
-		//	if(improve > 0.0){
+		//	this used to depend on param improvement - not sure why
+		//	if(rateOptImprove > 0.0){
 				scratchT->Score();
 				FLOAT_TYPE start=scratchT->lnL;
 				scratchT->OptimizeAllBranches(optPrecision);
 				FLOAT_TYPE bimprove = scratchT->lnL - start;
-				outman.UserMessage("   Optimizing branchlengths... improved %8.3f lnL", bimprove);
-		//		}
+				outman.UserMessage("\nOptimizing branchlengths... improved %f lnL", bimprove);
+	//			}
 			}
 		}		
 
@@ -662,7 +662,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			if(modSpec->includeInvariantSites && modSpec->fixInvariantSites == false) optPinv = true;
 			if(modSpec->IsCodon()) optOmega = true;
 			}
-		if(modSpecSet.InferSubsetRates())
+		if(modSpecSet.InferSubsetRates() && modSpecSet.NumSpecs() > 1)
 			optSubsetRates = true;
 		}
 
@@ -730,7 +730,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		if(optAlpha) outman.UserMessageNoCR(" alpha=%6.2f", alphaOptImprove);
 		if(optFlex) outman.UserMessageNoCR(" flex=%6.2f", flexOptImprove);
 		if(optPinv) outman.UserMessageNoCR(" pinv=%6.2f", pinvOptImprove);
-		if(optPinv) outman.UserMessageNoCR(" subset rates=%6.2f", subsetRateImprove);
+		if(optSubsetRates) outman.UserMessageNoCR(" subset rates=%6.2f", subsetRateImprove);
 		outman.UserMessage(")");
 		}
 

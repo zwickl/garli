@@ -576,9 +576,6 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 	nodeOptVector.clear();
 	SetNodesUnoptimized();
 
-	//DEBUG PARTITION - this assumes that all subsets are the same datatype
-	ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
-
 #ifdef EQUIV_CALCS
 	if(dirtyEQ){
 		ProfEQVectors.Start();
@@ -594,10 +591,15 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 	//branch length is super short and its MLE is large.  This is very
 	//rare, but hard to detect when it is happening.  So, raise the blens
 	//before all of the optimization if they are very small
-	if(modSpec->IsCodon()){
-		if(nd->left->dlen < 1e-4) SetBranchLength(nd->left, 1e-4);
-		if(nd->right->dlen < 1e-4) SetBranchLength(nd->right, 1e-4);
-		if(nd->dlen < 1e-4) SetBranchLength(nd, 1e-4);
+	//PARTITION - I guess this needs to happen if any of the subsets are codon
+	//and the subset mult should be figured in
+	for(int m = 0;m < modSpecSet.NumSpecs();m++){
+		if(modSpecSet.GetModSpec(m)->IsCodon()){
+			FLOAT_TYPE subsRate = modPart->SubsetRate(m);
+			if(nd->left->dlen * subsRate < 1e-4) SetBranchLength(nd->left, 1e-4 / subsRate);
+			if(nd->right->dlen * subsRate < 1e-4) SetBranchLength(nd->right, 1e-4 / subsRate);
+			if(nd->dlen * subsRate < 1e-4) SetBranchLength(nd, 1e-4 / subsRate);
+			}
 		}
 
 #ifdef CHECK_LNL_BEFORE_RAD
@@ -851,17 +853,18 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 
 	//zero out lnL here, since the looping over the various models below will just add to it
 	lnL = ZERO_POINT_ZERO;
-	//for(int modIndex=0;modIndex<modPart->NumModels();modIndex++){
 	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
 		Model *mod = modPart->GetModel((*specs).modelIndex);
 		ProfModDeriv.Start();
+		//DEBUG - this should be double checked
 		//mod->CalcDerivatives(nd2->dlen * mod->ModelSpecificRate() * modPart->GlobalRateScaler(), prmat, deriv1, deriv2);
 		mod->CalcDerivatives(nd2->dlen * modPart->SubsetRate((*specs).dataIndex), prmat, deriv1, deriv2);
 		ProfModDeriv.Stop();
 		claOne = setOne->GetCLA((*specs).claIndex);
 		if(setTwo != NULL)
 			claTwo = setTwo->GetCLA((*specs).claIndex);
-		bool isNucleotide = (claOne->NStates() == 4);
+
+		bool isNucleotide = mod->IsNucleotide();
 
 		if(nd2->left == NULL){
 			char *childData=nd2->tipData[(*specs).dataIndex];
@@ -971,12 +974,27 @@ void Tree::CalcEmpiricalDerivatives(TreeNode *nd, FLOAT_TYPE &D1, FLOAT_TYPE &D2
 	FLOAT_TYPE incr;
 	FLOAT_TYPE blen_used = start_blen;
 
-	if(blen_used > 1e-6)
-		incr= blen_used * 0.001;
-	else if(blen_used > min_brlen + 1.0e-8) incr = blen_used * 0.01; 
+	//derivs will be too small to avoid floating point error
+	//REMEMBER THAT THIS IS NOT ALWAYS ENOUGH THOUGH, AND ESPECIALLY THE 
+	//SEC DERIV CAN STILL BE FAIRLY WRONG
+	double precCompensationFactor = 1.0;
+	double digits = ceil(log10(-lnL));
+	if(digits > 4) precCompensationFactor = pow(10.0, digits - 4);
+
+	if(blen_used > 1e-6){
+		incr = blen_used * 0.001 * precCompensationFactor;
+		blen_used = max(min(start_blen, max_brlen - incr), min_brlen + incr);
+		SetBranchLength(nd, blen_used);
+		}
+	else if(blen_used > min_brlen + 1.0e-8) incr = blen_used * 0.01 * precCompensationFactor; 
 	else{
-		incr =1.0e-8;
-		blen_used = max(start_blen, min_brlen + incr);
+/*		ofstream deb("bcurve.log");
+		deb.precision(14);
+		SampleBlenCurve(nd, deb);
+		deb.close();
+*/
+		incr =1.0e-8 * precCompensationFactor * 10;
+		blen_used = max(start_blen, min_brlen * 2.0 + incr);
 		SetBranchLength(nd, blen_used);
 		}
 	
@@ -1018,6 +1036,7 @@ void Tree::CalcEmpiricalDerivatives(TreeNode *nd, FLOAT_TYPE &D1, FLOAT_TYPE &D2
 
 	SetBranchLength(nd, start_blen);
 //	MakeAllNodesDirty();
+	//Note that setting this isn't important except for proper score output when OPT_DEBUG is on
 	lnL = start;
 	}
 
@@ -1217,7 +1236,7 @@ if(nd->nodeNum == 8){
 			//Not allowing this escape anymore
 			if(fabs(d1) < ONE_POINT_ZERO){//don't bother doing anything if the surface is this flat
 														#ifdef OPT_DEBUG			
-														opt << "very small d1.  Return.\n";				
+														opt << "very small d1.\t";				
 														#endif				
 //				return totalEstImprove;
 				}
@@ -1240,6 +1259,8 @@ if(nd->nodeNum == 8){
 					}
 #else
 				if(FloatingPointEquals(nd->dlen, min_brlen, 1.0e-8)){
+//DEBUG
+					assert(lnL >= initialL - pow(10.0, -6.0+ceil(log10(-lnL))));
 					#ifdef OPT_DEBUG
 					opt << "already at min, return\n"; 
 					#endif
@@ -1260,10 +1281,17 @@ if(nd->nodeNum == 8){
 					//where we can actually trust the derivs
 					FLOAT_TYPE estImp = d1*(proposed - nd->dlen) + (d2 * (proposed - nd->dlen) * (proposed - nd->dlen) * ZERO_POINT_FIVE);
 					if(estImp < precision1){
+						//DEBUG - this shouldn't really be bailing because of low potential improvement
+						//unless the likelihood is at least as good as it was coming in
+						if(lnL >= initialL - 1.0e-4){
 														#ifdef OPT_DEBUG
 														opt << "imp to proposed " << proposed << " < prec, return\n";
 														#endif
-						return totalEstImprove;
+							return totalEstImprove;
+							}
+														#ifdef OPT_DEBUG
+														else opt << "don't return!";
+														#endif
 						}
 					}
 				v=proposed;
@@ -1288,10 +1316,17 @@ if(nd->nodeNum == 8){
 					//where we can actually trust the derivs
 					FLOAT_TYPE estImp = d1*(proposed - nd->dlen) + (d2 * (proposed - nd->dlen) * (proposed - nd->dlen) * ZERO_POINT_FIVE);
 					if(estImp < precision1){
+						//DEBUG - this shouldn't really be bailing because of low potential improvement
+						//unless the likelihood is at least as good as it was coming in
+						if(lnL >= initialL - 1.0e-4){
 														#ifdef OPT_DEBUG
 														opt << "imp to prop < prec, return\n";
 														#endif
-						return totalEstImprove;
+							return totalEstImprove;
+							}
+														#ifdef OPT_DEBUG
+														else opt << "don't return!";
+														#endif
 						}
 					}
 				v=proposed;
@@ -1316,7 +1351,7 @@ if(nd->nodeNum == 8){
 			//12/9/07 now requiring the actual likelihood to improve.  Single optimization passes with AA and Codon
 			//models were fairly often moving to worse likelihoods but indicating that the function should return
 			//since the deriv calculations are now calculating the true likelihood, this has no real overhead		
-			if(estScoreDelta < precision1 && (iter == 0 || lnL >= initialL)){
+			if(estScoreDelta < precision1 && (iter == 0 || lnL >= initialL - 1.0e-5)){
 														#ifdef OPT_DEBUG			
 														opt << "delta < prec, return\n";
 														if(curScore==-ONE_POINT_ZERO){
@@ -2029,6 +2064,14 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 	FLOAT_TYPE totL=ZERO_POINT_ZERO;
 
+#undef OUTPUT_SITEDERIVS
+
+#ifdef OUTPUT_SITEDERIVS
+	vector<double> siteLikes;
+	vector<double> siteD1s;
+	vector<double> siteD2s;
+#endif
+
 #ifdef OMP_TERMDERIV
 	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, Ldata, siteL) reduction(+ : tot1, tot2, totL)
 	for(int i=0;i<nchar;i++){
@@ -2185,36 +2228,20 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 	FLOAT_TYPE siteL, siteD1, siteD2;
+	FLOAT_TYPE constL, constD1, constD2, pC, pV, MkvScaler;
 
-#undef OUTPUT_DERIVS
+	FLOAT_TYPE unscaledlnL;
 
-#ifdef OUTPUT_DERIVS
-	ofstream out("derivs.log");
-
-	ofstream pout("pmat.log");
-	ofstream d1out("d1mat.log");
-	ofstream d2out("d2mat.log");
-
-	for(int a = 0;a < nstates;a++){
-		for(int b = 0;b < nstates;b++){
-			pout << prmat[b + nstates*a] << "\t";
-			d1out << d1mat[b + nstates*a] << "\t";
-			d2out << d2mat[b + nstates*a] << "\t";
-			}
-		pout << endl;
-		d1out << endl;
-		d2out << endl;
-		}
-	pout.close();
-	d1out.close();
-	d2out.close();
-
+#ifdef OUTPUT_SITEDERIVS
+	vector<double> siteLikes;
+	vector<double> siteD1s;
+	vector<double> siteD2s;
 #endif
 
 	if(nRateCats == 1){
 
 	#ifdef OMP_TERMDERIV_NSTATE
-		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL) reduction(+ : tot1, tot2, totL)
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates*nRateCats];
@@ -2249,19 +2276,64 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 					siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]));
 					}
-				
-				totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];
-				
-				siteD1 /= siteL;
-				tot1 += countit[i] * siteD1;
-				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
-				assert(tot1 == tot1);
-				assert(tot2 == tot2);
 
-#ifdef OUTPUT_DERIVS
-				out << "L\t" << siteL << "\tD1\t" << siteD1 << "\tD2\t" << siteD2 << "\tcount\t" << countit[i] << "\tunderM\t" << partialCLA->underflow_mult[i] << endl;
+				unscaledlnL=log(siteL) - partialCLA->underflow_mult[i];
+
+#ifdef MKV
+			if(mod->IsBinary() || mod->IsNState()){
+				assert(unscaledlnL < ZERO_POINT_ZERO);
+				if(i == 0){
+					if(partialCLA->underflow_mult[i] == 0){
+						constL = siteL;
+						pC = nstates * constL;
+						pV = (ONE_POINT_ZERO - pC);
+						MkvScaler = log(pV);
+						constD1 = siteD1 * nstates; 
+						constD2 = siteD2 * nstates;
+						}
+					else{
+						constL = ZERO_POINT_ZERO; 
+						pC = ZERO_POINT_ZERO;
+						pV = ONE_POINT_ZERO;
+						MkvScaler = ZERO_POINT_ZERO;
+						constD1 = ZERO_POINT_ZERO;
+						constD2 = ZERO_POINT_ZERO;
+						}
+					}
+				else{ 
+					//condition the likelihood on variability
+					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
+					assert(condlnL < ZERO_POINT_ZERO);
+					totL += condlnL * countit[i];
+
+					//condition the first deriv
+					FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
+
+					//condition the second
+					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
+					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
+
+					tot1 += countit[i] * condD1;
+					tot2 += countit[i] * condD2;
+					assert(tot1 == tot1);
+					assert(tot2 == tot2);
+					//these are just for site deriv output
+					unscaledlnL = condlnL;
+					siteD1 = condD1;
+					siteD2 = condD2;
+					}
+				}
+#else
+				if(0){}
 #endif
-
+				else if(unscaledlnL < ZERO_POINT_ZERO){
+					totL += unscaledlnL * countit[i];
+					siteD1 /= siteL;
+					tot1 += countit[i] * siteD1;
+					tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+					assert(tot1 == tot1);
+					assert(tot2 == tot2);
+					}
 				Ldata++;
 				partial+=nstates*nRateCats;
 				}
@@ -2274,10 +2346,24 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 #endif
 				Ldata++;
 				}
+#ifndef OUTPUT_SITEDERIVS
 			}
+#else
+			siteLikes.push_back(unscaledlnL);
+			siteD1s.push_back(siteD1);
+			siteD2s.push_back(siteD2);
+			}
+		ofstream ord("orderedSiteDerivs.term.log");
+		ofstream packed("packedSiteDerivs.term.log");
+		OutputSiteDerivatives(dataIndex, siteLikes, siteD1s, siteD2s, partialCLA->underflow_mult, NULL, ord, packed);
+		ord.close();
+		packed.close();
+#endif
 		}
 	else{
-
+		//I don't think that this is being used, as there is a separate function for PartialTermNStateRateHet
+		assert(0);
+/*
 #ifdef OMP_TERMDERIV_NSTATE
 		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL)
 		for(int i=0;i<nchar;i++){
@@ -2319,15 +2405,16 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 					siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]));
 					}
+				FLOAT_TYPE unscaledlnL=log(siteL) - partialCLA->underflow_mult[i];
 
-				totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];
-				siteD1 /= siteL;
-				tot1 += countit[i] * siteD1;
-				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
-				assert(siteL == siteL);
-				assert(totL == totL);
-				assert(tot1 == tot1);
-				assert(tot2 == tot2);
+				if(unscaledlnL < ZERO_POINT_ZERO){
+					totL += unscaledlnL * countit[i];
+					siteD1 /= siteL;
+					tot1 += countit[i] * siteD1;
+					tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+					assert(tot1 == tot1);
+					assert(tot2 == tot2);
+					}
 				}
 			else{
 #ifdef OPEN_MP	//this needs to be advanced in the case of openmp, regardless of whether
@@ -2337,11 +2424,7 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				Ldata++;
 				}
 			}
-		}
-
-#ifdef OUTPUT_DERIVS
-	out.close();
-#endif
+*/		}
 
 	d1Tot = tot1;
 	d2Tot = tot2;
@@ -2383,6 +2466,7 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE rateL, rateD1, rateD2;
+	FLOAT_TYPE constL, constD1, constD2, pC, pV, MkvScaler;
 
 #undef OUTPUT_DERIVS
 
@@ -2455,14 +2539,63 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 					siteL += (prI*freqs[conStates[i]] * (exp((FLOAT_TYPE)partialCLA->underflow_mult[i])));
 					}
 
-				totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];
-				siteD1 /= siteL;
-				tot1 += countit[i] * siteD1;
-				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
-				assert(siteL == siteL);
-				assert(totL == totL);
-				assert(tot1 == tot1);
-				assert(tot2 == tot2);
+				FLOAT_TYPE unscaledlnL=log(siteL) - partialCLA->underflow_mult[i];
+
+#ifdef MKV
+			if(mod->IsBinary() || mod->IsNState()){
+				assert(unscaledlnL < ZERO_POINT_ZERO);
+				if(i == 0){
+					if(partialCLA->underflow_mult[i] == 0){
+						constL = siteL;
+						pC = nstates * constL;
+						pV = (ONE_POINT_ZERO - pC);
+						MkvScaler = log(pV);
+						constD1 = siteD1 * nstates; 
+						constD2 = siteD2 * nstates;
+						}
+					else{
+						constL = ZERO_POINT_ZERO; 
+						pC = ZERO_POINT_ZERO;
+						pV = ONE_POINT_ZERO;
+						MkvScaler = ZERO_POINT_ZERO;
+						constD1 = ZERO_POINT_ZERO;
+						constD2 = ZERO_POINT_ZERO;
+						}
+					}
+				else{ 
+					//condition the likelihood on variability
+					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
+					assert(condlnL < ZERO_POINT_ZERO);
+					totL += condlnL * countit[i];
+
+					//condition the first deriv
+					FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
+
+					//condition the second
+					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
+					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
+
+					tot1 += countit[i] * condD1;
+					tot2 += countit[i] * condD2;
+					assert(tot1 == tot1);
+					assert(tot2 == tot2);
+					//these are just for site deriv output
+					unscaledlnL = condlnL;
+					siteD1 = condD1;
+					siteD2 = condD2;
+					}
+				}
+#else
+				if(0){}
+#endif
+				else if(unscaledlnL < ZERO_POINT_ZERO){
+					totL += unscaledlnL * countit[i];
+					siteD1 /= siteL;
+					tot1 += countit[i] * siteD1;
+					tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+					assert(tot1 == tot1);
+					assert(tot2 == tot2);
+					}
 				}
 			else{
 #ifdef OPEN_MP	//this needs to be advanced in the case of openmp, regardless of whether
@@ -2637,9 +2770,17 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
 	FLOAT_TYPE rateL, rateD1, rateD2;
+	FLOAT_TYPE unscaledlnL;
+	FLOAT_TYPE constL, constD1, constD2, pC, pV, MkvScaler;
+
+#ifdef OUTPUT_SITEDERIVS
+	vector<double> siteLikes;
+	vector<double> siteD1s;
+	vector<double> siteD2s;
+#endif
 
 #ifdef OMP_INTDERIV_NSTATE
-	#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, rateL, rateD1, rateD2, partial, CL1) reduction(+ : tot1, tot2, totL)
+	#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, rateL, rateD1, rateD2, partial, CL1, unscaledlnL) reduction(+ : tot1, tot2, totL)
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[nRateCats * nstates * i]);
 		CL1		= &(childCLA->arr[nRateCats * nstates * i]);
@@ -2677,14 +2818,78 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 				siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i])  *  exp((FLOAT_TYPE)childCLA->underflow_mult[i]));
 				}
-			totL += (log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i]) * countit[i];
-			siteD1 /= siteL;
-			tot1 += countit[i] * siteD1;
-			tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
-			assert(tot1 == tot1);
-			assert(tot2 == tot2);
+
+			unscaledlnL=log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i];
+
+#ifdef MKV
+			if(mod->IsBinary() || mod->IsNState()){
+				assert(unscaledlnL < ZERO_POINT_ZERO);
+				if(i == 0){
+					if(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i] == 0){
+						constL = siteL;
+						pC = nstates * constL;
+						pV = (ONE_POINT_ZERO - pC);
+						MkvScaler = log(pV);
+						constD1 = siteD1 * nstates; 
+						constD2 = siteD2 * nstates;
+						}
+					else{
+						constL = ZERO_POINT_ZERO; 
+						pC = ZERO_POINT_ZERO;
+						pV = ONE_POINT_ZERO;
+						MkvScaler = ZERO_POINT_ZERO;
+						constD1 = ZERO_POINT_ZERO;
+						constD2 = ZERO_POINT_ZERO;
+						}
+					}
+				else{ 
+					//condition the likelihood on variability
+					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
+					assert(condlnL < ZERO_POINT_ZERO);
+					totL += condlnL * countit[i];
+
+					//condition the first deriv
+					FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
+
+					//condition the second
+					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
+					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
+
+					tot1 += countit[i] * condD1;
+					tot2 += countit[i] * condD2;
+					assert(tot1 == tot1);
+					assert(tot2 == tot2);
+					//these are just for site deriv output
+					unscaledlnL = condlnL;
+					siteD1 = condD1;
+					siteD2 = condD2;
+					}
+				}
+#else
+			if(0){}
+#endif
+			else if(unscaledlnL < ZERO_POINT_ZERO){
+				totL += unscaledlnL * countit[i];
+				siteD1 /= siteL;
+				tot1 += countit[i] * siteD1;
+				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+				assert(tot1 == tot1);
+				assert(tot2 == tot2);
+				}
 			}
+#ifndef OUTPUT_SITEDERIVS
 		}
+#else
+		siteLikes.push_back(unscaledlnL);
+		siteD1s.push_back(siteD1);
+		siteD2s.push_back((siteD2 / siteL) - siteD1*siteD1);
+		}
+	ofstream ord("orderedSiteDerivs.log");
+	ofstream packed("packedSiteDerivs.log");
+	OutputSiteDerivatives(dataIndex, siteLikes, siteD1s, siteD2s, childCLA->underflow_mult, NULL, ord, packed);
+	ord.close();
+	packed.close();
+#endif
 
 	d1Tot = tot1;
 	d2Tot = tot2;
@@ -2729,6 +2934,14 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
+	FLOAT_TYPE constL, constD1, constD2, pV, pC, MkvScaler;
+	FLOAT_TYPE unscaledlnL;
+
+#ifdef OUTPUT_SITEDERIVS
+	vector<double> siteLikes;
+	vector<double> siteD1s;
+	vector<double> siteD2s;
+#endif
 
 #ifdef OMP_INTDERIV_NSTATE
 #pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, partial, CL1) reduction(+ : tot1, tot2, totL)
@@ -2761,17 +2974,81 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 				siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]) * exp((FLOAT_TYPE)childCLA->underflow_mult[i]));
 				}
 
-			totL += (log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i]) * countit[i];
-			siteD1 /= siteL;
-			tot1 += countit[i] * siteD1;
-			tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
-			assert(tot1 == tot1);
-			assert(tot2 == tot2);
+			unscaledlnL = log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i];
 
+#ifdef MKV
+			if(mod->IsBinary() || mod->IsNState()){
+				assert(unscaledlnL < ZERO_POINT_ZERO);
+				if(i == 0){
+					if(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i] == 0){
+						constL = siteL;
+						pC = nstates * constL;
+						pV = (ONE_POINT_ZERO - pC);
+						MkvScaler = log(pV);
+						constD1 = siteD1 * nstates; 
+						constD2 = siteD2 * nstates;
+						}
+					else{
+						constL = ZERO_POINT_ZERO; 
+						pC = ZERO_POINT_ZERO;
+						pV = ONE_POINT_ZERO;
+						MkvScaler = ZERO_POINT_ZERO;
+						constD1 = ZERO_POINT_ZERO;
+						constD2 = ZERO_POINT_ZERO;
+						}
+					}
+				else{ 
+					//condition the likelihood on variability
+					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
+					assert(condlnL < ZERO_POINT_ZERO);
+					totL += condlnL * countit[i];
+
+					//condition the first deriv
+					FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
+
+					//condition the second
+					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
+					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
+
+					tot1 += countit[i] * condD1;
+					tot2 += countit[i] * condD2;
+					assert(tot1 == tot1);
+					assert(tot2 == tot2);
+					//these are just for site deriv output
+					unscaledlnL = condlnL;
+					siteD1 = condD1;
+					siteD2 = condD2;
+					}
+				}
+#else
+			if(0){}
+#endif
+			else if(unscaledlnL < ZERO_POINT_ZERO){
+				totL += unscaledlnL * countit[i];
+				siteD1 /= siteL;
+				tot1 += countit[i] * siteD1;
+				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+				assert(tot1 == tot1);
+				assert(tot2 == tot2);
+				}
 			partial += nstates;
 			CL1 += nstates;
 			}
+#ifndef OUTPUT_SITEDERIVS
 		}
+#else
+		//siteLikes.push_back(log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i]);
+		siteLikes.push_back(unscaledlnL);
+		siteD1s.push_back(siteD1);
+		siteD2s.push_back(siteD2);
+		//siteD2s.push_back((siteD2 / siteL) - siteD1*siteD1);
+		}
+	ofstream ord("orderedSiteDerivs.int.log");
+	ofstream packed("packedSiteDerivs.int.log");
+	OutputSiteDerivatives(dataIndex, siteLikes, siteD1s, siteD2s, partialCLA->underflow_mult, childCLA->underflow_mult, ord, packed);
+	ord.close();
+	packed.close();
+#endif
 
 	d1Tot = tot1;
 	d2Tot = tot2;

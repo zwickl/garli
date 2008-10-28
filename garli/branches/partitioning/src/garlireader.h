@@ -193,7 +193,7 @@ class GarliReader
 		bool FoundModelString() {return modelString.length() > 0;}
 		void ClearModelString() {modelString.clear();}
 		void ResetReader(){ FactoryDefaults();}
-		void ReadData(const char* filename, const ModelSpecification &modspec);
+		bool ReadData(const char* filename, const ModelSpecification &modspec);
 		};
 
 /*----------------------------------------------------------------------------------------------------------------------
