@@ -410,13 +410,14 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 					}
 				}
 			outman.UserMessage("\nOptimizing parameters... improved %f lnL", rateOptImprove);
-			if(rateOptImprove > 0.0){
+		//	this used to depend on param improvement - not sure why
+		//	if(rateOptImprove > 0.0){
 				scratchT->Score();
 				FLOAT_TYPE start=scratchT->lnL;
 				scratchT->OptimizeAllBranches(optPrecision);
 				FLOAT_TYPE bimprove = scratchT->lnL - start;
 				outman.UserMessage("\nOptimizing branchlengths... improved %f lnL", bimprove);
-				}
+	//			}
 			}
 		}		
 
