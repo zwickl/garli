@@ -649,24 +649,144 @@ public:
 	enum type{
 		NUCLEOTIDE = 0,
 		AMINOACID = 1,
-		CODON = 2
+		CODON = 2, 
+		BINARY = 3,
+		NSTATE = 4
 		}readAs, usedAs;
 	int totalCharacters;
 	int uniqueCharacters;
-	string outputNames[3];//{"Nucleotide data", "Amino acid data", "Codon data"};
+	string outputNames[5];//{"Nucleotide data", "Amino acid data", "Codon data"};
 	DataSubsetInfo(int gssNum, int cbNum, string cbName, int psNum, string psName, type rAs, type uAs) :
 		garliSubsetNum(gssNum), charblockNum(cbNum), charblockName(cbName), partitionSubsetNum(psNum), partitionSubsetName(psName), readAs(rAs), usedAs(uAs){
 			outputNames[0]="Nucleotide data";
 			outputNames[1]="Amino acid data";
 			outputNames[2]="Codon data";
+			outputNames[3]="Binary data";
+			outputNames[4]="N-state data";
 			}
 	void Report(){
 		outman.UserMessage("GARLI partition subset %d", garliSubsetNum+1);
 		outman.UserMessage("\tCHARACTERS block #%d (\"%s\")", charblockNum+1, charblockName.c_str());
 		if(partitionSubsetNum >= 0) outman.UserMessage("\tCHARPARTITION subset #%d (\"%s\")", partitionSubsetNum+1, partitionSubsetName.c_str());
 		outman.UserMessage("\tData read as %s, modeled as %s", outputNames[readAs].c_str(), outputNames[usedAs].c_str());
-
 		}
 	};
 
+//
+// Mk type model, with binary data
+class BinaryData : public SequenceData{
+	public:
+		BinaryData() : SequenceData(){
+			maxNumStates = 2;
+			}
+
+		unsigned char CharToDatum(char d);
+		char DatumToChar( unsigned char d );
+		void CreateMatrixFromNCL(NxsCharactersBlock *);
+		void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
+		void CalcEmpiricalFreqs(){
+			//BINARY - this might actually make sense for gap encoding
+			}
+	};
+
+inline unsigned char BinaryData::CharToDatum( char ch ){
+	unsigned char datum;
+
+	if( ch == '0' || ch == '-' )
+		datum = 0;
+	else if( ch == '1' || ch == '+' )
+		datum = 1;
+	else if( ch == '?' )
+		datum = 2;
+	else
+      THROW_BADSTATE(ch);
+
+	return datum;
+	}
+
+inline char BinaryData::DatumToChar( unsigned char d ){
+	char ch = 'X';	// ambiguous
+
+	if( d == 2 )
+		ch = '?';
+	else if( d == 0 )
+		ch = '0';
+	else if( d == 1 )
+		ch = '1';
+
+	return ch;
+	}
+
+
+#define MKV
+//
+// Mk type model, with n-state data
+class NStateData : public SequenceData{
+	public:
+		NStateData() : SequenceData(){
+			maxNumStates = 99;
+			}
+		NStateData(int ns) : SequenceData(){
+			maxNumStates = ns;
+			}
+		void SetNumStates(int ns){maxNumStates = ns;}
+
+		unsigned char CharToDatum(char d);
+		char DatumToChar( unsigned char d );
+		void CreateMatrixFromNCL(NxsCharactersBlock *);
+		void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
+		void CalcEmpiricalFreqs(){
+			//BINARY - this might actually make sense for gap encoding
+			}
+	};
+
+inline unsigned char NStateData::CharToDatum( char ch ){
+	unsigned char datum;
+
+	if( ch == '0')
+		datum = 0;
+	else if( ch == '1')
+		datum = 1;
+	else if( ch == '2')
+		 datum = 2;
+	else if( ch == '3')
+		 datum = 3;
+	else if( ch == '4')
+		 datum = 4;
+	else if( ch == '5')
+		 datum = 5;
+	else if( ch == '6')
+		 datum = 6;
+	else if( ch == '7')
+		 datum = 7;
+	else if( ch == '8')
+		 datum = 8;
+	else if( ch == '9')
+		 datum = 9;
+	else if( ch == '?')
+		datum = 99;
+	else
+      THROW_BADSTATE(ch);
+
+	return datum;
+	}
+
+inline char NStateData::DatumToChar( unsigned char d ){
+	//NSTATE - not sure how this should work, but it isn't that important anyway
+	
+	char ch = 'X';	// ambiguous
+/*
+	if( d == 2 )
+		ch = '?';
+	else if( d == 0 )
+		ch = '0';
+	else if( d == 1 )
+		ch = '1';
+*/
+	return ch;
+	}
+
+
 #endif
+
+

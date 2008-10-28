@@ -340,7 +340,7 @@ int main( int argc, char* argv[] )	{
 			//read the datafile with the NCL-based GarliReader - should allow nexus, phylip and fasta
 			outman.UserMessage("###################################################\nREADING OF DATA");
 			GarliReader &reader = GarliReader::GetInstance();
-			reader.ReadData(datafile.c_str(), *modSpecSet.GetModSpec(0));
+			pop.usedNCL = reader.ReadData(datafile.c_str(), *modSpecSet.GetModSpec(0));
 			
 			//assuming a single taxa block
 			if(reader.GetNumTaxaBlocks() > 1) throw ErrorException("Expecting only one taxa block in datafile");
@@ -425,8 +425,13 @@ int main( int argc, char* argv[] )	{
 			//now create a datamatrix object for each effective matrix
 			//because of exsets some subsets of a charpart could contain no characters,
 			//but I'm not going to deal with that right now, and will crap out
+
+			//OK, EFFECTIVE matrices ( = datasubsets) are the actual chunks of data specified by separate charblocks and/or charpartitions
+			//There is a one to one matching between effective matrices and CLAs.  EXCEPT in the case of Nstate data,
+			//in which case multiple matrices will be spawned 
+
 			for(int d = 0;d < effectiveMatrices.size();d++){
-				const ModelSpecification *modSpec = NULL;
+				ModelSpecification *modSpec = NULL;
 				
 				if(d > 0){
 					if(conf.linkModels){//linkage means that all clas/matrices point to the same model/modSpec
@@ -455,78 +460,140 @@ int main( int argc, char* argv[] )	{
 					dataSubInfo[d].usedAs = DataSubsetInfo::AMINOACID;
 				else if(modSpec->IsAminoAcid())
 					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::AMINOACID;
+				else if(modSpec->IsBinary())
+					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::BINARY;
+				else if(modSpec->IsNState())
+					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::NSTATE;
 
 				dataSubInfo[d].Report();
 				outman.UserMessage("");
 
-				if(modSpecSet.GetModSpec(0)->datatype != modSpec->datatype)
-					throw ErrorException("Partitioned models with different datatypes are not yet implemented");
-
 				// Create the data object
-				if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
-					data = new AminoacidData();
-				else //all data besides AA will be read into a DNA matrix and
-					//then converted if necessary
-					data = new NucleotideData();
-				
-				if(effectiveMatrices[d].second.empty())//no charpartition specified
-					data->CreateMatrixFromNCL(effectiveMatrices[d].first);
-				else//with charpartition
+				//for nstate data the effective matrices will be further broken up into implied matrices that each have the same number of observed states
+				//the implied matrix number will be that number of states
+				int actuallyUsedImpliedMatrixIndex = 0;
+				int maxObservedStates = effectiveMatrices[d].first->GetMaxObsNumStates(false);
+				for(int impliedMatrix = 2;impliedMatrix < (modSpec->IsNState() ? maxObservedStates + 1 : 3);impliedMatrix++){
+					if(modSpec->IsNState()){
+						//DEBUG
+			//			assert(conf.linkModels);
+			//			assert(effectiveMatrices.size() == 1);
+						data = new NStateData(impliedMatrix);
+						}
+
+					else if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
+						data = new AminoacidData();
+					else if(modSpec->IsBinary())
+						data = new BinaryData();
+					else //all data besides AA will be read into a DNA matrix and
+						//then converted if necessary
+						data = new NucleotideData();
+					//if no charpart was specified, the second argument here will be empty
 					data->CreateMatrixFromNCL(effectiveMatrices[d].first, effectiveMatrices[d].second);
+
+#ifdef SINGLE_PRECISION_FLOATS
+					if(modSpec->IsBinary()) || modSpec->NState()) throw ErrorException("Sorry, Mk type models have not yet been tested with single precision.");
+#endif
 				
-				if(modSpec->IsCodon()){
-					rawPart.AddSubset(data);
-					const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
-					CodonData *d;
-					if(nuc != NULL)
-						d = new CodonData(nuc, modSpec->geneticCode);
-					else throw ErrorException("Attempted to create codon matrix from non-nucleotide data");
+					if(data->NChar() == 0){
+						//if there weren't any characters with a certain number of states,
+						//just get rid of the matrix.  This could in theory also work for
+						//totally excluded subsets, but that gets complicated because it
+						//isn't clear how the indexing of models specified in the config
+						//file should work
+						assert(modSpec->IsNState());
+						outman.UserMessage("NOTE: No characters found with %d observed states.", impliedMatrix);
+						delete data;
+						}
+					else{
+						if(modSpec->IsNState()){
+#ifdef OPEN_MP
+		throw ErrorException("Sorry, discrete Mk type models cannot currently be used with the OpenMP version");
+#endif
+								
+							if(actuallyUsedImpliedMatrixIndex > 0){
+								//the specs are being added as we read and create subsets, so we can add them for the implied matrices
+								//as we go
+								claSpecs.push_back(ClaSpecifier(d+actuallyUsedImpliedMatrixIndex, d+actuallyUsedImpliedMatrixIndex, d+actuallyUsedImpliedMatrixIndex));
+								//clone the current datasubset info, which applies to all of the implied matrices within this effective matrix
+								dataSubInfo.push_back(dataSubInfo[d]);
+								//also clone the modspec
+								modSpecSet.AddModSpec(conf.configModelSets[d]);
+								modSpec = modSpecSet.GetModSpec(d + actuallyUsedImpliedMatrixIndex);
+								}
+							modSpec->SetNStates(impliedMatrix);
+							}
+						else if(modSpec->IsCodon()){
+							rawPart.AddSubset(data);
+							const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
+							CodonData *d;
+							if(nuc != NULL)
+								d = new CodonData(nuc, modSpec->geneticCode);
+							else throw ErrorException("Attempted to create codon matrix from non-nucleotide data");
 
-					//this probably shouldn't go here, but...
-					if(modSpec->IsF1x4StateFrequencies()) d->SetF1X4Freqs();
-					else if(modSpec->IsF3x4StateFrequencies()) d->SetF3X4Freqs();
-					else if(modSpec->IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
+							//this probably shouldn't go here, but...
+							if(modSpec->IsF1x4StateFrequencies()) d->SetF1X4Freqs();
+							else if(modSpec->IsF3x4StateFrequencies()) d->SetF3X4Freqs();
+							else if(modSpec->IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
 
-					data = d;
+							data = d;
+							}
+						else if(modSpec->IsCodonAminoAcid()){
+							rawPart.AddSubset(data);
+							const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
+							AminoacidData *d;
+							if(nuc != NULL)
+								d = new AminoacidData(nuc, modSpec->geneticCode);
+							else throw ErrorException("Attempted to translate to amino acids from non-nucleotide data");
+
+							data = d;
+							}
+				
+						dataPart.AddSubset(data);
+
+						if(modSpec->IsNState())
+							outman.UserMessage("Subset of data with %d states:", impliedMatrix);
+
+						data->Summarize();
+						outman.UserMessage("\tSummary of data or data subset:");
+						outman.UserMessage("\t%5d sequences.", data->NTax());
+						outman.UserMessage("\t%5d constant characters.", data->NConstant());
+						outman.UserMessage("\t%5d parsimony-informative characters.", data->NInformative());
+						outman.UserMessage("\t%5d autapomorphic characters.", data->NAutapomorphic());
+						int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
+						if(data->NMissing() > 0){
+							outman.UserMessage("\t%5d characters were completely missing or ambiguous (removed).", data->NMissing());
+							outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
+						}
+						else outman.UserMessage("\t%5d total characters.", total);
+						
+						outman.flush();
+						
+						data->Collapse();
+						outman.UserMessage("\t%5d unique patterns in compressed data matrix.\n", data->NChar());
+
+						dataSubInfo[d + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();
+						dataSubInfo[d + actuallyUsedImpliedMatrixIndex].uniqueCharacters = data->NChar();
+						actuallyUsedImpliedMatrixIndex++;
+
+						//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
+						data->ReserveOriginalCounts();
+						
+						if(!modSpec->IsBinary() && !modSpec->IsNState())
+							data->DetermineConstantSites();
+						}
 					}
-				else if(modSpec->IsCodonAminoAcid()){
-					rawPart.AddSubset(data);
-					const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
-					AminoacidData *d;
-					if(nuc != NULL)
-						d = new AminoacidData(nuc, modSpec->geneticCode);
-					else throw ErrorException("Attempted to translate to amino acids from non-nucleotide data");
-
-					data = d;
-					}
-				
-				dataPart.AddSubset(data);
-
-				data->Summarize();
-				outman.UserMessage("\tSummary of data or data subset:");
-				outman.UserMessage("\t%5d sequences.", data->NTax());
-				outman.UserMessage("\t%5d constant characters.", data->NConstant());
-				outman.UserMessage("\t%5d parsimony-informative characters.", data->NInformative());
-				outman.UserMessage("\t%5d autapomorphic characters.", data->NAutapomorphic());
-				int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
-				if(data->NMissing() > 0){
-					outman.UserMessage("\t%5d characters were completely missing or ambiguous (removed).", data->NMissing());
-					outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
-				}
-				else outman.UserMessage("\t%5d total characters.", total);
-				
-				outman.flush();
-				
-				data->Collapse();
-				outman.UserMessage("\t%5d unique patterns in compressed data matrix.\n", data->NChar());
-
-				dataSubInfo[d].totalCharacters = data->TotalNChar();
-				dataSubInfo[d].uniqueCharacters = data->NChar();
-
-				//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
-				data->ReserveOriginalCounts();
-				
-				data->DetermineConstantSites();
+					//subset specific rates will be set if:
+					//1. subsetspecificrates = 1 in the conf
+					// and 
+					//2a. a partition is actually specified via multiple char blocks or a charpart
+					// and/or
+					//2b. nstate (Mk) model is specified, characters have different numbers of observed states
+					//(2b. is what needs to be taken care of here because we don't know whether there will
+					//be implied blocks in advance)
+					if(conf.subsetSpecificRates && modSpecSet.InferSubsetRates() == false)
+						if(actuallyUsedImpliedMatrixIndex > 1)
+							modSpecSet.SetInferSubsetRates(true);
 				}
 
 			outman.UserMessage("\n###################################################");

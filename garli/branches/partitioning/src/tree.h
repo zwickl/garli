@@ -273,6 +273,8 @@ class Tree{
 		void OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site);
 		void ClaReport(ofstream &cla);
 		FLOAT_TYPE CountClasInUse();
+		void OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *under1, const int *under2, ofstream &ordered, ofstream &packed);
+		void OutputSiteDerivatives(int partNum, vector<double> &likes, vector<double> &d1s, vector<double> &d2s, const int *under1, const int *under2, ofstream &ordered, ofstream &packed);
 		void CountNumReservedClas(int &, int &, int&);
 		void CheckClaAssignments(TreeNode *nd);
 		void RemoveTempClaReservations();
@@ -304,7 +306,7 @@ class Tree{
 		int NodeToNodeDistance(int num1, int num2);
 		int NodesToRoot(TreeNode *nd);
 		void SampleBlenCurve(TreeNode *nd, ofstream &out);
-		void CalcEmpiricalDerivatives(TreeNode *nd, FLOAT_TYPE &D1, FLOAT_TYPE &D2);
+		void CalcEmpiricalDerivatives(TreeNode *nd, double &D1, double &D2);
 		void SetDistanceBasedBranchLengthsAroundNode(TreeNode *nd);
 		void FindNearestTerminalUp(TreeNode *start, TreeNode *&, FLOAT_TYPE &dist);
 		void FindNearestTerminalsDown(TreeNode *start, TreeNode *from, TreeNode *&term1, TreeNode *&term2, FLOAT_TYPE &dist1, FLOAT_TYPE &dist2);

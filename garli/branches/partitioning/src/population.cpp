@@ -419,11 +419,21 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	//set two model statics
 	Model::mutationShape = conf->gammaShapeModel;
 
-	if(modSpecSet.GetModSpec(0)->IsCodon()){
-		//PARTITION
-		//Model::SetCode(static_cast<CodonData*>(data)->GetCode());
-		//DEBUG - code won't be able to be static anymore, since it might vary among model/partition subsets
-		Model::SetCode(static_cast<CodonData*>(dataPart->GetSubset(0))->GetCode());
+	//PARTITION
+	//Model::SetCode(static_cast<CodonData*>(data)->GetCode());
+	//DEBUG - code won't be able to be static anymore, since it might vary among model/partition subsets
+	//this is very convoluted
+	for(int m = 0;m < dataPart->NumSubsets();m++){
+		if(modSpecSet.GetModSpec(m)->IsCodon()){
+			for(int m2 = m+1;m2 < dataPart->NumSubsets();m2++){
+				if(modSpecSet.GetModSpec(m)->IsCodon()){
+					if(static_cast<CodonData*>(dataPart->GetSubset(m))->GetCode() 
+						!= static_cast<CodonData*>(dataPart->GetSubset(0))->GetCode())
+						throw ErrorException("Sorry, partitioned models with multiple genetic codes are not yet implemented");
+					}
+				}
+			Model::SetCode(static_cast<CodonData*>(dataPart->GetSubset(m))->GetCode());
+			}
 		}
  
 #ifdef INPUT_RECOMBINATION
@@ -591,34 +601,50 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 void Population::LoadNexusStartingConditions(){
 	GarliReader & reader = GarliReader::GetInstance();
  	NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
+	//DEBUG - this wasn't right, since having multiple trees with the data isn't a problem if we're getting the
+	//start from elsewhere
+	/*
 	if(reader.GetNumTreesBlocks(tax) > 1){
 		throw ErrorException("Expecting only one trees block (not sure which to use)");
 		}
+	*/
 	NxsTreesBlock *treesblock = reader.GetTreesBlock(tax, 0);
 
 	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
 		//in this case we should have already read in the tree when getting the data, so check
-		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
-			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting trees", conf->streefname.c_str());
+		if(treesblock == NULL) //with the NCL factory API the trees block will be null if none was found
+			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->streefname.c_str());
+		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false) //with the old API it will be allocated but empty
+			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->streefname.c_str());
+		if(reader.GetNumTreesBlocks(tax) > 1){
+			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
+			}
 		}
 	else{
 		//use NCL to get trees from the specified file
 		outman.UserMessage("Loading starting model and/or tree from file %s", conf->streefname.c_str());
+#ifndef FACTORY
+		//3/25/08 Made a change such that if a gblock was already read with the data and another
+		//is found with the following execute, an exception will be thrown in GarliReader::EnteringBlock
 		if(treesblock != NULL){
 			if(treesblock->GetNumTrees() > 0)//if we already had trees loaded, toss them
 				treesblock->Reset();
 			}
-
-		//3/25/08 Made a change such that if a gblock was already read with the data and another
-		//is found with the following execute, an exception will be thrown in GarliReader::EnteringBlock
-#ifdef FACTORY
-		reader.ReadFilepath(conf->streefname.c_str(), MultiFormatReader::NEXUS_FORMAT);
-#else
 		reader.HandleExecute(conf->streefname.c_str(), false);
+		//treesblock = reader.GetTreesBlock(tax, 0);
+		treesblock = reader.GetTreesBlock();
+#else
+		//clearing trees block doesn't actually remove it in factory mode, so we need to do this
+		int initNumTreesBlocks = reader.GetNumTreesBlocks(tax);
+
+		reader.ReadFilepath(conf->streefname.c_str(), MultiFormatReader::NEXUS_FORMAT);
+		int afterNumTreesBlocks = reader.GetNumTreesBlocks(tax);;
+		if(afterNumTreesBlocks - initNumTreesBlocks > 1){
+			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
+			}
+		else treesblock = treesblock = reader.GetTreesBlock(tax, afterNumTreesBlocks - 1);
 #endif
-		//FACTORY
-		//treesblock = reader.GetTreesBlock();
-		treesblock = reader.GetTreesBlock(tax, 0);
+
 		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting model and/or tree", conf->streefname.c_str());
 		}
@@ -905,7 +931,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 
 	//create the first indiv, and then copy the tree and clas
 	//this is very annoying with partitioning because a single model can apply to multiple
-	//partitions.  So, just use the first cla set that refers to this model
+	//subsets.  So, just use the first cla set that refers to this model
 	for(int m = 0;m < indiv[0].modPart.NumModels();m++){
 		for(vector<ClaSpecifier>::iterator c = claSpecs.begin();c != claSpecs.end();c++){
 			if((*c).modelIndex == m){
@@ -1645,6 +1671,7 @@ void Population::Run(){
 #endif
 
 	FinalOptimization();
+
 	gen = UINT_MAX;
 	OutputLog();
 
@@ -3337,7 +3364,10 @@ void Population::WriteStoredTrees( const char* treefname ){
 		else outf << "tree rep" << r+1 << " = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
 		//PARTITION
 		//storedTrees[r]->mod->OutputGarliFormattedModel(outf);
-		storedTrees[r]->modPart.GetModel(0)->OutputGarliFormattedModel(outf);
+		
+		//DEBUG BINARY
+		//storedTrees[r]->modPart.GetModel(0)->OutputGarliFormattedModel(outf);
+
 		outf << "]";
 
 		outf.setf( ios::floatfield, ios::fixed );
@@ -3351,24 +3381,28 @@ void Population::WriteStoredTrees( const char* treefname ){
 			}
 		}
 	outf << "end;\n";
-	if(modSpecSet.GetModSpec(0)->IsNucleotide()){
+
+//	if(modSpecSet.GetModSpec(0)->IsNucleotide()){
 		//add a paup block setting the model params
 		//PARTITION
 		//storedTrees[bestRep]->mod->OutputPaupBlockForModel(outf, name.c_str());
-		if(storedTrees[bestRep]->modPart.NumModels() == 1){
+		if(storedTrees[bestRep]->modPart.NumModels() == 1 && storedTrees[bestRep]->modPart.GetModel(0)->IsNucleotide()){
 			storedTrees[bestRep]->modPart.GetModel(0)->OutputPaupBlockForModel(outf, name.c_str());
 			outf << "[!****NOTE: The model parameters loaded are the final model estimates****\n****from GARLI for the best scoring search replicate (#" << bestRep + 1 << ").****\n****The best model parameters for other trees may vary.****]" << endl;
 			}
 		else{
 			for(int m = 0;m < storedTrees[bestRep]->modPart.NumModels();m++){
-				char mStr[20];
-				sprintf(mStr, "[model%d\n", m);
-				outf << mStr;
-				storedTrees[bestRep]->modPart.GetModel(m)->OutputPaupBlockForModel(outf, name.c_str());
-				outf << "\n]";
+				//DEBUG
+				if(storedTrees[bestRep]->modPart.GetModel(m)->IsNucleotide()){
+					char mStr[20];
+					sprintf(mStr, "[model%d\n", m);
+					outf << mStr;
+					storedTrees[bestRep]->modPart.GetModel(m)->OutputPaupBlockForModel(outf, name.c_str());
+					outf << "\n]";
+					}
 				}
 			}
-		}
+//		}
 	outf.close();
 	if(conf->outputPhylipTree) phytree.close();
 	}

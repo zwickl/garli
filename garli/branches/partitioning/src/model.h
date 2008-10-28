@@ -278,7 +278,9 @@ public:
 		RNA = 1,
 		CODON = 2,
 		AMINOACID = 3,
-		CODONAMINOACID = 4
+		CODONAMINOACID = 4,
+		BINARY = 5,
+		NSTATE = 6
 		}datatype;
 	
 	enum{
@@ -339,6 +341,9 @@ public:
 	bool IsNucleotide() const {return (datatype == DNA || datatype == RNA);}
 	bool IsAminoAcid() const {return (datatype == AMINOACID || datatype == CODONAMINOACID);}//for most purposes codon-aminoacid should be considered AA
 	bool IsCodonAminoAcid() const {return datatype == CODONAMINOACID;}
+	bool IsBinary() const {return datatype == BINARY;}
+	bool IsNState() const {return datatype == NSTATE;}
+
 	bool GotAnyParametersFromFile() const{
 		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile;
 		}
@@ -402,6 +407,28 @@ public:
 		stateFrequencies = WAG;
 		nstates = 20;
 		fixRelativeRates=true;
+		}
+
+	void SetBinary(){
+		datatype = BINARY;
+		rateMatrix = NST1;
+		stateFrequencies = EQUAL;
+		nstates = 2;
+		fixRelativeRates=true;
+		fixStateFreqs=true;
+		}
+
+	void SetNState(){
+		datatype = NSTATE;
+		rateMatrix = NST1;
+		stateFrequencies = EQUAL;
+		nstates = -1; //this will need to be reset later 
+		fixRelativeRates=true;
+		fixStateFreqs=true;
+		}
+
+	void SetNStates(int ns){
+		nstates = ns;
 		}
 
 	void SetGammaRates(){
@@ -664,7 +691,10 @@ public:
 		else if(_stricmp(str, "dna") == 0) str;
 		else if(_stricmp(str, "rna") == 0) str;
 		else if(_stricmp(str, "nucleotide") == 0) str;
-		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna)", str));
+		else if(_stricmp(str, "binary") == 0) SetBinary();
+		else if(_stricmp(str, "gaps") == 0) SetBinary();
+		else if(_stricmp(str, "nstate") == 0) SetNState();
+		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna, binary, nstate)", str));
 		}
 	void SetGeneticCode(const char *str){
 		if(datatype != DNA && datatype != RNA){
@@ -839,6 +869,7 @@ class Model{
 	void UpdateQMat();
 	void UpdateQMatCodon();
 	void UpdateQMatAminoAcid();
+	void UpdateQMatNState();
 	void DiscreteGamma(FLOAT_TYPE *, FLOAT_TYPE *, FLOAT_TYPE);
 	bool IsModelEqual(const Model *other) const ;	
 	void CopyModel(const Model *from);
@@ -886,6 +917,9 @@ class Model{
 	FLOAT_TYPE MaxPinv() const{return maxPropInvar;}
 	int NStates() const {return nstates;}
 	int NumMutatableParams() const {return (int) paramsToMutate.size();}
+	bool IsNucleotide() {return modSpec->IsNucleotide();}
+	bool IsNState() {return modSpec->IsNState();}
+	bool IsBinary() {return modSpec->IsBinary();}
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
@@ -1370,7 +1404,8 @@ public:
 		//optionally, pass the number of one of the rates to hold constant
 
 		//the proportions don't change, so this is simpler than flex rates
-		
+		assert(subsetRates.size() > 1);
+
 		double toRemainConstantContrib;
 		if(toRemainConstant > -1){
 			toRemainConstantContrib = subsetRates[toRemainConstant]*subsetProportions[toRemainConstant];

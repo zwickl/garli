@@ -475,10 +475,11 @@ void Tree::AllocateTree(){
 	modPart = NULL;
 	//this assumes that num specs = num data subsets
 	//ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
-	bool isNucleotide = modSpecSet.GetModSpec(0)->IsNucleotide();
+	//bool isNucleotide = modSpecSet.GetModSpec(0)->IsNucleotide();
 	
 	for(int m = 0;m < dataPart->NumSubsets();m++){
 		SequenceData *curData = dataPart->GetSubset(m);
+		bool isNucleotide = modSpecSet.GetModSpec(m)->IsNucleotide();
 		for(int t=1;t<=dataPart->NTax();t++){
 			if(isNucleotide){
 				//allNodes[t]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1);
@@ -3523,7 +3524,8 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 		mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
 
 		partialCLA = partialCLAset->GetCLA((*specs).claIndex);
-		bool isNucleotide = (partialCLA->NStates() == 4);
+
+		bool isNucleotide = mod->IsNucleotide();
 		if(childCLAset != NULL)
 			childCLA = childCLAset->GetCLA((*specs).claIndex);
 
@@ -3559,7 +3561,8 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 		mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), blen2 * modPart->SubsetRate((*specs).dataIndex), Lprmat, Rprmat);
 
 		destCLA = destCLAset->GetCLA((*specs).claIndex);
-		bool isNucleotide = (destCLA->NStates() == 4);
+
+		bool isNucleotide = mod->IsNucleotide();
 		if(firstCLAset != NULL)
 			firstCLA = firstCLAset->GetCLA((*specs).claIndex);
 		if(secCLAset != NULL)
@@ -4855,7 +4858,67 @@ FLOAT_TYPE Tree::CountClasInUse(){
 		}
 	return inUse;
 	}
+
+void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *under1, const int *under2, ofstream &ordered, ofstream &packed){
+	const SequenceData *data = dataPart->GetSubset(partNum);
 	
+	assert(likes.size() == data->NChar());;
+	ordered << "Partition subset " << partNum << "\nsite#\ttruelnL\tunder1\tunder2" << endl;
+	packed << "Partition subset " << partNum << "\npackedIndex\ttruelnL\tunder1\tunder2" << endl;
+	ordered.precision(10);
+	packed.precision(10);
+	
+	for(int site = 0;site < data->GapsIncludedNChar();site++){
+		int col = data->Number(site);
+		if(col == -1)
+			ordered << site+1 << "\tgap\t-\t-";
+		else{
+			ordered << site+1 << "\t" << likes[col] << "\t" << under1[col];
+			if(under2 != NULL)
+				ordered << "\t" << under2[col] << endl;
+			else
+				ordered << "\t-" << endl;
+			}
+		}
+	for(int c = 0;c < data->NChar();c++){
+		packed << c << "\t" << likes[c] << "\t" << under1[c];
+		if(under2 != NULL)
+			packed << "\t" << under2[c] << endl;
+		else
+			packed << "\t-" << endl;
+		}
+	}
+
+void Tree::OutputSiteDerivatives(int partNum, vector<double> &likes, vector<double> &d1s, vector<double> &d2s, const int *under1, const int *under2, ofstream &ordered, ofstream &packed){
+	const SequenceData *data = dataPart->GetSubset(partNum);
+
+	assert(likes.size() == data->NChar());;
+	ordered << "Partition subset " << partNum << "\nsite#\ttruelnL\td1\td2\tunder1\tunder2" << endl;
+	packed << "Partition subset " << partNum << "\npackedIndex\ttruelnL\td1\td2\tunder1\tunder2" << endl;
+	ordered.precision(10);
+	packed.precision(10);
+	
+	for(int site = 0;site < data->GapsIncludedNChar();site++){
+		int col = data->Number(site);
+		if(col == -1)
+			ordered << site+1 << "\tgap\t-\t-\t-\t-";
+		else{
+			ordered << site+1 << "\t" << likes[col] << "\t" << d1s[col] << "\t" << d2s[col] << "\t" << under1[col];
+			if(under2 != NULL)
+				ordered << "\t" << under2[col] << endl;
+			else
+				ordered << "\t-" << endl;
+			}
+		}
+	for(int c = 0;c < data->NChar();c++){
+		packed << c << "\t" << likes[c] << "\t" << d1s[c] << "\t" << d2s[c] << "\t" << under1[c];
+		if(under2 != NULL)
+			packed << "\t" << under2[c] << endl;
+		else
+			packed << "\t-" << endl;
+		}
+	}
+
 FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldat, int modIndex, int dataIndex){
 
 	//this function assumes that the pmat is arranged with the nstates^2 entries for the
@@ -4882,6 +4945,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 #endif
 
 	FLOAT_TYPE siteL, totallnL=0.0;
+	FLOAT_TYPE MkvScaler=0.0;
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
@@ -4940,7 +5004,26 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				//(which might not have been removed from the data because we are only scoring a
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
-				if(unscaledlnL < ZERO_POINT_ZERO)
+
+#ifdef MKV
+				if(mod->IsBinary() || mod->IsNState()){
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					if(i == 0){
+						if(underflow_mult[i] == 0)
+							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
+						else 
+							MkvScaler = ZERO_POINT_ZERO;
+						}
+					else{
+						unscaledlnL += MkvScaler;
+						totallnL += (countit[i] * unscaledlnL);
+						}
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					}
+#else
+				if(0){}
+#endif
+				else if(unscaledlnL < ZERO_POINT_ZERO)
 					totallnL += (countit[i] * unscaledlnL);
 
 #ifdef ALLOW_SINGLE_SITE
@@ -5012,7 +5095,27 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				//(which might not have been removed from the data because we are only scoring a
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
-				if(unscaledlnL < ZERO_POINT_ZERO)
+
+#ifdef MKV
+				if(mod->IsBinary() || mod->IsNState()){
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					if(i == 0){
+						if(underflow_mult[i] == 0)
+							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
+						else 
+							MkvScaler = ZERO_POINT_ZERO;
+						}
+					else{
+						unscaledlnL += MkvScaler;
+						totallnL += (countit[i] * unscaledlnL);
+						}
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					}
+#else
+				if(0){}
+#endif
+
+				else if(unscaledlnL < ZERO_POINT_ZERO)
 					totallnL += (countit[i] * unscaledlnL);
 
 #ifdef ALLOW_SINGLE_SITE
@@ -5276,20 +5379,19 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 #endif
 
 	FLOAT_TYPE totallnL=0.0, siteL;
+	FLOAT_TYPE unscaledlnL;
+	FLOAT_TYPE MkvScaler;
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
 #ifdef OUTPUT_SITELIKES
-	ofstream sit("sitelikes.log");
-	sit.precision(15);
-	assert(sit.good());
-	ofstream deb2("deb.log");
+vector<FLOAT_TYPE> siteLikes;
 #endif
 
 	if(nRateCats == 1){
 #ifdef OMP_INTSCORE_NSTATE
-	#pragma omp parallel for private(partial, CL1, siteL) reduction(+ : totallnL)
+	#pragma omp parallel for private(partial, CL1, siteL, unscaledlnL) reduction(+ : totallnL)
 		for(int i=0;i<nchar;i++){
 			partial = &(partialCLA->arr[nstates*i]);
 			CL1		= &(childCLA->arr[nstates*i]);
@@ -5320,14 +5422,33 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				CL1 += nstates;
 				partial += nstates;
 
-				FLOAT_TYPE unscaledlnL = (log(siteL) - underflow_mult1[i] - underflow_mult2[i]);
+				unscaledlnL = (log(siteL) - underflow_mult1[i] - underflow_mult2[i]);
 				assert(siteL > ZERO_POINT_ZERO);//this should be positive
 				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
 				//rounding error in multiplying a site that is fully ambiguous across the tree
 				//(which might not have been removed from the data because we are only scoring a
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
-				if(unscaledlnL < ZERO_POINT_ZERO)
+
+#ifdef MKV
+				if(mod->IsBinary() || mod->IsNState()){
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					if(i == 0){
+						if(underflow_mult1[i] + underflow_mult2[i] == 0)
+							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
+						else 
+							MkvScaler = ZERO_POINT_ZERO;
+						}
+					else{
+						unscaledlnL += MkvScaler;
+						totallnL += (countit[i] * unscaledlnL);
+						}
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					}
+#else
+			if(0){}
+#endif
+				else if(unscaledlnL < ZERO_POINT_ZERO)
 					totallnL += (countit[i] * unscaledlnL);
 
 #ifdef ALLOW_SINGLE_SITE
@@ -5340,11 +5461,14 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 #ifndef OUTPUT_SITELIKES
 			}
 #else
-//			for(int q=0;q<countit[i];q++)
-				sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
+			siteLikes.push_back(unscaledlnL+MkvScaler);
 			}
-//		sit.close();
-#endif
+		ofstream ord("orderedSiteLikes.int.log");
+		ofstream packed("packedSiteLikes.int.log");
+		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2, ord, packed);
+		ord.close();
+		packed.close();
+#endif		
 		}
 	else{
 		FLOAT_TYPE siteL, tempL, rateL;
@@ -5392,13 +5516,27 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				//(which might not have been removed from the data because we are only scoring a
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
-				if(unscaledlnL < ZERO_POINT_ZERO)
-					totallnL += (countit[i] * unscaledlnL);
 
-#ifdef OUTPUT_SITELIKES
-	//			for(int q=0;q<countit[i];q++)
-					sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << unscaledlnL << "\t" << totallnL << "\n";
+#ifdef MKV
+				if(mod->IsBinary() || mod->IsNState()){
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					if(i == 0){
+						if(underflow_mult1[i] + underflow_mult2[i] == 0)
+							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
+						else 
+							MkvScaler = ZERO_POINT_ZERO;
+						}
+					else{
+						unscaledlnL += MkvScaler;
+						totallnL += (countit[i] * unscaledlnL);
+						}
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					}
+#else
+				if(0){}
 #endif
+				else if(unscaledlnL < ZERO_POINT_ZERO)
+					totallnL += (countit[i] * unscaledlnL);
 
 #ifdef ALLOW_SINGLE_SITE
 				if(siteToScore > -1) break;
@@ -5406,11 +5544,18 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				}
 			else{ //nothing needs to be done if the count of this site is 0
 				}
+#ifndef OUTPUT_SITELIKES
 			}
-		}
-#ifdef OUTPUT_SITELIKES
-	sit.close();
+#else
+			siteLikes.push_back(unscaledlnL);
+			}
+		ofstream ord("orderedSiteLikes.log");
+		ofstream packed("packedSiteLikes.log");
+		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2, ord, packed);
+		ord.close();
+		packed.close();
 #endif
+		}
 
 	delete []freqs;
 	return totallnL;
@@ -6108,6 +6253,7 @@ FLOAT_TYPE Tree::OptimizeSubsetRates(FLOAT_TYPE prec){
 	Score();
 	FLOAT_TYPE after = lnL;
 	if(after < start){
+		outman.UserMessage("##SUBSET RATE OPT WORSENED SCORE##");
 		modPart->SetSubsetRates(initVals);
 		MakeAllNodesDirty();
 		Score();
