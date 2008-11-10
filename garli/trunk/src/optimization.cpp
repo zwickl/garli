@@ -336,10 +336,12 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 	int positiveD2Num = 0;
 	int pass = 0;
 
-/*	ofstream curves("lcurve.log");
+#ifdef OPT_BOUNDED_LTRACE
+	ofstream curves("lcurve.log");
 	curves.precision(8);
 	curves << endl;
-	for(double c = max(prevVal - 0.01, lowBound); c < min(prevVal + 0.01, highBound) ; c += 0.001){
+//DEBUG
+	for(double c = max(prevVal - 0.01, lowBound); c < min(1.5, highBound) ; c += 0.001){
 		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, c);
 		MakeAllNodesDirty();
 		Score();
@@ -350,7 +352,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
 	MakeAllNodesDirty();
 	Score();
-*/
+#endif
 	while(1){
 #ifdef SINGLE_PRECISION_FLOATS
 		incr=0.005f;
@@ -385,7 +387,9 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 		
 		FLOAT_TYPE proposed = prevVal + est;
 
-	//	outman.UserMessage("%f\t%f\t%f\t%f\t%f", d1, d2, prevVal, est, proposed);
+#ifdef OPT_BOUNDED_LTRACE
+		outman.UserMessageNoCR("%f\t%f\t%f\t%f\t%f", d1, d2, prevVal, est, proposed);
+#endif
 
 		if(d2 > ZERO_POINT_ZERO){
 			positiveD2Num++;
@@ -400,7 +404,11 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 				return prev-start;
 				}
 			lowBoundOvershoot++;
-			if(lowBoundOvershoot > 1)
+			//The previous behavior for low/high bracket overshooting caused rare problems because it automatically
+			//tried a value just inside the bracket if it was more than the first overshoot.  If the derivs at both
+			//the low and high brackets propose a value past the other, this can ping-pong back and forth making only
+			//very tiny moves inward, and crap out once 1000 reps have been completed.  Now just try near the bound once
+			if(lowBoundOvershoot == 2)
 				proposed = lowerBracket + epsilon;
 			else
 				proposed = (prevVal + lowerBracket) * ZERO_POINT_FIVE;
@@ -413,7 +421,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 				return prev-start;
 				}
 			upperBoundOvershoot++;
-			if(upperBoundOvershoot > 1)
+			if(upperBoundOvershoot == 2)			
 				proposed = upperBracket - epsilon;
 			else
 				proposed = (prevVal + upperBracket) * ZERO_POINT_FIVE;
@@ -1160,7 +1168,7 @@ if(nd->nodeNum == 8){
 		else if(d1 > ZERO_POINT_ZERO && nd->dlen > knownMin) knownMin = nd->dlen;
 
 														#ifdef OPT_DEBUG			
-														opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
+//														opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
 														#endif
 		FLOAT_TYPE abs_d1 = fabs(d1);
 		if (d2 >= ZERO_POINT_ZERO){//curvature is wrong for NR use 
@@ -1337,7 +1345,7 @@ if(nd->nodeNum == 8){
 					v += estDeltaNR;
 
 														#ifdef OPT_DEBUG
-														opt << v << "\t";			
+//														opt << v << "\t";			
 														#endif
 
 				}
@@ -1469,7 +1477,11 @@ if(nd->nodeNum == 8){
 opt << v << "\t" << "\n";
 opt.flush();
 #endif
-
+#ifdef OPT_DEBUG
+	opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
+	opt << v << "\t" << "\n";
+	opt.flush();
+#endif
 		prevScore=lnL;
 		v_prev=v;
 		
