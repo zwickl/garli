@@ -3072,18 +3072,12 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 					}
 #else	//double precison
 				if(large1< rescaleBelow){
-					if(large1 < 1e-170){
+					if(large1 < 1e-190){
 						throw(1);
 						}
 					int index = 0;
-//DEBUG
-//					while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
 					while(((index + 1) < RESCALE_ARRAY_LENGTH) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
 						index++;
-						}
-//DEBUG
-					if(index > 50){
-						cout << "index = " << index;
 						}
 					int incr = Tree::rescalePrecalcIncr[index];
 					underflow_mult[i]+=incr;
@@ -3091,10 +3085,7 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 					assert(large1 * mult < 1.0);
 					assert(large1 * mult > 0.0008);
 		
-		/*			int incr=((int) -log(large1))+2;
-					underflow_mult[i]+=incr;
-					FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
-		*/			for(int r=0;r<nRateCats;r++){
+					for(int r=0;r<nRateCats;r++){
 						for(int q=0;q<4;q++){
 							destination[r*4 + q]*=mult;
 							assert(destination[r*4 +q] == destination[r*4 +q]);
@@ -3196,7 +3187,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 #else
 			assert(large1 < 1.0e15);
 			if(large1< rescaleBelow){
-				if(large1 < 1e-170){
+				if(large1 < 1e-190){
 					throw(1);
 					}
 				int index = 0;
@@ -3209,11 +3200,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 				FLOAT_TYPE mult=Tree::rescalePrecalcMult[index];
 				assert(large1 * mult < 1.0);
 				assert(large1 * mult > 0.0008);						
-/*					
-				int incr=((int) -log(large1))+2;
-				underflow_mult[i]+=incr;
-				FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
-*/
+
 				for(int q=0;q<nstates*nRateCats;q++){
 					destination[q]*=mult;
 					assert(destination[q] == destination[q]);
