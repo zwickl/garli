@@ -102,6 +102,16 @@ if test "$enable_mpi" = yes; then
 	   ])
 fi
 
+# old Mpi wrapper version - run series of configs named run0.conf, run1.conf, etc
+AC_ARG_ENABLE(oldmpi,
+        AC_HELP_STRING([--enable-oldmpi],[build old MPI batch run version (YOU PROBABLY DON'T WANT THIS)]), , [enable_oldmpi=no])
+if test "$enable_oldmpi" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling old MPI batch run version
+           ])
+fi
+
+
 # Initialize optimization flag in case it doesn't get set below.
 CXXFLAGS_OPTIM_SPEED="-O"
 
@@ -125,7 +135,7 @@ if test  "$enable_openmp" = yes; then
 	fi
 fi
 
-if test "$CC" = "icc"; then
+if test "$CC" = "icc" -o "$CC" = "icc" ; then
 #	Intel C compiler for Linux
 	if test "$enable_debugging" = no; then
 		CXXFLAGS_OPTIM_SPEED="-O2 -ip -funroll-loops -fno-alias"
@@ -155,7 +165,7 @@ elif test "x$GCC" = "xyes" ; then
 		CXXFLAGS_OPTIM_SPEED="-O3 -ffast-math -funroll-loops -fstrict-aliasing"
 	fi
 	case "$build_os" in
-	 	darwin*) CXXFLAGS="$CXXFLAGS -Wno-long-double" ;;
+	 	darwin*) CXXFLAGS="$CXXFLAGS" ;;
 	 	*) CXXFLAGS="$CXXFLAGS -fsigned-char";;
 	esac	
 fi
@@ -170,6 +180,15 @@ if test  "$enable_mpi" = yes; then
 	CXX="$MPICXX"
 	LIBS="$MPILIBS $LIBS"
 fi
+
+#old MPI versionr
+if test  "$enable_oldmpi" = yes; then
+	CXXFLAGS="$CXXFLAGS -DOLD_SUBROUTINE_GARLI"
+	CC="$MPICC"
+	CXX="$MPICXX"
+	LIBS="$MPILIBS $LIBS"
+fi
+
 CXXFLAGS="$CXXFLAGS $CXXFLAGS_OPTIM_SPEED"
 
 

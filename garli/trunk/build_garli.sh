@@ -1,13 +1,13 @@
 #!/bin/sh
 set -x
-nl=`ls -l ncl*z | wc -l`
+nl=`ls -l ncl*.gz | wc -l`
 if ! test $nl = 1
 then
 	echo "You have more than one ncl version..."
-	nclv=`ls ncl*gz | tail -n1 | sed -E 's/.tar.gz//'`
+	nclv=`ls ncl*.gz | tail -n1 | sed 's/.tar.gz//'`
 	echo "Using most recent:  $nclv"
 else
-	nclv=`ls ncl*z`
+	nclv=`ls ncl*.gz | sed 's/.tar.gz//'`
 fi
 if ! test -d ${nclv}
 then
