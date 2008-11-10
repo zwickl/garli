@@ -58,6 +58,10 @@ class OutputManager{
 
 		void SetLogFile(const char *logname){
 			log=true;
+			if(logOut.is_open()){
+				logOut.close();
+				logOut.clear();
+				}
 			logOut.open(logname);
 			}
 
@@ -73,6 +77,10 @@ class OutputManager{
 
 		void SetLogFileForAppend(const char *logname){
 			log=true;
+			if(logOut.is_open()){
+				logOut.close();
+				logOut.clear();
+				}
 			logOut.open(logname, ios::app);
 			}
 

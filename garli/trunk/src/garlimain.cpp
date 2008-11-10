@@ -67,7 +67,29 @@ int CheckRestartNumber(const string str){
 	}
 
 void UsageMessage(char *execName){
-#ifndef SUBROUTINE_GARLI	
+#ifdef SUBROUTINE_GARLI	
+	outman.UserMessage("This MPI version is for doing a large number of search replicates or bootstrap");
+	outman.UserMessage("replicates, each using the SAME config file.  The results will be exactly");
+ 	outman.UserMessage("identical to those obtained by executing the config file a comparable number");
+ 	outman.UserMessage("of times with the serial version of the program.");
+	outman.UserMessage("\nUsage: The syntax for launching MPI jobs varies between systems");
+	outman.UserMessage("Most likely it will look something like the following:");
+	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
+	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.");
+	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
+#elif defined (OLD_SUBROUTINE_GARLI)
+	outman.UserMessage("This MPI version is for doing a large number of independent jobs in batch, each");
+	outman.UserMessage("using a DIFFERENT config file.  This might be useful for analyzing a large");
+	outman.UserMessage("number of simulated datasets or for analyzing a single dataset under a variety");
+	outman.UserMessage("of models or search settings.  The results will be exactly the same as if each");
+	outman.UserMessage("config file were executed separately by a serial version of GARLI.");
+	outman.UserMessage("\nUsage: The syntax for launching MPI jobs varies between systems");
+	outman.UserMessage("Most likely it will look something like the following:");
+	outman.UserMessage("  mpirun [MPI OPTIONS] %s [# of provided config files]", execName);
+	outman.UserMessage("This version will expect config files named \"run0.conf\", \"run1.conf\", etc.");
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
+#else
 	outman.UserMessage("Usage: %s [OPTION] [config filename]", execName);
 	outman.UserMessage("Options:");
 	outman.UserMessage("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
@@ -78,15 +100,9 @@ void UsageMessage(char *execName){
 	outman.UserMessage("  -h, --help		print this help and exit");
 	outman.UserMessage("  -t			run internal tests (requires dataset and config file)");
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"");
-#else
-	outman.UserMessage("Usage: The syntax for launching MPI jobs varies between systems");
-	outman.UserMessage("Most likely it will look something like the following:");
-	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
-	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.");
-	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
-	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
 #endif
 	}
+
 #ifdef BOINC
 int boinc_garli_main( int argc, char* argv[] );
 
@@ -104,7 +120,7 @@ int main( int argc, char* argv[] ){
 int boinc_garli_main( int argc, char* argv[] )	{
 	outman.SetNoOutput(true);
 
-#elif defined( SUBROUTINE_GARLI )
+#elif defined( SUBROUTINE_GARLI ) || defined(OLD_SUBROUTINE_GARLI)
 int SubGarliMain(int rank)	
 	{
 	int argc=1;
@@ -124,13 +140,14 @@ int main( int argc, char* argv[] )	{
 	#endif
 
 	string conf_name;
-#ifndef SUBROUTINE_GARLI
+
+#ifdef OLD_SUBROUTINE_GARLI
+	char name[12];
+	sprintf(name, "run%d.conf", rank);
+	conf_name = name;
+#elif defined(SUBROUTINE_GARLI)
 	conf_name = "garli.conf";
 #else
-//	char temp[100];
-//	sprintf(temp, "run%d.conf", rank);
-//	conf_name = temp;
-	//use the same config here too
 	conf_name = "garli.conf";
 #endif
 
