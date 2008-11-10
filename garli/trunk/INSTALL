@@ -24,7 +24,14 @@ executable in the bin directory within the current directory.
 You are done.  See the QuickStart.txt file, manual or support
 website for details on running the program.
 
-If you know what you are doing and want to use a different compiler
+->If you are doing an MPI build, use the Advanced instructions
+below.
+
+->If you have a newer version of NCL that you want to use, just
+put the ncl-xxxx.tar.gz archive within this directory and the
+build_garli script will find and use it.
+
+->If you know what you are doing and want to use a different compiler
 (such as the intel icc compiler) instead of gcc you can invoke the 
 build_garli.sh script like this:
 
