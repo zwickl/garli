@@ -1,0 +1,8 @@
+#!/bin/bash
+
+$1 $2 09.GTR.conf
+$1 $2 13.HKYG.conf
+$1 $2 20.REVIG.conf
+$1 $2 23.F81I.conf
+$1 $2 33.GTRF.conf
+$1 $2 34.GTRG5.conf
