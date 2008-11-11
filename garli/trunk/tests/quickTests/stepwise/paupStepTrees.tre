@@ -1,0 +1,59 @@
+#NEXUS 
+
+Begin trees;  [Treefile saved Sun Mar 09 15:19:30 2008]
+[!
+>Data file = C:\Documents and Settings\Derrick\Desktop\testSuiteFeb\quickTest\stepwise\rana8.nex
+>Heuristic search settings:
+>  Optimality criterion = likelihood
+>    Likelihood settings:
+>      Assumed nucleotide frequencies (set by user):
+>        A=0.25000  C=0.25000  G=0.25000  T=0.25000
+>      Among-site rate variation:
+>        Assumed proportion of invariable sites  = none
+>        Distribution of rates at variable sites = equal
+>      These settings correspond to the JC69 model
+>      Number of distinct data patterns under this model = 100
+>      Molecular clock not enforced
+>      Starting branch lengths obtained using Rogers-Swofford approximation method
+>      Trees with approximate likelihoods 5% or further from the target score are rejected without additional
+>        iteration
+>      Branch-length optimization = one-dimensional Newton-Raphson with pass limit=20, delta=1e-006
+>      -ln L (unconstrained) = unavailable due to missing-data and/or ambiguities
+>  Starting tree(s) obtained via stepwise addition
+>  Addition sequence: random
+>    Number of replicates = 1000
+>    Starting seed = 1783464443
+>    Saving optimal trees from each replicate, even if they are not optimal overall
+>  Number of trees held at each step during stepwise addition = 1
+>  Branch-swapping algorithm: none
+>  Branches collapsed (creating polytomies) if branch length is less than or equal to 1e-008
+>  Topological constraints not enforced
+>  Trees are unrooted
+>
+>Heuristic search completed
+>   Total number of rearrangements tried = 0
+>   Score of best tree(s) found = 5607.50256
+>   Number of trees retained = 10
+>   Time used = 18.08 sec
+]
+	Translate
+		1 temporariaDMH84R1,
+		2 boyliiMVZ148929,
+		3 luteiventris_MT_MVZ191016,
+		4 luteiventris_WA_MVZ225749,
+		5 muscosaMVZ149006,
+		6 auroraMVZ13957,
+		7 cascadaeMVZ148946,
+		8 sylvaticaMVZ137426
+		;
+tree PAUP_1 = [&U] (1,(((2,(3,4)),(5,(6,7))),8));
+tree PAUP_2 = [&U] (1,(2,(((3,4),(5,(6,7))),8)));
+tree PAUP_3 = [&U] (1,(2,((3,4),((5,(6,7)),8))));
+tree PAUP_4 = [&U] (1,(((2,(5,(6,7))),(3,4)),8));
+tree PAUP_5 = [&U] (1,((2,((5,(6,7)),8)),(3,4)));
+tree PAUP_6 = [&U] (1,((2,(3,4)),((5,(6,7)),8)));
+tree PAUP_7 = [&U] (1,(((2,8),(5,(6,7))),(3,4)));
+tree PAUP_8 = [&U] (1,((2,((3,4),(5,(6,7)))),8));
+tree PAUP_9 = [&U] (1,(2,(((3,4),8),(5,(6,7)))));
+tree PAUP_10 = [&U] (1,((2,8),((3,4),(5,(6,7)))));
+End;

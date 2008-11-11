@@ -1,0 +1,93 @@
+
+P A U P *
+Version 4.0b10 for 32-bit Microsoft Windows
+Sun Mar 09 15:19:08 2008
+
+      -----------------------------NOTICE-----------------------------
+        This is a beta-test version.  Please report any crashes,
+        apparent calculation errors, or other anomalous results.
+        There are no restrictions on publication of results obtained
+        with this version, but you should check the WWW site
+        frequently for bug announcements and/or updated versions.  
+        See the README file on the distribution media for details.
+      ----------------------------------------------------------------
+
+Processing of file "C:\Documents and Settings\Derrick\Desktop\testSuiteFeb\quickTest\stepwise\rana8.nex"
+begins...
+
+Optimality criterion reset to parsimony.
+Data read in DNA format
+
+Data matrix has 8 taxa, 1976 characters
+Valid character-state symbols: ACGT
+Missing data identified by '?'
+Gaps identified by '-'
+"Equate" macros in effect:
+   R,r ==> {AG}
+   Y,y ==> {CT}
+   M,m ==> {AC}
+   K,k ==> {GT}
+   S,s ==> {CG}
+   W,w ==> {AT}
+   H,h ==> {ACT}
+   B,b ==> {CGT}
+   V,v ==> {ACG}
+   D,d ==> {AGT}
+   N,n ==> {ACGT}
+
+Processing of file "C:\Documents and Settings\Derrick\Desktop\testSuiteFeb\quickTest\stepwise\rana8.nex"
+completed.
+
+Optimality criterion set to likelihood.
+
+Heuristic search settings:
+  Optimality criterion = likelihood
+    Likelihood settings:
+      Number of substitution types  = 1
+      Assumed nucleotide frequencies (set by user):
+        A=0.25000  C=0.25000  G=0.25000  T=0.25000
+      Among-site rate variation:
+        Assumed proportion of invariable sites  = none
+        Distribution of rates at variable sites = equal
+      These settings correspond to the JC69 model
+      Number of distinct data patterns under this model = 100
+      Molecular clock not enforced
+      Starting branch lengths obtained using Rogers-Swofford approximation method
+      Trees with approximate likelihoods 5% or further from the target score are rejected without additional
+        iteration
+      Branch-length optimization = one-dimensional Newton-Raphson with pass limit=20, delta=1e-006
+      -ln L (unconstrained) = unavailable due to missing-data and/or ambiguities
+  Starting tree(s) obtained via stepwise addition
+  Addition sequence: random
+    Number of replicates = 1000
+    Starting seed = 1783464443
+    Saving optimal trees from each replicate, even if they are not optimal overall
+  Number of trees held at each step during stepwise addition = 1
+  Branch-swapping algorithm: none
+  Branches collapsed (creating polytomies) if branch length is less than or equal to 1e-008
+  Topological constraints not enforced
+  Trees are unrooted
+
+Heuristic search completed
+   Total number of rearrangements tried = 0
+   Score of best tree(s) found = 5607.50256
+   Number of trees retained = 10
+   Time used = 18.08 sec
+
+Tree-island profile:
+                     First      Last                     First   Times
+Island      Size*     tree      tree        Score    replicate     hit
+----------------------------------------------------------------------
+     1         1         2         2   5607.50256            2     437
+     2         1         3         3   5607.88412            3     250
+     3         1         1         1   5611.03865            1     168
+     4         1         8         8   5611.14452           47      31
+     5         1         9         9   5612.21103          154      13
+     6         1         4         4   5614.37641            4      19
+     7         1         7         7   5614.73714           29      50
+     8         1        10        10   5617.79410          318       2
+     9         1         6         6   5621.04644           11      19
+    10         1         5         5   5621.16590            9      11
+
+10 trees saved to file "C:\Documents and
+Settings\Derrick\Desktop\testSuiteFeb\quickTest\stepwise\paupStepTrees.tre"

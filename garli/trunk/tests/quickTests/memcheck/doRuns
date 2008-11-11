@@ -1,0 +1,15 @@
+#!/bin/bash
+$1 $2 01.36pos.conf
+mv memcheck0.txt memcheck.01.36pos.conf
+$1 $2 02.36neg.conf
+mv memcheck0.txt memcheck.02.36neg.conf
+$1 $2 03.36posBack.conf
+mv memcheck0.txt memcheck.03.36posBack.conf
+$1 $2 04.36negBack.conf
+mv memcheck0.txt memcheck.04.36negBack.conf
+$1 $2 13.wagempG3.conf
+mv memcheck0.txt memcheck.13.wagempG3.conf
+$1 $2 18.K2PIG.conf
+mv memcheck0.txt memcheck.18.K2PIG.conf
+$1 $2 21.OK2Pf3x4.conf
+mv memcheck0.txt memcheck.21.OK2Pf3x4.conf
