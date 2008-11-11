@@ -1,0 +1,37 @@
+GARLI version 0.96 examples - May 2008
+
+SAMPLE DATASETS:
+Rana 64 taxon rRNA frog dataset:
+-This dataset is from Hillis and Wilcox. 2005. Phylogeny of the New World true frogs (Rana). Mol Phylogenet Evol. 34(2):299-314. 	
+-The 2 best trees for this dataset under the GTR+I+G model have log likelihood scores of -21812.66941 and -21812.64132.  Individual search replicates on this dataset should take < 20 min. 
+-A sample starting tree and model parameters in the legacy GARLI format is contained in ranastart.oldformat.tre
+-The same starting tree and model parameters in the new NEXUS format is contained in ranastart.nexus.tre
+-A sample constraint is contained in the files ranaconstraint.format1 and ranaconstraint.format2.  The best tree with this constraint has an optimized log likelihood score of -21821.57688
+
+Zakon 11 taxon Na+ channel gene fish dataset:
+-This dataset is from Zakon, Lu, Zwickl and Hillis. 2006. Sodium channel genes and the evolution of diversity in communication signals of electric fishes: Convergent molecular evolution. Proc. Natl. Acad. Sci. USA. 103(10):3675-80.
+-This is a protein coding gene, aligned in proper reading frame
+-This single dataset file can be analyzed using nucleotide, amino acid and codon models with the garli.conf.nuc.test, garli.conf.AA.test and garli.conf.codon.test configuration files, respectively.
+
+Configuration files:
+-The program will look for a configuration file named garli.conf in the current working directory, unless a different filename is passed to it from the command line
+-The included garli.conf.XXX.defaultSettings configuration files contain reasonable default search parameters.  
+-HOWEVER, the substitution models specified therein are ARBITRARY, and careful thought should be put into choosing the appropriate model for other datasets.  See the manual or support website for more information.
+-The garli.conf.XXX.test configuration files are meant for quick tests on the small 11 taxon dataset, and the settings contained are NOT good defaults for larger datasets.  See above.
+-See the manual or website for a general tutorial on using the program and the meaning of the configuration file entries
+
+// Copyright 2005-2008 Derrick J. Zwickl
+// email: zwickl@nescent.org
+//
+//  This program is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
