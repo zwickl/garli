@@ -966,6 +966,14 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].treeStruct->mod=indiv[0].mod;
 	indiv[0].CalcFitness(0);
 
+	//check the current likelihood now to know how accurate we can expect them to be later
+#ifdef SINGLE_PRECISION_FLOATS
+	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
+#else
+	Tree::expectedPrecision = pow(10.0, - (double) ((int) DBL_DIG - ceil(log10(-indiv[0].Fitness()))));
+#endif
+	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
+
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	if(indiv[0].mod->NumMutatableParams() == 0) {
 		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
@@ -2804,6 +2812,7 @@ if(rank > 0) return;
 
 //ofstream outf;
 //ofstream paupf;
+	paupf.precision(8);
 
 #ifdef NNI_SPECTRUM
 
@@ -2842,7 +2851,7 @@ if(rank > 0) return;
 	if(ind==NULL){
 		for(unsigned i=0;i<total_size;i++){
 			outf << "  utree " << gen << i << "= ";
-			indiv[i].treeStruct->root->MakeNewick(treeString, false, true);
+			indiv[i].treeStruct->root->MakeNewick(treeString, false, true, true);
 			outf << treeString << ";\n";
 			
 			paupf << "lset userbr ";

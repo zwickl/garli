@@ -1893,28 +1893,30 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 
 	}
 
+#define MODEL_OUTPUT_PREC 5
 void Model::FillGarliFormattedModelString(string &s) const{
 	char temp[1000];
+	int prec = MODEL_OUTPUT_PREC;
 	if(modSpec.IsCodon()){
 		s += " o";
 		for(int i=0;i<omegas.size();i++){
-			sprintf(temp," %f %f", *omegas[i], *omegaProbs[i]);
+			sprintf(temp," %.*f %.*f",  prec, *omegas[i],  prec, *omegaProbs[i]);
 			s += temp;
 			}
 		}
 	if(modSpec.IsAminoAcid() == false){
-		sprintf(temp," r %f %f %f %f %f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4));
+		sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", prec, Rates(0), prec, Rates(1), prec, Rates(2), prec, Rates(3), prec, Rates(4));
 		s += temp;
 		}
 	if(modSpec.IsNucleotide()){
-		sprintf(temp," e %f %f %f %f", StateFreq(0), StateFreq(1), StateFreq(2), StateFreq(3));
+		sprintf(temp," e %.*f %.*f %.*f %.*f",  prec, StateFreq(0),  prec, StateFreq(1),  prec, StateFreq(2),  prec, StateFreq(3));
 		s += temp;
 		}
 	else{
 		sprintf(temp," e ");
 		s += temp;
 		for(int i=0;i<nstates;i++){
-			sprintf(temp," %f ", StateFreq(i));
+			sprintf(temp," %.*f ",  prec, StateFreq(i));
 			s += temp;
 			}
 		}
@@ -1922,18 +1924,18 @@ void Model::FillGarliFormattedModelString(string &s) const{
 	if(modSpec.IsFlexRateHet()){
 		s += " f ";
 		for(int i=0;i<NRateCats();i++){
-			sprintf(temp, " %f %f ", rateMults[i], rateProbs[i]);
+			sprintf(temp, " %.*f %.*f ",  prec, rateMults[i],  prec, rateProbs[i]);
 			s += temp;
 			}
 		}
 	else{
 		if(modSpec.IsGammaRateHet()){
-			sprintf(temp, " a %f", Alpha());
+			sprintf(temp, " a %.*f",  prec, Alpha());
 			s += temp;
 			}
 		}
 	if(PropInvar()!=ZERO_POINT_ZERO){
-		sprintf(temp, " p %f", PropInvar());
+		sprintf(temp, " p %.*f",  prec, PropInvar());
 		s += temp;
 		}
 	s += " ";
