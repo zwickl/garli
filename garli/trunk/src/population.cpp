@@ -1507,10 +1507,13 @@ void Population::Run(){
 			boinc_checkpoint_completed();
 			}
 #endif
-		if(conf->stoptime - stopwatch.SplitTime() < 120){
-			outman.UserMessage("time limit of %d seconds reached...", conf->stoptime);
+		if(stopwatch.SplitTime() > conf->stoptime){
+			outman.UserMessage("NOTE: ****Specified time limit (%d seconds) reached...", conf->stoptime);
+			prematureTermination = true;
 			break;
 			}
+		if(gen == conf->stopgen)
+			outman.UserMessage("NOTE: ****Specified generation limit (%d) reached...", conf->stopgen);
 #ifdef INCLUDE_PERTURBATION
 		if(pertMan->pertAbandoned==true && pertMan->restartAfterAbandon==true && (gen - pertMan->lastPertGeneration > pertMan->gensBeforeRestart)){
 			params->starting_tree="";
