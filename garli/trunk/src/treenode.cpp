@@ -124,7 +124,7 @@ char *TreeNode::MakeNewick(char *s, bool internalNodes, bool branchLengths, bool
 			while(*s)s++;
 			}
 		*s++='(';
-		s=left->MakeNewick(s, internalNodes, branchLengths);
+		s=left->MakeNewick(s, internalNodes, branchLengths, highPrec);
 		if(anc){
 			if(branchLengths==true){
 				*s++=':';
@@ -153,7 +153,7 @@ char *TreeNode::MakeNewick(char *s, bool internalNodes, bool branchLengths, bool
 		
 	if(next){
 		*s++=',';
-		s=next->MakeNewick(s, internalNodes, branchLengths);
+		s=next->MakeNewick(s, internalNodes, branchLengths, highPrec);
 		}
 	else {
 		if(anc){
