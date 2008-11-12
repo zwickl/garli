@@ -1,49 +1,41 @@
-// GARLI version 0.96b8 source code
-// Copyright 2005-2008 Derrick J. Zwickl
-// email: zwickl@nescent.org
-//
-//  This program is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+/*
+ * cudaman.h
+ *
+ *  Created on: Nov 11, 2008
+ *      Author: ayres
+ */
 
 #ifndef CUDAMANAGER
 #define CUDAMANAGER
 
 using namespace std;
 
+#include "defs.h"
+
 class CudaManager {
+
+public:
+	CudaManager();
+	CudaManager(int nstatesIn, int numRateCatsIn, int ncharIn);
+	~CudaManager();
+
+	void BenchmarkGPU();
+
+private:
 	int nstates;
 	int numRateCats;
 	int nchar;
 
-public:
-	CudaManager() {
-		nstates=0;
-		numRateCats=0;
-		nchar=0;
-	}
+private:
+	// Allocates a matrix with random FLOAT_TYPE entries.
+	void RandomInit(FLOAT_TYPE* data, int size);
 
-	CudaManager(int nstatesIn, int numRateCatsIn, int ncharIn) {
-		nstates = nstatesIn;
-		numRateCats = numRateCatsIn;
-		nchar = ncharIn;
-	}
+	// Computes reference result
+	void ComputeGarliCLA(FLOAT_TYPE* dest, const FLOAT_TYPE* Lpr,
+					const FLOAT_TYPE* Rpr, const FLOAT_TYPE* LCL,
+					const FLOAT_TYPE* RCL);
 
-	~CudaManager() {
-	}
-
-	void BenchmarkGPU() {
-		outman.UserMessage("nstates %i, numRateCats %i, nchar %i", nstates, numRateCats, nchar);
-	}
+	void BenchmarkCLA();
 };
 
 #endif
