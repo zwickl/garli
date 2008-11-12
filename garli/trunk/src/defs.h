@@ -85,6 +85,8 @@ typedef double MODEL_FLOAT;
 	#define DEF_MAX_BRLEN 100.0f
 	#define DEF_STARTING_BRLEN 0.05f
 	#define GARLI_FP_EPS FLT_EPSILON
+	#define LUMP_LIKES
+	#define LUMP_FREQ 400
 #else
 	typedef double FLOAT_TYPE;
 	#define ONE_POINT_ZERO 1.0
