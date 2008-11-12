@@ -289,7 +289,8 @@ clean : tidy
 clobber : clean
 	$(VERBOSE)rm -rf $(ROOTOBJDIR)
 
-cudaman.cpp_o:		 cudaman.h
+cudainterface.cu_o:  cudakernel.cu defs.h
+cudaman.cpp_o:		 cudaman.h defs.h
 condlike.cpp_o:      condlike.h defs.h
 configreader.cpp_o:  configreader.h defs.h
 configoptions.cpp_o: configoptions.h hashdefines.h  defs.h
