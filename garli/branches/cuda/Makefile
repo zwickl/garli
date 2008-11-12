@@ -52,8 +52,8 @@ COMPILE_TYPE = gcc_any
 #See the NCL documentation for details on compiling it.
 #Note that you may be able to safely ignore some errors during
 #NCL compilation (Garli only needs the static library libncl.a)
-NCL_INCLUDES = /usr/local/include/ncl
-LIB_NCL = /usr/local/lib/ncl/libncl.a
+NCL_INCLUDES = /nfshomes/ayres/ncl-2.1.04/include/ncl
+LIB_NCL = /nfshomes/ayres/ncl-2.1.04/lib/ncl/libncl.a
 
 #(3)set this to yes to compile a version that uses MPI to fork
 #multiple serial runs across processors (using the same config)
@@ -108,7 +108,7 @@ endif
 .SUFFIXES : .cu .cu_dbg_o .c_dbg_o .cpp_dbg_o .cu_rel_o .c_rel_o .cpp_rel_o .cubin
 
 
-CUDA_INSTALL_PATH ?= /usr/local/cuda
+CUDA_INSTALL_PATH ?= /nfshomes/ayres/cuda_64_rhel5/cuda
 
 ifdef cuda-install
 	CUDA_INSTALL_PATH := $(cuda-install)
