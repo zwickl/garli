@@ -8,9 +8,10 @@
 # Add source files here
 EXECUTABLE	:= GPUGarli0.96
 # Cuda source files (compiled with cudacc)
-CUFILES		:= 
+CUFILES		:= cudainterface.cu
 # C/C++ source files (compiled with gcc / c++)
 CCFILES		:= \
+	cudaman.cpp \
 	condlike.cpp \
 	datamatr.cpp \
 	individual.cpp \
@@ -287,7 +288,8 @@ clean : tidy
 
 clobber : clean
 	$(VERBOSE)rm -rf $(ROOTOBJDIR)
-	
+
+cudaman.cpp_o:		 cudaman.h
 condlike.cpp_o:      condlike.h defs.h
 configreader.cpp_o:  configreader.h defs.h
 configoptions.cpp_o: configoptions.h hashdefines.h  defs.h
@@ -305,7 +307,7 @@ translatetable.cpp_o:translatetable.h defs.h
 set.cpp_o:           set.h defs.h
 rng.cpp_o:           rng.h defs.h
 topologylist.cpp_o:  topologylist.h defs.h
-adaptation.cpp_o:	 	 adaptation.h hashdefines.h defs.h
-sequencedata.cpp_o:		 sequencedata.h defs.h
-garlireader.cpp_o:	garlireader.h defs.h
+adaptation.cpp_o:	 adaptation.h hashdefines.h defs.h
+sequencedata.cpp_o:	 sequencedata.h defs.h
+garlireader.cpp_o:	 garlireader.h defs.h
 
