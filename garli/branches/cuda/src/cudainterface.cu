@@ -6,6 +6,7 @@
  */
 
 #include "cutil.h"
+#include <iostream>
 
 // includes, kernels
 #include "cudakernel.cu"

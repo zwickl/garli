@@ -219,7 +219,7 @@ endif
 
 # workaround for mac os x cuda 1.1 compiler issues
 ifneq ($(DARWIN),)
-	NVCCFLAGS += --host-compilation=C
+	#NVCCFLAGS += --host-compilation=C
 endif
 
 # Add common flags
@@ -289,7 +289,7 @@ clean : tidy
 clobber : clean
 	$(VERBOSE)rm -rf $(ROOTOBJDIR)
 
-cudainterface.cu_o:  cudakernel.cu
+cudainterface.cu_o:  cudakernel.cu defs.h
 cudaman.cpp_o:		 cudaman.h defs.h
 condlike.cpp_o:      condlike.h defs.h
 configreader.cpp_o:  configreader.h defs.h
