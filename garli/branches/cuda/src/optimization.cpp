@@ -1168,7 +1168,7 @@ if(nd->nodeNum == 8){
 		else if(d1 > ZERO_POINT_ZERO && nd->dlen > knownMin) knownMin = nd->dlen;
 
 														#ifdef OPT_DEBUG			
-//														opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
+														opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
 														#endif
 		FLOAT_TYPE abs_d1 = fabs(d1);
 		if (d2 >= ZERO_POINT_ZERO){//curvature is wrong for NR use 
@@ -1278,7 +1278,19 @@ if(nd->nodeNum == 8){
 			//12/9/07 now requiring the actual likelihood to improve.  Single optimization passes with AA and Codon
 			//models were fairly often moving to worse likelihoods but indicating that the function should return
 			//since the deriv calculations are now calculating the true likelihood, this has no real overhead		
+#ifdef NR_EXIT_96
+			if(estScoreDelta < precision1 && (iter == 0 || lnL >= initialL)){
+#elif defined(NR_EXIT_R340)
+			if(estScoreDelta < precision1 && (iter == 0 || lnL + 1.0e-8 >= initialL)){
+#elif defined(NR_EXIT_R343)
 			if(estScoreDelta < precision1 && (iter == 0 || lnL + max(1.0e-7, GARLI_FP_EPS * 10.0) >= initialL)){
+#else
+			//this will gradually increase the tolerated amount of score worsening (due to floating point imprecision)
+			//as the iterations go on.  If possible we'd still like to see very close scores, but if we're having
+			//trouble getting close after many iterations we don't want to terminate the program.  If something is
+			//horribly wrong with the scores this will still cause termination. 
+			if(estScoreDelta < precision1 && (iter == 0 || lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, GARLI_FP_EPS * 10)) >= initialL)){
+#endif				
 														#ifdef OPT_DEBUG			
 														opt << "delta < prec, return\n";
 														if(curScore==-ONE_POINT_ZERO){
@@ -1478,7 +1490,7 @@ opt << v << "\t" << "\n";
 opt.flush();
 #endif
 #ifdef OPT_DEBUG
-	opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
+//	opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
 	opt << v << "\t" << "\n";
 	opt.flush();
 #endif
@@ -1996,10 +2008,14 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	FLOAT_TYPE D1a, D1c, D1g, D1t;
 	FLOAT_TYPE D2a, D2c, D2g, D2t;
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
-	FLOAT_TYPE totL=ZERO_POINT_ZERO;
+	FLOAT_TYPE totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;
 
 #ifdef OMP_TERMDERIV
+	#ifdef LUMP_LIKES
+	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, Ldata, siteL) reduction(+ : tot1, tot2, totL, grandSumL)
+	#else	
 	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, Ldata, siteL) reduction(+ : tot1, tot2, totL)
+	#endif
 	for(int i=0;i<nchar;i++){
 		Ldata = &Ldat[ambigMap[i]];
 		partial = &partialCLA->arr[i*4*nRateCats];
@@ -2111,7 +2127,16 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 				}
 			}
 #endif
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumL += totL;
+			totL = ZERO_POINT_ZERO;
+			}
 		}
+	totL = totL + grandSumL;
+#else
+		}
+#endif
 
 	d1Tot = tot1;
 	d2Tot = tot2;
@@ -2146,7 +2171,7 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 	FLOAT_TYPE siteL, siteD1, siteD2;
 
 #undef OUTPUT_DERIVS
@@ -2177,7 +2202,11 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	if(nRateCats == 1){
 
 	#ifdef OMP_TERMDERIV_NSTATE
+		#ifdef LUMP_LIKES
+		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL, grandSumL)
+		#else
 		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL)
+		#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates*nRateCats];
@@ -2237,12 +2266,25 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 #endif
 				Ldata++;
 				}
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumL += totL;
+				totL = ZERO_POINT_ZERO;
+				}
 			}
+		totL += grandSumL;
+#else
+			}
+#endif
 		}
 	else{
 
 #ifdef OMP_TERMDERIV_NSTATE
-		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL)
+	#ifdef LUMP_LIKES
+	#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL, grandSumL)
+	#else
+	#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL)
+	#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates*nRateCats];
@@ -2299,7 +2341,16 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 #endif
 				Ldata++;
 				}
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumL += totL;
+				totL = ZERO_POINT_ZERO;
+				}
 			}
+		totL += grandSumL;
+#else
+			}
+#endif
 		}
 
 #ifdef OUTPUT_DERIVS
@@ -2340,7 +2391,7 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE rateL, rateD1, rateD2;
@@ -2371,7 +2422,11 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 #endif
 
 #ifdef OMP_TERMDERIV_NSTATE
-		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL)
+	#ifdef LUMP_LIKES
+	#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL, grandSumL)
+	#else
+	#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL)
+	#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates*nRateCats];
@@ -2432,7 +2487,16 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 #endif
 				Ldata++;
 				}
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumL += totL;
+				totL = ZERO_POINT_ZERO;
+				}
 			}
+		totL += grandSumL;
+#else
+			}
+#endif
 
 #ifdef OUTPUT_DERIVS
 	out.close();
@@ -2479,10 +2543,14 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	FLOAT_TYPE D1a, D1c, D1g, D1t;
 	FLOAT_TYPE D2a, D2c, D2g, D2t;
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
-	FLOAT_TYPE totL=ZERO_POINT_ZERO;
+	FLOAT_TYPE totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;
 
 #ifdef OMP_INTDERIV
-#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, CL1, siteL) reduction(+ : tot1, tot2, totL)
+	#ifdef LUMP_LIKES
+	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, CL1, siteL) reduction(+ : tot1, tot2, totL, grandSumL)
+	#else
+	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, CL1, siteL) reduction(+ : tot1, tot2, totL)
+	#endif
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[4*i*nRateCats]);
 		CL1		= &(childCLA->arr[4*i*nRateCats]);
@@ -2551,7 +2619,17 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	//		CL1+=4*nRateCats;			
 			}
 #endif
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumL += totL;
+			totL = ZERO_POINT_ZERO;
+			}
 		}
+	totL += grandSumL;
+#else
+		}
+#endif
+
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL = totL;
@@ -2588,14 +2666,18 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO, grandSumL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
 	FLOAT_TYPE rateL, rateD1, rateD2;
 
 #ifdef OMP_INTDERIV_NSTATE
+	#ifdef LUMP_LIKES
+	#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, rateL, rateD1, rateD2, partial, CL1) reduction(+ : tot1, tot2, totL, grandSumL)
+	#else
 	#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, rateL, rateD1, rateD2, partial, CL1) reduction(+ : tot1, tot2, totL)
+	#endif
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[nRateCats * nstates * i]);
 		CL1		= &(childCLA->arr[nRateCats * nstates * i]);
@@ -2640,7 +2722,16 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 			assert(tot1 == tot1);
 			assert(tot2 == tot2);
 			}
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumL += totL;
+			totL = ZERO_POINT_ZERO;
+			}
 		}
+	totL += grandSumL;
+#else
+		}
+#endif
 
 	d1Tot = tot1;
 	d2Tot = tot2;
@@ -2678,13 +2769,17 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO, grandSumL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
 
 #ifdef OMP_INTDERIV_NSTATE
-#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, partial, CL1) reduction(+ : tot1, tot2, totL)
+	#ifdef LUMP_LIKES
+	#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, partial, CL1) reduction(+ : tot1, tot2, totL, grandSumL)
+	#else
+	#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, partial, CL1) reduction(+ : tot1, tot2, totL)
+	#endif
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[nstates*i]);
 		CL1		= &(childCLA->arr[nstates*i]);
@@ -2724,7 +2819,16 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 			partial += nstates;
 			CL1 += nstates;
 			}
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumL += tot1;
+			totL = ZERO_POINT_ZERO;
+			}
 		}
+	tot1 = tot1 + grandSumL;
+#else
+		}
+#endif
 
 	d1Tot = tot1;
 	d2Tot = tot2;

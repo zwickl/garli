@@ -22,7 +22,7 @@
 //these will be defined by either the Microsoft compiler
 //or the intel compiler when openmp support is turned on
 //by compiling with /openmp (ms) or -openmp (icc)
-//Nothing else should need to be defined anywhere to get
+//Nothing else should need to be defined anywhere to get 
 //openMP working
 #if defined (__OPENMP) || defined (_OPENMP)
 	#include "omp.h"
@@ -31,7 +31,7 @@
 	#define OMP_INTTERMCLA
 	#define OMP_TERMDERIV
 	#define OMP_INTDERIV
-
+	
 	#define OMP_INTINTCLA_NSTATE
 	#define OMP_INTTERMCLA_NSTATE
 	#define OMP_TERMDERIV_NSTATE
@@ -87,6 +87,8 @@ typedef double MODEL_FLOAT;
 	#define DEF_MAX_BRLEN 100.0f
 	#define DEF_STARTING_BRLEN 0.05f
 	#define GARLI_FP_EPS FLT_EPSILON
+	#define LUMP_LIKES
+	#define LUMP_FREQ 400
 #else
 	typedef double FLOAT_TYPE;
 	#define ONE_POINT_ZERO 1.0
