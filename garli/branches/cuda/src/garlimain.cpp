@@ -71,7 +71,29 @@ int CheckRestartNumber(const string str){
 	}
 
 void UsageMessage(char *execName){
-#ifndef SUBROUTINE_GARLI
+#ifdef SUBROUTINE_GARLI	
+	outman.UserMessage("This MPI version is for doing a large number of search replicates or bootstrap");
+	outman.UserMessage("replicates, each using the SAME config file.  The results will be exactly");
+ 	outman.UserMessage("identical to those obtained by executing the config file a comparable number");
+ 	outman.UserMessage("of times with the serial version of the program.");
+	outman.UserMessage("\nUsage: The syntax for launching MPI jobs varies between systems");
+	outman.UserMessage("Most likely it will look something like the following:");
+	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
+	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.");
+	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
+#elif defined (OLD_SUBROUTINE_GARLI)
+	outman.UserMessage("This MPI version is for doing a large number of independent jobs in batch, each");
+	outman.UserMessage("using a DIFFERENT config file.  This might be useful for analyzing a large");
+	outman.UserMessage("number of simulated datasets or for analyzing a single dataset under a variety");
+	outman.UserMessage("of models or search settings.  The results will be exactly the same as if each");
+	outman.UserMessage("config file were executed separately by a serial version of GARLI.");
+	outman.UserMessage("\nUsage: The syntax for launching MPI jobs varies between systems");
+	outman.UserMessage("Most likely it will look something like the following:");
+	outman.UserMessage("  mpirun [MPI OPTIONS] %s [# of provided config files]", execName);
+	outman.UserMessage("This version will expect config files named \"run0.conf\", \"run1.conf\", etc.");
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
+#else
 	outman.UserMessage("Usage: %s [OPTION] [config filename]", execName);
 	outman.UserMessage("Options:");
 	outman.UserMessage("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
@@ -82,15 +104,9 @@ void UsageMessage(char *execName){
 	outman.UserMessage("  -h, --help		print this help and exit");
 	outman.UserMessage("  -t			run internal tests (requires dataset and config file)");
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"");
-#else
-	outman.UserMessage("Usage: The syntax for launching MPI jobs varies between systems");
-	outman.UserMessage("Most likely it will look something like the following:");
-	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
-	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.");
-	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
-	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
 #endif
 	}
+
 #ifdef BOINC
 int boinc_garli_main( int argc, char* argv[] );
 
@@ -108,8 +124,8 @@ int main( int argc, char* argv[] ){
 int boinc_garli_main( int argc, char* argv[] )	{
 	outman.SetNoOutput(true);
 
-#elif defined( SUBROUTINE_GARLI )
-int SubGarliMain(int rank)
+#elif defined( SUBROUTINE_GARLI ) || defined(OLD_SUBROUTINE_GARLI)
+int SubGarliMain(int rank)	
 	{
 	int argc=1;
 	char **argv=NULL;
@@ -128,13 +144,14 @@ int main( int argc, char* argv[] )	{
 	#endif
 
 	string conf_name;
-#ifndef SUBROUTINE_GARLI
+
+#ifdef OLD_SUBROUTINE_GARLI
+	char name[12];
+	sprintf(name, "run%d.conf", rank);
+	conf_name = name;
+#elif defined(SUBROUTINE_GARLI)
 	conf_name = "garli.conf";
 #else
-//	char temp[100];
-//	sprintf(temp, "run%d.conf", rank);
-//	conf_name = temp;
-	//use the same config here too
 	conf_name = "garli.conf";
 #endif
 
@@ -164,7 +181,7 @@ int main( int argc, char* argv[] )	{
 							EXIT_FAILURE;
 						}
 						[pool release];
-#endif
+#endif				
 					else if(argv[curarg][1]=='t') runTests = true;
 					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
 						outman.UserMessage("%s Version %.2f.%d", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION);
@@ -201,14 +218,14 @@ int main( int argc, char* argv[] )	{
 		//create the population object
 		Population pop;
 		SequenceData *data = NULL;
-
+		
 		try{
 			MasterGamlConfig conf;
 			bool confOK;
 			confOK = ((conf.Read(conf_name.c_str()) < 0) == false);
 
 #ifdef SUBROUTINE_GARLI
-			//override the ofprefix here, tacking .runXX onto it
+			//override the ofprefix here, tacking .runXX onto it 
 			char temp[10];
 			if(rank < 10) sprintf(temp, ".run0%d", rank);
 			else sprintf(temp, ".run%d", rank);
@@ -223,7 +240,7 @@ int main( int argc, char* argv[] )	{
 				}
 			else randomSeed=conf.randseed;
 			rnd.set_seed(randomSeed);
-
+			
 			char temp_buf[100];
 
 			string datafile = conf.datafname;
@@ -239,7 +256,7 @@ int main( int argc, char* argv[] )	{
 
 			//check for the presence of BOINC checkpoint files
 			conf.restart = true;
-
+			
 			sprintf(temp_buf, "%s.adap.check", conf.ofprefix.c_str());
 			boinc_resolve_filename(temp_buf, buffer, sizeof(buffer));
 			if(FileExists(buffer) == false) conf.restart = false;
@@ -261,7 +278,7 @@ int main( int argc, char* argv[] )	{
 
 			if(conf.restart)
 				outman.SetLogFileForAppend(temp_buf);
-			else
+			else 
 				outman.SetLogFile(temp_buf);
 
 			outman.UserMessage("Running BOINC GARLI, version 0.96beta8 r315 (Aug 2008)\n");
@@ -282,7 +299,7 @@ int main( int argc, char* argv[] )	{
 			else outman.SetLogFile(temp_buf);
 #ifdef SUBROUTINE_GARLI
 			outman.UserMessage("Running GARLI, version 0.96beta8 r315 (Aug 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
-			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)");
+			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
 #else	//nonMPI version
 			outman.UserMessage("Running serial GARLI, version 0.96beta8 r315 (Aug 2008)\n");
@@ -291,11 +308,11 @@ int main( int argc, char* argv[] )	{
 #endif  //not BOINC
 
 #ifdef OPEN_MP
-			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores");
+			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
 #endif
 			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
-			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__);
+			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__); 
 
 #if defined (_MSC_VER)
 			outman.UserMessage(" using Microsoft C++ compiler version %.2f", _MSC_VER/100.0);
@@ -303,7 +320,7 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage(" using Intel icc compiler version %.2f", __INTEL_COMPILER/100.0);
 #elif defined(__GNUC__)
 			outman.UserMessage(" using GNU gcc compiler version %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
-#else
+#else	
 			outman.UserMessage("");
 #endif
 
@@ -329,7 +346,7 @@ int main( int argc, char* argv[] )	{
 				data = new NucleotideData();
 
 			pop.usedNCL = ReadData(datafile.c_str(), data);
-
+			
 			if(modSpec.IsCodon()){
 				CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
 				pop.rawData = data;
@@ -342,7 +359,7 @@ int main( int argc, char* argv[] )	{
 			else if(modSpec.IsCodonAminoAcid()){
 				AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
 				pop.rawData = data;
-				data = d;
+				data = d;				
 				}
 
 			data->Summarize();
@@ -363,13 +380,6 @@ int main( int argc, char* argv[] )	{
 			data->Collapse();
 			outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
 
-#ifdef CUDA_GPU
-			CudaManager cudaman(modSpec.nstates, modSpec.numRateCats, data->NChar());
-			//cudaman = new CudaManager(modSpec.nstates, modSpec.numRateCats, data->NChar());
-			cudaman.BenchmarkGPU();
-			return 0;
-#endif
-
 			//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 			data->ReserveOriginalCounts();
 
@@ -384,7 +394,7 @@ int main( int argc, char* argv[] )	{
 				outman.UserMessage("******Successfully completed tests.******");
 				return 0;
 				}
-
+			
 			if(conf.runmode != 0){
 				if(conf.runmode == 1)
 					pop.ApplyNSwaps(10);
@@ -443,7 +453,7 @@ int main( int argc, char* argv[] )	{
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
 				}
 		if(data != NULL) delete data;
-
+	
 		if(interactive==true){
 			outman.UserMessage("\n-Press enter to close program.-");
 			char d=getchar();

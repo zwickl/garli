@@ -88,6 +88,7 @@ vector<Constraint> Tree::constraints;
 AttemptedSwapList Tree::attemptedSwaps;
 FLOAT_TYPE Tree::uniqueSwapBias;
 FLOAT_TYPE Tree::distanceSwapBias;
+FLOAT_TYPE Tree::expectedPrecision;
 
 FLOAT_TYPE Tree::uniqueSwapPrecalc[500];
 FLOAT_TYPE Tree::distanceSwapPrecalc[1000];
@@ -4770,14 +4771,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE siteL, totallnL=0.0;
+	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, unscaledlnL, grandSumlnL=ZERO_POINT_ZERO;
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
 #undef OUTPUT_SITELIKES
-
-	FLOAT_TYPE unscaledlnL;
 
 #ifdef OUTPUT_SITELIKES
 	vector<double> siteLikes;
@@ -4787,7 +4786,11 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 
 	if(nRateCats == 1){
 #ifdef OMP_TERMSCORE_NSTATE
+		#ifdef LUMP_LIKES
+		#pragma omp parallel for private(partial, Ldata, siteL, unscaledlnL) reduction(+ : totallnL, grandSumlnL)
+		#else
 		#pragma omp parallel for private(partial, Ldata, siteL, unscaledlnL) reduction(+ : totallnL)
+		#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates];
@@ -4840,6 +4843,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 			else{//nothing needs to be done if the count for this site is 0
 				}
 			Ldata++;
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumlnL += totallnL;
+				totallnL = ZERO_POINT_ZERO;
+				}
+#endif
 	#ifndef OUTPUT_SITELIKES
 			}
 	#else
@@ -4855,7 +4864,11 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	else{//multiple rates
 		FLOAT_TYPE rateL;
 #ifdef OMP_TERMSCORE_NSTATE
-		#pragma omp parallel for private(partial, Ldata, siteL, rateL, unscaledlnL) reduction(+ : totallnL)
+	#ifdef LUMP_LIKES
+	#pragma omp parallel for private(partial, Ldata, siteL, rateL, unscaledlnL) reduction(+ : totallnL, grandSumlnL)
+	#else
+	#pragma omp parallel for private(partial, Ldata, siteL, rateL, unscaledlnL) reduction(+ : totallnL)
+	#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates*nRateCats];
@@ -4913,6 +4926,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 #endif
 				}
 			Ldata++;
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumlnL += totallnL;
+				totallnL = ZERO_POINT_ZERO;
+				}
+#endif
 	#ifndef OUTPUT_SITELIKES
 			}
 	#else
@@ -4925,6 +4944,9 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 		packed.close();
 	#endif
 		}
+#ifdef LUMP_LIKES
+	totallnL += grandSumlnL;
+#endif
 
 	delete []freqs;
 	return totallnL;
@@ -4958,14 +4980,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	if(siteToScore > 0) Ldata = AdvanceDataPointer(Ldata, siteToScore);
 #endif
 
-	FLOAT_TYPE siteL, totallnL=0.0;
+	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 
 #ifdef OUTPUT_SITELIKES
 	vector<double> siteLikes;
 #endif
-
-	FLOAT_TYPE unscaledlnL;
 
 	for(int i=0;i<nchar;i++){
 #ifdef USE_COUNTS_IN_BOOT
@@ -5043,6 +5063,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 					}while (states-- > 0);
 				}
 			}
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumlnL += totallnL;
+			totallnL = ZERO_POINT_ZERO;
+			}
+#endif
 #ifndef OUTPUT_SITELIKES
 		}
 #else
@@ -5053,6 +5079,9 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	OutputSiteLikelihoods(siteLikes, underflow_mult, NULL, ord, packed);
 	ord.close();
 	packed.close();
+#endif
+#ifdef LUMP_LIKES
+	totallnL += grandSumlnL;
 #endif
 	return totallnL;
 	}
@@ -5084,14 +5113,12 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE siteL, totallnL=0.0;
+	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 
 #ifdef OUTPUT_SITELIKES
 	vector<double> siteLikes;
 #endif
-	
-FLOAT_TYPE	unscaledlnL;
 
 	for(int i=0;i<nchar;i++){
 #ifdef USE_COUNTS_IN_BOOT
@@ -5139,6 +5166,12 @@ FLOAT_TYPE	unscaledlnL;
 			CL1+=4*nRateCats;
 #endif
 			}
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumlnL += totallnL;
+			totallnL = ZERO_POINT_ZERO;
+			}
+#endif
 #ifndef OUTPUT_SITELIKES
 		}
 #else
@@ -5150,6 +5183,10 @@ FLOAT_TYPE	unscaledlnL;
 	ord.close();
 	packed.close();
 #endif
+#ifdef LUMP_LIKES
+	totallnL += grandSumlnL;
+#endif
+
 	return totallnL;
 	}
 
@@ -5176,12 +5213,10 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE totallnL=0.0, siteL;
+	FLOAT_TYPE totallnL=ZERO_POINT_ZERO, siteL, unscaledlnL, grandSumlnL=ZERO_POINT_ZERO;
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
-
-	FLOAT_TYPE unscaledlnL;
 
 #ifdef OUTPUT_SITELIKES
 	vector<double> siteLikes;
@@ -5189,7 +5224,11 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 
 	if(nRateCats == 1){
 #ifdef OMP_INTSCORE_NSTATE
+	#ifdef LUMP_LIKES
+	#pragma omp parallel for private(partial, CL1, siteL, unscaledlnL) reduction(+ : totallnL, grandSumlnL)
+	#else
 	#pragma omp parallel for private(partial, CL1, siteL, unscaledlnL) reduction(+ : totallnL)
+	#endif
 		for(int i=0;i<nchar;i++){
 			partial = &(partialCLA->arr[nstates*i]);
 			CL1		= &(childCLA->arr[nstates*i]);
@@ -5236,7 +5275,12 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				}
 			else{//nothing needs to be done if the count for this site is 0
 				}
-
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumlnL += totallnL;
+				totallnL = ZERO_POINT_ZERO;
+				}
+#endif
 #ifndef OUTPUT_SITELIKES
 			}
 #else
@@ -5253,7 +5297,11 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 		FLOAT_TYPE siteL, tempL, rateL;
 		
 #ifdef OMP_INTSCORE_NSTATE
-		#pragma omp parallel for private(partial, CL1, siteL, tempL, rateL, unscaledlnL) reduction(+ : totallnL)
+	#ifdef LUMP_LIKES
+	#pragma omp parallel for private(partial, CL1, siteL, tempL, rateL, unscaledlnL) reduction(+ : totallnL, grandSumlnL)
+	#else
+	#pragma omp parallel for private(partial, CL1, siteL, tempL, rateL, unscaledlnL) reduction(+ : totallnL)
+	#endif
 		for(int i=0;i<nchar;i++){
 			partial = &(partialCLA->arr[nRateCats*nstates*i]);
 			CL1		= &(childCLA->arr[nRateCats*nstates*i]);
@@ -5298,24 +5346,33 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				if(unscaledlnL < ZERO_POINT_ZERO)
 					totallnL += (countit[i] * unscaledlnL);
 
-#ifdef OUTPUT_SITELIKES
-				siteLikes.push_back(unscaledlnL);
-#endif
-
 #ifdef ALLOW_SINGLE_SITE
 				if(siteToScore > -1) break;
 #endif
 				}
 			else{ //nothing needs to be done if the count of this site is 0
 				}
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumlnL += totallnL;
+				totallnL = ZERO_POINT_ZERO;
+				}
+#endif
+
+#ifndef OUTPUT_SITELIKES
 			}
+#else
+			siteLikes.push_back(unscaledlnL);
+			}
+		ofstream ord("orderedSiteLikes.log");
+		ofstream packed("packedSiteLikes.log");
+		OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2, ord, packed);
+		ord.close();
+		packed.close();
+#endif
 		}
-#ifdef OUTPUT_SITELIKES
-	ofstream ord("orderedSiteLikes.log");
-	ofstream packed("packedSiteLikes.log");
-	OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2, ord, packed);
-	ord.close();
-	packed.close();
+#ifdef LUMP_LIKES
+	totallnL += grandSumlnL;
 #endif
 
 	delete []freqs;
