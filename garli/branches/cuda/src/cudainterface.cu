@@ -25,7 +25,7 @@ void AllocateGPU(void** arr, unsigned int mem_size_bytes) {
 }
 
 extern "C"
-void RunGPUCLA(FLOAT_TYPE* h_Lpr, FLOAT_TYPE* h_Rpr, FLOAT_TYPE* h_LCL, FLOAT_TYPE* h_RCL, FLOAT_TYPE* h_CLA,
+void ComputeGPUCLA(FLOAT_TYPE* h_Lpr, FLOAT_TYPE* h_Rpr, FLOAT_TYPE* h_LCL, FLOAT_TYPE* h_RCL, FLOAT_TYPE* h_CLA,
 		FLOAT_TYPE* d_Lpr, FLOAT_TYPE* d_Rpr, FLOAT_TYPE* d_LCL, FLOAT_TYPE* d_RCL, FLOAT_TYPE* d_CLA,
 		unsigned int mem_size_pr, unsigned int mem_size_CL,
 		int nstates, int nRateCats, int nchar, int ncharGPU, dim3 dimBlock, dim3 dimGrid) {
@@ -72,7 +72,7 @@ void RunGPUCLA(FLOAT_TYPE* h_Lpr, FLOAT_TYPE* h_Rpr, FLOAT_TYPE* h_LCL, FLOAT_TY
 }
 
 extern "C"
-void RunGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1, int* h_partial_underflow_mult,
+void ComputeGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1, int* h_partial_underflow_mult,
 		int* h_CL1_underflow_mult, FLOAT_TYPE* h_prmat, FLOAT_TYPE* h_d1mat, FLOAT_TYPE* h_d2mat,
 		FLOAT_TYPE* h_rateProb, FLOAT_TYPE* h_freqs, int* h_countit, int* h_conStates,
 		FLOAT_TYPE* h_Tots, FLOAT_TYPE* h_Tots_arr,
