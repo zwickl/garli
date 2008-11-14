@@ -6296,6 +6296,12 @@ void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondL
 	const int nchar = data->NChar();
 	const int *counts = data->GetCounts();
 
+#ifdef CUDA_GPU
+	if (cudaman->GetGPUCLAEnabled()) {
+		cudaman->ComputeGPUCLA(Lpr, Rpr, LCL, RCL, dest);
+	} else {
+#endif
+
 #ifdef UNIX
 	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 	madvise((void *)LCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
@@ -6338,6 +6344,10 @@ void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondL
 #endif
 			}
 		}
+
+#ifdef CUDA_GPU
+		}
+#endif
 
 	const int *left_mult=LCLA->underflow_mult;
 	const int *right_mult=RCLA->underflow_mult;
