@@ -506,7 +506,7 @@ void CudaManager::TestGPUCLA() {
 		outman.UserMessageNoCR("%4.2f\t", best_cpu);
 		outman.UserMessageNoCR("%4.4f\t", best_gpu);
 		outman.UserMessageNoCR("%s\t", (test_passed) ? "passed" : "failed");
-		outman.UserMessageNoCR("%s\n", (gpu_cla_enabled) ? "true" : "false");
+		outman.UserMessageNoCR("%s\n", (gpu_cla_enabled) ? "yes" : "no");
 	}
 }
 
@@ -755,6 +755,6 @@ void CudaManager::TestGPUDeriv() {
 		outman.UserMessageNoCR("%4.2f\t", best_cpu);
 		outman.UserMessageNoCR("%4.4f\t", best_gpu);
 		outman.UserMessageNoCR("%s\t", (test_passed) ? "passed" : "failed");
-		outman.UserMessageNoCR("%s\n", (gpu_deriv_enabled) ? "true" : "false");
+		outman.UserMessageNoCR("%s\n", (gpu_deriv_enabled) ? "yes" : "no");
 	}
 }
