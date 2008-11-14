@@ -1486,8 +1486,8 @@ if(nd->nodeNum == 8){
 		curScore=lnL;	
 		delta=prevScore - lnL;
 
-opt << v << "\t" << "\n";
-opt.flush();
+//opt << v << "\t" << "\n";
+//opt.flush();
 #endif
 #ifdef OPT_DEBUG
 //	opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";		
@@ -2133,7 +2133,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			totL = ZERO_POINT_ZERO;
 			}
 		}
-	totL = totL + grandSumL;
+	totL += grandSumL;
 #else
 		}
 #endif
@@ -2821,11 +2821,11 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
-			grandSumL += tot1;
+			grandSumL += totL;
 			totL = ZERO_POINT_ZERO;
 			}
 		}
-	tot1 = tot1 + grandSumL;
+	totL += grandSumL;
 #else
 		}
 #endif
