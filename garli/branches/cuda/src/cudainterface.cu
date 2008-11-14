@@ -37,11 +37,11 @@ void CuComputeGPUCLA(FLOAT_TYPE* h_Lpr, FLOAT_TYPE* h_Rpr, FLOAT_TYPE* h_LCL, FL
 
 	// run kernel
 	if (nstates == 4)
-		GarliCLANucleotideNRate<<< dimGrid, dimBlock >>>(d_CLA, d_Lpr, d_Rpr, d_LCL, d_RCL, nRateCats);
+	GarliCLANucleotideNRate<<< dimGrid, dimBlock >>>(d_CLA, d_Lpr, d_Rpr, d_LCL, d_RCL, nRateCats);
 	else if (nstates == 20)
-		GarliCLAAminoAcidNRate<<< dimGrid, dimBlock >>>(d_CLA, d_Lpr, d_Rpr, d_LCL, d_RCL, nRateCats);
+	GarliCLAAminoAcidNRate<<< dimGrid, dimBlock >>>(d_CLA, d_Lpr, d_Rpr, d_LCL, d_RCL, nRateCats);
 	else
-		GarliCLACodonNRate<<< dimGrid, dimBlock >>>(d_CLA, d_Lpr, d_Rpr, d_LCL, d_RCL, nRateCats);
+	GarliCLACodonNRate<<< dimGrid, dimBlock >>>(d_CLA, d_Lpr, d_Rpr, d_LCL, d_RCL, nRateCats);
 
 	//check if kernel execution generated and error
 	CUT_CHECK_ERROR("Kernel execution failed");
@@ -100,20 +100,20 @@ void CuComputeGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1, int* h_partial_
 
 	// run kernel
 	if (nstates == 4)
-		GarliDerivNucleotideNRate<<< dimGrid, dimBlock >>>(d_partial, d_CL1, d_partial_underflow_mult,
-				d_CL1_underflow_mult, d_prmat, d_d1mat, d_d2mat,
-				d_rateProb, d_freqs, d_countit, d_conStates, d_Tots_arr,
-				lastConst, NoPinvInModel, prI, nRateCats);
+	GarliDerivNucleotideNRate<<< dimGrid, dimBlock >>>(d_partial, d_CL1, d_partial_underflow_mult,
+			d_CL1_underflow_mult, d_prmat, d_d1mat, d_d2mat,
+			d_rateProb, d_freqs, d_countit, d_conStates, d_Tots_arr,
+			lastConst, NoPinvInModel, prI, nRateCats);
 	else if (nstates == 20)
-		GarliDerivAminoAcidNRate<<< dimGrid, dimBlock >>>(d_partial, d_CL1, d_partial_underflow_mult,
-				d_CL1_underflow_mult, d_prmat, d_d1mat, d_d2mat,
-				d_rateProb, d_freqs, d_countit, d_conStates, d_Tots_arr,
-				lastConst, NoPinvInModel, prI, nRateCats);
+	GarliDerivAminoAcidNRate<<< dimGrid, dimBlock >>>(d_partial, d_CL1, d_partial_underflow_mult,
+			d_CL1_underflow_mult, d_prmat, d_d1mat, d_d2mat,
+			d_rateProb, d_freqs, d_countit, d_conStates, d_Tots_arr,
+			lastConst, NoPinvInModel, prI, nRateCats);
 	else
-		GarliDerivCodonNRate<<< dimGrid, dimBlock >>>(d_partial, d_CL1, d_partial_underflow_mult,
-				d_CL1_underflow_mult, d_prmat, d_d1mat, d_d2mat,
-				d_rateProb, d_freqs, d_countit, d_conStates, d_Tots_arr,
-				lastConst, NoPinvInModel, prI, nRateCats);
+	GarliDerivCodonNRate<<< dimGrid, dimBlock >>>(d_partial, d_CL1, d_partial_underflow_mult,
+			d_CL1_underflow_mult, d_prmat, d_d1mat, d_d2mat,
+			d_rateProb, d_freqs, d_countit, d_conStates, d_Tots_arr,
+			lastConst, NoPinvInModel, prI, nRateCats);
 
 	//check if kernel execution generated and error
 	CUT_CHECK_ERROR("Kernel execution failed");
@@ -152,45 +152,59 @@ void CuComputeGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1, int* h_partial_
 			h_CL1 += nstates;
 		}
 
-		if((NoPinvInModel == false) && (i<=lastConst))
-		siteL += (prI*h_freqs[h_conStates[i]] * exp((FLOAT_TYPE)h_partial_underflow_mult[i]) * exp((FLOAT_TYPE)h_CL1_underflow_mult[i]));
+		if((NoPinvInModel == false) && (i<=lastConst)) {
+			if (nstates == 4) {
+				float btot = 0.0f;
+				if (h_conStates[i] & 1)
+				btot += h_freqs[0];
+				if (h_conStates[i] & 2)
+				btot += h_freqs[1];
+				if (h_conStates[i] & 4)
+				btot += h_freqs[2];
+				if (h_conStates[i] & 8)
+				btot += h_freqs[3];
+				siteL += (prI * btot) * exp(h_partial_underflow_mult[i]
+						+ h_CL1_underflow_mult[i]);
+			} else
+				siteL += (prI*h_freqs[h_conStates[i]] * exp((FLOAT_TYPE)h_partial_underflow_mult[i]) * exp((FLOAT_TYPE)h_CL1_underflow_mult[i]));
+		}
 
-		totL += (log(siteL) - h_partial_underflow_mult[i] - h_CL1_underflow_mult[i]) * h_countit[i];
-		siteD1 /= siteL;
-		tot1 += h_countit[i] * siteD1;
-		tot2 += h_countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+			totL += (log(siteL) - h_partial_underflow_mult[i] - h_CL1_underflow_mult[i]) * h_countit[i];
+			siteD1 /= siteL;
+			tot1 += h_countit[i] * siteD1;
+			tot2 += h_countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+		}
+
+		// copy result back to host
+		CUDA_SAFE_CALL(cudaMemcpy(h_Tots_arr, d_Tots_arr, mem_size_Tots_arr, cudaMemcpyDeviceToHost));
+
+		// clear previous results
+		h_Tots[0] = 0;
+		h_Tots[1] = 0;
+		h_Tots[2] = 0;
+
+		for (int i=0;i<dimGrid.x;i++) {
+			h_Tots[0] += h_Tots_arr[i];
+			h_Tots[1] += h_Tots_arr[i+dimGrid.x];
+			h_Tots[2] += h_Tots_arr[i+dimGrid.x*2];
+		}
+
+		// add up the results from the remaining chars
+		h_Tots[0] += totL;
+		h_Tots[1] += tot1;
+		h_Tots[2] += tot2;
+
 	}
 
-	// copy result back to host
-	CUDA_SAFE_CALL(cudaMemcpy(h_Tots_arr, d_Tots_arr, mem_size_Tots_arr, cudaMemcpyDeviceToHost));
-
-	// clear previous results
-	h_Tots[0] = 0;
-	h_Tots[1] = 0;
-	h_Tots[2] = 0;
-
-	for (int i=0;i<dimGrid.x;i++) {
-		h_Tots[0] += h_Tots_arr[i];
-		h_Tots[1] += h_Tots_arr[i+dimGrid.x];
-		h_Tots[2] += h_Tots_arr[i+dimGrid.x*2];
+	extern "C"
+	void FreeGPU(FLOAT_TYPE* arr) {
+		// free device memory
+		CUDA_SAFE_CALL(cudaFree(arr));
 	}
 
-	// add up the results from the remaining chars
-	h_Tots[0] += totL;
-	h_Tots[1] += tot1;
-	h_Tots[2] += tot2;
+	extern "C"
+	void FreePinnedMemory(void* arr) {
+		// free host pinned memory
+		CUDA_SAFE_CALL(cudaFreeHost(arr));
 
-}
-
-extern "C"
-void FreeGPU(FLOAT_TYPE* arr) {
-	// free device memory
-	CUDA_SAFE_CALL(cudaFree(arr));
-}
-
-extern "C"
-void FreePinnedMemory(void* arr) {
-	// free host pinned memory
-	CUDA_SAFE_CALL(cudaFreeHost(arr));
-
-}
+	}
