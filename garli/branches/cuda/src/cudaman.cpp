@@ -333,11 +333,10 @@ void CudaManager::ComputeRefDeriv(const FLOAT_TYPE *partial,
 					btot += freqs[3];
 				siteL += (prI * btot) * exp(partial_underflow_mult[i]
 						+ CL1_underflow_mult[i]);
-			} else {
+			} else
 				siteL += (prI * freqs[conStates[i]] * exp(
 						(FLOAT_TYPE) partial_underflow_mult[i]) * exp(
 						(FLOAT_TYPE) CL1_underflow_mult[i]));
-			}
 		}
 
 		totL += countit[i] * (log(siteL) - partial_underflow_mult[i]
@@ -427,7 +426,7 @@ void CudaManager::TestGPUCLA() {
 		}
 
 		// initialize host memory with random data
-		srand(42);
+		srand(i);
 		RandomInit(h_Lpr, size_pr);
 		RandomInit(h_Rpr, size_pr);
 		RandomInit(h_LCL, size_CL_host);
@@ -526,8 +525,9 @@ void CudaManager::TestGPUDeriv() {
 		FLOAT_TYPE *h_Tots_arr, *h_Tots;
 		FLOAT_TYPE *reference_Tots;
 
-		int lastConst = 500;
-		FLOAT_TYPE prI = 0.234553;
+		int lastConst;
+		FLOAT_TYPE prI;
+
 		bool NoPinvInModel = false;
 
 		int *d_countit, *d_partial_underflow_mult, *d_CL1_underflow_mult,
@@ -630,7 +630,9 @@ void CudaManager::TestGPUDeriv() {
 		AllocateGPU((void**) &d_conStates, mem_size_int_char);
 
 		// initialize host memory with random data
-		srand(42);
+		srand(i);
+		RandomIntInit(&lastConst, 1, nchar);
+		RandomInit(&prI, 1);
 		RandomIntInit(h_countit, nchar, 20);
 		RandomInit(h_partial, size_CL_host);
 		RandomInit(h_CL1, size_CL_host);
