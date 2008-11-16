@@ -105,10 +105,25 @@ void CudaManager::ComputeGPUCLA(const FLOAT_TYPE* h_Lpr,
 
 void CudaManager::ComputeGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1,
 		int* h_partial_underflow_mult, int* h_CL1_underflow_mult,
-		FLOAT_TYPE* h_prmat, FLOAT_TYPE* h_d1mat, FLOAT_TYPE* h_d2mat,
-		FLOAT_TYPE* h_rateProb, FLOAT_TYPE* h_freqs, int* h_countit,
-		int* h_conStates, int lastConst, bool NoPinvInModel, FLOAT_TYPE prI) {
+		const FLOAT_TYPE* h_prmat, const FLOAT_TYPE* h_d1mat,
+		const FLOAT_TYPE* h_d2mat, const FLOAT_TYPE* h_rateProb,
+		FLOAT_TYPE* h_freqs, const int* h_countit, const int* h_conStates,
+		int lastConst, bool NoPinvInModel, FLOAT_TYPE prI) {
+	CuComputeGPUDeriv(h_partial, h_CL1, h_partial_underflow_mult,
+			h_CL1_underflow_mult, h_prmat, h_d1mat, h_d2mat, h_rateProb,
+			h_freqs, h_countit, h_conStates, deriv_h_Tots, deriv_h_Tots_arr,
+			deriv_d_partial, deriv_d_CL1, deriv_d_partial_underflow_mult,
+			deriv_d_CL1_underflow_mult, deriv_d_prmat, deriv_d_d1mat,
+			deriv_d_d2mat, deriv_d_rateProb, deriv_d_freqs, deriv_d_countit,
+			deriv_d_conStates, deriv_d_Tots, deriv_d_Tots_arr,
+			deriv_mem_size_pr, deriv_mem_size_CL, deriv_mem_size_int_char,
+			deriv_mem_size_rates, deriv_mem_size_states, deriv_mem_size_Tots,
+			deriv_mem_size_Tots_arr, lastConst, NoPinvInModel, prI, nstates,
+			numRateCats, nchar, deriv_ncharGPU, deriv_dimBlock, deriv_dimGrid);
+}
 
+FLOAT_TYPE CudaManager::GetDerivTots(int index) {
+	return deriv_h_Tots[index];
 }
 
 // Private methods

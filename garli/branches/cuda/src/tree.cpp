@@ -6270,7 +6270,7 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 		}
 
 #ifdef CUDA_GPU
-		}
+	}
 #endif
 
 	const int *left_mult=LCLA->underflow_mult;
@@ -6346,7 +6346,7 @@ void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondL
 		}
 
 #ifdef CUDA_GPU
-		}
+	}
 #endif
 
 	const int *left_mult=LCLA->underflow_mult;
