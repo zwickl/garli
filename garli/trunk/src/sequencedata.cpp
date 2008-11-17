@@ -487,7 +487,7 @@ void CodonData::CalcF1x4Freqs(){
 
 void CodonData::CalcF3x4Freqs(){
 	//this assumes that the empirical base freqs have already been calculated in FillCodonMatrixFromDNA
-	assert(fabs(empBaseFreqsPos1[0] + empBaseFreqsPos1[1] + empBaseFreqsPos1[2] + empBaseFreqsPos1[3] - 1.0) < 1.0e-8);
+	assert(fabs(empBaseFreqsPos1[0] + empBaseFreqsPos1[1] + empBaseFreqsPos1[2] + empBaseFreqsPos1[3] - 1.0) < 1.0e-4);
 
 	if((empBaseFreqsPos1[0] == ZERO_POINT_ZERO) ||
 	   (empBaseFreqsPos1[1] == ZERO_POINT_ZERO) ||
