@@ -179,6 +179,14 @@ elif test "x$GCC" = "xyes" ; then
 	esac	
 fi
 
+#single precision
+if test  "$enable_single_prec" = yes; then
+	CXXFLAGS="$CXXFLAGS -DSINGLE_PRECISION_FLOATS"
+	if test "$CC" = "gcc" ; then
+		CXXFLAGS="$CXXFLAGS -fno-caller-saves"
+	fi
+fi
+
 AC_LANG(C++)
 ACX_MPI
 
@@ -198,13 +206,6 @@ if test  "$enable_oldmpi" = yes; then
 	LIBS="$MPILIBS $LIBS"
 fi
 
-#single precision
-if test  "$enable_single_prec" = yes; then
-	CXXFLAGS="$CXXFLAGS -DSINGLE_PRECISION_FLOATS"
- 	if test "x$GCC" = "xyes" ; then
-		CXXFLAGS="$CXXFLAGS -fno-caller-saves"
-	fi
-fi
 
 CXXFLAGS="$CXXFLAGS $CXXFLAGS_OPTIM_SPEED"
 
