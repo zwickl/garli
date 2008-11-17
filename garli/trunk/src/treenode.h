@@ -116,6 +116,11 @@ class TreeNode{
 		void FindCrazyShortBranches();
 		void CheckTreeFormation();
 		void OutputNodeConnections();
+
+		//these are for saving the branchlengths incase an optimization function accidentally worsens them
+		//this mainly happens during treescale optimization when branchlengths are at min or max boundaries
+		void StoreAllBranchlengths(vector<FLOAT_TYPE> &blens);
+		void RestoreAllBranchlengths(vector<FLOAT_TYPE>::iterator blit);
 };
 
 inline void TreeNode::CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, int dir){

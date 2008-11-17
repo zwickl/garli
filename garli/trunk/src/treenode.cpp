@@ -819,3 +819,15 @@ void TreeNode::CollapseMinLengthBranches(){
 		}
 	if(next) next->CollapseMinLengthBranches();
 	}
+
+void TreeNode::StoreAllBranchlengths(vector<FLOAT_TYPE> &blens){
+	if(anc) blens.push_back(dlen);
+	if(left) left->StoreAllBranchlengths(blens);
+	if(next) next->StoreAllBranchlengths(blens);
+	}
+
+void TreeNode::RestoreAllBranchlengths(vector<FLOAT_TYPE>::iterator blit){
+	if(anc) dlen = *(blit++);
+	if(left) left->RestoreAllBranchlengths(blit);
+	if(next) next->RestoreAllBranchlengths(blit);
+	}
