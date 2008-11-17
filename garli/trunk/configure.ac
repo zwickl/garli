@@ -111,6 +111,15 @@ if test "$enable_oldmpi" = yes; then
            ])
 fi
 
+# single precision version (still being tested)
+AC_ARG_ENABLE(single-prec,
+        AC_HELP_STRING([--enable-single-prec],[use single precision floating point variables (EXPERIMENTAL)]), , [enable_single_prec=no])
+if test "$enable_single_prec" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling single precision floating point version
+           ])
+fi
+
 
 # Initialize optimization flag in case it doesn't get set below.
 CXXFLAGS_OPTIM_SPEED="-O"
@@ -187,6 +196,14 @@ if test  "$enable_oldmpi" = yes; then
 	CC="$MPICC"
 	CXX="$MPICXX"
 	LIBS="$MPILIBS $LIBS"
+fi
+
+#single precision
+if test  "$enable_single_prec" = yes; then
+	CXXFLAGS="$CXXFLAGS -DSINGLE_PRECISION_FLOATS"
+ 	if test "x$GCC" = "xyes" ; then
+		CXXFLAGS="$CXXFLAGS -fno-caller-saves"
+	fi
 fi
 
 CXXFLAGS="$CXXFLAGS $CXXFLAGS_OPTIM_SPEED"

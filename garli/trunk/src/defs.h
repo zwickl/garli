@@ -48,7 +48,7 @@
 
 #define USE_COUNTS_IN_BOOT
 
-#undef OPT_DEBUG
+//#undef OPT_DEBUG
 
 //The ONLY thing that should need to be done to turn on memcheck leak detection
 //should be defining MONITORING_ALLOCATION here
@@ -61,7 +61,7 @@
 #undef INCLUDE_PERTURBATION
 #undef SUBTREE_VERSION
 #undef ENABLE_CUSTOM_PROFILER
-#undef SINGLE_PRECISION_FLOATS
+//#undef SINGLE_PRECISION_FLOATS
 #undef SWAP_BASED_TERMINATION
 
 #undef OUTPUT_UNIQUE_TREES
