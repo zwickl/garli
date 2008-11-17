@@ -646,11 +646,11 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		vector<FLOAT_TYPE> blens;
 		treeStruct->StoreBranchlengths(blens);
 		scaleImprove=treeStruct->OptimizeTreeScale(branchPrec);
-		//if some of the branch lengths are at the minimum or maximum boundaries the scale optimization
-		//can actually worsen the score.  This isn't particularly important during initial refinement,
-		//so just hide it to keep the user from thinking that there is something terribly wrong
+		CalcFitness(0);
+		//if some of the branch lengths were at the minimum or maximum boundaries the scale optimization
+		//can actually worsen the score.  If so, return them to their original lengths.
 		if(scaleImprove < ZERO_POINT_ZERO){
-			treeStruct->RestoreBranchlengths(blens.begin());
+			treeStruct->RestoreBranchlengths(blens);
 			CalcFitness(0);
 			scaleImprove = ZERO_POINT_ZERO;
 			}
