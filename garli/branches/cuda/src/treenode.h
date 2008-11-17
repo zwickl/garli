@@ -116,6 +116,7 @@ class TreeNode{
 		void FindCrazyShortBranches();
 		void CheckTreeFormation();
 		void OutputNodeConnections();
+
 };
 
 inline void TreeNode::CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, int dir){

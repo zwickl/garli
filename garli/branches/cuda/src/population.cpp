@@ -91,7 +91,7 @@ FLOAT_TYPE globalBest;
 
 #undef PERIODIC_SCORE_DEBUG
 
-#undef DEBUG_SCORES
+//#undef DEBUG_SCORES
 
 #undef NNI_SPECTRUM
 
@@ -101,7 +101,7 @@ FLOAT_TYPE globalBest;
 
 #undef DETAILED_SWAP_REPORT
 
-#undef NO_EVOLUTION
+//#undef NO_EVOLUTION
 
 bool output_tree=false;
 
@@ -984,6 +984,11 @@ void Population::SeedPopulationWithStartingTree(int rep){
 
 	outman.precision(10);
 	outman.UserMessage("Initial ln Likelihood: %.4f", indiv[0].Fitness());
+
+#ifdef SCORE_INITIAL_ONLY
+exit(0);
+#endif
+
 #ifdef MAC_FRONTEND
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	[[MFEInterfaceClient sharedClient] didBeginInitializingSearch];
