@@ -22,7 +22,7 @@
 //these will be defined by either the Microsoft compiler
 //or the intel compiler when openmp support is turned on
 //by compiling with /openmp (ms) or -openmp (icc)
-//Nothing else should need to be defined anywhere to get
+//Nothing else should need to be defined anywhere to get 
 //openMP working
 #if defined (__OPENMP) || defined (_OPENMP)
 	#include "omp.h"
@@ -31,7 +31,7 @@
 	#define OMP_INTTERMCLA
 	#define OMP_TERMDERIV
 	#define OMP_INTDERIV
-
+	
 	#define OMP_INTINTCLA_NSTATE
 	#define OMP_INTTERMCLA_NSTATE
 	#define OMP_TERMDERIV_NSTATE
@@ -53,7 +53,7 @@
 
 #define USE_COUNTS_IN_BOOT
 
-#undef OPT_DEBUG
+//#undef OPT_DEBUG
 
 //The ONLY thing that should need to be done to turn on memcheck leak detection
 //should be defining MONITORING_ALLOCATION here

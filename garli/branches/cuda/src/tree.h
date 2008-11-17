@@ -259,6 +259,17 @@ class Tree{
 		void RescaleRateHet(CondLikeArray *destCLA);
 		void RescaleRateHetNState(CondLikeArray *destCLA);
 
+		void StoreBranchlengths(vector<FLOAT_TYPE> &blens){
+			for(int n=1;n<numNodesTotal;n++)
+				blens.push_back(allNodes[n]->dlen);
+			assert(blens.size() == numNodesTotal - 1);
+			}
+		void RestoreBranchlengths(vector<FLOAT_TYPE> &blens){
+			for(int n=1;n<numNodesTotal;n++)
+				SetBranchLength(allNodes[n], blens[n-1]);
+			MakeAllNodesDirty();
+			}
+
 		pair<FLOAT_TYPE, FLOAT_TYPE> OptimizeSingleSiteTreeScale(FLOAT_TYPE optPrecision);
 
 		//functions for dealing with conditional likelihood arrays

@@ -1119,7 +1119,7 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 		}
 	if(modSpec.numRateCats > 1 && modSpec.IsNonsynonymousRateHet() == false) DiscreteGamma(rateMults, rateProbs, *alpha);
 
-	if((modSpec.IsEqualStateFrequencies() == false && modSpec.IsDayhoffAAFreqs() == false && modSpec.IsWAGAAFreqs() == false && modSpec.IsJonesAAFreqs() == false && modSpec.IsMtMamAAFreqs() == false && modSpec.IsMtRevAAFreqs() == false)
+	if((modSpec.IsEqualStateFrequencies() == false && (modSpec.IsCodon() && modSpec.IsUserSpecifiedStateFrequencies()) == false && modSpec.IsDayhoffAAFreqs() == false && modSpec.IsWAGAAFreqs() == false && modSpec.IsJonesAAFreqs() == false && modSpec.IsMtMamAAFreqs() == false && modSpec.IsMtRevAAFreqs() == false)
 		|| (modSpec.IsF3x4StateFrequencies() || modSpec.IsF1x4StateFrequencies())){
 		//if the state freqs aren't equal, they will either start at the empirical values 
 		//or be fixed at them
