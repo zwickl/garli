@@ -1272,7 +1272,7 @@ void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 		}
 
 	//write any individuals that we may have stored from previous search reps
-	for(vector<Individual*>::iterator it = storedTrees.begin(); it < storedTrees.end() ; it++){
+	for(vector<Individual*>::iterator it = storedTrees.begin(); it != storedTrees.end() ; it++){
 		(*it)->mod->OutputBinaryFormattedModel(out);
 		(*it)->treeStruct->OutputBinaryFormattedTree(out);
 		}

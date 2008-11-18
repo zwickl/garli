@@ -863,8 +863,14 @@ class Model{
 			*stateFreqs[i]=b[i];
 			freqTot += *stateFreqs[i];
 			}
-		if(FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-5) == false)
+		if(FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-3) == false)
 			throw(ErrorException("State frequencies do not appear to add up to 1.0!\n"));
+		//if the total is near 1, make it exactly 1
+		else if(FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-6) == false){
+			for(int i=0;i<nstates;i++){
+				*stateFreqs[i] /= freqTot;
+				}
+			}
 		eigenDirty=true;
 		}
 

@@ -539,7 +539,14 @@ class Bipartition{
 	void BipartFromNodenums(vector<int> nodes){
 		ClearBipartition();
 		Bipartition temp;
-		for(vector<int>::iterator it = nodes.begin();it < nodes.end();it++)
+		for(vector<int>::iterator it = nodes.begin();it != nodes.end();it++)
+			*this += temp.TerminalBipart(*it);
+		}
+
+	void BipartFromNodenums(set<unsigned> nodes){
+		ClearBipartition();
+		Bipartition temp;
+		for(set<unsigned>::iterator it = nodes.begin();it != nodes.end();it++)
 			*this += temp.TerminalBipart(*it);
 		}
 
