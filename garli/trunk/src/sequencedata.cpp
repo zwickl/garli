@@ -465,7 +465,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 
 void CodonData::CalcF1x4Freqs(){
 	//this assumes that the empirical base freqs have already been calculated in FillCodonMatrixFromDNA
-	assert(fabs(empBaseFreqsAllPos[0] + empBaseFreqsAllPos[1] + empBaseFreqsAllPos[2] + empBaseFreqsAllPos[3] - 1.0) < 1.0e-8);
+	assert(fabs(empBaseFreqsAllPos[0] + empBaseFreqsAllPos[1] + empBaseFreqsAllPos[2] + empBaseFreqsAllPos[3] - 1.0) < 1.0e-4);
 
 	FLOAT_TYPE total = ZERO_POINT_ZERO;
 

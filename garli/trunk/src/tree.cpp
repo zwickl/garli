@@ -35,6 +35,7 @@ using namespace std;
 #include "model.h"
 #include "tree.h"
 #include "reconnode.h"
+#include "garlireader.h"
 
 #include "utility.h"
 Profiler ProfIntInt   ("ClaIntInt     ");
@@ -176,35 +177,51 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 
 	//deal with the outgroup specification, if there is one
 	if(conf->outgroupString.length() > 0){
-		//NxsString s(conf->outgroupString.c_str());
-		const char *o = conf->outgroupString.c_str();
-		vector<int> nums;
-		unsigned pos1=0, pos2;
-		while(pos1 < conf->outgroupString.size()){
-			pos2 = conf->outgroupString.find(" ", pos1+1);
-			string tax = conf->outgroupString.substr(pos1, pos2);
-			nums.push_back(atoi(tax.c_str()));
-			pos1 = pos2;
-			}
-
 		if(outgroup) outgroup->ClearBipartition();
 		else outgroup = new Bipartition();
-		outgroup->BipartFromNodenums(nums);
-		
-		//if the outgroup consists of multiple taxa, make a constraint that the ingroup be monophyletic
-/*		if(nums.size() > 1){
-			Constraint out(outgroup, true);
-			out.Standardize();
-			out.SetAsOutgroup();
 
-			int num=1;
-			for(vector<Constraint>::iterator con=constraints.begin();con!=constraints.end();con++){
-				if((*con).IsCompatibleWithConstraint(&out) == false) throw ErrorException("Specified outgroup is not compatible with constraint number %d!", num);
-				num++;
+		GarliReader &reader = GarliReader::GetInstance();
+		if(reader.GetTaxaBlock()->GetNTax() > 0){
+			//now using NCL to much more rigorously and flexibly read the outgroup specification
+			NxsString tax(conf->outgroupString.c_str());
+			tax += ";";
+			std::istringstream s(tax);
+			NxsToken tok(s);
+			tok.GetNextToken();
+			NxsUnsignedSet set;
+			try{
+				NxsSetReader::ReadSetDefinition(tok, *reader.GetTaxaBlock(), "outgroup", "GARLI configuration", &set);
+				outman.UserMessage("Found outgroup specification: %s\n", NxsSetReader::GetSetAsNexusString(set).c_str());
 				}
-			constraints.push_back(out);
+			catch (const NxsException & x){
+				throw ErrorException("%s", x.msg.c_str());
+				}
+			//the set has been read as indeces, so change to taxon numbers before passing to the bipart func
+			for(NxsUnsignedSet::iterator it = set.begin();it != set.end();it++)
+				(*it)++;
+
+			outgroup->BipartFromNodenums(set);
 			}
-*/		}
+		else{//the old half-assed outgroup reader
+			vector<int> nums;
+			unsigned pos1=0, pos2;
+			while(pos1 < conf->outgroupString.size()){
+				pos2 = conf->outgroupString.find(" ", pos1+1);
+				string tax = conf->outgroupString.substr(pos1, pos2 - pos1);
+				tax = NxsString::strip_whitespace(tax);
+				for(string::iterator it = tax.begin();it != tax.end();it++)
+					if(isdigit(*it) == false)
+						throw ErrorException("problem in outgroup specification.\nExpecting taxon numbers separated by spaces, found %s.", tax.c_str());
+				nums.push_back(atoi(tax.c_str()));
+				pos1 = pos2;
+				}
+			outman.UserMessageNoCR("Found outgroup specification: ");
+			for(vector<int>::iterator it = nums.begin();it != nums.end();it++)
+				outman.UserMessageNoCR("%d ", *it);
+			outman.UserMessage("\n");
+			outgroup->BipartFromNodenums(nums);
+			}
+		}
 	}
 
 //DJZ 4-28-04

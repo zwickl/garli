@@ -1762,7 +1762,7 @@ void DataMatrix::CheckForIdenticalTaxonNames(){
 	
 	if(identicals.size() > 0){
 		outman.UserMessage("Error! Multiple sequences with same name encountered!:");
-		for(vector< pair<int, int> >::iterator it=identicals.begin() ; it < identicals.end() ; it++){
+		for(vector< pair<int, int> >::iterator it=identicals.begin() ; it != identicals.end() ; it++){
 			outman.UserMessage("\t%s : numbers %d and %d", TaxonLabel((*it).first), (*it).first+1, (*it).second+1);
 			}
 		throw(ErrorException("Terminating.  Please make all sequence names unique!"));
