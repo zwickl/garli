@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <set>
 
 using namespace std;
 
@@ -536,17 +537,17 @@ class Bipartition{
 		return nodes; 
 		}
 	
-	void BipartFromNodenums(vector<int> nodes){
+	void BipartFromNodenums(const vector<int> & nodes){
 		ClearBipartition();
 		Bipartition temp;
-		for(vector<int>::iterator it = nodes.begin();it != nodes.end();it++)
+		for(vector<int>::const_iterator it = nodes.begin();it != nodes.end();it++)
 			*this += temp.TerminalBipart(*it);
 		}
 
-	void BipartFromNodenums(set<unsigned> nodes){
+	void BipartFromNodenums(const std::set<unsigned> & nodes){
 		ClearBipartition();
 		Bipartition temp;
-		for(set<unsigned>::iterator it = nodes.begin();it != nodes.end();it++)
+		for(set<unsigned>::const_iterator it = nodes.begin();it != nodes.end();it++)
 			*this += temp.TerminalBipart(*it);
 		}
 

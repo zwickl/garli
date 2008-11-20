@@ -188,19 +188,21 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 			std::istringstream s(tax);
 			NxsToken tok(s);
 			tok.GetNextToken();
-			NxsUnsignedSet set;
+			NxsUnsignedSet iset;
 			try{
-				NxsSetReader::ReadSetDefinition(tok, *reader.GetTaxaBlock(), "outgroup", "GARLI configuration", &set);
-				outman.UserMessage("Found outgroup specification: %s\n", NxsSetReader::GetSetAsNexusString(set).c_str());
+				NxsSetReader::ReadSetDefinition(tok, *reader.GetTaxaBlock(), "outgroup", "GARLI configuration", &iset);
+				outman.UserMessage("Found outgroup specification: %s\n", NxsSetReader::GetSetAsNexusString(iset).c_str());
 				}
 			catch (const NxsException & x){
 				throw ErrorException("%s", x.msg.c_str());
 				}
-			//the set has been read as indeces, so change to taxon numbers before passing to the bipart func
-			for(NxsUnsignedSet::iterator it = set.begin();it != set.end();it++)
-				(*it)++;
 
-			outgroup->BipartFromNodenums(set);
+			//the set has been read as indeces, so change to taxon numbers before passing to the bipart func
+			NxsUnsignedSet nset;
+			for(NxsUnsignedSet::const_iterator it = iset.begin();it != iset.end(); it++)
+				nset.insert(*it + 1);
+
+			outgroup->BipartFromNodenums(nset);
 			}
 		else{//the old half-assed outgroup reader
 			vector<int> nums;
