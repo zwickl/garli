@@ -2279,53 +2279,50 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 
 				unscaledlnL=log(siteL) - partialCLA->underflow_mult[i];
 
-#ifdef MKV
-			if(mod->IsBinary() || mod->IsNState()){
-				assert(unscaledlnL < ZERO_POINT_ZERO);
-				if(i == 0){
-					if(partialCLA->underflow_mult[i] == 0){
-						constL = siteL;
-						pC = nstates * constL;
-						pV = (ONE_POINT_ZERO - pC);
-						MkvScaler = log(pV);
-						constD1 = siteD1 * nstates; 
-						constD2 = siteD2 * nstates;
+				if(mod->IsNStateV()){
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					if(i == 0){
+						if(partialCLA->underflow_mult[i] == 0){
+							constL = siteL;
+							pC = nstates * constL;
+							pV = (ONE_POINT_ZERO - pC);
+							MkvScaler = log(pV);
+							constD1 = siteD1 * nstates; 
+							constD2 = siteD2 * nstates;
+							}
+						else{
+							constL = ZERO_POINT_ZERO; 
+							pC = ZERO_POINT_ZERO;
+							pV = ONE_POINT_ZERO;
+							MkvScaler = ZERO_POINT_ZERO;
+							constD1 = ZERO_POINT_ZERO;
+							constD2 = ZERO_POINT_ZERO;
+							}
 						}
-					else{
-						constL = ZERO_POINT_ZERO; 
-						pC = ZERO_POINT_ZERO;
-						pV = ONE_POINT_ZERO;
-						MkvScaler = ZERO_POINT_ZERO;
-						constD1 = ZERO_POINT_ZERO;
-						constD2 = ZERO_POINT_ZERO;
+					else{ 
+						//condition the likelihood on variability
+						FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
+						assert(condlnL < ZERO_POINT_ZERO);
+						totL += condlnL * countit[i];
+
+						//condition the first deriv
+						FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
+
+						//condition the second
+						FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
+						FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
+
+						tot1 += countit[i] * condD1;
+						tot2 += countit[i] * condD2;
+						assert(tot1 == tot1);
+						assert(tot2 == tot2);
+						//these are just for site deriv output
+						unscaledlnL = condlnL;
+						siteD1 = condD1;
+						siteD2 = condD2;
 						}
 					}
-				else{ 
-					//condition the likelihood on variability
-					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
-					assert(condlnL < ZERO_POINT_ZERO);
-					totL += condlnL * countit[i];
 
-					//condition the first deriv
-					FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
-
-					//condition the second
-					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
-					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
-
-					tot1 += countit[i] * condD1;
-					tot2 += countit[i] * condD2;
-					assert(tot1 == tot1);
-					assert(tot2 == tot2);
-					//these are just for site deriv output
-					unscaledlnL = condlnL;
-					siteD1 = condD1;
-					siteD2 = condD2;
-					}
-				}
-#else
-				if(0){}
-#endif
 				else if(unscaledlnL < ZERO_POINT_ZERO){
 					totL += unscaledlnL * countit[i];
 					siteD1 /= siteL;
@@ -2541,53 +2538,49 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 
 				FLOAT_TYPE unscaledlnL=log(siteL) - partialCLA->underflow_mult[i];
 
-#ifdef MKV
-			if(mod->IsBinary() || mod->IsNState()){
-				assert(unscaledlnL < ZERO_POINT_ZERO);
-				if(i == 0){
-					if(partialCLA->underflow_mult[i] == 0){
-						constL = siteL;
-						pC = nstates * constL;
-						pV = (ONE_POINT_ZERO - pC);
-						MkvScaler = log(pV);
-						constD1 = siteD1 * nstates; 
-						constD2 = siteD2 * nstates;
+				if(mod->IsNStateV()){
+					assert(unscaledlnL < ZERO_POINT_ZERO);
+					if(i == 0){
+						if(partialCLA->underflow_mult[i] == 0){
+							constL = siteL;
+							pC = nstates * constL;
+							pV = (ONE_POINT_ZERO - pC);
+							MkvScaler = log(pV);
+							constD1 = siteD1 * nstates; 
+							constD2 = siteD2 * nstates;
+							}
+						else{
+							constL = ZERO_POINT_ZERO; 
+							pC = ZERO_POINT_ZERO;
+							pV = ONE_POINT_ZERO;
+							MkvScaler = ZERO_POINT_ZERO;
+							constD1 = ZERO_POINT_ZERO;
+							constD2 = ZERO_POINT_ZERO;
+							}
 						}
-					else{
-						constL = ZERO_POINT_ZERO; 
-						pC = ZERO_POINT_ZERO;
-						pV = ONE_POINT_ZERO;
-						MkvScaler = ZERO_POINT_ZERO;
-						constD1 = ZERO_POINT_ZERO;
-						constD2 = ZERO_POINT_ZERO;
+					else{ 
+						//condition the likelihood on variability
+						FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
+						assert(condlnL < ZERO_POINT_ZERO);
+						totL += condlnL * countit[i];
+
+						//condition the first deriv
+						FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
+
+						//condition the second
+						FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
+						FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
+
+						tot1 += countit[i] * condD1;
+						tot2 += countit[i] * condD2;
+						assert(tot1 == tot1);
+						assert(tot2 == tot2);
+						//these are just for site deriv output
+						unscaledlnL = condlnL;
+						siteD1 = condD1;
+						siteD2 = condD2;
 						}
 					}
-				else{ 
-					//condition the likelihood on variability
-					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
-					assert(condlnL < ZERO_POINT_ZERO);
-					totL += condlnL * countit[i];
-
-					//condition the first deriv
-					FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
-
-					//condition the second
-					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
-					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
-
-					tot1 += countit[i] * condD1;
-					tot2 += countit[i] * condD2;
-					assert(tot1 == tot1);
-					assert(tot2 == tot2);
-					//these are just for site deriv output
-					unscaledlnL = condlnL;
-					siteD1 = condD1;
-					siteD2 = condD2;
-					}
-				}
-#else
-				if(0){}
-#endif
 				else if(unscaledlnL < ZERO_POINT_ZERO){
 					totL += unscaledlnL * countit[i];
 					siteD1 /= siteL;
@@ -2821,8 +2814,7 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 
 			unscaledlnL=log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i];
 
-#ifdef MKV
-			if(mod->IsBinary() || mod->IsNState()){
+			if(mod->IsNStateV()){
 				assert(unscaledlnL < ZERO_POINT_ZERO);
 				if(i == 0){
 					if(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i] == 0){
@@ -2865,9 +2857,6 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 					siteD2 = condD2;
 					}
 				}
-#else
-			if(0){}
-#endif
 			else if(unscaledlnL < ZERO_POINT_ZERO){
 				totL += unscaledlnL * countit[i];
 				siteD1 /= siteL;
@@ -2976,8 +2965,7 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 
 			unscaledlnL = log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i];
 
-#ifdef MKV
-			if(mod->IsBinary() || mod->IsNState()){
+			if(mod->IsNStateV()){
 				assert(unscaledlnL < ZERO_POINT_ZERO);
 				if(i == 0){
 					if(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i] == 0){
@@ -3020,9 +3008,6 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 					siteD2 = condD2;
 					}
 				}
-#else
-			if(0){}
-#endif
 			else if(unscaledlnL < ZERO_POINT_ZERO){
 				totL += unscaledlnL * countit[i];
 				siteD1 /= siteL;

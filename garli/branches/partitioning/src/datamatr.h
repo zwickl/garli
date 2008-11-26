@@ -277,7 +277,7 @@ protected:
       			}
       		}
       void Reweight(FLOAT_TYPE prob);
-      long BootstrapReweight(int seed, FLOAT_TYPE resampleProportion);
+      virtual long BootstrapReweight(int seed, FLOAT_TYPE resampleProportion);
       
 #endif
 };
