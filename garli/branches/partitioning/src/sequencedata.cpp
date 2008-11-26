@@ -20,6 +20,11 @@
 #include "defs.h"
 #include "sequencedata.h"
 #include "garlireader.h"
+#include "rng.h"
+
+extern rng rnd;
+extern OutputManager outman;
+extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
 
 #undef DEBUG_CALCFREQ
 #undef DEBUG_CALCPRMATRIX
@@ -1346,11 +1351,10 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 		return;
 
 	//make room for a dummy constant character here
-#ifdef MKV
-	NewMatrix( numActiveTaxa, realCharSet->size() + 1);
-#else
-	NewMatrix( numActiveTaxa, realCharSet->size());
-#endif
+	if(type == ONLY_VARIABLE)
+		NewMatrix( numActiveTaxa, realCharSet->size() + 1);
+	else
+		NewMatrix( numActiveTaxa, realCharSet->size());
 
 	// read in the data, including taxon names
 	int i=0;
@@ -1364,10 +1368,9 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 			SetTaxonLabel( i, tlabel.c_str());
 			
 			int j = 0;
-#ifdef MKV
 			//add the dummy constant character
-			SetMatrix( i, j++, 0 );
-#endif
+			if(type == ONLY_VARIABLE)
+				SetMatrix( i, j++, 0 );
 
 			bool firstAmbig = true;
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
@@ -1397,4 +1400,71 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 			i++;
 			}
 		}
+	}
+
+//this is a virtual overload for NState because it might have to deal with the dummy char, which shouldn't be included in the resampling
+long NStateData::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportion){
+	//allow for a seed to be passed in and used for the reweighting - Used for bootstrap restarting.
+	//Either way we'll save the seed at the end of the reweighting as the DataMatrix currentBootstrapSeed,
+	//which allows exactly the same bootstraped datasets to be used in multiple runs, but with different
+	//settings for the actual search
+	if(resampleProportion >= 5.0) outman.UserMessage("WARNING: The resampleproportion setting is the proportion to resample,\nNOT the percentage (1.0 = 100%%).\nThe value you specified (%.2f) is a very large proportion.", resampleProportion);
+	if(currentBootstrapSeed == 0) currentBootstrapSeed = rnd.seed();
+
+	int originalSeed = rnd.seed();
+	if(restartSeed > 0) //if a seed was passed in for restarting
+		rnd.set_seed(restartSeed);
+	else //otherwise use the stored bootstrap seed 
+		rnd.set_seed(currentBootstrapSeed);
+
+	long seedUsed = rnd.seed();
+
+	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
+	
+	FLOAT_TYPE p=0.0;
+	if(type == ONLY_VARIABLE){
+		assert(origCounts[0] > 0);
+		assert(origCounts[1] > 0);
+		cumProbs[0] = ZERO_POINT_ZERO;
+		cumProbs[1]=(FLOAT_TYPE) origCounts[0] / ((FLOAT_TYPE) totalNChar - 1);
+		for(int i=2;i<nChar;i++){
+			cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar - 1);
+			assert(origCounts[i] > 0);
+			}
+		for(int q=1;q<nChar;q++) count[q]=0;
+		assert(FloatingPointEquals(cumProbs[nChar-1], ONE_POINT_ZERO, 1e-6));
+		}
+	else{	
+		cumProbs[0]=(FLOAT_TYPE) origCounts[0] / ((FLOAT_TYPE) totalNChar);
+		for(int i=1;i<nChar;i++){
+			cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar);
+			}	
+		for(int q=0;q<nChar;q++) count[q]=0;
+		}
+
+	ofstream deb("counts.log", ios::app);
+
+	//round to nearest int
+	int numToSample = (int) (((FLOAT_TYPE)totalNChar * resampleProportion) + 0.5);
+	if(numToSample != totalNChar) outman.UserMessage("Resampling %d characters (%.2f%%).\n", numToSample, resampleProportion*100);
+
+	for(int c=0;c<numToSample;c++){
+		FLOAT_TYPE p=rnd.uniform();
+		int pat=0; 
+		while(p > cumProbs[pat]) pat++;
+		count[pat]++;
+		}
+	int num0=0;
+	for(int d=0;d<nChar;d++){
+		if(count[d]==0) num0++;
+		deb << count[d] << "\t";
+		}
+	deb << endl;
+	deb.close();
+	if(type == ONLY_VARIABLE) assert(count[0] == 1);
+
+	currentBootstrapSeed = rnd.seed();
+	if(restartSeed > 0) rnd.set_seed(originalSeed);
+	delete []cumProbs;
+	return seedUsed;
 	}

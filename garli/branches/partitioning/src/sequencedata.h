@@ -650,8 +650,8 @@ public:
 		NUCLEOTIDE = 0,
 		AMINOACID = 1,
 		CODON = 2, 
-		BINARY = 3,
-		NSTATE = 4
+		NSTATE= 3,
+		NSTATEV = 4
 		}readAs, usedAs;
 	int totalCharacters;
 	int uniqueCharacters;
@@ -661,8 +661,8 @@ public:
 			outputNames[0]="Nucleotide data";
 			outputNames[1]="Amino acid data";
 			outputNames[2]="Codon data";
-			outputNames[3]="Binary data";
-			outputNames[4]="N-state data";
+			outputNames[3]="Standard k-state data";
+			outputNames[4]="Standard k-state data, variable only";
 			}
 	void Report(){
 		outman.UserMessage("GARLI partition subset %d", garliSubsetNum+1);
@@ -716,17 +716,24 @@ inline char BinaryData::DatumToChar( unsigned char d ){
 
 	return ch;
 	}
-
-
-#define MKV
 //
-// Mk type model, with n-state data
+// Mk or Mkv type model, with n-state data
 class NStateData : public SequenceData{
 	public:
+		enum{
+			ALL = 0,
+			ONLY_VARIABLE = 1,
+			ONLY_INFORM = 2
+			}type;
 		NStateData() : SequenceData(){
 			maxNumStates = 99;
 			}
 		NStateData(int ns) : SequenceData(){
+			maxNumStates = ns;
+			}
+		NStateData(int ns, bool isMkv) : SequenceData(){
+			if(isMkv)type = ONLY_VARIABLE;
+			else type = ALL;
 			maxNumStates = ns;
 			}
 		void SetNumStates(int ns){maxNumStates = ns;}
@@ -738,6 +745,8 @@ class NStateData : public SequenceData{
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
 			}
+		//this is a virtual overload for NState because it might have to deal with the dummy char, which shouldn't be included in the resampling
+		long BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportion);
 	};
 
 inline unsigned char NStateData::CharToDatum( char ch ){

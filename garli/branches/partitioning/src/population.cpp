@@ -612,7 +612,7 @@ void Population::LoadNexusStartingConditions(){
 
 	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
 		//in this case we should have already read in the tree when getting the data, so check
-		if(treesblock == NULL) //with the NCL factory API the trees block will be null if none was found
+		if(treesblock == NULL && reader.FoundModelString() == false) //with the NCL factory API the trees block will be null if none was found
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->streefname.c_str());
 		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false) //with the old API it will be allocated but empty
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->streefname.c_str());
@@ -642,7 +642,7 @@ void Population::LoadNexusStartingConditions(){
 		if(afterNumTreesBlocks - initNumTreesBlocks > 1){
 			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
 			}
-		else treesblock = treesblock = reader.GetTreesBlock(tax, afterNumTreesBlocks - 1);
+		else treesblock = reader.GetTreesBlock(tax, afterNumTreesBlocks - 1);
 #endif
 
 		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
@@ -3365,8 +3365,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 		//PARTITION
 		//storedTrees[r]->mod->OutputGarliFormattedModel(outf);
 		
-		//DEBUG BINARY
-		//storedTrees[r]->modPart.GetModel(0)->OutputGarliFormattedModel(outf);
+		storedTrees[r]->modPart.GetModel(0)->OutputGarliFormattedModel(outf);
 
 		outf << "]";
 

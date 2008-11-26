@@ -279,8 +279,8 @@ public:
 		CODON = 2,
 		AMINOACID = 3,
 		CODONAMINOACID = 4,
-		BINARY = 5,
-		NSTATE = 6
+		NSTATE = 5,
+		NSTATEV = 6
 		}datatype;
 	
 	enum{
@@ -341,8 +341,8 @@ public:
 	bool IsNucleotide() const {return (datatype == DNA || datatype == RNA);}
 	bool IsAminoAcid() const {return (datatype == AMINOACID || datatype == CODONAMINOACID);}//for most purposes codon-aminoacid should be considered AA
 	bool IsCodonAminoAcid() const {return datatype == CODONAMINOACID;}
-	bool IsBinary() const {return datatype == BINARY;}
 	bool IsNState() const {return datatype == NSTATE;}
+	bool IsNStateV() const {return datatype == NSTATEV;}
 
 	bool GotAnyParametersFromFile() const{
 		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile;
@@ -409,17 +409,17 @@ public:
 		fixRelativeRates=true;
 		}
 
-	void SetBinary(){
-		datatype = BINARY;
+	void SetNState(){
+		datatype = NSTATE;
 		rateMatrix = NST1;
 		stateFrequencies = EQUAL;
-		nstates = 2;
+		nstates = -1; //this will need to be reset later 
 		fixRelativeRates=true;
 		fixStateFreqs=true;
 		}
 
-	void SetNState(){
-		datatype = NSTATE;
+	void SetNStateV(){
+		datatype = NSTATEV;
 		rateMatrix = NST1;
 		stateFrequencies = EQUAL;
 		nstates = -1; //this will need to be reset later 
@@ -604,6 +604,8 @@ public:
 	bool IsNonsynonymousRateHet() const {return rateHetType == NONSYN;}
 
 	void SetStateFrequencies(const char *str){
+		if((datatype == NSTATE || datatype == NSTATEV) && _stricmp(str, "equal") != 0) 
+			throw(ErrorException("Invalid setting for statefrequencies: %s\n\tOnly equal state frequencies are currently available for the standard data type", str));
 		if(_stricmp(str, "equal") == 0) SetEqualStateFreqs();
 		else if(_stricmp(str, "estimate") == 0){
 			if(datatype == CODON) throw ErrorException("Sorry, ML estimation of equilibrium frequencies is not available under\ncodon models.  Try statefrequencies = empirical");
@@ -630,6 +632,10 @@ public:
 			else if(_stricmp(str, "mtmam") == 0) SetMtMamAAMatrix();
 			else if(_stricmp(str, "mtrev") == 0) SetMtRevAAMatrix();
 			else throw(ErrorException("Sorry, %s is not a valid aminoacid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag, mtmam, mtrev)", str));
+			}
+		else if(datatype == NSTATE || datatype == NSTATEV){
+			if(_stricmp(str, "1rate") != 0) throw(ErrorException("Sorry, %s is not a valid ratematrix setting for the standard data type.\n\tOnly 1rate matrices are currently allowed.", str));
+			else rateMatrix = NST1;
 			}
 		else{
 			if(_stricmp(str, "6rate") == 0) rateMatrix = NST6;
@@ -691,9 +697,11 @@ public:
 		else if(_stricmp(str, "dna") == 0) str;
 		else if(_stricmp(str, "rna") == 0) str;
 		else if(_stricmp(str, "nucleotide") == 0) str;
-		else if(_stricmp(str, "binary") == 0) SetBinary();
-		else if(_stricmp(str, "gaps") == 0) SetBinary();
 		else if(_stricmp(str, "nstate") == 0) SetNState();
+		else if(_stricmp(str, "standard") == 0) SetNState();
+		else if(_stricmp(str, "mk") == 0) SetNState();
+		else if(_stricmp(str, "standardvariable") == 0) SetNStateV();
+		else if(_stricmp(str, "mkv") == 0) SetNStateV();
 		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna, binary, nstate)", str));
 		}
 	void SetGeneticCode(const char *str){
@@ -919,7 +927,7 @@ class Model{
 	int NumMutatableParams() const {return (int) paramsToMutate.size();}
 	bool IsNucleotide() {return modSpec->IsNucleotide();}
 	bool IsNState() {return modSpec->IsNState();}
-	bool IsBinary() {return modSpec->IsBinary();}
+	bool IsNStateV() {return modSpec->IsNStateV();}
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);

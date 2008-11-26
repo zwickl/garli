@@ -5005,8 +5005,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
 
-#ifdef MKV
-				if(mod->IsBinary() || mod->IsNState()){
+				if(mod->IsNStateV()){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					if(i == 0){
 						if(underflow_mult[i] == 0)
@@ -5020,9 +5019,6 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 						}
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					}
-#else
-				if(0){}
-#endif
 				else if(unscaledlnL < ZERO_POINT_ZERO)
 					totallnL += (countit[i] * unscaledlnL);
 
@@ -5096,8 +5092,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
 
-#ifdef MKV
-				if(mod->IsBinary() || mod->IsNState()){
+				if(mod->IsNStateV()){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					if(i == 0){
 						if(underflow_mult[i] == 0)
@@ -5111,10 +5106,6 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 						}
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					}
-#else
-				if(0){}
-#endif
-
 				else if(unscaledlnL < ZERO_POINT_ZERO)
 					totallnL += (countit[i] * unscaledlnL);
 
@@ -5430,8 +5421,7 @@ vector<FLOAT_TYPE> siteLikes;
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
 
-#ifdef MKV
-				if(mod->IsBinary() || mod->IsNState()){
+				if(mod->IsNStateV()){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					if(i == 0){
 						if(underflow_mult1[i] + underflow_mult2[i] == 0)
@@ -5445,9 +5435,6 @@ vector<FLOAT_TYPE> siteLikes;
 						}
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					}
-#else
-			if(0){}
-#endif
 				else if(unscaledlnL < ZERO_POINT_ZERO)
 					totallnL += (countit[i] * unscaledlnL);
 
@@ -5517,8 +5504,7 @@ vector<FLOAT_TYPE> siteLikes;
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
 
-#ifdef MKV
-				if(mod->IsBinary() || mod->IsNState()){
+				if(mod->IsNStateV()){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					if(i == 0){
 						if(underflow_mult1[i] + underflow_mult2[i] == 0)
@@ -5532,9 +5518,6 @@ vector<FLOAT_TYPE> siteLikes;
 						}
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					}
-#else
-				if(0){}
-#endif
 				else if(unscaledlnL < ZERO_POINT_ZERO)
 					totallnL += (countit[i] * unscaledlnL);
 

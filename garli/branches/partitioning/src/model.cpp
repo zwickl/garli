@@ -231,7 +231,7 @@ void Model::UpdateQMat(){
 		UpdateQMatAminoAcid();
 		return;
 		}
-	else if(modSpec->IsBinary() || modSpec->IsNState()){
+	else if(modSpec->IsNState() || modSpec->IsNStateV()){
 		UpdateQMatNState();
 		return;
 		}
@@ -1115,7 +1115,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 				}
 			}
 		}
-	else if(modSpec->IsNState()){
+	else if(modSpec->IsNState() || modSpec->IsNStateV()){
 		for(int rate=0;rate<NRateCats();rate++){
 			int model=0;
 			const unsigned rateOffset = nstates*rate;
@@ -1798,7 +1798,7 @@ void Model::OutputGarliFormattedModel(ostream &outf) const{
 			}
 		}
 
-	if(modSpec->IsAminoAcid() == false)
+	if(modSpec->IsNucleotide() || modSpec->IsCodon())
 		outf << " r " << Rates(0) << " " << Rates(1) << " " << Rates(2) << " " << Rates(3) << " " << Rates(4);
 	outf << " e " ;
 	for(int i=0;i<nstates;i++)
@@ -1933,10 +1933,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		}
 	else if(modSpec->IsAminoAcid())
 		outman.UserMessage("  Number of states = 20 (amino acid data)");
-	else if(modSpec->IsNState())
-		outman.UserMessage("  Number of states = %d (discrete data)", nstates);
-	else if(modSpec->IsBinary())
-		outman.UserMessage("  Number of states = 2 (discrete binary data)");
+	else if(modSpec->IsNState() || modSpec->IsNStateV())
+		outman.UserMessage("  Number of states = %d (standard data)", nstates);
 	else
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
@@ -1967,7 +1965,10 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		else if(modSpec->IsMtMamAAMatrix()) outman.UserMessage("MtMam");
 		else if(modSpec->IsMtRevAAMatrix()) outman.UserMessage("MtRev");
 		}
-	else if(modSpec->IsNState() || modSpec->IsBinary()){
+	else if(modSpec->IsNState()){
+		outman.UserMessage("  Character change matrix:\n    One rate (symmetric one rate Mk model)");
+		}
+	else if(modSpec->IsNStateV()){
 		outman.UserMessage("  Character change matrix:\n    One rate (symmetric one rate Mkv model)");
 		}
 
@@ -1980,7 +1981,7 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 			}
 		else if(modSpec->IsAminoAcid())
 			outman.UserMessage("equal (0.05, fixed)");
-		else if(modSpec->IsBinary() || modSpec->IsNState())
+		else if(modSpec->IsNState() || modSpec->IsNStateV())
 			outman.UserMessage("equal (%.2f, fixed)", 1.0/nstates);
 		else 
 			outman.UserMessage("equal (0.25, fixed)");
@@ -2468,8 +2469,8 @@ void Model::CreateModelFromSpecification(int modnum){
 		//require the Eigen stuff	
 
 	if(modSpec->IsNucleotide()) UpdateQMat();
-	else if(modSpec->IsBinary() || modSpec->IsNState()){
-		//NSTATE
+	else if(modSpec->IsNState() || modSpec->IsNStateV()){
+		//NSTATE - nothing needs to be done here right now
 		}
 	else if(modSpec->IsCodon()){
 		FLOAT_TYPE *d;
@@ -3815,13 +3816,28 @@ ModelPartition::ModelPartition(){
 	//they aren't actually being estiamted
 	if(dataSubInfo.size() > 1){
 		int totalCharacters = 0;
-		for(int d = 0;d < dataSubInfo.size();d++){
+/*		for(int d = 0;d < dataSubInfo.size();d++){
 			totalCharacters += dataSubInfo[d].totalCharacters;
 			}
 		for(int d = 0;d < dataSubInfo.size();d++){
 			subsetRates.push_back(1.0);
 			subsetProportions.push_back(dataSubInfo[d].totalCharacters / (FLOAT_TYPE) totalCharacters);
 			}
+*/
+		//if we're in MKV mode and this is a subset that MKV will be applied to, need to compensate for dummy char
+		for(int d = 0;d < dataSubInfo.size();d++){
+			totalCharacters += dataSubInfo[d].totalCharacters - (dataSubInfo[d].usedAs == DataSubsetInfo::NSTATEV ? 1 : 0);
+			}
+		for(int d = 0;d < dataSubInfo.size();d++){
+			subsetRates.push_back(1.0);
+			subsetProportions.push_back((dataSubInfo[d].totalCharacters - (dataSubInfo[d].usedAs == DataSubsetInfo::NSTATEV ? 1 : 0))/ (FLOAT_TYPE) totalCharacters);
+			}
+#ifndef NDEBUG
+		double propTot = 0.0;
+		for(int d = 0;d < dataSubInfo.size();d++) propTot += subsetProportions[d];
+		assert(FloatingPointEquals(propTot, 1.0, 1e-6));
+#endif
+
 		if(modSpecSet.InferSubsetRates()){
 			vector<FLOAT_TYPE*> dummy;
 			for(int d = 0;d < dataSubInfo.size();d++)

@@ -460,10 +460,10 @@ int main( int argc, char* argv[] )	{
 					dataSubInfo[d].usedAs = DataSubsetInfo::AMINOACID;
 				else if(modSpec->IsAminoAcid())
 					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::AMINOACID;
-				else if(modSpec->IsBinary())
-					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::BINARY;
 				else if(modSpec->IsNState())
 					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::NSTATE;
+				else if(modSpec->IsNStateV())
+					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::NSTATEV;
 
 				dataSubInfo[d].Report();
 				outman.UserMessage("");
@@ -473,26 +473,20 @@ int main( int argc, char* argv[] )	{
 				//the implied matrix number will be that number of states
 				int actuallyUsedImpliedMatrixIndex = 0;
 				int maxObservedStates = effectiveMatrices[d].first->GetMaxObsNumStates(false);
-				for(int impliedMatrix = 2;impliedMatrix < (modSpec->IsNState() ? maxObservedStates + 1 : 3);impliedMatrix++){
-					if(modSpec->IsNState()){
-						//DEBUG
-			//			assert(conf.linkModels);
-			//			assert(effectiveMatrices.size() == 1);
-						data = new NStateData(impliedMatrix);
+				for(int impliedMatrix = 2;impliedMatrix < ((modSpec->IsNState() || modSpec->IsNStateV()) ? maxObservedStates + 1 : 3);impliedMatrix++){
+					if(modSpec->IsNState() || modSpec->IsNStateV()){
+						data = new NStateData(impliedMatrix, modSpec->IsNStateV());
 						}
-
 					else if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
 						data = new AminoacidData();
-					else if(modSpec->IsBinary())
-						data = new BinaryData();
-					else //all data besides AA will be read into a DNA matrix and
+					else //all other data will be read into a DNA matrix and
 						//then converted if necessary
 						data = new NucleotideData();
 					//if no charpart was specified, the second argument here will be empty
 					data->CreateMatrixFromNCL(effectiveMatrices[d].first, effectiveMatrices[d].second);
 
 #ifdef SINGLE_PRECISION_FLOATS
-					if(modSpec->IsBinary()) || modSpec->NState()) throw ErrorException("Sorry, Mk type models have not yet been tested with single precision.");
+					if(modSpec->NState() || modSpec->NStateV()) throw ErrorException("Sorry, Mk/Mkv type models have not yet been tested with single precision.");
 #endif
 				
 					if(data->NChar() == 0){
@@ -501,14 +495,14 @@ int main( int argc, char* argv[] )	{
 						//totally excluded subsets, but that gets complicated because it
 						//isn't clear how the indexing of models specified in the config
 						//file should work
-						assert(modSpec->IsNState());
+						assert(modSpec->IsNState() || modSpec->IsNStateV());
 						outman.UserMessage("NOTE: No characters found with %d observed states.", impliedMatrix);
 						delete data;
 						}
 					else{
-						if(modSpec->IsNState()){
+						if(modSpec->IsNState() || modSpec->IsNStateV()){
 #ifdef OPEN_MP
-		throw ErrorException("Sorry, discrete Mk type models cannot currently be used with the OpenMP version");
+							throw ErrorException("Sorry, discrete Mk type models cannot currently be used with the OpenMP version");
 #endif
 								
 							if(actuallyUsedImpliedMatrixIndex > 0){
@@ -551,26 +545,35 @@ int main( int argc, char* argv[] )	{
 				
 						dataPart.AddSubset(data);
 
-						if(modSpec->IsNState())
+						if(modSpec->IsNState() || modSpec->IsNStateV())
 							outman.UserMessage("Subset of data with %d states:", impliedMatrix);
+
+						//this accounts for the dummy character stuck into each data subset
+						//for Mkv.  We don't want the screen output to include it.
+						int mkvDiff = 0;
+						if(modSpec->IsNStateV()) mkvDiff = 1;
 
 						data->Summarize();
 						outman.UserMessage("\tSummary of data or data subset:");
 						outman.UserMessage("\t%5d sequences.", data->NTax());
-						outman.UserMessage("\t%5d constant characters.", data->NConstant());
+						
+						if(modSpec->IsNStateV())
+							if(data->NConstant() != 1) throw ErrorException("Constant characters are not allowed when using Mkv (as opposed to Mk) because it specifically assumes that all characters are variable");
+
+						outman.UserMessage("\t%5d constant characters.", data->NConstant() - mkvDiff);
 						outman.UserMessage("\t%5d parsimony-informative characters.", data->NInformative());
 						outman.UserMessage("\t%5d autapomorphic characters.", data->NAutapomorphic());
 						int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
 						if(data->NMissing() > 0){
 							outman.UserMessage("\t%5d characters were completely missing or ambiguous (removed).", data->NMissing());
-							outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
-						}
-						else outman.UserMessage("\t%5d total characters.", total);
+							outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar() - mkvDiff);
+							}
+						else outman.UserMessage("\t%5d total characters.", total - mkvDiff);
 						
 						outman.flush();
 						
 						data->Collapse();
-						outman.UserMessage("\t%5d unique patterns in compressed data matrix.\n", data->NChar());
+						outman.UserMessage("\t%5d unique patterns in compressed data matrix.\n", data->NChar() - mkvDiff);
 
 						dataSubInfo[d + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();
 						dataSubInfo[d + actuallyUsedImpliedMatrixIndex].uniqueCharacters = data->NChar();
@@ -579,7 +582,7 @@ int main( int argc, char* argv[] )	{
 						//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 						data->ReserveOriginalCounts();
 						
-						if(!modSpec->IsBinary() && !modSpec->IsNState())
+						if(!modSpec->IsNState() && !modSpec->IsNStateV())
 							data->DetermineConstantSites();
 						}
 					}
