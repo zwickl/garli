@@ -6221,16 +6221,13 @@ FLOAT_TYPE Tree::OptimizeSubsetRates(FLOAT_TYPE prec){
 		initVals.push_back(modPart->SubsetRate(i));
 
 	//limiting change in any one pass
-	double maxRateChangeProp = 0.75;
+	double maxRateChangeProp = 0.9;
 	for(i=0;i < modPart->NumSubsetRates();i++){
 		subrateImprove += OptimizeBoundedParameter<ModelPartition>(prec, modPart->SubsetRate(i), i, 
 			max(minVal, modPart->SubsetRate(i)*maxRateChangeProp),
-			modPart->SubsetRate(i)+modPart->SubsetRate(i)*maxRateChangeProp,
+			modPart->SubsetRate(i) / maxRateChangeProp,
 			modPart,
 			&ModelPartition::SetSubsetRate);
-		if(subrateImprove < 0.0){
-			int poo = 2;
-			}
 		}
 
 	Score();
