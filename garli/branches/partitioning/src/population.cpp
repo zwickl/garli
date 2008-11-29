@@ -1576,11 +1576,11 @@ void Population::Run(){
 							improve += indiv[bestIndiv].treeStruct->OptimizeFlexRates(adap->branchOptPrecision, modnum);
 							}
 						else if(modSpec->fixAlpha == false){//normal gamma
-							improve += indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(adap->branchOptPrecision, mod->Alpha(), 0, 0.05, 999.9, modnum, &Model::SetAlpha);
+							improve += indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(adap->branchOptPrecision, mod->Alpha(), 0, min(mod->Alpha(), 0.05), 999.9, modnum, &Model::SetAlpha);
 							}
 						}
 					if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
-						improve += indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(adap->branchOptPrecision, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, modnum, &Model::SetPinv);
+						improve += indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(adap->branchOptPrecision, mod->PropInvar(), 0, min(mod->PropInvar(), 1.0e-8), mod->maxPropInvar, modnum, &Model::SetPinv);
 					}
 				if(modSpecSet.InferSubsetRates()){
 					improve += indiv[bestIndiv].treeStruct->OptimizeSubsetRates(adap->branchOptPrecision);
