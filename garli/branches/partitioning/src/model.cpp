@@ -1180,6 +1180,7 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 		//if(data->NConstant() == 0) throw(ErrorException("This dataset contains no constant characters!\nInference of the proportion of invariant sites is therefore meaningless.\nPlease set invariantsites to \"none\""));
 		if(data->NConstant() == 0){
 			outman.UserMessage("This dataset contains no constant characters!\nInference of the proportion of invariant sites is therefore meaningless.\nSetting invariantsites to \"none\".");
+			outman.UserMessage("(If this is a partitioned model, you may ignore the previous message)");
 			SetPinv(ZERO_POINT_ZERO, false);
 			SetMaxPinv(ZERO_POINT_ZERO);
 			modSpec->includeInvariantSites = false;
