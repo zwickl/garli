@@ -421,21 +421,20 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 
 	//PARTITION
 	//Model::SetCode(static_cast<CodonData*>(data)->GetCode());
-	//DEBUG - code won't be able to be static anymore, since it might vary among model/partition subsets
-	//this is very convoluted
-	for(int m = 0;m < dataPart->NumSubsets();m++){
-		if(modSpecSet.GetModSpec(m)->IsCodon()){
-			for(int m2 = m+1;m2 < dataPart->NumSubsets();m2++){
-				if(modSpecSet.GetModSpec(m)->IsCodon()){
-					if(static_cast<CodonData*>(dataPart->GetSubset(m))->GetCode() 
-						!= static_cast<CodonData*>(dataPart->GetSubset(0))->GetCode())
+	//DEBUG - code won't be able to be static anymore in the future, since it might vary among model/partition subsets
+	//for now check for different codes (in a very convoluted way) and crap out if necessary
+	for(vector<ClaSpecifier>::iterator c = claSpecs.begin();c != claSpecs.end();c++){
+		if(modSpecSet.GetModSpec((*c).modelIndex)->IsCodon()){
+			for(vector<ClaSpecifier>::iterator c2 = c+1;c2 != claSpecs.end();c2++){
+				if(modSpecSet.GetModSpec((*c2).modelIndex)->IsCodon()){
+					if(modSpecSet.GetModSpec((*c).modelIndex)->geneticCode != modSpecSet.GetModSpec((*c2).modelIndex)->geneticCode)
 						throw ErrorException("Sorry, partitioned models with multiple genetic codes are not yet implemented");
 					}
 				}
-			Model::SetCode(static_cast<CodonData*>(dataPart->GetSubset(m))->GetCode());
+			Model::SetCode(static_cast<CodonData*>(dataPart->GetSubset((*c).dataIndex))->GetCode());
 			}
 		}
- 
+
 #ifdef INPUT_RECOMBINATION
 	total_size = conf->nindivs + NUM_INPUT;
 #endif
@@ -930,19 +929,34 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		}
 
 	//create the first indiv, and then copy the tree and clas
-	//this is very annoying with partitioning because a single model can apply to multiple
-	//subsets.  So, just use the first cla set that refers to this model
-	for(int m = 0;m < indiv[0].modPart.NumModels();m++){
-		for(vector<ClaSpecifier>::iterator c = claSpecs.begin();c != claSpecs.end();c++){
+
+	//this is really annoying and hacky - the maxPinv value is held by each model, and is data dependent (maxPinv can't be > obs pinv)
+	//But, since a single model may apply to multiple data, need to be sure that the maxPinv is > the highest obs pinv of any of them
+	//now always setting the model default for each data subset (which due to linkage might reset the model several times), but this 
+	//shouldn't be problematic.  Note that the other data dependent model thing is empirical base freqs, but that will be disallowed
+	//elsewhere when there is linkage.
+	FLOAT_TYPE maxPinv = ZERO_POINT_ZERO;
+	for(vector<ClaSpecifier>::iterator c = claSpecs.begin();c != claSpecs.end();c++){
+		for(int m = 0;m < indiv[0].modPart.NumModels();m++){
 			if((*c).modelIndex == m){
 				indiv[0].modPart.GetModel(m)->SetDefaultModelParameters(dataPart->GetSubset((*c).dataIndex));
-				//DEBUG - need to stick this in somewhere more natural so that it gets reset after a rep completes
-				indiv[0].modPart.Reset();
-				break;
+				if(indiv[0].modPart.GetModel(m)->MaxPinv() > maxPinv) maxPinv = indiv[0].modPart.GetModel(m)->MaxPinv();
 				}
-			assert(c != (claSpecs.end()-1));
 			}
 		}
+	//we should only need to do this crap if the models are linked, but not currently allowing linking of some models but not others
+	if(conf->linkModels){
+		assert(indiv[0].modPart.NumModels() == 1);
+		//if(indiv[0].modPart.GetModel(0)->PropInvar() > ZERO_POINT_ZERO){
+		if(modSpecSet.GetModSpec(0)->includeInvariantSites == true){
+			if(maxPinv > ZERO_POINT_ZERO == false) throw ErrorException("invariantsites = estimate was specified, but no data subsets contained constant characters!");
+			indiv[0].modPart.GetModel(0)->SetMaxPinv(maxPinv);
+			indiv[0].modPart.GetModel(0)->SetPinv(maxPinv * 0.25, false);
+			}
+		}
+
+	//DEBUG - need to stick this in somewhere more natural so that it gets reset after a rep completes
+	indiv[0].modPart.Reset();
 
 	//This is getting very complicated.  Here are the allowable combinations.
 	//streefname not specified (random or stepwise)
