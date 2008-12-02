@@ -395,6 +395,10 @@ void Population::CheckForIncompatibleConfigEntries(){
 		}
 
 	if(conf->inferInternalStateProbs && conf->bootstrapReps > 0) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
+	for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
+		if(modSpecSet.GetModSpec(ms)->IsNStateV() && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
+			throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used if\n\tthe Mkv model (datatype = standardvariable) is used for any data.\n\tTry streefname = random.");
+		}
 	}
 
 void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *rawD, int nprocs, int r){
@@ -945,14 +949,11 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			}
 		}
 	//we should only need to do this crap if the models are linked, but not currently allowing linking of some models but not others
-	if(conf->linkModels){
+	if(conf->linkModels && modSpecSet.GetModSpec(0)->includeInvariantSites == true){
 		assert(indiv[0].modPart.NumModels() == 1);
-		//if(indiv[0].modPart.GetModel(0)->PropInvar() > ZERO_POINT_ZERO){
-		if(modSpecSet.GetModSpec(0)->includeInvariantSites == true){
-			if(maxPinv > ZERO_POINT_ZERO == false) throw ErrorException("invariantsites = estimate was specified, but no data subsets contained constant characters!");
-			indiv[0].modPart.GetModel(0)->SetMaxPinv(maxPinv);
-			indiv[0].modPart.GetModel(0)->SetPinv(maxPinv * 0.25, false);
-			}
+		if(maxPinv > ZERO_POINT_ZERO == false) throw ErrorException("invariantsites = estimate was specified, but no data subsets contained constant characters!");
+		indiv[0].modPart.GetModel(0)->SetMaxPinv(maxPinv);
+		indiv[0].modPart.GetModel(0)->SetPinv(maxPinv * 0.25, false);
 		}
 
 	//DEBUG - need to stick this in somewhere more natural so that it gets reset after a rep completes
@@ -1918,13 +1919,14 @@ int Population::EvaluateStoredTrees(bool report){
 			for(int part = 0;part < storedTrees[0]->modPart.NumModels();part++){
 				if(storedTrees[0]->modPart.NumModels() > 1)
 					outman.UserMessage("\nPartition subset %d:", part);
-				string s;
-				storedTrees[0]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, false);
-				outman.UserMessage("       %s", s.c_str());
-				for(unsigned i=0;i<storedTrees.size();i++){
-					storedTrees[i]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, true);
-				//	storedTrees[i]->modPart.GetModel(part)->FillRateMatrixString(s);
-					outman.UserMessage("rep%2d: %s", i+1, s.c_str());
+				if(storedTrees[0]->modPart.GetModel(part)->GetMutableParameters()->size()){
+					string s;
+					storedTrees[0]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, false);
+					outman.UserMessage("       %s", s.c_str());
+					for(unsigned i=0;i<storedTrees.size();i++){
+						storedTrees[i]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, true);
+						outman.UserMessage("rep%2d: %s", i+1, s.c_str());
+						}
 					}
 				}
 			if(modSpecSet.InferSubsetRates()){

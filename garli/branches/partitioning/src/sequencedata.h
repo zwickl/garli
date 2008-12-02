@@ -668,7 +668,7 @@ public:
 		outman.UserMessage("GARLI partition subset %d", garliSubsetNum+1);
 		outman.UserMessage("\tCHARACTERS block #%d (\"%s\")", charblockNum+1, charblockName.c_str());
 		if(partitionSubsetNum >= 0) outman.UserMessage("\tCHARPARTITION subset #%d (\"%s\")", partitionSubsetNum+1, partitionSubsetName.c_str());
-		outman.UserMessage("\tData read as %s, modeled as %s", outputNames[readAs].c_str(), outputNames[usedAs].c_str());
+		outman.UserMessage("\tData read as %s,\n\tmodeled as %s", outputNames[readAs].c_str(), outputNames[usedAs].c_str());
 		}
 	};
 

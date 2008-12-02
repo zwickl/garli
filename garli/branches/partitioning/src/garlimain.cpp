@@ -305,7 +305,7 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("            see this hidden page for details on using it:");
 			outman.UserMessage("      https://www.nescent.org/wg_garli/Partition_testing_version");
 			outman.UserMessage("             CHECK WITH ME BEFORE PUBLISHING WITH IT");
-			outman.UserMessage("                         !!!!THANKS!!!\n");
+			outman.UserMessage("                         !!!!THANKS!!!!\n");
 			outman.UserMessage("###################################################");
 
 			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
@@ -426,64 +426,73 @@ int main( int argc, char* argv[] )	{
 			//because of exsets some subsets of a charpart could contain no characters,
 			//but I'm not going to deal with that right now, and will crap out
 
-			//OK, EFFECTIVE matrices ( = datasubsets) are the actual chunks of data specified by separate charblocks and/or charpartitions
+			//EFFECTIVE matrices ( = datasubsets) are the actual chunks of data specified by separate charblocks and/or charpartitions
 			//There is a one to one matching between effective matrices and CLAs.  EXCEPT in the case of Nstate data,
 			//in which case multiple matrices will be spawned 
 
-			for(int d = 0;d < effectiveMatrices.size();d++){
+			for(int dataChunk = 0;dataChunk < effectiveMatrices.size();dataChunk++){
 				ModelSpecification *modSpec = NULL;
-				
-				if(d > 0){
+				//for Mk type data the number of actual matrices created can be > the number of actual data chunks
+				//e.g., a first characters block might spawn 3 matrices for 2 state, 3 state and 4 state characters
+				//sucessive char blocks then need to take that into account
+				//a dataSubset is equivalent to a matrix in this respect
+				int nextMatrixNum = dataPart.NumSubsets();
+
+				if(dataChunk > 0){
 					if(conf.linkModels){//linkage means that all clas/matrices point to the same model/modSpec
-						claSpecs.push_back(ClaSpecifier(d,0,d));
+						//EXCEPT in the case of Mk type data with different numbers of states.  That is taken 
+						//care of below.
+						claSpecs.push_back(ClaSpecifier(dataChunk,0,dataChunk));
 						modSpec = modSpecSet.GetModSpec(0);
 						}
 					else{//models are not linked ...
 						if(conf.configModelSets.size() == 1)//but are all described by the same settings in the config file
 							modSpecSet.AddModSpec(conf.configModelSets[0]);
 						else{ //each has its own description in the config
-							modSpecSet.AddModSpec(conf.configModelSets[d]);
+							modSpecSet.AddModSpec(conf.configModelSets[dataChunk]);
 							}
-						claSpecs.push_back(ClaSpecifier(d,d,d));
-						modSpec = modSpecSet.GetModSpec(d);
+						claSpecs.push_back(ClaSpecifier(nextMatrixNum, nextMatrixNum, nextMatrixNum));
+						modSpec = modSpecSet.GetModSpec(nextMatrixNum);
 						}
 					}
 				else{ //if this is the first model, it must correspond to the first modSpec
 					modSpec = modSpecSet.GetModSpec(0);
 					claSpecs.push_back(ClaSpecifier(0,0,0));
 					}
+				if(conf.linkModels && (modSpec->IsNState() || modSpec->IsNState()))
+					throw ErrorException("Model linkage cannot be used with Mk/Mkv models (nor does it\n\tneed to be, since there are no estimated parameters.\n\tSet linkmodels = 0");
 
 				//defaults here are NUCLEOTIDE, so make changes as necessary
 				if(modSpec->IsCodon()) 
-					dataSubInfo[d].usedAs = DataSubsetInfo::CODON;
+					dataSubInfo[dataChunk].usedAs = DataSubsetInfo::CODON;
 				else if(modSpec->IsCodonAminoAcid())
-					dataSubInfo[d].usedAs = DataSubsetInfo::AMINOACID;
+					dataSubInfo[dataChunk].usedAs = DataSubsetInfo::AMINOACID;
 				else if(modSpec->IsAminoAcid())
-					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::AMINOACID;
+					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::AMINOACID;
 				else if(modSpec->IsNState())
-					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::NSTATE;
+					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATE;
 				else if(modSpec->IsNStateV())
-					dataSubInfo[d].readAs = dataSubInfo[d].usedAs = DataSubsetInfo::NSTATEV;
+					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATEV;
 
-				dataSubInfo[d].Report();
+				dataSubInfo[dataChunk].Report();
 				outman.UserMessage("");
 
 				// Create the data object
 				//for nstate data the effective matrices will be further broken up into implied matrices that each have the same number of observed states
 				//the implied matrix number will be that number of states
 				int actuallyUsedImpliedMatrixIndex = 0;
-				int maxObservedStates = effectiveMatrices[d].first->GetMaxObsNumStates(false);
+				int maxObservedStates = effectiveMatrices[dataChunk].first->GetMaxObsNumStates(false);
+				//for Mk the impliedMatrix number is the number of states
 				for(int impliedMatrix = 2;impliedMatrix < ((modSpec->IsNState() || modSpec->IsNStateV()) ? maxObservedStates + 1 : 3);impliedMatrix++){
-					if(modSpec->IsNState() || modSpec->IsNStateV()){
+					if(modSpec->IsNState() || modSpec->IsNStateV())
 						data = new NStateData(impliedMatrix, modSpec->IsNStateV());
-						}
 					else if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
 						data = new AminoacidData();
 					else //all other data will be read into a DNA matrix and
 						//then converted if necessary
 						data = new NucleotideData();
 					//if no charpart was specified, the second argument here will be empty
-					data->CreateMatrixFromNCL(effectiveMatrices[d].first, effectiveMatrices[d].second);
+					data->CreateMatrixFromNCL(effectiveMatrices[dataChunk].first, effectiveMatrices[dataChunk].second);
 
 #ifdef SINGLE_PRECISION_FLOATS
 					if(modSpec->NState() || modSpec->NStateV()) throw ErrorException("Sorry, Mk/Mkv type models have not yet been tested with single precision.");
@@ -499,48 +508,52 @@ int main( int argc, char* argv[] )	{
 						outman.UserMessage("NOTE: No characters found with %d observed states.", impliedMatrix);
 						delete data;
 						}
-					else{
+					else{//now we have a data matrix object created, already filtered for the correct sites or number of states
 						if(modSpec->IsNState() || modSpec->IsNStateV()){
 #ifdef OPEN_MP
 							throw ErrorException("Sorry, discrete Mk type models cannot currently be used with the OpenMP version");
 #endif
-								
+							if(modSpec->IsGammaRateHet() || modSpec->IsFlexRateHet())
+								throw ErrorException("Sorry, rate heterogeneity cannot be used with Mk/Mkv models yet.\n\tSet ratehetmodel = none.");
 							if(actuallyUsedImpliedMatrixIndex > 0){
 								//the specs are being added as we read and create subsets, so we can add them for the implied matrices
 								//as we go
-								claSpecs.push_back(ClaSpecifier(d+actuallyUsedImpliedMatrixIndex, d+actuallyUsedImpliedMatrixIndex, d+actuallyUsedImpliedMatrixIndex));
+								claSpecs.push_back(ClaSpecifier(nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex));
 								//clone the current datasubset info, which applies to all of the implied matrices within this effective matrix
-								dataSubInfo.push_back(dataSubInfo[d]);
-								//also clone the modspec
-								modSpecSet.AddModSpec(conf.configModelSets[d]);
-								modSpec = modSpecSet.GetModSpec(d + actuallyUsedImpliedMatrixIndex);
+								dataSubInfo.push_back(dataSubInfo[dataChunk]);
+								//also clone the modspec.  This isn't really necessary (or good) except that the number of states is stored by the modspecs
+								if(conf.linkModels)
+									modSpecSet.AddModSpec(conf.configModelSets[0]);
+								else
+									modSpecSet.AddModSpec(conf.configModelSets[dataChunk]);
+								modSpec = modSpecSet.GetModSpec(modSpecSet.NumSpecs() - 1);
 								}
 							modSpec->SetNStates(impliedMatrix);
 							}
 						else if(modSpec->IsCodon()){
 							rawPart.AddSubset(data);
 							const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
-							CodonData *d;
+							CodonData *dat;
 							if(nuc != NULL)
-								d = new CodonData(nuc, modSpec->geneticCode);
+								dat = new CodonData(nuc, modSpec->geneticCode);
 							else throw ErrorException("Attempted to create codon matrix from non-nucleotide data");
 
 							//this probably shouldn't go here, but...
-							if(modSpec->IsF1x4StateFrequencies()) d->SetF1X4Freqs();
-							else if(modSpec->IsF3x4StateFrequencies()) d->SetF3X4Freqs();
-							else if(modSpec->IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
+							if(modSpec->IsF1x4StateFrequencies()) dat->SetF1X4Freqs();
+							else if(modSpec->IsF3x4StateFrequencies()) dat->SetF3X4Freqs();
+							else if(modSpec->IsEmpiricalStateFrequencies()) dat->SetCodonTableFreqs();
 
-							data = d;
+							data = dat;
 							}
 						else if(modSpec->IsCodonAminoAcid()){
 							rawPart.AddSubset(data);
 							const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
-							AminoacidData *d;
+							AminoacidData *dat;
 							if(nuc != NULL)
-								d = new AminoacidData(nuc, modSpec->geneticCode);
+								dat = new AminoacidData(nuc, modSpec->geneticCode);
 							else throw ErrorException("Attempted to translate to amino acids from non-nucleotide data");
 
-							data = d;
+							data = dat;
 							}
 				
 						dataPart.AddSubset(data);
@@ -575,8 +588,8 @@ int main( int argc, char* argv[] )	{
 						data->Collapse();
 						outman.UserMessage("\t%5d unique patterns in compressed data matrix.\n", data->NChar() - mkvDiff);
 
-						dataSubInfo[d + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();
-						dataSubInfo[d + actuallyUsedImpliedMatrixIndex].uniqueCharacters = data->NChar();
+						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();
+						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].uniqueCharacters = data->NChar();
 						actuallyUsedImpliedMatrixIndex++;
 
 						//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
