@@ -155,7 +155,7 @@ elif test "x$GCC" = "xyes" ; then
 		CXXFLAGS_OPTIM_SPEED="-O3 -ffast-math -funroll-loops -fstrict-aliasing"
 	fi
 	case "$build_os" in
-	 	darwin*) CXXFLAGS="$CXXFLAGS -Wno-long-double" ;;
+	 	darwin*) CXXFLAGS="$CXXFLAGS" ;;
 	 	*) CXXFLAGS="$CXXFLAGS -fsigned-char";;
 	esac	
 fi
