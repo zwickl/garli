@@ -4950,8 +4950,6 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-#undef OUTPUT_SITELIKES
-
 #ifdef OUTPUT_SITELIKES
 	ofstream sit("sitelikes.log");
 	sit.precision(15);
@@ -5369,9 +5367,9 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE totallnL=0.0, siteL;
+	FLOAT_TYPE totallnL=ZERO_POINT_ZERO, siteL;
 	FLOAT_TYPE unscaledlnL;
-	FLOAT_TYPE MkvScaler;
+	FLOAT_TYPE MkvScaler=ZERO_POINT_ZERO;
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);

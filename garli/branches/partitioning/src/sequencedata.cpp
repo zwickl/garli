@@ -835,7 +835,7 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
 	if(charblock->GetDataType() != NxsCharactersBlock::dna 
 		&& charblock->GetDataType() != NxsCharactersBlock::rna 
 		&& charblock->GetDataType() != NxsCharactersBlock::nucleotide )
-		throw ErrorException("Tried to create nucleotide matrix from non-nucleotide data.\n\t(Check your datatype setting.)");
+		throw ErrorException("Tried to create nucleotide matrix from non-nucleotide data.\n\t(Check your datatype settings in your datafile and Garli config file)");
 
 	if(charblock->GetNumActiveChar() < charblock->GetNChar()){
 		NxsUnsignedSet excluded = charblock->GetExcludedIndexSet();
@@ -891,7 +891,7 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsig
 	if(charblock->GetDataType() != NxsCharactersBlock::dna 
 		&& charblock->GetDataType() != NxsCharactersBlock::rna 
 		&& charblock->GetDataType() != NxsCharactersBlock::nucleotide )
-		throw ErrorException("Tried to create nucleotide matrix from non-nucleotide data.\n\t(Check your datatype setting.)");
+		throw ErrorException("Tried to create nucleotide matrix from non-nucleotide data.\n\tCheck the datatype settings in your datafile in the characters\n\tor data block and the datatype setting in your Garli config file.");
 
 	int numOrigTaxa = charblock->GetNTax();
 	int numActiveTaxa = charblock->GetNumActiveTaxa();

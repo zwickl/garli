@@ -767,7 +767,8 @@ public:
 		modSpecs.push_back(mod);
 		}
 	ModelSpecification *GetModSpec(int num) const{
-		if(num > -1 == false || num >= modSpecs.size()) throw ErrorException("tried to access invalid ModSpec number");
+		if(num > -1 == false || num >= modSpecs.size()) 
+			throw ErrorException("tried to access invalid ModSpec number");
 		return modSpecs[num];
 		}
 	bool IsSetup(int num){return GetModSpec(num)->isSetup;}
