@@ -1,0 +1,3 @@
+#!/bin/bash
+$1 $2 06.omegaK2Pf1x4.conf |tee -a RUNOUTPUT.log
+$1 $2 17.M3K2Pf3x4.conf |tee -a RUNOUTPUT.log

@@ -1,0 +1,4 @@
+#!/bin/bash
+$1 $2 18.wagempG.conf |tee RUNOUTPUT.log
+$1 $2 boot.jonesjones.conf |tee -a RUNOUTPUT.log
+$1 $2 boot.wagempG.conf |tee -a RUNOUTPUT.log
