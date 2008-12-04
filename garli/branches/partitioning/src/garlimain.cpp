@@ -19,7 +19,7 @@
 
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION 0.96
-#define MINOR_VERSION 0
+#define MINOR_VERSION "r396"
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
@@ -166,13 +166,17 @@ int main( int argc, char* argv[] )	{
 #endif				
 					else if(argv[curarg][1]=='t') runTests = true;
 					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
-						outman.UserMessage("%s Version %.2f.%d", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION);
+						outman.UserMessage("%s Version %.2f.%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION);
 #ifdef SUBROUTINE_GARLI
 						outman.UserMessage("MPI run distributing version");
 #endif
 #ifdef OPEN_MP
 						outman.UserMessage("OpenMP multithreaded version");
 #endif
+#ifdef SINGLE_PRECISION_FLOATS
+						outman.UserMessage("Single precision floating point version");
+#endif
+						outman.UserMessage("Partitioned/Mkv model testing version");
 						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2008");
 						outman.UserMessage("zwickl@nescent.org");
 						exit(0);
@@ -267,8 +271,8 @@ int main( int argc, char* argv[] )	{
 				outman.SetLogFileForAppend(temp_buf);
 			else 
 				outman.SetLogFile(temp_buf);
-
-			outman.UserMessage("Running BOINC GARLI, version 0.96 (Partitioning Branch) r326 (Sept 2008)\n");
+			
+			outman.UserMessage("Running BOINC GARLI, version %.2f.%s (Partitioning Branch) (Dec 2008)\n", MAJOR_VERSION, MINOR_VERSION);
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -287,11 +291,12 @@ int main( int argc, char* argv[] )	{
 			else outman.SetLogFile(temp_buf);
 	#ifdef SUBROUTINE_GARLI
 			//MPI search forking version
-			outman.UserMessage("Running GARLI, version 0.96 (Partitioning Branch) r326 (Sept 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
+			outman.UserMessage("Running GARLI, version %.2f.%s (Partitioning Branch) (Dec 2008)\n", MAJOR_VERSION, MINOR_VERSION);
+			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
 	#else	//nonMPI version
-			outman.UserMessage("\nRunning serial GARLI, version 0.96 (Partitioning Branch) r326 (Sept 2008)\n");
+			outman.UserMessage("Running GARLI, version %.2f.%s (Partitioning Branch) (Dec 2008)\n", MAJOR_VERSION, MINOR_VERSION);
 	#endif
 
 #endif //end of BOINC / nonBOINC
@@ -300,10 +305,13 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
 #endif
 			outman.UserMessage("###################################################");
-			outman.UserMessage("THIS IS A TESTING VERSION FOR PARTITIONED MODELS.  IT APPEARS TO BE WORKING");
-			outman.UserMessage("PROPERLY BUT PLEASE LET ME KNOW OF ANY PROBLEMS AT garli.support@gmail.com");
-			outman.UserMessage("            see this hidden page for details on using it:");
+			outman.UserMessage("THIS IS A TESTING VERSION FOR PARTITIONED MODELS AND THE MKV MORPHOLOGY MODEL.");
+			outman.UserMessage("IT APPEARS TO BE WORKING PROPERLY, BUT PLEASE LET ME KNOW OF ANY PROBLEMS AT:");
+			outman.UserMessage("		          garli.support@gmail.com");
+			outman.UserMessage("        see this hidden page for details on partitioned usage:");
 			outman.UserMessage("      https://www.nescent.org/wg_garli/Partition_testing_version");
+			outman.UserMessage("       and this page for details on Mkv mophology model usage:");
+			outman.UserMessage("      https://www.nescent.org/wg_garli/Mkv_morphology_model");
 			outman.UserMessage("             CHECK WITH ME BEFORE PUBLISHING WITH IT");
 			outman.UserMessage("                         !!!!THANKS!!!!\n");
 			outman.UserMessage("###################################################");
