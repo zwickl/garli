@@ -1,13 +1,15 @@
 ACLOCAL_AMFLAGS = -I config/m4
 
 EXTRA_DIST = \
+	build_garli.sh \
 	README.txt \
 	QuickStart.txt \
 	example \
 	project \
-	doc
+	doc \
+	ncl-2.1.06.tar.gz
 
-SUBDIRS = src
+SUBDIRS = src 
 
 dist-hook:
 	find "$(distdir)/doc" -depth -and -name .svn -and -type d -and -exec rm -rf {} \; 

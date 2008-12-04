@@ -102,6 +102,25 @@ if test "$enable_mpi" = yes; then
 	   ])
 fi
 
+# old Mpi wrapper version - run series of configs named run0.conf, run1.conf, etc
+AC_ARG_ENABLE(oldmpi,
+        AC_HELP_STRING([--enable-oldmpi],[build old MPI batch run version (YOU PROBABLY DON'T WANT THIS)]), , [enable_oldmpi=no])
+if test "$enable_oldmpi" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling old MPI batch run version
+           ])
+fi
+
+# single precision version (still being tested)
+AC_ARG_ENABLE(single-prec,
+        AC_HELP_STRING([--enable-single-prec],[use single precision floating point variables (EXPERIMENTAL)]), , [enable_single_prec=no])
+if test "$enable_single_prec" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling single precision floating point version
+           ])
+fi
+
+
 # Initialize optimization flag in case it doesn't get set below.
 CXXFLAGS_OPTIM_SPEED="-O"
 
@@ -125,7 +144,7 @@ if test  "$enable_openmp" = yes; then
 	fi
 fi
 
-if test "$CC" = "icc"; then
+if test "$CC" = "icc" -o "$CC" = "icc" ; then
 #	Intel C compiler for Linux
 	if test "$enable_debugging" = no; then
 		CXXFLAGS_OPTIM_SPEED="-O2 -ip -funroll-loops -fno-alias"
@@ -160,6 +179,14 @@ elif test "x$GCC" = "xyes" ; then
 	esac	
 fi
 
+#single precision
+if test  "$enable_single_prec" = yes; then
+	CXXFLAGS="$CXXFLAGS -DSINGLE_PRECISION_FLOATS"
+	if test "$CC" = "gcc" ; then
+		CXXFLAGS="$CXXFLAGS -fno-caller-saves"
+	fi
+fi
+
 AC_LANG(C++)
 ACX_MPI
 
@@ -170,6 +197,16 @@ if test  "$enable_mpi" = yes; then
 	CXX="$MPICXX"
 	LIBS="$MPILIBS $LIBS"
 fi
+
+#old MPI versionr
+if test  "$enable_oldmpi" = yes; then
+	CXXFLAGS="$CXXFLAGS -DOLD_SUBROUTINE_GARLI"
+	CC="$MPICC"
+	CXX="$MPICXX"
+	LIBS="$MPILIBS $LIBS"
+fi
+
+
 CXXFLAGS="$CXXFLAGS $CXXFLAGS_OPTIM_SPEED"
 
 
@@ -204,7 +241,7 @@ if ! test -d "$NCL_LIB_DIR" ; then
 	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
 fi
 
-INCLUDE="$INCLUDE -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
+CPPFLAGS="$CPPFLAGS -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
 if test -d "$NCL_LIB_DIR/ncl" ; then
 	LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR/ncl"
 else
@@ -216,7 +253,7 @@ GARLI_LIBS="-lncl"
 
 AC_SUBST([GARLI_LIBS])
 
-AC_SUBST([INCLUDE])
+AC_SUBST([CPPFLAGS])
 AC_SUBST([LDFLAGS])
 
 
