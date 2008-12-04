@@ -1919,7 +1919,7 @@ int Population::EvaluateStoredTrees(bool report){
 			for(int part = 0;part < storedTrees[0]->modPart.NumModels();part++){
 				if(storedTrees[0]->modPart.NumModels() > 1)
 					outman.UserMessage("\nPartition subset %d:", part);
-				if(storedTrees[0]->modPart.GetModel(part)->GetMutableParameters()->size()){
+				if(storedTrees[0]->modPart.GetModel(part)->GetMutableParameters()->size() > 0){
 					string s;
 					storedTrees[0]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, false);
 					outman.UserMessage("       %s", s.c_str());
@@ -1927,6 +1927,9 @@ int Population::EvaluateStoredTrees(bool report){
 						storedTrees[i]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, true);
 						outman.UserMessage("rep%2d: %s", i+1, s.c_str());
 						}
+					}
+				else{
+					outman.UserMessage("\t Model contains no estimated parameters");
 					}
 				}
 			if(modSpecSet.InferSubsetRates()){
