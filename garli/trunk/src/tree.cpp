@@ -181,7 +181,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 		else outgroup = new Bipartition();
 
 		GarliReader &reader = GarliReader::GetInstance();
-		if(reader.GetTaxaBlock()->GetNTax() > 0){
+		if(reader.GetTaxaBlock(0)->GetNTax() > 0){
 			//now using NCL to much more rigorously and flexibly read the outgroup specification
 			NxsString tax(conf->outgroupString.c_str());
 			tax += ";";
@@ -190,7 +190,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 			tok.GetNextToken();
 			NxsUnsignedSet iset;
 			try{
-				NxsSetReader::ReadSetDefinition(tok, *reader.GetTaxaBlock(), "outgroup", "GARLI configuration", &iset);
+				NxsSetReader::ReadSetDefinition(tok, *reader.GetTaxaBlock(0), "outgroup", "GARLI configuration", &iset);
 				outman.UserMessage("Found outgroup specification: %s\n", NxsSetReader::GetSetAsNexusString(iset).c_str());
 				}
 			catch (const NxsException & x){
@@ -226,11 +226,28 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 		}
 	}
 
+//this assumes that a tree string has been passed in with *s pointing to the first char of a blen
+//description, and reads and advances the string up to the next non-blen character.  The string that
+//was interpreted as the branch length is placed into the NxsString passed in
+double ReadBranchlength(const char *&s, NxsString &blen){
+	blen = "";
+	while(*(s+1) && *(s+1)!=')'&& *(s+1)!=',' && *(s+1)!=';'){
+		blen += *(s+1);
+		s++;
+		}
+	s++;
+	double len;
+	if(NxsString::to_double(blen.c_str(), &len) == false)
+		throw ErrorException("Problem reading tree description.  Illegal branch-length specification: \"%s\"", blen.c_str());
+	return len;
+	}
+
 //DJZ 4-28-04
 //adding the ability to read in treestrings in which the internal node numbers are specified.  I'd like to make the
 //internal numbers be specified the way that internal node labels are according to the newick format, ie directly after
 //the closing paren that represents the internal node.  But, that makes going from string -> tree annoying
 //because by the time the internal node number would be read the treeNode structure would have already been created.
+
 //So, the internal node numbers will go just BEFORE the opening paren that represents that node
 //Example:  50(1:.05, 2:.02):.1 signifies a node numbered 50 that is ancestral to 1 and 2.
 Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, bool allowMissingTaxa /*=false*/){
@@ -244,10 +261,8 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	int current=numTipsTotal+1;
 	bool cont=false;
 //	numBranchesAdded=-1;//if reading in a tree start at -1 so opening ( doesn't add a branch
-	while(*s)
-		{
+	while(*s){
 		cont = false;
-
 		if(*s == ';')
 			break;  // ignore semicolons
 		else if(*s == ' ' || *s == '\t')
@@ -255,26 +270,24 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			//DEBUG
 			//break;  // ignore spaces
 		else if(*s == ')'){
+			//we're closing a paren, moving a node toward the root
 			assert(temp->anc);
 			if(!temp->anc) throw ErrorException("Problem reading tree description.  Mismatched parentheses?");
 			temp=temp->anc;
 			s++;
-			while(*s && !isgraph(*s))
+			//while(*s && !isgraph(*s))
+			//an internal node label might appear here, so ignore anything up to one of these valid next characters
+			while(*s && (*s != ',') && (*s != ':') && (*s != ',') && (*s != ')') && (*s != ';'))
 				s++;
-			if(*s==':')
-				{NxsString info = "";
-				while( *(s+1)!=')'&& *(s+1)!=','){
-						info+=*(s+1);
-						s++;
-					}
-				s++;
-				temp->dlen = (FLOAT_TYPE) atof( info.c_str() );
+			if(*s==':'){//adding a branch length
+				NxsString len;
+				temp->dlen = ReadBranchlength(s, len);
 				if(temp->dlen < min_brlen){
-					outman.UserMessage("->Branch of length %s is less than min of %.1e.  Setting to min.", info.c_str(), min_brlen);
+					outman.UserMessage("->Branch of length %s is less than min of %.1e.  Setting to min.", len.c_str(), min_brlen);
 					temp->dlen = min_brlen;
 					}
 				else if (temp->dlen > max_brlen){
-					outman.UserMessage("->Branch of length %f is greater than max of %.0f.  Setting to max.", temp->dlen, max_brlen);
+					outman.UserMessage("->Branch of length %s is greater than max of %.0f.  Setting to max.", len.c_str(), max_brlen);
 					temp->dlen = max_brlen;
 					}
 				}
@@ -371,7 +384,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 					while(*s == ' ') s++;;//eat any spaces here
 					
 					if(*s!=':' && *s!=',' && *s!=')'){
-						throw ErrorException("Problem parsing tree string!  Expecting : or , or ), found %c", *s);
+						throw ErrorException("Problem parsing tree string!  Expecting \":\" or \",\" or \")\", found %c", *s);
 						s--;	
 						ofstream str("treestring.log", ios::app);
 						str << s << endl;
@@ -380,19 +393,14 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 						}
 						
 	                if(*s==':'){
-						NxsString info = "";
-						while( *(s+1)!=')'&& *(s+1)!=','){
-							info+=*(s+1);
-							s++;
-							}
-						s++;
-						temp->dlen = (FLOAT_TYPE)atof( info.c_str() );
+						NxsString len;
+						temp->dlen = ReadBranchlength(s, len);
 						if(temp->dlen < min_brlen){
-							outman.UserMessage("->Branch of length %s is less than min of %.1e.  Setting to min.", info.c_str(), min_brlen);
+							outman.UserMessage("->Branch of length %s is less than min of %.1e.  Setting to min.", len.c_str(), min_brlen);
 							temp->dlen = min_brlen;
 							}
 						else if (temp->dlen > max_brlen){
-							outman.UserMessage("->Branch of length %f is greater than max of %.0f.  Setting to max.", temp->dlen, max_brlen);
+							outman.UserMessage("->Branch of length %s is greater than max of %.0f.  Setting to max.", len.c_str(), max_brlen);
 							temp->dlen = max_brlen;
 							}
 						}
@@ -4795,7 +4803,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-
+#undef OUTPUT_SITELIKES
 
 #ifdef OUTPUT_SITELIKES
 	vector<double> siteLikes;
