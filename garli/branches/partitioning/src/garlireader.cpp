@@ -381,7 +381,7 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &modsp
 		}
 	else{//DEBUG assuming that otherwise the file is phylip format, and for the moment with relaxed names and non-interleaved
 		if(modspec.IsAminoAcid()){
-			outman.UserMessage("Attempting to read data file as Phylip amino acid sequence (using NCL):\n]t%s ...", filename);
+			outman.UserMessage("Attempting to read data file as Phylip amino acid sequence (using NCL):\n\t%s ...", filename);
 			ReadFilepath(filename, RELAXED_PHYLIP_AA_FORMAT);
 			}
 		else{
