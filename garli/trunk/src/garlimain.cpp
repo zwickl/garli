@@ -128,7 +128,7 @@ int SubGarliMain(int rank)
 	//clear out whatever is in the reader already - it might be full if a single
 	//process has called SubGarliMain multiple times
 	GarliReader &reader = GarliReader::GetInstance();
-	reader.ResetReader();
+	reader.ClearContent();
 #else
 int main( int argc, char* argv[] )	{
 #endif
@@ -341,8 +341,19 @@ int main( int argc, char* argv[] )	{
 				//then converted if necessary
 				data = new NucleotideData();
 
-			pop.usedNCL = ReadData(datafile.c_str(), data);
+			GarliReader &reader = GarliReader::GetInstance();
+			pop.usedNCL = reader.ReadData(datafile.c_str(), modSpec);
+
+			if(reader.GetNumTaxaBlocks() > 1)
+				if(reader.GetNumTaxaBlocks() > 1) throw ErrorException("Expecting only one taxa block in datafile");
+			NxsTaxaBlock *taxablock = reader.GetTaxaBlock(0);
+			NxsCharactersBlock *charblock = reader.GetCharactersBlock(taxablock, 0);
 			
+			//using 2 argument form of CreateMatrix (taken from paritition branch) but passing dummy charset for
+			//now.  Exsets will be taken care of in CreateMatrix
+			NxsUnsignedSet charSet;
+			data->CreateMatrixFromNCL(charblock, charSet);
+
 			if(modSpec.IsCodon()){
 				CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
 				pop.rawData = data;

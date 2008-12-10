@@ -600,12 +600,13 @@ void Individual::GetStartingTreeFromNCL(NxsTreesBlock *treesblock, int rank, int
 
 	int effectiveRank = rank % totalTrees;
 	
-	//we will get the tree string from NCL with names rather than numbers, regardless of how it was initially read in 
-	NxsString treestr = treesblock->GetTranslatedTreeDescription(effectiveRank);
-	treestr.BlanksToUnderscores();
-	
-	treeStruct=new Tree(treestr.c_str(), false, true);
-	//treeStruct=new Tree(treesblock->GetTreeDescription(effectiveRank).c_str(), false);
+	//we will get the tree string from NCL with taxon numbers (starting at 1), regardless of how it was initially read in 
+	const NxsFullTreeDescription &t = treesblock->GetFullTreeDescription(effectiveRank);
+	if(t.AllTaxaAreIncluded() == false)
+		throw ErrorException("Starting tree description must contain all taxa.");
+	string ts = t.GetNewick();
+	ts += ";";
+	treeStruct=new Tree(ts.c_str(), true, true);
 
 	//check that any defined constraints are present in the starting tree
 	int conNum=1;

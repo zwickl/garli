@@ -551,29 +551,50 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 
 void Population::LoadNexusStartingConditions(){
 	GarliReader & reader = GarliReader::GetInstance();
-	NxsTreesBlock *treesblock = reader.GetTreesBlock();
+	NxsTaxaBlock *tax = NULL;
+	NxsTreesBlock *treesblock = NULL;
+	
+	if(reader.GetNumTaxaBlocks() == 1) 
+		reader.GetTaxaBlock(0);
+	else //I think this check happens in NCL as well, but best to be safe
+		throw ErrorException("multiple non-identical taxa blocks have been read");
 
 	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
-		//in this case we should have already read in the tree when getting the data, so check
-		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
-			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting trees", conf->streefname.c_str());
+		//in this case we should have already read in the tree when getting the data, so check that we have either one
+		//trees block for this taxa block or a garli block
+		if(reader.GetNumTreesBlocks(tax) == 0 && reader.FoundModelString() == false) 
+			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->streefname.c_str());
+		else if(reader.GetNumTreesBlocks(tax) > 1)
+			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
+		else if(reader.GetNumTreesBlocks(tax) == 1)
+			startingTreeInNCL = true;
+		else startingTreeInNCL = false;
 		}
 	else{
 		//use NCL to get trees from the specified file
 		outman.UserMessage("Loading starting model and/or tree from file %s", conf->streefname.c_str());
-		if(treesblock != NULL){
-			if(treesblock->GetNumTrees() > 0)//if we already had trees loaded, toss them
-				treesblock->Reset();
+		//it isn't easy to remove a previous trees block in factory mode, so we need to do this
+		int initNumTreesBlocks = reader.GetNumTreesBlocks(tax);
+		try{
+			reader.ReadFilepath(conf->streefname.c_str(), MultiFormatReader::NEXUS_FORMAT);
 			}
+		catch (const NxsException & x){
+			throw ErrorException("%s", x.msg.c_str());
+			}
+		int afterNumTreesBlocks = reader.GetNumTreesBlocks(tax);;
+		if(afterNumTreesBlocks - initNumTreesBlocks > 1){//we added more than one trees block
+			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
+			}
+		//otherwise we want the last one because others may have been read with the data
+		else if(afterNumTreesBlocks == initNumTreesBlocks)//we didnt' add any tree blocks
+			startingTreeInNCL = false;
+		else //we found exactly one trees block.  WE NEED TO BE SURE THAT WE USE THE LATEST ONE LATER in SeeedPop
+			startingTreeInNCL = true; 
 
-		//3/25/08 Made a change such that if a gblock was already read with the data and another
-		//is found with the following execute, an exception will be thrown in GarliReader::EnteringBlock
-		reader.HandleExecute(conf->streefname.c_str(), false);
-		treesblock = reader.GetTreesBlock();
-		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
-			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting model and/or tree", conf->streefname.c_str());
+		//we read the file, but didn't find either
+		if(startingTreeInNCL == false && reader.FoundModelString() == false)
+			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as the source of starting model and/or tree", conf->streefname.c_str());
 		}
-	if(treesblock->GetNumTrees() > 0) startingTreeInNCL = true;
 	if(reader.FoundModelString()) startingModelInNCL = true;
 	}
 
@@ -880,7 +901,12 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		//be handled below, although both a garli block (in the data) and an old style model specification
 		//are not allowed
 		if(startingTreeInNCL){//cases 3, 5, 6 and 8
-			NxsTreesBlock *treesblock = reader.GetTreesBlock();
+			//CAREFUL here - we may have more than one trees block because a tree could appear with the
+			//dataset and in a different starting tree file.  The factory api allows this fine, so we
+			//need to be sure to grab the last trees block.  Checking for whether the starting tree
+			//file contained multiple trees blocks was already done in LoadNexusStartingConditions
+			NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
+			assert(treesblock != NULL);
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
 				int treeNum = (rank+rep-1) % numTrees;
@@ -3013,7 +3039,6 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	outf.open( filename.c_str() );
 	outf.precision(8);
 #endif
-
 	string str;
 	char temp[101];//the max taxon name is 100 (defined as MAX_TAXON_LABEL in datamatr.cpp)
 	str = "#nexus\n\n";
