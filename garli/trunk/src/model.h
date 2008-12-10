@@ -314,11 +314,11 @@ public:
 		isSetup = false;
 		}
 
-	bool IsCodon() {return datatype == CODON;}
-	bool IsNucleotide() {return (datatype == DNA || datatype == RNA);}
-	bool IsAminoAcid() {return (datatype == AMINOACID || datatype == CODONAMINOACID);}//for most purposes codon-aminoacid should be considered AA
-	bool IsCodonAminoAcid() {return datatype == CODONAMINOACID;}
-	bool GotAnyParametersFromFile(){
+	bool IsCodon() const {return datatype == CODON;}
+	bool IsNucleotide() const {return (datatype == DNA || datatype == RNA);}
+	bool IsAminoAcid() const {return (datatype == AMINOACID || datatype == CODONAMINOACID);}//for most purposes codon-aminoacid should be considered AA
+	bool IsCodonAminoAcid() const {return datatype == CODONAMINOACID;}
+	bool GotAnyParametersFromFile() const {
 		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile;
 		}
 	//A number of canned model setups
