@@ -196,6 +196,7 @@ bool FileIsFasta(const char *name){
 	return fasta;
 	}
 
+/* //the ReadData within the GarliReader should now be used to read all data files
 bool ReadData(const char* filename, SequenceData* data)	{
 	bool usedNCL = false;
 
@@ -223,7 +224,7 @@ bool ReadData(const char* filename, SequenceData* data)	{
 		outman.UserMessage("Attempting to read data file in Phylip format: %s ...", filename);
 		data->ReadPhylip(filename);
 		}
-
+*/
 /*
 	if(modSpec.IsCodon()){
 		assert(0);
@@ -275,8 +276,9 @@ bool ReadData(const char* filename, SequenceData* data)	{
 			}
 		}
 */	
-	return usedNCL;
+/*	return usedNCL;
 	}
+*/
 
 int ReadData(GeneralGamlConfig *conf, NucleotideData* data)	{
 	assert(0);
