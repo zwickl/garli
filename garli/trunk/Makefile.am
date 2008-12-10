@@ -7,7 +7,7 @@ EXTRA_DIST = \
 	example \
 	project \
 	doc \
-	ncl-2.1.04.tar.gz
+	ncl-2.1.06.tar.gz
 
 SUBDIRS = src 
 
