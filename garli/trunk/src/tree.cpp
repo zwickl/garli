@@ -1203,7 +1203,7 @@ bool Tree::IdenticalTopology(const TreeNode *other){
 bool Tree::IdenticalTopologyAllowingRerooting(const TreeNode *other){
 	//this is intitially called with the root, it will detect any difference in the 
 	//overall topology
-	bool identical;
+	bool identical = true;
 	//NOTE: This requires that the bipartitions are "standardized" meaning that
 	//the one bit is always "on".  In general in other places we do not need that
 	//to be the case
@@ -1214,7 +1214,17 @@ bool Tree::IdenticalTopologyAllowingRerooting(const TreeNode *other){
 			CalcBipartitions(true);		
 		}
 
-	
+	if(other->IsTerminal()) return true;
+	if(other->IsRoot() == false)
+		identical = (ContainsBipartitionOrComplement(*other->bipart) != NULL);
+	TreeNode *nd=other->left;
+	while(identical && nd != NULL){ 
+		identical = IdenticalTopologyAllowingRerooting(nd);
+		if(identical == false) break;
+		nd=nd->next;
+		}
+	return identical;
+/*	
 	if(other->IsRoot() == false){
 		if(other->IsTerminal()) return true;
 		identical= (ContainsBipartitionOrComplement(*other->bipart) != NULL);
@@ -1235,7 +1245,7 @@ bool Tree::IdenticalTopologyAllowingRerooting(const TreeNode *other){
 			}
 		}
 	return identical;
-	}
+*/	}
 
 int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE optPrecision){
 	//find a bipartition that is shared between the trees
