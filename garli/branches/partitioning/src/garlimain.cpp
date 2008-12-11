@@ -577,10 +577,6 @@ int main( int argc, char* argv[] )	{
 						data->Summarize();
 						outman.UserMessage("\tSummary of data or data subset:");
 						outman.UserMessage("\t%5d sequences.", data->NTax());
-						
-						if(modSpec->IsNStateV())
-							if(data->NConstant() != 1) throw ErrorException("Constant characters are not allowed when using Mkv (as opposed to Mk) because it specifically assumes that all characters are variable");
-
 						outman.UserMessage("\t%5d constant characters.", data->NConstant() - mkvDiff);
 						outman.UserMessage("\t%5d parsimony-informative characters.", data->NInformative());
 						outman.UserMessage("\t%5d autapomorphic characters.", data->NAutapomorphic());

@@ -1325,12 +1325,22 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 	//If not, just return and the function that called this should be able to check if any characters were actually read, and act accordingly
 	//remove_if(realCharSet->begin(), realCharSet->end(), charblock->GetObsNumStates);
 
+	NxsUnsignedSet consts;
 	for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();){
 		unsigned num = *cit;
 		cit++;
-		if(charblock->GetObsNumStates(num, false) != maxNumStates){
-			realCharSet->erase(num);
-			}
+		int ns = charblock->GetObsNumStates(num, false);
+		if(ns == 1)
+			consts.insert(num);
+		else if(ns == 0 && maxNumStates == 2)
+			outman.UserMessage("NOTE: entirely missing character #%d removed from matrix.", num+1);
+		else if(ns != maxNumStates){
+				realCharSet->erase(num);
+				}
+		}
+	if(consts.size() > 0){
+		string c = NxsSetReader::GetSetAsNexusString(consts);
+		throw ErrorException("Character number(s) %s is/are constant and are not allowed when using the Mkv\n\tmodel (as opposed to Mk), because it specifically assumes that all characters\n\tare variable.  Exclude the characters or change to datatype = standard.", c.c_str());
 		}
 
 //DEBUG
