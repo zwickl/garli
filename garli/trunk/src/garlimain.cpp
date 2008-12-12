@@ -20,7 +20,9 @@
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION 0.96
 #define MINOR_VERSION 0
-#define SVN_REV $Rev$
+//DON'T mess with the following 2 lines!.  They are auto substituted by svn.
+#define SVN_REV "$Rev$"
+#define SVN_DATE "$Date$"
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
@@ -55,6 +57,33 @@
 
 OutputManager outman;
 bool interactive;
+
+//This is annoying, but the substituted rev and date from svn are in crappy format.
+//Get what we need from them
+//revision string looks like this: $Rev$
+std::string GetSvnRev(){ 
+	string temp = SVN_REV;
+	string ret;
+	for(int i=0;i<temp.length();i++){
+		char c = temp[i];
+		if(isdigit(c)) {
+			ret += c;
+			}
+		}
+	return ret;
+	}
+//date string looks like this: $Date$
+std::string GetSvnDate(){
+	string temp = SVN_DATE;
+	string ret;
+	int i=0;
+	int len = temp.length();
+	while(i < len && temp[i] != ',') i++;
+	i++;
+	while(i < len && !isdigit(temp[i])) i++;
+	while(i < len && temp[i] != ')') ret += temp[i++];
+	return ret;
+	}
 
 int CheckRestartNumber(const string str){
 	int num=1;
@@ -142,6 +171,9 @@ int main( int argc, char* argv[] )	{
 
 	string conf_name;
 
+	string svnRev = GetSvnRev();
+	string svnDate = GetSvnDate();
+	
 #ifdef OLD_SUBROUTINE_GARLI
 	char name[12];
 	sprintf(name, "run%d.conf", rank);
@@ -181,7 +213,7 @@ int main( int argc, char* argv[] )	{
 #endif				
 					else if(argv[curarg][1]=='t') runTests = true;
 					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
-						outman.UserMessage("%s Version %.2f.%d", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION);
+						outman.UserMessage("%s Version %.2f.r%s", PROGRAM_NAME, MAJOR_VERSION, svnRev.c_str());
 #ifdef SUBROUTINE_GARLI
 						outman.UserMessage("MPI run distributing version");
 #endif
@@ -278,34 +310,36 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC GARLI, version 0.96beta8 r315 (Aug 2008)\n");
+			outman.UserMessage("Running BOINC GARLI version 0.96beta8 rev%s (%s)\n", svnRev.c_str(), svnDate.c_str());
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
 			datafile = buffer;
 #else	//not BOINC
-			if(confOK == true){
-				//changing this to always append to the .screen.log after a restart
+			if(confOK == true)
 				sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
-				//if(conf.restart == false) sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
-				//else sprintf(temp_buf, "%s.restart%d.screen.log", conf.ofprefix.c_str(), CheckRestartNumber(conf.ofprefix));
-				}
-			else sprintf(temp_buf, "ERROR.log");
+			else 
+				sprintf(temp_buf, "ERROR.log");
 
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
-#ifdef SUBROUTINE_GARLI
-			outman.UserMessage("Running GARLI, version 0.96beta8 r315 (Aug 2008)\n->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
-			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
-#else	//nonMPI version
-			outman.UserMessage("Running serial GARLI, version 0.96beta8 %s (Aug 2008)\n", SVN_REV);
+			outman.UserMessage("Running GARLI version 0.96beta8 rev%s (%s)", svnRev.c_str(), svnDate.c_str());
+
 #endif
 
-#endif  //not BOINC
+#ifdef SUBROUTINE_GARLI //MPI versions
+			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
+			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
+#endif
+#if defined(OPEN_MP)
+			outman.UserMessage("->OpenMP multithreaded version for multiple processors/cores<-"); 
+#else	
+			outman.UserMessage("->Single processor version<-\n", svnRev.c_str(), svnDate.c_str());
+#endif
 
-#ifdef OPEN_MP
-			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
+#ifdef SINGLE_PRECISION_FLOATS
+			outman.UserMessage("->Single precision floating point version<-\n");
 #endif
 			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
@@ -323,10 +357,6 @@ int main( int argc, char* argv[] )	{
 
 #ifdef NCL_NAME_AND_VERSION
 			outman.UserMessage("Using %s\n", NCL_NAME_AND_VERSION);
-#endif
-
-#ifdef SINGLE_PRECISION_FLOATS
-			outman.UserMessage("Single precision floating point version\n");
 #endif
 
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
