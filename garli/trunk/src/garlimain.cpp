@@ -20,6 +20,7 @@
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION 0.96
 #define MINOR_VERSION 0
+#define SVN_REV $REV$
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
@@ -298,7 +299,7 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
 #else	//nonMPI version
-			outman.UserMessage("Running serial GARLI, version 0.96beta8 r315 (Aug 2008)\n");
+			outman.UserMessage("Running serial GARLI, version 0.96beta8 %s (Aug 2008)\n", SVN_REV);
 #endif
 
 #endif  //not BOINC
