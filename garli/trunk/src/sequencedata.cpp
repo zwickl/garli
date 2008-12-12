@@ -775,54 +775,76 @@ unsigned char NucleotideData::CharToDatum( char ch ){
 	return datum;
 	}
 
-unsigned char AminoacidData::CharToDatum(char d){
-	char ch = 20;
-	switch(d){
-		case'A'	: ch=	0	;break;
-		case'C' : ch=	1	;break;
-		case'D' : ch=	2	;break;
-		case'E' : ch=	3	;break;
-		case'F' : ch=	4	;break;
-		case'G' : ch=	5	;break;
-		case'H' : ch=	6	;break;
-		case'I' : ch=	7	;break;
-		case'K' : ch=	8	;break;
-		case'L' : ch=	9	;break;
-		case'M' : ch=	10	;break;
-		case'N' : ch=	11	;break;
-		case'P' : ch=	12	;break;
-		case'Q' : ch=	13	;break;
-		case'R' : ch=	14	;break;
-		case'S' : ch=	15	;break;
-		case'T' : ch=	16	;break;
-		case'V'	: ch=	17	;break;
-		case'W'	: ch=	18	;break;
-		case'Y' : ch=	19	;break;
-		case'-'	: ch=   20  ;break;
-		case'?'	: ch=   20  ;break;
-		case'a'	: ch=	0	;break;
-		case'c' : ch=	1	;break;
-		case'd' : ch=	2	;break;
-		case'e' : ch=	3	;break;
-		case'f' : ch=	4	;break;
-		case'g' : ch=	5	;break;
-		case'h' : ch=	6	;break;
-		case'i' : ch=	7	;break;
-		case'k' : ch=	8	;break;
-		case'l' : ch=	9	;break;
-		case'm' : ch=	10	;break;
-		case'n' : ch=	11	;break;
-		case'p' : ch=	12	;break;
-		case'q' : ch=	13	;break;
-		case'r' : ch=	14	;break;
-		case's' : ch=	15	;break;
-		case't' : ch=	16	;break;
-		case'v'	: ch=	17	;break;
-		case'w'	: ch=	18	;break;
-		case'y' : ch=	19	;break;
+unsigned char AminoacidData::CharToDatum(char ch){
+	char datum = 20;
+	switch(ch){
+		case'A'	: datum=	0	;break;
+		case'B' :{
+			outman.UserMessage("NOTE: unsupported amino acid abiguity code 'B' changed to full ambiguity");
+			datum=	20;
+			break;
+			}
+		case'C' : datum=	1	;break;
+		case'D' : datum=	2	;break;
+		case'E' : datum=	3	;break;
+		case'F' : datum=	4	;break;
+		case'G' : datum=	5	;break;
+		case'H' : datum=	6	;break;
+		case'I' : datum=	7	;break;
+		case'K' : datum=	8	;break;
+		case'L' : datum=	9	;break;
+		case'M' : datum=	10	;break;
+		case'N' : datum=	11	;break;
+		case'P' : datum=	12	;break;
+		case'Q' : datum=	13	;break;
+		case'R' : datum=	14	;break;
+		case'S' : datum=	15	;break;
+		case'T' : datum=	16	;break;
+		case'V'	: datum=	17	;break;
+		case'W'	: datum=	18	;break;
+		case'X' : datum=	20	;break;
+		case'Y' : datum=	19	;break;
+		case'Z' :{
+			outman.UserMessage("NOTE: unsupported amino acid abiguity code 'Z' changed to full ambiguity");
+			datum=	20;
+			break;
+			}
+		case'-'	: datum=   20  ;break;
+		case'?'	: datum=   20  ;break;
+		case'a'	: datum=	0	;break;
+		case'b' :{
+			outman.UserMessage("NOTE: unsupported amino acid abiguity code 'b' changed to full ambiguity");
+			datum=	20;
+			break;
+			}
+		case'c' : datum=	1	;break;
+		case'd' : datum=	2	;break;
+		case'e' : datum=	3	;break;
+		case'f' : datum=	4	;break;
+		case'g' : datum=	5	;break;
+		case'h' : datum=	6	;break;
+		case'i' : datum=	7	;break;
+		case'k' : datum=	8	;break;
+		case'l' : datum=	9	;break;
+		case'm' : datum=	10	;break;
+		case'n' : datum=	11	;break;
+		case'p' : datum=	12	;break;
+		case'q' : datum=	13	;break;
+		case'r' : datum=	14	;break;
+		case's' : datum=	15	;break;
+		case't' : datum=	16	;break;
+		case'v'	: datum=	17	;break;
+		case'w'	: datum=	18	;break;
+		case'x' : datum=	20	;break;
+		case'y' : datum=	19	;break;
+		case'z' :{
+			outman.UserMessage("NOTE: unsupported amino acid abiguity code 'z' changed to full ambiguity");
+			datum=	20;
+			break;
+			}
 		default : throw ErrorException("Unknown Amino Acid %c!", ch);
 		}
-	return ch;
+	return datum;
 	}
 
 void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
