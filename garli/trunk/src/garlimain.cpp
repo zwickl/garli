@@ -20,7 +20,7 @@
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION 0.96
 #define MINOR_VERSION 0
-#define SVN_REV $REV$
+#define SVN_REV $Rev$
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
