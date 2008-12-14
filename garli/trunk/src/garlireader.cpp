@@ -332,25 +332,60 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &modsp
 		outman.UserMessage("Attempting to read data file in Nexus format (using NCL):\n\t%s ...", filename);
 		ReadFilepath(filename, NEXUS_FORMAT);
 		}
-	else if(FileIsFasta(filename)){
-		if(modspec.IsAminoAcid()){
-			outman.UserMessage("Attempting to read data file as Fasta amino acid sequence (using NCL):\n\t%s ...", filename);
-			ReadFilepath(filename, FASTA_AA_FORMAT);
+	else{//if this isn't nexus we'll try a bunch of formats to see if we can get something to work
+		//the idea here is that we create an ordered list of formats to try, then we try them 
+		typedef pair<MultiFormatReader::DataFormatType, NxsString> FormatPair;
+		list<FormatPair> formatsToTry;
+		NxsString name;
+		if(FileIsFasta(filename)){
+			if(modspec.IsAminoAcid()){
+				formatsToTry.push_back(FormatPair(FASTA_AA_FORMAT, "Fasta amino acid"));
+				}
+			else{
+				if(modSpec.IsRna() == false)
+					formatsToTry.push_back(FormatPair(FASTA_DNA_FORMAT, "Fasta DNA"));
+				formatsToTry.push_back(FormatPair(FASTA_RNA_FORMAT, "Fasta RNA"));
+				}
 			}
-		else{ //DEBUG not sure how this will behave in the case of RNA
-			outman.UserMessage("Attempting to read data file as Fasta DNA sequence (using NCL):\n\t%s ...", filename);
-			ReadFilepath(filename, FASTA_DNA_FORMAT);
+		else{//otherwise assume phylip format
+			if(modSpec.IsAminoAcid()){
+				formatsToTry.push_back(FormatPair(RELAXED_PHYLIP_AA_FORMAT, "relaxed Phylip amino acid"));
+				formatsToTry.push_back(FormatPair(INTERLEAVED_RELAXED_PHYLIP_AA_FORMAT, "interleaved relaxed Phylip amino acid"));
+				formatsToTry.push_back(FormatPair(PHYLIP_AA_FORMAT, "strict Phylip amino acid"));
+				formatsToTry.push_back(FormatPair(INTERLEAVED_PHYLIP_AA_FORMAT, "interleaved strict Phylip amino acid"));
+				}
+			else{
+				if(modSpec.IsRna() == false){
+					formatsToTry.push_back(FormatPair(RELAXED_PHYLIP_DNA_FORMAT, "relaxed Phylip DNA"));
+					formatsToTry.push_back(FormatPair(INTERLEAVED_RELAXED_PHYLIP_DNA_FORMAT, "interleaved relaxed Phylip DNA"));
+					formatsToTry.push_back(FormatPair(PHYLIP_DNA_FORMAT, "strict Phylip DNA"));
+					formatsToTry.push_back(FormatPair(INTERLEAVED_PHYLIP_DNA_FORMAT, "interleaved strict Phylip DNA"));
+					}
+
+				formatsToTry.push_back(FormatPair(RELAXED_PHYLIP_RNA_FORMAT, "relaxed Phylip RNA"));
+				formatsToTry.push_back(FormatPair(INTERLEAVED_RELAXED_PHYLIP_RNA_FORMAT, "interleaved relaxed Phylip RNA"));
+				formatsToTry.push_back(FormatPair(PHYLIP_RNA_FORMAT, "strict Phylip RNA"));
+				formatsToTry.push_back(FormatPair(INTERLEAVED_PHYLIP_RNA_FORMAT, "interleaved strict Phylip RNA"));
+				}
 			}
-		}
-	else{//DEBUG assuming that otherwise the file is phylip format, and for the moment with relaxed names and non-interleaved
-		if(modspec.IsAminoAcid()){
-			outman.UserMessage("Attempting to read data file as Phylip amino acid sequence (using NCL):\n]t%s ...", filename);
-			ReadFilepath(filename, RELAXED_PHYLIP_AA_FORMAT);
+		//now start trying
+		bool success;
+		for(list<FormatPair>::iterator formIt = formatsToTry.begin();formIt != formatsToTry.end();formIt++){
+			success = true;
+			try{
+				outman.UserMessage("Attempting to read data file %s as\n\t%s format (using NCL) ...", filename, (*formIt).second.c_str());
+				ReadFilepath(filename, (*formIt).first);
+				}catch(NxsException err){
+					NexusError(err.msg, err.pos, err.line, err.col, false);
+					outman.UserMessage("Problem reading data file as %s format...\n", (*formIt).second.c_str());
+					success = false;
+					}
+			if(success) break;
 			}
-		else{
-			outman.UserMessage("Attempting to read data file as Phylip dna sequence (using NCL):\n\t%s ...", filename);
-			ReadFilepath(filename, RELAXED_PHYLIP_DNA_FORMAT);
-			}
+		if(success == false)
+			throw ErrorException("\nUnable to read data file %s in any format.\n", filename);
+		else 
+			outman.UserMessage("\nRead successful");
 		}
 	return true;
 	}
@@ -929,7 +964,8 @@ void GarliReader::NexusError(
   NxsString msg,	/* the error message */
   file_pos ,		/* the point in the NEXUS file where the error occurred */
   long line,		/* the line in the NEXUS file where the error occurred */
-  long col)			/* the column in the NEXUS file where the error occurred */
+  long col,			/* the column in the NEXUS file where the error occurred */
+  bool throwExcept /*=true*/)	/* whether to throw an actual exception or just output the error message */
 	{
 	message = "\n";
 	message += msg;
@@ -945,7 +981,8 @@ void GarliReader::NexusError(
 		message += col;
 		PrintMessage();
 		}
-	throw ErrorException("NCL encountered a problem reading the dataset.");
+	if(throwExcept)
+		throw ErrorException("NCL encountered a problem reading the dataset.");
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
