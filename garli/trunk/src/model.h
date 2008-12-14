@@ -316,6 +316,7 @@ public:
 
 	bool IsCodon() const {return datatype == CODON;}
 	bool IsNucleotide() const {return (datatype == DNA || datatype == RNA);}
+	bool IsRna() const {return (datatype == RNA);} //rna will be treated identically to dna almost everywhere, but it might be good to know when reading
 	bool IsAminoAcid() const {return (datatype == AMINOACID || datatype == CODONAMINOACID);}//for most purposes codon-aminoacid should be considered AA
 	bool IsCodonAminoAcid() const {return datatype == CODONAMINOACID;}
 	bool GotAnyParametersFromFile() const {
@@ -356,6 +357,16 @@ public:
 		rateMatrix = NST6;
 		SetEstimateStateFreqs();
 		fixRelativeRates=false;
+		}
+
+	//this is the default, and shouldn't really need to be explicitly set
+	//this and SetRna depend on the default model settings from the constructor
+	void SetDna(){
+		datatype = DNA;
+		}
+
+	void SetRna(){
+		datatype = DNA;
 		}
 
 	void SetCodon(){
@@ -641,9 +652,9 @@ public:
 		else if(_stricmp(str, "aminoacid") == 0) SetAminoAcid();
 		else if(_stricmp(str, "protein") == 0) SetAminoAcid();
 		else if(_stricmp(str, "dna") == 0) str;
-		else if(_stricmp(str, "rna") == 0) str;
+		else if(_stricmp(str, "rna") == 0) SetRna();
 		else if(_stricmp(str, "nucleotide") == 0) str;
-		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna)", str));
+		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, nucleotide, dna, rna)", str));
 		}
 	void SetGeneticCode(const char *str){
 		if(datatype != DNA && datatype != RNA){

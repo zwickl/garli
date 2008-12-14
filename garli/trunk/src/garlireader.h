@@ -131,7 +131,7 @@ class GarliReader
 		void				ExecuteStopping();
 		void				OutputComment(const NxsString &msg);
 		void				HandleNextCommand();
-		void				NexusError(NxsString msg, file_pos pos, long line, long col);
+		void				NexusError(NxsString msg, file_pos pos, long line, long col, bool throwExcept = true);
 		void				PreprocessNextCommand();
 		void				PrintMessage(bool linefeed = true);
 	//	virtual void		Report(ostream &out);
