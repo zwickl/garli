@@ -368,7 +368,7 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &modsp
 				formatsToTry.push_back(FormatPair(INTERLEAVED_PHYLIP_RNA_FORMAT, "interleaved strict Phylip RNA"));
 				}
 			}
-		//now start trying
+		//now start trying formats
 		bool success;
 		for(list<FormatPair>::iterator formIt = formatsToTry.begin();formIt != formatsToTry.end();formIt++){
 			success = true;
@@ -385,9 +385,48 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &modsp
 		if(success == false)
 			throw ErrorException("\nUnable to read data file %s in any format.\n", filename);
 		else 
-			outman.UserMessage("\nRead successful");
+			outman.UserMessage("\nData read successfully.");
 		}
 	return true;
+	}
+
+//verifies that we got the right number/type of blocks and returns the Characters block to be used
+NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec){
+	if(GetNumTaxaBlocks() > 1) 
+		throw ErrorException("Either more than one taxa block was found in the data file\n\tor multiple blocks had different taxon sets.");
+	else if(GetNumTaxaBlocks() == 0)
+		throw ErrorException("No taxa information was provided by NCL.\n\tThere may have been a problem reading the data file.\n\tCheck output above.");
+	NxsTaxaBlock *taxablock = GetTaxaBlock(0);
+	if(GetNumCharactersBlocks(taxablock) == 0)
+		throw ErrorException("No character data was provided by NCL.\n\tThere may have been a problem reading the data file.\n\tCheck output above.");
+	
+	//now check that we only have one of the charblock types that we want
+	int correctIndex = -1;
+	for(int c = 0;c < GetNumCharactersBlocks(taxablock);c++){
+		NxsCharactersBlock *charblock = GetCharactersBlock(taxablock, c);
+		if((charblock->GetDataType() == NxsCharactersBlock::dna || charblock->GetDataType() == NxsCharactersBlock::nucleotide)
+			&& (modSpec.IsNucleotide() || modSpec.IsCodon() || modSpec.IsCodonAminoAcid())){
+			if(correctIndex > -1) throw ErrorException("More than one block containing nucleotide data was found.");
+			else correctIndex = c;
+			}
+		//rna data is not allowed as input for codon or codon-aminoacid analyses
+		else if(charblock->GetDataType() == NxsCharactersBlock::rna && (modSpec.IsNucleotide() || modSpec.IsRna())){
+			if(correctIndex > -1) throw ErrorException("More than one block containing nucleotide data was found.");
+			else correctIndex = c;
+			}
+		else if(charblock->GetDataType() == NxsCharactersBlock::protein && (modSpec.IsAminoAcid())){
+			if(correctIndex > -1) throw ErrorException("More than one block containing amino acid (protein) data was found.");
+			else correctIndex = c;
+			}
+		}
+	if(correctIndex == -1){
+		if(modSpec.IsNucleotide()) throw ErrorException("A data file was read, but no nucleotide data was found.");
+		else if(modSpec.IsRna()) throw ErrorException("A data file was read, but no RNA data was found.");
+		else if(modSpec.IsAminoAcid()) throw ErrorException("A data file was read, but no amino acid (protein) data was found.");
+		else if(modSpec.IsCodon()) throw ErrorException("DNA data is required as input for codon models.\n\tA data file was read, but none was found.");
+		else if(modSpec.IsCodonAminoAcid()) throw ErrorException("DNA data is required as input for codon translated amino acid models.\n\tA data file was read, but none was found.");
+		}
+	return GetCharactersBlock(taxablock, correctIndex);
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
