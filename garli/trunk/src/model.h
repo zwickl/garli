@@ -654,7 +654,7 @@ public:
 		else if(_stricmp(str, "dna") == 0) str;
 		else if(_stricmp(str, "rna") == 0) SetRna();
 		else if(_stricmp(str, "nucleotide") == 0) str;
-		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, nucleotide, dna, rna)", str));
+		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, nucleotide)", str));
 		}
 	void SetGeneticCode(const char *str){
 		if(datatype != DNA && datatype != RNA){
