@@ -193,7 +193,7 @@ class GarliReader
 		//for further reading
 		void ClearContent();
 		bool ReadData(const char* filename, const ModelSpecification &modspec);
-		NxsCharactersBlock *CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec);
+		NxsCharactersBlock *CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec) const;
 		};
 
 /*----------------------------------------------------------------------------------------------------------------------
