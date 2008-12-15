@@ -391,14 +391,17 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &modsp
 	}
 
 //verifies that we got the right number/type of blocks and returns the Characters block to be used
-NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec){
-	if(GetNumTaxaBlocks() > 1) 
+NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec) const{
+	const int numTaxaBlocks = GetNumTaxaBlocks();
+	if(numTaxaBlocks > 1) 
 		throw ErrorException("Either more than one taxa block was found in the data file\n\tor multiple blocks had different taxon sets.");
-	else if(GetNumTaxaBlocks() == 0)
+	else if(numTaxaBlocks == 0)
 		throw ErrorException("No taxa information was provided by NCL.\n\tThere may have been a problem reading the data file.\n\tCheck output above.");
-	NxsTaxaBlock *taxablock = GetTaxaBlock(0);
-	if(GetNumCharactersBlocks(taxablock) == 0)
-		throw ErrorException("No character data was provided by NCL.\n\tThere may have been a problem reading the data file.\n\tCheck output above.");
+	const NxsTaxaBlock *taxablock = GetTaxaBlock(0);
+	const int numCharBlocks = GetNumCharactersBlocks(taxablock);
+	outman.UserMessageNoCR("");
+	if(numCharBlocks == 0)
+		throw ErrorException("No character data was provided by NCL. There may have been a problem reading\n\tthe data file, or the data was of the wrong type. Check output above.");
 	
 	//now check that we only have one of the charblock types that we want
 	int correctIndex = -1;
