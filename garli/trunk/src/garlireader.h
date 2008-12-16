@@ -168,7 +168,7 @@ class GarliReader
 		NxsString			errormsg;
 		char				*next_command;		/* workspace for processing next command entered interactively by user */
 
-		unsigned			CharLabelToNumber(NxsString s);
+		unsigned			CharLabelToNumber(NxsString s) const;
 		bool				FileExists(const char* fn) const;
 		bool				FileIsNexus(const char *name) const;
 		bool				FileIsFasta(const char *name) const;
@@ -193,7 +193,7 @@ class GarliReader
 		//for further reading
 		void ClearContent();
 		bool ReadData(const char* filename, const ModelSpecification &modspec);
-		NxsCharactersBlock *CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec) const;
+		const NxsCharactersBlock *CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec) const;
 		};
 
 /*----------------------------------------------------------------------------------------------------------------------

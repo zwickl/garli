@@ -40,8 +40,7 @@ extern ModelSpecification modSpec;
 extern rng rnd;
 extern OutputManager outman;
 
-DataMatrix::~DataMatrix()
-{
+DataMatrix::~DataMatrix(){
 	if( count ) MEM_DELETE_ARRAY(count); // count is of length nChar
 	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates is of length nChar
 	if( stateDistr ) MEM_DELETE_ARRAY(stateDistr); // stateDistr is of length (maxNumStates+1)
@@ -61,35 +60,32 @@ DataMatrix::~DataMatrix()
 	if(constStates!=NULL) delete []constStates;
 	if(origCounts!=NULL) delete []origCounts;
 	memset(this, 0, sizeof(DataMatrix));
-}
+	}
 
-void DataMatrix::SetTaxonLabel(int i, const char* s)
-{
+void DataMatrix::SetTaxonLabel(int i, const char* s){
 	if( taxonLabel && (i < nTax) )
 		ReplaceTaxonLabel(i, s);
-}
+	}
 
-void DataMatrix::ReplaceTaxonLabel( int i, const char* s )
-{
+void DataMatrix::ReplaceTaxonLabel( int i, const char* s ){
 	assert( taxonLabel );
 	if( taxonLabel[i] ) {
 		MEM_DELETE_ARRAY(taxonLabel[i]); // taxonLabel[i] is of length strlen(taxonLabel[i])+1
-	}
+		}
 	int newLength = (strlen(s)+1);
 	if(newLength > MAX_TAXON_LABEL) throw ErrorException("Sorry, taxon name %s for taxon #%d is too long (max length=%d)", s, i+1, MAX_TAXON_LABEL);
 	MEM_NEW_ARRAY(taxonLabel[i],char,newLength);
 	strcpy(taxonLabel[i], s);
-}
+	}
 
-FLOAT_TYPE DataMatrix::prNumStates(int n) const
-{
+FLOAT_TYPE DataMatrix::prNumStates(int n) const{
 	assert( stateDistr );
 	assert( stateDistrComputed );
 	return ( n > maxNumStates ? (FLOAT_TYPE)0.0 : stateDistr[n] );
-}
+	}
 
-void DataMatrix::AllocPr( DblPtrPtr& pr )
-{	int ns = maxNumStates;
+void DataMatrix::AllocPr( DblPtrPtr& pr ){
+	int ns = maxNumStates;
 	MEM_NEW_ARRAY(pr,FLOAT_TYPE*,ns);
     int i;
 	
@@ -102,10 +98,9 @@ void DataMatrix::AllocPr( DblPtrPtr& pr )
 		pr[i]=pr[i-1]+ns;
 		}	
 #endif
-}
+	}
 
-void DataMatrix::DeletePr( DblPtrPtr& pr )
-{
+void DataMatrix::DeletePr( DblPtrPtr& pr ){
 	if( !pr ) return;
 	int ns = maxNumStates;
 #ifndef CONTIG_PRMAT
@@ -116,37 +111,29 @@ void DataMatrix::DeletePr( DblPtrPtr& pr )
 #else
 	MEM_DELETE_ARRAY(pr[0]);
 
-
 #endif
     MEM_DELETE_ARRAY(pr); // pr is of length ns
 	pr = 0;
-	
-	
-	
-}
+	}
 
 //
 // PositionOf returns position (starting from 0) of taxon whose name
 // matches the string s in the taxonLabel list
 //
-int DataMatrix::PositionOf( char* s ) const
-{
+int DataMatrix::PositionOf( char* s ) const{
 	int i;
 
 	for( i = 0; i < nTax; i++ ) {
 		if( strcmp( taxonLabel[i], s ) == 0 ) break;
-	}
-
+		}
 	assert( i < nTax );
-
 	return i;
-}
+	}
 
 //
 // PatternType determines whether pattern k is constant, informative, or autoapomorphic
 //
-int DataMatrix::PatternType( int k , int *c, unsigned char *s) const
-{
+int DataMatrix::PatternType( int k , int *c, unsigned char *s) const{
 	if( k >= nChar )
 		return 0;
 	int i, j, retval;
@@ -168,9 +155,9 @@ int DataMatrix::PatternType( int k , int *c, unsigned char *s) const
 				unsigned char tmp = s[i];
 				s[i] = s[j];
 				s[j] = tmp;
+				}
 			}
 		}
-	}
 	
 	// add counts of duplicate elements of s to first instance
 	int nStates = 0; 
@@ -239,13 +226,12 @@ int DataMatrix::PatternType( int k , int *c, unsigned char *s) const
 
 	numStates[k] = nStates;
 	return retval;
-}
+	}
 
 //
 // Summarize tallies number of constant, informative, and autapomorphic characters
 //
-void DataMatrix::Summarize()
-{
+void DataMatrix::Summarize(){
 	int i, k;
 	assert( nChar > 0 );
 
@@ -281,14 +267,13 @@ void DataMatrix::Summarize()
    
    delete []c;
    delete []s;
-}
+	}
 
 //
 // NewMatrix deletes old matrix, taxonLabel, count, and number
 // arrays and creates new ones
 //
-void DataMatrix::NewMatrix( int taxa, int sites )
-{
+void DataMatrix::NewMatrix( int taxa, int sites ){
 	// delete taxon labels
 	if( taxonLabel ) {
 		int i;
@@ -355,10 +340,9 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 	// set dimension variables to new values
 	nTax = taxa;
 	gapsIncludedNChar = totalNChar = nChar = sites;
-}
+	}
 
-DataMatrix& DataMatrix::operator =(const DataMatrix& d)
-{
+DataMatrix& DataMatrix::operator =(const DataMatrix& d){
 	NewMatrix( d.NTax(), d.NChar() );
 
 	int i, j;
@@ -377,13 +361,12 @@ DataMatrix& DataMatrix::operator =(const DataMatrix& d)
 	}
 
 	return *this;
-}
+	}
 
 //
 // Pack simply deletes sites having a count of zero
 //
-void DataMatrix::Pack()
-{
+void DataMatrix::Pack(){
 
 //ofstream deb("debug.log");
 //for(int q=0;q<nChar;q++){
@@ -467,8 +450,7 @@ int i, j, newNChar = 0;
 //	number = newNumber;
 	matrix = newMatrix;
 	nChar = newNChar;
-	
-}
+	}
 
 
 void DataMatrix::DetermineConstantSites(){
@@ -532,7 +514,7 @@ void DataMatrix::SwapCharacters( int i, int j ){
 		if(number[c] == i) number[c]=j;
 		else if(number[c] == j) number[c]=i;
 		}
-}
+	}
 
 void DataMatrix::BeginNexusTreesBlock(ofstream &treeout) const{
 	//this outputs everything up through the translate table
@@ -555,8 +537,7 @@ void DataMatrix::BeginNexusTreesBlock(ofstream &treeout) const{
 //	-1		if i less than j
 //	 1		if i greater than j
 //
-int DataMatrix::ComparePatterns( const int i, const int j ) const
-{		
+int DataMatrix::ComparePatterns( const int i, const int j ) const{		
 	//DJZ 10/28/03 altering this to always put constant patterns at the start, which will
 	//make implementing invariant sites much easier.  
 
@@ -629,8 +610,7 @@ void DataMatrix::Collapse(){
 //
 //  BSort implements a simple bubblesort
 //
-void DataMatrix::BSort( int byCounts /* = 0 */ )
-{
+void DataMatrix::BSort( int byCounts /* = 0 */ ){
 	int swap, k;
 	for( int i = 0; i < nChar-1; i++ ) {
 		for( int j = i+1; j < nChar; j++ ) {

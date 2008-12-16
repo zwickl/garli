@@ -593,7 +593,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	delete []temp;
 	}
 
-void Individual::GetStartingTreeFromNCL(NxsTreesBlock *treesblock, int rank, int nTax, bool restart /*=false*/){
+void Individual::GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart /*=false*/){
 	assert(treeStruct == NULL);
 
 	int totalTrees = treesblock->GetNumTrees();
