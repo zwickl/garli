@@ -61,7 +61,7 @@ class GarliBlock: public NxsBlock{
 		const NxsString GetModelString(){return modelString;}
 		bool ModelStringWasRead(){return modelString.empty() == false;}
 		void Clear() { modelString.clear();}
-		void Report(ostream &out);
+		void Report(ostream &out) const;
 	//	void HandleNextCommand();
 //		void NexusError(NxsString msg, file_pos pos, long line, long col);
     }; 
