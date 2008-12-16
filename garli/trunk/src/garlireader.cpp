@@ -175,7 +175,7 @@ void GarliReader::Add(
 |	return the character index in the range [1..`nchar']; i.e., add one to the 0-offset index.
 */
 unsigned GarliReader::CharLabelToNumber(
-  NxsString)	/* the character label to be translated to character number */
+  NxsString) const /* the character label to be translated to character number */
 	{
 	return 0;
 	}
@@ -391,7 +391,7 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &modsp
 	}
 
 //verifies that we got the right number/type of blocks and returns the Characters block to be used
-NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec) const{
+const NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec) const{
 	const int numTaxaBlocks = GetNumTaxaBlocks();
 	if(numTaxaBlocks > 1) 
 		throw ErrorException("Either more than one taxa block was found in the data file\n\tor multiple blocks had different taxon sets.");
@@ -406,7 +406,7 @@ NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const ModelSp
 	//now check that we only have one of the charblock types that we want
 	int correctIndex = -1;
 	for(int c = 0;c < GetNumCharactersBlocks(taxablock);c++){
-		NxsCharactersBlock *charblock = GetCharactersBlock(taxablock, c);
+		const NxsCharactersBlock *charblock = GetCharactersBlock(taxablock, c);
 		if((charblock->GetDataType() == NxsCharactersBlock::dna || charblock->GetDataType() == NxsCharactersBlock::nucleotide)
 			&& (modSpec.IsNucleotide() || modSpec.IsCodon() || modSpec.IsCodonAminoAcid())){
 			if(correctIndex > -1) throw ErrorException("More than one block containing nucleotide data was found.");

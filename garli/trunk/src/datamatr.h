@@ -119,10 +119,10 @@ protected:
 
 		// pure virtual functions - must override in derived class
 		virtual unsigned char	CharToDatum( char ch )					= 0;
-		virtual unsigned char CharToBitwiseRepresentation( char ch ) 	= 0;
-		virtual char	DatumToChar( unsigned char d )	                = 0;
-		virtual unsigned char	FirstState()		                    = 0;
-		virtual unsigned char	LastState()		                        = 0;
+		virtual unsigned char CharToBitwiseRepresentation( char ch ) const= 0;
+		virtual char	DatumToChar( unsigned char d )	const           = 0;
+		virtual unsigned char	FirstState()		    const           = 0;
+		virtual unsigned char	LastState()		        const           = 0;
 //		virtual FLOAT_TYPE	Freq( unsigned char, int = 0)	                        = 0;
 
 		// virtual functions - can override in derived class
@@ -134,9 +134,9 @@ protected:
 		FLOAT_TYPE prNumStates( int n ) const;
 
 		// functions for quizzing dmFlags
-		int InvarCharsExpected() { return !(dmFlags & allvariable); }
-		int VariableNumStates() { return (dmFlags & vnstates); }
-		int AmbiguousStates() { return (dmFlags & ambigstates); }
+		int InvarCharsExpected() const { return !(dmFlags & allvariable); }
+		int VariableNumStates() const { return (dmFlags & vnstates); }
+		int AmbiguousStates() const { return (dmFlags & ambigstates); }
 
 		// functions for getting the data in and out
 		int GetToken( istream& in, char* tokenbuf, int maxlen, bool acceptComments=true );
@@ -146,7 +146,7 @@ protected:
 		int Save( const char* filename, char* newfname = 0, char* nxsfname = 0 );
 
 		char*	DataType() { return info; }
-		int     unsigned charToInt( unsigned char d ) { return (int)d; }
+		int     unsigned charToInt( unsigned char d ) const { return (int)d; }
 
 		int NTax() const { return nTax; }
 		void SetNTax(int ntax) { nTax = ntax; }
@@ -192,8 +192,8 @@ protected:
 
 		void BeginNexusTreesBlock(ofstream &treeout) const;
 		//virtual void CreateMatrixFromNCL(GarliReader &reader) {};
-		virtual void CreateMatrixFromNCL(NxsCharactersBlock *) = 0;
-		virtual void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
+		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *) = 0;
+		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
 		
 		virtual unsigned char Matrix( int i, int j ) const {
 			assert( matrix );
@@ -313,8 +313,7 @@ class BinaryData : public DataMatrix
 		virtual int	NumStates(int) const { return 2; }
 };
 
-inline unsigned char BinaryData::CharToDatum( char ch )
-{
+inline unsigned char BinaryData::CharToDatum( char ch ){
 	unsigned char datum;
 
 	if( ch == '0' || ch == '-' )

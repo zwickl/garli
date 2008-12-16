@@ -375,7 +375,7 @@ int main( int argc, char* argv[] )	{
 			GarliReader &reader = GarliReader::GetInstance();
 			pop.usedNCL = reader.ReadData(datafile.c_str(), modSpec);
 			if(! pop.usedNCL) throw ErrorException("There was a problem reading the data file.");
-			NxsCharactersBlock *charblock = reader.CheckBlocksAndGetCorrectCharblock(modSpec);
+			const NxsCharactersBlock *charblock = reader.CheckBlocksAndGetCorrectCharblock(modSpec);
 			
 			//using 2 argument form of CreateMatrix (taken from paritition branch) but passing dummy charset for
 			//now.  Exsets will be taken care of in CreateMatrix

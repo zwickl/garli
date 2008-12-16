@@ -847,7 +847,7 @@ unsigned char AminoacidData::CharToDatum(char ch){
 	return datum;
 	}
 
-void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
+void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock){
 	//deprecated - use the 2 param version
 	assert(0);
 
@@ -900,7 +900,7 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
 		}
 	}
 
-void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
+void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
 	
 	if(charblock->GetDataType() != NxsCharactersBlock::dna 
 		&& charblock->GetDataType() != NxsCharactersBlock::rna 
@@ -965,7 +965,7 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsig
 		}
 	}
 
-void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
+void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock){
 	//deprecated - use the 2 param version
 	assert(0);
 
@@ -1029,7 +1029,7 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock){
 		}
 	}
 
-void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
+void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
 
 	if(charblock->GetDataType() != NxsCharactersBlock::protein)
 		throw ErrorException("Tried to create amino acid matrix from non-amino acid data.\n\t(Did you mean to use datatype = codon-aminoacid?)");

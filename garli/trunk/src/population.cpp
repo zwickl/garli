@@ -905,7 +905,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			//dataset and in a different starting tree file.  The factory api allows this fine, so we
 			//need to be sure to grab the last trees block.  Checking for whether the starting tree
 			//file contained multiple trees blocks was already done in LoadNexusStartingConditions
-			NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
+			const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
 			assert(treesblock != NULL);
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
