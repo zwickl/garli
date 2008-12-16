@@ -291,7 +291,7 @@ class ClaManager{
 *.		
 //	int NumCopies(){ return numCopies;}
 	int NumNodes(){return numNodes;}
-/*	
+*/ /*	
 	void OutputAssignedClaArray(){
 		static int count = 0;
 		//ofstream out("claindeces.txt", ios::app);
