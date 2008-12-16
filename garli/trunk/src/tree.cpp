@@ -4813,7 +4813,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-#undef OUTPUT_SITELIKES
+//#undef OUTPUT_SITELIKES
 
 #ifdef OUTPUT_SITELIKES
 	vector<double> siteLikes;
