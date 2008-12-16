@@ -1205,7 +1205,7 @@ void GarliBlock::Read(
 |	in the NxsBlock base class.
 */
 void GarliBlock::Report(
-  ostream &out)	/* the output stream to which to write the report */
+  ostream &out)	const /* the output stream to which to write the report */
 	{
 /*	message.clear();
 	PrintMessage();
