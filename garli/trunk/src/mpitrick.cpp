@@ -29,7 +29,7 @@
 
 using namespace std;
 
-void SubGarliMain(int);
+int SubGarliMain(int);
 
 void UsageMessage(char *execName);
 
@@ -88,7 +88,7 @@ int main(int argc,char **argv){
 
 	if(argc > 1){
 		if(! isdigit(argv[1][0])){
-			outman.UserMessage("ERROR:\n\tGARLI is expecting <exe> <total # configs>\n  or\n<exe> <nothing>\nGot <exe> %s", argv[1]);
+			outman.UserMessage("***ERROR***:GARLI is expecting <exe> <total # configs>\n\tor\n\t<exe> <nothing>\n\tGot <exe> %s", argv[1]);
 			UsageMessage(argv[0]);
 			MPI_Finalize();
 			return 1;
@@ -98,7 +98,7 @@ int main(int argc,char **argv){
 	else numJobsTotal = nproc;
 #else
 	if(argc == 1 || (argv[1][0] != '-' && !isdigit(argv[1][0]))){
-		outman.UserMessage("ERROR:\n\tGarli is expecting the number of jobs to be run to follow\nthe executable name on the command line");
+		outman.UserMessage("***ERROR***:Garli is expecting the number of jobs to be run to follow\n\tthe executable name on the command line\n");
 		UsageMessage(argv[0]);
 		MPI_Finalize();
 		return 1;
@@ -120,13 +120,14 @@ int main(int argc,char **argv){
   MPI_Bcast(&numJobsTotal, 1, MPI_INT, 0, comm);
 
   int jobsCompleted = jobloop(rank,nproc,mycomm,numJobsTotal);
-
   outman.SetLogFileForAppend("mpi_messages.log");
+  if(jobsCompleted > -1){
 #ifdef OLD_SUBROUTINE_GARLI
-  outman.UserMessage("process %d finished, did %d run(s), no more configs to execute at %s. Waiting for other procs...", rank, jobsCompleted,  MyFormattedTime().c_str());
+ 	outman.UserMessage("process %d finished, did %d run(s), no more configs to execute at %s. Waiting for other procs...", rank, jobsCompleted,  MyFormattedTime().c_str());
 #else
-  outman.UserMessage("process %d finished, did %d run(s), no further runs to do at %s. Waiting for other procs...", rank, jobsCompleted,  MyFormattedTime().c_str());
+ 	outman.UserMessage("process %d finished, did %d run(s), no further runs to do at %s. Waiting for other procs...", rank, jobsCompleted,  MyFormattedTime().c_str());
 #endif
+	}
 
   MPI_Barrier(comm);
   if(rank == 0)  outman.UserMessage("all processes completed at %s", MyFormattedTime().c_str());
@@ -167,7 +168,13 @@ int jobloop(int mytid,int ntids,MPI_Comm comm, int numJobs){
 			lock.close();
 			outman.SetLogFileForAppend("mpi_messages.log");
 			outman.UserMessage("process %d starting run %d at %s", mytid, jobNum, MyFormattedTime().c_str());
-			SubGarliMain(jobNum);
+			int err = SubGarliMain(jobNum);
+			if(err){
+				outman.SetLogFileForAppend("mpi_messages.log");
+				outman.UserMessage("***process %d aborted run %d at %s", mytid, jobNum, MyFormattedTime().c_str());
+				outman.UserMessage("\tsee the <filename>.screen.log files for details on what went wrong");
+				return -1;
+				}
 			jobsCompleted++;
 			jobNum++;
 			}
