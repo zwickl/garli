@@ -107,7 +107,7 @@ void UsageMessage(char *execName){
 	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
 	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.");
 	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
-	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs\n");
 #elif defined (OLD_SUBROUTINE_GARLI)
 	outman.UserMessage("This MPI version is for doing a large number of independent jobs in batch, each");
 	outman.UserMessage("using a DIFFERENT config file.  This might be useful for analyzing a large");
@@ -118,7 +118,7 @@ void UsageMessage(char *execName){
 	outman.UserMessage("Most likely it will look something like the following:");
 	outman.UserMessage("  mpirun [MPI OPTIONS] %s [# of provided config files]", execName);
 	outman.UserMessage("This version will expect config files named \"run0.conf\", \"run1.conf\", etc.");
-	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs\n");
 #else
 	outman.UserMessage("Usage: %s [OPTION] [config filename]", execName);
 	outman.UserMessage("Options:");
@@ -129,7 +129,7 @@ void UsageMessage(char *execName){
 	outman.UserMessage("  -v, --version		print version information and exit");
 	outman.UserMessage("  -h, --help		print this help and exit");
 	outman.UserMessage("  -t			run internal tests (requires dataset and config file)");
-	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"");
+	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"\n");
 #endif
 	}
 
@@ -334,7 +334,7 @@ int main( int argc, char* argv[] )	{
 #endif
 #if defined(OPEN_MP)
 			outman.UserMessage("->OpenMP multithreaded version for multiple processors/cores<-"); 
-#else	
+#elif !defined(SUBROUTINE_GARLI)
 			outman.UserMessage("->Single processor version<-\n", svnRev.c_str(), svnDate.c_str());
 #endif
 
@@ -361,6 +361,13 @@ int main( int argc, char* argv[] )	{
 
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
+
+#ifdef SUBROUTINE_GARLI
+			if(conf.randseed != -1)
+				throw ErrorException("You cannot specify a random number seed with the MPI version.  This would cause all of the\n\tindependent MPI processes to give exactly identical results.  Set randomseed to -1");
+			if(conf.checkpoint || conf.restart)
+				throw  ErrorException("Checkpointing cannot be used with the MPI version.  Set \"writecheckpoints\" and \"restart\" to 0");
+#endif
 
 			//set up the model specification
 			modSpec.SetupModSpec(conf);
