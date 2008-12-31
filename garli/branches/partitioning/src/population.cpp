@@ -92,7 +92,7 @@ FLOAT_TYPE globalBest;
 
 #undef PERIODIC_SCORE_DEBUG
 
-#undef DEBUG_SCORES
+//#undef DEBUG_SCORES
 
 #undef NNI_SPECTRUM
 
@@ -102,7 +102,7 @@ FLOAT_TYPE globalBest;
 
 #undef DETAILED_SWAP_REPORT
 
-#undef NO_EVOLUTION
+//#undef NO_EVOLUTION
 
 bool output_tree=false;
 
@@ -2181,6 +2181,12 @@ void Population::PerformSearch(){
 					outman.UserMessage("Saving best search rep (#%d) to bootstrap file", best+1);
 					FinishBootstrapRep(storedTrees[best], currentBootstrapRep);
 					}
+				//this was a bug - when collapse was on and bootstrapping was being done with one search
+				//rep, the best tree was being written to the boot file.  The tree in the storedTrees is
+				//the one that was actually collapsed though	
+				//else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
+				else if(storedTrees.size() == 1)
+					FinishBootstrapRep(storedTrees[0], currentBootstrapRep);	
 				else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
 				}
 			else if(prematureTermination && !(bootlog_output & WRITE_PREMATURE)) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
