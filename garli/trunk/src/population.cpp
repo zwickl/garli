@@ -1925,8 +1925,15 @@ void Population::PerformSearch(){
 			indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
 			if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
 			Individual *repResult = new Individual(&indiv[bestIndiv]);
-			if(conf->collapseBranches)
-				repResult->treeStruct->root->CollapseMinLengthBranches();
+			if(conf->collapseBranches){
+				int numCollapsed = 0;
+				repResult->treeStruct->root->CollapseMinLengthBranches(numCollapsed);
+				outman.UserMessage("\nNOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");\
+				if(numCollapsed == 0)
+					outman.UserMessage("    No branches were short enough to be collapsed.");
+				else 
+					outman.UserMessage("    %d branches were collapsed.", numCollapsed);
+				}
 			storedTrees.push_back(repResult);
 			}
 		else{
@@ -2002,6 +2009,12 @@ void Population::PerformSearch(){
 					outman.UserMessage("Saving best search rep (#%d) to bootstrap file", best+1);
 					FinishBootstrapRep(storedTrees[best], currentBootstrapRep);
 					}
+				//this was a bug - when collapse was on and bootstrapping was being done with one search
+				//rep, the best tree was being written to the boot file.  The tree in the storedTrees is
+				//the one that was actually collapsed though	
+				//else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
+				else if(storedTrees.size() == 1)
+					FinishBootstrapRep(storedTrees[0], currentBootstrapRep);	
 				else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
 				}
 			else if(prematureTermination && !(bootlog_output & WRITE_PREMATURE)) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
