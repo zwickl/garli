@@ -799,23 +799,23 @@ void TreeNode::OutputBinaryNodeInfo(OUTPUT_CLASS &out) const{
 	out.WRITE_TO_FILE(&dlen, sizeof(FLOAT_TYPE), 1);
 	}
 
-void TreeNode::CollapseMinLengthBranches(){
-	
+void TreeNode::CollapseMinLengthBranches(int &num){
 	if(this->IsInternal()){
 		TreeNode *nd = left;
 		do{
-			if(FloatingPointEquals(nd->dlen, DEF_MIN_BRLEN, 1e-8) && nd->IsInternal()){
+			if(FloatingPointEquals(nd->dlen, DEF_MIN_BRLEN, 2e-8) && nd->IsInternal()){
 				TreeNode *childNode = nd->left;
 				childNode->Prune();
 				AddDes(childNode);
 				//this resets the node checking to the left des of the current node
 				//when a branch is removed.  This duplicates some effort but is safe. 
 				nd = left; 
+				num++;
 				}
 			else 
 				nd = nd->next;
 			}while(nd);
-		left->CollapseMinLengthBranches();
+		left->CollapseMinLengthBranches(num);
 		}
-	if(next) next->CollapseMinLengthBranches();
+	if(next) next->CollapseMinLengthBranches(num);
 	}
