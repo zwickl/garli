@@ -3214,7 +3214,21 @@ void Population::WritePhylipTree(ofstream &phytree){
 		else{
 			while(isdigit(*loc))
 				temp += *loc++;
-			phytree << data->TaxonLabel(atoi(temp.c_str())-1);
+			//The stored taxon names will have been gotten with GetEscaped, and thus might
+			//have quotes around them if they have Nexus punctuation.  The quotes probably
+			//shouldn't appear in the phylip output.  However, if the names have three single
+			//quotes this corresponds to a single literal quote, in which case it will be output
+			NxsString pname = data->TaxonLabel(atoi(temp.c_str())-1);
+			if(pname[0] == '\'' && pname[pname.size()-1] == '\''){
+				pname.erase(pname.end()-1);
+				pname.erase(pname.begin());
+				}
+			if(pname[0] == '\'' && pname[1] == '\'' ){
+				pname.erase(pname.end()-1);
+				pname.erase(pname.begin());
+				}
+			phytree << pname.c_str();
+			//phytree << data->TaxonLabel(atoi(temp.c_str())-1);
 			temp="";
 			}
 		}
