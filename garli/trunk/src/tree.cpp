@@ -374,23 +374,26 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 							}
 						//This is a bit annoying.  If the tree string came directly from NCL then GetEscaped should get any
 						//names to match the names present in the datamatrix (whether Nexus or not).  But, if the tree string
-						//came from a start file with just a newick string it could have quotes around the taxon names.  The
-						//quotes might be literal quotes (in which case calling GetEscaped on them will return triple quotes)
-						//or just ignorable quotes.  If we don't get a match with GetEscaped, trying removing any quotes at the
-						//start and end and try again.
-						NxsString esc = NxsString::GetEscaped(name).c_str();
-						taxonnodeNum = data->TaxonNameToNumber(esc);
+						//came from a start file with just a newick string there are various possibilities.  First try interpreting
+						//the name as-is.  If that doesn't work, try GetEscaped.  If that doesn't work, try removing quotes (if any)
+						//before calling GetEscaped
+						taxonnodeNum = data->TaxonNameToNumber(name);
+						if(taxonnodeNum < 0){
+							NxsString esc = NxsString::GetEscaped(name).c_str();
+							taxonnodeNum = data->TaxonNameToNumber(esc);
+							}
 						if(taxonnodeNum < 0){
 							if(name.c_str()[0] == '\'' && name.c_str()[name.size()-1] == '\''){
 								NxsString esc2;
 								for(int c=1;c<name.size()-1;c++){
 									esc2 += name[c];
 									}
-								esc = NxsString::GetEscaped(esc2).c_str();
+								NxsString esc = NxsString::GetEscaped(esc2).c_str();
 								taxonnodeNum = data->TaxonNameToNumber(esc);
 								}
-							if(taxonnodeNum < 0)
-								throw ErrorException("Unknown taxon \"%s\" encountered in tree description!", name.c_str());
+							}
+						if(taxonnodeNum < 0){
+							throw ErrorException("Unknown taxon \"%s\" encountered in tree description!", name.c_str());
 							}
 						}
 	                temp=temp->AddDes(allNodes[taxonnodeNum]);
