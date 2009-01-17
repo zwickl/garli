@@ -5,10 +5,8 @@
  *      Author: ayres
  */
 
-#ifndef CUDAKERNEL_
-#define CUDAKERNEL
-
-#include "defs.h"
+#ifndef CUDAKERNELS
+#define CUDAKERNELS
 
 __global__ void GarliCLANucleotideNRate(FLOAT_TYPE* CLA, FLOAT_TYPE* Lpr,
 		FLOAT_TYPE* Rpr, FLOAT_TYPE* LCL, FLOAT_TYPE* RCL, int nRateCats) {
@@ -540,4 +538,4 @@ __global__ void GarliDerivCodonNRate(FLOAT_TYPE* d_partial, FLOAT_TYPE* d_CL1,
 	}
 }
 
-#endif // #ifndef CUDAKERNEL
+#endif// #ifndef CUDAKERNELS

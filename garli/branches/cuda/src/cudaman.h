@@ -11,6 +11,9 @@
 using namespace std;
 
 #include "defs.h"
+
+#ifdef CUDA_GPU
+
 #include "vector_types.h"
 
 class CudaManager {
@@ -134,3 +137,4 @@ void CuComputeGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1,
 
 #endif
 
+#endif // #ifndef CUDAMANAGER
