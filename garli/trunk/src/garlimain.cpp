@@ -23,7 +23,7 @@
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
 #define SVN_REV "$Rev$"
 #define SVN_DATE "$Date$"
-  
+
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
 #define INSTANTIATE_MEMCHK
@@ -55,13 +55,18 @@
 #include "mpi.h"
 #endif
 
+#ifdef CUDA_GPU
+#include "cudaman.h"
+CudaManager *cudaman;
+#endif
+
 OutputManager outman;
 bool interactive;
 
 //This is annoying, but the substituted rev and date from svn are in crappy format.
 //Get what we need from them
 //revision string looks like this: $Rev$
-std::string GetSvnRev(){ 
+std::string GetSvnRev(){
 	string temp = SVN_REV;
 	string ret;
 	for(int i=0;i<temp.length();i++){
@@ -97,7 +102,7 @@ int CheckRestartNumber(const string str){
 	}
 
 void UsageMessage(char *execName){
-#ifdef SUBROUTINE_GARLI	
+#ifdef SUBROUTINE_GARLI
 	outman.UserMessage("This MPI version is for doing a large number of search replicates or bootstrap");
 	outman.UserMessage("replicates, each using the SAME config file.  The results will be exactly");
  	outman.UserMessage("identical to those obtained by executing the config file a comparable number");
@@ -151,7 +156,7 @@ int boinc_garli_main( int argc, char* argv[] )	{
 	outman.SetNoOutput(true);
 
 #elif defined( SUBROUTINE_GARLI ) || defined(OLD_SUBROUTINE_GARLI)
-int SubGarliMain(int rank)	
+int SubGarliMain(int rank)
 	{
 	int argc=1;
 	char **argv=NULL;
@@ -173,7 +178,7 @@ int main( int argc, char* argv[] )	{
 
 	string svnRev = GetSvnRev();
 	string svnDate = GetSvnDate();
-	
+
 #ifdef OLD_SUBROUTINE_GARLI
 	char name[12];
 	sprintf(name, "run%d.conf", rank);
@@ -210,7 +215,7 @@ int main( int argc, char* argv[] )	{
 							EXIT_FAILURE;
 						}
 						[pool release];
-#endif				
+#endif
 					else if(argv[curarg][1]=='t') runTests = true;
 					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
 						outman.UserMessage("%s Version %.2f.r%s", PROGRAM_NAME, MAJOR_VERSION, svnRev.c_str());
@@ -247,14 +252,14 @@ int main( int argc, char* argv[] )	{
 		//create the population object
 		Population pop;
 		SequenceData *data = NULL;
-		
+
 		try{
 			MasterGamlConfig conf;
 			bool confOK;
 			confOK = ((conf.Read(conf_name.c_str()) < 0) == false);
 
 #ifdef SUBROUTINE_GARLI
-			//override the ofprefix here, tacking .runXX onto it 
+			//override the ofprefix here, tacking .runXX onto it
 			char temp[10];
 			if(rank < 10) sprintf(temp, ".run0%d", rank);
 			else sprintf(temp, ".run%d", rank);
@@ -269,7 +274,7 @@ int main( int argc, char* argv[] )	{
 				}
 			else randomSeed=conf.randseed;
 			rnd.set_seed(randomSeed);
-			
+
 			char temp_buf[100];
 
 			string datafile = conf.datafname;
@@ -285,7 +290,7 @@ int main( int argc, char* argv[] )	{
 
 			//check for the presence of BOINC checkpoint files
 			conf.restart = true;
-			
+
 			sprintf(temp_buf, "%s.adap.check", conf.ofprefix.c_str());
 			boinc_resolve_filename(temp_buf, buffer, sizeof(buffer));
 			if(FileExists(buffer) == false) conf.restart = false;
@@ -307,7 +312,7 @@ int main( int argc, char* argv[] )	{
 
 			if(conf.restart)
 				outman.SetLogFileForAppend(temp_buf);
-			else 
+			else
 				outman.SetLogFile(temp_buf);
 
 			outman.UserMessage("Running BOINC GARLI version 0.96beta8 rev%s (%s)\n", svnRev.c_str(), svnDate.c_str());
@@ -318,7 +323,7 @@ int main( int argc, char* argv[] )	{
 #else	//not BOINC
 			if(confOK == true)
 				sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
-			else 
+			else
 				sprintf(temp_buf, "ERROR.log");
 
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
@@ -330,10 +335,10 @@ int main( int argc, char* argv[] )	{
 
 #ifdef SUBROUTINE_GARLI //MPI versions
 			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
-			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
+			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)");
 #endif
 #if defined(OPEN_MP)
-			outman.UserMessage("->OpenMP multithreaded version for multiple processors/cores<-"); 
+			outman.UserMessage("->OpenMP multithreaded version for multiple processors/cores<-");
 #elif !defined(SUBROUTINE_GARLI)
 			outman.UserMessage("->Single processor version<-\n", svnRev.c_str(), svnDate.c_str());
 #endif
@@ -343,7 +348,7 @@ int main( int argc, char* argv[] )	{
 #endif
 			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
-			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__); 
+			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__);
 
 #if defined (_MSC_VER)
 			outman.UserMessage(" using Microsoft C++ compiler version %.2f", _MSC_VER/100.0);
@@ -351,7 +356,7 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage(" using Intel icc compiler version %.2f", __INTEL_COMPILER/100.0);
 #elif defined(__GNUC__)
 			outman.UserMessage(" using GNU gcc compiler version %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
-#else	
+#else
 			outman.UserMessage("");
 #endif
 
@@ -383,7 +388,7 @@ int main( int argc, char* argv[] )	{
 			pop.usedNCL = reader.ReadData(datafile.c_str(), modSpec);
 			if(! pop.usedNCL) throw ErrorException("There was a problem reading the data file.");
 			const NxsCharactersBlock *charblock = reader.CheckBlocksAndGetCorrectCharblock(modSpec);
-			
+
 			//using 2 argument form of CreateMatrix (taken from paritition branch) but passing dummy charset for
 			//now.  Exsets will be taken care of in CreateMatrix
 			NxsUnsignedSet charSet;
@@ -401,7 +406,7 @@ int main( int argc, char* argv[] )	{
 			else if(modSpec.IsCodonAminoAcid()){
 				AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
 				pop.rawData = data;
-				data = d;				
+				data = d;
 				}
 
 			data->Summarize();
@@ -422,6 +427,10 @@ int main( int argc, char* argv[] )	{
 			data->Collapse();
 			outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
 
+#ifdef CUDA_GPU
+			cudaman = new CudaManager(modSpec.nstates, modSpec.numRateCats, data->NChar(), 0, true);
+#endif
+
 			//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 			data->ReserveOriginalCounts();
 
@@ -436,7 +445,7 @@ int main( int argc, char* argv[] )	{
 				outman.UserMessage("******Successfully completed tests.******");
 				return 0;
 				}
-			
+
 			if(conf.runmode != 0){
 				if(conf.runmode == 1)
 					pop.ApplyNSwaps(10);
@@ -495,7 +504,7 @@ int main( int argc, char* argv[] )	{
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
 				}
 		if(data != NULL) delete data;
-	
+
 		if(interactive==true){
 			outman.UserMessage("\n-Press enter to close program.-");
 			char d=getchar();

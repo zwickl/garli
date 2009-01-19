@@ -22,6 +22,10 @@
 #include "clamanager.h"
 #include "utility.h"
 
+#ifdef CUDA_MEMORY_PINNED
+#include "cudaman.h"
+#endif
+
 #undef ALIGN_CLAS
 #define CLA_ALIGNMENT 32
 
@@ -30,7 +34,11 @@ CondLikeArray::~CondLikeArray(){
 	//be called from Population level if CONDLIKE SHARED is defined
 	if( arr ){
 #ifndef ALIGN_CLAS
+#ifdef CUDA_MEMORY_PINNED
+		FreePinnedMemory(arr);
+#else
 		delete []arr;
+#endif
 #else
 		DeleteAlignedArray(arr);
 #endif
@@ -42,7 +50,11 @@ CondLikeArray::~CondLikeArray(){
 void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	if( arr ){
 #ifndef ALIGN_CLAS
+#ifdef CUDA_MEMORY_PINNED
+		FreePinnedMemory(arr);
+#else
 		delete []arr;
+#endif
 #else
 		DeleteAlignedArray(arr);
 #endif
@@ -52,7 +64,11 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	nsites = ns;
 	nstates = nk;
 #ifndef ALIGN_CLAS
+#ifdef CUDA_MEMORY_PINNED
+	AllocatePinnedMemory((void**)&arr, sizeof(FLOAT_TYPE)*nk*nr*ns);
+#else
 	arr=new FLOAT_TYPE[nk*nr*ns];
+#endif
 #else
 	arr = NewAlignedArray<FLOAT_TYPE>(nk*nr*ns, CLA_ALIGNMENT);
 #endif
@@ -74,13 +90,13 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 		#endif
 
 		if(claStack.empty() == true) RecycleClas();
-		
+
 		CondLikeArray *arr=claStack[claStack.size()-1];
-		
+
 		assert(arr != NULL);
 		claStack.pop_back();
 		if(numClas - (int)claStack.size() > maxUsed) maxUsed=numClas - (int)claStack.size();
-		
+
 		return arr;
 		}
 
