@@ -40,6 +40,10 @@ extern FLOAT_TYPE globalBest;
 
 extern int optCalcs;
 
+#ifdef CUDA_GPU
+extern CudaManager *cudaman;
+#endif
+
 #define FOURTH_ROOT
 
 		#ifdef OPT_DEBUG

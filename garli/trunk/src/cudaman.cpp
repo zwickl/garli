@@ -4,18 +4,17 @@
  *  Created on: Nov 12, 2008
  *      Author: ayres
  */
-#include "defs.h"
-#ifdef CUDA_GPU
 
 using namespace std;
 
 #include <math.h>
 
-#include "cudaman.h"
+#include <cutil.h>
+#include <vector_types.h>
 
+#include "defs.h"
+#include "cudaman.h"
 #include "outputman.h"
-#include "cutil.h"
-#include "vector_types.h"
 
 extern OutputManager outman;
 
@@ -775,5 +774,3 @@ void CudaManager::TestGPUDeriv() {
 		outman.UserMessageNoCR("%s\n", (gpu_deriv_enabled) ? "yes" : "no");
 	}
 }
-
-#endif

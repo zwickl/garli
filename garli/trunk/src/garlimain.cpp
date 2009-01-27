@@ -428,7 +428,7 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
 
 #ifdef CUDA_GPU
-			cudaman = new CudaManager(modSpec.nstates, modSpec.numRateCats, data->NChar(), 0, true);
+			cudaman = new CudaManager(modSpec.nstates, modSpec.numRateCats, data->NChar(), 10, true);
 #endif
 
 			//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig

@@ -120,6 +120,25 @@ if test "$enable_single_prec" = yes; then
            ])
 fi
 
+#DLA - cuda gpu version (still being tested)
+AC_ARG_ENABLE(cuda-gpu,
+        AC_HELP_STRING([--enable-cuda-gpu],[use CUDA GPU (EXPERIMENTAL)]), , [enable_cuda_gpu=no])
+if test "$enable_cuda_gpu" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling CUDA GPU version
+           ])
+fi
+
+#DLA - cuda gpu pinned memory (still being tested)
+AC_ARG_ENABLE(cuda-memory,
+        AC_HELP_STRING([--enable-cuda-memory],[use pinned memory (requires --enable-cuda-gpu)]), , [enable_cuda_memory=no])
+if test "$enable_cuda_gpu" = yes; then
+	if test "$enable_cuda_memory" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling CUDA GPU version with pinned memory
+           ])
+	fi
+fi
 
 # Initialize optimization flag in case it doesn't get set below.
 CXXFLAGS_OPTIM_SPEED="-O"
@@ -186,6 +205,61 @@ if test  "$enable_single_prec" = yes; then
 		CXXFLAGS="$CXXFLAGS -fno-caller-saves"
 	fi
 fi
+
+##########################################################
+# DLA cuda gpu                                           #
+#                                                        #
+
+CUDA_INSTALL_PATH="/usr/local/cuda"
+CUDA_SDK_INSTALL_PATH="/Developer/CUDA"
+
+AC_ARG_WITH(
+	[cuda],
+	AC_HELP_STRING(
+		[--with-cuda=DIR],
+		[Specify the root directory for cuda toolkit. Omit this flag to build using the default location ("/usr/local/cuda").]
+		),
+	[
+	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
+		CUDA_INSTALL_PATH="$withval"
+	fi
+	])
+	
+AC_ARG_WITH(
+	[cuda-sdk],
+	AC_HELP_STRING(
+		[--with-cuda-sdk=DIR],
+		[Specify the root directory for cuda sdk. Omit this flag to build using the default location ("/Developer/CUDA").]
+		),
+	[
+	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
+		CUDA_SDK_INSTALL_PATH="$withval"
+	fi
+	])
+
+if test  "$enable_cuda_gpu" = yes; then
+	NVCCFLAGS="$NVCCFLAGS --ptxas-options=-v -DUNIX --compiler-options -fno-strict-aliasing"
+	CUDA_CFLAGS="$CUDA_CFLAGS -DCUDA_GPU"
+	CUDA_CFLAGS="$CUDA_CFLAGS -I$CUDA_INSTALL_PATH/include -I$CUDA_SDK_INSTALL_PATH/common/inc"
+	if test  "$enable_cuda_memory" = yes; then
+		CUDA_CFLAGS="$CUDA_CFLAGS -DCUDA_MEMORY_PINNED"
+	fi
+	if test  "$enable_single_prec" = yes; then
+		NVCCFLAGS="$NVCCFLAGS -DSINGLE_PRECISION_FLOATS"
+	fi
+   CUDA_LIBS="-L$CUDA_INSTALL_PATH/lib -L$CUDA_SDK_INSTALL_PATH/lib -lcuda -lcudart -lcutil"
+   LDFLAGS="$LDFLAGS $CUDA_LIBS"
+   CXXFLAGS="$CXXFLAGS $CUDA_CFLAGS"
+   NVCCFLAGS="$NVCCFLAGS $CUDA_CFLAGS"
+   NVCC="nvcc"
+   AC_SUBST(NVCC)
+   AC_SUBST(NVCCFLAGS)
+fi
+
+AM_CONDITIONAL(CUDASOURCE, test "$enable_cuda_gpu" = yes)
+
+#                                                        #
+##########################################################
 
 AC_LANG(C++)
 ACX_MPI
