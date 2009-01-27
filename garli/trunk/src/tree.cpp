@@ -442,6 +442,9 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 				}
 			}
 		}
+	if((allowMissingTaxa == false) && (numTipsAdded != numTipsTotal))
+		throw ErrorException("Number of taxa in tree description (%d) not equal to number of\n\ttaxa in dataset (%d)!  Check tree string.", numTipsAdded, numTipsTotal);
+		
 	if(root->left->next==root->right){
 		MakeTrifurcatingRoot(true, false);
 		}
@@ -449,9 +452,6 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 		EliminateNode(2*data->NTax()-2);
 		}
 	assert(root->left->next!=root->right);
-
-	if((allowMissingTaxa == false) && (numTipsAdded != numTipsTotal))
-		throw ErrorException("Number of taxa in tree description (%d) not equal to number of taxa in dataset (%d)!", numTipsAdded, numTipsTotal);
 
 	root->CheckforLeftandRight();
 	if(allowPolytomies == false) root->CheckforPolytomies();
