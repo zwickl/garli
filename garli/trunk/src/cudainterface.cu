@@ -4,12 +4,12 @@
  *  Created on: Nov 12, 2008
  *      Author: ayres
  */
-#include "defs.h"
 
-#ifdef CUDA_GPU
-
-#include "cutil.h"
 #include <iostream>
+
+#include <cutil.h>
+
+#include "defs.h"
 
 // includes, kernels
 #include "cudakernel.cu"
@@ -212,4 +212,3 @@ void CuComputeGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1, int* h_partial_
 
 	}
 
-#endif

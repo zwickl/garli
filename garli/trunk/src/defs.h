@@ -46,10 +46,10 @@
 #endif
 */
 
-#undef CUDA_GPU
-#ifdef CUDA_GPU
-	#define CUDA_MEMORY_PINNED
-#endif
+//#undef CUDA_GPU
+//#ifdef CUDA_GPU
+//	#define CUDA_MEMORY_PINNED
+//#endif
 
 #define USE_COUNTS_IN_BOOT
 
