@@ -31,7 +31,7 @@ INP_CXXFLAGS="$CXXFLAGS"
 AC_PROG_CXX
 
 # Initialize CXXFLAGS to prevent it from defaulting to "-g -O2"
-CXXFLAGS="$INP_CXXFLAGS -DUNIX"
+CXXFLAGS="$INP_CXXFLAGS -DUNIX -DNCL_CONST_FUNCS"
 
 # required because we are building a library 
 AC_PROG_RANLIB
