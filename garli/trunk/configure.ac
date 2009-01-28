@@ -315,12 +315,23 @@ if ! test -d "$NCL_LIB_DIR" ; then
 	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
 fi
 
+
+
+
 CPPFLAGS="$CPPFLAGS -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
+
 if test -d "$NCL_LIB_DIR/ncl" ; then
 	LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR/ncl"
 else
 	LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR"
 fi
+
+LIBS="$LIBS -lncl"
+AC_TRY_LINK( 
+[#include "ncl/nxsdefs.h" ], 
+[onlyDefinedInCouldBeConst ();], 
+[], 
+[AC_MSG_ERROR([NCL must be compiled with the NCL_CONST_FUNCS macro defined. Usually adding -DNCL_CONST_FUNCS to CPPFLAGS in your invocation of the NCL configure script is the solution.])]) 
 
 GARLI_LIBS="-lncl"
 
