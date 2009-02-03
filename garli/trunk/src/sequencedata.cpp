@@ -323,7 +323,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
 
-	nChar = dnaData->NChar()/3;
+	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
 	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon datatype specified, but number of nucleotides not divisible by 3!");  
 	NewMatrix(nTax, nChar);
@@ -407,7 +407,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
 
-	nChar = dnaData->NChar()/3;
+	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
 	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon to Aminoacid translation specified, but number of nucleotides not divisible by 3!");  
 	NewMatrix(nTax, nChar);

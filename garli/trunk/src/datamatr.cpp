@@ -339,7 +339,7 @@ void DataMatrix::NewMatrix( int taxa, int sites ){
 
 	// set dimension variables to new values
 	nTax = taxa;
-	gapsIncludedNChar = totalNChar = nChar = sites;
+	nonZeroCharCount = gapsIncludedNChar = totalNChar = nChar = sites;
 	}
 
 DataMatrix& DataMatrix::operator =(const DataMatrix& d){
@@ -450,6 +450,7 @@ int i, j, newNChar = 0;
 //	number = newNumber;
 	matrix = newMatrix;
 	nChar = newNChar;
+	nonZeroCharCount = nChar;
 	}
 
 
@@ -582,7 +583,7 @@ int DataMatrix::ComparePatterns( const int i, const int j ) const{
 //
 void DataMatrix::Collapse(){
 	int i = 0, j = 1;
-
+	assert(nonZeroCharCount == nChar);
 	Sort();
 
 	while( i < NChar() ) {
@@ -605,6 +606,7 @@ void DataMatrix::Collapse(){
 		}
 	
 	Pack();
+	assert(nonZeroCharCount == nChar);
 	}
 
 //
@@ -1715,13 +1717,14 @@ long DataMatrix::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 		while(p > cumProbs[pat]) pat++;
 		count[pat]++;
 		}
-	int num0=0;
+	//take a count of the number of chars that were actually resampled
+	nonZeroCharCount = 0;
+	int numZero = 0;
 	for(int d=0;d<nChar;d++){
-		if(count[d]==0) num0++;
-//		deb << count[d] << "\t";
+		if(count[d] > 0) nonZeroCharCount++;
+		else numZero++;
 		}
-//	deb << endl;
-//	deb.close();
+	assert(nonZeroCharCount + numZero == nChar);
 	currentBootstrapSeed = rnd.seed();
 	if(restartSeed > 0) rnd.set_seed(originalSeed);
 	delete []cumProbs;

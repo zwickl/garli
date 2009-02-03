@@ -52,6 +52,10 @@ protected:
 	int 	gapsIncludedNChar; //the actual number of columns in the data matrix read in
 								//only used when outputting something relative to input alignment
 	int		dense;		//whether the data has been sorted and identical patterns combined
+	int		nonZeroCharCount;	//this is the number of character patterns that have non-zero
+								//counts after bootstrap resampling.  Zero count characters can
+								//be avoided in the conditional likelihood calcs, but how this
+								//is done varies depending on the context
 	
 	unsigned char**         matrix;
 	int*		count;
@@ -156,6 +160,7 @@ protected:
 		int GapsIncludedNChar() const { return gapsIncludedNChar; }
 		void SetNChar(int nchar) { nChar = nchar; }
 
+		int BootstrappedNChar() {return nonZeroCharCount;} 
 		void Flush() { NewMatrix( 0, 0 ); }
 		int Dense() const { return dense; }
 		
