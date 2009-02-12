@@ -18,10 +18,12 @@ class CudaManager {
 
 public:
 	CudaManager();
-	CudaManager(int nstatesIn, int numRateCatsIn, int ncharIn);
-	CudaManager(int nstatesIn, int numRateCatsIn, int ncharIn,
-			int test_iterations, bool print_to_screen);
+	CudaManager(int nstates_in, int numRateCats_in, int nchar_in);
+	CudaManager(int nstates_in, int numRateCats_in, int nchar_in,
+			int test_iterations_in, bool print_to_screen_in);
 	~CudaManager();
+
+	void ChangeNChar(int nchar_boot_in, const int* counts_in);
 
 	bool GetGPUCLAEnabled();
 	bool GetGPUDerivEnabled();
@@ -30,11 +32,11 @@ public:
 			const FLOAT_TYPE* h_LCL, const FLOAT_TYPE* h_RCL,
 			const FLOAT_TYPE* h_CLA);
 
-	void ComputeGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1,
-			int* h_partial_underflow_mult, int* h_CL1_underflow_mult,
+	void ComputeGPUDeriv(const FLOAT_TYPE* h_partial, const FLOAT_TYPE* h_CL1,
+			const int* h_partial_underflow_mult, const int* h_CL1_underflow_mult,
 			const FLOAT_TYPE* h_prmat, const FLOAT_TYPE* h_d1mat,
 			const FLOAT_TYPE* h_d2mat, const FLOAT_TYPE* h_rateProb,
-			FLOAT_TYPE* h_freqs, const int* h_countit, const int* h_conStates,
+			const FLOAT_TYPE* h_freqs, const int* h_countit, const int* h_conStates,
 			int lastConst, bool NoPinvInModel, FLOAT_TYPE prI);
 
 	FLOAT_TYPE GetDerivTots(int index);
@@ -53,25 +55,31 @@ private:
 	unsigned int cla_mem_size_pr, cla_mem_size_CL;
 
 	int *deriv_d_countit, *deriv_d_partial_underflow_mult,
-			*deriv_d_CL1_underflow_mult, *deriv_d_conStates;
+			*deriv_d_CL1_underflow_mult, *deriv_d_conStates,
+			*deriv_d_nchar_boot_index;
 	FLOAT_TYPE *deriv_d_partial, *deriv_d_CL1, *deriv_d_prmat, *deriv_d_d1mat,
 			*deriv_d_d2mat, *deriv_d_rateProb, *deriv_d_freqs,
 			*deriv_d_Tots_arr, *deriv_d_Tots, *deriv_h_Tots_arr, *deriv_h_Tots;
 	dim3 deriv_dimBlock, deriv_dimGrid;
 	int deriv_ncharGPU;
+	int deriv_nchar_full;
+	int *deriv_h_nchar_boot_index;
+	int *deriv_counts;
 	unsigned int deriv_mem_size_pr, deriv_mem_size_CL, deriv_mem_size_int_char,
 			deriv_mem_size_rates, deriv_mem_size_states, deriv_mem_size_Tots,
-			deriv_mem_size_Tots_arr;
+			deriv_mem_size_Tots_arr, deriv_mem_size_nchar_boot_index;
 
 private:
-	// Test GPU performance and correctness and enable functions accordingly
-	void TestGPU();
-	void TestGPUCLA();
-	void TestGPUDeriv();
-
 	// Calculate all GPU parameters that don't change from call to call
 	void SetGPUCLAParameters();
 	void SetGPUDerivParameters();
+
+	// Initialize nchar_full and nchar_boot_index
+	void InitGPUDeriv(int nchar_full_in);
+
+	// Free GPU allocated memory
+	void FreeGPUCLA();
+	void FreeGPUDeriv();
 
 	// Allocates a matrix with random FLOAT_TYPE entries.
 	void RandomInit(FLOAT_TYPE* data, int size);
@@ -93,6 +101,11 @@ private:
 			const FLOAT_TYPE *freqs, const int *countit, const int lastConst,
 			const bool NoPinvInModel, const FLOAT_TYPE prI,
 			const int *conStates, FLOAT_TYPE *reference_Tots);
+
+	// Test GPU performance and correctness and enable functions accordingly
+	void TestGPU();
+	void TestGPUCLA();
+	void TestGPUDeriv();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -113,22 +126,24 @@ void CuComputeGPUCLA(const FLOAT_TYPE* h_Lpr, const FLOAT_TYPE* h_Rpr,
 		unsigned int mem_size_pr, unsigned int mem_size_CL, int nstates,
 		int nRateCats, int nchar, int ncharGPU, dim3 dimBlock, dim3 dimGrid);
 
-void CuComputeGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1,
-		int* h_partial_underflow_mult, int* h_CL1_underflow_mult,
+void CuComputeGPUDeriv(const FLOAT_TYPE* h_partial, const FLOAT_TYPE* h_CL1,
+		const int* h_partial_underflow_mult, const int* h_CL1_underflow_mult,
 		const FLOAT_TYPE* h_prmat, const FLOAT_TYPE* h_d1mat,
 		const FLOAT_TYPE* h_d2mat, const FLOAT_TYPE* h_rateProb,
-		FLOAT_TYPE* h_freqs, const int* h_countit, const int* h_conStates,
-		FLOAT_TYPE* h_Tots, FLOAT_TYPE* h_Tots_arr, FLOAT_TYPE* d_partial,
-		FLOAT_TYPE* d_CL1, int* d_partial_underflow_mult,
-		int* d_CL1_underflow_mult, FLOAT_TYPE* d_prmat, FLOAT_TYPE* d_d1mat,
-		FLOAT_TYPE* d_d2mat, FLOAT_TYPE* d_rateProb, FLOAT_TYPE* d_freqs,
-		int* d_countit, int* d_conStates, FLOAT_TYPE* d_Tots,
-		FLOAT_TYPE* d_Tots_arr, unsigned int mem_size_pr,
+		const FLOAT_TYPE* h_freqs, const int* h_countit, const int* h_conStates,
+		FLOAT_TYPE* h_Tots, FLOAT_TYPE* h_Tots_arr, int* h_nchar_boot_index,
+		FLOAT_TYPE* d_partial, FLOAT_TYPE* d_CL1,
+		int* d_partial_underflow_mult, int* d_CL1_underflow_mult,
+		FLOAT_TYPE* d_prmat, FLOAT_TYPE* d_d1mat, FLOAT_TYPE* d_d2mat,
+		FLOAT_TYPE* d_rateProb, FLOAT_TYPE* d_freqs, int* d_countit,
+		int* d_conStates, FLOAT_TYPE* d_Tots, FLOAT_TYPE* d_Tots_arr,
+		int* d_nchar_boot_index, unsigned int mem_size_pr,
 		unsigned int mem_size_CL, unsigned int mem_size_int_char,
 		unsigned int mem_size_rates, unsigned int mem_size_states,
 		unsigned int mem_size_Tots, unsigned int mem_size_Tots_arr,
-		int lastConst, bool NoPinvInModel, FLOAT_TYPE prI, int nstates,
-		int nRateCats, int nchar, int ncharGPU, dim3 dimBlock, dim3 dimGrid);
+		unsigned int mem_size_nchar_boot_index, int lastConst,
+		bool NoPinvInModel, FLOAT_TYPE prI, int nstates, int nRateCats,
+		int nchar, int ncharGPU, dim3 dimBlock, dim3 dimGrid);
 }
 ////////////////////////////////////////////////////////////////////////////////
 

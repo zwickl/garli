@@ -247,8 +247,10 @@ if test  "$enable_cuda_gpu" = yes; then
 	if test  "$enable_single_prec" = yes; then
 		NVCCFLAGS="$NVCCFLAGS -DSINGLE_PRECISION_FLOATS"
 	fi
-   CUDA_LIBS="-L$CUDA_INSTALL_PATH/lib -L$CUDA_SDK_INSTALL_PATH/lib -lcuda -lcudart -lcutil"
-   LDFLAGS="$LDFLAGS $CUDA_LIBS"
+   CUDA_LDFLAGS="-L$CUDA_INSTALL_PATH/lib -L$CUDA_SDK_INSTALL_PATH/lib"
+   CUDA_LIBS="-lcuda -lcudart -lcutil"
+   LDFLAGS="$LDFLAGS $CUDA_LDFLAGS"
+   LIBS="$LIBS $CUDA_LIBS"
    CXXFLAGS="$CXXFLAGS $CUDA_CFLAGS"
    NVCCFLAGS="$NVCCFLAGS $CUDA_CFLAGS"
    NVCC="nvcc"
