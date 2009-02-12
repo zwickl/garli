@@ -346,6 +346,11 @@ int main( int argc, char* argv[] )	{
 #ifdef SINGLE_PRECISION_FLOATS
 			outman.UserMessage("->Single precision floating point version<-\n");
 #endif
+
+#ifdef CUDA_GPU
+			outman.UserMessage("->CUDA GPU version<-\n");
+#endif
+
 			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
 			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__);

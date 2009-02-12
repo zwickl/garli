@@ -23,7 +23,8 @@ CudaManager::CudaManager() {
 }
 
 CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in) {
-	gpu_cla_enabled = gpu_deriv_enabled = true;
+	gpu_cla_enabled = true;
+	gpu_deriv_enabled = true;
 	nstates = nstates_in;
 	numRateCats = numRateCats_in;
 	nchar = nchar_in;
@@ -31,12 +32,15 @@ CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in) {
 	print_to_screen = false;
 
 	SetGPUCLAParameters();
+
+	InitGPUDeriv(nchar_in);
 	SetGPUDerivParameters();
 }
 
 CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in,
 		int test_iterations_in, bool print_to_screen_in) {
-	gpu_cla_enabled = gpu_deriv_enabled = true;
+	gpu_cla_enabled = true;
+	gpu_deriv_enabled = true;
 	nstates = nstates_in;
 	numRateCats = numRateCats_in;
 	nchar = nchar_in;
@@ -49,41 +53,35 @@ CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in,
 	if (gpu_cla_enabled)
 		SetGPUCLAParameters();
 
-	if (gpu_deriv_enabled)
+	if (gpu_deriv_enabled) {
+		InitGPUDeriv(nchar_in);
 		SetGPUDerivParameters();
+	}
 }
 
 CudaManager::~CudaManager() {
+	if (gpu_cla_enabled)
+		FreeGPUCLA();
+
+	if (gpu_deriv_enabled) {
+		delete []deriv_counts;
+		FreeGPUDeriv();
+	}
+}
+
+void CudaManager::ChangeNChar(int nchar_boot_in, const int* counts_in) {
+	nchar = nchar_boot_in;
+
 	if (gpu_cla_enabled) {
-		FreeGPU(cla_d_Lpr);
-		FreeGPU(cla_d_Rpr);
-		FreeGPU(cla_d_LCL);
-		FreeGPU(cla_d_RCL);
-		FreeGPU(cla_d_CLA);
+		FreeGPUCLA();
+		SetGPUCLAParameters();
 	}
 
 	if (gpu_deriv_enabled) {
-		FreeGPU(deriv_d_countit);
-		FreeGPU(deriv_d_partial);
-		FreeGPU(deriv_d_CL1);
-		FreeGPU(deriv_d_partial_underflow_mult);
-		FreeGPU(deriv_d_CL1_underflow_mult);
-		FreeGPU(deriv_d_prmat);
-		FreeGPU(deriv_d_d1mat);
-		FreeGPU(deriv_d_d2mat);
-		FreeGPU(deriv_d_rateProb);
-		FreeGPU(deriv_d_freqs);
-		FreeGPU(deriv_d_Tots);
-		FreeGPU(deriv_d_Tots_arr);
-		FreeGPU(deriv_d_conStates);
-
-#ifdef CUDA_MEMORY_PINNED
-		FreePinnedMemory(&deriv_h_Tots);
-		FreePinnedMemory(&deriv_h_Tots_arr);
-#else
-		free(deriv_h_Tots);
-		free(deriv_h_Tots_arr);
-#endif
+		for (int i = 0; i < deriv_nchar_full; ++i)
+			deriv_counts[i] = counts_in[i];
+		FreeGPUDeriv();
+		SetGPUDerivParameters();
 	}
 }
 
@@ -104,68 +102,30 @@ void CudaManager::ComputeGPUCLA(const FLOAT_TYPE* h_Lpr,
 			cla_dimGrid);
 }
 
-void CudaManager::ComputeGPUDeriv(FLOAT_TYPE* h_partial, FLOAT_TYPE* h_CL1,
-		int* h_partial_underflow_mult, int* h_CL1_underflow_mult,
+void CudaManager::ComputeGPUDeriv(const FLOAT_TYPE* h_partial, const FLOAT_TYPE* h_CL1,
+		const int* h_partial_underflow_mult, const int* h_CL1_underflow_mult,
 		const FLOAT_TYPE* h_prmat, const FLOAT_TYPE* h_d1mat,
 		const FLOAT_TYPE* h_d2mat, const FLOAT_TYPE* h_rateProb,
-		FLOAT_TYPE* h_freqs, const int* h_countit, const int* h_conStates,
+		const FLOAT_TYPE* h_freqs, const int* h_countit, const int* h_conStates,
 		int lastConst, bool NoPinvInModel, FLOAT_TYPE prI) {
+
 	CuComputeGPUDeriv(h_partial, h_CL1, h_partial_underflow_mult,
 			h_CL1_underflow_mult, h_prmat, h_d1mat, h_d2mat, h_rateProb,
 			h_freqs, h_countit, h_conStates, deriv_h_Tots, deriv_h_Tots_arr,
-			deriv_d_partial, deriv_d_CL1, deriv_d_partial_underflow_mult,
-			deriv_d_CL1_underflow_mult, deriv_d_prmat, deriv_d_d1mat,
-			deriv_d_d2mat, deriv_d_rateProb, deriv_d_freqs, deriv_d_countit,
-			deriv_d_conStates, deriv_d_Tots, deriv_d_Tots_arr,
-			deriv_mem_size_pr, deriv_mem_size_CL, deriv_mem_size_int_char,
-			deriv_mem_size_rates, deriv_mem_size_states, deriv_mem_size_Tots,
-			deriv_mem_size_Tots_arr, lastConst, NoPinvInModel, prI, nstates,
-			numRateCats, nchar, deriv_ncharGPU, deriv_dimBlock, deriv_dimGrid);
+			deriv_h_nchar_boot_index, deriv_d_partial, deriv_d_CL1,
+			deriv_d_partial_underflow_mult, deriv_d_CL1_underflow_mult,
+			deriv_d_prmat, deriv_d_d1mat, deriv_d_d2mat, deriv_d_rateProb,
+			deriv_d_freqs, deriv_d_countit, deriv_d_conStates, deriv_d_Tots,
+			deriv_d_Tots_arr, deriv_d_nchar_boot_index, deriv_mem_size_pr,
+			deriv_mem_size_CL, deriv_mem_size_int_char, deriv_mem_size_rates,
+			deriv_mem_size_states, deriv_mem_size_Tots,
+			deriv_mem_size_Tots_arr, deriv_mem_size_nchar_boot_index,
+			lastConst, NoPinvInModel, prI, nstates, numRateCats, nchar,
+			deriv_ncharGPU, deriv_dimBlock, deriv_dimGrid);
 }
 
 FLOAT_TYPE CudaManager::GetDerivTots(int index) {
 	return deriv_h_Tots[index];
-}
-
-// Private methods
-void CudaManager::TestGPU() {
-	if (print_to_screen) {
-		outman.UserMessageNoCR(
-				"======================= GPU Tests =======================");
-
-		outman.UserMessageNoCR("\nParameters:\n");
-		outman.UserMessageNoCR("memory \t");
-		outman.UserMessageNoCR("float \t");
-		outman.UserMessageNoCR("states\t");
-		outman.UserMessageNoCR("rates\t");
-		outman.UserMessageNoCR("chars\n");
-#ifdef CUDA_MEMORY_PINNED
-		outman.UserMessageNoCR("pinned\t");
-#else
-		outman.UserMessageNoCR("paged\t");
-#endif
-		outman.UserMessageNoCR("%i bytes\t", sizeof(FLOAT_TYPE));
-		outman.UserMessageNoCR("%i\t", nstates);
-		outman.UserMessageNoCR("%i\t", numRateCats);
-		outman.UserMessageNoCR("%i\n", nchar);
-
-		outman.UserMessageNoCR(
-				"\nBenchmarks: (best results out of %i iterations)\n",
-				test_iterations);
-		outman.UserMessageNoCR("function\t");
-		outman.UserMessageNoCR("speedup\t");
-		outman.UserMessageNoCR("cpu   \t");
-		outman.UserMessageNoCR("gpu   \t");
-		outman.UserMessageNoCR("test\t");
-		outman.UserMessageNoCR("enabled\n");
-	}
-
-	TestGPUCLA();
-	TestGPUDeriv();
-
-	if (print_to_screen)
-		outman.UserMessageNoCR(
-				"=========================================================\n\n");
 }
 
 void CudaManager::SetGPUCLAParameters() {
@@ -235,19 +195,29 @@ void CudaManager::SetGPUDerivParameters() {
 	int deriv_size_Tots_arr = 3 * deriv_dimGrid.x;
 	deriv_mem_size_pr = sizeof(FLOAT_TYPE) * deriv_size_pr;
 	deriv_mem_size_CL = sizeof(FLOAT_TYPE) * deriv_size_CL;
-	deriv_mem_size_int_char = sizeof(int) * deriv_ncharGPU;
+	deriv_mem_size_int_char = sizeof(int) * deriv_nchar_full;
 	deriv_mem_size_rates = sizeof(int) * numRateCats;
 	deriv_mem_size_states = sizeof(int) * nstates;
 	deriv_mem_size_Tots = sizeof(FLOAT_TYPE) * deriv_size_Tots;
 	deriv_mem_size_Tots_arr = sizeof(FLOAT_TYPE) * deriv_size_Tots_arr;
+	deriv_mem_size_nchar_boot_index = sizeof(int) * nchar;
 
 #ifdef CUDA_MEMORY_PINNED
 	AllocatePinnedMemory((void**) &deriv_h_Tots, deriv_mem_size_Tots);
 	AllocatePinnedMemory((void**) &deriv_h_Tots_arr, deriv_mem_size_Tots_arr);
+	AllocatePinnedMemory((void**) &deriv_h_nchar_boot_index,
+			deriv_mem_size_nchar_boot_index);
 #else
 	deriv_h_Tots = (FLOAT_TYPE*) malloc(deriv_mem_size_Tots);
 	deriv_h_Tots_arr = (FLOAT_TYPE*) malloc(deriv_mem_size_Tots_arr);
+	deriv_h_nchar_boot_index = (int*) malloc(deriv_mem_size_nchar_boot_index);
 #endif
+
+	// initialize nchar_boot_index
+	int index_count = 0;
+	for (int i = 0; i < deriv_nchar_full; ++i)
+		if (deriv_counts[i] != 0)
+			deriv_h_nchar_boot_index[index_count++] = i;
 
 	// allocate memory on gpu
 	AllocateGPU((void**) &deriv_d_countit, deriv_mem_size_int_char);
@@ -264,6 +234,48 @@ void CudaManager::SetGPUDerivParameters() {
 	AllocateGPU((void**) &deriv_d_Tots, deriv_mem_size_Tots);
 	AllocateGPU((void**) &deriv_d_Tots_arr, deriv_mem_size_Tots_arr);
 	AllocateGPU((void**) &deriv_d_conStates, deriv_mem_size_int_char);
+	AllocateGPU((void**) &deriv_d_nchar_boot_index,
+			deriv_mem_size_nchar_boot_index);
+}
+//
+void CudaManager::InitGPUDeriv(int nchar_full_in) {
+	deriv_nchar_full = nchar_full_in;
+	deriv_counts = new int[deriv_nchar_full];
+	for (int i = 0; i < deriv_nchar_full; ++i)
+		deriv_counts[i] = 1;
+}
+
+void CudaManager::FreeGPUCLA() {
+	FreeGPU(cla_d_Lpr);
+	FreeGPU(cla_d_Rpr);
+	FreeGPU(cla_d_LCL);
+	FreeGPU(cla_d_RCL);
+	FreeGPU(cla_d_CLA);
+}
+
+void CudaManager::FreeGPUDeriv() {
+	FreeGPU(deriv_d_countit);
+	FreeGPU(deriv_d_partial);
+	FreeGPU(deriv_d_CL1);
+	FreeGPU(deriv_d_partial_underflow_mult);
+	FreeGPU(deriv_d_CL1_underflow_mult);
+	FreeGPU(deriv_d_prmat);
+	FreeGPU(deriv_d_d1mat);
+	FreeGPU(deriv_d_d2mat);
+	FreeGPU(deriv_d_rateProb);
+	FreeGPU(deriv_d_freqs);
+	FreeGPU(deriv_d_Tots);
+	FreeGPU(deriv_d_Tots_arr);
+	FreeGPU(deriv_d_conStates);
+#ifdef CUDA_MEMORY_PINNED
+	FreePinnedMemory(deriv_h_Tots);
+	FreePinnedMemory(deriv_h_Tots_arr);
+	FreePinnedMemory(deriv_h_nchar_boot_index);
+#else
+	free(deriv_h_Tots);
+	free(deriv_h_Tots_arr);
+	free(deriv_h_nchar_boot_index);
+#endif
 }
 
 void CudaManager::RandomInit(FLOAT_TYPE* data, int size) {
@@ -365,6 +377,47 @@ void CudaManager::ComputeRefDeriv(const FLOAT_TYPE *partial,
 	reference_Tots[0] = totL;
 	reference_Tots[1] = tot1;
 	reference_Tots[2] = tot2;
+}
+
+// Private methods
+void CudaManager::TestGPU() {
+	if (print_to_screen) {
+		outman.UserMessageNoCR(
+				"======================= GPU Tests =======================");
+
+		outman.UserMessageNoCR("\nParameters:\n");
+		outman.UserMessageNoCR("memory \t");
+		outman.UserMessageNoCR("float \t");
+		outman.UserMessageNoCR("states\t");
+		outman.UserMessageNoCR("rates\t");
+		outman.UserMessageNoCR("chars\n");
+#ifdef CUDA_MEMORY_PINNED
+		outman.UserMessageNoCR("pinned\t");
+#else
+		outman.UserMessageNoCR("paged\t");
+#endif
+		outman.UserMessageNoCR("%i bytes\t", sizeof(FLOAT_TYPE));
+		outman.UserMessageNoCR("%i\t", nstates);
+		outman.UserMessageNoCR("%i\t", numRateCats);
+		outman.UserMessageNoCR("%i\n", nchar);
+
+		outman.UserMessageNoCR(
+				"\nBenchmarks: (best results out of %i iterations)\n",
+				test_iterations);
+		outman.UserMessageNoCR("function\t");
+		outman.UserMessageNoCR("speedup\t");
+		outman.UserMessageNoCR("cpu   \t");
+		outman.UserMessageNoCR("gpu   \t");
+		outman.UserMessageNoCR("test\t");
+		outman.UserMessageNoCR("enabled\n");
+	}
+
+	TestGPUCLA();
+	TestGPUDeriv();
+
+	if (print_to_screen)
+		outman.UserMessageNoCR(
+				"=========================================================\n\n");
 }
 
 void CudaManager::TestGPUCLA() {
@@ -490,11 +543,11 @@ void CudaManager::TestGPUCLA() {
 
 		// free memory cuda allocated pinned memory on host
 #ifdef CUDA_MEMORY_PINNED
-		FreePinnedMemory(&h_Lpr);
-		FreePinnedMemory(&h_Rpr);
-		FreePinnedMemory(&h_LCL);
-		FreePinnedMemory(&h_RCL);
-		FreePinnedMemory(&h_CLA);
+		FreePinnedMemory(h_Lpr);
+		FreePinnedMemory(h_Rpr);
+		FreePinnedMemory(h_LCL);
+		FreePinnedMemory(h_RCL);
+		FreePinnedMemory(h_CLA);
 #else
 		free(h_Lpr);
 		free(h_Rpr);
@@ -540,14 +593,14 @@ void CudaManager::TestGPUDeriv() {
 				*h_rateProb, *h_freqs;
 		FLOAT_TYPE *h_Tots_arr, *h_Tots;
 		FLOAT_TYPE *reference_Tots;
-
+		int *h_nchar_boot_index;
 		int lastConst;
 		FLOAT_TYPE prI;
 
 		bool NoPinvInModel = false;
 
 		int *d_countit, *d_partial_underflow_mult, *d_CL1_underflow_mult,
-				*d_conStates;
+				*d_conStates, *d_nchar_boot_index;
 		FLOAT_TYPE *d_partial, *d_CL1, *d_prmat, *d_d1mat, *d_d2mat,
 				*d_rateProb, *d_freqs;
 		FLOAT_TYPE *d_Tots_arr, *d_Tots;
@@ -576,6 +629,7 @@ void CudaManager::TestGPUDeriv() {
 		unsigned int mem_size_rates = sizeof(int) * numRateCats;
 		unsigned int mem_size_states = sizeof(int) * nstates;
 		unsigned int mem_size_Tots = sizeof(FLOAT_TYPE) * size_Tots;
+		unsigned int mem_size_nchar_boot_index = sizeof(int) * nchar;
 
 		// setup block and grid size for gpu
 		dim3 dimBlock;
@@ -612,6 +666,8 @@ void CudaManager::TestGPUDeriv() {
 		AllocatePinnedMemory((void**) &h_Tots, mem_size_Tots);
 		AllocatePinnedMemory((void**) &h_Tots_arr, mem_size_Tots_arr);
 		AllocatePinnedMemory((void**) &h_conStates, mem_size_int_char_host);
+		AllocatePinnedMemory((void**) &h_nchar_boot_index,
+				mem_size_nchar_boot_index);
 #else
 		h_countit = (int*) malloc(mem_size_int_char_host);
 		h_partial = (FLOAT_TYPE*) malloc(mem_size_CL_host);
@@ -626,6 +682,7 @@ void CudaManager::TestGPUDeriv() {
 		h_Tots = (FLOAT_TYPE*) malloc(mem_size_Tots);
 		h_Tots_arr = (FLOAT_TYPE*) malloc(mem_size_Tots_arr);
 		h_conStates = (int*) malloc(mem_size_int_char_host);
+		h_nchar_boot_index = (int*) malloc(mem_size_nchar_boot_index);
 #endif
 
 		reference_Tots = (FLOAT_TYPE*) malloc(mem_size_Tots);
@@ -644,6 +701,7 @@ void CudaManager::TestGPUDeriv() {
 		AllocateGPU((void**) &d_Tots, mem_size_Tots);
 		AllocateGPU((void**) &d_Tots_arr, mem_size_Tots_arr);
 		AllocateGPU((void**) &d_conStates, mem_size_int_char);
+		AllocateGPU((void**) &d_nchar_boot_index, mem_size_nchar_boot_index);
 
 		// initialize host memory with random data
 		srand(i);
@@ -662,6 +720,9 @@ void CudaManager::TestGPUDeriv() {
 		RandomIntInit(h_conStates, nchar, nstates - 1);
 		h_Tots[0] = h_Tots[1] = h_Tots[2] = 0;
 
+		for (int j = 0; j < nchar; ++j)
+			h_nchar_boot_index[j] = j;
+
 		reference_Tots[0] = reference_Tots[1] = reference_Tots[2] = 0;
 
 		// create and start GPU timer
@@ -672,13 +733,15 @@ void CudaManager::TestGPUDeriv() {
 		// run likelihood calculation on GPU (includes memory transfers)
 		CuComputeGPUDeriv(h_partial, h_CL1, h_partial_underflow_mult,
 				h_CL1_underflow_mult, h_prmat, h_d1mat, h_d2mat, h_rateProb,
-				h_freqs, h_countit, h_conStates, h_Tots, h_Tots_arr, d_partial,
-				d_CL1, d_partial_underflow_mult, d_CL1_underflow_mult, d_prmat,
-				d_d1mat, d_d2mat, d_rateProb, d_freqs, d_countit, d_conStates,
-				d_Tots, d_Tots_arr, mem_size_pr, mem_size_CL,
+				h_freqs, h_countit, h_conStates, h_Tots, h_Tots_arr,
+				h_nchar_boot_index, d_partial, d_CL1, d_partial_underflow_mult,
+				d_CL1_underflow_mult, d_prmat, d_d1mat, d_d2mat, d_rateProb,
+				d_freqs, d_countit, d_conStates, d_Tots, d_Tots_arr,
+				d_nchar_boot_index, mem_size_pr, mem_size_CL,
 				mem_size_int_char, mem_size_rates, mem_size_states,
-				mem_size_Tots, mem_size_Tots_arr, lastConst, NoPinvInModel,
-				prI, nstates, numRateCats, nchar, ncharGPU, dimBlock, dimGrid);
+				mem_size_Tots, mem_size_Tots_arr, mem_size_nchar_boot_index,
+				lastConst, NoPinvInModel, prI, nstates, numRateCats, nchar,
+				ncharGPU, dimBlock, dimGrid);
 
 		// stop GPU timer
 		CUT_SAFE_CALL(cutStopTimer(gpu_timer));
@@ -715,19 +778,20 @@ void CudaManager::TestGPUDeriv() {
 
 		// free memory cuda allocated memory on host
 #ifdef CUDA_MEMORY_PINNED
-		FreePinnedMemory(&h_countit);
-		FreePinnedMemory(&h_partial);
-		FreePinnedMemory(&h_CL1);
-		FreePinnedMemory(&h_partial_underflow_mult);
-		FreePinnedMemory(&h_CL1_underflow_mult);
-		FreePinnedMemory(&h_prmat);
-		FreePinnedMemory(&h_d1mat);
-		FreePinnedMemory(&h_d2mat);
-		FreePinnedMemory(&h_rateProb);
-		FreePinnedMemory(&h_freqs);
-		FreePinnedMemory(&h_Tots);
-		FreePinnedMemory(&h_Tots_arr);
-		FreePinnedMemory(&h_conStates);
+		FreePinnedMemory(h_countit);
+		FreePinnedMemory(h_partial);
+		FreePinnedMemory(h_CL1);
+		FreePinnedMemory(h_partial_underflow_mult);
+		FreePinnedMemory(h_CL1_underflow_mult);
+		FreePinnedMemory(h_prmat);
+		FreePinnedMemory(h_d1mat);
+		FreePinnedMemory(h_d2mat);
+		FreePinnedMemory(h_rateProb);
+		FreePinnedMemory(h_freqs);
+		FreePinnedMemory(h_Tots);
+		FreePinnedMemory(h_Tots_arr);
+		FreePinnedMemory(h_conStates);
+		FreePinnedMemory(h_nchar_boot_index);
 #else
 		free(h_countit);
 		free(h_partial);
@@ -742,6 +806,7 @@ void CudaManager::TestGPUDeriv() {
 		free(h_Tots);
 		free(h_Tots_arr);
 		free(h_conStates);
+		free(h_nchar_boot_index);
 #endif
 
 		free(reference_Tots);
@@ -760,6 +825,7 @@ void CudaManager::TestGPUDeriv() {
 		FreeGPU(d_Tots);
 		FreeGPU(d_Tots_arr);
 		FreeGPU(d_conStates);
+		FreeGPU(d_nchar_boot_index);
 	}
 
 	if (!test_passed || best_cpu / best_gpu < 1)

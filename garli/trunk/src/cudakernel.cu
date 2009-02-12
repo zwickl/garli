@@ -200,7 +200,7 @@ __global__ void GarliDerivNucleotideNRate(FLOAT_TYPE* d_partial,
 		FLOAT_TYPE* d_CL1, int* d_partial_underflow_mult,
 		int* d_CL1_underflow_mult, FLOAT_TYPE* d_prmat, FLOAT_TYPE* d_d1mat,
 		FLOAT_TYPE* d_d2mat, FLOAT_TYPE* d_rateProb, FLOAT_TYPE* d_freqs,
-		int* d_countit, int* d_conStates, FLOAT_TYPE* d_Tots_arr,
+		int* d_countit, int* d_conStates, FLOAT_TYPE* d_Tots_arr, int* d_nchar_boot_index,
 		int lastConst, bool NoPinvInModel, FLOAT_TYPE prI, int nRateCats) {
 	__shared__ float prmat[4*4];
 	__shared__ float d1mat[4*4];
@@ -277,12 +277,12 @@ __global__ void GarliDerivNucleotideNRate(FLOAT_TYPE* d_partial,
 		d_CL1 += nstates;
 	}
 
-	float partial_underflow_mult = d_partial_underflow_mult[i];
-	float CL1_underflow_mult = d_CL1_underflow_mult[i];
+	float partial_underflow_mult = d_partial_underflow_mult[d_nchar_boot_index[i]];
+	float CL1_underflow_mult = d_CL1_underflow_mult[d_nchar_boot_index[i]];
 
-	if ((NoPinvInModel == false) && (i <= lastConst)) {
+	if ((NoPinvInModel == false) && (d_nchar_boot_index[i] <= lastConst)) {
 		float btot = 0.0f;
-		int conStates = d_conStates[i];
+		int conStates = d_conStates[d_nchar_boot_index[i]];
 		if (conStates & 1)
 			btot += freqs[0];
 		if (conStates & 2)
@@ -295,7 +295,7 @@ __global__ void GarliDerivNucleotideNRate(FLOAT_TYPE* d_partial,
 				* exp(partial_underflow_mult + CL1_underflow_mult);
 	}
 
-	int countit = d_countit[i];
+	int countit = d_countit[d_nchar_boot_index[i]];
 
 	Tots[tx] = (log(siteL) - partial_underflow_mult - CL1_underflow_mult)
 			* countit;
@@ -323,7 +323,7 @@ __global__ void GarliDerivAminoAcidNRate(FLOAT_TYPE* d_partial,
 		FLOAT_TYPE* d_CL1, int* d_partial_underflow_mult,
 		int* d_CL1_underflow_mult, FLOAT_TYPE* d_prmat, FLOAT_TYPE* d_d1mat,
 		FLOAT_TYPE* d_d2mat, FLOAT_TYPE* d_rateProb, FLOAT_TYPE* d_freqs,
-		int* d_countit, int* d_conStates, FLOAT_TYPE* d_Tots_arr,
+		int* d_countit, int* d_conStates, FLOAT_TYPE* d_Tots_arr, int* d_nchar_boot_index,
 		int lastConst, bool NoPinvInModel, FLOAT_TYPE prI, int nRateCats) {
 	__shared__ float prmat[20*20];
 	__shared__ float d1mat[20*20];
@@ -407,14 +407,14 @@ __global__ void GarliDerivAminoAcidNRate(FLOAT_TYPE* d_partial,
 		d_CL1 += nstates;
 	}
 
-	float partial_underflow_mult = d_partial_underflow_mult[i];
-	float CL1_underflow_mult = d_CL1_underflow_mult[i];
+	float partial_underflow_mult = d_partial_underflow_mult[d_nchar_boot_index[i]];
+	float CL1_underflow_mult = d_CL1_underflow_mult[d_nchar_boot_index[i]];
 
-	if ((NoPinvInModel == false) && (i <= lastConst))
-		siteL += (prI * freqs[d_conStates[i]] * exp(partial_underflow_mult
+	if ((NoPinvInModel == false) && (d_nchar_boot_index[i] <= lastConst))
+		siteL += (prI * freqs[d_conStates[d_nchar_boot_index[i]]] * exp(partial_underflow_mult
 				+ CL1_underflow_mult));
 
-	int countit = d_countit[i];
+	int countit = d_countit[d_nchar_boot_index[i]];
 
 	Tots[tx] = (log(siteL) - partial_underflow_mult - CL1_underflow_mult)
 			* countit;
@@ -454,7 +454,7 @@ __global__ void GarliDerivCodonNRate(FLOAT_TYPE* d_partial, FLOAT_TYPE* d_CL1,
 		int* d_partial_underflow_mult, int* d_CL1_underflow_mult,
 		FLOAT_TYPE* d_prmat, FLOAT_TYPE* d_d1mat, FLOAT_TYPE* d_d2mat,
 		FLOAT_TYPE* d_rateProb, FLOAT_TYPE* d_freqs, int* d_countit,
-		int* d_conStates, FLOAT_TYPE* d_Tots_arr, int lastConst,
+		int* d_conStates, FLOAT_TYPE* d_Tots_arr, int* d_nchar_boot_index, int lastConst,
 		bool NoPinvInModel, FLOAT_TYPE prI, int nRateCats) {
 	__shared__ float freqs[61];
 	__shared__ float rateProb[4];
@@ -508,14 +508,14 @@ __global__ void GarliDerivCodonNRate(FLOAT_TYPE* d_partial, FLOAT_TYPE* d_CL1,
 		d_CL1 += nstates;
 	}
 
-	float partial_underflow_mult = d_partial_underflow_mult[i];
-	float CL1_underflow_mult = d_CL1_underflow_mult[i];
+	float partial_underflow_mult = d_partial_underflow_mult[d_nchar_boot_index[i]];
+	float CL1_underflow_mult = d_CL1_underflow_mult[d_nchar_boot_index[i]];
 
-	if ((NoPinvInModel == false) && (i <= lastConst))
-		siteL += (prI * freqs[d_conStates[i]] * exp(partial_underflow_mult
+	if ((NoPinvInModel == false) && (d_nchar_boot_index[i] <= lastConst))
+		siteL += (prI * freqs[d_conStates[d_nchar_boot_index[i]]] * exp(partial_underflow_mult
 				+ CL1_underflow_mult));
 
-	int countit = d_countit[i];
+	int countit = d_countit[d_nchar_boot_index[i]];
 
 	Tots[tx] = (log(siteL) - partial_underflow_mult - CL1_underflow_mult)
 			* countit;
