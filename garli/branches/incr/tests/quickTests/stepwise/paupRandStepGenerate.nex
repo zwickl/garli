@@ -1,0 +1,12 @@
+#NEXUS
+
+begin paup;
+log file=paupRandStepGenerate.log;
+exec rana8.nex;
+set crit=l;
+lset nst=1 base=eq rates=eq pinv=0.0;
+hse start=step addseq=rand nreps=1000 swap=no savereps;
+savetree file=paupStepTrees.tre;
+log stop;
+end;
+
