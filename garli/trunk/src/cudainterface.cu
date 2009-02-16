@@ -14,8 +14,15 @@
 // includes, kernels
 #include "cudakernel.cu"
 
+//#define CUDADEVICE 1
+
 extern "C"
 void AllocatePinnedMemory(void** arr, unsigned int mem_size_bytes) {
+	//cudaSetDevice(CUDADEVICE);
+	//    cudaDeviceProp deviceProp;
+	//    cudaGetDeviceProperties(&deviceProp, CUDADEVICE);
+	//    printf ("      device %d:%s\n", CUDADEVICE,deviceProp.name);
+
 	// allocate host pinned memory
 	CUDA_SAFE_CALL(cudaMallocHost((void**)&(*arr), mem_size_bytes));
 
@@ -88,7 +95,6 @@ void CuComputeGPUDeriv(const FLOAT_TYPE* h_partial, const FLOAT_TYPE* h_CL1, con
 		unsigned int mem_size_Tots_arr, unsigned int mem_size_nchar_boot_index, int lastConst,
 		bool NoPinvInModel, FLOAT_TYPE prI,
 		int nstates, int nRateCats, int nchar, int ncharGPU, dim3 dimBlock, dim3 dimGrid) {
-
 	// copy matrices to the device
 	CUDA_SAFE_CALL(cudaMemcpy(d_partial, h_partial, mem_size_CL, cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(d_CL1, h_CL1, mem_size_CL, cudaMemcpyHostToDevice));
@@ -124,7 +130,7 @@ void CuComputeGPUDeriv(const FLOAT_TYPE* h_partial, const FLOAT_TYPE* h_CL1, con
 	CUT_CHECK_ERROR("Kernel execution failed");
 
 	// calculate remaining chars
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO;
+	FLOAT_TYPE tot1=0, tot2=0, totL = 0;
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
@@ -134,12 +140,12 @@ void CuComputeGPUDeriv(const FLOAT_TYPE* h_partial, const FLOAT_TYPE* h_CL1, con
 	h_CL1 += nstates * nRateCats * ncharGPU;
 
 	for(int i=ncharGPU;i<nchar;i++) {
-		siteL = siteD1 = siteD2 = ZERO_POINT_ZERO;
+		siteL = siteD1 = siteD2 = 0;
 		for(int rate=0;rate<nRateCats;rate++) {
-			rateL = rateD1 = rateD2 = ZERO_POINT_ZERO;
+			rateL = rateD1 = rateD2 = 0;
 			int rateOffset = rate*nstates*nstates;
 			for(int from=0;from<nstates;from++) {
-				tempL = tempD1 = tempD2 = ZERO_POINT_ZERO;
+				tempL = tempD1 = tempD2 = 0;
 				int offset = from * nstates;
 				for(int to=0;to<nstates;to++) {
 					tempL += h_prmat[rateOffset + offset + to]*h_CL1[to];
