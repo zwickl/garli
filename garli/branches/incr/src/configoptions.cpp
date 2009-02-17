@@ -15,11 +15,10 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#include <string.h>
+
 #include <cassert>
 #include <iostream>
 #include <climits>
-
 using namespace std;
 
 #include "defs.h"
@@ -30,6 +29,28 @@ using namespace std;
 /////////////////////////////////////////////////////////////////////////
 // GamlConfig::General methods //////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
+
+GeneralGamlConfig::StartingTree GeneralGamlConfig::GetStartMode() const {
+	if (_stricmp(this->streefname.c_str(), "random") == 0)
+		return RANDOM_START;
+	if (_stricmp(this->streefname.c_str(), "stepwise") == 0)
+		return STEPWISE_ADDITION_START;
+	if (_stricmp(this->streefname.c_str(), "incomplete") == 0)
+		return INCOMPLETE_FROM_FILE_START;
+	return FROM_FILE_START;
+}
+
+const char * GeneralGamlConfig::GetTreeFilename() const {
+	StartingTree m = GetStartMode();
+	if (m == FROM_FILE_START)
+		return this->streefname.c_str();
+	if (m == INCOMPLETE_FROM_FILE_START)
+		return this->incompletetreefname.c_str();
+	assert(false); // should not be requesting the tree file name when we are not in the From file or incomplete from file mode
+	return this->streefname.c_str();
+}
+
+
 
 GeneralGamlConfig::GeneralGamlConfig(){
 	//Default values for everything
@@ -47,6 +68,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	//starting the run
 	randseed = -1;
 	streefname = "random";
+	incompletetreefname.clear();
 	refineStart = true;
 
 	//general run details
@@ -144,6 +166,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetStringOption("datafname", datafname);
 	errors += cr.GetStringOption("ofprefix", ofprefix);
 	errors += cr.GetStringOption("streefname", streefname);
+	errors += cr.GetStringOption("incompletetreefname", incompletetreefname);
 	cr.GetStringOption("constraintfile", constraintfile, true);
 	errors += cr.GetIntNonZeroOption("randseed", randseed);
 	errors += cr.GetBoolOption("refinestart", refineStart);
@@ -292,6 +315,7 @@ int GeneralGamlConfig::Serialize(char** buf_, int* size_) const	{
 	size += (int)datafname.length() + 1;
 	size += (int)ofprefix.length() + 1;
 	size += (int)streefname.length() + 1;
+	size += (int)incompletetreefname.length() + 1;
 	
 	// allocate the buffer
 	buf = new char[size];
@@ -320,6 +344,9 @@ int GeneralGamlConfig::Serialize(char** buf_, int* size_) const	{
 
 	memcpy(p, streefname.c_str(), streefname.length()+1);
 	p += streefname.length()+1;
+
+	memcpy(p, incompletetreefname.c_str(), incompletetreefname.length()+1);
+	p += incompletetreefname.length()+1;
 	
 	// sanity checks
 	assert(p-buf == size);
@@ -347,6 +374,9 @@ int GeneralGamlConfig::Deserialize(char* buf, int size)	{
 	p += strlen(p)+1;
 	
 	streefname = p;
+	p += strlen(p)+1;
+
+	incompletetreefname = p;
 	p += strlen(p)+1;
 	
 	// sanity checks

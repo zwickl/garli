@@ -69,7 +69,7 @@ bool interactive;
 std::string GetSvnRev(){
 	string temp = SVN_REV;
 	string ret;
-	for(int i=0;i<temp.length();i++){
+	for(unsigned i=0;i<temp.length();i++){
 		char c = temp[i];
 		if(isdigit(c)) {
 			ret += c;
@@ -501,7 +501,7 @@ int main( int argc, char* argv[] )	{
 #endif
 				if(interactive==true){
 					outman.UserMessage("\n-Press enter to close program.-");
-					char d=getchar();
+					getchar();
 					}
 				return 1;
 				}
@@ -512,7 +512,7 @@ int main( int argc, char* argv[] )	{
 
 		if(interactive==true){
 			outman.UserMessage("\n-Press enter to close program.-");
-			char d=getchar();
+			getchar();
 			}
 		outman.CloseLogFile();
 		}

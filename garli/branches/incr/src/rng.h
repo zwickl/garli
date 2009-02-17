@@ -35,6 +35,7 @@
 #include <cassert>
 #include <iostream>
 
+#include "defs.h"
 using namespace std;
 
 class rng

@@ -102,7 +102,7 @@ typedef double MODEL_FLOAT;
 	#define DEF_STARTING_BRLEN 0.05
 	#define GARLI_FP_EPS DBL_EPSILON
 #endif
-
+bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
 #define MAXPATH   		256
 #define DEF_PRECISION	8
 
@@ -148,5 +148,11 @@ typedef double MODEL_FLOAT;
 #define TAG_SUBTREE_ITERATION	19
 #define TAG_PERTURB				20
 #endif
+
+
+#if !defined(_MSC_VER)
+# define _stricmp strcasecmp
+#endif
+
 
 #endif

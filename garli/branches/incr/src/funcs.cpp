@@ -280,7 +280,7 @@ bool ReadData(const char* filename, SequenceData* data)	{
 	}
 */
 
-int ReadData(GeneralGamlConfig *conf, NucleotideData* data)	{
+int ReadData(GeneralGamlConfig *, NucleotideData*)	{
 	assert(0);
 	// regurgitate params specified
 /*	if( params.restart ) {

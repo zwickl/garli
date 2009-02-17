@@ -53,7 +53,7 @@ class InternalState{
 		}
 	};
 
-bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
+
 
 #if defined(SINGLE_PRECISION_FLOATS) && !defined(_MSC_VER)
 //Overloaded versions of min and max that take different types for the two arguments
