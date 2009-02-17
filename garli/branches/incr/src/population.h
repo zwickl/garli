@@ -299,11 +299,8 @@ public:
 	Individual* indiv;
 
 private:
-
 	Individual* newindiv;
-
 	vector<int> subtreeMemberNodes;
-
 #ifdef INCLUDE_PERTURBATION
 	PerturbManager *pertMan;
 #endif
@@ -382,21 +379,8 @@ private:
 	Individual *bestSinceRestart;
 #endif
 
-	public:	
-		Population() : error(0), conf(NULL), usedNCL(false), startingTreeInNCL(false), startingModelInNCL(false),
-			bestFitness(-(FLT_MAX)), bestIndiv(0), currentSearchRep(1), 
-			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
-			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
-			treeString(NULL), adap(NULL), fraction_done(ZERO_POINT_ZERO),
-			topologies(NULL), prematureTermination(false), currentBootstrapRep(0),
-			finishedRep(false), lastBootstrapSeed(0), data(NULL), rawData(NULL)
-#ifdef INCLUDE_PERTURBATION			 
-			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
-#endif
-			{
-			lastTopoImprove = 0;
-			lastPrecisionReduction = 0;
-			}
+	public:
+		Population();
 
 		~Population();
 

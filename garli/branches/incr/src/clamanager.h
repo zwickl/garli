@@ -50,7 +50,8 @@ class ClaManager{
 	vector<int> holderStack;
 	
 	public:	
-	ClaManager(int nnod, int nClas, int nHolders, int nchar, int nrates) : numNodes(nnod), numClas(nClas), numHolders(nHolders), numRates(nrates){
+	ClaManager(int nnod, int nClas, int nHolders, int nchar, int nrates) 
+	  : numNodes(nnod), numRates(nrates), numClas(nClas), numHolders(nHolders){
 		maxUsed=0;
 		allClas=new CondLikeArray*[numClas];
 		claStack.reserve(numClas);
@@ -235,7 +236,7 @@ class ClaManager{
 		}
 
 	inline void ClaManager::CheckClaHolders(){
-		int used=0;
+		unsigned used=0;
 		int reclaim2=0;
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL){

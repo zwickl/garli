@@ -100,6 +100,7 @@ class Individual
 			}
 		void GetStartingConditionsFromFile(const char *fname, int rank, int nTax, bool restart=false);
 		void GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false);
+		void GetIncompleteStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false);
 		void RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec);
 		void CalcFitness(int subtreeNode);
 		void ReadTreeFromFile(istream & inf);
@@ -117,8 +118,9 @@ class Individual
 		void CopySecByStealingFirstTree(Individual * sourceOfTreePtr, const Individual *sourceOfInformation);
 		void CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const Individual *sourceOfInformation, bool CLAassigned=false);
 		void ResetIndiv();
-		void MakeRandomTree(int nTax);
-		void MakeStepwiseTree(int nTax, int attemptsPerTaxon, FLOAT_TYPE optPrecision );
+		void MakeRandomTree(unsigned nTax);
+		void MakeStepwiseTree(unsigned nTax, unsigned attemptsPerTaxon, FLOAT_TYPE optPrecision );
+		void ContinueBuildingStepwiseTree(unsigned nTax, unsigned attachesPerTaxon, FLOAT_TYPE optPrecision, Individual & scratchI, std::set<unsigned> & taxset, int &placeInAllNodes, Bipartition & mask);
 	};
 
 

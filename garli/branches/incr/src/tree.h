@@ -262,7 +262,7 @@ class Tree{
 		void StoreBranchlengths(vector<FLOAT_TYPE> &blens){
 			for(int n=1;n<numNodesTotal;n++)
 				blens.push_back(allNodes[n]->dlen);
-			assert(blens.size() == numNodesTotal - 1);
+			assert(blens.size() == (size_t)(numNodesTotal - 1));
 			}
 		void RestoreBranchlengths(vector<FLOAT_TYPE> &blens){
 			for(int n=1;n<numNodesTotal;n++)

@@ -108,16 +108,16 @@ protected:
 		};
 
 	public:
-		DataMatrix() : dmFlags(0), dense(0), nTax(0), nChar(0), matrix(0), count(0)
-			, number(0), taxonLabel(0), numStates(0), stateDistr(0)
-			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
-			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
+		DataMatrix() : nTax(0), nChar(0), dense(0), matrix(0), count(0), origCounts(0)
+			, number(0), taxonLabel(0), nMissing(0), nConstant(0), nInformative(0)
+			, nAutapomorphic(0),  lastConstant(-1), constStates(0), stateDistr(0)
+			, stateDistrComputed(0), currentBootstrapSeed(0), numStates(0), dmFlags(0)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
-			: nTax(ntax), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
-			, number(0), taxonLabel(0), numStates(0), stateDistr(0)
-			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
-			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
+			: nTax(0), nChar(0), dense(0), matrix(0), count(0), origCounts(0)
+			, number(0), taxonLabel(0), nMissing(0), nConstant(0), nInformative(0)
+			, nAutapomorphic(0),  lastConstant(-1), constStates(0), stateDistr(0)
+			, stateDistrComputed(0), currentBootstrapSeed(0), numStates(0), dmFlags(0)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
 		virtual ~DataMatrix();
 
@@ -227,10 +227,7 @@ protected:
 
 		DataMatrix& operator =(const DataMatrix&);
 
-		void Sort( int byCounts = 0 ){
-			byCounts;
-			QSort( 0, NChar()-1 );
-			}
+		void Sort( int byCounts = 0 );
 		virtual int PatternType( int , int*, unsigned char *) const;	// returns PT_XXXX constant indicating type of pattern
 		void Summarize();       // fills in nConstant, nInformative, and nAutapomorphic data members
 		virtual void Collapse();
@@ -288,6 +285,11 @@ protected:
       
 #endif
 };
+
+inline void DataMatrix::Sort( int) {
+	QSort( 0, NChar() - 1 );
+	}
+
 
 #endif
 

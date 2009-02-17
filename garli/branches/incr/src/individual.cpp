@@ -20,11 +20,10 @@
 #include <iosfwd>
 #include <iomanip>
 #include <sstream>
-
+#include <set>
 using namespace std;
 
 #include "defs.h"
-#include "set.h"
 #include "funcs.h"
 #include "adaptation.h"
 #include "model.h"
@@ -52,20 +51,39 @@ extern OutputManager outman;
 // Methods for class Individual
 //
 //
-Individual::Individual() : dirty(1), fitness(0.0), 
-	reproduced(false), willreproduce(false), parent(-1),
-	willrecombine(false), recombinewith(-1), topo(-1), mutated_brlen(0), 
-	mutation_type(0), accurateSubtrees(0){
+Individual::Individual()
+	:fitness(0.0),
+	dirty(1), 
+	mutation_type(0), 
+	mutated_brlen(0),
+	accurateSubtrees(0),
+	mod(0L),
+	treeStruct(0L),
+	reproduced(false),
+	willreproduce(false), 
+	willrecombine(false),
+	recombinewith(-1), 
+	parent(-1),
+	topo(-1) {
 	 
  	treeStruct=NULL;
 	mod=new Model();
 	}
 
-Individual::Individual(const Individual *other) : 
-	dirty(1), fitness(0.0), 
-	reproduced(false), willreproduce(false), parent(-1),
-	willrecombine(false), recombinewith(-1), topo(-1), mutated_brlen(0), 
-	mutation_type(0), accurateSubtrees(0){
+Individual::Individual(const Individual *other)
+	:fitness(0.0),
+	dirty(1), 
+	mutation_type(0), 
+	mutated_brlen(0),
+	accurateSubtrees(0),
+	mod(0L),
+	treeStruct(0L),
+	reproduced(false),
+	willreproduce(false), 
+	willrecombine(false),
+	recombinewith(-1), 
+	parent(-1),
+	topo(-1) {
 
 	mod=new Model();
 	treeStruct=new Tree();
@@ -204,33 +222,48 @@ void Individual::CalcFitness(int subtreeNode){
 		treeStruct->RemoveTempClaReservations();
 	}
 
-void Individual::MakeRandomTree(int nTax){
+
+unsigned PopRandom(std::set<unsigned> indexSet, rng & rnd);
+
+unsigned PopRandom(std::set<unsigned> indexSet, rng & rnd) {
+	assert (! indexSet.empty());
+	const unsigned pos = rnd.random_int( indexSet.size() );
+	unsigned i = 0;
+	std::set<unsigned>::iterator sIt = indexSet.begin();
+	for (; i != pos ; ++i, ++sIt)
+		{
+		assert(sIt != indexSet.end());
+		}
+	assert(sIt != indexSet.end());
+	const unsigned toReturn = *sIt;
+	indexSet.erase(sIt);
+	return toReturn;
+	}
+
+
+void Individual::MakeRandomTree(unsigned nTax){
 	treeStruct=new Tree();
 
-	int n = nTax;
-	Set taxset(n);
-	for( int i = 1; i <= n; i++ )
-		taxset += i;
+	unsigned n = (unsigned) nTax;
+	std::set<unsigned> taxset;
+	for( unsigned i = 1; i <= n; i++ )
+		taxset.insert(i);
 		
-	int placeInAllNodes=n+1;
+	int placeInAllNodes = n + 1;
 	
 	if(treeStruct->constraints.empty() == true){
 		// add nodes randomly
-		for( int i = 0; i < n; i++ ) {
-			int pos = rnd.random_int( taxset.Size() );
-			int k = taxset[pos];
+		for( unsigned i = 0; i < n; i++ ) {
+			unsigned k = PopRandom(taxset, rnd);
 			treeStruct->AddRandomNode(k, placeInAllNodes  );
-			taxset -= k;
 			}
 		}
 	else{
 		// add nodes randomly, ensuring that the resulting partial tree is compatible with constraints
 		Bipartition mask;
-		for( int i = 0; i < n; i++ ) {
-			int pos = rnd.random_int( taxset.Size() );
-			int k = taxset[pos];
+		for( unsigned i = 0; i < n; i++ ) {
+			unsigned k = PopRandom(taxset, rnd);
 			treeStruct->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
-			taxset -= k;
 			}
 #ifndef NDEBUG
 		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
@@ -247,7 +280,7 @@ void Individual::MakeRandomTree(int nTax){
 	treeStruct->AssignCLAsFromMaster();
 	}
 
-void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE optPrecision ){
+void Individual::MakeStepwiseTree(unsigned nTax, unsigned attachesPerTaxon, FLOAT_TYPE optPrecision ){
 	treeStruct=new Tree();
 	treeStruct->AssignCLAsFromMaster();
 
@@ -257,24 +290,22 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 	scratchT->AssignCLAsFromMaster();
 	scratchI.CopySecByRearrangingNodesOfFirst(scratchT, this, true);
 
-	int n = nTax;
-	Set taxset(n);
-	for( int i = 1; i <= n; i++ )
-		taxset += i;
+	unsigned n = nTax;
+	std::set<unsigned> taxset;
+	for( unsigned i = 1; i <= n; i++ )
+		taxset.insert(i);
 		
-	int placeInAllNodes=n+1;
+	int placeInAllNodes = n + 1;
 //	ofstream stepout("stepwise.log");
 	outman.UserMessage("number of taxa added:");
 
 	Bipartition mask;//mask is used for constrained trees
-	for(int i = 0;i<3;i++){//add the first 3
-		int pos = rnd.random_int( taxset.Size() );
-		int k = taxset[pos];
+	for(unsigned i = 0; i < 3; i++){//add the first 3
+		unsigned k = PopRandom(taxset, rnd);
 		if(treeStruct->constraints.empty())
 			scratchT->AddRandomNode(k, placeInAllNodes  );
 		else
 			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
-		taxset -= k;
 		}
 	//use information on the similarity between sequences to choose first stepwise additions
 /*	
@@ -318,17 +349,26 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 	scratchT->AddRandomNode(third, placeInAllNodes  );
 	taxset -= third;
 */
-	CopySecByRearrangingNodesOfFirst(treeStruct, &scratchI, true);
 
-	for( int i = 3; i < n; i++ ) {
+	this->ContinueBuildingStepwiseTree(nTax, attachesPerTaxon, optPrecision, scratchI, taxset, placeInAllNodes, mask);
+	}
+
+void Individual::ContinueBuildingStepwiseTree(unsigned nTax, unsigned attachesPerTaxon, FLOAT_TYPE optPrecision, Individual & scratchI, std::set<unsigned> & taxset, int & placeInAllNodes, Bipartition & mask) {
+	assert(scratchI.treeStruct);
+	Tree *scratchT = scratchI.treeStruct;
+	assert (nTax >= taxset.size());
+
+	CopySecByRearrangingNodesOfFirst(treeStruct, &scratchI, true);
+	
+	
+	unsigned i = nTax - taxset.size();
+	while (!taxset.empty()) {
 		//select a random node
-		int pos = rnd.random_int( taxset.Size() );
-		int k = taxset[pos];
-		taxset -= k;
+		unsigned k = PopRandom(taxset, rnd);
 		//add the node randomly - this is a little odd, but for the existing swap collecting machinery
 		//to work right, the taxon to be added needs to already be in the tree
 		if(treeStruct->constraints.empty())
-			scratchT->AddRandomNode(k, placeInAllNodes  );
+			scratchT->AddRandomNode(k, placeInAllNodes );
 		else
 			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
 		TreeNode *added = scratchT->allNodes[k];
@@ -346,7 +386,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 //			stepout << i << "\t" << k << "\t" << bestScore << "\t";
 
 		//start swappin
-		int num=0;
+		unsigned num=0;
 		//for(list<ReconNode>::iterator b = scratchT->sprRang.begin();b != scratchT->sprRang.end();b++){
 		ReconList attempted;
 		while(num < attachesPerTaxon && scratchT->sprRang.size() > 0){
@@ -392,7 +432,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		outman.UserMessageNoCR(" %d ", i+1);
 		outman.flush();
 		//when we've added half the taxa optimize alpha, flex or omega 
-		if(i == (n/2) && (modSpec.IsCodon() || mod->NRateCats() > 1) && modSpec.fixAlpha == false){
+		if (i == (nTax/2) && (modSpec.IsCodon() || mod->NRateCats() > 1) && modSpec.fixAlpha == false){
 			FLOAT_TYPE rateOptImprove = 0.0;
 			if(modSpec.IsCodon())//optimize omega even if there is only 1
 				rateOptImprove = scratchT->OptimizeOmegaParameters(optPrecision);
@@ -419,6 +459,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 				outman.UserMessage("\nOptimizing branchlengths... improved %f lnL", bimprove);
 	//			}
 			}
+		++i;
 		}		
 
 //	stepout.close();
@@ -624,6 +665,36 @@ void Individual::GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int ran
 	mod->UpdateQMat();
 	}
 
+void Individual::GetIncompleteStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart /*=false*/){
+	assert(treeStruct == NULL);
+
+	int totalTrees = treesblock->GetNumTrees();
+
+	int effectiveRank = rank % totalTrees;
+	
+	//we will get the tree string from NCL with taxon numbers (starting at 1), regardless of how it was initially read in 
+	const NxsFullTreeDescription &t = treesblock->GetFullTreeDescription(effectiveRank);
+
+	string ts = t.GetNewick();
+	ts += ";";
+	treeStruct=new Tree(ts.c_str(), true, true);
+
+	//check that any defined constraints are present in the starting tree
+	int conNum=1;
+	for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
+		TreeNode *check = NULL;
+		if((*conit).IsBackbone())
+			check = treeStruct->ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
+		else
+			check = treeStruct->ContainsBipartitionOrComplement(*(*conit).GetBipartition());
+		if(((*conit).IsPositive() && check == NULL) || ((*conit).IsPositive() == false  && check != NULL))
+			throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
+		}
+	treeStruct->AssignCLAsFromMaster();
+
+	mod->UpdateQMat();
+	}
+
 void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	if(optModel && mod->NRateCats() > 1 && modSpec.IsNonsynonymousRateHet() == false && modSpec.gotFlexFromFile == false) outman.UserMessage("optimizing starting branch lengths and rate heterogeneity parameters...");
 	else if(modSpec.IsCodon()) outman.UserMessage("optimizing starting branch lengths and dN/dS (aka omega) parameters...");
@@ -809,7 +880,7 @@ void Individual::SubtreeMutate(int subdomain, FLOAT_TYPE optPrecision, vector<in
 	   		else dirty=true;
 		  }
 		}
-/*  
+*//*  
   else{
     assert(TaxonSwapList.size>0);
     FLOAT_TYPE s2, s1 = params->rnd.uniform();

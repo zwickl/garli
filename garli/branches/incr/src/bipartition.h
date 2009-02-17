@@ -59,8 +59,8 @@ class Bipartition{
 	Bipartition(const char *c){//construct from a ***.... string
 		rep=new unsigned int[nBlocks];
 		ClearBipartition();
-		size_t len=strlen(c);
-		assert(len == ntax);
+		size_t len= (size_t) strlen(c);
+		assert(len == (size_t)ntax);
 		Bipartition tmp;
 		for(unsigned i=0;i<len;i++){
 			if(c[i] == '*') *this += tmp.TerminalBipart(i+1);

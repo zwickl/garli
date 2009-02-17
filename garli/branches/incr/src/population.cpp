@@ -176,6 +176,44 @@ char AskUser(std::string s)
    }
 #endif
 
+
+Population::Population(): 
+	bestIndiv(0),
+	bestFitness(-(FLT_MAX)),
+	prevBestFitness(-(FLT_MAX)),
+	gen(0),
+	currentBootstrapRep(0),
+	currentSearchRep(1),
+	conf(NULL),
+	error(0),
+	usedNCL(false),
+	startingTreeInNCL(false),
+	startingModelInNCL(false),
+	indiv(NULL),
+	newindiv(NULL),
+	cumfit(NULL),
+	paraMan(NULL),
+	subtreeDefNumber(0),
+	claMan(NULL),
+	treeString(NULL),
+	adap(NULL),
+	fraction_done(ZERO_POINT_ZERO),
+	topologies(NULL),
+	prematureTermination(false),
+	finishedRep(false),
+	lastBootstrapSeed(0),
+	data(NULL),
+#ifdef INCLUDE_PERTURBATION			 
+	, pertMan(NULL),
+	allTimeBest(NULL),
+	bestSinceRestart(NULL),
+#endif
+	rawData(NULL)
+	{
+	lastTopoImprove = 0;
+	lastPrecisionReduction = 0;
+	}
+
 void InterruptMessage( int )
 {
 	askQuitNow = 1;
@@ -473,7 +511,7 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 
 	int claSizePerNode = (modSpec.nstates * modSpec.numRateCats * sites * sizeof(FLOAT_TYPE)) + (sites * sizeof(int));
 	int numNodesPerIndiv = data->NTax()-2;
-	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
+	//int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
 	int maxClas = (int)((memToUse*MB)/ claSizePerNode);
 	int numClas;
@@ -549,8 +587,8 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	GetConstraints();
 
 	//try to get nexus starting tree/trees from file, which we don't want to do within the PerformSearch loop
-	if((_stricmp(conf->streefname.c_str(), "random") != 0)  && (_stricmp(conf->streefname.c_str(), "stepwise") != 0))
-		if(FileIsNexus(conf->streefname.c_str())){
+	if(conf->ReadTreeFromFile())
+		if(FileIsNexus(conf->GetTreeFilename())){
 			LoadNexusStartingConditions();
 			}
 	}
@@ -558,38 +596,38 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 void Population::LoadNexusStartingConditions(){
 	GarliReader & reader = GarliReader::GetInstance();
 	NxsTaxaBlock *tax = NULL;
-	NxsTreesBlock *treesblock = NULL;
+	//NxsTreesBlock *treesblock = NULL;
 
 	if(reader.GetNumTaxaBlocks() == 1)
 		reader.GetTaxaBlock(0);
 	else //I think this check happens in NCL as well, but best to be safe
 		throw ErrorException("multiple non-identical taxa blocks have been read");
 
-	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
+	if(usedNCL && strcmp(conf->GetTreeFilename(), conf->datafname.c_str()) == 0){
 		//in this case we should have already read in the tree when getting the data, so check that we have either one
 		//trees block for this taxa block or a garli block
 		if(reader.GetNumTreesBlocks(tax) == 0 && reader.FoundModelString() == false)
-			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->streefname.c_str());
+			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->GetTreeFilename());
 		else if(reader.GetNumTreesBlocks(tax) > 1)
-			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
+			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->GetTreeFilename());
 		else if(reader.GetNumTreesBlocks(tax) == 1)
 			startingTreeInNCL = true;
 		else startingTreeInNCL = false;
 		}
 	else{
 		//use NCL to get trees from the specified file
-		outman.UserMessage("Loading starting model and/or tree from file %s", conf->streefname.c_str());
+		outman.UserMessage("Loading starting model and/or tree from file %s", conf->GetTreeFilename());
 		//it isn't easy to remove a previous trees block in factory mode, so we need to do this
 		int initNumTreesBlocks = reader.GetNumTreesBlocks(tax);
 		try{
-			reader.ReadFilepath(conf->streefname.c_str(), MultiFormatReader::NEXUS_FORMAT);
+			reader.ReadFilepath(conf->GetTreeFilename(), MultiFormatReader::NEXUS_FORMAT);
 			}
 		catch (const NxsException & x){
 			throw ErrorException("%s", x.msg.c_str());
 			}
 		int afterNumTreesBlocks = reader.GetNumTreesBlocks(tax);;
 		if(afterNumTreesBlocks - initNumTreesBlocks > 1){//we added more than one trees block
-			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
+			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->GetTreeFilename());
 			}
 		//otherwise we want the last one because others may have been read with the data
 		else if(afterNumTreesBlocks == initNumTreesBlocks)//we didnt' add any tree blocks
@@ -599,7 +637,7 @@ void Population::LoadNexusStartingConditions(){
 
 		//we read the file, but didn't find either
 		if(startingTreeInNCL == false && reader.FoundModelString() == false)
-			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as the source of starting model and/or tree", conf->streefname.c_str());
+			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as the source of starting model and/or tree", conf->GetTreeFilename());
 		}
 	if(reader.FoundModelString()) startingModelInNCL = true;
 	}
@@ -639,7 +677,7 @@ void Population::ApplyNSwaps(int numSwaps){
 
 	Individual *ind0 = &newindiv[0];
 
-	ind0->GetStartingConditionsFromFile(conf->streefname.c_str(), 0, data->NTax());
+	ind0->GetStartingConditionsFromFile(conf->GetTreeFilename(), 0, data->NTax());
 	ind0->treeStruct->mod = ind0->mod;
 	//ind0->GetStartingConditionsFromNCL(	File(conf->streefname.c_str(), 0, data->NTax());
 
@@ -687,7 +725,8 @@ void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
 void Population::GenerateTreesOnly(int nTrees){
 	SeedPopulationWithStartingTree(0);
 	InitializeOutputStreams();
-	if((_stricmp(conf->streefname.c_str(), "random") == 0)){
+	const GeneralGamlConfig::StartingTree m =  conf->GetStartMode();
+	if(GeneralGamlConfig::RANDOM_START == m){
 		outman.UserMessageNoCR("Making random trees compatible with constraints... ");
 		for(int i=0;i<nTrees;i++){
 			indiv[0].MakeRandomTree(data->NTax());
@@ -698,7 +737,7 @@ void Population::GenerateTreesOnly(int nTrees){
 			if(!(i % 100)) outman.UserMessageNoCR("%d ", i);
 			}
 		}
-	else if((_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
+	else if(GeneralGamlConfig::STEPWISE_ADDITION_START == m){
 		outman.UserMessageNoCR("Making stepwise trees compatible with constraints... ");
 		for(int i=0;i<nTrees;i++){
 			indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
@@ -828,12 +867,12 @@ void Population::RunTests(){
 	}
 
 void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
-	const int KB = 1024;
-	const int MB = KB*KB;
+	//const int KB = 1024;
+	//const int MB = KB*KB;
 
-	int claSizePerNode = (4 * modSpec.numRateCats * data->NChar() * sizeof(FLOAT_TYPE)) + (data->NChar() * sizeof(int));
-	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
-	int idealClas =  3 * total_size * numNodesPerIndiv;
+	//int claSizePerNode = (4 * modSpec.numRateCats * data->NChar() * sizeof(FLOAT_TYPE)) + (data->NChar() * sizeof(int));
+	//int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
+	//int idealClas =  3 * total_size * numNodesPerIndiv;
 
 	int L0=(int) (numNodesPerIndiv * total_size * 2);//a downward and one upward set for each tree
 	int L1=(int) (numNodesPerIndiv * total_size + 2*total_size + numNodesPerIndiv); //at least a downward set and a full root set for every tree, plus one other set
@@ -873,7 +912,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].mod->SetDefaultModelParameters(data);
 
 	//This is getting very complicated.  Here are the allowable combinations.
-	//streefname not specified (random or stepwise)
+	//streefname not specified (random , stepwise)
 		//Case 1 - no gblock in datafile
 		//Case 2 - found gblock in datafile
 	//streefname specified
@@ -900,7 +939,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 #ifdef INPUT_RECOMBINATION
 	if(0){
 #else
-	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0)){
+	if(conf->ReadTreeFromFile()){
 		//some starting file has been specified - Cases 3-11
 #endif
 		//we already checked in Setup whether NCL has trees for us.  A starting model in Garli block will
@@ -921,11 +960,11 @@ void Population::SeedPopulationWithStartingTree(int rep){
 				}
 			else throw ErrorException("Problem getting tree(s) from NCL!");
 			}
-		else if(strcmp(conf->streefname.c_str(), conf->datafname.c_str()) != 0 && !FileIsNexus(conf->streefname.c_str())){
+		else if(strcmp(conf->GetTreeFilename(), conf->datafname.c_str()) != 0 && !FileIsNexus(conf->GetTreeFilename())){
 			//cases 9-11 if the streef file is not the same as the datafile, and it isn't Nexus
 			//use the old garli starting model/tree format
-			outman.UserMessage("Obtaining starting conditions from file %s", conf->streefname.c_str());
-			indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank + rep - 1, data->NTax());
+			outman.UserMessage("Obtaining starting conditions from file %s", conf->GetTreeFilename());
+			indiv[0].GetStartingConditionsFromFile(conf->GetTreeFilename(), rank + rep - 1, data->NTax());
 			}
 		indiv[0].SetDirty();
 		}
@@ -951,9 +990,9 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		}
 
 	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
-
+	GeneralGamlConfig::StartingTree startMode = conf->GetStartMode();
 	//A random tree specified, or a starting file was specified but contained no tree
-	if(_stricmp(conf->streefname.c_str(), "stepwise") == 0){
+	if(startMode == GeneralGamlConfig::STEPWISE_ADDITION_START){
 		if(Tree::constraints.empty()) outman.UserMessage("creating likelihood stepwise addition starting tree...");
 		else outman.UserMessage("creating likelihood stepwise addition starting tree (compatible with constraints)...");
 		//5/20/08 If we're making a stepwise tree, we depend on the extern globalBest being zero to keep the optimization
@@ -965,15 +1004,18 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		globalBest = ZERO_POINT_ZERO;
 		indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 		}
-	else if(_stricmp(conf->streefname.c_str(), "random") == 0 || indiv[0].treeStruct == NULL){
+	else if( startMode == GeneralGamlConfig::RANDOM_START || indiv[0].treeStruct == NULL){
 		if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
 		else outman.UserMessage("creating random starting tree (compatible with constraints)...");
 		indiv[0].MakeRandomTree(data->NTax());
 		indiv[0].SetDirty();
 		}
+	else if(startMode == GeneralGamlConfig::INCOMPLETE_FROM_FILE_START){
+		
+		}
 
 	//Here we'll error out if something was fixed but didn't appear
-	if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
+	if(startMode == GeneralGamlConfig::RANDOM_START || startMode == GeneralGamlConfig::STEPWISE_ADDITION_START){
 		//if no streefname file was specified, the param values should be in a garli block with the dataset
 		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
@@ -981,10 +1023,17 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 		}
 	else{
-		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		const char * msg = 0L;
+		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile)
+			msg  = "state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!";
+		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile)
+			msg = "alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!";
+		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) 
+			msg = "proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!";
+		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) 
+			msg = "relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!";
+		if (msg)
+			throw ErrorException(msg, conf->GetTreeFilename(), conf->datafname.c_str());
 		}
 
 	assert(indiv[0].treeStruct != NULL);

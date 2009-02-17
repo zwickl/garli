@@ -19,6 +19,7 @@
 #ifndef CONFIGOPTIONS_H
 #define CONFIGOPTIONS_H
 
+#include <string.h>
 #include <string>
 
 using std::string;
@@ -44,7 +45,24 @@ class GeneralGamlConfig{
 
 	//starting the run
 	int randseed;
-	string streefname;
+
+	public:
+		enum StartingTree {
+			RANDOM_START,
+			STEPWISE_ADDITION_START,
+			FROM_FILE_START,
+			INCOMPLETE_FROM_FILE_START
+		};
+		StartingTree GetStartMode() const;
+		const char * GetTreeFilename() const;
+		bool ReadTreeFromFile() const {
+			StartingTree m = GetStartMode();
+			return (m == FROM_FILE_START || m == INCOMPLETE_FROM_FILE_START);
+		}
+	private:
+		string streefname;
+		string incompletetreefname;
+	public:
 	bool refineStart;
 
 	//general run details

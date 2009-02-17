@@ -18,9 +18,6 @@
 #ifndef _MODEL_
 #define _MODEL_
 
-#if !defined(_MSC_VER)
-#define _stricmp strcasecmp
-#endif
 
 #include <iostream>
 #include <cassert>
@@ -39,7 +36,7 @@ class MFILE;
 
 extern rng rnd;
 extern ModelSpecification modSpec;
-extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
+
 
 	enum{//the types
 		STATEFREQS = 1,
@@ -83,7 +80,7 @@ public:
 		maxv=mx;
 		fixed=false;
 		}
-	~BaseParameter(){};
+	virtual ~BaseParameter(){};
 /*	void Report(ostream &out){
 		out << "Type:\t" << name << "\n";
 		if(numElements > 1)
@@ -120,13 +117,14 @@ public:
 			if(b!=freqToChange) *vals[b] *= (FLOAT_TYPE)((1.0-newFreq)/(1.0-*vals[freqToChange]));
 		*vals[freqToChange]=newFreq;
 		}
+	virtual ~StateFrequencies(){}
 	};
 
 class RelativeRates:public BaseParameter{
 public:
 	// 5/9/06 now enforcing non-zero minimum relative rate to avoid problems in the linear algebra functions
 	RelativeRates(const char *c, FLOAT_TYPE **dv, int numE):BaseParameter(c, dv, RELATIVERATES, numE, (FLOAT_TYPE)1.0e-6, (FLOAT_TYPE)999.9){};
-
+	virtual ~RelativeRates(){}
 	void Mutator(FLOAT_TYPE mutationShape){
 		if(numElements > 1){
 			int rateToChange=int(rnd.uniform()*(numElements));
@@ -183,6 +181,8 @@ public:
 class RateProportions:public BaseParameter{
 public:
 	RateProportions(FLOAT_TYPE **dv, int numE):BaseParameter("Rate props", dv, RATEPROPS, numE, 1e-5, 0.999){};
+	virtual ~RateProportions(){}
+	
 	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
@@ -203,6 +203,8 @@ public:
 class RateMultipliers:public BaseParameter{
 public:
 	RateMultipliers(FLOAT_TYPE **dv, int numE):BaseParameter("Rate mults", dv, RATEMULTS, numE, (FLOAT_TYPE)1e-5, (FLOAT_TYPE)999.9){};
+	~RateMultipliers(){}
+	
 	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
@@ -213,6 +215,7 @@ public:
 class AlphaShape:public BaseParameter{
 public:
 	AlphaShape(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, ALPHASHAPE, 1, (FLOAT_TYPE)1e-5, (FLOAT_TYPE)999.9){};
+	virtual ~AlphaShape(){}
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
 		}
@@ -221,6 +224,7 @@ public:
 class ProportionInvariant:public BaseParameter{
 public:
 	ProportionInvariant(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0, (FLOAT_TYPE)1.0){};
+	virtual ~ProportionInvariant(){}
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
 		}
@@ -647,14 +651,22 @@ public:
 			}
 		}
 	void SetDataType(const char *str){
-		if(_stricmp(str, "codon") == 0) SetCodon();
-		else if(_stricmp(str, "codon-aminoacid") == 0) SetCodonAminoAcid();
-		else if(_stricmp(str, "aminoacid") == 0) SetAminoAcid();
-		else if(_stricmp(str, "protein") == 0) SetAminoAcid();
-		else if(_stricmp(str, "dna") == 0) str;
-		else if(_stricmp(str, "rna") == 0) SetRna();
-		else if(_stricmp(str, "nucleotide") == 0) str;
-		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, nucleotide)", str));
+		if(_stricmp(str, "codon") == 0)
+			SetCodon();
+		else if(_stricmp(str, "codon-aminoacid") == 0)
+			SetCodonAminoAcid();
+		else if(_stricmp(str, "aminoacid") == 0)
+			SetAminoAcid();
+		else if(_stricmp(str, "protein") == 0) 
+			SetAminoAcid();
+		else if(_stricmp(str, "dna") == 0) 
+			{;}
+		else if(_stricmp(str, "rna") == 0)
+			SetRna();
+		else if(_stricmp(str, "nucleotide") == 0)
+			{;}
+		else 
+			throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, nucleotide)", str));
 		}
 	void SetGeneticCode(const char *str){
 		if(datatype != DNA && datatype != RNA){
@@ -928,7 +940,7 @@ class Model{
 			}
 		}
 
-	void SetAlpha(int which, FLOAT_TYPE val){
+	void SetAlpha(int , FLOAT_TYPE val){
 		assert(modSpec.numRateCats > 1);
 		*alpha=val;
 		DiscreteGamma(rateMults, rateProbs, *alpha);

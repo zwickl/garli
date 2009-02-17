@@ -558,7 +558,7 @@ public:
 	~CodonData(){}
 
 	void FillCodonMatrixFromDNA(const NucleotideData *);
-	unsigned char CharToDatum(char c)  {
+	unsigned char CharToDatum(char )  {
 		//this shouldn't be getting called, as it makes no sense for codon data
 		assert(0);
 		return 0;
@@ -569,7 +569,7 @@ public:
 		//by the NCL
 		assert(0);
 		}
-	void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset){
+	void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet & ){
 		//this also should not be getting called.  The codon matrix
 		//is created from a DNA matrix that has been read in, possibly
 		//by the NCL

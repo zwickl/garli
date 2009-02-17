@@ -37,7 +37,7 @@ class ErrorException{
 		va_end(vl);
 		}
 
-	void Print(ostream &out){
+	void Print(ostream & ){
 		outman.UserMessage("ERROR!: %s\n\n", message);
 		//out << "ERROR!: " << message << endl << endl;
 		}

@@ -290,8 +290,8 @@ public:
 		inuse=false;
 #endif
 		}
-	void Report(ostream &out, int progTime){
 #ifdef ENABLE_CUSTOM_PROFILER
+	void Report(ostream &out, int progTime){
 	#ifdef _MSC_VER
 		FLOAT_TYPE seconds = totalTics/(FLOAT_TYPE)ticsPerSec.QuadPart;
 	#else
@@ -300,9 +300,11 @@ public:
 		out << setw( 10 ) << name.c_str() << "\t" << setw( 10 )<< numCalls << "\t";
 		out.precision(4);
 		out << setw( 10 ) << seconds << "\t" << setw( 10 ) << seconds/(FLOAT_TYPE)numCalls << "\t" << setw( 10 ) << seconds*100/(FLOAT_TYPE)progTime << endl;
-
-#endif
 		}
+#else
+	void Report(ostream & , int){
+		}
+#endif
 	};
 
 #endif //

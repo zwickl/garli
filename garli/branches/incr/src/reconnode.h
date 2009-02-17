@@ -267,7 +267,7 @@ public:
 		count++;	
 		}
 
-	int Count()const {
+	unsigned short Count()const {
 		return count;	
 		}
 
@@ -393,8 +393,9 @@ public:
 		IndexSwaps();
 
 		assert(swaps.size() == unique);
-		int tot=0;
-		for(list<Swap>::iterator it=swaps.begin();it != swaps.end(); it++) tot += (*it).Count();
+		unsigned tot=0;
+		for(list<Swap>::iterator it=swaps.begin();it != swaps.end(); it++)
+			tot += (*it).Count();
 		if(tot != total) throw ErrorException("problem reading swap checkpoint!");
 		}
 

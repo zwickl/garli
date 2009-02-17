@@ -78,7 +78,7 @@ class CondLikeArrayHolder{
 	bool tempReserved;
 	bool reserved;
 	CondLikeArray *theArray;
-	CondLikeArrayHolder() : theArray(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){}
+	CondLikeArrayHolder() : numAssigned(0), reclaimLevel(0), tempReserved(false), reserved(false), theArray(NULL) {}
 	~CondLikeArrayHolder() {};
 	int GetReclaimLevel() {return reclaimLevel;}
 	void SetReclaimLevel(int lvl) {reclaimLevel = lvl;}
