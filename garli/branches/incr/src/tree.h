@@ -128,6 +128,12 @@ class Tree{
 		//destructor
 		~Tree();
 
+		TreeNode *GetRoot() {
+			return root;
+			}
+		const TreeNode * GetRootConst() const {
+			return root;
+			}
 		//functions for manipulating and making trees
 		void AddRandomNode(int nodenum, int & );
 		void AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition *mask);

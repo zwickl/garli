@@ -99,8 +99,7 @@ class Individual
 			dirty=false;
 			}
 		void GetStartingConditionsFromFile(const char *fname, int rank, int nTax, bool restart=false);
-		void GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false);
-		void GetIncompleteStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false);
+		void GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false, bool demandAllTaxa=true);
 		void RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec);
 		void CalcFitness(int subtreeNode);
 		void ReadTreeFromFile(istream & inf);
@@ -121,6 +120,7 @@ class Individual
 		void MakeRandomTree(unsigned nTax);
 		void MakeStepwiseTree(unsigned nTax, unsigned attemptsPerTaxon, FLOAT_TYPE optPrecision );
 		void ContinueBuildingStepwiseTree(unsigned nTax, unsigned attachesPerTaxon, FLOAT_TYPE optPrecision, Individual & scratchI, std::set<unsigned> & taxset, int &placeInAllNodes, Bipartition & mask);
+		void FinishIncompleteTreeByStepwiseAddition(unsigned nTax, unsigned attachesPerTaxon, FLOAT_TYPE optPrecision , Individual & scratchI);
 	};
 
 
