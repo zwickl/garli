@@ -65,7 +65,7 @@ Individual::Individual()
 	willrecombine(false),
 	recombinewith(-1), 
 	parent(-1),
-	topo(-1) {
+	topologyInt(-1) {
 	 
  	treeStruct=NULL;
 	mod=new Model();
@@ -84,7 +84,7 @@ Individual::Individual(const Individual *other)
 	willrecombine(false),
 	recombinewith(-1), 
 	parent(-1),
-	topo(-1) {
+	topologyInt(-1) {
 
 	mod=new Model();
 	treeStruct=new Tree();
@@ -94,7 +94,7 @@ Individual::Individual(const Individual *other)
 	treeStruct->MimicTopo(other->treeStruct);
 	dirty=false;
 	treeStruct->lnL=other->fitness;
-	treeStruct->mod=mod;
+	treeStruct->SetModel(mod);
 	}
 
 Individual::~Individual(){
@@ -123,7 +123,7 @@ void Individual::CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const 
 	treeStruct->CopyClaIndeces(sourceOfInformation->treeStruct,CLAassigned);
 	dirty=false;
 	treeStruct->lnL=sourceOfInformation->fitness;
-	treeStruct->mod=mod;
+	treeStruct->SetModel(mod);
 	}
 
 void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
@@ -224,9 +224,9 @@ void Individual::CalcFitness(int subtreeNode){
 	}
 
 
-unsigned PopRandom(std::set<unsigned> indexSet, rng & rnd);
+unsigned PopRandom(std::set<unsigned> & indexSet, rng & rnd);
 
-unsigned PopRandom(std::set<unsigned> indexSet, rng & rnd) {
+unsigned PopRandom(std::set<unsigned> & indexSet, rng & rnd) {
 	assert (! indexSet.empty());
 	const unsigned pos = rnd.random_int( indexSet.size() );
 	unsigned i = 0;
@@ -287,10 +287,12 @@ void Individual::FinishIncompleteTreeByStepwiseAddition(unsigned nTax,
 														FLOAT_TYPE optPrecision , 
 														Individual & scratchI) {
 	assert(treeStruct == 0L);
-	treeStruct = new Tree();
-	treeStruct->AssignCLAsFromMaster();
+	this->treeStruct = new Tree();
+	this->treeStruct->AssignCLAsFromMaster();
 
 	Tree *scratchT = scratchI.treeStruct;
+	scratchT->SetModel(scratchI.mod);
+	this->treeStruct->SetModel(this->mod);
 	assert(scratchT != 0L);
 	
 	const unsigned n = nTax;
@@ -298,7 +300,7 @@ void Individual::FinishIncompleteTreeByStepwiseAddition(unsigned nTax,
 	for( unsigned i = 1; i <= n; i++ )
 		taxaIndicesToAdd.insert(i);
 		
-	int placeInAllNodes = n;
+	int placeInAllNodes = n + 1;
 	Bipartition mask; //mask is used for constrained trees
 	Bipartition temp;
 	
@@ -306,6 +308,9 @@ void Individual::FinishIncompleteTreeByStepwiseAddition(unsigned nTax,
 	//	all of the added leaves from our taxaIndicesToAdd.
 	
 	const TreeNode * nd = scratchT->GetRootConst();
+	assert(nd);
+	assert(nd->left);
+	nd = nd->left;
 	const TreeNode * tmpNd;
 	assert(nd != 0L);
 	std::stack<const TreeNode *> ndStack;
@@ -448,8 +453,14 @@ void Individual::ContinueBuildingStepwiseTree(unsigned nTax,
 	
 	unsigned i = nTax - taxaIndicesToAdd.size();
 	while (!taxaIndicesToAdd.empty()) {
+		outman.UserMessage("\nStill left to attach:\n");
+		for (std::set<unsigned>::const_iterator iIt = taxaIndicesToAdd.begin(); iIt != taxaIndicesToAdd.end(); ++iIt)
+			outman.UserMessage(" %d\n", *iIt);
 		//select a random node
 		unsigned k = PopRandom(taxaIndicesToAdd, rnd);
+		outman.UserMessage("\nAttaching %d. Still left to attach:\n", k);
+		for (std::set<unsigned>::const_iterator iIt = taxaIndicesToAdd.begin(); iIt != taxaIndicesToAdd.end(); ++iIt)
+			outman.UserMessage(" %d\n", *iIt);
 		//add the node randomly - this is a little odd, but for the existing swap collecting machinery
 		//to work right, the taxon to be added needs to already be in the tree
 		if(treeStruct->constraints.empty())
@@ -721,8 +732,8 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 
 void Individual::GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, 
 										int rank, 
-										int nTax, 
-										bool restart /*=false*/,
+										int , //nTax, 
+										bool , //restart, // = false
 										bool demandAllTaxa /* = true */) {
 	assert(treeStruct == NULL);
 
@@ -850,7 +861,7 @@ void Individual::CopyNonTreeFields(const Individual* ind ){
 	mod->CopyModel(ind->mod);
 	
 	dirty = ind->dirty;
-	topo=ind->topo;
+	SetTopo(ind->GetTopo());
 	}
 
 

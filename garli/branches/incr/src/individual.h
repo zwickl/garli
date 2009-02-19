@@ -85,10 +85,23 @@ class Individual
 		bool willreproduce;
 		bool willrecombine;
 		int recombinewith;
-		int parent,topo;
+		int parent;
+	private:
+		int topologyInt;
+	public:
 		Individual();
 		Individual(const Individual *other);
 		~Individual();
+
+		// getters and setters
+		const int GetTopo() const { 
+			return this->topologyInt;
+			}
+		const int SetTopo(int t) { 
+			this->topologyInt = t;
+			return t;
+			}
+
 
 		FLOAT_TYPE Fitness() const { return fitness; }
 		void SetDirty() { dirty = true; }

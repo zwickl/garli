@@ -3364,7 +3364,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 
 			blen2 = Rchild->dlen;
 			}
-
+		assert(mod);
 		mod->CalcPmats(blen1, blen2, Lprmat, Rprmat);
 
 		if(direction==DOWN) destCLA=GetClaDown(nd, false);
