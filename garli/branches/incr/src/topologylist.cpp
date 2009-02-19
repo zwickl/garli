@@ -79,7 +79,8 @@ int TopologyList::Allocate(int s/*=0*/)
 void TopologyList::RemoveInd(int i)
 {	int *temp=indNums;
 	nInds--;
-	while(*temp++!=i) i ;
+	while(*temp++!=i)
+		;
 	do	{*(temp-1)=*temp;
 		}
 	while(*(temp++-1)!=-1);
@@ -95,7 +96,8 @@ void TopologyList::AddInd(int i)
 void TopologyList::DecrementTopoFieldOfInds()
 {	for(int i=0;i<nInds;i++)
 		{assert(indNums[i]>=0);//TEMPORARY
-		listOfInd[indNums[i]].topo--;
+		Individual & tempInd(listOfInd[indNums[i]]);
+		tempInd.SetTopo(tempInd.GetTopo() - 1);
 		}
 }
 

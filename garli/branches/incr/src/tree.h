@@ -60,7 +60,9 @@ class Tree{
 
 	public:
 		FLOAT_TYPE lnL;	// holds likelihood score
+	private:
 		Model *mod;
+	public:
 		TreeNode *root;
 		TreeNode **allNodes;
 		ReconList sprRang;
@@ -128,11 +130,21 @@ class Tree{
 		//destructor
 		~Tree();
 
+		// getters and setters
 		TreeNode *GetRoot() {
 			return root;
 			}
 		const TreeNode * GetRootConst() const {
 			return root;
+			}
+		Model *GetModel() {
+			return this->mod;
+			}
+		Model *GetModelConst() const {
+			return this->mod;
+			}
+		void SetModel(Model *m) {
+			this->mod = m;
 			}
 		//functions for manipulating and making trees
 		void AddRandomNode(int nodenum, int & );

@@ -490,7 +490,7 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 		if(i<(int)total_size){
 			topologies[i]->AddInd(i);
 			TopologyList::ntoposexamined++;
-			indiv[i].topo=i;
+			indiv[i].SetTopo(i);
 			}
 		}
 
@@ -680,7 +680,7 @@ void Population::ApplyNSwaps(int numSwaps){
 	Individual *ind0 = &newindiv[0];
 
 	ind0->GetStartingConditionsFromFile(conf->GetTreeFilename(), 0, data->NTax());
-	ind0->treeStruct->mod = ind0->mod;
+	ind0->treeStruct->SetModel(ind0->mod);
 	//ind0->GetStartingConditionsFromNCL(	File(conf->streefname.c_str(), 0, data->NTax());
 
 	Individual *repResult = new Individual(ind0);
@@ -773,7 +773,7 @@ void Population::RunTests(){
 
 	//ind0->MakeRandomTree(data->NTax());
 	ind0->MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
-	ind0->treeStruct->mod=ind0->mod;
+	ind0->treeStruct->SetModel(ind0->mod);
 
 	//check that the score was correct coming out of MakeStepwiseTree
 	FLOAT_TYPE scr = ind0->treeStruct->lnL;
@@ -815,7 +815,7 @@ void Population::RunTests(){
 
 	ind1->treeStruct=new Tree();
 	ind1->CopySecByRearrangingNodesOfFirst(ind1->treeStruct, &newindiv[0]);
-	ind1->treeStruct->mod=ind1->mod;
+	ind1->treeStruct->SetModel(ind1->mod);
 
 	ind0->SetDirty();
 	ind0->CalcFitness(0);
@@ -962,6 +962,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 				if (startMode == GeneralGamlConfig::INCOMPLETE_FROM_FILE_START){
 					scratchIndividual.GetStartingTreeFromNCL(treesblock, (rank + rep - 1), data->NTax(), false, false);
 					outman.UserMessage("Obtained incomplete starting tree %d from Nexus", treeNum+1);
+					scratchIndividual.SetDirty();
 					}
 				else {
 					indiv[0].GetStartingTreeFromNCL(treesblock, (rank + rep - 1), data->NTax());
@@ -1027,6 +1028,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			outman.UserMessage("using stepwise addition to complete the starting tree (compatible with constraints)...");
 		globalBest = ZERO_POINT_ZERO;
 		indiv[0].FinishIncompleteTreeByStepwiseAddition(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision, scratchIndividual);
+		indiv[0].SetTopo(0);
 		}
 	else if( startMode == GeneralGamlConfig::RANDOM_START || indiv[0].treeStruct == NULL){
 		if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
@@ -1065,7 +1067,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].treeStruct->root->CheckforPolytomies();
 
 	indiv[0].treeStruct->CheckBalance();
-	indiv[0].treeStruct->mod=indiv[0].mod;
+	indiv[0].treeStruct->SetModel(indiv[0].mod);
 	indiv[0].CalcFitness(0);
 
 	//check the current likelihood now to know how accurate we can expect them to be later
@@ -1111,19 +1113,19 @@ exit(0);
 	for(unsigned i=1;i<total_size;i++){
 		if(indiv[i].treeStruct==NULL) indiv[i].treeStruct=new Tree();
 		indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].treeStruct->SetModel(indiv[i].mod);
 		}
 #else
 	for(unsigned i=1;i<conf->nindivs;i++){
 		if(indiv[i].treeStruct==NULL) indiv[i].treeStruct=new Tree();
 		indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].treeStruct->SetModel(indiv[i].mod);
 		}
 
 	//string inputs="sphinx.input6000.goodmod.tre";
 	for(unsigned i=conf->nindivs;i<total_size;i++){
 		indiv[i].GetStartingConditionsFromFile(conf->streefname.c_str(), i-conf->nindivs, data->NTax());
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].treeStruct->SetModel(indiv[i].mod);
 		indiv[i].SetDirty();
 		//indiv[i].RefineStartingConditions((adap->modWeight == ZERO_POINT_ZERO || modSpec.fixAlpha == true) == false, adap->branchOptPrecision);
 		indiv[i].CalcFitness(0);
@@ -1424,7 +1426,7 @@ void Population::ReadPopulationCheckpoint(){
 		indiv[i].treeStruct = new Tree();
 		indiv[i].treeStruct->ReadBinaryFormattedTree(pin);
 		indiv[i].treeStruct->AssignCLAsFromMaster();
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].treeStruct->SetModel(indiv[i].mod);
 		indiv[i].SetDirty();
 		indiv[i].treeStruct->root->CheckTreeFormation();
 		indiv[i].CalcFitness(0);
@@ -1439,7 +1441,7 @@ void Population::ReadPopulationCheckpoint(){
 		ind->treeStruct = new Tree();
 		ind->treeStruct->ReadBinaryFormattedTree(pin);
 		ind->treeStruct->AssignCLAsFromMaster();
-		ind->treeStruct->mod=ind->mod;
+		ind->treeStruct->SetModel(ind->mod);
 		ind->SetDirty();
 		ind->treeStruct->root->CheckTreeFormation();
 		ind->CalcFitness(0);
@@ -2582,7 +2584,7 @@ void Population::DetermineParentage(){
 					int ind=conf->nindivs+r;
 					recomSelect[r][0]=(FLOAT_TYPE)(ind);
 					if(ind==parent //don't recombine with your parent
-						|| (indiv[parent].topo == indiv[ind].topo) //don't recombine with another of the same topo
+						|| (indiv[parent].SetTopo(indiv[ind].GetTopo())) //don't recombine with another of the same topo
 						|| (indiv[ind].willrecombine == true))//don't recombine with someone who is already doing so
 						recomSelect[r][1]=-1e100;
 					else{
@@ -2607,7 +2609,7 @@ void Population::DetermineParentage(){
 					newindiv[i].recombinewith=curMate;
 					indiv[curMate].willrecombine=true;
 					//this will be a new topology, so mark it as topo -1.  This will be dealt with when we update the topolist
-					newindiv[i].topo=-1;
+					newindiv[i].SetTopo(-1);
 					}
 				for(int q=0;q<paraMan->nremotes;q++)
 					delete []recomSelect[q];
@@ -2635,7 +2637,7 @@ void Population::DetermineParentage(){
 					int ind=conf->nindivs+r;
 					recomSelect[r][0]=(FLOAT_TYPE)(ind);
 					if(ind==parent //don't recombine with your parent
-						|| (indiv[parent].topo == indiv[ind].topo) //don't recombine with another of the same topo
+						|| (indiv[parent].SetTopo(indiv[ind].GetTopo())) //don't recombine with another of the same topo
 						|| (indiv[ind].willrecombine == true))//don't recombine with someone who is already doing so
 						recomSelect[r][1]=-1e100;
 					else{
@@ -2660,7 +2662,7 @@ void Population::DetermineParentage(){
 					newindiv[i].recombinewith=curMate;
 					indiv[curMate].willrecombine=true;
 					//this will be a new topology, so mark it as topo -1.  This will be dealt with when we update the topolist
-					newindiv[i].topo=-1;
+					newindiv[i].SetTopo(-1);
 					}
 				for(int q=0;q<paraMan->nremotes;q++)
 					delete []recomSelect[q];
@@ -2673,8 +2675,8 @@ void Population::DetermineParentage(){
 #endif
 
 		newindiv[i].parent=parent;
-		if(newindiv[i].mutation_type==Individual::subtreeRecom) newindiv[i].topo=-1; //VERIFY
-		else newindiv[i].topo=indiv[parent].topo;
+		if(newindiv[i].mutation_type==Individual::subtreeRecom) newindiv[i].SetTopo(-1); //VERIFY
+		else newindiv[i].SetTopo(indiv[parent].GetTopo());
 		indiv[ parent ].willreproduce=true;
 		}
 	}
@@ -2687,9 +2689,9 @@ void Population::FindTreeStructsForNextGeneration(){
 		if( i < conf->nindivs && (indiv[newindiv[i].parent].reproduced||indiv[newindiv[i].parent].willrecombine )){
 			//See if there is another ind with the same topology that also will not recombine
 			int sot=-1;
-			if(topologies[indiv[newindiv[i].parent].topo]->nInds>1)//if this isn't the only individual of this topo
+			if(topologies[indiv[newindiv[i].parent].GetTopo()]->nInds>1)//if this isn't the only individual of this topo
 				do{
-					sot=topologies[indiv[newindiv[i].parent].topo]->GetNumberOfUnselectedInd();
+					sot=topologies[indiv[newindiv[i].parent].GetTopo()]->GetNumberOfUnselectedInd();
 					if( !(sot==newindiv[i].parent) && !(indiv[sot].reproduced) && !(indiv[sot].willrecombine)) break;
 					}while(sot!=-1);
 			if(sot>=0){
@@ -2733,7 +2735,7 @@ void Population::PerformMutation(int indNum){
 			beforeScore=par->Fitness();
 			NNIoptimization(indNum, 1);
 			if(beforeScore==ind->Fitness()){
-				topologies[ind->topo]->exNNItried=true;
+				topologies[ind->GetTopo()]->exNNItried=true;
 				}
 			//ind->accurateSubtrees=false;
 			break;
@@ -2824,17 +2826,17 @@ void Population::PerformMutation(int indNum){
 void Population::AssignNewTopology(Individual *indArray, int indNum){
 	assert(indArray == topologies[0]->GetListOfInd());
 	Individual *ind = &indArray[indNum];
-	if(ind->topo == -1){
-		ind->topo=ntopos++;
-		topologies[ind->topo]->AddInd(indNum);
+	if(ind->GetTopo() == -1){
+		ind->SetTopo(ntopos++);
+		topologies[ind->GetTopo()]->AddInd(indNum);
 		}
-	else if(topologies[ind->topo]->nInds>1){
-		topologies[ind->topo]->RemoveInd(indNum);
-		ind->topo=ntopos++;
-		topologies[ind->topo]->AddInd(indNum);
+	else if(topologies[ind->GetTopo()]->nInds>1){
+		topologies[ind->GetTopo()]->RemoveInd(indNum);
+		ind->SetTopo(ntopos++);
+		topologies[ind->GetTopo()]->AddInd(indNum);
 		}
-	topologies[ind->topo]->gensAlive=0;
-	assert(topologies[ind->topo]->nInds==1);
+	topologies[ind->GetTopo()]->gensAlive=0;
+	assert(topologies[ind->GetTopo()]->nInds==1);
 	TopologyList::ntoposexamined++;
 	}
 
@@ -2920,7 +2922,7 @@ void Population::OutputFate(){
 	    fate << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision;
 
 //some extra debugging info
-/*		fate << "\t" << indiv[i].topo << "\t";
+/*		fate << "\t" << indiv[i].GetTopo() << "\t";
 	    fate << indiv[i].treeStruct->calcs << "\t";
 	    indiv[i].treeStruct->calcs=0;
 	    int c, tr, r;
@@ -3416,8 +3418,8 @@ void Population::UpdateTopologyList(Individual *inds){
 	//BE SURE that conf->nindivs has been updated to the new size before calling this.
 	int new_topos=0;
 	for(unsigned i=0;i<total_size;i++){
-		if(inds[i].topo<0){
-			inds[i].topo=ntopos+new_topos++;
+		if(inds[i].GetTopo()<0){
+			inds[i].SetTopo(ntopos+new_topos++);
 			}
 		}
 	ntopos+=new_topos;
@@ -3426,20 +3428,20 @@ void Population::UpdateTopologyList(Individual *inds){
 	for(unsigned i=0;i<ntopos;i++)
 		topologies[i]->Clear();
 	for(unsigned i = 0; i <total_size; i++ )
-		topologies[inds[i].topo]->AddInd(i);
+		topologies[inds[i].GetTopo()]->AddInd(i);
 	CompactTopologiesList();
 	if(ntopos < total_size) assert(topologies[ntopos]->nInds == 0);
 	}
 
 void Population::RemoveFromTopologyList(Individual *ind){
-	topologies[ind->topo]->nInds--;
+	topologies[ind->GetTopo()]->nInds--;
 	ntopos--;
-	ind->topo=-1;
+	ind->SetTopo(-1);
 	}
 
 void Population::CheckIndividuals(){
 	for(unsigned i=0;i<conf->nindivs;i++){
-		assert(!(indiv[i].topo>(int)ntopos));
+		assert(!(indiv[i].GetTopo()>(int)ntopos));
 		}
 	}
 
@@ -3458,7 +3460,7 @@ void Population::TopologyReport(){
 		}
 	out << "ind\ttopo" << endl;
 	for(unsigned i=0;i<conf->nindivs;i++){
-		out << i << "\t" << indiv[i].topo << endl;
+		out << i << "\t" << indiv[i].GetTopo() << endl;
 		}
 	out.close();
 	}
@@ -3534,19 +3536,19 @@ int Population::ReplaceSpecifiedIndividuals(int count, int* which_array, const c
 		which = which_array[i];
 		Individual *ind=&indiv[which];
 		ind->treeStruct->RemoveTreeFromAllClas();
-		topologies[ind->topo]->RemoveInd(which);
-		ind->topo=-1;
+		topologies[ind->GetTopo()]->RemoveInd(which);
+		ind->SetTopo(-1);
 		ind->mutation_type=-1;
 
 		delete ind->treeStruct;
 		ind->treeStruct = new Tree(tree_strings, true);
 		ind->treeStruct->AssignCLAsFromMaster();
 		ind->mod->SetModel(model_string);
-		ind->treeStruct->mod=ind->mod;
+		ind->treeStruct->SetModel(ind->mod);
 
 		ind->SetDirty();
 		tree_strings += strlen(tree_strings)+1;
-		ind->treeStruct->mod=ind->mod;
+		ind->treeStruct->SetModel(ind->mod);
 		}
 	CompactTopologiesList();
 	UpdateTopologyList(indiv);
@@ -3650,17 +3652,17 @@ int Population::ReplicateSpecifiedIndividuals(int count, int* which, const char*
 		indiv[which[i]].treeStruct = new Tree(tree_string, true);
 		indiv[which[i]].treeStruct->AssignCLAsFromMaster();
 		indiv[which[i]].mod->SetModel(model_string);
-		indiv[which[i]].treeStruct->mod=indiv[which[i]].mod;
+		indiv[which[i]].treeStruct->SetModel(indiv[which[i]].mod);
 		indiv[which[i]].SetDirty();
-		indiv[which[i]].treeStruct->mod=indiv[which[i]].mod;
+		indiv[which[i]].treeStruct->SetModel(indiv[which[i]].mod);
 		}
 	return 0;
 }
 
 void Population::UpdateTreeModels(){
 	for(unsigned ind=0;ind<total_size;ind++){
-		newindiv[ind].treeStruct->mod=newindiv[ind].mod;
-//		indiv[ind].treeStruct->mod=indiv[ind].mod;
+		newindiv[ind].treeStruct->SetModel(newindiv[ind].mod);
+//		indiv[ind].treeStruct->SetModel(indiv[ind].mod);
 		}
 	}
 
@@ -3672,8 +3674,8 @@ void Population::OutputModelAddresses(){
 	ofstream mods("modeldeb.log", ios::app);
 
 	for(unsigned i=0;i<total_size;i++){
-		mods << "indiv " << i << "\t" << indiv[i].mod << "\t" << indiv[i].treeStruct->mod << "\n";
-		mods << "newindiv " << i << "\t" << newindiv[i].mod << "\t" << newindiv[i].treeStruct->mod << "\n";
+		mods << "indiv " << i << "\t" << indiv[i].mod << "\t" << indiv[i].treeStruct->GetModel() << "\n";
+		mods << "newindiv " << i << "\t" << newindiv[i].mod << "\t" << newindiv[i].treeStruct->GetModel() << "\n";
 		}
 	mods << endl;
 	}
@@ -3689,13 +3691,13 @@ void Population::NNIoptimization(){
 	//	}
 
 	if(topoChange==true){
-		if(topologies[indiv[bestIndiv].topo]->nInds>1){
-			topologies[indiv[bestIndiv].topo]->RemoveInd(bestIndiv);
-			indiv[bestIndiv].topo=ntopos++;
-			topologies[indiv[bestIndiv].topo]->AddInd(bestIndiv);
-			assert(topologies[indiv[bestIndiv].topo]->nInds==1);
+		if(topologies[indiv[bestIndiv].GetTopo()]->nInds>1){
+			topologies[indiv[bestIndiv].GetTopo()]->RemoveInd(bestIndiv);
+			indiv[bestIndiv].SetTopo(ntopos++);
+			topologies[indiv[bestIndiv].GetTopo()]->AddInd(bestIndiv);
+			assert(topologies[indiv[bestIndiv].GetTopo()]->nInds==1);
 			}
-		topologies[indiv[bestIndiv].topo]->gensAlive=0;
+		topologies[indiv[bestIndiv].GetTopo()]->gensAlive=0;
 		TopologyList::ntoposexamined++;
 		UpdateTopologyList(indiv);
 		}
@@ -4087,7 +4089,7 @@ void Population::TurnOffRatchet(){
 
 void Population::RestoreAllTimeBest(){
 	UpdateTopologyList(indiv);
-	topologies[indiv[0].topo]->RemoveInd(0);
+	topologies[indiv[0].GetTopo()]->RemoveInd(0);
 	CompactTopologiesList();
 	indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, allTimeBest, true);
 	indiv[0].treeStruct->AssignCLAsFromMaster();
@@ -4100,7 +4102,7 @@ void Population::RestoreAllTimeBest(){
 
 void Population::RestoreBestForPert(){
 	UpdateTopologyList(indiv);
-	topologies[indiv[0].topo]->RemoveInd(0);
+	topologies[indiv[0].GetTopo()]->RemoveInd(0);
 	CompactTopologiesList();
 	indiv[0].CopySecByRearrangingNodesOfFirst(indiv[0].treeStruct, bestSinceRestart, true);
 	indiv[0].treeStruct->AssignCLAsFromMaster();
@@ -4133,7 +4135,7 @@ void Population::StoreBestForPert(){
 		unusedTrees.pop_back();
 		}
 	bestSinceRestart->CopySecByRearrangingNodesOfFirst(bestSinceRestart->treeStruct, &indiv[bestIndiv]);
-	bestSinceRestart->topo=-1;
+	bestSinceRestart->SetTopo(-1);
 	//need to do this to be sure that the bestSinceRestart isn't tying up clas
 	bestSinceRestart->treeStruct->RemoveTreeFromAllClas();
 
@@ -4160,7 +4162,7 @@ void Population::StoreAllTimeBest(){
 		unusedTrees.pop_back();
 		}
 	allTimeBest->CopySecByRearrangingNodesOfFirst(allTimeBest->treeStruct, &indiv[bestIndiv]);
-	allTimeBest->topo=-1;
+	allTimeBest->SetTopo(-1);
 	//need to do this to be sure that the alltimebest isn't tying up clas
 	allTimeBest->treeStruct->RemoveTreeFromAllClas();
 	}
@@ -4888,16 +4890,16 @@ void Population::CheckSubtrees(){
 void Population::FillPopWithClonesOfBest(){
 	UpdateTopologyList(indiv);
 	Individual *best=&indiv[bestIndiv];
-	best->treeStruct->mod=best->mod;
+	best->treeStruct->SetModel(best->mod);
 	for(unsigned i=0;i<conf->nindivs;i++){
 		if(&indiv[i]!=best){
 			indiv[i].treeStruct->RemoveTreeFromAllClas();
-			topologies[indiv[i].topo]->RemoveInd(i);
+			topologies[indiv[i].GetTopo()]->RemoveInd(i);
 			indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct,best);
-			topologies[indiv[bestIndiv].topo]->AddInd(i);
+			topologies[indiv[bestIndiv].GetTopo()]->AddInd(i);
 			indiv[i].mutation_type=-1;
 			}
-		indiv[i].treeStruct->mod=indiv[i].mod;
+		indiv[i].treeStruct->SetModel(indiv[i].mod);
 		}
 	UpdateTopologyList(indiv);
 	CalcAverageFitness();
@@ -5891,13 +5893,13 @@ void Population::SPRoptimization(int indivIndex){
 		}
 
 */ /*	if(topoChange==true){
-		if(topologies[indiv[bestIndiv].topo]->nInds>1){
-			topologies[indiv[bestIndiv].topo]->RemoveInd(bestIndiv);
-			indiv[bestIndiv].topo=ntopos++;
-			topologies[indiv[bestIndiv].topo]->AddInd(bestIndiv);
-			assert(topologies[indiv[bestIndiv].topo]->nInds==1);
+		if(topologies[indiv[bestIndiv].GetTopo()]->nInds>1){
+			topologies[indiv[bestIndiv].GetTopo()]->RemoveInd(bestIndiv);
+			indiv[bestIndiv].SetTopo(ntopos++).SetTopo(ntopos++);
+			topologies[indiv[bestIndiv].GetTopo()]->AddInd(bestIndiv);
+			assert(topologies[indiv[bestIndiv].GetTopo()]->nInds==1);
 			}
-		topologies[indiv[bestIndiv].topo]->gensAlive=0;
+		topologies[indiv[bestIndiv].GetTopo()]->gensAlive=0;
 		TopologyList::ntoposexamined++;
 		UpdateTopologyList(indiv);
 		}
