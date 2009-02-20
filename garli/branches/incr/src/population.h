@@ -32,6 +32,7 @@ using namespace std;
 #include "stopwatch.h"
 #include "errorexception.h"
 
+void CatchInterrupt();
 class CondLikeArray;
 class TopologyList;
 class Tree;
@@ -269,6 +270,8 @@ class PerturbManager{
 class Population{
 
 private: 
+	FLOAT_TYPE CheckPrecision();
+
 	int rank;//denotes which processor this is.  0 if serial
 	int bestIndiv;
 	int bestAccurateIndiv;
@@ -400,6 +403,7 @@ private:
 		void WriteStoredTrees( const char* treefname );
 		void OutputRepNums(ofstream &out);
 		void GetRepNums(string &s);
+		void AddTaxonRunMode();
 		void PerformSearch();
 		int EvaluateStoredTrees(bool report);
 		void ClearStoredTrees();
@@ -512,7 +516,7 @@ private:
 		void RunTests();
 		void GenerateTreesOnly(int nTrees);
 		void ApplyNSwaps(int numSwaps);
-		void SwapToCompletion(FLOAT_TYPE optPrecision);
+		void SwapToCompletion(GarliRunMode, FLOAT_TYPE optPrecision);
 		void CheckForIncompatibleConfigEntries();
 
 		void Bootstrap();
@@ -525,5 +529,11 @@ private:
 		void CheckRemoteReplaceThresh();
 		void TurnOffRatchet();
 		unsigned Gen()const {return gen;}
-	};
+		void NextAddTaxonRound(const NxsFullTreeDescription & treeDesc,
+							   unsigned attachmentsPerTaxonVar,
+							   FLOAT_TYPE branchOptPrecisionVar, 
+							   Individual & scratchIndividual,
+							   unsigned repN,
+							   unsigned nReps);
+};
 #endif

@@ -211,24 +211,24 @@ void TreeNode::Prune()
 				}
 			else 
 				{assert(anc->left==prev && anc->right==next);
-		next->prev=prev;
-		prev->next=next;
-		assert(anc->left &&  anc->right);
-		TreeNode *temp;
+				next->prev=prev;
+				prev->next=next;
+				assert(anc->left &&  anc->right);
+				TreeNode *temp;
 				if(anc->left->left){
 					//anc->right->dlen+=anc->left->dlen;
-			temp=anc->left;
-			temp->SubstituteNodeWithRespectToAnc(temp->left);
-			anc->AddDes(temp->right);
-			temp->attached=false;
-			}
-		else
+					temp=anc->left;
+					temp->SubstituteNodeWithRespectToAnc(temp->left);
+					anc->AddDes(temp->right);
+					temp->attached=false;
+					}
+				else
 					if(anc->right->left){
 						//anc->left->dlen+=anc->right->dlen;
-				temp=anc->right;
-				temp->SubstituteNodeWithRespectToAnc(temp->left);
-				anc->AddDes(temp->right);
-				temp->attached=false;
+						temp=anc->right;
+						temp->SubstituteNodeWithRespectToAnc(temp->left);
+						anc->AddDes(temp->right);
+						temp->attached=false;
 						}
 				}
 		
@@ -277,7 +277,7 @@ int TreeNode::CountTerminals(int s){
 		s=right->CountTerminals(s);
 	return s;
 }
-
+	
 int TreeNode::CountTerminalsDown(int s, TreeNode *calledFrom){
 	TreeNode *sib;
 	

@@ -113,6 +113,7 @@ class Individual
 			}
 		void GetStartingConditionsFromFile(const char *fname, int rank, int nTax, bool restart=false);
 		void GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false, bool demandAllTaxa=true);
+		void ReadNxsFullTreeDescription(const NxsFullTreeDescription &t, bool demandAllTaxa=true);
 		void RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec);
 		void CalcFitness(int subtreeNode);
 		void ReadTreeFromFile(istream & inf);

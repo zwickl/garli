@@ -451,14 +451,15 @@ int main( int argc, char* argv[] )	{
 				return 0;
 				}
 
-			if(conf.runmode != 0){
-				if(conf.runmode == 1)
+			const GarliRunMode runMode = conf.GetRunMode();
+			if(runMode != NORMAL_RUN_MODE){
+				if(runMode == NSWAPS_RUN_MODE)
 					pop.ApplyNSwaps(10);
-				else if(conf.runmode == 7)
+				else if(runMode == NONREDUCING_VAR_START_RUN_MODE)
 					pop.VariableStartingTreeOptimization(false);
-				else if(conf.runmode == 9)
+				else if(runMode == REDUCING_VAR_START_RUN_MODE)
 					pop.VariableStartingTreeOptimization(true);
-				else if(conf.runmode == 8){
+				else if(runMode == SITE_RATES_RUN_MODE){
 #ifdef OPEN_MP
 					throw ErrorException("can't estimate site rates in openmp version!");
 #endif
@@ -467,11 +468,16 @@ int main( int argc, char* argv[] )	{
 #endif
 					pop.OptimizeSiteRates();
 					}
-				else if(conf.runmode > 20){
-					pop.GenerateTreesOnly(conf.runmode);
+				else if((unsigned) runMode >= (unsigned) GENERATE_TREES_RUNMODE){
+					pop.GenerateTreesOnly((unsigned)runMode);
 					}
-				else if(conf.runmode > 1)
-					pop.SwapToCompletion(conf.startOptPrec);
+				else if(runMode >= SWAPPER_BY_DIST_NOT_FURTHEST_RUN_MODE && runMode <= SWAPPER_BY_CUT_FURTHEST_RUN_MODE)
+					pop.SwapToCompletion(runMode, conf.startOptPrec);
+				else if(runMode == ADD_TAXON_RUN_MODE)
+					pop.AddTaxonRunMode();
+				else {
+					throw ErrorException("Unsupported runmode");
+					}
 				}
 			else{
 				if(pop.conf->restart) pop.ReadStateFiles();

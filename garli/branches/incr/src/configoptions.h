@@ -23,9 +23,23 @@
 #include <string>
 
 using std::string;
-
 #include "hashdefines.h"
-
+#include "defs.h"
+enum GarliRunMode {
+	NORMAL_RUN_MODE = 0,
+	NSWAPS_RUN_MODE = 1,
+	SWAPPER_BY_DIST_NOT_FURTHEST_RUN_MODE = 2,
+	SWAPPER_BY_CUT_NOT_FURTHEST_RUN_MODE = 3,
+	SWAPPER_RANDOM_RUN_MODE = 4,
+	SWAPPER_BY_DIST_FURTHEST_RUN_MODE = 5,
+	SWAPPER_BY_CUT_FURTHEST_RUN_MODE = 6,
+	NONREDUCING_VAR_START_RUN_MODE = 7,
+	SITE_RATES_RUN_MODE = 8,
+	REDUCING_VAR_START_RUN_MODE = 9,
+	ADD_TAXON_RUN_MODE = 10,
+	GENERATE_TREES_RUNMODE = 21
+	};
+		
 class GeneralGamlConfig{
 	public:
 	//these options will be the same regardless of whether a population is master or remote
@@ -75,8 +89,11 @@ class GeneralGamlConfig{
 	FLOAT_TYPE significantTopoChange;
 	string outgroupString;
 	unsigned searchReps;
-	unsigned runmode;
-
+	public:
+		GarliRunMode GetRunMode() const {return runmode;}
+	private:
+		GarliRunMode runmode;
+	public:
 	//finishing the run
 	bool enforceTermConditions;
 	unsigned lastTopoImproveThresh;

@@ -49,6 +49,37 @@ int GARLI_main( int argc, char* argv[] );
 
 extern OutputManager outman;
 
+
+unsigned GarliReader::GetNumTrees(const NxsTaxaBlock *taxa) const {
+	const NxsTaxaBlock * queryTaxa = (taxa ? taxa : this->GetTaxaBlock(0));
+	if (queryTaxa == 0L)
+		return 0;
+	const unsigned nTreesBlocks = this->GetNumTreesBlocks(taxa);
+	unsigned totalNTrees = 0;
+	for (unsigned i = 0; i < nTreesBlocks; ++i) {
+		const NxsTreesBlock * treesblock = this->GetTreesBlock(taxa, i);
+		totalNTrees += treesblock->GetNumTrees();
+		}
+	return totalNTrees;
+}
+
+
+const NxsFullTreeDescription * GarliReader::GetNxsFullTreeDescription(unsigned treeIndex) const {
+	const NxsTaxaBlock * taxa = this->GetTaxaBlock(0);
+	const unsigned nTreesBlocks = this->GetNumTreesBlocks(taxa);
+	unsigned currTree = 0;
+	for (unsigned i = 0; i < nTreesBlocks; ++i) {
+		const NxsTreesBlock * treesblock = this->GetTreesBlock(taxa, i);
+		const unsigned nTreesInBlock = treesblock->GetNumTrees();
+		if (currTree + nTreesInBlock > treeIndex ) {
+			const unsigned indexInBlock = treeIndex - currTree;
+			return &(treesblock->GetFullTreeDescription(indexInBlock));
+			}
+		currTree += nTreesInBlock;
+		}
+	return 0L;
+	}
+
 /*----------------------------------------------------------------------------------------------------------------------
 |	The constructor simply passes along `i' to the base class constructor. Nothing else needs to be done.
 */
@@ -232,6 +263,12 @@ void GarliReader::ExitingBlock(
 			case NxsCharactersBlock::continuous:
 				mess = " found continuous data...";
 				break;
+			case NxsCharactersBlock::codon:
+				mess = " unsupported codon datatype found" ;
+				break;
+			case NxsCharactersBlock::mixed:
+				mess = " unsupported mixed datatype found" ;
+				
 			}
 		}
 
@@ -391,7 +428,7 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &modsp
 	}
 
 //verifies that we got the right number/type of blocks and returns the Characters block to be used
-const NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec) const{
+const NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const ModelSpecification &) const{
 	const int numTaxaBlocks = GetNumTaxaBlocks();
 	if(numTaxaBlocks > 1) 
 		throw ErrorException("Either more than one taxa block was found in the data file\n\tor multiple blocks had different taxon sets.");
@@ -405,7 +442,7 @@ const NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const M
 	
 	//now check that we only have one of the charblock types that we want
 	int correctIndex = -1;
-	for(int c = 0;c < GetNumCharactersBlocks(taxablock);c++){
+	for(unsigned c = 0;c < GetNumCharactersBlocks(taxablock);c++){
 		const NxsCharactersBlock *charblock = GetCharactersBlock(taxablock, c);
 		if((charblock->GetDataType() == NxsCharactersBlock::dna || charblock->GetDataType() == NxsCharactersBlock::nucleotide)
 			&& (modSpec.IsNucleotide() || modSpec.IsCodon() || modSpec.IsCodonAminoAcid())){
@@ -650,7 +687,7 @@ void GarliReader::HandleExecute(
 		}
 	}
 
-int GarliReader::HandleExecute(const char *filename, bool purge)	
+int GarliReader::HandleExecute(const char *filename, bool )	
 	{
 	// The filename to execute is passed in
 	//
@@ -739,8 +776,7 @@ void GarliReader::HandleHelp(
 	}
 
 void GarliReader::HandleGarliReader(
-  NxsToken &token){	/* the token used to read from `in' */
-	
+  NxsToken &){	/* the token used to read from `in' */
 	}
 
 /*This would need to be rewritten for the new Factory/Multiformat system
@@ -1205,7 +1241,7 @@ void GarliBlock::Read(
 |	in the NxsBlock base class.
 */
 void GarliBlock::Report(
-  ostream &out)	const /* the output stream to which to write the report */
+  ostream &)	const /* the output stream to which to write the report */
 	{
 /*	message.clear();
 	PrintMessage();

@@ -43,6 +43,28 @@ extern int memLevel;
 extern int calcCount;
 extern OutputManager outman;
 
+
+
+unsigned PopRandom(std::set<unsigned> & indexSet, rng & rnd);
+
+// returns a random element from the set and removes the element.
+// 	Assumes that the set is not empty.
+unsigned PopRandom(std::set<unsigned> & indexSet, rng & rnd) {
+	assert (! indexSet.empty());
+	const unsigned pos = rnd.random_int( indexSet.size() );
+	unsigned i = 0;
+	std::set<unsigned>::iterator sIt = indexSet.begin();
+	for (; i != pos ; ++i, ++sIt)
+		{
+		assert(sIt != indexSet.end());
+		}
+	assert(sIt != indexSet.end());
+	const unsigned toReturn = *sIt;
+	indexSet.erase(sIt);
+	return toReturn;
+	}
+
+
 #define MUTUALLY_EXCLUSIVE_MUTS
 
 #undef VARIABLE_OPTIMIZATION
@@ -53,38 +75,37 @@ extern OutputManager outman;
 //
 //
 Individual::Individual()
-	:fitness(0.0),
-	dirty(1), 
-	mutation_type(0), 
-	mutated_brlen(0),
-	accurateSubtrees(0),
-	mod(0L),
-	treeStruct(0L),
-	reproduced(false),
-	willreproduce(false), 
-	willrecombine(false),
-	recombinewith(-1), 
-	parent(-1),
-	topologyInt(-1) {
-	 
+  :fitness(0.0),
+  dirty(1), 
+  mutation_type(0), 
+  mutated_brlen(0),
+  accurateSubtrees(0),
+  mod(0L),
+  treeStruct(0L),
+  reproduced(false),
+  willreproduce(false), 
+  willrecombine(false),
+  recombinewith(-1), 
+  parent(-1),
+  topologyInt(-1) { 
  	treeStruct=NULL;
 	mod=new Model();
 	}
 
 Individual::Individual(const Individual *other)
-	:fitness(0.0),
-	dirty(1), 
-	mutation_type(0), 
-	mutated_brlen(0),
-	accurateSubtrees(0),
-	mod(0L),
-	treeStruct(0L),
-	reproduced(false),
-	willreproduce(false), 
-	willrecombine(false),
-	recombinewith(-1), 
-	parent(-1),
-	topologyInt(-1) {
+  :fitness(0.0),
+  dirty(1), 
+  mutation_type(0), 
+  mutated_brlen(0),
+  accurateSubtrees(0),
+  mod(0L),
+  treeStruct(0L),
+  reproduced(false),
+  willreproduce(false), 
+  willrecombine(false),
+  recombinewith(-1), 
+  parent(-1),
+  topologyInt(-1) {
 
 	mod=new Model();
 	treeStruct=new Tree();
@@ -224,23 +245,6 @@ void Individual::CalcFitness(int subtreeNode){
 	}
 
 
-unsigned PopRandom(std::set<unsigned> & indexSet, rng & rnd);
-
-unsigned PopRandom(std::set<unsigned> & indexSet, rng & rnd) {
-	assert (! indexSet.empty());
-	const unsigned pos = rnd.random_int( indexSet.size() );
-	unsigned i = 0;
-	std::set<unsigned>::iterator sIt = indexSet.begin();
-	for (; i != pos ; ++i, ++sIt)
-		{
-		assert(sIt != indexSet.end());
-		}
-	assert(sIt != indexSet.end());
-	const unsigned toReturn = *sIt;
-	indexSet.erase(sIt);
-	return toReturn;
-	}
-
 
 void Individual::MakeRandomTree(unsigned nTax){
 	treeStruct=new Tree();
@@ -289,6 +293,10 @@ void Individual::FinishIncompleteTreeByStepwiseAddition(unsigned nTax,
 	assert(treeStruct == 0L);
 	this->treeStruct = new Tree();
 	this->treeStruct->AssignCLAsFromMaster();
+	
+	std::string modelString;
+	this->mod->FillGarliFormattedModelString(modelString);
+	scratchI.mod->ReadGarliFormattedModelString(modelString);
 
 	Tree *scratchT = scratchI.treeStruct;
 	scratchT->SetModel(scratchI.mod);
@@ -453,14 +461,9 @@ void Individual::ContinueBuildingStepwiseTree(unsigned nTax,
 	
 	unsigned i = nTax - taxaIndicesToAdd.size();
 	while (!taxaIndicesToAdd.empty()) {
-		outman.UserMessage("\nStill left to attach:\n");
-		for (std::set<unsigned>::const_iterator iIt = taxaIndicesToAdd.begin(); iIt != taxaIndicesToAdd.end(); ++iIt)
-			outman.UserMessage(" %d\n", *iIt);
 		//select a random node
 		unsigned k = PopRandom(taxaIndicesToAdd, rnd);
-		outman.UserMessage("\nAttaching %d. Still left to attach:\n", k);
-		for (std::set<unsigned>::const_iterator iIt = taxaIndicesToAdd.begin(); iIt != taxaIndicesToAdd.end(); ++iIt)
-			outman.UserMessage(" %d\n", *iIt);
+
 		//add the node randomly - this is a little odd, but for the existing swap collecting machinery
 		//to work right, the taxon to be added needs to already be in the tree
 		if(treeStruct->constraints.empty())
@@ -743,6 +746,10 @@ void Individual::GetStartingTreeFromNCL(const NxsTreesBlock *treesblock,
 	
 	//we will get the tree string from NCL with taxon numbers (starting at 1), regardless of how it was initially read in 
 	const NxsFullTreeDescription &t = treesblock->GetFullTreeDescription(effectiveRank);
+	this->ReadNxsFullTreeDescription(t, demandAllTaxa);
+	}
+
+void Individual::ReadNxsFullTreeDescription(const NxsFullTreeDescription &t, bool demandAllTaxa) {
 	if(demandAllTaxa && t.AllTaxaAreIncluded() == false)
 		throw ErrorException("Starting tree description must contain all taxa.");
 	string ts = t.GetNewick();

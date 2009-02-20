@@ -149,6 +149,10 @@ class GarliReader
 		//that were here are now further up in the inheritance chain and not part of my code
 		//char blocks
 	
+		// Expects a 0-based tree index. returns 0L if the tree is out of range
+		const NxsFullTreeDescription * GetNxsFullTreeDescription(unsigned treeIndex) const ;
+		// Returns the number of trees for the taxa block (first taxa block is used if none is specified).
+		unsigned 			GetNumTrees(const NxsTaxaBlock *taxa=0L) const ;
 	protected:
 		bool				inf_open;			/* true if `inf' is currently open */
 		bool				logf_open;			/* true if `logf' is currently open */

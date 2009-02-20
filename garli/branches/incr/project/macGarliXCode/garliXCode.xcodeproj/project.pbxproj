@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2D6276E70F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D6276E60F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp */; };
 		2DF842D40D25844F00FC557F /* adaptation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DF842950D25844F00FC557F /* adaptation.cpp */; };
 		2DF842D50D25844F00FC557F /* adaptation.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2DF842960D25844F00FC557F /* adaptation.h */; };
 		2DF842D60D25844F00FC557F /* bipartition.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DF842970D25844F00FC557F /* bipartition.cpp */; };
@@ -111,6 +112,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2D6276E60F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = addtaxonrunmode.cpp; sourceTree = "<group>"; };
 		2DF842950D25844F00FC557F /* adaptation.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = adaptation.cpp; sourceTree = "<group>"; };
 		2DF842960D25844F00FC557F /* adaptation.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = adaptation.h; sourceTree = "<group>"; };
 		2DF842970D25844F00FC557F /* bipartition.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = bipartition.cpp; sourceTree = "<group>"; };
@@ -203,6 +205,7 @@
 		2DF842940D25844F00FC557F /* src */ = {
 			isa = PBXGroup;
 			children = (
+				2D6276E60F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp */,
 				2DF842950D25844F00FC557F /* adaptation.cpp */,
 				2DF842960D25844F00FC557F /* adaptation.h */,
 				2DF842970D25844F00FC557F /* bipartition.cpp */,
@@ -338,6 +341,7 @@
 				2DF8430C0D25844F00FC557F /* translatetable.cpp in Sources */,
 				2DF8430E0D25844F00FC557F /* tree.cpp in Sources */,
 				2DF843100D25844F00FC557F /* treenode.cpp in Sources */,
+				2D6276E70F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
