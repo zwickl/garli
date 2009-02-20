@@ -215,6 +215,16 @@ Population::Population():
 	lastTopoImprove = 0;
 	lastPrecisionReduction = 0;
 	}
+	
+FLOAT_TYPE Population::CheckPrecision() {
+#ifdef SINGLE_PRECISION_FLOATS
+	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
+#else
+	Tree::expectedPrecision = pow(10.0, - (double) ((int) DBL_DIG - ceil(log10(-indiv[0].Fitness()))));
+#endif
+	return Tree::expectedPrecision;
+}
+
 
 void InterruptMessage( int )
 {
@@ -696,19 +706,19 @@ void Population::ApplyNSwaps(int numSwaps){
 	WriteStoredTrees("swapped.tre");
 	}
 
-void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
+void Population::SwapToCompletion(GarliRunMode runMode, FLOAT_TYPE optPrecision){
 	SeedPopulationWithStartingTree(currentSearchRep);
 	InitializeOutputStreams();
 
-	if(conf->runmode == 2)
+	if(runMode == SWAPPER_BY_DIST_NOT_FURTHEST_RUN_MODE)
 		indiv[0].treeStruct->DeterministicSwapperByDist(&indiv[0], optPrecision, conf->limSPRrange, false);
-	else if(conf->runmode == 3)
+	else if(runMode == SWAPPER_BY_CUT_NOT_FURTHEST_RUN_MODE)
 		indiv[0].treeStruct->DeterministicSwapperByCut(&indiv[0], optPrecision, conf->limSPRrange, false);
-	else if(conf->runmode == 4)
+	else if(runMode == SWAPPER_RANDOM_RUN_MODE)
 		indiv[0].treeStruct->DeterministicSwapperRandom(&indiv[0], optPrecision, conf->limSPRrange);
-	else if(conf->runmode == 5)
+	else if(runMode == SWAPPER_BY_DIST_FURTHEST_RUN_MODE)
 		indiv[0].treeStruct->DeterministicSwapperByDist(&indiv[0], optPrecision, conf->limSPRrange, true);
-	else if(conf->runmode == 6)
+	else if(runMode == SWAPPER_BY_CUT_FURTHEST_RUN_MODE)
 		indiv[0].treeStruct->DeterministicSwapperByCut(&indiv[0], optPrecision, conf->limSPRrange, true);
 
 	bestIndiv = 0;
@@ -904,7 +914,7 @@ void Population::GetConstraints(){
 		}
 	}
 
-void Population::SeedPopulationWithStartingTree(int rep){
+void Population::SeedPopulationWithStartingTree(int rep) {
 	for(unsigned i=0;i<total_size;i++){
 		if(indiv[i].treeStruct != NULL) indiv[i].treeStruct->RemoveTreeFromAllClas();
 		if(newindiv[i].treeStruct != NULL) newindiv[i].treeStruct->RemoveTreeFromAllClas();
@@ -1040,10 +1050,14 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	//Here we'll error out if something was fixed but didn't appear
 	if(startMode == GeneralGamlConfig::RANDOM_START || startMode == GeneralGamlConfig::STEPWISE_ADDITION_START){
 		//if no streefname file was specified, the param values should be in a garli block with the dataset
-		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) 
+			throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile)
+			throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile)
+			throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) 
+			throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 		}
 	else{
 		const char * msg = 0L;
@@ -1071,12 +1085,8 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].CalcFitness(0);
 
 	//check the current likelihood now to know how accurate we can expect them to be later
-#ifdef SINGLE_PRECISION_FLOATS
-	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
-#else
-	Tree::expectedPrecision = pow(10.0, - (double) ((int) DBL_DIG - ceil(log10(-indiv[0].Fitness()))));
-#endif
-	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
+	const FLOAT_TYPE ePrec = Population::CheckPrecision();
+	outman.UserMessage("expected likelihood precision = %.4e", ePrec);
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	if(indiv[0].mod->NumMutatableParams() == 0) {
@@ -1914,51 +1924,13 @@ void Population::Bootstrap(){
 		}
 	}
 
-/* OLD VERSION
-void Population::Bootstrap(){
-
-	data->ReserveOriginalCounts();
-
-	stopwatch.Start();
-	CatchInterrupt();
-
-	for(int rep=1;rep <= (int) conf->bootstrapReps;rep++){
-		lastTopoImprove = lastPrecisionReduction = gen = 0;
-		outman.UserMessage("bootstrap replicate %d (seed %d)", rep, rnd.seed());
-#ifdef MAC_FRONTEND
-		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-		[[MFEInterfaceClient sharedClient] didBeginBootstrapReplicate:rep];
-		[pool release];
-#endif
-		data->BootstrapReweight();
-
-		SeedPopulationWithStartingTree();
-		Run();
-
-		if(prematureTermination == false){
-			adap->branchOptPrecision = adap->startOptPrecision;
-			FinishBootstrapRep(rep);
-			outman.UserMessage("finished with bootstrap rep %d\n", rep);
-#ifdef MAC_FRONTEND
-			pool = [[NSAutoreleasePool alloc] init];
-			[[MFEInterfaceClient sharedClient] didCompleteBoostrapReplicate:rep];
-			[pool release];
-#endif
-			}
-		else {
-			outman.UserMessage("abandoning bootstrap rep %d ....terminating", rep);
-			break;
-			}
-		}
-	FinalizeOutputStreams();
-	}
-*/
 
 //this function manages multiple search replicates, setting up the population
 //and then calling Run().  It can be called either directly from main(), or
 //from Bootstrap()
 void Population::PerformSearch(){
-	if(conf->restart == false) currentSearchRep = 1;
+	if(conf->restart == false)
+		currentSearchRep = 1;
 	else{
 		outman.UserMessage("\nRestarting from checkpoint...");
 		if(finishedRep == true){
@@ -1976,7 +1948,8 @@ void Population::PerformSearch(){
 
 	for(;currentSearchRep<=conf->searchReps;currentSearchRep++){
 		string s;
-		if(conf->restart == false && currentSearchRep > 1) Reset();
+		if(conf->restart == false && currentSearchRep > 1)
+			Reset();
 
 		//ensure that the user can ctrl-c kill the program during creation of each stepwise addition tree
 		//the signal handling will be returned to the custom message below

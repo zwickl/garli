@@ -122,6 +122,8 @@ void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bo
 FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar);
 inline FLOAT_TYPE CallBranchLike(TreeNode *thisnode, Tree *thistree, FLOAT_TYPE blen, bool brak);
 
+
+
 //basic function to deal with the odd data string format that I use for nuc data
 const char *AdvanceDataPointer(const char *arr, int num){
 	for(int a=0;a<num;a++){

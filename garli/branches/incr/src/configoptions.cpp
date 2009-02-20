@@ -81,7 +81,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	significantTopoChange = (FLOAT_TYPE)0.01;
 	searchReps = 1;
 	//this isn't for general consumption, but lets me easily enable hacked in features
-	runmode = 0;
+	runmode = NORMAL_RUN_MODE;
 	
 	attachmentsPerTaxon = 50;
 
@@ -197,7 +197,9 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 		throw ErrorException("Sorry, the collapsebranches option can not currently be used with checkpointing");
 
 	cr.GetUnsignedNonZeroOption("searchreps", searchReps, true);
-	cr.GetUnsignedOption("runmode", runmode, true);
+	unsigned rm;
+	cr.GetUnsignedOption("runmode", rm, true);
+	this->runmode = GarliRunMode(rm);
 
 	//cr.GetBoolOption("useflexrates", useflexrates, true);
 	//cr.GetBoolOption("dontinferproportioninvariant", dontInferProportionInvariant, true);

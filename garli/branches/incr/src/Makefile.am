@@ -52,6 +52,7 @@ endif
 
 Garli@VERSION@_SOURCES = \
 	$(CUDASRCS) \
+	addtaxonrunmode.cpp \
 	adaptation.cpp \
 	bipartition.cpp \
 	condlike.cpp \
