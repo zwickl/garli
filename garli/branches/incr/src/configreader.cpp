@@ -33,6 +33,21 @@ int ConfigReader::UNKNOWN=0;
 int ConfigReader::SECTION=1;
 int ConfigReader::OPTION=2; 
 
+
+bool ParseLineIntoNameValue(const std::string & line, std::string & name, std::string & val) {
+	const size_t len = line.length();
+	const size_t index = line.find('=');
+	if (index < len) {
+		val = line.substr(index+1);
+		TrimWhiteSpace(val);
+		name = line.substr(0, index);
+		TrimWhiteSpace(name);
+		return true;
+	}
+	return false; 
+}
+
+
 ConfigReader::ConfigReader()	{
 
 }
@@ -268,128 +283,116 @@ int ConfigReader::GetStringOption(const char* _option, string& val, bool optiona
 	return rv;
 }
 
+
+bool ParseStringAsBool(const std::string & str, const char * optName) {
+	if (str == "true")
+		return true;
+	if (str == "false")
+		return false;
+	if(isdigit(str[0]) != 0){
+		return (atoi(str.c_str()) != 0);
+	throw ErrorException("expecting boolean (0 or 1) for entry \"%s\", found %s", optName, str.c_str());
+}
+
+int  ParseStringAsInt(const std::string & str, const char * optName) {
+	long dummy;
+	if (!NxsString::to_long(str.c_str(), &dummy))
+		throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
+	if(dummy > long(INT_MAX-1))
+		throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (INT_MAX-1));
+	int val = (int) dummy;
+	return val;
+}
+
+FLOAT_TYPE ParseStringAsDouble(const std::string & str, const char * optName) {
+	double dummy;
+	if (!NxsString::to_double(str.c_str(), &dummy))
+		throw ErrorException("entry for option \"%s\" (%s) is not an number" , option, str.c_str());
+	return FLOAT_TYPE(dummy);
+}
+
+unsigned ParseStringAsUnsigned(const std::string & str, const char * optName) {
+	int i = ParseStringAsInt(str, optName);
+	if (i < 0)
+		ErrorException("entry for option \"%s\" must be >=0", option);
+	return unsigned (i);
+}
+
+
 /****************************************************************************************/
 /*** GetBoolOption() ***/
 /****************************************************************************************/
 int ConfigReader::GetBoolOption(const char* option, bool& val, bool optional /*=false*/)	{
-	int rv;
 	string str;
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		// lower case it
-		for (int i = 0; i < (int)str.length(); ++i)
-			str[i] = tolower(str[i]);
- 
-		if (str == "true")
-			val = true;
-		else if (str == "false")
-			val = false;
-		else if(isdigit(str[0]) != 0){
-			if (atoi(str.c_str()) != 0)
-				val = true;
-			else val = false;
-			}
-		else 
-			throw ErrorException("expecting boolean (0 or 1) for entry \"%s\", found %s", option, str.c_str());
-
-		rv = 0;
+ 		val = ParseStringAsBool(str, option);
+		return 0;
 	}
-	else{
-		rv = -1;
-		if(!optional) throw ErrorException("could not find boolean configuration entry \"%s\"", option);
-		}
-		
-	return rv;
+	if (!optional)
+		throw ErrorException("could not find boolean configuration entry \"%s\"", option);
+	return -1;
 }
 
 /****************************************************************************************/
 /*** GetIntOption() ***/
 /****************************************************************************************/
 int ConfigReader::GetIntOption(const char* option, int& val, bool optional /*=false*/)	{
-	int rv;
 	string str;
-	FLOAT_TYPE dummy;//read into a FLOAT_TYPE first to check bounds
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		dummy = (FLOAT_TYPE) atof(str.c_str());
-		if(dummy > (INT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (INT_MAX-1));
-		if(fabs(dummy - (int)dummy) > 0.0) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
-		val = (int) dummy;
-		rv = 0;
+		val = ParseStringAsInt(str, option);
+		return 0;
 	}
-	else{
-		rv = -1;
-		if(!optional) throw ErrorException("could not find integer configuration entry \"%s\"", option);
-		}
-
-	return rv;
+	if(!optional)
+		throw ErrorException("could not find integer configuration entry \"%s\"", option);
+	return -1;
 }
 
 /****************************************************************************************/
 /*** GetIntNonZeroOption() ***/
 /****************************************************************************************/
 int ConfigReader::GetIntNonZeroOption(const char* option, int& val, bool optional /*=false*/)	{
-	int rv;
 	string str;
-	FLOAT_TYPE dummy;//read into a FLOAT_TYPE first to check bounds
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		dummy = (FLOAT_TYPE) atof(str.c_str());
-		if(dummy > (INT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (INT_MAX-1));
-		if(FloatingPointEquals(dummy, ZERO_POINT_ZERO, 1e-8)) throw ErrorException("entry for option \"%s\" cannot be zero", option);
-		if(!(FloatingPointEquals(dummy, (int)dummy, 1e-8))) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
-		val = (int) dummy;
-		rv = 0;
+		int dummy = ParseStringAsInt(str, option);
+		if (dummy == 0)
+			throw ErrorException("entry for option \"%s\" cannot be zero", option);
+		val = dummy;
+		return 0;
 	}
-	else{
-		rv = -1;
-		if(!optional) throw ErrorException("could not find integer configuration entry \"%s\"", option);
-		}
-
-	return rv;
+	if(!optional)
+		throw ErrorException("could not find integer configuration entry \"%s\"", option);
+	return -1;
 }
 
 /****************************************************************************************/
 /*** GetUnsignedOption() ***/
 /****************************************************************************************/
 int ConfigReader::GetUnsignedOption(const char* option, unsigned& val, bool optional /*=false*/)	{
-	int rv;
 	string str;
-	FLOAT_TYPE dummy;//read into a FLOAT_TYPE first to check sign and bounds
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		dummy = (FLOAT_TYPE) atof(str.c_str());
-		if(dummy < 0.0) throw ErrorException("entry for option \"%s\" must be >=0", option);
-		if(dummy > (UINT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (UINT_MAX-1));
-		if(fabs(dummy - (unsigned)dummy) > 0.0) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
-		val = (unsigned) dummy;
-		rv = 0;
+		val = ParseStringAsUnsigned(str, option);
+		return 0;
 	}
-	else{
-		rv = -1;
-		if(!optional) throw ErrorException("could not find unsigned integer configuration entry \"%s\"", option);
-		}
-
-	return rv;
+	if (!optional)
+		throw ErrorException("could not find unsigned integer configuration entry \"%s\"", option);
+	return -1;
 }
 
 /****************************************************************************************/
 /*** GetUnsignedOption() ***/
 /****************************************************************************************/
 int ConfigReader::GetUnsignedNonZeroOption(const char* option, unsigned& val, bool optional /*=false*/)	{
-	int rv;
 	string str;
-	FLOAT_TYPE dummy;//read into a FLOAT_TYPE first to check sign and bounds
 	if (GetStringOption(option, str, optional) == 0)	{  // option exists
-		dummy = (FLOAT_TYPE) atof(str.c_str());
-		if(!(dummy > 0.0)) throw ErrorException("entry for option \"%s\" must be >0", option);
-		if(dummy > (UINT_MAX-1)) throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (UINT_MAX-1));
-		if(!(FloatingPointEquals(dummy, (unsigned)dummy, 1e-8))) throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
-		val = (unsigned) dummy;
-		rv = 0;
+		unsigned u = ParseStringAsUnsigned(str, option);
+		if (u == 0)
+			throw ErrorException("entry for option \"%s\" must be >0", option);
+		val = u;
+		return 0;
 	}
-	else{
-		rv = -1;
-		if(!optional) throw ErrorException("could not find unsigned integer configuration entry \"%s\"", option);
-		}
-
-	return rv;
+	if (!optional)
+		throw ErrorException("could not find unsigned integer configuration entry \"%s\"", option);
+	return -1;
 }
 
 
@@ -601,7 +604,7 @@ int ConfigReader::ReadLine(FILE* file, string& line)	{
 	return (int)line.length();
 }
 
-void ConfigReader::TrimWhiteSpace(string& str)	{
+void TrimWhiteSpace(string& str)	{
 	int index;
 
 	if (str.length() == 0)

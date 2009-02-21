@@ -28,6 +28,14 @@
 typedef map<string, string> Options;
 typedef map<string, Options> Sections;
 
+bool ParseStringAsBool(const std::string & str, const char * optName);
+FLOAT_TYPE ParseStringAsDouble(const std::string & str, const char * optName);
+int  ParseStringAsInt(const std::string & str, const char * optName);
+unsigned ParseStringAsUnsigned(const std::string & str, const char * optName);
+
+bool ParseLineIntoNameValue(const std::string & line, std::string & name, std::string & val);
+void TrimWhiteSpace(string& str);
+
 class ConfigReader	{
 public:
 	ConfigReader();
@@ -75,7 +83,6 @@ private:
 	int ReadSectionOrOption(FILE* file, string& name, string& val);
 	int ReadLine(FILE* file, string& line);
 
-	void TrimWhiteSpace(string& str);
 
 	Sections sections;
 	string cur_section;
