@@ -74,6 +74,13 @@ class GeneralGamlConfig {
 			StartingTree m = GetStartMode();
 			return (m == FROM_FILE_START || m == INCOMPLETE_FROM_FILE_START);
 		}
+		bool		  IsValid() const;
+		bool		  ParseLineIntoConfigObject(const std::string line);		
+		bool  		* GetBoolOptReference(const char * n) ;
+		double 		* GetDoubleOptReference(const char * n) ;
+		int			* GetIntOptReference(const char * n);
+		std::string * GetStringOptReference(const char * n);
+		unsigned 	* GetUnsignedOptReference(const char * n);		
 	private:
 		string streefname;
 		string incompletetreefname;
@@ -91,9 +98,9 @@ class GeneralGamlConfig {
 	string outgroupString;
 	unsigned searchReps;
 	public:
-		GarliRunMode GetRunMode() const {return runmode;}
+		GarliRunMode GetRunMode() const {return GarliRunMode(runmode);}
 	private:
-		GarliRunMode runmode;
+		unsigned runmode;
 	public:
 	//finishing the run
 	bool enforceTermConditions;

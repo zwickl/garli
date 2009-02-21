@@ -50,6 +50,47 @@ const char * GeneralGamlConfig::GetTreeFilename() const {
 	return this->streefname.c_str();
 }
 
+bool GeneralGamlConfig::ParseLineIntoConfigObject(const std::string line) {
+	std::string value;
+	std::string name;
+	if (!ParseLineIntoNameValue(line, name, value))
+		throw ErrorException("Could not parse line \"%s\"", line.c_str());
+	const char * n = name.c_str();
+	bool * b = 0L;
+	double * d = 0L;
+	int * i = 0L;
+	std::string * s = 0L;
+	unsigned * u = 0L;
+	
+	b = GetBoolOptReference(n);
+	if (!b) {
+		d = GetDoubleOptReference(n);
+		if (!d) {
+			i = GetIntOptReference(n);
+			if (!i) {
+				s = GetStringOptReference(n);
+				if (!s) {
+					u = GetUnsignedOptReference(n);	
+				}
+			}
+		}
+	}
+	
+	if (b)
+		*b = ParseStringAsBool(value, n); 
+	else if (d)
+		*d = ParseStringAsDouble(value, n); 
+	else if (i)
+		*i = ParseStringAsInt(value, n); 
+	else if (s)
+		*s = value;	
+	else if (u)
+		*u = ParseStringAsUnsigned(value, n); 
+	else
+		throw ErrorException("Unknown option \"%s\"", n);
+
+	return this->IsValid();
+}
 
 
 GeneralGamlConfig::GeneralGamlConfig(){
