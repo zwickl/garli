@@ -21,6 +21,7 @@
 
 #include "garlireader.h"
 extern FLOAT_TYPE globalBest; // defined in population.cpp
+extern int optCalcs ; // defined in population.cpp
 
 bool ShouldWriteResults(bool prematureTermination, Population::output_details od, unsigned currRep, unsigned nReps);
 unsigned RefillTreeBuffer(GarliReader &reader, unsigned treeNum);
@@ -38,12 +39,24 @@ bool ShouldWriteResults(bool prematureTermination, Population::output_details od
 	}
 
 #if defined(SUBROUTINE_GARLI)
+
 void Population::AddTaxonRunMode() {
 	throw ErrorException("MPI support for the AddTaxonRunMode has not been added");
 }
 
-#else //defined(SUBROUTINE_GARLI)
+#elif defined (SWAP_BASED_TERMINATION)
 
+void Population::AddTaxonRunMode() {
+	throw ErrorException("SWAP_BASED_TERMINATION support for the AddTaxonRunMode has not been added");
+}
+
+#elif defined (BOINC) 
+
+void Population::AddTaxonRunMode() {
+	throw ErrorException("BOINC support for the AddTaxonRunMode has not been added");
+}
+
+#else
 void Population::AddTaxonRunMode() {
 	if (conf->restart)
 		throw ErrorException("Checkpointing is not supported in AddTaxonRunMode");
@@ -92,7 +105,7 @@ void Population::AddTaxonRunMode() {
 	string modelString;
 
 	unsigned totalNumTrees = numTrees;
-	for (;;) {
+	for (;!prematureTermination;) {
 		if (treeNum >= numTrees) {
 			treeNum = RefillTreeBuffer(reader, treeNum);
 			std::string newModelString = reader.GetModelString();
@@ -138,6 +151,8 @@ void Population::NextAddTaxonRound(const NxsFullTreeDescription & treeDescriptio
 								   unsigned repN,
 								   unsigned nReps)
 	{
+	stopwatch.Restart();
+	ResetTerminationVariables();
 	string s;
 	const unsigned nTax = data->NTax();
 	scratchIndividual.ReadNxsFullTreeDescription(treeDescription, false);
@@ -237,14 +252,10 @@ void Population::NextAddTaxonRound(const NxsFullTreeDescription & treeDescriptio
 
 	UpdateTopologyList(indiv);
 	CalcAverageFitness();
-#	ifndef BOINC
-		//3/24/08 moving this after SeedPop, since it disallows normal ctrl-c killing of runs during stepwise
-		CatchInterrupt();
-#	endif
 
-
-	Run();
-
+	//3/24/08 moving this after SeedPop, since it disallows normal ctrl-c killing of runs during stepwise
+	CatchInterrupt();
+	RunImplForAddTaxonRunMode();
 
 	//this rep is over
 	if (prematureTermination == false) {
@@ -328,3 +339,88 @@ void Population::NextAddTaxonRound(const NxsFullTreeDescription & treeDescriptio
 		WriteStateFiles();
 #	endif
 	}
+
+
+void Population::RunImplForAddTaxonRunMode() {
+	optCalcs=0;
+
+#	ifdef MAC_FRONTEND
+		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+		[[MFEInterfaceClient sharedClient] didBeginRun];
+		[pool release];
+#	endif
+
+	outman.precision(6);
+	outman.UserMessage("%-10s%-15s%-10s%-15s", "gen", "current_lnL", "precision", "last_tree_imp");
+	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+	OutputLog();
+	if(conf->outputMostlyUselessFiles) OutputFate();
+
+	CatchInterrupt();
+
+	gen++;
+	for (; gen < conf->stopgen+1; ++gen){
+
+		NextGeneration();
+
+		keepTrack();
+		if(conf->outputMostlyUselessFiles)
+			OutputFate();
+		if(conf->logevery > 0 && !(gen % conf->logevery))
+			OutputLog();
+		if(conf->saveevery > 0 && !(gen % conf->saveevery)) 
+			OutputSave();
+			
+
+		prematureTermination = CheckForUserSignal();
+		if(prematureTermination)
+			break;
+
+#		ifdef PERIODIC_SCORE_DEBUG
+			if(gen % 500 == 0 ||gen==1)
+				OutputFilesForScoreDebugging(&indiv[bestIndiv], tempGlobal++);
+#		endif
+
+#		ifdef NNI_SPECTRUM
+			if(gen % 1000 == 0 || gen==1)
+				NNISpectrum(bestIndiv);
+#		endif
+
+		if(!(gen%adap->intervalLength)) {
+			const ContinuationCode x = this->AdaptPrec();
+			if (x == FINISH_RUN)
+				break;
+			if (x == ABORT_IMMEDIATELY)
+				return;
+		}
+		if(conf->checkpoint==true && ((gen % conf->saveevery) == 0))
+			WriteStateFiles();
+
+		if(stopwatch.SplitTime() > (int)conf->stoptime){
+			outman.UserMessage("NOTE: ****Specified time limit (%d seconds) reached...", conf->stoptime);
+			prematureTermination = true;
+			break;
+			}
+		if(gen == conf->stopgen)
+			outman.UserMessage("NOTE: ****Specified generation limit (%d) reached...", conf->stopgen);
+#		ifdef INCLUDE_PERTURBATION
+			if(pertMan->pertAbandoned==true && pertMan->restartAfterAbandon==true && (gen - pertMan->lastPertGeneration > pertMan->gensBeforeRestart)){
+				params->starting_tree="";
+				pertMan->lastPertGeneration=gen;
+				pertMan->pertAbandoned=false;
+				pertMan->numPertsNoImprove=0;
+				bestSinceRestart.SetFitness(-1e100);
+				if(BestFitness() > allTimeBest.Fitness()) StoreAllTimeBest();
+				SeedPopulationWithStartingTree();
+				outman.UserMessage("restarting ....");
+				}
+#		endif
+		}
+
+	FinalOptimization();
+	gen = UINT_MAX;
+	OutputLog();
+
+	if(conf->bootstrapReps==0)
+		outman.UserMessage("finished");
+}

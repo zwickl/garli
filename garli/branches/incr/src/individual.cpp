@@ -290,9 +290,10 @@ void Individual::FinishIncompleteTreeByStepwiseAddition(unsigned nTax,
 														unsigned attachesPerTaxon, 
 														FLOAT_TYPE optPrecision , 
 														Individual & scratchI) {
-	assert(treeStruct == 0L);
-	this->treeStruct = new Tree();
-	this->treeStruct->AssignCLAsFromMaster();
+	if (treeStruct == 0L) {
+		this->treeStruct = new Tree();
+		this->treeStruct->AssignCLAsFromMaster();
+	}
 	
 	std::string modelString;
 	this->mod->FillGarliFormattedModelString(modelString);

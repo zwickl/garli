@@ -176,7 +176,97 @@ char AskUser(std::string s)
    }
 #endif
 
+// returns false to indicate termination condition reached
+ContinuationCode Population::AdaptPrec() {
+	outman.precision(10);
+	bool reduced=false;
+	if(gen-(max(lastTopoImprove, lastPrecisionReduction)) >= adap->intervalsToStore*adap->intervalLength){
+		//this allows the program to bail if numPrecReductions < 0, which can be handy to get to this point
+		//with checkpointing in and then restart from the same checkpoint with various values of numPrecReductions
+		if(adap->numPrecReductions < 0)
+			return ABORT_IMMEDIATELY;
+		reduced=adap->ReducePrecision();
+		}
+	if(reduced){
+		lastPrecisionReduction=gen;
+		FLOAT_TYPE before=bestFitness;
+		//under some conditions (very steep lopsided likelihood curve for branch lengths)
+		//the blen opt can actually make the score worse
 
+		indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
+		indiv[bestIndiv].SetDirty();
+		CalcAverageFitness();
+		outman.UserMessage("opt. precision reduced, optimizing branchlengths:%.4f -> %.4f", before, bestFitness);
+
+/*				if(modSpec.IsCodon()){
+			before=bestFitness;
+			indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
+			indiv[bestIndiv].SetDirty();
+			CalcAverageFitness();
+			outman.UserMessage("optimizing omega parameters:%.4f -> %.4f", before, bestFitness);
+			}
+*/				}
+
+	UpdateFractionDone();
+
+/*			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
+		FLOAT_TYPE before=bestFitness;
+		indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
+		indiv[bestIndiv].SetDirty();
+		CalcAverageFitness();
+		outman.UserMessage("optimizing branchlengths...\t%.4f %.4f", before, bestFitness);
+		}
+*/
+	//termination conditions
+
+	if(conf->enforceTermConditions == true) {
+		const bool betterImprove = gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh;
+#		ifdef SWAP_BASED_TERMINATION
+			const bool c = (gen - lastUniqueSwap > 200 || ( betterImprove|| FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))));
+#		else
+			const bool c = (betterImprove|| FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)));
+#		endif
+		if (c && (gen > adap->intervalsToStore * adap->intervalLength)
+			  && adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
+			  && (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)) {
+			if(adap->topoMutateProb > ZERO_POINT_ZERO)
+				outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
+			else
+				outman.UserMessage("Reached termination condition!\n");
+			outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
+			return FINISH_RUN;
+			}
+		}
+#ifdef INCLUDE_PERTURBATION
+	CheckPerturbSerial();
+#endif
+	return CONTINUE_RUN;
+	}
+
+
+void Population::OutputSave() {
+	if(best_output & WRITE_CONTINUOUS){
+		string outname = besttreefile;
+		outname += ".current";
+		WriteTreeFile( outname.c_str() );
+		}
+
+#	ifdef SWAP_BASED_TERMINATION
+		outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove, indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
+#	else
+		outman.UserMessage("%-10d%-15.4f%-10.3f%-8d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+#	endif
+
+
+	if(conf->outputMostlyUselessFiles){
+#		ifdef DETAILED_SWAP_REPORT
+			swapLog << gen << "\t";
+			indiv[bestIndiv].treeStruct->attemptedSwaps.SwapReport(swapLog);
+#		else
+			swapLog << gen << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique() << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetTotal() << endl;
+#		endif
+		}
+	}
 Population::Population(): 
 	bestIndiv(0),
 	subtreeDefNumber(0),
@@ -654,17 +744,21 @@ void Population::LoadNexusStartingConditions(){
 	if(reader.FoundModelString()) startingModelInNCL = true;
 	}
 
-//return population more or less to what it looked like just after Setup()
-void Population::Reset(){
-	if(adap != NULL) delete adap;
-	adap=new Adaptation(conf);
+
+void Population::ResetTerminationVariables() {
 	lastTopoImprove = lastPrecisionReduction = gen = 0;
 	//conf->restart indicates whether the current rep was restarted, so if we complete one rep and then
 	//move on to another it should be false
 	conf->restart = false;
 	finishedRep = false;
 	bestFitness = prevBestFitness = -(FLT_MAX);
-
+}
+//return population more or less to what it looked like just after Setup()
+void Population::Reset(){
+	if (adap != NULL)
+		delete adap;
+	adap=new Adaptation(conf);
+	ResetTerminationVariables();
 	for(unsigned i=0;i<total_size;i++){
 		if(indiv[i].treeStruct != NULL){
 			indiv[i].treeStruct->RemoveTreeFromAllClas();
@@ -1515,30 +1609,13 @@ void Population::Run(){
 			}
 #endif
 		keepTrack();
-		if(conf->outputMostlyUselessFiles) OutputFate();
-		if(conf->logevery > 0 && !(gen % conf->logevery)) OutputLog();
-		if(conf->saveevery > 0 && !(gen % conf->saveevery)){
-			if(best_output & WRITE_CONTINUOUS){
-				string outname = besttreefile;
-				outname += ".current";
-				WriteTreeFile( outname.c_str() );
-				}
+		if(conf->outputMostlyUselessFiles)
+			OutputFate();
+		if(conf->logevery > 0 && !(gen % conf->logevery))
+			OutputLog();
+		if(conf->saveevery > 0 && !(gen % conf->saveevery))
+			OutputSave();
 
-#ifdef SWAP_BASED_TERMINATION
-			outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove, indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
-#else
-			outman.UserMessage("%-10d%-15.4f%-10.3f%-8d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
-#endif
-
-			if(conf->outputMostlyUselessFiles){
-#ifdef DETAILED_SWAP_REPORT
-				swapLog << gen << "\t";
-				indiv[bestIndiv].treeStruct->attemptedSwaps.SwapReport(swapLog);
-#else
-				swapLog << gen << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique() << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetTotal() << endl;
-#endif
-				}
-			}
 #ifndef BOINC
 		prematureTermination = CheckForUserSignal();
 		if(prematureTermination) break;
@@ -1554,69 +1631,18 @@ void Population::Run(){
 			NNISpectrum(bestIndiv);
 #endif
 
-		if(!(gen%adap->intervalLength)){
-			outman.precision(10);
-			bool reduced=false;
-			if(gen-(max(lastTopoImprove, lastPrecisionReduction)) >= adap->intervalsToStore*adap->intervalLength){
-				//this allows the program to bail if numPrecReductions < 0, which can be handy to get to this point
-				//with checkpointing in and then restart from the same checkpoint with various values of numPrecReductions
-				if(adap->numPrecReductions < 0) return;
-				reduced=adap->ReducePrecision();
-				}
-			if(reduced){
-				lastPrecisionReduction=gen;
-				FLOAT_TYPE before=bestFitness;
-				//under some conditions (very steep lopsided likelihood curve for branch lengths)
-				//the blen opt can actually make the score worse
-
-				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-				indiv[bestIndiv].SetDirty();
-				CalcAverageFitness();
-				outman.UserMessage("opt. precision reduced, optimizing branchlengths:%.4f -> %.4f", before, bestFitness);
-
-/*				if(modSpec.IsCodon()){
-					before=bestFitness;
-					indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
-					indiv[bestIndiv].SetDirty();
-					CalcAverageFitness();
-					outman.UserMessage("optimizing omega parameters:%.4f -> %.4f", before, bestFitness);
-					}
-*/				}
-
-			UpdateFractionDone();
-
-/*			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
-				FLOAT_TYPE before=bestFitness;
-				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-				indiv[bestIndiv].SetDirty();
-				CalcAverageFitness();
-				outman.UserMessage("optimizing branchlengths...\t%.4f %.4f", before, bestFitness);
-				}
-*/
-			//termination conditions
-			if(conf->enforceTermConditions == true
-#ifdef SWAP_BASED_TERMINATION
-				&& (gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
-#else
-				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
-#endif
-				&& (gen > adap->intervalsToStore * adap->intervalLength)
-				&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
-				&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)){
-				if(adap->topoMutateProb > ZERO_POINT_ZERO) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
-				else outman.UserMessage("Reached termination condition!\n");
-				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
+		if(!(gen%adap->intervalLength)) {
+			ContinuationCode x = this->AdaptPrec();
+			if (x == FINISH_RUN)
 				break;
-				}
-
-#ifdef INCLUDE_PERTURBATION
-			CheckPerturbSerial();
-#endif
-			}
+			if (x == ABORT_IMMEDIATELY)
+				return;
+		}
 
 #ifndef BOINC
 			//non-BOINC checkpointing
-		if(conf->checkpoint==true && ((gen % conf->saveevery) == 0)) WriteStateFiles();
+		if(conf->checkpoint==true && ((gen % conf->saveevery) == 0))
+			WriteStateFiles();
 #endif
 
 #ifdef BOINC

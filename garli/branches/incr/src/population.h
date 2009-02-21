@@ -33,11 +33,20 @@ using namespace std;
 #include "errorexception.h"
 
 void CatchInterrupt();
+bool CheckForUserSignal();
+
 class CondLikeArray;
 class TopologyList;
 class Tree;
 class ClaManager;
 class Adaptation;
+
+enum ContinuationCode {
+	CONTINUE_RUN,
+	FINISH_RUN,
+	ABORT_IMMEDIATELY
+	
+};
 
 class Subtree{
 	public:
@@ -509,6 +518,7 @@ private:
 		void OutputFate();
 		void OutputLog();
 		void OutputModelReport();
+		void OutputSave();
 
 		void OutputModelAddresses();
 		void OutputClaReport(Individual *arr);
@@ -529,6 +539,12 @@ private:
 		void CheckRemoteReplaceThresh();
 		void TurnOffRatchet();
 		unsigned Gen()const {return gen;}
+		
+		
+		ContinuationCode AdaptPrec();
+		// functions hacked in to support the addtaxon run mode
+		void ResetTerminationVariables();
+		void RunImplForAddTaxonRunMode();
 		void NextAddTaxonRound(const NxsFullTreeDescription & treeDesc,
 							   unsigned attachmentsPerTaxonVar,
 							   FLOAT_TYPE branchOptPrecisionVar, 

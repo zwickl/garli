@@ -123,6 +123,94 @@ FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar);
 inline FLOAT_TYPE CallBranchLike(TreeNode *thisnode, Tree *thistree, FLOAT_TYPE blen, bool brak);
 
 
+void Tree::CopyClaIndeces(const Tree *from, bool remove){
+	//the bool argument "remove" designates whether the tree currently has cla arrays
+	//assigned to it or not (if not, it must have come from the unused tree vector)
+
+	//do the clas down
+	if((allNodes[0]->claIndexDown != -1) && remove)
+		claMan->DecrementCla(allNodes[0]->claIndexDown);
+	allNodes[0]->claIndexDown=from->allNodes[0]->claIndexDown;
+	if(allNodes[0]->claIndexDown != -1)
+		claMan->IncrementCla(allNodes[0]->claIndexDown);
+	
+#ifdef EQUIV_CALCS
+	if(from->dirtyEQ == false){
+		memcpy(allNodes[0]->tipData, from->allNodes[0]->tipData, data->NChar()*sizeof(char));
+		for(int i=numTipsTotal+1;i<numNodesTotal;i++)
+			memcpy(allNodes[i]->tipData, from->allNodes[i]->tipData, data->NChar()*sizeof(char));
+		dirtyEQ = false;
+		}
+	else dirtyEQ = true;
+#endif
+
+	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		if(remove && (allNodes[i]->claIndexDown != -1))
+			claMan->DecrementCla(allNodes[i]->claIndexDown);
+		allNodes[i]->claIndexDown=from->allNodes[i]->claIndexDown;
+		if(allNodes[i]->claIndexDown != -1)
+			claMan->IncrementCla(allNodes[i]->claIndexDown);
+		}
+		
+	//do the clas up left
+	if(remove && (allNodes[0]->claIndexUL != -1))
+		claMan->DecrementCla(allNodes[0]->claIndexUL);
+	allNodes[0]->claIndexUL=from->allNodes[0]->claIndexUL;
+	if(allNodes[0]->claIndexUL != -1)
+		claMan->IncrementCla(allNodes[0]->claIndexUL);
+	
+	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		if(remove && (allNodes[i]->claIndexUL != -1))
+			claMan->DecrementCla(allNodes[i]->claIndexUL);
+		allNodes[i]->claIndexUL=from->allNodes[i]->claIndexUL;
+		if(allNodes[i]->claIndexUL != -1)
+			claMan->IncrementCla(allNodes[i]->claIndexUL);
+		}
+	
+	//do the clas up right
+	if(remove && (allNodes[0]->claIndexUR != -1))
+		claMan->DecrementCla(allNodes[0]->claIndexUR);
+	allNodes[0]->claIndexUR=from->allNodes[0]->claIndexUR;
+	if(allNodes[0]->claIndexUR != -1)
+		claMan->IncrementCla(allNodes[0]->claIndexUR);
+		
+	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		if(remove && (allNodes[i]->claIndexUR != -1))
+			claMan->DecrementCla(allNodes[i]->claIndexUR);
+		allNodes[i]->claIndexUR=from->allNodes[i]->claIndexUR;
+		if(allNodes[i]->claIndexUR != -1)
+			claMan->IncrementCla(allNodes[i]->claIndexUR);
+		}
+	}
+
+void Tree::RemoveTreeFromAllClas(){
+	if(root->claIndexDown != -1){
+		claMan->DecrementCla(root->claIndexDown);
+		root->claIndexDown=-1;
+		}
+	if(root->claIndexUL != -1){
+		claMan->DecrementCla(root->claIndexUL);
+		root->claIndexUL=-1;
+		}
+	if(root->claIndexUR != -1){	
+		claMan->DecrementCla(root->claIndexUR);
+		root->claIndexUR=-1;
+		}
+	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		if(allNodes[i]->claIndexDown != -1){
+			claMan->DecrementCla(allNodes[i]->claIndexDown);
+			allNodes[i]->claIndexDown=-1;
+			}
+		if(allNodes[i]->claIndexUL != -1){
+			claMan->DecrementCla(allNodes[i]->claIndexUL);
+			allNodes[i]->claIndexUL=-1;
+			}
+		if(allNodes[i]->claIndexUR != -1){
+			claMan->DecrementCla(allNodes[i]->claIndexUR);
+			allNodes[i]->claIndexUR=-1;
+			}
+		}
+	}
 
 //basic function to deal with the odd data string format that I use for nuc data
 const char *AdvanceDataPointer(const char *arr, int num){
@@ -1164,7 +1252,8 @@ int Tree::SubtreeBasedRecombination( Tree *t, int recomNodeNum, bool sameModel, 
 	if(tempnext) tempnext->prev=tonode;
 	if(tempprev) tempprev->next=tonode;
 	MimicTopo(fromnode, 1, sameModel);
-	if(sameModel==true) CopyClaIndecesInSubtree(fromnode, true);
+	if(sameModel==true)
+		CopyClaIndecesInSubtree(fromnode, true);
 	else DirtyNodesInSubtree(tonode);
 
 	SweepDirtynessOverTree(tonode);
@@ -1343,7 +1432,8 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 		if(tempnext) tempnext->prev=tonode;
 		if(tempprev) tempprev->next=tonode;
 		MimicTopo(fromnode, 1, sameModel);
-		if(sameModel==true) CopyClaIndecesInSubtree(fromnode, true);
+		if(sameModel==true) 
+			CopyClaIndecesInSubtree(fromnode, true);
 		else DirtyNodesInSubtree(tonode);
 
 		//try branch length optimization of tonode's branch, to make sure it fits in it's new tree background
@@ -3039,8 +3129,10 @@ void Tree::CopyClaIndecesInSubtree(const TreeNode *from, bool remove){
 	allNodes[from->nodeNum]->claIndexUR=from->claIndexUR;
 	if(allNodes[from->nodeNum]->claIndexUR != -1) claMan->IncrementCla(allNodes[from->nodeNum]->claIndexUR);
 
-	if(from->left->IsInternal()) CopyClaIndecesInSubtree(from->left, remove);
-	if(from->right->IsInternal()) CopyClaIndecesInSubtree(from->right, remove);
+	if(from->left->IsInternal())
+		CopyClaIndecesInSubtree(from->left, remove);
+	if(from->right->IsInternal())
+		CopyClaIndecesInSubtree(from->right, remove);
 	}
 
 void Tree::DirtyNodesInSubtree(TreeNode *nd){

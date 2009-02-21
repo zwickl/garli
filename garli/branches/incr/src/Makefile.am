@@ -57,6 +57,7 @@ Garli@VERSION@_SOURCES = \
 	bipartition.cpp \
 	condlike.cpp \
 	configoptions.cpp \
+	configoptionsauto.cpp \
 	configreader.cpp \
 	datamatr.cpp \
 	funcs.cpp \
