@@ -24,9 +24,13 @@ extern FLOAT_TYPE globalBest; // defined in population.cpp
 extern int optCalcs ; // defined in population.cpp
 
 bool ShouldWriteResults(bool prematureTermination, Population::output_details od, unsigned currRep, unsigned nReps);
-unsigned RefillTreeBuffer(GarliReader &reader, unsigned treeNum);
 
-unsigned RefillTreeBuffer(GarliReader &, unsigned treeNum) {
+
+unsigned Population::RefillTreeBuffer(GarliReader &, unsigned treeNum) {
+	GeneralGamlConfig c(*(this->conf));
+	std::string nextLine;
+	std::getline(std::cin, nextLine);
+	const AttemptedParseResult parseResult = c.ParseLineIntoConfigObject(nextLine);
 	return treeNum;
 }
 	

@@ -40,7 +40,8 @@ enum GarliRunMode {
 	ADD_TAXON_RUN_MODE = 10,
 	GENERATE_TREES_RUNMODE = 21
 	};
-		
+typedef std::pair<std::string, std::string> KeyValueStringPair;
+typedef std::pair<bool, KeyValueStringPair> AttemptedParseResult;
 class GeneralGamlConfig {
 	public:
 	//these options will be the same regardless of whether a population is master or remote
@@ -75,7 +76,8 @@ class GeneralGamlConfig {
 			return (m == FROM_FILE_START || m == INCOMPLETE_FROM_FILE_START);
 		}
 		bool		  IsValid() const;
-		bool		  ParseLineIntoConfigObject(const std::string line);		
+		
+		AttemptedParseResult ParseLineIntoConfigObject(const std::string line);		
 		bool  		* GetBoolOptReference(const char * n) ;
 		double 		* GetDoubleOptReference(const char * n) ;
 		int			* GetIntOptReference(const char * n);
@@ -188,13 +190,14 @@ class GeneralGamlConfig {
 
  	// methods
 	GeneralGamlConfig();
+	GeneralGamlConfig(const GeneralGamlConfig &);
 	int Read(const char*, bool isMaster=false);
 	int Serialize(char**, int*) const;
 	int Deserialize(char*, int);
 	bool operator==(const GeneralGamlConfig&) const;
 	};
 		
-class MasterGamlConfig: public GeneralGamlConfig{
+class MasterGamlConfig : public GeneralGamlConfig{
 	public:
 	//parallel behavior parameters-stored in pop->paraMan on master only
 	FLOAT_TYPE startUpdateThresh;
@@ -227,6 +230,10 @@ class MasterGamlConfig: public GeneralGamlConfig{
 
  	// methods
 	MasterGamlConfig();
+	MasterGamlConfig(const MasterGamlConfig & other)
+		:GeneralGamlConfig(other) {
+		*this = other;
+	}
 	int Read(const char*, bool isMaster=false);
 	};
 

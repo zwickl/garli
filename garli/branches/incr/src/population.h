@@ -542,7 +542,9 @@ private:
 		
 		
 		ContinuationCode AdaptPrec();
+		
 		// functions hacked in to support the addtaxon run mode
+		unsigned RefillTreeBuffer(GarliReader &reader, unsigned treeNum);
 		void ResetTerminationVariables();
 		void RunImplForAddTaxonRunMode();
 		void NextAddTaxonRound(const NxsFullTreeDescription & treeDesc,
