@@ -25,6 +25,7 @@
 using std::string;
 #include "hashdefines.h"
 #include "defs.h"
+
 enum GarliRunMode {
 	NORMAL_RUN_MODE = 0,
 	NSWAPS_RUN_MODE = 1,
@@ -40,7 +41,7 @@ enum GarliRunMode {
 	GENERATE_TREES_RUNMODE = 21
 	};
 		
-class GeneralGamlConfig{
+class GeneralGamlConfig {
 	public:
 	//these options will be the same regardless of whether a population is master or remote
 
