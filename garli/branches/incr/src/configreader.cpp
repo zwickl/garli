@@ -289,7 +289,7 @@ bool ParseStringAsBool(const std::string & str, const char * optName) {
 		return true;
 	if (str == "false")
 		return false;
-	if(isdigit(str[0]) != 0){
+	if(isdigit(str[0]) != 0)
 		return (atoi(str.c_str()) != 0);
 	throw ErrorException("expecting boolean (0 or 1) for entry \"%s\", found %s", optName, str.c_str());
 }
@@ -297,9 +297,9 @@ bool ParseStringAsBool(const std::string & str, const char * optName) {
 int  ParseStringAsInt(const std::string & str, const char * optName) {
 	long dummy;
 	if (!NxsString::to_long(str.c_str(), &dummy))
-		throw ErrorException("entry for option \"%s\" (%s) is not an integer" , option, str.c_str());
+		throw ErrorException("entry for option \"%s\" (%s) is not an integer" , optName, str.c_str());
 	if(dummy > long(INT_MAX-1))
-		throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , option, str.c_str(), (INT_MAX-1));
+		throw ErrorException("entry for option \"%s\" (%s) is greater than its max (%u)" , optName, str.c_str(), (INT_MAX-1));
 	int val = (int) dummy;
 	return val;
 }
@@ -307,14 +307,14 @@ int  ParseStringAsInt(const std::string & str, const char * optName) {
 FLOAT_TYPE ParseStringAsDouble(const std::string & str, const char * optName) {
 	double dummy;
 	if (!NxsString::to_double(str.c_str(), &dummy))
-		throw ErrorException("entry for option \"%s\" (%s) is not an number" , option, str.c_str());
+		throw ErrorException("entry for option \"%s\" (%s) is not an number" , optName, str.c_str());
 	return FLOAT_TYPE(dummy);
 }
 
 unsigned ParseStringAsUnsigned(const std::string & str, const char * optName) {
 	int i = ParseStringAsInt(str, optName);
 	if (i < 0)
-		ErrorException("entry for option \"%s\" must be >=0", option);
+		ErrorException("entry for option \"%s\" must be >=0", optName);
 	return unsigned (i);
 }
 
