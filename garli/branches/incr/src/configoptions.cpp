@@ -40,6 +40,11 @@ GeneralGamlConfig::StartingTree GeneralGamlConfig::GetStartMode() const {
 	return FROM_FILE_START;
 }
 
+GeneralGamlConfig::GeneralGamlConfig(const GeneralGamlConfig &other) {
+	*this = other;
+}
+
+
 const char * GeneralGamlConfig::GetTreeFilename() const {
 	StartingTree m = GetStartMode();
 	if (m == FROM_FILE_START)
@@ -50,9 +55,11 @@ const char * GeneralGamlConfig::GetTreeFilename() const {
 	return this->streefname.c_str();
 }
 
-bool GeneralGamlConfig::ParseLineIntoConfigObject(const std::string line) {
-	std::string value;
-	std::string name;
+AttemptedParseResult  GeneralGamlConfig::ParseLineIntoConfigObject(const std::string line) {
+ 	AttemptedParseResult result(false, KeyValueStringPair());
+	KeyValueStringPair & kvp(result.second);
+	std::string & name(kvp.first);
+	std::string & value(kvp.second);
 	if (!ParseLineIntoNameValue(line, name, value))
 		throw ErrorException("Could not parse line \"%s\"", line.c_str());
 	const char * n = name.c_str();
@@ -87,9 +94,9 @@ bool GeneralGamlConfig::ParseLineIntoConfigObject(const std::string line) {
 	else if (u)
 		*u = ParseStringAsUnsigned(value, n); 
 	else
-		throw ErrorException("Unknown option \"%s\"", n);
-
-	return this->IsValid();
+		return result;
+	result.first = true;
+	return result;
 }
 
 
@@ -438,11 +445,9 @@ bool GeneralGamlConfig::operator==(const GeneralGamlConfig& rhs) const	{
 }
 
 MasterGamlConfig::MasterGamlConfig() : GeneralGamlConfig() {
-	
-	
 	}
 
-int MasterGamlConfig::Read(const char* fname, bool isMaster){
+int MasterGamlConfig::Read(const char* fname, bool ){
 	ConfigReader cr;	
 	if (cr.Load(fname) != 0)	{
 		printf("ERROR: GamlConfig::General::Read(%s) failed.\n", fname);
