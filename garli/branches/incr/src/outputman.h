@@ -41,7 +41,7 @@ class OutputManager{
 		OutputManager(){
 			noOutput=false;
 			log=false;
-			defaultOut=&cout;
+			defaultOut=&cerr;
 			}
 			
 		~OutputManager(){
