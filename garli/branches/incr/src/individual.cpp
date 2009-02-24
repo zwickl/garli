@@ -334,7 +334,7 @@ void Individual::FinishIncompleteTreeByStepwiseAddition(unsigned nTax,
 			}
 		else {
 			int nn = (unsigned) nd->nodeNum;
-			assert (nn >= 0 && nn < (int)nTax);
+			assert (nn >= 0 && nn <= (int)nTax);
 			taxaIndicesToAdd.erase((unsigned) nn);
 			if(!(treeStruct->constraints.empty())) {
 				mask += temp.TerminalBipart(nn);
