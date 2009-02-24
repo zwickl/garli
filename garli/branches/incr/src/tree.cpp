@@ -359,7 +359,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	root->attached=true;
 	int current=numTipsTotal+1;
 	bool cont=false;
-//	numBranchesAdded=-1;//if reading in a tree start at -1 so opening ( doesn't add a branch
+	this->numBranchesAdded = 0;
 	while(*s){
 		cont = false;
 		if(*s == ';')
@@ -417,13 +417,17 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			assert(temp->anc);
 			if(!temp->anc) throw ErrorException("Problem reading tree description.  Mismatched parentheses?");
 			temp=temp->anc;
-			numBranchesAdded--;//sloppy way to avoid over incrementing numBranchesAdded
-			if(*(s+1)!='(') s++;
+			if(*(s+1)!='(') {
+				s++;
+			}
+			else {
+				numBranchesAdded--; // this ( will be encountered in two consecutive loops, so we decrement numBranchesAdded to avoid overcounting.
+			}
 			cont = true;
 			}
 		if(*s == '(' || isdigit(*s) || cont==true){
 			//here we're about to add a node of some sort
-			numBranchesAdded++;
+			this->numBranchesAdded++;
 			if(*(s+1)=='('){//add an internal node
 				temp=temp->AddDes(allNodes[current++]);
 				numNodesAdded++;
@@ -434,7 +438,10 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 				//num specifed, or a terminal node.  Either way the next characters in the string will be
 				//digits.  We'll have to look ahead to see what the next non-digit character is.  If it's
 				//a '(', we know we are adding a prenumbered internal
-				if(*s=='(') s++;
+				if(*s=='(') {
+					this->numBranchesAdded++;
+					s++;
+				}
 				int i=0;
 				bool term=true;
 				while(isdigit(*(s+i))) i++;
@@ -532,6 +539,8 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 				}
 			}
 		}
+	this->numBranchesAdded--; // now we reduce the count of branches because the outer () count as a branch, but we don't really use the branch leading to the root of the tree
+	
 	if((allowMissingTaxa == false) && (numTipsAdded != numTipsTotal))
 		throw ErrorException("Number of taxa in tree description (%d) not equal to number of\n\ttaxa in dataset (%d)!  Check tree string.", numTipsAdded, numTipsTotal);
 		

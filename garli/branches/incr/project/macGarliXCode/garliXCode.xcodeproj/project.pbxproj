@@ -7,6 +7,24 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2D611D510F51FB8E00F2613B /* configoptionsauto.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D500F51FB8E00F2613B /* configoptionsauto.cpp */; };
+		2D611D8C0F51FC7D00F2613B /* nxsassumptionsblock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D640F51FC7D00F2613B /* nxsassumptionsblock.cpp */; };
+		2D611D8D0F51FC7D00F2613B /* nxsblock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D660F51FC7D00F2613B /* nxsblock.cpp */; };
+		2D611D8E0F51FC7D00F2613B /* nxscharactersblock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D690F51FC7D00F2613B /* nxscharactersblock.cpp */; };
+		2D611D8F0F51FC7D00F2613B /* nxscxxdiscretematrix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D6B0F51FC7D00F2613B /* nxscxxdiscretematrix.cpp */; };
+		2D611D900F51FC7D00F2613B /* nxsdatablock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D6D0F51FC7D00F2613B /* nxsdatablock.cpp */; };
+		2D611D910F51FC7D00F2613B /* nxsdistancedatum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D710F51FC7D00F2613B /* nxsdistancedatum.cpp */; };
+		2D611D920F51FC7D00F2613B /* nxsdistancesblock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D730F51FC7D00F2613B /* nxsdistancesblock.cpp */; };
+		2D611D940F51FC7D00F2613B /* nxsexception.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D770F51FC7D00F2613B /* nxsexception.cpp */; };
+		2D611D950F51FC7D00F2613B /* nxsmultiformat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D790F51FC7D00F2613B /* nxsmultiformat.cpp */; };
+		2D611D960F51FC7D00F2613B /* nxspublicblocks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D7B0F51FC7D00F2613B /* nxspublicblocks.cpp */; };
+		2D611D970F51FC7D00F2613B /* nxsreader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D7D0F51FC7D00F2613B /* nxsreader.cpp */; };
+		2D611D980F51FC7D00F2613B /* nxssetreader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D7F0F51FC7D00F2613B /* nxssetreader.cpp */; };
+		2D611D990F51FC7D00F2613B /* nxsstring.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D810F51FC7D00F2613B /* nxsstring.cpp */; };
+		2D611D9A0F51FC7D00F2613B /* nxstaxablock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D830F51FC7D00F2613B /* nxstaxablock.cpp */; };
+		2D611D9B0F51FC7D00F2613B /* nxstoken.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D850F51FC7D00F2613B /* nxstoken.cpp */; };
+		2D611D9C0F51FC7D00F2613B /* nxstreesblock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D870F51FC7D00F2613B /* nxstreesblock.cpp */; };
+		2D611D9D0F51FC7D00F2613B /* nxsunalignedblock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D611D890F51FC7D00F2613B /* nxsunalignedblock.cpp */; };
 		2D6276E70F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D6276E60F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp */; };
 		2DF842D40D25844F00FC557F /* adaptation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DF842950D25844F00FC557F /* adaptation.cpp */; };
 		2DF842D50D25844F00FC557F /* adaptation.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2DF842960D25844F00FC557F /* adaptation.h */; };
@@ -112,6 +130,47 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2D611D500F51FB8E00F2613B /* configoptionsauto.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = configoptionsauto.cpp; sourceTree = "<group>"; };
+		2D611D620F51FC7D00F2613B /* ncl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ncl.h; sourceTree = "<group>"; };
+		2D611D630F51FC7D00F2613B /* nxsallocatematrix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsallocatematrix.h; sourceTree = "<group>"; };
+		2D611D640F51FC7D00F2613B /* nxsassumptionsblock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsassumptionsblock.cpp; sourceTree = "<group>"; };
+		2D611D650F51FC7D00F2613B /* nxsassumptionsblock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsassumptionsblock.h; sourceTree = "<group>"; };
+		2D611D660F51FC7D00F2613B /* nxsblock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsblock.cpp; sourceTree = "<group>"; };
+		2D611D670F51FC7D00F2613B /* nxsblock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsblock.h; sourceTree = "<group>"; };
+		2D611D680F51FC7D00F2613B /* nxscdiscretematrix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxscdiscretematrix.h; sourceTree = "<group>"; };
+		2D611D690F51FC7D00F2613B /* nxscharactersblock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxscharactersblock.cpp; sourceTree = "<group>"; };
+		2D611D6A0F51FC7D00F2613B /* nxscharactersblock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxscharactersblock.h; sourceTree = "<group>"; };
+		2D611D6B0F51FC7D00F2613B /* nxscxxdiscretematrix.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxscxxdiscretematrix.cpp; sourceTree = "<group>"; };
+		2D611D6C0F51FC7D00F2613B /* nxscxxdiscretematrix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxscxxdiscretematrix.h; sourceTree = "<group>"; };
+		2D611D6D0F51FC7D00F2613B /* nxsdatablock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsdatablock.cpp; sourceTree = "<group>"; };
+		2D611D6E0F51FC7D00F2613B /* nxsdatablock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsdatablock.h; sourceTree = "<group>"; };
+		2D611D6F0F51FC7D00F2613B /* nxsdefs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsdefs.h; sourceTree = "<group>"; };
+		2D611D700F51FC7D00F2613B /* nxsdiscretedatum.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsdiscretedatum.h; sourceTree = "<group>"; };
+		2D611D710F51FC7D00F2613B /* nxsdistancedatum.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsdistancedatum.cpp; sourceTree = "<group>"; };
+		2D611D720F51FC7D00F2613B /* nxsdistancedatum.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsdistancedatum.h; sourceTree = "<group>"; };
+		2D611D730F51FC7D00F2613B /* nxsdistancesblock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsdistancesblock.cpp; sourceTree = "<group>"; };
+		2D611D740F51FC7D00F2613B /* nxsdistancesblock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsdistancesblock.h; sourceTree = "<group>"; };
+		2D611D770F51FC7D00F2613B /* nxsexception.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsexception.cpp; sourceTree = "<group>"; };
+		2D611D780F51FC7D00F2613B /* nxsexception.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsexception.h; sourceTree = "<group>"; };
+		2D611D790F51FC7D00F2613B /* nxsmultiformat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsmultiformat.cpp; sourceTree = "<group>"; };
+		2D611D7A0F51FC7D00F2613B /* nxsmultiformat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsmultiformat.h; sourceTree = "<group>"; };
+		2D611D7B0F51FC7D00F2613B /* nxspublicblocks.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxspublicblocks.cpp; sourceTree = "<group>"; };
+		2D611D7C0F51FC7D00F2613B /* nxspublicblocks.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxspublicblocks.h; sourceTree = "<group>"; };
+		2D611D7D0F51FC7D00F2613B /* nxsreader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsreader.cpp; sourceTree = "<group>"; };
+		2D611D7E0F51FC7D00F2613B /* nxsreader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsreader.h; sourceTree = "<group>"; };
+		2D611D7F0F51FC7D00F2613B /* nxssetreader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxssetreader.cpp; sourceTree = "<group>"; };
+		2D611D800F51FC7D00F2613B /* nxssetreader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxssetreader.h; sourceTree = "<group>"; };
+		2D611D810F51FC7D00F2613B /* nxsstring.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsstring.cpp; sourceTree = "<group>"; };
+		2D611D820F51FC7D00F2613B /* nxsstring.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsstring.h; sourceTree = "<group>"; };
+		2D611D830F51FC7D00F2613B /* nxstaxablock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxstaxablock.cpp; sourceTree = "<group>"; };
+		2D611D840F51FC7D00F2613B /* nxstaxablock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxstaxablock.h; sourceTree = "<group>"; };
+		2D611D850F51FC7D00F2613B /* nxstoken.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxstoken.cpp; sourceTree = "<group>"; };
+		2D611D860F51FC7D00F2613B /* nxstoken.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxstoken.h; sourceTree = "<group>"; };
+		2D611D870F51FC7D00F2613B /* nxstreesblock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxstreesblock.cpp; sourceTree = "<group>"; };
+		2D611D880F51FC7D00F2613B /* nxstreesblock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxstreesblock.h; sourceTree = "<group>"; };
+		2D611D890F51FC7D00F2613B /* nxsunalignedblock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = nxsunalignedblock.cpp; sourceTree = "<group>"; };
+		2D611D8A0F51FC7D00F2613B /* nxsunalignedblock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsunalignedblock.h; sourceTree = "<group>"; };
+		2D611D8B0F51FC7D00F2613B /* nxsutilcopy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nxsutilcopy.h; sourceTree = "<group>"; };
 		2D6276E60F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = addtaxonrunmode.cpp; sourceTree = "<group>"; };
 		2DF842950D25844F00FC557F /* adaptation.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; path = adaptation.cpp; sourceTree = "<group>"; };
 		2DF842960D25844F00FC557F /* adaptation.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = adaptation.h; sourceTree = "<group>"; };
@@ -187,6 +246,7 @@
 		08FB7794FE84155DC02AAC07 /* garliXCode */ = {
 			isa = PBXGroup;
 			children = (
+				2D611D5F0F51FC7D00F2613B /* ncl */,
 				2DF842940D25844F00FC557F /* src */,
 				C6859E8C029090F304C91782 /* Documentation */,
 				1AB674ADFE9D54B511CA2CBB /* Products */,
@@ -202,9 +262,57 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		2D611D5F0F51FC7D00F2613B /* ncl */ = {
+			isa = PBXGroup;
+			children = (
+				2D611D620F51FC7D00F2613B /* ncl.h */,
+				2D611D630F51FC7D00F2613B /* nxsallocatematrix.h */,
+				2D611D640F51FC7D00F2613B /* nxsassumptionsblock.cpp */,
+				2D611D650F51FC7D00F2613B /* nxsassumptionsblock.h */,
+				2D611D660F51FC7D00F2613B /* nxsblock.cpp */,
+				2D611D670F51FC7D00F2613B /* nxsblock.h */,
+				2D611D680F51FC7D00F2613B /* nxscdiscretematrix.h */,
+				2D611D690F51FC7D00F2613B /* nxscharactersblock.cpp */,
+				2D611D6A0F51FC7D00F2613B /* nxscharactersblock.h */,
+				2D611D6B0F51FC7D00F2613B /* nxscxxdiscretematrix.cpp */,
+				2D611D6C0F51FC7D00F2613B /* nxscxxdiscretematrix.h */,
+				2D611D6D0F51FC7D00F2613B /* nxsdatablock.cpp */,
+				2D611D6E0F51FC7D00F2613B /* nxsdatablock.h */,
+				2D611D6F0F51FC7D00F2613B /* nxsdefs.h */,
+				2D611D700F51FC7D00F2613B /* nxsdiscretedatum.h */,
+				2D611D710F51FC7D00F2613B /* nxsdistancedatum.cpp */,
+				2D611D720F51FC7D00F2613B /* nxsdistancedatum.h */,
+				2D611D730F51FC7D00F2613B /* nxsdistancesblock.cpp */,
+				2D611D740F51FC7D00F2613B /* nxsdistancesblock.h */,
+				2D611D770F51FC7D00F2613B /* nxsexception.cpp */,
+				2D611D780F51FC7D00F2613B /* nxsexception.h */,
+				2D611D790F51FC7D00F2613B /* nxsmultiformat.cpp */,
+				2D611D7A0F51FC7D00F2613B /* nxsmultiformat.h */,
+				2D611D7B0F51FC7D00F2613B /* nxspublicblocks.cpp */,
+				2D611D7C0F51FC7D00F2613B /* nxspublicblocks.h */,
+				2D611D7D0F51FC7D00F2613B /* nxsreader.cpp */,
+				2D611D7E0F51FC7D00F2613B /* nxsreader.h */,
+				2D611D7F0F51FC7D00F2613B /* nxssetreader.cpp */,
+				2D611D800F51FC7D00F2613B /* nxssetreader.h */,
+				2D611D810F51FC7D00F2613B /* nxsstring.cpp */,
+				2D611D820F51FC7D00F2613B /* nxsstring.h */,
+				2D611D830F51FC7D00F2613B /* nxstaxablock.cpp */,
+				2D611D840F51FC7D00F2613B /* nxstaxablock.h */,
+				2D611D850F51FC7D00F2613B /* nxstoken.cpp */,
+				2D611D860F51FC7D00F2613B /* nxstoken.h */,
+				2D611D870F51FC7D00F2613B /* nxstreesblock.cpp */,
+				2D611D880F51FC7D00F2613B /* nxstreesblock.h */,
+				2D611D890F51FC7D00F2613B /* nxsunalignedblock.cpp */,
+				2D611D8A0F51FC7D00F2613B /* nxsunalignedblock.h */,
+				2D611D8B0F51FC7D00F2613B /* nxsutilcopy.h */,
+			);
+			path = ncl;
+			sourceTree = NCL_ROOT;
+		};
 		2DF842940D25844F00FC557F /* src */ = {
 			isa = PBXGroup;
 			children = (
+				2D611D500F51FB8E00F2613B /* configoptionsauto.cpp */,
 				2D6276E60F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp */,
 				2DF842950D25844F00FC557F /* adaptation.cpp */,
 				2DF842960D25844F00FC557F /* adaptation.h */,
@@ -342,6 +450,24 @@
 				2DF8430E0D25844F00FC557F /* tree.cpp in Sources */,
 				2DF843100D25844F00FC557F /* treenode.cpp in Sources */,
 				2D6276E70F4F1E4E00A1FCE9 /* addtaxonrunmode.cpp in Sources */,
+				2D611D510F51FB8E00F2613B /* configoptionsauto.cpp in Sources */,
+				2D611D8C0F51FC7D00F2613B /* nxsassumptionsblock.cpp in Sources */,
+				2D611D8D0F51FC7D00F2613B /* nxsblock.cpp in Sources */,
+				2D611D8E0F51FC7D00F2613B /* nxscharactersblock.cpp in Sources */,
+				2D611D8F0F51FC7D00F2613B /* nxscxxdiscretematrix.cpp in Sources */,
+				2D611D900F51FC7D00F2613B /* nxsdatablock.cpp in Sources */,
+				2D611D910F51FC7D00F2613B /* nxsdistancedatum.cpp in Sources */,
+				2D611D920F51FC7D00F2613B /* nxsdistancesblock.cpp in Sources */,
+				2D611D940F51FC7D00F2613B /* nxsexception.cpp in Sources */,
+				2D611D950F51FC7D00F2613B /* nxsmultiformat.cpp in Sources */,
+				2D611D960F51FC7D00F2613B /* nxspublicblocks.cpp in Sources */,
+				2D611D970F51FC7D00F2613B /* nxsreader.cpp in Sources */,
+				2D611D980F51FC7D00F2613B /* nxssetreader.cpp in Sources */,
+				2D611D990F51FC7D00F2613B /* nxsstring.cpp in Sources */,
+				2D611D9A0F51FC7D00F2613B /* nxstaxablock.cpp in Sources */,
+				2D611D9B0F51FC7D00F2613B /* nxstoken.cpp in Sources */,
+				2D611D9C0F51FC7D00F2613B /* nxstreesblock.cpp in Sources */,
+				2D611D9D0F51FC7D00F2613B /* nxsunalignedblock.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -357,13 +483,10 @@
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = NCL_CONST_FUNCS;
-				HEADER_SEARCH_PATHS = (
-					"${NCL_ROOT}/ncl",
-					"${NCL_ROOT}",
-				);
+				HEADER_SEARCH_PATHS = "${NCL_ROOT}";
 				INSTALL_PATH = "$(HOME)/bin";
-				LIBRARY_SEARCH_PATHS = "${NCL_LIB_DIR}";
-				OTHER_LDFLAGS = "-lncl";
+				LIBRARY_SEARCH_PATHS = "";
+				OTHER_LDFLAGS = "";
 				PRODUCT_NAME = garliXCode;
 				ZERO_LINK = NO;
 			};
