@@ -16,6 +16,7 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
+#include <sstream>
 #include "adaptation.h"
 #include "population.h"
 
@@ -26,11 +27,56 @@ extern int optCalcs ; // defined in population.cpp
 bool ShouldWriteResults(bool prematureTermination, Population::output_details od, unsigned currRep, unsigned nReps);
 
 
-unsigned Population::RefillTreeBuffer(GarliReader &, unsigned treeNum) {
-	GeneralGamlConfig c(*(this->conf));
+unsigned Population::RefillTreeBuffer(GarliReader &reader, unsigned treeNum) {
 	std::string nextLine;
-	std::getline(std::cin, nextLine);
-	const AttemptedParseResult parseResult = c.ParseLineIntoConfigObject(nextLine);
+	for (;;) {
+		GeneralGamlConfig c(*(this->conf));
+		std::cerr << "iGarli> ";
+		nextLine.clear();
+		std::getline(std::cin, nextLine);
+		if (nextLine.empty())
+			break;
+		try {
+			const AttemptedParseResult parseResult = c.ParseLineIntoConfigObject(nextLine);
+			if (parseResult.first) {
+				*(this->conf) = c;
+			}
+			else {
+				const char * key = parseResult.second.first.c_str();
+				const char * value = parseResult.second.second.c_str();
+				if (NxsString::case_insensitive_equals(key, "clear")) {
+					NxsTaxaBlock * currTaxa = reader.GetTaxaBlock(0);
+					assert (currTaxa);
+					if (currTaxa) {
+						reader.RemoveBlockFromUsedBlockList(currTaxa);
+						reader.DeleteBlocksFromFactories();
+						reader.AddReadTaxaBlock(currTaxa);
+						assert(reader.GetTaxaBlock(0));
+					}
+					treeNum = 0;
+				}
+				if (NxsString::case_insensitive_equals(key, "run"))
+					break;
+				if (NxsString::case_insensitive_equals(key, "tree")) {
+					const NxsTaxaBlock * queryTaxa = reader.GetTaxaBlock(0);
+					if (queryTaxa) {
+						const std::string & taxaTitle = queryTaxa->GetTitle();
+						std::ostringstream outF;
+						outF << "#NEXUS\nBegin Trees;\n Link taxa = " << NxsString::GetEscaped(taxaTitle);
+						outF << ";\n Tree stdintree = " << value << " ;\nend;\n";
+						reader.ReadStringAsNexusContent(outF.str());
+					}
+					else {
+						assert (queryTaxa);
+						throw ErrorException("Tree command is not available when a Taxa block has not been read.");
+					}
+				}
+			}
+		}
+		catch (ErrorException & x) {
+			x.Print(std::cerr);
+		}
+	}
 	return treeNum;
 }
 	

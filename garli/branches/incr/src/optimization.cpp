@@ -621,11 +621,17 @@ void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, i
 	totalIncrease = leftIncrease + rightIncrease + ancIncrease;
 #else
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->left, false);
-	totalIncrease+= OptimizeBranchLength(optPrecision, nd, false);
+	if (nd->anc)
+		totalIncrease+= OptimizeBranchLength(optPrecision, nd, false);
+	else if (nd->left->next != nd->right)
+		totalIncrease+= OptimizeBranchLength(optPrecision, nd->left->next, false);
 	totalIncrease += OptimizeBranchLength(optPrecision, nd->right, false);
 
 	nodeOptVector.push_back(nd->left);
-	nodeOptVector.push_back(nd);
+	if (nd->anc)
+		nodeOptVector.push_back(nd);
+	else if (nd->left->next != nd->right)
+		nodeOptVector.push_back(nd->left->next);
 	nodeOptVector.push_back(nd->right);
 
 #endif
