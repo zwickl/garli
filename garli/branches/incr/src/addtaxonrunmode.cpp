@@ -193,6 +193,17 @@ void Population::AddTaxonRunMode() {
 #endif //defined(SUBROUTINE_GARLI)
 
 
+void treeToWrapper(char * treeString, const Individual & ind) {
+	std::cout << "tree best = [&U][!GarliScore " << ind.Fitness() ; 
+	std::string modstr;
+	ind.mod->FillGarliFormattedModelString(modstr);
+	std::cout << "][!GarliModel " <<  modstr <<  "] ";
+	std::cout.setf( ios::floatfield, ios::fixed );
+	std::cout.setf( ios::showpoint );
+	ind.treeStruct->root->MakeNewick(treeString, false, true);
+	std::cout << treeString << '\n';
+}
+
 // should only be called by AddTaxonRunMode
 void Population::NextAddTaxonRound(const NxsFullTreeDescription & treeDescription, 
 								   unsigned attachmentsPerTaxonVar,
@@ -343,8 +354,10 @@ void Population::NextAddTaxonRound(const NxsFullTreeDescription & treeDescriptio
 		if(storedTrees.size() > 0)
 			WriteStoredTrees(besttreefile.c_str());
 		}
-	if (ShouldWriteResults(prematureTermination, best_output, currentSearchRep, nReps))
+	if (ShouldWriteResults(prematureTermination, best_output, currentSearchRep, nReps)) {
 		WriteTreeFile(besttreefile.c_str());
+		treeToWrapper(this->treeString, this->indiv[bestIndiv]);
+	}
 
 	if(conf->bootstrapReps > 0){
 		if (ShouldWriteResults(prematureTermination, bootlog_output, currentSearchRep, nReps)) {
