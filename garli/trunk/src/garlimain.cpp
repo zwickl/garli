@@ -419,8 +419,8 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage(" %d sequences.", data->NTax());
 			outman.UserMessage(" %d constant characters.", data->NConstant());
 			outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
-			outman.UserMessage(" %d autapomorphic characters.", data->NAutapomorphic());
-			int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
+			outman.UserMessage(" %d uninformative variable characters.", data->NVarUninform());
+			int total = data->NConstant() + data->NInformative() + data->NVarUninform();
 			if(data->NMissing() > 0){
 				outman.UserMessage(" %d characters were completely missing or ambiguous (removed).", data->NMissing());
 				outman.UserMessage(" %d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
