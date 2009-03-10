@@ -66,15 +66,12 @@ protected:
 						//both start at 0, so offset upon output
 						//This used to represent something else (I think)
 	char**          taxonLabel;
-	char**          taxonColor;
 	int		nMissing;
 	int		nConstant;
 	int		nInformative;
-	int		nAutapomorphic;
+	int		nVarUninform;
 	int 	lastConstant;//DJZ
 	int 	*constStates;//the state (or states) that a constant site contains
-	FLOAT_TYPE*	stateDistr;
-	int		stateDistrComputed;
 	int		currentBootstrapSeed;
 	
 	protected:
@@ -103,20 +100,19 @@ protected:
 			PT_MISSING		= 0x0000,
 			PT_CONSTANT		= 0x0001,
 			PT_INFORMATIVE		= 0x0002,
-			PT_AUTAPOMORPHIC	= 0x0004,
-			PT_VARIABLE		= 0x0008
+			PT_VARIABLE		= 0x0004
 		};
 
 	public:
 		DataMatrix() : dmFlags(0), dense(0), nTax(0), nChar(0), matrix(0), count(0)
-			, number(0), taxonLabel(0), numStates(0), stateDistr(0)
-			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
+			, number(0), taxonLabel(0), numStates(0) 
+			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
 			: nTax(ntax), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
-			, number(0), taxonLabel(0), numStates(0), stateDistr(0)
-			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
+			, number(0), taxonLabel(0), numStates(0)
+			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
 		virtual ~DataMatrix();
@@ -134,8 +130,6 @@ protected:
 			, int /*site*/, FLOAT_TYPE /*brlen*/) { return 0.0; }
 		virtual int NumStates(int j) const
 			{ return ( numStates && (j < nChar) ? numStates[j] : 0 ); }
-
-		FLOAT_TYPE prNumStates( int n ) const;
 
 		// functions for quizzing dmFlags
 		int InvarCharsExpected() const { return !(dmFlags & allvariable); }
@@ -223,7 +217,7 @@ protected:
 		int NConstant() const { return nConstant; }
 		int LastConstant() const {return lastConstant;}
 		int NInformative() const { return nInformative; }
-		int NAutapomorphic() const { return nAutapomorphic; }
+		int NVarUninform() const { return nVarUninform; }
 
 		DataMatrix& operator =(const DataMatrix&);
 
@@ -231,7 +225,7 @@ protected:
 			byCounts;
 			QSort( 0, NChar()-1 );
 			}
-		virtual int PatternType( int , int*, unsigned char *) const;	// returns PT_XXXX constant indicating type of pattern
+		virtual int PatternType( int , unsigned int *) const;	// returns PT_XXXX constant indicating type of pattern
 		void Summarize();       // fills in nConstant, nInformative, and nAutapomorphic data members
 		virtual void Collapse();
 		virtual void Pack();
@@ -248,6 +242,9 @@ protected:
 		bool operator==(const DataMatrix& rhs) const; // cjb - to test serialization
 		void ExplicitDestructor();  // cjb - totally clear the DataMatrix and revert it to its original state as if it was just constructed
 		void CheckForIdenticalTaxonNames();
+
+		//for determining parsimony informative chars
+		int MinScore(set<unsigned char> patt, int bound, unsigned char bits=15, int sc=0) const;
 
 	public:	// exception classes
 #if defined( CPLUSPLUS_EXCEPTIONS )

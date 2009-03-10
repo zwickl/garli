@@ -663,10 +663,7 @@ void CodonData::NewCodonMatrix( int taxa, int sites ){
 			//memset( matrix[i], 0xff, taxa*sizeof(unsigned char) );
 			memset( codonMatrix[i], 0xff, sites*sizeof(unsigned char) );
 		}
-		int max = maxNumStates;
-		for( int k = 0; k <= max; k++ )
-			stateDistr[k] = 0.0;
-		}
+	}
 
 	// set dimension variables to new values
 	nTax = taxa;

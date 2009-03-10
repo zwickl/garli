@@ -1144,8 +1144,8 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 			modSpec.includeInvariantSites = false;
 			}
 		else{
-			SetPinv((FLOAT_TYPE)0.25 * ((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic())), false);
-			SetMaxPinv((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NAutapomorphic()));
+			SetPinv((FLOAT_TYPE)0.25 * ((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NVarUninform())), false);
+			SetMaxPinv((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NVarUninform()));
 			if(modSpec.IsFlexRateHet()) NormalizeRates();
 			else AdjustRateProportions();
 			}
