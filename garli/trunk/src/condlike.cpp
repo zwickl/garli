@@ -35,10 +35,13 @@ CondLikeArray::~CondLikeArray(){
 	//be called from Population level if CONDLIKE SHARED is defined
 	if( arr ){
 #ifndef ALIGN_CLAS
+#ifdef CUDA_GPU
 	if(cudaman->GetPinnedMemoryEnabled())
 		FreePinnedMemory(arr);
 	else
+#else
 		delete []arr;
+#endif
 
 #else
 		DeleteAlignedArray(arr);
@@ -51,11 +54,13 @@ CondLikeArray::~CondLikeArray(){
 void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	if( arr ){
 #ifndef ALIGN_CLAS
+#ifdef CUDA_GPU
 	if(cudaman->GetPinnedMemoryEnabled())
 		FreePinnedMemory(arr);
 	else
+#else
 		delete []arr;
-
+#endif
 #else
 		DeleteAlignedArray(arr);
 #endif
@@ -65,10 +70,13 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	nsites = ns;
 	nstates = nk;
 #ifndef ALIGN_CLAS
+#ifdef CUDA_GPU
 if(cudaman->GetPinnedMemoryEnabled())
 	AllocatePinnedMemory((void**)&arr, sizeof(FLOAT_TYPE)*nk*nr*ns);
 else
+#else
 	arr=new FLOAT_TYPE[nk*nr*ns];
+#endif
 
 #else
 	arr = NewAlignedArray<FLOAT_TYPE>(nk*nr*ns, CLA_ALIGNMENT);
