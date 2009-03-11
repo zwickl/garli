@@ -371,8 +371,8 @@ void CudaManager::ComputeRefDeriv(const FLOAT_TYPE *partial,
 					btot += freqs[2];
 				if (conStates[i] & 8)
 					btot += freqs[3];
-				siteL += (prI * btot) * exp(partial_underflow_mult[i]
-						+ CL1_underflow_mult[i]);
+				siteL += (prI * btot) * exp((FLOAT_TYPE) (partial_underflow_mult[i]
+						+ CL1_underflow_mult[i]));
 			} else
 				siteL += (prI * freqs[conStates[i]] * exp(
 						(FLOAT_TYPE) partial_underflow_mult[i]) * exp(
