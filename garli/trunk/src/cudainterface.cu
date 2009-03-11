@@ -5,23 +5,111 @@
  *      Author: ayres
  */
 
-#include <iostream>
 
 #include <cutil.h>
 
 #include "defs.h"
+#include "outputman.h"
 
 // includes, kernels
 #include "cudakernel.cu"
 
-//#define CUDADEVICE 1
+extern OutputManager outman;
+
+extern "C"
+bool CheckCuda() {
+    int deviceCount;
+    bool cuda_support = false;
+
+    CUDA_SAFE_CALL(cudaGetDeviceCount(&deviceCount));
+    if (deviceCount == 0)
+    	outman.UserMessageNoCR("There is no device supporting CUDA\n");
+    else
+    	cuda_support = true;
+
+    return cuda_support;
+}
+
+extern "C"
+void DeviceQuery() {
+
+	outman.UserMessageNoCR(
+			"========================= GPU Device Query =========================\n");
+
+    int deviceCount;
+    CUDA_SAFE_CALL(cudaGetDeviceCount(&deviceCount));
+    if (deviceCount == 0)
+    	outman.UserMessageNoCR("There is no device supporting CUDA\n");
+    int dev;
+    for (dev = 0; dev < deviceCount; ++dev) {
+        cudaDeviceProp deviceProp;
+        CUDA_SAFE_CALL(cudaGetDeviceProperties(&deviceProp, dev));
+        if (dev == 0) {
+            if (deviceProp.major == 9999 && deviceProp.minor == 9999)
+            	outman.UserMessageNoCR("There is no device supporting CUDA.\n");
+            else if (deviceCount == 1)
+            	outman.UserMessageNoCR("There is 1 device supporting CUDA\n");
+            else
+            	outman.UserMessageNoCR("There are %d devices supporting CUDA\n", deviceCount);
+        }
+        outman.UserMessageNoCR("\nDevice %d: \"%s\"\n", dev, deviceProp.name);
+        outman.UserMessageNoCR("  Major revision number:                         %d\n",
+               deviceProp.major);
+        outman.UserMessageNoCR("  Minor revision number:                         %d\n",
+               deviceProp.minor);
+        outman.UserMessageNoCR("  Total amount of global memory:                 %u bytes\n",
+               deviceProp.totalGlobalMem);
+    #if CUDART_VERSION >= 2000
+        outman.UserMessageNoCR("  Number of multiprocessors:                     %d\n",
+               deviceProp.multiProcessorCount);
+        outman.UserMessageNoCR("  Number of cores:                               %d\n",
+               8 * deviceProp.multiProcessorCount);
+    #endif
+        outman.UserMessageNoCR("  Total amount of constant memory:               %u bytes\n",
+               deviceProp.totalConstMem);
+        outman.UserMessageNoCR("  Total amount of shared memory per block:       %u bytes\n",
+               deviceProp.sharedMemPerBlock);
+        outman.UserMessageNoCR("  Total number of registers available per block: %d\n",
+               deviceProp.regsPerBlock);
+        outman.UserMessageNoCR("  Warp size:                                     %d\n",
+               deviceProp.warpSize);
+        outman.UserMessageNoCR("  Maximum number of threads per block:           %d\n",
+               deviceProp.maxThreadsPerBlock);
+        outman.UserMessageNoCR("  Maximum sizes of each dimension of a block:    %d x %d x %d\n",
+               deviceProp.maxThreadsDim[0],
+               deviceProp.maxThreadsDim[1],
+               deviceProp.maxThreadsDim[2]);
+        outman.UserMessageNoCR("  Maximum sizes of each dimension of a grid:     %d x %d x %d\n",
+               deviceProp.maxGridSize[0],
+               deviceProp.maxGridSize[1],
+               deviceProp.maxGridSize[2]);
+        outman.UserMessageNoCR("  Maximum memory pitch:                          %u bytes\n",
+               deviceProp.memPitch);
+        outman.UserMessageNoCR("  Texture alignment:                             %u bytes\n",
+               deviceProp.textureAlignment);
+        outman.UserMessageNoCR("  Clock rate:                                    %.2f GHz\n",
+               deviceProp.clockRate * 1e-6f);
+    #if CUDART_VERSION >= 2000
+        outman.UserMessageNoCR("  Concurrent copy and execution:                 %s\n",
+               deviceProp.deviceOverlap ? "Yes" : "No");
+    #endif
+    }
+
+	outman.UserMessageNoCR(
+				"====================================================================\n\n");
+}
+
+
+extern "C"
+void SetDevice(unsigned int device_number) {
+	cudaSetDevice(device_number);
+	    cudaDeviceProp deviceProp;
+	    cudaGetDeviceProperties(&deviceProp, device_number);
+	    outman.UserMessageNoCR ("Using GPU device %d: %s\n\n", device_number,deviceProp.name);
+}
 
 extern "C"
 void AllocatePinnedMemory(void** arr, unsigned int mem_size_bytes) {
-	//cudaSetDevice(CUDADEVICE);
-	//    cudaDeviceProp deviceProp;
-	//    cudaGetDeviceProperties(&deviceProp, CUDADEVICE);
-	//    printf ("      device %d:%s\n", CUDADEVICE,deviceProp.name);
 
 	// allocate host pinned memory
 	CUDA_SAFE_CALL(cudaMallocHost((void**)&(*arr), mem_size_bytes));

@@ -5,8 +5,6 @@
  *      Author: ayres
  */
 
-using namespace std;
-
 #include <math.h>
 
 #include <cutil.h>
@@ -28,35 +26,27 @@ CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in) {
 	nstates = nstates_in;
 	numRateCats = numRateCats_in;
 	nchar = nchar_in;
+	device_number = 0;
 	test_iterations = 0;
-	print_to_screen = false;
+	print_gpu_tests = false;
+	print_device_query = false;
 
-	SetGPUCLAParameters();
-
-	InitGPUDeriv(nchar_in);
-	SetGPUDerivParameters();
+	Initialization();
 }
 
-CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in,
-		int test_iterations_in, bool print_to_screen_in) {
+CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in, int device_number_in,
+		int test_iterations_in, bool print_to_screen_in, bool print_device_query_in) {
 	gpu_cla_enabled = true;
 	gpu_deriv_enabled = true;
 	nstates = nstates_in;
 	numRateCats = numRateCats_in;
 	nchar = nchar_in;
+	device_number = device_number_in;
 	test_iterations = test_iterations_in;
-	print_to_screen = print_to_screen_in;
+	print_gpu_tests = print_to_screen_in;
+	print_device_query = print_device_query_in;
 
-	if (test_iterations > 0)
-		TestGPU();
-
-	if (gpu_cla_enabled)
-		SetGPUCLAParameters();
-
-	if (gpu_deriv_enabled) {
-		InitGPUDeriv(nchar_in);
-		SetGPUDerivParameters();
-	}
+	Initialization();
 }
 
 CudaManager::~CudaManager() {
@@ -66,6 +56,28 @@ CudaManager::~CudaManager() {
 	if (gpu_deriv_enabled) {
 		delete []deriv_counts;
 		FreeGPUDeriv();
+	}
+}
+
+void CudaManager::Initialization() {
+	bool cuda_support = CheckCuda();
+	if (cuda_support) {
+		if (print_device_query)
+				DeviceQuery();
+		SetDevice(device_number);
+		if (test_iterations > 0)
+			TestGPU();
+	} else {
+		gpu_cla_enabled = false;
+		gpu_deriv_enabled = false;
+	}
+
+	if (gpu_cla_enabled)
+		SetGPUCLAParameters();
+
+	if (gpu_deriv_enabled) {
+		InitGPUDeriv(nchar);
+		SetGPUDerivParameters();
 	}
 }
 
@@ -381,10 +393,10 @@ void CudaManager::ComputeRefDeriv(const FLOAT_TYPE *partial,
 
 // Private methods
 void CudaManager::TestGPU() {
-	if (print_to_screen) {
+
+	if (print_gpu_tests) {
 		outman.UserMessageNoCR(
 				"======================= GPU Tests =======================");
-
 		outman.UserMessageNoCR("\nParameters:\n");
 		outman.UserMessageNoCR("memory \t");
 		outman.UserMessageNoCR("float \t");
@@ -415,7 +427,7 @@ void CudaManager::TestGPU() {
 	TestGPUCLA();
 	TestGPUDeriv();
 
-	if (print_to_screen)
+	if (print_gpu_tests)
 		outman.UserMessageNoCR(
 				"=========================================================\n\n");
 }
@@ -569,7 +581,7 @@ void CudaManager::TestGPUCLA() {
 	if (!test_passed || best_cpu / best_gpu < 1)
 		gpu_cla_enabled = false;
 
-	if (print_to_screen) {
+	if (print_gpu_tests) {
 		outman.UserMessageNoCR("GPUCLA   \t");
 		outman.UserMessageNoCR("%4.4f\t", best_cpu / best_gpu);
 		outman.UserMessageNoCR("%4.2f\t", best_cpu);
@@ -831,7 +843,7 @@ void CudaManager::TestGPUDeriv() {
 	if (!test_passed || best_cpu / best_gpu < 1)
 		gpu_deriv_enabled = false;
 
-	if (print_to_screen) {
+	if (print_gpu_tests) {
 		outman.UserMessageNoCR("GPUDeriv   \t");
 		outman.UserMessageNoCR("%4.4f\t", best_cpu / best_gpu);
 		outman.UserMessageNoCR("%4.2f\t", best_cpu);

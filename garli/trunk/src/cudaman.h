@@ -6,9 +6,8 @@
  */
 
 #ifndef CUDAMANAGER
-#define CUDAMANAGER
+#define CUDAMANAGERe
 
-using namespace std;
 
 #include <vector_types.h>
 
@@ -19,9 +18,11 @@ class CudaManager {
 public:
 	CudaManager();
 	CudaManager(int nstates_in, int numRateCats_in, int nchar_in);
-	CudaManager(int nstates_in, int numRateCats_in, int nchar_in,
-			int test_iterations_in, bool print_to_screen_in);
+	CudaManager(int nstates_in, int numRateCats_in, int nchar_in, int device_number,
+			int test_iterations_in, bool print_to_screen_in, bool print_device_query);
 	~CudaManager();
+
+	void Initialization();
 
 	void ChangeNChar(int nchar_boot_in, const int* counts_in);
 
@@ -45,7 +46,9 @@ private:
 	bool gpu_cla_enabled, gpu_deriv_enabled;
 
 	int test_iterations;
-	bool print_to_screen;
+	bool print_gpu_tests;
+	bool print_device_query;
+	int device_number;
 
 	int nstates, numRateCats, nchar;
 
@@ -111,6 +114,12 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // declaration, forward
 extern "C" {
+bool CheckCuda();
+
+void DeviceQuery();
+
+void SetDevice(unsigned int device_number);
+
 void AllocatePinnedMemory(void** arr, unsigned int mem_size_bytes);
 
 void AllocateGPU(void** arr, unsigned int mem_size_bytes);

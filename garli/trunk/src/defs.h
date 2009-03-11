@@ -51,6 +51,13 @@
 //	#define CUDA_MEMORY_PINNED
 //#endif
 
+#ifdef CUDA_GPU
+	#define CUDA_DEVICE_NUMBER 0
+	#define CUDA_TEST_ITERATIONS 10
+	#define CUDA_PRINT_TESTS 0
+	#define CUDA_PRINT_DEVICE_QUERY 0
+#endif
+
 #define USE_COUNTS_IN_BOOT
 
 //#undef OPT_DEBUG
