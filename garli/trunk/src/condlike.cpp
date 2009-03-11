@@ -22,8 +22,9 @@
 #include "clamanager.h"
 #include "utility.h"
 
-#ifdef CUDA_MEMORY_PINNED
+#ifdef CUDA_GPU
 #include "cudaman.h"
+extern CudaManager *cudaman;
 #endif
 
 #undef ALIGN_CLAS
@@ -34,11 +35,11 @@ CondLikeArray::~CondLikeArray(){
 	//be called from Population level if CONDLIKE SHARED is defined
 	if( arr ){
 #ifndef ALIGN_CLAS
-#ifdef CUDA_MEMORY_PINNED
+	if(cudaman->GetPinnedMemoryEnabled())
 		FreePinnedMemory(arr);
-#else
+	else
 		delete []arr;
-#endif
+
 #else
 		DeleteAlignedArray(arr);
 #endif
@@ -50,11 +51,11 @@ CondLikeArray::~CondLikeArray(){
 void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	if( arr ){
 #ifndef ALIGN_CLAS
-#ifdef CUDA_MEMORY_PINNED
+	if(cudaman->GetPinnedMemoryEnabled())
 		FreePinnedMemory(arr);
-#else
+	else
 		delete []arr;
-#endif
+
 #else
 		DeleteAlignedArray(arr);
 #endif
@@ -64,11 +65,11 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	nsites = ns;
 	nstates = nk;
 #ifndef ALIGN_CLAS
-#ifdef CUDA_MEMORY_PINNED
+if(cudaman->GetPinnedMemoryEnabled())
 	AllocatePinnedMemory((void**)&arr, sizeof(FLOAT_TYPE)*nk*nr*ns);
-#else
+else
 	arr=new FLOAT_TYPE[nk*nr*ns];
-#endif
+
 #else
 	arr = NewAlignedArray<FLOAT_TYPE>(nk*nr*ns, CLA_ALIGNMENT);
 #endif

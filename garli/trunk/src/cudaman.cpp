@@ -30,6 +30,12 @@ CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in) {
 	test_iterations = 0;
 	print_gpu_tests = false;
 	print_device_query = false;
+#ifdef CUDA_MEMORY_PINNED
+	pinned_memory_enabled = true;
+#else
+	pinned_memory_enabled = false;
+#endif
+
 
 	Initialization();
 }
@@ -45,6 +51,11 @@ CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in, int d
 	test_iterations = test_iterations_in;
 	print_gpu_tests = print_to_screen_in;
 	print_device_query = print_device_query_in;
+#ifdef CUDA_MEMORY_PINNED
+	pinned_memory_enabled = true;
+#else
+	pinned_memory_enabled = false;
+#endif
 
 	Initialization();
 }
@@ -60,7 +71,7 @@ CudaManager::~CudaManager() {
 }
 
 void CudaManager::Initialization() {
-	bool cuda_support = CheckCuda();
+	bool cuda_support = CheckCuda(device_number);
 	if (cuda_support) {
 		if (print_device_query)
 				DeviceQuery();
@@ -95,6 +106,10 @@ void CudaManager::ChangeNChar(int nchar_boot_in, const int* counts_in) {
 		FreeGPUDeriv();
 		SetGPUDerivParameters();
 	}
+}
+
+bool CudaManager::GetPinnedMemoryEnabled() {
+	return pinned_memory_enabled;
 }
 
 bool CudaManager::GetGPUCLAEnabled() {
@@ -214,16 +229,16 @@ void CudaManager::SetGPUDerivParameters() {
 	deriv_mem_size_Tots_arr = sizeof(FLOAT_TYPE) * deriv_size_Tots_arr;
 	deriv_mem_size_nchar_boot_index = sizeof(int) * nchar;
 
-#ifdef CUDA_MEMORY_PINNED
+if (pinned_memory_enabled) {
 	AllocatePinnedMemory((void**) &deriv_h_Tots, deriv_mem_size_Tots);
 	AllocatePinnedMemory((void**) &deriv_h_Tots_arr, deriv_mem_size_Tots_arr);
 	AllocatePinnedMemory((void**) &deriv_h_nchar_boot_index,
 			deriv_mem_size_nchar_boot_index);
-#else
+} else {
 	deriv_h_Tots = (FLOAT_TYPE*) malloc(deriv_mem_size_Tots);
 	deriv_h_Tots_arr = (FLOAT_TYPE*) malloc(deriv_mem_size_Tots_arr);
 	deriv_h_nchar_boot_index = (int*) malloc(deriv_mem_size_nchar_boot_index);
-#endif
+}
 
 	// initialize nchar_boot_index
 	int index_count = 0;
@@ -279,15 +294,15 @@ void CudaManager::FreeGPUDeriv() {
 	FreeGPU(deriv_d_Tots);
 	FreeGPU(deriv_d_Tots_arr);
 	FreeGPU(deriv_d_conStates);
-#ifdef CUDA_MEMORY_PINNED
+if (pinned_memory_enabled) {
 	FreePinnedMemory(deriv_h_Tots);
 	FreePinnedMemory(deriv_h_Tots_arr);
 	FreePinnedMemory(deriv_h_nchar_boot_index);
-#else
+} else {
 	free(deriv_h_Tots);
 	free(deriv_h_Tots_arr);
 	free(deriv_h_nchar_boot_index);
-#endif
+}
 }
 
 void CudaManager::RandomInit(FLOAT_TYPE* data, int size) {
@@ -403,11 +418,11 @@ void CudaManager::TestGPU() {
 		outman.UserMessageNoCR("states\t");
 		outman.UserMessageNoCR("rates\t");
 		outman.UserMessageNoCR("chars\n");
-#ifdef CUDA_MEMORY_PINNED
+	if (pinned_memory_enabled)
 		outman.UserMessageNoCR("pinned\t");
-#else
+	else
 		outman.UserMessageNoCR("paged\t");
-#endif
+
 		outman.UserMessageNoCR("%i bytes\t", sizeof(FLOAT_TYPE));
 		outman.UserMessageNoCR("%i\t", nstates);
 		outman.UserMessageNoCR("%i\t", numRateCats);
@@ -472,19 +487,19 @@ void CudaManager::TestGPUCLA() {
 		reference_CLA = (FLOAT_TYPE*) malloc(mem_size_CL_host);
 
 		// allocate host memory
-#ifdef CUDA_MEMORY_PINNED
+	if (pinned_memory_enabled) {
 		AllocatePinnedMemory((void**) &h_Lpr, mem_size_pr);
 		AllocatePinnedMemory((void**) &h_Rpr, mem_size_pr);
 		AllocatePinnedMemory((void**) &h_LCL, mem_size_CL_host);
 		AllocatePinnedMemory((void**) &h_RCL, mem_size_CL_host);
 		AllocatePinnedMemory((void**) &h_CLA, mem_size_CL_host);
-#else
+	} else {
 		h_Lpr = (FLOAT_TYPE*) malloc(mem_size_pr);
 		h_Rpr = (FLOAT_TYPE*) malloc(mem_size_pr);
 		h_LCL = (FLOAT_TYPE*) malloc(mem_size_CL_host);
 		h_RCL = (FLOAT_TYPE*) malloc(mem_size_CL_host);
 		h_CLA = (FLOAT_TYPE*) malloc(mem_size_CL_host);
-#endif
+	}
 
 		// allocate memory on gpu
 		if (nstates == 61) {
@@ -554,19 +569,19 @@ void CudaManager::TestGPUCLA() {
 			test_passed = false;
 
 		// free memory cuda allocated pinned memory on host
-#ifdef CUDA_MEMORY_PINNED
+	if (pinned_memory_enabled) {
 		FreePinnedMemory(h_Lpr);
 		FreePinnedMemory(h_Rpr);
 		FreePinnedMemory(h_LCL);
 		FreePinnedMemory(h_RCL);
 		FreePinnedMemory(h_CLA);
-#else
+	} else {
 		free(h_Lpr);
 		free(h_Rpr);
 		free(h_LCL);
 		free(h_RCL);
 		free(h_CLA);
-#endif
+	}
 
 		// free gpu memory
 		FreeGPU(d_Lpr);
@@ -662,7 +677,7 @@ void CudaManager::TestGPUDeriv() {
 		unsigned int mem_size_Tots_arr = sizeof(FLOAT_TYPE) * size_Tots_arr;
 
 		// allocate host memory
-#ifdef CUDA_MEMORY_PINNED
+	if (pinned_memory_enabled) {
 		AllocatePinnedMemory((void**) &h_countit, mem_size_int_char_host);
 		AllocatePinnedMemory((void**) &h_partial, mem_size_CL_host);
 		AllocatePinnedMemory((void**) &h_CL1, mem_size_CL_host);
@@ -680,7 +695,7 @@ void CudaManager::TestGPUDeriv() {
 		AllocatePinnedMemory((void**) &h_conStates, mem_size_int_char_host);
 		AllocatePinnedMemory((void**) &h_nchar_boot_index,
 				mem_size_nchar_boot_index);
-#else
+	} else {
 		h_countit = (int*) malloc(mem_size_int_char_host);
 		h_partial = (FLOAT_TYPE*) malloc(mem_size_CL_host);
 		h_CL1 = (FLOAT_TYPE*) malloc(mem_size_CL_host);
@@ -695,7 +710,7 @@ void CudaManager::TestGPUDeriv() {
 		h_Tots_arr = (FLOAT_TYPE*) malloc(mem_size_Tots_arr);
 		h_conStates = (int*) malloc(mem_size_int_char_host);
 		h_nchar_boot_index = (int*) malloc(mem_size_nchar_boot_index);
-#endif
+}
 
 		reference_Tots = (FLOAT_TYPE*) malloc(mem_size_Tots);
 
@@ -789,7 +804,7 @@ void CudaManager::TestGPUDeriv() {
 			test_passed = false;
 
 		// free memory cuda allocated memory on host
-#ifdef CUDA_MEMORY_PINNED
+	if (pinned_memory_enabled) {
 		FreePinnedMemory(h_countit);
 		FreePinnedMemory(h_partial);
 		FreePinnedMemory(h_CL1);
@@ -804,7 +819,7 @@ void CudaManager::TestGPUDeriv() {
 		FreePinnedMemory(h_Tots_arr);
 		FreePinnedMemory(h_conStates);
 		FreePinnedMemory(h_nchar_boot_index);
-#else
+	} else {
 		free(h_countit);
 		free(h_partial);
 		free(h_CL1);
@@ -819,7 +834,7 @@ void CudaManager::TestGPUDeriv() {
 		free(h_Tots_arr);
 		free(h_conStates);
 		free(h_nchar_boot_index);
-#endif
+	}
 
 		free(reference_Tots);
 
