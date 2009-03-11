@@ -39,9 +39,9 @@ CondLikeArray::~CondLikeArray(){
 	if(cudaman->GetPinnedMemoryEnabled())
 		FreePinnedMemory(arr);
 	else
-#else
-		delete []arr;
 #endif
+		delete []arr;
+
 
 #else
 		DeleteAlignedArray(arr);
@@ -58,9 +58,9 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	if(cudaman->GetPinnedMemoryEnabled())
 		FreePinnedMemory(arr);
 	else
-#else
-		delete []arr;
 #endif
+		delete []arr;
+
 #else
 		DeleteAlignedArray(arr);
 #endif
@@ -74,9 +74,9 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 if(cudaman->GetPinnedMemoryEnabled())
 	AllocatePinnedMemory((void**)&arr, sizeof(FLOAT_TYPE)*nk*nr*ns);
 else
-#else
-	arr=new FLOAT_TYPE[nk*nr*ns];
 #endif
+	arr=new FLOAT_TYPE[nk*nr*ns];
+
 
 #else
 	arr = NewAlignedArray<FLOAT_TYPE>(nk*nr*ns, CLA_ALIGNMENT);
