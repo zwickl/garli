@@ -17,15 +17,21 @@
 extern OutputManager outman;
 
 extern "C"
-bool CheckCuda() {
+bool CheckCuda(unsigned int device_number) {
     int deviceCount;
     bool cuda_support = false;
 
     CUDA_SAFE_CALL(cudaGetDeviceCount(&deviceCount));
     if (deviceCount == 0)
-    	outman.UserMessageNoCR("There is no device supporting CUDA\n");
-    else
-    	cuda_support = true;
+    	outman.UserMessageNoCR("There is no device supporting CUDA\n\n");
+    else {
+		cudaDeviceProp deviceProp;
+		CUDA_SAFE_CALL(cudaGetDeviceProperties(&deviceProp, device_number));
+		if ((deviceProp.major < 9999 && deviceProp.minor < 9999) && deviceProp.name != "")
+    		cuda_support = true;
+    	else
+    		outman.UserMessageNoCR("Unsupported CUDA device\n\n");
+    }
 
     return cuda_support;
 }

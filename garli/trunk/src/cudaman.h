@@ -26,6 +26,8 @@ public:
 
 	void ChangeNChar(int nchar_boot_in, const int* counts_in);
 
+	bool GetPinnedMemoryEnabled();
+
 	bool GetGPUCLAEnabled();
 	bool GetGPUDerivEnabled();
 
@@ -43,6 +45,7 @@ public:
 	FLOAT_TYPE GetDerivTots(int index);
 
 private:
+	bool pinned_memory_enabled;
 	bool gpu_cla_enabled, gpu_deriv_enabled;
 
 	int test_iterations;
@@ -114,7 +117,7 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // declaration, forward
 extern "C" {
-bool CheckCuda();
+bool CheckCuda(unsigned int device_number);
 
 void DeviceQuery();
 
