@@ -17,7 +17,7 @@
 extern OutputManager outman;
 
 CudaManager::CudaManager() {
-	gpu_cla_enabled = gpu_deriv_enabled = false;
+	pinned_memory_enabled = gpu_cla_enabled = gpu_deriv_enabled = false;
 }
 
 CudaManager::CudaManager(int nstates_in, int numRateCats_in, int nchar_in) {
@@ -79,6 +79,7 @@ void CudaManager::Initialization() {
 		if (test_iterations > 0)
 			TestGPU();
 	} else {
+		pinned_memory_enabled = false;
 		gpu_cla_enabled = false;
 		gpu_deriv_enabled = false;
 	}
