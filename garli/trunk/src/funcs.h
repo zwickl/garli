@@ -34,7 +34,7 @@ class InternalState{
 	private:
 	char best;
 	FLOAT_TYPE probs[4];
-	
+
 	public:
 	InternalState(FLOAT_TYPE *tots){
 		char bases[4]={'A', 'C', 'G', 'T'};
@@ -42,20 +42,20 @@ class InternalState{
 		FLOAT_TYPE tot=0.0;
 		tot = tots[0] + tots[1] + tots[2] + tots[3];
 		int max1=(tots[0] > tots[1] ? 0:1);
-		int max2=(tots[2] > tots[3] ? 2:3);	
+		int max2=(tots[2] > tots[3] ? 2:3);
 		best=bases[(tots[max1] > tots[max2] ? max1 : max2)];
 		for(int i=0;i<4;i++)
 			probs[i]=tots[i]/tot;
 		}
 	void Output(ofstream &out){
 		out << best << "\t" << probs[0] << "\t" << probs[1] <<  "\t" << probs[2] << "\t" <<  probs[3] << "\n";
-		
+
 		}
 	};
 
 bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
 
-#if defined(SINGLE_PRECISION_FLOATS) && !defined(_MSC_VER)
+#if defined(SINGLE_PRECISION_FLOATS) && (!defined(_MSC_VER)) || (defined(BOINC) && defined (_WIN32))
 //Overloaded versions of min and max that take different types for the two arguments
 //This should not be used in hot code when possible, and conditional comp should
 //be used to make two different versions of the code
@@ -102,7 +102,7 @@ inline void ArrayMultiply(FLOAT_TYPE *dest, const FLOAT_TYPE *source, int num){
 	for(register int i=0;i<num;i++)
 		*(dest++) *= *(source++);
 	}
-	
+
 inline void CalcSiteCLARateHetEquals(FLOAT_TYPE *dest, const FLOAT_TYPE *tCL, const FLOAT_TYPE *tp){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
@@ -128,7 +128,7 @@ inline void CalcSiteCLARateHetTimes(FLOAT_TYPE *dest, const FLOAT_TYPE *tCL, con
 		tCL+=4;
 		}
 					}
-			 
+
 
 
 
