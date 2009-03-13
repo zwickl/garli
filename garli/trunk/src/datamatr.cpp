@@ -276,6 +276,13 @@ int DataMatrix::PatternType( int k , unsigned int *stateCounts) const{
 		nStates = max(2, nStates);
 		}
 
+	//DEBUG
+/*	ofstream deb;
+	if(k==0) deb.open("pat.log");
+	else deb.open("pat.log", ios::app);
+	deb << k << "\t" << constant << "\t" << informative << "\t" << nStates << "\n";
+	deb.close();
+*/
 	//Note that numStates here may not be the true number of states in the
 	//case of ambiguity, but it really only matters that it is accurate in 
 	//discriminating 0/1/1+ states because code elsewhere depends on it.
