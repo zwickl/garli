@@ -2008,7 +2008,13 @@ void Population::PerformSearch(){
 			if(conf->searchReps > 1 && storedTrees.size() > 0){
 				WriteTreeFile(besttreefile.c_str(), best);
 				}
-			else WriteTreeFile(besttreefile.c_str());
+			//this was also a bug, like the one just below for single rep bootstrap runs.  Collapsed tree was not being written
+			//to file
+			//else WriteTreeFile(besttreefile.c_str());
+			else if(storedTrees.size() == 1)
+				WriteTreeFile(besttreefile.c_str(), 0);
+			else
+				WriteTreeFile(besttreefile.c_str());
 			}
 
 		if(conf->bootstrapReps > 0){
