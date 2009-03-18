@@ -1087,23 +1087,47 @@ class Model{
 			if(i != toRemainConstant) rateProbs[i] /= sum;
 			}
 
-		sum=0.0;
-		
-		double toRemainConstantContrib;
-		if(toRemainConstant > -1){
-			toRemainConstantContrib = rateMults[toRemainConstant]*rateProbs[toRemainConstant];
-			//this means that it isn't possible to rescale and keep one of the rate/probs constant
-			if(toRemainConstantContrib > ONE_POINT_ZERO)
+		//3/17/09 - it is possible for mult rescaling to cause two rates to "cross" if one is being held constant.  If
+		//that happens, try again without holding it constant.  It isn't safe to call CheckAndCorrectRateOrdering()
+		//from here because that would change the numbering of the rates and would screw things up at a higher level
+		//if e.g. rate 2 is being optimized but it suddenly becomes rate 3.  NOTE THAT THIS IS ONLY USED FOR Flex rates
+		//although M3 codon models are very similar, the normalization there happens differently through the rmat rescaling
+		bool OK = true;
+		FLOAT_TYPE backup_mults[20];
+		for(int r=0;r<NRateCats();r++)
+			backup_mults[r] = rateMults[r];
+		do{
+			double toRemainConstantContrib;
+			sum=0.0;
+			if(toRemainConstant > -1){
+				toRemainConstantContrib = rateMults[toRemainConstant]*rateProbs[toRemainConstant];
+				//this means that it isn't possible to rescale and keep one of the rate/probs constant
+				if(toRemainConstantContrib > ONE_POINT_ZERO)
+					toRemainConstant = -1;
+				}
+				
+			for(int i=0;i<NRateCats();i++){
+				if(i != toRemainConstant) sum += rateMults[i]*rateProbs[i];
+				}
+			if(toRemainConstant > -1) sum /= (ONE_POINT_ZERO - (rateMults[toRemainConstant] * rateProbs[toRemainConstant]));
+			for(int i=0;i<NRateCats();i++){
+				if(i != toRemainConstant) rateMults[i] /= sum;
+				}
+			//check if the rates are ordered properly
+			int r = 1;
+			for(;r<NRateCats();r++)
+				if(rateMults[r-1] > rateMults[r]){
+					OK = false;
+					break;
+					}
+			if(r == NRateCats()) OK = true;
+			if(toRemainConstant == -1) assert(OK);
+			if(!OK){//restore the rates and try again
+				for(int r=0;r<NRateCats();r++)
+					rateMults[r] = backup_mults[r];
 				toRemainConstant = -1;
-			}
-			
-		for(int i=0;i<NRateCats();i++){
-			if(i != toRemainConstant) sum += rateMults[i]*rateProbs[i];
-			}
-		if(toRemainConstant > -1) sum /= (ONE_POINT_ZERO - (rateMults[toRemainConstant] * rateProbs[toRemainConstant]));
-		for(int i=0;i<NRateCats();i++){
-			if(i != toRemainConstant) rateMults[i] /= sum;
-			}
+				}
+			}while(!OK);
 
 #ifndef NDEBUG
 		sum=0.0;
