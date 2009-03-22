@@ -58,6 +58,7 @@
 #ifdef CUDA_GPU
 #include "cudaman.h"
 CudaManager *cudaman;
+int cuda_device_number=0;
 #endif
 
 OutputManager outman;
@@ -134,6 +135,9 @@ void UsageMessage(char *execName){
 	outman.UserMessage("  -v, --version		print version information and exit");
 	outman.UserMessage("  -h, --help		print this help and exit");
 	outman.UserMessage("  -t			run internal tests (requires dataset and config file)");
+#ifdef CUDA_GPU
+	outman.UserMessage("  --device d_number	use specified CUDA device");
+#endif
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"\n");
 #endif
 	}
@@ -233,6 +237,9 @@ int main( int argc, char* argv[] )	{
 						UsageMessage(argv[0]);
 						exit(0);
 						}
+#ifdef CUDA_GPU
+					else if(!_stricmp(argv[curarg], "--device")) cuda_device_number = atoi(argv[++curarg]);
+#endif
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						UsageMessage(argv[0]);
@@ -434,7 +441,7 @@ int main( int argc, char* argv[] )	{
 
 #ifdef CUDA_GPU
 			cudaman = new CudaManager(modSpec.nstates, modSpec.numRateCats, data->NChar(),
-					CUDA_DEVICE_NUMBER, CUDA_TEST_ITERATIONS, CUDA_PRINT_TESTS, CUDA_PRINT_DEVICE_QUERY);
+					cuda_device_number, CUDA_TEST_ITERATIONS, CUDA_PRINT_TESTS, CUDA_PRINT_DEVICE_QUERY);
 #endif
 
 			//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
