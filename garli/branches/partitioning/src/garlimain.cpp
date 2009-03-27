@@ -54,7 +54,7 @@
 
 OutputManager outman;
 bool interactive;
-
+ 
 vector<ClaSpecifier> claSpecs;
 vector<DataSubsetInfo> dataSubInfo;
 
