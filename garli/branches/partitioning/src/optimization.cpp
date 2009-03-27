@@ -404,7 +404,11 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 				return prev-start;
 				}
 			lowBoundOvershoot++;
-			if(lowBoundOvershoot > 1)
+			//The previous behavior for low/high bracket overshooting caused rare problems because it automatically
+			//tried a value just inside the bracket if it was more than the first overshoot.  If the derivs at both
+			//the low and high brackets propose a value past the other, this can ping-pong back and forth making only
+			//very tiny moves inward, and crap out once 1000 reps have been completed.  Now just try near the bound once
+			if(lowBoundOvershoot == 2)
 				proposed = lowerBracket + epsilon;
 			else
 				proposed = (prevVal + lowerBracket) * ZERO_POINT_FIVE;
@@ -417,7 +421,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 				return prev-start;
 				}
 			upperBoundOvershoot++;
-			if(upperBoundOvershoot > 1)
+			if(upperBoundOvershoot == 2)
 				proposed = upperBracket - epsilon;
 			else
 				proposed = (prevVal + upperBracket) * ZERO_POINT_FIVE;
