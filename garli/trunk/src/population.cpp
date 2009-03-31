@@ -1286,7 +1286,7 @@ void Population::WritePopulationCheckpoint(ofstream &out) {
 void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 	long currentSeed = rnd.seed();
 	out.WRITE_TO_FILE(&currentSeed, sizeof(currentSeed), 1);
-	long currentTime = stopwatch.SplitTime();
+	int currentTime = stopwatch.SplitTime();
 	out.WRITE_TO_FILE(&currentTime, sizeof(currentTime), 1);
 
 	//7/13/07 changing this to calculate the actual size of the chunk of scalars
@@ -1326,7 +1326,7 @@ void Population::ReadPopulationCheckpoint(){
 #endif
 
 	int tmp;
-	fread((char *) &tmp, sizeof(int), 1, pin);
+	fread((char *) &tmp, sizeof(long), 1, pin);
 	rnd.set_seed(tmp);
 
 	fread((char *) &tmp, sizeof(int), 1, pin);
