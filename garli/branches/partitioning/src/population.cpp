@@ -1609,7 +1609,7 @@ void Population::Run(){
 				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
 				indiv[bestIndiv].SetDirty();
 				CalcAverageFitness();
-				outman.UserMessage("   Optimizing branchlengths... improved %8.3f lnL", bestFitness - before);
+				outman.UserMessage("   Optimizing branchlengths... improved %8.3f lnL", bestFitness - before - improve);
 
 /*				if(modSpec->IsCodon()){
 					before=bestFitness;
