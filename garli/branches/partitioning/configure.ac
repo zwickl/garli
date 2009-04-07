@@ -75,6 +75,9 @@ if test "$enable_debugging" = yes; then
 	   ])
 fi
 
+
+# we tell NCL that we will ignore asserts
+NCL_ASSERT_FLAG="-DIGNORE_NXS_ASSERT"
 # Check whether asserts should be allowed.
 AC_ARG_ENABLE(asserts,
 	AC_HELP_STRING([--enable-asserts],[build with asserts on (NDEBUG not defined)]), , [enable_asserts=no])
@@ -82,6 +85,9 @@ if test "$enable_asserts" = yes; then
 	AC_MSG_NOTICE([
 	   *** NOTE: compiling with assertions on (NDEBUG not defined)
 	   ])
+	if test "$enable_debugging" = yes; then
+		NCL_ASSERT_FLAG=""
+	fi
 fi
 
 # Compile openMP multithreaded version
@@ -241,7 +247,7 @@ if ! test -d "$NCL_LIB_DIR" ; then
 	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
 fi
 
-CPPFLAGS="$CPPFLAGS -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
+CPPFLAGS="$CPPFLAGS -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl $NCL_ASSERT_FLAG"
 if test -d "$NCL_LIB_DIR/ncl" ; then
 	LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR/ncl"
 else
