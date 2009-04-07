@@ -1459,6 +1459,8 @@ long NStateData::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 
 	long seedUsed = rnd.seed();
 
+	//for mkv this will include the dummy const char (the first), but it will
+	//have a resample prob of zero
 	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
 	
 	FLOAT_TYPE p=0.0;
@@ -1466,7 +1468,10 @@ long NStateData::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 		assert(origCounts[0] > 0);
 		assert(origCounts[1] > 0);
 		cumProbs[0] = ZERO_POINT_ZERO;
-		cumProbs[1]=(FLOAT_TYPE) origCounts[0] / ((FLOAT_TYPE) totalNChar - 1);
+		//there was a bug here in which origCounts[0] was used instead of origCounts[1].  As long
+		//as they were both 1 (meaning that the first column in the compressed matrix was only observed
+		//once) it should have worked fine, but should have thrown an assert or crashed otherwise
+		cumProbs[1]=(FLOAT_TYPE) origCounts[1] / ((FLOAT_TYPE) totalNChar - 1);
 		for(int i=2;i<nChar;i++){
 			cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar - 1);
 			assert(origCounts[i] > 0);
