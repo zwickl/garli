@@ -361,35 +361,42 @@ void GarliReader::FactoryDefaults()
 bool GarliReader::ReadData(const char* filename, const ModelSpecification &modspec){
 	//first use a few of my crappy functions to try to diagnose the type of file and data
 	//then call the NxsMultiFormatReader functions to process it
-	if (!FileExists(filename))	{
-		throw ErrorException("data file not found: %s!", filename);
-		}
-	//if it is Nexus, don't need to specify anything else in advance
-	if(FileIsNexus(filename)){
-		outman.UserMessage("Attempting to read data file in Nexus format (using NCL):\n\t%s ...", filename);
-		ReadFilepath(filename, NEXUS_FORMAT);
-		}
-	else if(FileIsFasta(filename)){
-		if(modspec.IsAminoAcid()){
-			outman.UserMessage("Attempting to read data file as Fasta amino acid sequence (using NCL):\n\t%s ...", filename);
-			ReadFilepath(filename, FASTA_AA_FORMAT);
+
+	try{
+		if (!FileExists(filename))	{
+			throw ErrorException("data file not found: %s!", filename);
 			}
-		else{ //DEBUG not sure how this will behave in the case of RNA
-			outman.UserMessage("Attempting to read data file as Fasta DNA sequence (using NCL):\n\t%s ...", filename);
-			ReadFilepath(filename, FASTA_DNA_FORMAT);
+		//if it is Nexus, don't need to specify anything else in advance
+		if(FileIsNexus(filename)){
+			outman.UserMessage("Attempting to read data file in Nexus format (using NCL):\n\t%s ...", filename);
+			ReadFilepath(filename, NEXUS_FORMAT);
 			}
+		else if(FileIsFasta(filename)){
+			if(modspec.IsAminoAcid()){
+				outman.UserMessage("Attempting to read data file as Fasta amino acid sequence (using NCL):\n\t%s ...", filename);
+				ReadFilepath(filename, FASTA_AA_FORMAT);
+				}
+			else{ //DEBUG not sure how this will behave in the case of RNA
+				outman.UserMessage("Attempting to read data file as Fasta DNA sequence (using NCL):\n\t%s ...", filename);
+				ReadFilepath(filename, FASTA_DNA_FORMAT);
+				}
+			}
+		else{//DEBUG assuming that otherwise the file is phylip format, and for the moment with relaxed names and non-interleaved
+			if(modspec.IsAminoAcid()){
+				outman.UserMessage("Attempting to read data file as Phylip amino acid sequence (using NCL):\n\t%s ...", filename);
+				ReadFilepath(filename, RELAXED_PHYLIP_AA_FORMAT);
+				}
+			else{
+				outman.UserMessage("Attempting to read data file as Phylip dna sequence (using NCL):\n\t%s ...", filename);
+				ReadFilepath(filename, RELAXED_PHYLIP_DNA_FORMAT);
+				}
+			}
+		return true;
 		}
-	else{//DEBUG assuming that otherwise the file is phylip format, and for the moment with relaxed names and non-interleaved
-		if(modspec.IsAminoAcid()){
-			outman.UserMessage("Attempting to read data file as Phylip amino acid sequence (using NCL):\n\t%s ...", filename);
-			ReadFilepath(filename, RELAXED_PHYLIP_AA_FORMAT);
-			}
-		else{
-			outman.UserMessage("Attempting to read data file as Phylip dna sequence (using NCL):\n\t%s ...", filename);
-			ReadFilepath(filename, RELAXED_PHYLIP_DNA_FORMAT);
-			}
+	catch(NxsException &err){
+		NexusError(err.msg, err.pos, err.line, err.col);
+		throw ErrorException("NCL encountered a problem reading the dataset.");
 		}
-	return true;
 	}
 
 /*----------------------------------------------------------------------------------------------------------------------
