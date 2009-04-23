@@ -1453,7 +1453,7 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 	//verify that every allowed state was observed for each character
 #ifndef NDEBUG
 	bool found;
-	for(int c = 0;c < nChar;c++){
+	for(int c = (type == ONLY_VARIABLE ? 1 : 0);c < nChar;c++){
 		for(int s = 0;s < maxNumStates;s++){
 			found = false;
 			for(int t = 0;t < nTax;t++){
