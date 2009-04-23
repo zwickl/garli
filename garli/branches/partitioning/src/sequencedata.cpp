@@ -1356,11 +1356,11 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 			consts.insert(num);
 		else if(ns == 0 && maxNumStates == 2)
 			outman.UserMessage("NOTE: entirely missing character #%d removed from matrix.", num+1);
-		else if(ns != maxNumStates){
-				realCharSet->erase(num);
-				}
+		if(ns != maxNumStates){
+			realCharSet->erase(num);
+			}
 		}
-	if(consts.size() > 0){
+	if(consts.size() > 0 && type == ONLY_VARIABLE){
 		string c = NxsSetReader::GetSetAsNexusString(consts);
 		throw ErrorException("Character number(s) %s is/are constant and are not allowed when using the Mkv\n\tmodel (as opposed to Mk), because it specifically assumes that all characters\n\tare variable.  Exclude the characters or change to datatype = standard.", c.c_str());
 		}
@@ -1416,8 +1416,18 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				unsigned char datum = '\0';
-				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = maxNumStates;
-				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = maxNumStates;
+				int poo = *cit;
+				if(charblock->IsGapState(origTaxIndex, *cit) == true){
+					//if gapmode=newstate is on (default is gapmode=missing) then need handle the gap properly
+					//changes in NCL should now have it correctly reporting the number of states with gaps {in, ex}cluded
+					if(charblock->GetGapModeSetting() == CharactersBlock::GAP_MODE_NEWSTATE)
+						datum = maxNumStates - 1;
+					else
+						datum = maxNumStates;
+					}
+				else if(charblock->IsMissingState(origTaxIndex, *cit) == true){
+					datum = maxNumStates;
+					}
 				else{
 					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
 					//assert(nstates == 1);
@@ -1440,6 +1450,22 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 			i++;
 			}
 		}
+	//verify that every allowed state was observed for each character
+#ifndef NDEBUG
+	bool found;
+	for(int c = 0;c < nChar;c++){
+		for(int s = 0;s < maxNumStates;s++){
+			found = false;
+			for(int t = 0;t < nTax;t++){
+				if(Matrix(t, c) == s){
+					found = true;
+					break;
+					}
+				}
+			assert(found);
+			}
+		}
+#endif
 	}
 
 //this is a virtual overload for NState because it might have to deal with the dummy char, which shouldn't be included in the resampling
