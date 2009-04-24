@@ -65,7 +65,7 @@ MyNexusToken::MyNexusToken(
 void MyNexusToken::OutputComment(
   const NxsString &msg)	/* the output comment to be displayed */
 	{
-	unsigned pos;
+	size_t pos;
 	string s;
 	//changing this again - just eating the Garli output comments
 	s = "GarliScore";
@@ -1380,7 +1380,7 @@ bool GarliReader::UserQuery(
 */
 inline void	GarliReader::OutputComment(const NxsString &msg)
 	{
-	unsigned pos;
+	size_t pos;
 	string s;
 	//changing this again - just eating the Garli output comments
 	s = "GarliScore";

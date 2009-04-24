@@ -322,7 +322,7 @@ int main( int argc, char* argv[] )	{
 			else
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC GARLI version 0.96beta8 rev%s (%s)\n", svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running BOINC GARLI version 0.961b rev%s (%s)\n", svnRev.c_str(), svnDate.c_str());
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -336,7 +336,7 @@ int main( int argc, char* argv[] )	{
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running GARLI version 0.96beta8 rev%s (%s)", svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running GARLI version 0.961b rev%s (%s)", svnRev.c_str(), svnDate.c_str());
 
 #endif
 
