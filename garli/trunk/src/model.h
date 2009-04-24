@@ -83,7 +83,7 @@ public:
 		maxv=mx;
 		fixed=false;
 		}
-	~BaseParameter(){};
+	virtual ~BaseParameter(){};
 /*	void Report(ostream &out){
 		out << "Type:\t" << name << "\n";
 		if(numElements > 1)
