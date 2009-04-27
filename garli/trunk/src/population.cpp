@@ -1325,12 +1325,13 @@ void Population::ReadPopulationCheckpoint(){
 	FILE *pin = fopen(str, "rb");
 #endif
 
-	int tmp;
-	fread((char *) &tmp, sizeof(long), 1, pin);
-	rnd.set_seed(tmp);
+	long seed;
+	fread((char *) &seed, sizeof(seed), 1, pin);
+	rnd.set_seed(seed);
 
-	fread((char *) &tmp, sizeof(int), 1, pin);
-	stopwatch.AddPreviousTime(tmp);
+	int t;
+	fread((char *) &t, sizeof(t), 1, pin);
+	stopwatch.AddPreviousTime(t);
 
 	//7/13/07 changing this to calculate the actual size of the chunk of scalars
 	//(the number of bytes between the start of the object and the first nonscalar
