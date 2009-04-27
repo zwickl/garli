@@ -1,0 +1,87 @@
+
+
+kernel void
+BranchLike2(float4 des<>, out float4 res<>, float pmat[16]){
+	res.x = des.x * pmat[0] + des.y * pmat[1] + des.z * pmat[2] + des.w * pmat[3];
+	res.y = des.x * pmat[4] + des.y * pmat[5] + des.z * pmat[6] + des.w * pmat[7];
+	res.z = des.x * pmat[8] + des.y * pmat[9] + des.z * pmat[10] + des.w * pmat[11];
+	res.w = des.x * pmat[12] + des.y * pmat[13] + des.z * pmat[14] + des.w * pmat[15];
+	}
+
+kernel void
+SecondBranchLike(float4 des<>, float4 part<>, out float4 res<>, float pmat[16]){
+	res.x = part.x * (des.x * pmat[0] + des.y * pmat[1] + des.z * pmat[2] + des.w * pmat[3]);
+	res.y = part.y * (des.x * pmat[4] + des.y * pmat[5] + des.z * pmat[6] + des.w * pmat[7]);
+	res.z = part.z * (des.x * pmat[8] + des.y * pmat[9] + des.z * pmat[10] + des.w * pmat[11]);
+	res.w = part.w * (des.x * pmat[12] + des.y * pmat[13] + des.z * pmat[14] + des.w * pmat[15]);
+	}
+/*
+kernel void
+SingleLikeKernel(float4 des<>, float4 des2<>, out float4 res<>, float pmat[32]){
+	res.x = des.x * pmat[0] + des.y * pmat[1] + des.z * pmat[2] + des.w * pmat[3];
+	res.y = des.x * pmat[4] + des.y * pmat[5] + des.z * pmat[6] + des.w * pmat[7];
+	res.z = des.x * pmat[8] + des.y * pmat[9] + des.z * pmat[10] + des.w * pmat[11];
+	res.w = des.x * pmat[12] + des.y * pmat[13] + des.z * pmat[14] + des.w * pmat[15];
+
+	res.x *= (des2.x * pmat[16] + des2.y * pmat[17] + des2.z * pmat[18] + des2.w * pmat[19]);
+	res.y *= (des2.x * pmat[20] + des2.y * pmat[21] + des2.z * pmat[22] + des2.w * pmat[23]);
+	res.z *= (des2.x * pmat[24] + des2.y * pmat[25] + des2.z * pmat[26] + des2.w * pmat[27]);
+	res.w *= (des2.x * pmat[28] + des2.y * pmat[29] + des2.z * pmat[30] + des2.w * pmat[31]);
+	}
+*/
+/*
+
+kernel void
+Product(float des1<>, float des2<>, out float res<>){
+	res = des1 * des2;
+	}
+	
+kernel void
+Product4(float4 des1<>, float4 des2<>, out float4 res<>){
+	res.x = des1.x * des2.x;
+	res.y = des1.y * des2.y;
+	res.z = des1.z * des2.z;
+	res.w = des1.w * des2.w;
+	}
+*/
+/*
+void DoOneBranchLike(float *des, float *res, float *pmat, int len){
+	float4 desstream<1>, resstream<1>;
+	//float pmatstream<4, 4>;
+	float pmatstream<16>;
+	
+	streamRead(desstream, des);
+	streamRead(resstream, res);
+	streamRead(pmatstream, pmat);
+	
+	BranchLike2(desstream, resstream, pmatstream);
+	streamWrite(resstream, res);
+	}
+*/
+/*	
+kernel void
+BranchLikeSecond(float4 des<>, float4 first<>, out float4 res<>, float pmat[4][4]){
+	res.x = first.x * (des.x * pmat[0][0] + des.y * pmat[0][1] + des.z * pmat[0][2] + des.w * pmat[0][3]);
+	res.y = first.y * (des.x * pmat[1][0] + des.y * pmat[1][1] + des.z * pmat[1][2] + des.w * pmat[1][3]);
+	res.z = first.z * (des.x * pmat[2][0] + des.y * pmat[2][1] + des.z * pmat[2][2] + des.w * pmat[2][3]);
+	res.w = first.w * (des.x * pmat[3][0] + des.y * pmat[3][1] + des.z * pmat[3][2] + des.w * pmat[3][3]);
+	}
+
+kernel void
+BranchLike2(float4 des<>, float4 des2<>, out float4 res<>, float pmat[4][4], float pmat2[4][4]){
+	res.x = (des.x * pmat[0][0] + des.y * pmat[0][1] + des.z * pmat[0][2] + des.w * pmat[0][3]) * (des2.x * pmat2[0][0] + des2.y * pmat2[0][1] + des2.z * pmat2[0][2] + des2.w * pmat2[0][3]);
+	res.y = (des.x * pmat[1][0] + des.y * pmat[1][1] + des.z * pmat[1][2] + des.w * pmat[1][3]) * (des2.x * pmat2[1][0] + des2.y * pmat2[1][1] + des2.z * pmat2[1][2] + des2.w * pmat2[1][3]);
+	res.z = (des.x * pmat[2][0] + des.y * pmat[2][1] + des.z * pmat[2][2] + des.w * pmat[2][3]) * (des2.x * pmat2[2][0] + des2.y * pmat2[2][1] + des2.z * pmat2[2][2] + des2.w * pmat2[2][3]);
+	res.w = (des.x * pmat[3][0] + des.y * pmat[3][1] + des.z * pmat[3][2] + des.w * pmat[3][3]) * (des2.x * pmat2[3][0] + des2.y * pmat2[3][1] + des2.z * pmat2[3][2] + des2.w * pmat2[3][3]);
+	}
+*/
+
+/*
+kernel void
+BranchLike(float4 des<>, out float4 res<>, float pmat[4][4]){
+	res.x = des.x * pmat[0][0] + des.y * pmat[0][1] + des.z * pmat[0][2] + des.w * pmat[0][3];
+	res.y = des.x * pmat[1][0] + des.y * pmat[1][1] + des.z * pmat[1][2] + des.w * pmat[1][3];
+	res.z = des.x * pmat[2][0] + des.y * pmat[2][1] + des.z * pmat[2][2] + des.w * pmat[2][3];
+	res.w = des.x * pmat[3][0] + des.y * pmat[3][1] + des.z * pmat[3][2] + des.w * pmat[3][3];
+	}
+*/
