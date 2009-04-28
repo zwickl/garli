@@ -382,8 +382,9 @@ int main( int argc, char* argv[] )	{
 #ifdef SUBROUTINE_GARLI
 			if(conf.randseed != -1)
 				throw ErrorException("You cannot specify a random number seed with the MPI version.  This would cause all of the\n\tindependent MPI processes to give exactly identical results.  Set randomseed to -1");
-			if(conf.checkpoint || conf.restart)
-				throw  ErrorException("Checkpointing cannot be used with the MPI version.  Set \"writecheckpoints\" and \"restart\" to 0");
+//DEBUG
+//			if(conf.checkpoint || conf.restart)
+//				throw  ErrorException("Checkpointing cannot be used with the MPI version.  Set \"writecheckpoints\" and \"restart\" to 0");
 #endif
 
 			//set up the model specification
@@ -482,7 +483,8 @@ int main( int argc, char* argv[] )	{
 					pop.SwapToCompletion(conf.startOptPrec);
 				}
 			else{
-				if(pop.conf->restart) pop.ReadStateFiles();
+				//if no checkpoint files are actually found conf->restart will be set to zero
+				if(pop.conf->restart) pop.conf->restart = pop.ReadStateFiles();
 
 				pop.SetOutputDetails();
 				if(pop.conf->bootstrapReps == 0){//NOT bootstrapping

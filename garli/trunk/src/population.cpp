@@ -1224,7 +1224,8 @@ void Population::WriteStateFiles(){
 		}
 	}
 
-void Population::ReadStateFiles(){
+//Returns whether or not checkpoints were actually found and read
+bool Population::ReadStateFiles(){
 	char name[100];
 
 	//read the adaptation binary checkpoint
@@ -1236,7 +1237,14 @@ void Population::ReadStateFiles(){
 	in = boinc_fopen(physical_name, "rb");
 
 #else
-	if(FileExists(name) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe checkpoint files were moved/deleted or the ofprefix setting\nin the config file was changed.", name));
+	if(FileExists(name) == false){
+	#if defined(SUBROUTINE_GARLI) || defined(OLD_SUBROUTINE_GARLI)
+		//for the MPI version we don't care if checkpoint files weren't found
+		return false;
+	#else
+		throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe checkpoint files were moved/deleted or the ofprefix setting\nin the config file was changed.", name));
+	#endif
+		}
 	in = fopen(name, "rb");
 #endif
 	adap->ReadFromCheckpoint(in);
@@ -1259,6 +1267,7 @@ void Population::ReadStateFiles(){
 		Tree::attemptedSwaps.ReadBinarySwapCheckpoint(sin);
 		fclose(sin);
 		}
+	return true;
 	}
 /*
 void Population::WritePopulationCheckpoint(ofstream &out) {
