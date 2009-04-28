@@ -19,7 +19,7 @@
 
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION 0.96
-#define MINOR_VERSION 0
+#define MINOR_VERSION "1b"
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
 #define SVN_REV "$Rev$"
 #define SVN_DATE "$Date$"
@@ -222,14 +222,14 @@ int main( int argc, char* argv[] )	{
 #endif
 					else if(argv[curarg][1]=='t') runTests = true;
 					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
-						outman.UserMessage("%s Version %.2f.r%s", PROGRAM_NAME, MAJOR_VERSION, svnRev.c_str());
+						outman.UserMessage("%s Version %.2f%s.r%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str());
 #ifdef SUBROUTINE_GARLI
 						outman.UserMessage("MPI run distributing version");
 #endif
 #ifdef OPEN_MP
 						outman.UserMessage("OpenMP multithreaded version");
 #endif
-						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2008");
+						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2009");
 						outman.UserMessage("zwickl@nescent.org");
 						exit(0);
 						}
@@ -322,7 +322,7 @@ int main( int argc, char* argv[] )	{
 			else
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC GARLI version 0.961b rev%s (%s)\n", svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running BOINC %s Version %.2f%s.r%s (%s)\n", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -336,7 +336,7 @@ int main( int argc, char* argv[] )	{
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running GARLI version 0.961b rev%s (%s)", svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running %s Version %.2f%s.r%s (%s)\n", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
 
 #endif
 
