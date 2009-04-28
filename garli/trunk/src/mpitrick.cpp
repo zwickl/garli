@@ -119,6 +119,25 @@ int main(int argc,char **argv){
 //send all of the processors the number of jobs total
   MPI_Bcast(&numJobsTotal, 1, MPI_INT, 0, comm);
 
+//DEBUG
+  //if startjob lockfiles exist at this point that must mean that a previous run bailed.  Remove them.
+  //Then processes will start those same runs and possibly restart from checkpoint (if any were being 
+  //written and restart=1 was specified).  Otherwise they will just start them over.
+  if(rank == 0){
+	for(int j = 0;j < numJobsTotal;j++){
+		char startfile[100], donefile[100];
+		sprintf(startfile, ".s-lock%d", j);
+		sprintf(donefile, ".d-lock%d", j);
+		if(FileExists(donefile)){
+			outman.UserMessage("It appears that run %d was completed in a previous MPI invocation.\n\tRun %d will not be rerun unless the hidden file \"%s\" and any checkpoint files for this run (if present) are deleted from this directory.", j, j, donefile);
+			}
+		else if(FileExists(startfile)){
+			outman.UserMessage("It appears that run %d was started but not completed in a previous MPI invocation.\n\tRun %d will either be re-run or restarted from a checkpoint (if restart = 1 was specified in the GARLI config file).", j, j);
+			remove(startfile);
+			}
+  		}
+	}
+
   int jobsCompleted = jobloop(rank,nproc,mycomm,numJobsTotal);
   outman.SetLogFileForAppend("mpi_messages.log");
   if(jobsCompleted > -1){
@@ -133,15 +152,17 @@ int main(int argc,char **argv){
   if(rank == 0)  outman.UserMessage("all processes completed at %s", MyFormattedTime().c_str());
   else nanosleep(&wait, NULL);//this is just to keep proper ordering in the output file
  
-   outman.UserMessage("process %d terminating", rank);
-  if(rank == 0){
+  outman.UserMessage("process %d terminating", rank);
+  
+//Not sure if deleting lock files should or should not be done.
+/*  if(rank == 0){
 	char temp[100];
 	for(int i=0;i<numJobsTotal;i++){
 		sprintf(temp, ".lock%d", i);
 		remove(temp);
 		}
 	}
-  
+  */
   MPI_Finalize();
   return 0;
 }
@@ -161,10 +182,17 @@ int jobloop(int mytid,int ntids,MPI_Comm comm, int numJobs){
 	nanosleep(&wait, NULL);
 #endif
 	while(jobNum < numJobs){
-		sprintf(temp, ".lock%d", jobNum);
-		if(FileExists(temp)) jobNum++;
+		//DEBUG
+		//sprintf(temp, ".lock%d", jobNum);
+		ofstream lock;
+		char startfile[100], donefile[100];
+		sprintf(startfile, ".s-lock%d", jobNum);
+		sprintf(donefile, ".d-lock%d", jobNum);
+		//DEBUG
+		
+		if(FileExists(donefile) || FileExists(startfile)) jobNum++;
 		else{
-			ofstream lock(temp);
+			lock.open(startfile);
 			lock.close();
 			outman.SetLogFileForAppend("mpi_messages.log");
 			outman.UserMessage("process %d starting run %d at %s", mytid, jobNum, MyFormattedTime().c_str());
@@ -176,6 +204,9 @@ int jobloop(int mytid,int ntids,MPI_Comm comm, int numJobs){
 				return -1;
 				}
 			jobsCompleted++;
+			lock.open(donefile);
+			lock.close();
+			remove(startfile);
 			jobNum++;
 			}
 		}
