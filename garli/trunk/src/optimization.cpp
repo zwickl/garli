@@ -408,8 +408,8 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 				}
 			else cont = true;
 			}
-		cur=lnL;
 #endif
+		cur=lnL;
 		FLOAT_TYPE d11=(cur-prev)/incr;
 
 #ifdef OPT_BOUNDED_LTRACE

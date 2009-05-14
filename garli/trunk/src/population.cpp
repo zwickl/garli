@@ -104,7 +104,7 @@ FLOAT_TYPE globalBest;
 
 //#undef VARIABLE_OPTIMIZATION
 
-#undef DETAILED_SWAP_REPORT
+//#undef DETAILED_SWAP_REPORT
 
 //#undef NO_EVOLUTION
 
@@ -1507,6 +1507,14 @@ void Population::Run(){
 				CalcAverageFitness();
 				outman.UserMessage("opt. precision reduced, optimizing branchlengths:%.4f -> %.4f", before, bestFitness);
 
+				before = bestFitness;
+				if(modSpec.IsCodon()) {
+					indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
+					indiv[bestIndiv].SetDirty();	
+					CalcAverageFitness();
+					outman.UserMessage("\t\t\toptimizing omega parameters:%.4f -> %.4f", before, bestFitness);
+					}
+
 /*				if(modSpec.IsCodon()){
 					before=bestFitness;
 					indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
@@ -1679,7 +1687,7 @@ void Population::FinalOptimization(){
 		if(modSpec.IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(max(adap->branchOptPrecision*0.1, 0.001));
 		else if(modSpec.IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(max(adap->branchOptPrecision*0.1, 0.001));
 		paramTot += paramOpt;
-		}while(paramOpt > ZERO_POINT_ZERO);
+		}while(paramOpt > 1.0e-2);
 
 	if(modSpec.IsFlexRateHet()){
 		outman.UserMessage("Flex optimization: %f", paramTot);
@@ -1692,6 +1700,12 @@ void Population::FinalOptimization(){
 
 		indiv[bestIndiv].CalcFitness(0);
 		outman.UserMessage("\tpass %d %.4f", pass++, indiv[bestIndiv].Fitness());
+		//optimize omega more often, since it can be very strongly correlated with blens
+		if(modSpec.IsCodon() && pass % 2 == 0) {
+			paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(max(adap->branchOptPrecision*0.1, 0.001));
+			outman.UserMessage("Omega optimization: %f", paramOpt);
+			incr += paramOpt;
+			}
 		}while(incr > .00001 || pass < 10);
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	unsigned totalSecs = stopwatch.SplitTime();
