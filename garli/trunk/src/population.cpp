@@ -372,7 +372,12 @@ void Population::CheckForIncompatibleConfigEntries(){
 
 	if(conf->inferInternalStateProbs && (modSpec.IsNucleotide() == false))
 		throw ErrorException("Sorry, internal state reconstruction not yet implemented for non-nucleotide models.\nPAML does a good job of this with fixed trees, so you might try using your best GARLI tree there.");
-	if(conf->inferInternalStateProbs && conf->bootstrapReps > 0) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
+	if(conf->inferInternalStateProbs && conf->bootstrapReps > 0) 
+		throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
+	if(conf->outputSitelikelihoods > 0 && conf->bootstrapReps > 0) 
+		throw(ErrorException("You cannont output site likelihoods during a bootstrap run!"));
+	if(conf->outputSitelikelihoods > 0 && conf->searchReps > 1)
+		throw(ErrorException("You cannont output site likelihoods during a multi-rep run (searchreps > 1)!"));
 	}
 
 void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r){
@@ -1959,6 +1964,20 @@ void Population::PerformSearch(){
 		else{
 			if(s.length() > 0) outman.UserMessage(">>>Terminated %s<<<\n", s.c_str());
 			outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
+			}
+
+		//output site likelihoods if requested
+		if(conf->outputSitelikelihoods > 0){
+			assert(conf->searchReps == 1 && conf->bootstrapReps == 0);
+			if(prematureTermination == false){
+				outman.UserMessage("Outputting site likelihoods ...");
+				}
+			else{
+				outman.UserMessage("WARNING: Site likelihoods being output on prematurely terminated run ...");
+				}
+			indiv[bestIndiv].treeStruct->sitelikeLevel = conf->outputSitelikelihoods;
+			indiv[bestIndiv].treeStruct->ofprefix = conf->ofprefix;
+			indiv[bestIndiv].treeStruct->Score();
 			}
 
 		int best=0;
