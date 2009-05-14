@@ -58,6 +58,7 @@ class GeneralGamlConfig{
 	string outgroupString;
 	unsigned searchReps;
 	unsigned runmode;
+	unsigned outputSitelikelihoods;
 
 	//finishing the run
 	bool enforceTermConditions;

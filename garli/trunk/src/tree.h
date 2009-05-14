@@ -103,6 +103,12 @@ class Tree{
 
 		int calcs;
 
+		//this controls the amount of site likelihood output. It is easier to just set it for the whole
+		//tree instead of passing it around a lot.  0 = no sitelikes, 1 = user level sitelikes, 2 = debugging
+		//it is NOT PERSISTENT, so after OutputSitelikes is called it is reset to 0
+		int sitelikeLevel;
+		string ofprefix;
+
 	enum{//the directions for sweeping of CLAs
 		DOWN = 1,
 		UPLEFT = 2,
@@ -285,7 +291,7 @@ class Tree{
 		void OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site);
 		void ClaReport(ofstream &cla);
 		FLOAT_TYPE CountClasInUse();
-		void OutputSiteLikelihoods(vector<double> &likes, const int *under1, const int *under2, ofstream &ordered, ofstream &packed);
+		void OutputSiteLikelihoods(vector<double> &likes, const int *under1, const int *under2);
 		void OutputSiteDerivatives(vector<double> &likes, vector<double> &d1s, vector<double> &d2s, const int *under1, const int *under2, ofstream &ordered, ofstream &packed);
 		void CountNumReservedClas(int &, int &, int&);
 		void CheckClaAssignments(TreeNode *nd);
