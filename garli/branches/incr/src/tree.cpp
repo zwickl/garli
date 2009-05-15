@@ -137,14 +137,14 @@ void Tree::CopyClaIndeces(const Tree *from, bool remove){
 #ifdef EQUIV_CALCS
 	if(from->dirtyEQ == false){
 		memcpy(allNodes[0]->tipData, from->allNodes[0]->tipData, data->NChar()*sizeof(char));
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++)
+		for(int i=numTipsTotal+1;i<allNodes.size();i++)
 			memcpy(allNodes[i]->tipData, from->allNodes[i]->tipData, data->NChar()*sizeof(char));
 		dirtyEQ = false;
 		}
 	else dirtyEQ = true;
 #endif
 
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		if(remove && (allNodes[i]->claIndexDown != -1))
 			claMan->DecrementCla(allNodes[i]->claIndexDown);
 		allNodes[i]->claIndexDown=from->allNodes[i]->claIndexDown;
@@ -159,7 +159,7 @@ void Tree::CopyClaIndeces(const Tree *from, bool remove){
 	if(allNodes[0]->claIndexUL != -1)
 		claMan->IncrementCla(allNodes[0]->claIndexUL);
 	
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		if(remove && (allNodes[i]->claIndexUL != -1))
 			claMan->DecrementCla(allNodes[i]->claIndexUL);
 		allNodes[i]->claIndexUL=from->allNodes[i]->claIndexUL;
@@ -174,7 +174,7 @@ void Tree::CopyClaIndeces(const Tree *from, bool remove){
 	if(allNodes[0]->claIndexUR != -1)
 		claMan->IncrementCla(allNodes[0]->claIndexUR);
 		
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		if(remove && (allNodes[i]->claIndexUR != -1))
 			claMan->DecrementCla(allNodes[i]->claIndexUR);
 		allNodes[i]->claIndexUR=from->allNodes[i]->claIndexUR;
@@ -196,7 +196,7 @@ void Tree::RemoveTreeFromAllClas(){
 		claMan->DecrementCla(root->claIndexUR);
 		root->claIndexUR=-1;
 		}
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		if(allNodes[i]->claIndexDown != -1){
 			claMan->DecrementCla(allNodes[i]->claIndexDown);
 			allNodes[i]->claIndexDown=-1;
@@ -353,10 +353,9 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	//if we are using this constructor, we can't guarantee that the tree will be specified unrooted (with
 	//a trifurcating root), so use an allocation function that is guaranteed to have enough room and then
 	//trifurcate and delete if necessary
-
 	AllocateTree();
 	TreeNode *temp=root;
-	root->attached=true;
+	root->SetAttached(true);
 	int current=numTipsTotal+1;
 	bool cont=false;
 	this->numBranchesAdded = 0;
@@ -540,7 +539,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			}
 		}
 	this->numBranchesAdded--; // now we reduce the count of branches because the outer () count as a branch, but we don't really use the branch leading to the root of the tree
-	
+
 	if((allowMissingTaxa == false) && (numTipsAdded != numTipsTotal))
 		throw ErrorException("Number of taxa in tree description (%d) not equal to number of\n\ttaxa in dataset (%d)!  Check tree string.", numTipsAdded, numTipsTotal);
 		
@@ -553,7 +552,9 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	assert(root->left->next!=root->right);
 
 	root->CheckforLeftandRight();
-	if(allowPolytomies == false) root->CheckforPolytomies();
+	if(allowPolytomies == false) {
+		root->CheckforPolytomies();
+		}
 	root->CheckTreeFormation();
 	bipartCond = DIRTY;
 	}
@@ -562,13 +563,14 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 //separating general tree construction stuff from CLA assignment/allocation
 //which will happend differently if the CLAs are shared or not
 Tree::Tree(){
-	allNodes=new TreeNode*[2*data->NTax()-2];
-	for(int i=0;i<2*data->NTax()-2;i++){
+	const unsigned nNodes = 2*data->NTax() - 2;
+	allNodes.assign(nNodes, (TreeNode *) 0L);
+	for(int i=0;i<nNodes;i++){
 		allNodes[i]=new TreeNode(i);
 		allNodes[i]->bipart=new Bipartition();
 		}
 	root=allNodes[0];
-	root->attached=true;
+	root->SetAttached(true);
 	//assign data to tips
 	for(int i=1;i<=data->NTax();i++){
 		if(modSpec.IsNucleotide()){
@@ -584,7 +586,6 @@ Tree::Tree(){
 	numTipsAdded=0;
 	numNodesAdded=1;//root
 	numTipsTotal=data->NTax();
-	numNodesTotal=2*data->NTax()-2;
 	lnL=0.0;
 
 	calcs=0;
@@ -595,7 +596,7 @@ Tree::Tree(){
 #ifdef EQUIV_CALCS
 	//need to do the root too, since that node is sometimes stolen
 	allNodes[0]->tipData = new char[data->NChar()];
-	for(int i=data->NTax()+1;i<numNodesTotal;i++){
+	for(int i=data->NTax()+1;i<allNodes.size();i++){
 		allNodes[i]->tipData = new char[data->NChar()];
 		}
 	dirtyEQ=true;
@@ -604,8 +605,9 @@ Tree::Tree(){
 
 void Tree::AllocateTree(){
 	calcs=0;
-	allNodes=new TreeNode*[2*data->NTax()-1];
-	for(int i=0;i<2*data->NTax()-1;i++){
+	const unsigned nNodes = 2*data->NTax() - 1;
+	allNodes.assign(nNodes, (TreeNode *) 0L);
+	for(int i=0;i<nNodes;i++){
 		allNodes[i]=new TreeNode(i);
 		allNodes[i]->bipart=new Bipartition();
 		}
@@ -624,20 +626,16 @@ void Tree::AllocateTree(){
 	numTipsAdded=0;
 	numNodesAdded=1;//root
 	numTipsTotal=data->NTax();
-	numNodesTotal=2*data->NTax()-1;
 	lnL=0.0;
 	numBranchesAdded=0;
 	taxtags=new int[numTipsTotal+1];
 	}
 
 Tree::~Tree(){
-	if(taxtags!=NULL) delete []taxtags;
-	if(allNodes!=NULL){
-		for(int x=0; x<numNodesTotal; x++){
-			delete *(allNodes+x);
-			}
-		delete []allNodes;
-		}
+	if(taxtags!=NULL)
+		delete []taxtags;
+	for(int x=0; x<allNodes.size(); x++)
+		delete allNodes[x];
 	}
 
 int Tree::BrlenMutate(){
@@ -646,11 +644,11 @@ int Tree::BrlenMutate(){
 	int numBrlenMuts;
 	if(rnd.uniform() < 0.05){//do a whole tree rescale occasionally
 		ScaleWholeTree();
-		numBrlenMuts = numNodesTotal - 1;
+		numBrlenMuts = allNodes.size() - 1;
 		}
 	else{
 		do{
-			numBrlenMuts=rnd.random_binomial(numNodesTotal-1, meanBrlenMuts);
+			numBrlenMuts=rnd.random_binomial(allNodes.size() - 1, meanBrlenMuts);
 			}while(numBrlenMuts==0);
 		for(int i=0;i<numBrlenMuts;i++){
 			int branch=GetRandomNonRootNode();
@@ -663,7 +661,7 @@ int Tree::BrlenMutate(){
 	}
 
 void Tree::PerturbAllBranches(){
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		allNodes[i]->dlen*=rnd.gamma(100);
 		}
 	MakeAllNodesDirty();
@@ -671,7 +669,7 @@ void Tree::PerturbAllBranches(){
 
 void Tree::RandomizeBranchLengths(FLOAT_TYPE lowLimit, FLOAT_TYPE highLimit){
 	FLOAT_TYPE range = (highLimit - lowLimit);
-	for(int i=1;i<numNodesTotal;i++){
+	for(int i=1;i<allNodes.size();i++){
 		allNodes[i]->dlen = lowLimit + (rnd.uniform() * range);
 		}
 	MakeAllNodesDirty();
@@ -679,14 +677,14 @@ void Tree::RandomizeBranchLengths(FLOAT_TYPE lowLimit, FLOAT_TYPE highLimit){
 
 void Tree::RandomizeBranchLengthsExponential(FLOAT_TYPE lambda){
 
-	for(int i=1;i<numNodesTotal;i++){
+	for(int i=1;i<allNodes.size();i++){
 		allNodes[i]->dlen = rnd.exponential(lambda);
 		}
 /*
 	FLOAT_TYPE low = log(lowLimit);
 	FLOAT_TYPE high = log(highLimit);
 	FLOAT_TYPE range = high - low;
-	for(int i=1;i<numNodesTotal;i++){
+	for(int i=1;i<allNodes.size();i++){
 		allNodes[i]->dlen = exp(low + rnd.uniform() * range);
 		}
 */
@@ -696,8 +694,8 @@ void Tree::RandomizeBranchLengthsExponential(FLOAT_TYPE lambda){
 void Tree::ScaleWholeTree(FLOAT_TYPE factor/*=-1.0*/){
 	if(factor==-1.0) factor = rnd.gamma( Tree::alpha );
 	//9-12-06 Stupid!  Why the hell was this only scaling the internals?
-	//for(int i=numTipsTotal;i<numNodesTotal;i++){
-	for(int i=1;i<numNodesTotal;i++){
+	//for(int i=numTipsTotal;i<allNodes.size();i++){
+	for(int i=1;i<allNodes.size();i++){
 		allNodes[i]->dlen*=factor;
 		allNodes[i]->dlen = (allNodes[i]->dlen > min_brlen ? (allNodes[i]->dlen < max_brlen ? allNodes[i]->dlen : max_brlen) : min_brlen);
 		assert(!(allNodes[i]->dlen < min_brlen));
@@ -764,7 +762,7 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 		t2=root->left->right;
 		l=root->left->dlen;
 		root->right->dlen+=l;
-		root->left->attached=false;
+		root->left->SetAttached(false);
 		if(clasAssigned){
 			root->left->claIndexDown=claMan->SetDirty(root->left->claIndexDown);
 			root->left->claIndexUL=claMan->SetDirty(root->left->claIndexUL);
@@ -784,7 +782,7 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 		t2=root->right->right;
 		l=root->right->dlen;
 		root->left->dlen+=l;
-	 	root->right->attached=false;
+	 	root->right->SetAttached(false);
 		if(clasAssigned){
 			root->right->claIndexDown=claMan->SetDirty(root->right->claIndexDown);
 			root->right->claIndexUL=claMan->SetDirty(root->right->claIndexUL);
@@ -811,17 +809,21 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 
 bool Tree::ArbitrarilyBifurcate(){
 	//note that this assumes that the root has been already been made into at least a trichotomy
-	if(numNodesAdded == numNodesTotal) return false;
+	if(numNodesAdded == allNodes.size())
+		return false;
+	assert (numNodesAdded < allNodes.size());
 	//first figure out which internal nodenums haven't been used yet
 	int placeInAllNodes=1;
-	while(allNodes[placeInAllNodes]->attached == true) placeInAllNodes++;
+	while(allNodes[placeInAllNodes]->IsAttached()) {
+		placeInAllNodes++;
+		}
 	vector<TreeNode*> nodes;
 	TreeNode *curNode = root;
 	TreeNode *desNode;
 	bool goingDown = false;
 	bool polytomiesFound = false;
 
-	while(numNodesAdded < numNodesTotal){
+	while(numNodesAdded < allNodes.size()){
 		if(curNode->IsInternal() && !goingDown){
 			desNode = curNode->left;
 			nodes.push_back(desNode);
@@ -881,7 +883,7 @@ bool Tree::ArbitrarilyBifurcate(){
 
 		nodes.clear();
 		}
-	assert(numNodesAdded == numNodesTotal);
+	assert(numNodesAdded == allNodes.size());
 	return polytomiesFound;
 	}
 
@@ -1462,7 +1464,6 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 //on a temporary tree
 void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, int range, bool furthestFirst){
 
-	TreeNode *cut;
 	int swapNum=0;
 
 	Individual tempIndiv;
@@ -1512,7 +1513,7 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 	startC = c;
 
 	while(1){
-		cut=tempIndiv.treeStruct->allNodes[c];
+		TreeNode * cut = tempIndiv.treeStruct->allNodes[c];
 		tempIndiv.treeStruct->GatherValidReconnectionNodes(range, cut, NULL);
 		tempIndiv.treeStruct->sprRang.SortByDist();
 		if(furthestFirst) tempIndiv.treeStruct->sprRang.Reverse();
@@ -1563,7 +1564,7 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 				}
 			}
 		c++;
-		if(c == numNodesTotal) c = 1;
+		if(c == allNodes.size()) c = 1;
 		if(newBest == true){
 			startC = c;
 			newBest = false;
@@ -1584,24 +1585,90 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 	tempIndiv.treeStruct=NULL;
 	}
 
+
+// returns true if we have a new best tree
+bool Tree::DeterministicSwapByDistAroundNode(
+  Individual & orig,
+  Individual & tempIndiv, 
+  TreeNode * cut,
+  double optPrecision,
+  int range,
+  int currentDist,
+  int c,
+  ostream & better,
+  int * swapNum,
+  int * acceptedSwaps,
+  FILE * log )  {
+	const size_t stringSize=(size_t)((data->NTax()*2)*(10+DEF_PRECISION));
+	std::string treeStringCleanup(stringSize, '\0');
+	char * treeString = const_cast<char *>(treeStringCleanup.c_str());
+
+	GatherValidReconnectionNodes(range, cut, NULL);
+	sprRang.SortByDist();
+	for(list<ReconNode>::iterator b = sprRang.GetFirstNodeAtDist(currentDist); b != sprRang.end() && b->reconDist == currentDist; b++) {
+		ReconNode * broken = &(*b);
+
+		//log the swap about to be performed.  Although this func goes through the swaps in order,
+		//there will be duplication because of the way that NNIs are performed.  Two different cut
+		//nodes can be reconnected with an NNI such that the same topology results
+		bool unique=false;
+		Bipartition proposed;
+		CalcBipartitions(true);
+		proposed.FillWithXORComplement(*cut->bipart, *allNodes[broken->nodeNum]->bipart);
+		unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+
+		if(unique){
+			if (swapNum)
+				(*swapNum) += 1;
+			if(broken->withinCutSubtree == true) {
+				tempIndiv.treeStruct->ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
+				}
+			else {
+				tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
+				}
+
+#			ifdef OUTPUT_ALL
+				tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+				all << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
+#			endif
+
+			if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
+				outman.UserMessage("%f\t%f\t%d\t%d", tempIndiv.treeStruct->lnL, lnL - tempIndiv.treeStruct->lnL, c, b->reconDist);
+
+				orig.CopySecByRearrangingNodesOfFirst(orig.treeStruct, &tempIndiv, true);
+				lnL = tempIndiv.treeStruct->lnL;
+
+				tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+				better << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
+				if (acceptedSwaps)
+					(*acceptedSwaps) += 1;
+				attemptedSwaps.ClearAttemptedSwaps();
+				return true;
+				}
+			else{
+				tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, &orig, true);
+				}
+			if(acceptedSwaps && log && swapNum &&  ((*swapNum) % 100 == 0))
+				fprintf(log, "%d\t%d\t%f\n", *swapNum, *acceptedSwaps, lnL);
+			}
+		}
+	return false;
+}
 //this is essentially a version of TopologyMutator that goes through cut nodes in order
 //and for each cut node goes through the broken nodes in order.  It the swaps are performed
 //on a temporary tree
 void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, int range, bool furthestFirst){
 
-	TreeNode *cut;
-	int swapNum=0;
-
 	Individual tempIndiv;
 	tempIndiv.treeStruct=new Tree();
-
 	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source);
 
 	//ensure that the starting tree is optimal up to the required precision
 	FLOAT_TYPE imp = 999.9;
-	do{
+	do {
 		imp = tempIndiv.treeStruct->OptimizeAllBranches(optPrecision);
-		}while(imp > 0.0);
+	}
+	while(imp > 0.0);
 
 	outman.UserMessage("starting score:%f", tempIndiv.treeStruct->lnL);
 
@@ -1613,107 +1680,51 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 	better.precision(9);
 	data->BeginNexusTreesBlock(better);
 
-#ifdef OUTPUT_ALL
-	if(furthestFirst) sprintf(str, "determAllDistR.%d.%f.tre", range, optPrecision);
-	else sprintf(str, "determAllDist.%d.%f.tre", range, optPrecision);
+#	ifdef OUTPUT_ALL
+		if(furthestFirst)
+			sprintf(str, "determAllDistR.%d.%f.tre", range, optPrecision);
+		else
+			sprintf(str, "determAllDist.%d.%f.tre", range, optPrecision);
+	
+		ofstream all(str);
+		data->BeginNexusTreesBlock(all);
+#	endif
 
-	ofstream all(str);
-	data->BeginNexusTreesBlock(all);
-#endif
-
-	if(furthestFirst) sprintf(str, "determDistR%d.%f.log", range, optPrecision);
-	else sprintf(str, "determDist%d.%f.log", range, optPrecision);
+	if(furthestFirst)
+		sprintf(str, "determDistR%d.%f.log", range, optPrecision);
+	else
+		sprintf(str, "determDist%d.%f.log", range, optPrecision);
 	FILE *log = fopen(str, "w");
 
 	//allocate a treeString
 	double taxsize=log10((double) ((double)data->NTax())*data->NTax()*2);
-	int stringSize=(int)((data->NTax()*2)*(10+DEF_PRECISION));
-	char *treeString=new char[stringSize];
-	stringSize--;
-	treeString[stringSize]='\0';
-	bool newBest=false;
 	attemptedSwaps.ClearAttemptedSwaps();
-	int startC, c=1;
-
-	int currentDist;
-	if(furthestFirst) currentDist = range;
-	else currentDist = 1;
+	int c = 1;
+	int currentDist = (furthestFirst ?  range : 1);
+	const int distIncr = (furthestFirst ? -1 : 1);
 	int acceptedSwaps = 0;
-	startC = c;
-	do{
-		cut=allNodes[c];
-		//outman.UserMessageNoCR("cut=%d ", c);
-		GatherValidReconnectionNodes(range, cut, NULL);
-		sprRang.SortByDist();
-
-		for(list<ReconNode>::iterator b = sprRang.GetFirstNodeAtDist(currentDist);b != sprRang.end() && b->reconDist == currentDist;b++){
-			ReconNode *broken = &(*b);
-
-			//log the swap about to be performed.  Although this func goes through the swaps in order,
-			//there will be duplication because of the way that NNIs are performed.  Two different cut
-			//nodes can be reconnected with an NNI such that the same topology results
-			bool unique=false;
-			Bipartition proposed;
-			CalcBipartitions(true);
-			proposed.FillWithXORComplement(*cut->bipart, *allNodes[broken->nodeNum]->bipart);
-			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
-
-			if(unique){
-				swapNum++;
-				if(broken->withinCutSubtree == true){
-					tempIndiv.treeStruct->ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
-					}
-				else{
-					tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
-					}
-
-#ifdef OUTPUT_ALL
-				tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
-				all << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
-#endif
-
-				if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
-					outman.UserMessage("%f\t%f\t%d\t%d", tempIndiv.treeStruct->lnL, lnL - tempIndiv.treeStruct->lnL, c, b->reconDist);
-
-					source->CopySecByRearrangingNodesOfFirst(source->treeStruct, &tempIndiv, true);
-					lnL = tempIndiv.treeStruct->lnL;
-
-					tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
-					better << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
-					newBest = true;
-					acceptedSwaps++;
-					attemptedSwaps.ClearAttemptedSwaps();
-					break;
-					}
-				else{
-					tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source, true);
-					}
-				if(swapNum %100 == 0) fprintf(log, "%d\t%d\t%f\n", swapNum, acceptedSwaps, lnL);
-				}
-			}
+	int startC = c;
+	int swapNum=0;
+	do {
+		const bool newBest = this->DeterministicSwapByDistAroundNode(*source, tempIndiv, allNodes[c], optPrecision, range, currentDist, c, better, &swapNum, &acceptedSwaps, log);
 		c++;
-		if(c == numNodesTotal) c = 1;
-		if(newBest == true){
+		if(c == allNodes.size())
+			c = 1;
+		if (newBest) {
 			startC = c;
-			if(furthestFirst)
-				currentDist = range;
-			else
-				currentDist = 1;
-			newBest = false;
-			}
+			currentDist = (furthestFirst ? range : 1);
+		}
 		else if(c == startC){
-			if(furthestFirst)
-				currentDist--;
-			else currentDist++;
+			currentDist += distIncr;
 			outman.UserMessage("dist = %d", currentDist);
-			}
-		}while(currentDist <= range && currentDist > 0);
+		}
+	}
+	while(currentDist <= range && currentDist > 0);
 
 	outman.UserMessage("done. %d swaps, %d accepted", swapNum, acceptedSwaps);
 
 	better << "end;";
 	better.close();
-	delete []treeString;
 	fclose(log);
 
 	tempIndiv.treeStruct->RemoveTreeFromAllClas();
@@ -1723,21 +1734,21 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 
 void Tree::FillAllSwapsList(ReconList *cuts, int reconLim){
 	CalcBipartitions(true);
-	for(int i=1;i<numNodesTotal;i++) cuts[i].clear();
-	for(int i=1;i<numNodesTotal;i++){
+	for(int i=1;i<allNodes.size();i++) cuts[i].clear();
+	for(int i=1;i<allNodes.size();i++){
 		GatherValidReconnectionNodes(cuts[i], reconLim, allNodes[i], NULL);
 		}
 	}
 
 unsigned Tree::FillWeightsForAllSwaps(ReconList *cuts, double *cutWeights){
 	double tot = 0.0, runningTot = 0.0;
-	for(int i=1;i<numNodesTotal;i++)
+	for(int i=1;i<allNodes.size();i++)
 		tot += cuts[i].size();
-	for(int i=1;i<numNodesTotal;i++){
+	for(int i=1;i<allNodes.size();i++){
 		runningTot += (double) cuts[i].size() / tot;
 		cutWeights[i] = runningTot;
 		}
-	cutWeights[numNodesTotal] = 1.0;
+	cutWeights[allNodes.size()] = 1.0;
 	return (unsigned) tot;
 	}
 
@@ -1789,8 +1800,8 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 	int c=1;
 
 	//zeroth element won't be used, for clarity of indexing
-	vector<ReconList> cuts(numNodesTotal+1);
-	vector<double> cutWeights(numNodesTotal+1);
+	vector<ReconList> cuts(allNodes.size()+1);
+	vector<double> cutWeights(allNodes.size()+1);
 	tempIndiv.treeStruct->FillAllSwapsList(&cuts[0], range);
 	unsigned swapsLeft = tempIndiv.treeStruct->FillWeightsForAllSwaps(&cuts[0], &cutWeights[0]);
 
@@ -1857,88 +1868,7 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 
 	outman.UserMessage("%d swaps before completion", swapsOnCurrent);
 
-/*	while(1){
-		int attempts = 0;
-		do{
-			c = GetRandomNonRootNode();
-			if(attempts++ > numNodesTotal){
-				int n=1;
-				while(completed[n] && n < numNodesTotal) n++;
-				if(n == numNodesTotal){
-					outman.UserMessage("done. %d swaps, %d accepted", swapNum, acceptedSwaps);
-
-					better << "end;";
-					better.close();
-					delete []treeString;
-					fclose(log);
-
-					tempIndiv.treeStruct->RemoveTreeFromAllClas();
-					delete tempIndiv.treeStruct;
-					tempIndiv.treeStruct=NULL;
-					return;
-					}
-				}
-			}while(completed[c]);
-		cut=allNodes[c];
-		//outman.UserMessageNoCR("cut=%d ", c);
-		GatherValidReconnectionNodes(range, cut, NULL);
-
-		//for(list<ReconNode>::iterator b = sprRang.GetFirstNodeAtDist(currentDist);b != sprRang.end() && b->reconDist == currentDist;b++){
-		bool noSwapFound = true;
-		listIt b;
-		while(sprRang.size() > 0){
-			b = sprRang.NthElement(rnd.random_int(sprRang.size()));
-			ReconNode *broken = &(*b);
-
-			//log the swap about to be performed.  Although this func goes through the swaps in order,
-			//there will be duplication because of the way that NNIs are performed.  Two different cut
-			//nodes can be reconnected with an NNI such that the same topology results
-			bool unique=false;
-			Bipartition proposed;
-			CalcBipartitions(true);
-			proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
-			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
-
-			if(unique){
-				swapNum++;
-				if(broken->withinCutSubtree == true){
-					tempIndiv.treeStruct->ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
-					}
-				else{
-					tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
-					}
-#ifdef OUTPUT_ALL
-				tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
-				all << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
-#endif
-
-				if(tempIndiv.treeStruct->lnL > (lnL+optPrecision)){
-					outman.UserMessage("%f\t%f\t%d\t%d", tempIndiv.treeStruct->lnL, lnL - tempIndiv.treeStruct->lnL, c, b->reconDist);
-					source->CopySecByRearrangingNodesOfFirst(source->treeStruct, &tempIndiv, true);
-					lnL = tempIndiv.treeStruct->lnL;
-
-					tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
-					better << "tree " << c << "." << b->reconDist << "= [&U][" << lnL << "]" << treeString << ";" << endl;
-					newBest = true;
-					acceptedSwaps++;
-					attemptedSwaps.ClearAttemptedSwaps();
-					for(int i=0;i<numNodesTotal;i++) completed[i] = 0;
-					break;
-					}
-				else{
-					tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source, true);
-					break;
-					}
-				}
-			else sprRang.RemoveElement(b);
-			}
-		if(swapNum %100 == 0) fprintf(log, "%d\t%d\t%f\n", swapNum, acceptedSwaps, lnL);
-		if(sprRang.size() == 0){
-			outman.UserMessage("completed %d", c);
-			completed[c] = 1;
-			}
-		}
-*/	}
+}
 
 //this function now returns the reconnection distance, with it being negative if its a
 //subtree reorientation swap
@@ -2673,124 +2603,142 @@ void Tree::ReorientSubtreeSPRMutate(int oroot, ReconNode *nroot, FLOAT_TYPE optP
 	bipartCond = DIRTY;
 	}
 
-void Tree::LoadConstraints(ifstream &con, int nTaxa){
+
+
+
+				
+void Tree::ReadNewickConstraint(const char * newick, bool numericalTaxa, bool isPositive) {				
+	//this is rather silly, but because any call to the Tree constructor will generate random
+	//branch lengths (even though this tree is only temporary for the reading of the constraint),
+	//it will change the seed.  So, store and restore it
+	int seed = rnd.seed();
+	//the last two arguments here specify that both polytomies and missing taxa (for backbone constraints) should be allowed
+	Tree contree(newick, numericalTaxa, true, true);
+	//check if the tree is completely constrained - users try to do that to optimize on a fixed
+	//topology, but that should be done by specifying a starting tree and a topoweight of zero
+	if(contree.numNodesAdded == contree.allNodes.size())
+		throw ErrorException("Constraint represents a fully resolved tree!\nIf you would like to fix the tree topology during a run,\ndo so by specifying your tree as a starting tree and\nsetting topoweight to 0.0");
+
+	rnd.set_seed(seed);
+
+	contree.CalcBipartitions(true);
+	vector<Bipartition> bip;
+	contree.root->GatherConstrainedBiparitions(bip);
+	if(bip.size() == 0)
+		throw ErrorException("Specified constraint does not constrain any relationships.\n\tSee manual for constraint format");
+	if( (!isPositive) && (bip.size() > 1))
+		throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch (bipartition):-(");
+
+	//BACKBONE - see if all taxa appear in this constraint or if its a backbone
+	if(contree.numTipsAdded < contree.numTipsTotal) {
+		Bipartition mask = *(contree.root->bipart);
+		//complement the mask if necessary
+		TreeNode *n = contree.root;
+		while(n->IsInternal())
+			n = n->left;
+		if (!mask.ContainsTaxon(n->nodeNum))
+			mask.Complement();
+
+		for(vector<Bipartition>::iterator bit=bip.begin();bit!=bip.end();bit++) {
+			constraints.push_back(Constraint(&(*bit), &mask, isPositive));
+		}
+	}
+	else {
+		for(vector<Bipartition>::iterator bit=bip.begin();bit!=bip.end();bit++) {
+			constraints.push_back(Constraint(&(*bit), isPositive));
+		}
+	}
+}
+void Tree::LoadConstraints(ifstream &con, int nTaxa) {
 	string temp;//=new char[numTipsTotal + 100];
 	Constraint constr;
-	int conNum=0;
-	do{
+	do {
 		temp.clear();
 		char c;
 		con.get(c);
-		do{
+		do {
 			temp += c;
 			con.get(c);
-			}while(c != '\n' && c!= '\r' && con.eof() == false);
-		while((con.peek() == '\n' || con.peek() == '\r') && con.eof() == false){
+		}
+		while(c != '\n' && c!= '\r' && con.eof() == false);
+		
+		while((con.peek() == '\n' || con.peek() == '\r') && con.eof() == false) {
 			con.get(c);
-			}
+		}
 
 		//getline works strangely on some compilers.  temp should end with ; or \0 , but
 		//might end with \r or \n
 		size_t len=temp.length();
 		char last=temp.c_str()[len-1];
-		while(last == '\r' || last == '\n' || last == ' '){
+		while(last == '\r' || last == '\n' || last == ' ') {
 			temp.erase(len-1, 1);
 			len--;
 			last=temp.c_str()[len-1];
-			}
-		if(temp[0] != '\0'){
-			if(temp[0] != '+' && temp[0] != '-') throw ErrorException("constraint string must start with \'+\' (positive constraint) or \'-\' (negative constraint)");
-			if(temp[1] == '.' || temp[1] == '*'){//if individual biparts are specified in *. format
+		}
+		if(temp[0] != '\0') {
+			if(temp[0] != '+' && temp[0] != '-')
+				throw ErrorException("constraint string must start with \'+\' (positive constraint) or \'-\' (negative constraint)");
+			if(temp[1] == '.' || temp[1] == '*') {//if individual biparts are specified in *. format
 				//while(temp[temp.length()-1] == ' ') temp.erase(temp.length()-1);//eat any spaces at the end
-				if(len != nTaxa+1) throw ErrorException("constraint # %d does not have the correct number of characters!\n(has %d) constraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format.  \nNote that backbone constraints cannot be specified in ...*** format.", conNum, len);
+				if(len != nTaxa+1)
+					throw ErrorException("constraint # %d does not have the correct number of characters!\n(has %d) constraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format.  \nNote that backbone constraints cannot be specified in ...*** format.", constraints.size(), len);
 				constr.ReadDotStarConstraint(temp.c_str());
 				constraints.push_back(constr);
-				conNum++;
-				}
-			else if(temp[1] == '('){//if a constraint tree in parenthetical notation is used
+			}
+			else if(temp[1] == '(') {//if a constraint tree in parenthetical notation is used
 				bool numericalTaxa=true;
-				for(unsigned i=0;i<len;i++){//see if we are dealing with a treestring with taxa as # or names
-					if(isalpha(temp[i])){
+				for(unsigned i=0;i<len;i++) {//see if we are dealing with a treestring with taxa as # or names
+					if(isalpha(temp[i])) {
 						numericalTaxa=false;
 						break;
-						}
-					}
-				bool pos;
-				if(temp[0] == '+') pos=true;
-				else pos=false;
-				//this is rather silly, but because any call to the Tree constructor will generate random
-				//branch lengths (even though this tree is only temporary for the reading of the constraint),
-				//it will change the seed.  So, store and restore it
-				int seed = rnd.seed();
-				//the last two arguments here specify that both polytomies and missing taxa (for backbone constraints) should be allowed
-				Tree contree(temp.c_str()+1, numericalTaxa, true, true);
-				//check if the tree is completely constrained - users try to do that to optimize on a fixed
-				//topology, but that should be done by specifying a starting tree and a topoweight of zero
-				if(contree.numNodesAdded == contree.numNodesTotal)
-					throw ErrorException("Constraint represents a fully resolved tree!\nIf you would like to fix the tree topology during a run,\ndo so by specifying your tree as a starting tree and\nsetting topoweight to 0.0");
-
-				rnd.set_seed(seed);
-
-				contree.CalcBipartitions(true);
-				vector<Bipartition> bip;
-				contree.root->GatherConstrainedBiparitions(bip);
-				if(bip.size() == 0) throw ErrorException("Specified constraint does not constrain any relationships.\n\tSee manual for constraint format");
-				if(pos==false && (bip.size() > 1)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch (bipartition):-(");
-				//BACKBONE - see if all taxa appear in this constraint or if its a backbone
-				if(contree.numTipsAdded < contree.numTipsTotal){
-					Bipartition mask = *(contree.root->bipart);
-					//complement the mask if necessary
-					TreeNode *n=contree.root;
-					while(n->IsInternal()) n = n->left;
-					if(mask.ContainsTaxon(n->nodeNum) == false) mask.Complement();
-
-					for(vector<Bipartition>::iterator bit=bip.begin();bit!=bip.end();bit++){
-						constraints.push_back(Constraint(&(*bit), &mask, pos));
-						conNum++;
-						}
-					}
-				else{
-					for(vector<Bipartition>::iterator bit=bip.begin();bit!=bip.end();bit++){
-						constraints.push_back(Constraint(&(*bit), pos));
-						conNum++;
-						}
 					}
 				}
-			else{
-				throw ErrorException("problem with constraint # %d\nconstraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format", conNum, len);
-				}
+				const bool isPositive = (temp[0] == '+');
+				ReadNewickConstraint(temp.c_str() + 1, numericalTaxa, isPositive);
 			}
-		}while(con.eof() == false);
-
-	//make sure the constraints are compatible with each other!
-	if(conNum > 1){
-		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
-			for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++){
-				if((*first).IsPositive() != (*sec).IsPositive()) throw ErrorException("cannot mix positive and negative constraints!");
-				if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
-				if((*first).ConstraintIsCompatibleWithConstraint((*sec)) == false) throw ErrorException("constraints are not compatible with one another!");
-			}
+			else {
+				throw ErrorException("problem with constraint # %d\nconstraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format", constraints.size(), len);
 			}
 		}
+	}
+	while(!con.eof());
+
+	//make sure the constraints are compatible with each other!
+	if(constraints.size() > 1) {
+		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++) {
+			for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++) {
+				if((*first).IsPositive() != (*sec).IsPositive())
+					throw ErrorException("cannot mix positive and negative constraints!");
+				if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false))
+					throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
+				if((*first).ConstraintIsCompatibleWithConstraint((*sec)) == false)
+					throw ErrorException("constraints are not compatible with one another!");
+			}
+		}
+	}
 	//summarize the constraint info to the screen
 	string str;
 	int num=1;
-	if(constraints[0].IsPositive()){
+	if(constraints[0].IsPositive()) {
 		outman.UserMessage("Found %d positively constrained bipartition(s)", constraints.size());
-		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
+		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++) {
 			(*first).NumericalOutput(str);
-			if((*first).IsBackbone()) outman.UserMessage("     Bipartition %d (backbone): %s", num, str.c_str());
-			else outman.UserMessage("     Bipartition %d: %s", num, str.c_str());
+			if((*first).IsBackbone())
+				outman.UserMessage("     Bipartition %d (backbone): %s", num, str.c_str());
+			else
+				outman.UserMessage("     Bipartition %d: %s", num, str.c_str());
 			num++;
-			}
-		}
-	else{
-		outman.UserMessage("Found 1 negatively (conversely) constrained bipartition");
-		constraints[0].NumericalOutput(str);
-		if(constraints[0].IsBackbone()) outman.UserMessage("     Bipartition %d (backbone): %s", num, str.c_str());
-		else outman.UserMessage("     Bipartition %d: %s", num, str.c_str());
 		}
 	}
+	else {
+		outman.UserMessage("Found 1 negatively (conversely) constrained bipartition");
+		constraints[0].NumericalOutput(str);
+		if(constraints[0].IsBackbone())
+			outman.UserMessage("     Bipartition %d (backbone): %s", num, str.c_str());
+		else
+			outman.UserMessage("     Bipartition %d: %s", num, str.c_str());
+	}
+}
 
 //this just "fakes" the swapping of the subtree rooted at cut to a postition as the sister of broken by adjusting the
 //biparts across the tree.  This should only be used for NORMAL SPR's not subtree reorient SPR's
@@ -3031,33 +2979,28 @@ void Tree::SPRMutate(int cutnum, int broknum, FLOAT_TYPE optPrecision, const vec
 	bipartCond = DIRTY;
 	}
 
+TreeNode * getCorrespondingNode(const TreeNode * s, std::vector<TreeNode *> & an);
+
+inline TreeNode * getCorrespondingNode(const TreeNode * s, std::vector<TreeNode *> & an)
+{
+	return (s == NULL ? NULL : an[s->nodeNum]); 
+}
+
 void Tree::MimicTopo(const Tree *source){
 //DZ 10-25-02 This should be much easier and faster using the allnodes array rather
 //than being recursive.  Notice that even if the allNodes array of source is not
 //ordered according to nodeNum, the new tree will be.
-	TreeNode **allNs=source->allNodes;
-	for(int i=0;i<source->numNodesTotal;i++){
-		if(allNs[i]->anc!=NULL)
-			allNodes[i]->anc=allNodes[allNs[i]->anc->nodeNum];
-		else allNodes[i]->anc=NULL;
-		if(allNs[i]->left!=NULL){
-			allNodes[i]->left=allNodes[allNs[i]->left->nodeNum];
-			allNodes[i]->right=allNodes[allNs[i]->right->nodeNum];
-			}
-		else{
-			allNodes[i]->left=NULL;
-			allNodes[i]->right=NULL;
-			}
-		if(allNs[i]->next!=NULL)
-			allNodes[i]->next=allNodes[allNs[i]->next->nodeNum];
-		else allNodes[i]->next=NULL;
-		if(allNs[i]->prev!=NULL)
-			allNodes[i]->prev=allNodes[allNs[i]->prev->nodeNum];
-		else allNodes[i]->prev=NULL;
+	const std::vector<TreeNode *> &allNs = source->allNodes;
+	for(int i=0;i<source->allNodes.size();i++) {
+		TreeNode * srcNd = allNs[i];
+		allNodes[i]->anc = getCorrespondingNode(srcNd->anc, allNodes);
+		allNodes[i]->left = getCorrespondingNode(srcNd->left, allNodes);
+		allNodes[i]->right = getCorrespondingNode(srcNd->right, allNodes);
+		allNodes[i]->next = getCorrespondingNode(srcNd->next, allNodes);
+		allNodes[i]->prev = getCorrespondingNode(srcNd->prev, allNodes);
 		allNodes[i]->dlen=allNs[i]->dlen;
-		allNodes[i]->attached=true;
+		allNodes[i]->SetAttached(srcNd->IsAttached());
 		}
-	numNodesTotal=source->numNodesTotal;
 	numNodesAdded=source->numNodesAdded;
 	numTipsAdded=source->numTipsAdded;
 	numBranchesAdded=source->numBranchesAdded;
@@ -3076,7 +3019,7 @@ void Tree::MimicTopo(TreeNode *nd, bool firstNode, bool sameModel){
 	//otherwise the replicated nodes will be marked as dirty
 	TreeNode *mnd;
 	mnd=allNodes[nd->nodeNum];
-	mnd->attached=true;
+	mnd->SetAttached(true);
 	if(!firstNode){
 		//stuff that should not be done for the root of the subtree
 		if(nd->anc){
@@ -3880,7 +3823,7 @@ void Tree::SortAllNodesArray(){
 	//having the nodes always in order will make some other operations much simpler
 	//the root(nodenum=0) and terminals(nodenums=1->Ntax) should already be in order, so just sort
 	//starting at Ntax+1.  I'm making up a kind of wacky algorithm for this. DZ 10-30-02
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		if(allNodes[i]->nodeNum!=i){
 			while(allNodes[i]->nodeNum!=i){
 				TreeNode *toPlace=allNodes[i];
@@ -3899,18 +3842,13 @@ void Tree::EliminateNode(int nn){
 	//at the root.  This isn't the prettiest thing, but I can't think of an obvious way to make a tree that has 3 des
 	//from the root in the first place
 	delete allNodes[nn];
-	for(int i=nn;i<numNodesTotal-1;i++){
+	for(int i=nn;i<allNodes.size()-1;i++){
 		allNodes[i]=allNodes[i+1];
 		allNodes[i]->nodeNum=i;
 		}
-	allNodes[numNodesTotal-1]=NULL;
-	numNodesTotal--;
-
-	//now make a new allNodes array of the proper length
-	TreeNode **newNodes=new TreeNode*[numNodesTotal];
-	memcpy(newNodes, allNodes, sizeof(TreeNode*)*numNodesTotal);
-	delete []allNodes;
-	allNodes=newNodes;
+	std::vector<TreeNode *>::iterator it = allNodes.begin();
+	it += nn;
+	allNodes.erase(it);
 	}
 
 //CAREFUL!  This is called from CheckBalance and assumes that this tree
@@ -4066,7 +4004,7 @@ void Tree::SwapAndFreeNodes(TreeNode *cop){
 	int tofree=cop->nodeNum;
 	//we need to actually swap the memory addresses of the nodes in the allnodes array so that all other node pointers in the
 	//tree stay correct
-	if(allNodes[tofree]->attached){
+	if(allNodes[tofree]->IsAttached()){
 		//find a node to swap with
 		int unused=FindUnusedNode(numTipsTotal+1);
 		TreeNode *tempnode=allNodes[unused];
@@ -4095,14 +4033,14 @@ void Tree::SwapAndFreeNodes(TreeNode *cop){
 //		assert(0);
 //		allNodes[tofree]->claIndex=claMan->SetDirty(allNodes[tofree]->nodeNum, allNodes[tofree]->claIndex, true);
 //		allNodes[unused]->claIndex=claMan->SetDirty(allNodes[unused]->nodeNum, allNodes[unused]->claIndex, true);
-		allNodes[unused]->attached=true;
-		allNodes[tofree]->attached=true;//actual its not attached, but we need to mark it as such so it isn't used as a connector
+		allNodes[unused]->SetAttached(true);
+		allNodes[tofree]->SetAttached(true);//actual its not attached, but we need to mark it as such so it isn't used as a connector
 		}
 	else//this is odd, but if a node will need to be used to
 		//mimic nodenums in the subtree, but was already unattached,
 		//we need to mark it as attached so that it isn't used for
 		//some other purpose.
-		allNodes[tofree]->attached=true;
+		allNodes[tofree]->SetAttached(true);
 
 	if(cop->left->left) SwapAndFreeNodes(cop->left);
 	if(cop->right->left) SwapAndFreeNodes(cop->right);
@@ -4523,21 +4461,21 @@ void Tree::MakeNodeDirty(TreeNode *nd){
 
 void Tree::RemoveTempClaReservations(){
 	if(memLevel > 1){
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		for(int i=numTipsTotal+1;i<allNodes.size();i++){
 			claMan->ClearTempReservation(allNodes[i]->claIndexDown);
 			}
 		}
 
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		claMan->ClearTempReservation(allNodes[i]->claIndexUR);
 		}
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		claMan->ClearTempReservation(allNodes[i]->claIndexUL);
 		}
 	}
 
 void Tree::ReclaimUniqueClas(){
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		if(claMan->GetNumAssigned(allNodes[i]->claIndexDown) == 1){
 			claMan->ReclaimSingleCla(allNodes[i]->claIndexDown);
 			}
@@ -4561,13 +4499,13 @@ void Tree::MarkUpwardClasToReclaim(int subtreeNode){
 			if(allNodes[0]->claIndexUR > 0)
 				claMan->MarkReclaimable(allNodes[0]->claIndexUR, 2);
 			}
-*/		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+*/		for(int i=numTipsTotal+1;i<allNodes.size();i++){
 //			claMan->MarkReclaimable(allNodes[i]->claIndexUL, 2, false);
 //			claMan->MarkReclaimable(allNodes[i]->claIndexUR, 2, false);
 			}
 		}
 	else{
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		for(int i=numTipsTotal+1;i<allNodes.size();i++){
 			if((allNodes[i]->nodeNum != subtreeNode) && (allNodes[i]->nodeNum != allNodes[subtreeNode]->anc->nodeNum)){
 				if(allNodes[i]->claIndexUL > 0){
 //					claMan->MarkReclaimable(allNodes[i]->claIndexUL, 2, false);
@@ -4587,19 +4525,19 @@ void Tree::MarkDownwardClasToReclaim(int subtreeNode){
 
 	if(subtreeNode==0){
 		if(memLevel<3){
-			for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+			for(int i=numTipsTotal+1;i<allNodes.size();i++){
 //				claMan->MarkReclaimable(allNodes[i]->claIndexDown, 1);
 				}
 			}
 		else{
-			for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+			for(int i=numTipsTotal+1;i<allNodes.size();i++){
 //				claMan->MarkReclaimable(allNodes[i]->claIndexDown, 1, false);
 				}
 			}
 		}
 	else{
 		return;  //I think that this is safe, since in general many fewer node will be necessary in subtree mode
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		for(int i=numTipsTotal+1;i<allNodes.size();i++){
 			if((allNodes[i]->nodeNum != subtreeNode) && (allNodes[i]->nodeNum != allNodes[subtreeNode]->anc->nodeNum)){
 				if(allNodes[i]->claIndexUL > 0){
 //					claMan->MarkReclaimable(allNodes[i]->claIndexUL, 1);
@@ -4618,7 +4556,7 @@ void Tree::MarkClasNearTipsToReclaim(int subtreeNode){
 		}
 	else{
 		return;  //I think that this is safe, since in general many fewer node will be necessary in subtree mode
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		for(int i=numTipsTotal+1;i<allNodes.size();i++){
 			if((allNodes[i]->nodeNum != subtreeNode) && (allNodes[i]->nodeNum != allNodes[subtreeNode]->anc->nodeNum)){
 				if(allNodes[i]->claIndexUL > 0){
 //					claMan->MarkReclaimable(allNodes[i]->claIndexUL, 1);
@@ -4702,7 +4640,7 @@ void Tree::CountNumReservedClas(int &clean, int &tempRes, int&res){
 		res += (claMan->IsClaReserved(allNodes[0]->claIndexUR));
 		tempRes += (claMan->IsClaTempReserved(allNodes[0]->claIndexUR));
 		}
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		if(claMan->IsDirty(allNodes[i]->claIndexDown)==false){
 			clean++;
 			res += (claMan->IsClaReserved(allNodes[i]->claIndexDown));
@@ -4760,7 +4698,7 @@ void Tree::OutputValidClaIndeces(){
 	if(claMan->IsDirty(allNodes[0]->claIndexDown)==false){
 		cla << "0\t" << allNodes[0]->claIndexDown << "\t" << claMan->GetNumAssigned(allNodes[0]->claIndexDown) << "\t" << claMan->GetReclaimLevel(allNodes[0]->claIndexDown) << "\t" << claMan->IsClaReserved(allNodes[0]->claIndexDown) <<"\n";
 		}
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		cla << i << "\t" << allNodes[i]->claIndexDown << "\t" << claMan->GetNumAssigned(allNodes[i]->claIndexDown) << "\t" << claMan->GetReclaimLevel(allNodes[i]->claIndexDown) << "\t" << claMan->IsClaReserved(allNodes[i]->claIndexDown) << "\n";
 		}
 	cla.close();
@@ -4833,7 +4771,7 @@ void Tree::ClaReport(ofstream &cla){
 	cla << "\n\t" << claMan->GetReclaimLevel(root->claIndexUL) << "\t" << claMan->GetNumAssigned(root->claIndexUL) << "\t" << claMan->GetClaNumber(root->claIndexUL);
 	cla << "\n\t" << claMan->GetReclaimLevel(root->claIndexUR)  << "\t" << claMan->GetNumAssigned(root->claIndexUR)  << "\t" << claMan->GetClaNumber(root->claIndexUR) << "\n";
 //	cla << "\t" << claMan->GetNumAssigned(root->claIndexDown) << "\t" << claMan->GetNumAssigned(root->claIndexUL) << "\t" << claMan->GetNumAssigned(root->claIndexUR)  << "\n";
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		TreeNode *n=allNodes[i];
 	cla << i << "\t" << claMan->GetReclaimLevel(n->claIndexDown) << "\t" << claMan->GetNumAssigned(n->claIndexDown) << "\t" << claMan->GetClaNumber(n->claIndexDown);
 	cla << "\n\t" << claMan->GetReclaimLevel(n->claIndexUL) << "\t" << claMan->GetNumAssigned(n->claIndexUL) << "\t" << claMan->GetClaNumber(n->claIndexUL);
@@ -4852,7 +4790,7 @@ FLOAT_TYPE Tree::CountClasInUse(){
 	if(claMan->IsDirty(root->claIndexDown) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(root->claIndexDown);
 	if(claMan->IsDirty(root->claIndexUL) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(root->claIndexUL);
 	if(claMan->IsDirty(root->claIndexUR) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(root->claIndexUR);
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		TreeNode *n=allNodes[i];
 		if(claMan->IsDirty(n->claIndexDown) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(n->claIndexDown);
 		if(claMan->IsDirty(n->claIndexUL) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(n->claIndexUL);
@@ -5863,7 +5801,7 @@ void Tree::NNIMutate(int node, int branch, FLOAT_TYPE optPrecision, int subtreeN
 	TreeNode* broken=NULL;
 	TreeNode* sib=NULL;
 
-	assert(node<numNodesTotal);
+	assert(node<allNodes.size());
 	connector = allNodes[node];
 	assert(connector->IsInternal());
 
@@ -5925,7 +5863,7 @@ void Tree::NNIMutate(int node, int branch, FLOAT_TYPE optPrecision, int subtreeN
 /*
 void Tree::OutputBinaryFormattedTree(ofstream &out) const{
 
-	for(int i=0;i<numNodesTotal;i++){
+	for(int i=0;i<allNodes.size();i++){
 		allNodes[i]->OutputBinaryNodeInfo(out);
 		}
 	out.write((char*) &lnL, sizeof(FLOAT_TYPE));
@@ -5933,7 +5871,6 @@ void Tree::OutputBinaryFormattedTree(ofstream &out) const{
 	out.write((char*) &numTipsAdded, sizeof(numTipsAdded));
 	out.write((char*) &numNodesAdded, sizeof(numNodesAdded));
 	out.write((char*) &numBranchesAdded, sizeof(numBranchesAdded));
-	out.write((char*) &numNodesTotal, sizeof(numNodesTotal));
 	}
 */
 
@@ -5944,9 +5881,10 @@ void Tree::OutputBinaryFormattedTree(OUTPUT_CLASS &out) const{
 	out.WRITE_TO_FILE(&numTipsAdded, sizeof(numTipsAdded), 1);
 	out.WRITE_TO_FILE(&numNodesAdded, sizeof(numNodesAdded), 1);
 	out.WRITE_TO_FILE(&numBranchesAdded, sizeof(numBranchesAdded), 1);
+	int numNodesTotal = allNodes.size();
 	out.WRITE_TO_FILE(&numNodesTotal, sizeof(numNodesTotal), 1);
 
-	for(int i=0;i<numNodesTotal;i++){
+	for(int i=0;i<allNodes.size();i++){
 		allNodes[i]->OutputBinaryNodeInfo(out);
 		}
 	}
@@ -5967,8 +5905,8 @@ void Tree::ReadBinaryFormattedTree(FILE *in){
 	fread((char*) &numTipsAdded, sizeof(numTipsAdded), 1, in);
 	fread((char*) &numNodesAdded, sizeof(numNodesAdded), 1, in);
 	fread((char*) &numBranchesAdded, sizeof(numBranchesAdded), 1, in);
+	int numNodesTotal;
 	fread((char*) &numNodesTotal, sizeof(numNodesTotal), 1, in);
-
 	int dum;
 
 	fread((char*) &dum, sizeof(dum), 1, in);
@@ -6009,7 +5947,7 @@ void Tree::ReadBinaryFormattedTree(FILE *in){
 		fread(&(allNodes[i]->dlen), sizeof(FLOAT_TYPE), 1, in);
 		}
 
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		fread((char*) &dum, sizeof(dum), 1, in);
 		allNodes[i]->left = allNodes[dum];
 
@@ -7226,7 +7164,6 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 		//return conditions
 		if(estImprove < optPrecision && d2 < ZERO_POINT_ZERO){
 			ScaleWholeTree(ONE_POINT_ZERO/effectiveScale);
-			//cout << pass << endl;
 			return make_pair<FLOAT_TYPE, FLOAT_TYPE>(effectiveScale, prev);
 			}
 

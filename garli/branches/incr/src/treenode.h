@@ -43,14 +43,16 @@ class TreeNode{
  		int claIndexUL;
  		int claIndexUR;
  		FLOAT_TYPE dlen;
-		bool attached;
+		bool isAttached;
 		bool alreadyOptimized;
 		Bipartition *bipart;
 		char *tipData;
 #ifdef OPEN_MP
 		unsigned *ambigMap;
 #endif
-
+		bool IsAttached() const {return this->isAttached;}
+		void SetAttached(bool v);
+		
 		TreeNode( const int i = -1 );
 		~TreeNode();
 		
@@ -99,7 +101,8 @@ class TreeNode{
 		void StandardizeBipartition();
 		void GatherConstrainedBiparitions(vector<Bipartition> &biparts);
 		void OutputBipartition(ostream &out);
-		void PrintSubtreeMembers(ofstream &out);
+		void PrintSubtree(std::ostream &out, bool n=false);
+		void PrintSubtreeMembers(std::ostream &out);
 		void SetUnoptimized(){
 			alreadyOptimized=false;
 			if(left) left->SetUnoptimized();

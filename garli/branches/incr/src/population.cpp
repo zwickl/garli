@@ -998,9 +998,11 @@ void Population::ResetMemLevel(int numNodesPerIndiv, int numClas){
 void Population::GetConstraints(){
 	//first see if there are any constraints
 	if((strlen(conf->constraintfile.c_str()) != 0) && (_stricmp(conf->constraintfile.c_str(), "none") != 0)){
-		if(FileIsNexus(conf->constraintfile.c_str())) throw ErrorException("Sorry, Garli doesn't allow constraint trees in Nexus format.\n     See the manual for proper constraint format.");
+		if(FileIsNexus(conf->constraintfile.c_str()))
+			throw ErrorException("Sorry, Garli doesn't allow constraint trees in Nexus format.\n     See the manual for proper constraint format.");
 		ifstream con(conf->constraintfile.c_str());
-		if(con.good() == false) throw ErrorException("Could not open constraint file %s!", conf->constraintfile.c_str());
+		if(con.good() == false)
+			throw ErrorException("Could not open constraint file %s!", conf->constraintfile.c_str());
 		if(con.good()){
 			outman.UserMessage("Loading constraints from file %s", conf->constraintfile.c_str());
 			Tree::LoadConstraints(con, data->NTax());
