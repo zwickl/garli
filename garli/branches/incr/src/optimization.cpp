@@ -99,9 +99,9 @@ void Tree::OptimizeBranchesInArray(int *nodes, int numNodes, FLOAT_TYPE optPreci
 FLOAT_TYPE Tree::OptimizeAllBranches(FLOAT_TYPE optPrecision){
 	FLOAT_TYPE improve=ZERO_POINT_ZERO;
 	SetNodesUnoptimized();
-	improve = RecursivelyOptimizeBranches(root->left, optPrecision, 0, numNodesTotal, true, improve, true);
-	improve = RecursivelyOptimizeBranches(root->left->next, optPrecision, 0, numNodesTotal, true, improve, true);
-	improve = RecursivelyOptimizeBranches(root->right, optPrecision, 0, numNodesTotal, true, improve, true);
+	improve = RecursivelyOptimizeBranches(root->left, optPrecision, 0, allNodes.size(), true, improve, true);
+	improve = RecursivelyOptimizeBranches(root->left->next, optPrecision, 0, allNodes.size(), true, improve, true);
+	improve = RecursivelyOptimizeBranches(root->right, optPrecision, 0, allNodes.size(), true, improve, true);
 
 	return improve;
 	}

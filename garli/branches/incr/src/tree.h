@@ -54,7 +54,6 @@ class Tree{
 		int numTipsAdded;
 		int numNodesAdded;
 		int numBranchesAdded;
-		int numNodesTotal;
 		int *taxtags;//int[ntax+1] used in tagging terminals in recombine function
 			//allocated in SharedTreeConstruction, deleted in dest
 
@@ -64,7 +63,7 @@ class Tree{
 		Model *mod;
 	public:
 		TreeNode *root;
-		TreeNode **allNodes;
+		std::vector<TreeNode *> allNodes;
 		ReconList sprRang;
 
 #ifdef EQUIV_CALCS
@@ -176,6 +175,7 @@ class Tree{
 
 		// mutation functions
 		int TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode);
+		bool DeterministicSwapByDistAroundNode(Individual & original, Individual & tempIndiv, TreeNode *cut,  double optPrecision, int range, int currentDist, int c, std::ostream & better, int *swapNum=0L, int * acceptedSwaps=0L, FILE * log = 0L);
 		void DeterministicSwapperByDist(Individual *source, double optPrecision, int range, bool furthestFirst);
 		void DeterministicSwapperByCut(Individual *source, double optPrecision, int range, bool furthestFirst);
 		void DeterministicSwapperRandom(Individual *source, double optPrecision, int range);
@@ -205,6 +205,8 @@ class Tree{
 
 		//functions for dealing with constraints and bipartitions
 		static void LoadConstraints(ifstream &con, int nTaxa);
+		static void ReadNewickConstraint(const char * newick, bool numericalTaxa, bool isPositive);
+
 		bool SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, ReconNode *broken, const Bipartition &proposed, const Bipartition *partialMask);
 		
 		//functions for determining if adding a particular taxon to a particular place in a growing tree is allowed by any constraints
@@ -279,12 +281,12 @@ class Tree{
 		void RescaleRateHetNState(CondLikeArray *destCLA);
 
 		void StoreBranchlengths(vector<FLOAT_TYPE> &blens){
-			for(int n=1;n<numNodesTotal;n++)
+			for(int n=1;n<allNodes.size();n++)
 				blens.push_back(allNodes[n]->dlen);
-			assert(blens.size() == (size_t)(numNodesTotal - 1));
+			assert(blens.size() == (size_t)(allNodes.size() - 1));
 			}
 		void RestoreBranchlengths(vector<FLOAT_TYPE> &blens){
-			for(int n=1;n<numNodesTotal;n++)
+			for(int n=1;n<allNodes.size();n++)
 				SetBranchLength(allNodes[n], blens[n-1]);
 			MakeAllNodesDirty();
 			}
@@ -324,10 +326,10 @@ class Tree{
 		//accessor funcs
 		bool IsGood() const {return root->IsGood();}
 		int getNumTipsTotal() const {return numTipsTotal;}
-		int getNumNodesTotal() const {return numNodesTotal;}
+		int getNumNodesTotal() const {return allNodes.size();}
 		int GetRandomInternalNode() const {return numTipsTotal+rnd.random_int(numTipsTotal-3)+1;}
 		int GetRandomTerminalNode() const {return rnd.random_int(numTipsTotal)+1;}
-		int GetRandomNonRootNode() const {return rnd.random_int(numNodesTotal-1)+1;}
+		int GetRandomNonRootNode() const {return rnd.random_int(allNodes.size()-1)+1;}
 
 		//odds and ends
 		void PerturbAllBranches();
@@ -350,7 +352,7 @@ class Tree{
 
 
 inline void Tree::CopyBranchLens(const Tree *s){
-	for(int i=1;i<numNodesTotal;i++)
+	for(int i=1;i<allNodes.size();i++)
 		allNodes[i]->dlen=s->allNodes[i]->dlen;
 	}
 
@@ -358,7 +360,7 @@ inline void Tree::MakeAllNodesDirty(){
 	root->claIndexDown=claMan->SetDirty(root->claIndexDown);
 	root->claIndexUL=claMan->SetDirty(root->claIndexUL);
 	root->claIndexUR=claMan->SetDirty(root->claIndexUR);
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		allNodes[i]->claIndexDown=claMan->SetDirty(allNodes[i]->claIndexDown);
 		allNodes[i]->claIndexUL=claMan->SetDirty(allNodes[i]->claIndexUL);
 		allNodes[i]->claIndexUR=claMan->SetDirty(allNodes[i]->claIndexUR);
@@ -367,8 +369,8 @@ inline void Tree::MakeAllNodesDirty(){
 	}
 	
 inline int Tree::FindUnusedNode(int start){
-	for(int i=start;i<numNodesTotal;i++)
-		if(!(allNodes[i]->attached))
+	for(int i=start;i<allNodes.size();i++)
+		if(!(allNodes[i]->IsAttached()))
 			{allNodes[i]->left=allNodes[i]->right=NULL;
 			return i;
 			}
@@ -383,7 +385,7 @@ inline void Tree::AssignCLAsFromMaster(){
 	allNodes[0]->claIndexDown=claMan->AssignClaHolder();
 	allNodes[0]->claIndexUL=claMan->AssignClaHolder();
 	allNodes[0]->claIndexUR=claMan->AssignClaHolder();
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		assert(allNodes[i]->claIndexDown==-1);
 		allNodes[i]->claIndexDown=claMan->AssignClaHolder();
 		allNodes[i]->claIndexUL=claMan->AssignClaHolder();
@@ -433,19 +435,19 @@ inline CondLikeArray *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/){
 
 inline void Tree::ProtectClas(){
 	if(memLevel != 3){
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		for(int i=numTipsTotal+1;i<allNodes.size();i++){
 			claMan->ReserveCla(allNodes[i]->claIndexDown, false);
 			}
 		}
 	else{
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+		for(int i=numTipsTotal+1;i<allNodes.size();i++){
 			if(allNodes[i]->left->IsInternal() && allNodes[i]->right->IsInternal()) claMan->ReserveCla(allNodes[i]->claIndexDown, false);
 			}
 		}
 	}
 
 inline void Tree::UnprotectClas(){
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
+	for(int i=numTipsTotal+1;i<allNodes.size();i++){
 		if(allNodes[i]->claIndexDown > -1)
 			claMan->UnreserveCla(allNodes[i]->claIndexDown);
 		}

@@ -553,5 +553,12 @@ private:
 							   Individual & scratchIndividual,
 							   unsigned repN,
 							   unsigned nReps);
+		void AddTaxonSwap(const NxsFullTreeDescription & treeDesc,
+							   unsigned attachmentsPerTaxonVar,
+							   FLOAT_TYPE branchOptPrecisionVar, 
+							   Individual & scratchIndividual,
+							   unsigned repN,
+							   unsigned nReps);
+
 };
 #endif

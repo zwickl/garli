@@ -35,10 +35,15 @@ extern OutputManager outman;
 
 #undef DEBUG_RECOMBINEWITH
 
+
+void TreeNode::SetAttached(bool v) 
+{
+	this->isAttached = v;
+}
+
 TreeNode::TreeNode( const int no )
-	: left(0), right(0), next(0), prev(0), anc(0), tipData(0L), bipart(0L)
-{	attached =false;
-	
+	: left(0), right(0), next(0), prev(0), anc(0), isAttached(false), tipData(0L), bipart(0L)
+{	
 	claIndexDown=-1;
 	claIndexUL=-1;
 	claIndexUR=-1;
@@ -77,7 +82,7 @@ TreeNode* TreeNode::AddDes(TreeNode *d){
 		left=d;
 		d->prev=NULL;
 		}
-	d->attached=true;
+	d->SetAttached(true);
 
 /* GANESH added this */
 #ifdef PECR_SET_PARSIMONY_BRLEN
@@ -176,7 +181,7 @@ void TreeNode::Prune()
 {	//DZ 7-6 removing adjustments to branch lengths when pruning, which just result in adding a whole bunch of length
 	//to the whole tree, making the dlens get longer and longer and longer as the run progresses
 	assert(anc);//never call with this=root
-	attached=false;
+	SetAttached(false);
 	if(anc->anc)
 		{//not connected to the root
 		if(anc->left->next==anc->right)
@@ -187,7 +192,7 @@ void TreeNode::Prune()
 				sis=anc->left;
 //			sis->dlen+=anc->dlen;
 			anc->SubstituteNodeWithRespectToAnc(sis);
-			anc->attached=false;
+			anc->SetAttached(false);
 			}
 		else
 			{
@@ -220,7 +225,7 @@ void TreeNode::Prune()
 					temp=anc->left;
 					temp->SubstituteNodeWithRespectToAnc(temp->left);
 					anc->AddDes(temp->right);
-					temp->attached=false;
+					temp->SetAttached(false);
 					}
 				else
 					if(anc->right->left){
@@ -228,7 +233,7 @@ void TreeNode::Prune()
 						temp=anc->right;
 						temp->SubstituteNodeWithRespectToAnc(temp->left);
 						anc->AddDes(temp->right);
-						temp->attached=false;
+						temp->SetAttached(false);
 						}
 				}
 		
@@ -252,8 +257,8 @@ void TreeNode::SubstituteNodeWithRespectToAnc(TreeNode *subs)//note THIS DOESN't
 			next->prev=subs;
 		if(prev)
 			prev->next=subs;
-		subs->attached=true;
-		attached=false;
+		subs->SetAttached(true);
+		SetAttached(false);
 		next=prev=anc=NULL;
 }
 
@@ -336,7 +341,7 @@ void TreeNode::MarkTerminals(int *taxtags){
 }
 
 void TreeNode::MarkUnattached(bool includenode){
-	attached=false;
+	SetAttached(false);
 	if(left)
 		left->MarkUnattached(false);
 	if(next&&includenode==false)
@@ -376,7 +381,7 @@ TreeNode* TreeNode::FindNode( int &n){
 }
 
 bool TreeNode::IsGood()
-{	if(attached || !anc)
+{	if(IsAttached() || !anc)
 		{if(!left && right)
 			return false;
 		if(!anc)
@@ -648,10 +653,27 @@ void TreeNode::FlipBlensToNode(TreeNode *from, TreeNode *stopNode){
 	else dlen=from->dlen;
 	}
 
-void TreeNode::PrintSubtreeMembers(ofstream &out){
-	if(IsTerminal()) out << nodeNum << "\t"; 
-	else left->PrintSubtreeMembers(out);
-	if(next!=NULL) next->PrintSubtreeMembers(out);
+
+void TreeNode::PrintSubtree(std::ostream &out, bool n) {
+	if(IsTerminal())
+		out << nodeNum; 
+	else {
+		out << '(';
+		left->PrintSubtree(out, true);
+		out << ')';
+		}
+	if (n && next!=NULL) {
+		out << ',';
+		next->PrintSubtree(out, true);
+		}
+	}
+void TreeNode::PrintSubtreeMembers(std::ostream &out){
+	if(IsTerminal())
+		out << nodeNum << "\t"; 
+	else
+		left->PrintSubtreeMembers(out);
+	if(next!=NULL)
+		next->PrintSubtreeMembers(out);
 	}
 	
 void TreeNode::AdjustClasForReroot(int dir){

@@ -25,7 +25,44 @@ extern FLOAT_TYPE globalBest; // defined in population.cpp
 extern int optCalcs ; // defined in population.cpp
 
 bool ShouldWriteResults(bool prematureTermination, Population::output_details od, unsigned currRep, unsigned nReps);
+void treeToWrapper(char * treeString, const Individual & ind);
 
+enum InteractiveModeActionEnum {FINISH_STEPADD_ACTION, SEARCH_ACTION, SWAP_ACTION};
+InteractiveModeActionEnum gInteractive_mode_action =  FINISH_STEPADD_ACTION;
+MultiFormatReader * gConstraintReader = 0L;
+
+MultiFormatReader * createConstraintFileReader() {
+	MultiFormatReader * mfr = new MultiFormatReader();
+	return mfr;
+}
+
+
+NxsFullTreeDescription readConstraintTreeDesc(const char * nexusContent, NxsTaxaBlock *tb) {
+	if (gConstraintReader == 0L)
+		gConstraintReader = createConstraintFileReader();
+	else {
+		assert(gConstraintReader->GetNumTaxaBlocks() == 1);
+		assert(gConstraintReader->GetTaxaBlock(N) == 1);
+	}
+	gConstraintReader->ClearContent();
+	if (tb)
+		gConstraintReader->AddReadTaxaBlock(tb);
+	
+	gConstraintReader->ReadStringAsNexusContent(nexusContent);
+	unsigned nt = gConstraintReader->GetNumTreesBlocks(tb);
+	if (nt == 0)
+		throw ErrorException("No trees block found!");
+	if (nt > 1)
+		throw ErrorException("More than one trees block found");
+	NxsTreesBlock * treesB = gConstraintReader->GetTreesBlock(tb, 0);
+	const unsigned ntrees = treesB->GetNumTrees();
+	if (ntrees > 1)
+		throw ErrorException("More than one trees block found");
+	NxsFullTreeDescription t = treesB->GetFullTreeDescription(0);
+	delete treesB;
+	gConstraintReader->ClearContent();
+	return t;
+}
 
 unsigned Population::RefillTreeBuffer(GarliReader &reader, unsigned treeNum) {
 	std::string nextLine;
@@ -55,9 +92,9 @@ unsigned Population::RefillTreeBuffer(GarliReader &reader, unsigned treeNum) {
 					}
 					treeNum = 0;
 				}
-				if (NxsString::case_insensitive_equals(key, "run"))
+				else if (NxsString::case_insensitive_equals(key, "run"))
 					break;
-				if (NxsString::case_insensitive_equals(key, "tree")) {
+				else if (NxsString::case_insensitive_equals(key, "tree")) {
 					const NxsTaxaBlock * queryTaxa = reader.GetTaxaBlock(0);
 					if (queryTaxa) {
 						const std::string & taxaTitle = queryTaxa->GetTitle();
@@ -69,6 +106,31 @@ unsigned Population::RefillTreeBuffer(GarliReader &reader, unsigned treeNum) {
 					else {
 						assert (queryTaxa);
 						throw ErrorException("Tree command is not available when a Taxa block has not been read.");
+					}
+				}
+				else if (NxsString::case_insensitive_equals(key, "stepadd"))
+					gInteractive_mode_action = FINISH_STEPADD_ACTION;
+				else if (NxsString::case_insensitive_equals(key, "search"))
+					gInteractive_mode_action = SEARCH_ACTION;
+				else if (NxsString::case_insensitive_equals(key, "swap"))
+					gInteractive_mode_action = SWAP_ACTION;
+				else if (NxsString::case_insensitive_equals(key, "posconstraint") || NxsString::case_insensitive_equals(key, "negconstraint")) {
+					const bool negConstraint = NxsString::case_insensitive_equals(key, "negconstraint");
+					NxsTaxaBlock * queryTaxa = reader.GetTaxaBlock(0);
+					if (queryTaxa) {
+						const std::string & taxaTitle = queryTaxa->GetTitle();
+						std::ostringstream outF;
+						outF << "#NEXUS\nBegin Trees;\n Link taxa = " << NxsString::GetEscaped(taxaTitle);
+						outF << ";\n Tree stdintree = " << value << " ;\nend;\n";
+						std::string s = outF.str();
+						NxsFullTreeDescription newConTreeDescription = readConstraintTreeDesc(s.c_str(), queryTaxa);
+						std::string constraintNewick = newConTreeDescription.GetNewick();
+						Tree::constraints.clear();
+						Tree::ReadNewickConstraint(constraintNewick.c_str(), true, !negConstraint);
+					}
+					else {
+						assert (queryTaxa);
+						throw ErrorException("Constraint command is not available when a Taxa block has not been read.");
 					}
 				}
 			}
@@ -177,8 +239,15 @@ void Population::AddTaxonRunMode() {
 			break;
 			}
 		outman.UserMessage("Obtained incomplete starting tree %d from Nexus", treeNum+1);
-		
-		this->NextAddTaxonRound(*treeDescription, attachmentsPerTaxonVar, branchOptPrecisionVar, scratchIndividual, numTrees, totalNumTrees);
+		if (gInteractive_mode_action == FINISH_STEPADD_ACTION)
+			this->NextAddTaxonRound(*treeDescription, attachmentsPerTaxonVar, branchOptPrecisionVar, scratchIndividual, numTrees, totalNumTrees);
+		else if (gInteractive_mode_action == SEARCH_ACTION) {
+			throw ErrorException("Not implemented yet");
+		}
+		else if (gInteractive_mode_action == SWAP_ACTION) 
+			{
+			this->AddTaxonSwap(*treeDescription, attachmentsPerTaxonVar, branchOptPrecisionVar, scratchIndividual, numTrees, totalNumTrees);
+			}
 		//this needs to be set here so that the population is reset at the top of this loop before the next rep
 		conf->restart = false;
 		++treeNum;
@@ -192,6 +261,208 @@ void Population::AddTaxonRunMode() {
 }
 #endif //defined(SUBROUTINE_GARLI)
 
+
+void Population::AddTaxonSwap(const NxsFullTreeDescription & treeDescription, 
+								   unsigned attachmentsPerTaxonVar,
+								   FLOAT_TYPE branchOptPrecisionVar,
+								   Individual & scratchIndividual,
+								   unsigned repN,
+								   unsigned nReps) {
+{
+	stopwatch.Restart();
+	ResetTerminationVariables();
+	string s;
+	const unsigned nTax = data->NTax();
+	scratchIndividual.ReadNxsFullTreeDescription(treeDescription, false);
+	scratchIndividual.SetDirty();
+	indiv[0].SetDirty();
+
+	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
+	if(Tree::constraints.empty())
+		outman.UserMessage("using stepwise addition to complete the starting tree...");
+	else 
+		outman.UserMessage("using stepwise addition to complete the starting tree (compatible with constraints)...");
+
+	globalBest = ZERO_POINT_ZERO;
+	
+	this->SwapToCompletion(SWAPPER_BY_DIST_NOT_FURTHEST_RUN_MODE, branchOptPrecisionVar);
+
+	indiv[0].FinishIncompleteTreeByStepwiseAddition(nTax, attachmentsPerTaxonVar, branchOptPrecisionVar, scratchIndividual);
+	indiv[0].SetTopo(0);
+
+	const char * msg = 0L;
+	if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile)
+		msg  = "state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!";
+	else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile)
+		msg = "alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!";
+	else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) 
+		msg = "proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!";
+	else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) 
+		msg = "relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!";
+	if (msg)
+		throw ErrorException(msg, conf->GetTreeFilename(), conf->datafname.c_str());
+
+	assert(indiv[0].treeStruct != NULL);
+	bool foundPolytomies = indiv[0].treeStruct->ArbitrarilyBifurcate();
+	if(foundPolytomies) outman.UserMessage("WARNING: Polytomies found in start tree.  These were arbitrarily resolved.");
+
+	indiv[0].treeStruct->root->CheckTreeFormation();
+	indiv[0].treeStruct->root->CheckforPolytomies();
+
+	indiv[0].treeStruct->CheckBalance();
+	indiv[0].treeStruct->SetModel(indiv[0].mod);
+	indiv[0].CalcFitness(0);
+
+	FLOAT_TYPE ePrec = 0.0;
+	if (repN == 0)
+		ePrec = Population::CheckPrecision();
+	outman.UserMessage("expected likelihood precision = %.4e", ePrec);
+
+	//if there are not mutable params in the model, remove any weight assigned to the model
+	if(indiv[0].mod->NumMutatableParams() == 0) {
+		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
+			outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
+		adap->modelMutateProb=ZERO_POINT_ZERO;
+		adap->UpdateProbs();
+		}
+
+	outman.precision(10);
+	outman.UserMessage("Initial ln Likelihood: %.4f", indiv[0].Fitness());
+
+#	ifdef SCORE_INITIAL_ONLY
+		exit(0);
+#	endif
+
+#	ifdef MAC_FRONTEND
+		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+		[[MFEInterfaceClient sharedClient] didBeginInitializingSearch];
+		[pool release];
+#	endif
+
+	if(conf->refineStart==true){
+		//12/26/07 now only passing the first argument here ("optModel") as false if no model muts are used
+		//if single parameters are fixed that will be checked in the Refine function itself
+		indiv[0].RefineStartingConditions(adap->modWeight != ZERO_POINT_ZERO, adap->branchOptPrecision);
+		indiv[0].CalcFitness(0);
+		outman.UserMessage("lnL after optimization: %.4f", indiv[0].Fitness());
+		}
+
+	globalBest = bestFitness = prevBestFitness = indiv[0].Fitness();
+
+#	ifndef INPUT_RECOMBINATION
+		for(unsigned i=1;i<total_size;i++){
+			if(indiv[i].treeStruct==NULL)
+				indiv[i].treeStruct=new Tree();
+			indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
+			indiv[i].treeStruct->SetModel(indiv[i].mod);
+			}
+#	else
+		for(unsigned i=1;i<conf->nindivs;i++){
+			if(indiv[i].treeStruct==NULL)
+				indiv[i].treeStruct=new Tree();
+			indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
+			indiv[i].treeStruct->SetModel(indiv[i].mod);
+			}
+		for(unsigned i=conf->nindivs;i<total_size;i++){
+			indiv[i].GetStartingConditionsFromFile(conf->streefname.c_str(), i-conf->nindivs, nTax);
+			indiv[i].treeStruct->SetModel(indiv[i].mod);
+			indiv[i].SetDirty();
+			indiv[i].CalcFitness(0);
+			}
+#	endif
+
+	UpdateTopologyList(indiv);
+	CalcAverageFitness();
+
+	//3/24/08 moving this after SeedPop, since it disallows normal ctrl-c killing of runs during stepwise
+	CatchInterrupt();
+	RunImplForAddTaxonRunMode();
+
+	//this rep is over
+	if (prematureTermination == false) {
+		if (s.length() > 0)
+			outman.UserMessage(">>>Completed %s<<<\n", s.c_str());
+		//not sure where this should best go
+		outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
+		indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
+		if(Tree::outgroup != NULL)
+			OutgroupRoot(&indiv[bestIndiv], bestIndiv);
+		Individual *repResult = new Individual(&indiv[bestIndiv]);
+		if (conf->collapseBranches) {
+			int numCollapsed = 0;
+			repResult->treeStruct->root->CollapseMinLengthBranches(numCollapsed);
+			outman.UserMessage("\nNOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");\
+			if(numCollapsed == 0)
+				outman.UserMessage("    No branches were short enough to be collapsed.");
+			else
+				outman.UserMessage("    %d branches were collapsed.", numCollapsed);
+			}
+		storedTrees.push_back(repResult);
+		}
+	else{
+		if(s.length() > 0)
+			outman.UserMessage(">>>Terminated %s<<<\n", s.c_str());
+		outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
+		}
+
+	int best=0;
+	if(storedTrees.size() > 1) {
+		best=EvaluateStoredTrees(true);
+		}
+
+	if (ShouldWriteResults(prematureTermination, all_best_output, currentSearchRep, nReps)) {
+		if(storedTrees.size() > 0)
+			WriteStoredTrees(besttreefile.c_str());
+		}
+	if (ShouldWriteResults(prematureTermination, best_output, currentSearchRep, nReps)) {
+		WriteTreeFile(besttreefile.c_str());
+		treeToWrapper(this->treeString, this->indiv[bestIndiv]);
+	}
+
+	if(conf->bootstrapReps > 0){
+		if (ShouldWriteResults(prematureTermination, bootlog_output, currentSearchRep, nReps)) {
+			Individual * bt;
+			if(conf->searchReps > 1 && storedTrees.size() > 0){
+				outman.UserMessage("Saving best search rep (#%d) to bootstrap file", best+1);
+				bt = storedTrees[best];
+				}
+			//this was a bug - when collapse was on and bootstrapping was being done with one search
+			//rep, the best tree was being written to the boot file.  The tree in the storedTrees is
+			//the one that was actually collapsed though
+			//else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
+			else
+				bt = (storedTrees.size() == 1 ? storedTrees[0] : &indiv[bestIndiv]);
+			FinishBootstrapRep(bt, currentBootstrapRep);
+			}
+		else if (prematureTermination && !(bootlog_output & WRITE_PREMATURE))
+			outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
+		}
+
+	if(conf->inferInternalStateProbs == true){
+		if(prematureTermination == false && currentSearchRep == conf->searchReps){
+			if(storedTrees.size() > 0){//careful here, the trees in the storedTrees array don't have clas assigned
+				outman.UserMessage("Inferring internal state probabilities on best tree....");
+				storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
+				}
+			}
+		else if(prematureTermination){
+			outman.UserMessage(">>>Internal state probabilities not inferred due to premature termination<<<");
+			}
+		}
+	if(prematureTermination == true)
+		return;
+
+	//write a checkpoint that will indicate that the rep is done and results have been written to file
+	//the gen will be UINT_MAX, as it is after a rep has terminated, which will tell the function that reads
+	//the checkpoint to set finishedrep = true.  This automatically happens in the BOINC case
+#	ifndef BOINC
+		if(conf->checkpoint)
+			WriteStateFiles();
+#	else
+		WriteStateFiles();
+#	endif
+	}
+}
 
 void treeToWrapper(char * treeString, const Individual & ind) {
 	std::cout << "tree best = [&U][!GarliScore " << ind.Fitness() ; 

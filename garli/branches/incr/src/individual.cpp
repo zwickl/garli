@@ -137,7 +137,7 @@ void Individual::CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const 
 	treeStruct=sourceOfTreePtr;
 
 	for(int i=treeStruct->getNumTipsTotal()+1;i<(2*treeStruct->getNumTipsTotal()-2);i++)
-		treeStruct->allNodes[i]->attached=false;
+		treeStruct->allNodes[i]->SetAttached(false);
 		
 	//DZ 10-28 changing this	
 	treeStruct->MimicTopo(sourceOfInformation->treeStruct);
