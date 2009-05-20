@@ -73,6 +73,7 @@ protected:
 	int 	lastConstant;//DJZ
 	int 	*constStates;//the state (or states) that a constant site contains
 	int		currentBootstrapSeed;
+	unsigned char fullyAmbigChar;
 	
 	protected:
 		int*	numStates;
@@ -107,13 +108,15 @@ protected:
 		DataMatrix() : dmFlags(0), dense(0), nTax(0), nChar(0), matrix(0), count(0)
 			, number(0), taxonLabel(0), numStates(0) 
 			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
-			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
+			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
+			fullyAmbigChar(15)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
 			: nTax(ntax), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
 			, number(0), taxonLabel(0), numStates(0)
 			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
-			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
+			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
+			fullyAmbigChar(15)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
 		virtual ~DataMatrix();
 
@@ -282,6 +285,7 @@ protected:
       		}
       void Reweight(FLOAT_TYPE prob);
       long BootstrapReweight(int seed, FLOAT_TYPE resampleProportion);
+	  void CountMissingCharsByColumn(vector<int> &vec);
       
 #endif
 };

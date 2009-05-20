@@ -170,8 +170,8 @@ class NucleotideData : public SequenceData{
 #endif
 
 public:		
-	NucleotideData() : SequenceData() {}
-	NucleotideData( int ntax, int nchar ) : SequenceData( ntax, nchar ) {}
+	NucleotideData() : SequenceData() {fullyAmbigChar = 15;}
+	NucleotideData( int ntax, int nchar ) : SequenceData( ntax, nchar ) {fullyAmbigChar = 15;}
 	~NucleotideData() {
 		for(vector<char*>::iterator delit=ambigStrings.begin();delit!=ambigStrings.end();delit++)
 			delete [](*delit);
@@ -534,6 +534,7 @@ public:
 		maxNumStates = 61;
 		code.SetStandardCode();
 		empType = NOT_EMPIRICAL;
+		fullyAmbigChar = maxNumStates;
 		}
 
 	CodonData(const NucleotideData *dat, int genCode) : SequenceData(){
@@ -553,6 +554,7 @@ public:
 		FillCodonMatrixFromDNA(dat);
 		CopyNamesFromOtherMatrix(dat);
 		empType = NOT_EMPIRICAL;
+		fullyAmbigChar = maxNumStates;
 		}
 
 	~CodonData(){}
@@ -595,6 +597,7 @@ class AminoacidData : public SequenceData{
 public:
 	AminoacidData() : SequenceData(){
 		maxNumStates = 20;
+		fullyAmbigChar = maxNumStates;
 		}
 
 	AminoacidData(const NucleotideData *dat, int genCode) : SequenceData(){
@@ -605,6 +608,7 @@ public:
 		else c.SetInvertMitoCode();
 		FillAminoacidMatrixFromDNA(dat, &c);
 		CopyNamesFromOtherMatrix(dat);
+		fullyAmbigChar = maxNumStates;
 		}
 	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code);
 	void CalcEmpiricalFreqs();
