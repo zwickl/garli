@@ -1716,3 +1716,14 @@ void DataMatrix::CheckForIdenticalTaxonNames(){
 		throw(ErrorException("Terminating.  Please make all sequence names unique!"));
 		}
 	}
+
+void DataMatrix::CountMissingCharsByColumn(vector<int> &vec){
+	for(int c = 0;c < nChar;c++){
+		int missing = 0;
+		for(int t = 0;t < nTax;t++){
+			if(Matrix(t, c) == fullyAmbigChar) 
+				missing++;
+			}
+		vec.push_back(missing);
+		}
+	}
