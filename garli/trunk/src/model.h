@@ -815,6 +815,8 @@ class Model{
 	FLOAT_TYPE MaxPinv() const{return maxPropInvar;}
 	int NStates() const {return nstates;}
 	int NumMutatableParams() const {return (int) paramsToMutate.size();}
+	int Nst() const {return nst;}
+	const int *GetArbitraryRateMatrixIndeces() const {return arbitraryMatrixIndeces;}
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
@@ -918,6 +920,36 @@ class Model{
 	//These are the set parameter functions used in the generic OptimizeBoundedParameter function
 	//They need to have a standardized form, despite the fact that the "which" argument is unneccesary
 	//for some of them
+
+	void SetEquilibriumFreq(int which, FLOAT_TYPE val){
+		assert(which < this->nstates);
+		FLOAT_TYPE rescale = (FLOAT_TYPE)((1.0 - val)/(1.0 - *stateFreqs[which]));
+		for(int b=0;b<nstates;b++)
+			if(b!=which) *stateFreqs[b] *= rescale;
+		*stateFreqs[which] = val;
+		eigenDirty = true;
+		}
+
+	void SetRelativeNucRate(int which, FLOAT_TYPE val){
+		//this has the potential to do GT (fixed at 1.0) although that won't work with
+		//OptBounded currently
+		//DEBUG
+		assert(which < 6);
+		//note that for arbitrary rate matrices mutation
+		//of a rate other than GT might actually alter GT, so we need to actually check
+		//whether it is 1.0 or not
+		*relNucRates[which] = val;
+		if(FloatingPointEquals(*relNucRates[5], ONE_POINT_ZERO, 1.0e-12) == false){
+			FLOAT_TYPE scaler = ONE_POINT_ZERO / *relNucRates[5];
+			for(int i=0;i<6;i++){
+				if(relNucRates[i] != relNucRates[5]){
+					*relNucRates[i] *= scaler;
+					}
+				}
+			*relNucRates[5] *= scaler;
+			}
+		eigenDirty = true;
+		}
 
 	void SetPinv(int which, FLOAT_TYPE val){
 		assert(which == 0);

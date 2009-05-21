@@ -216,6 +216,110 @@ FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
 	return -1;
 	}
 
+FLOAT_TYPE Tree::OptimizeReferenceRelativeRate(FLOAT_TYPE optPrecision){
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) Score();
+	Score();
+	FLOAT_TYPE start=lnL;
+	FLOAT_TYPE prev=lnL;
+	FLOAT_TYPE cur;
+	FLOAT_TYPE scale;
+	FLOAT_TYPE t;
+	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
+	FLOAT_TYPE effectiveScale = ONE_POINT_ZERO; //this measures the change in scale relative to what it began at.
+	FLOAT_TYPE upperBracket = FLT_MAX;   //the smallest value we know of with a negative d1 (relative to inital scale of 1.0!)
+	FLOAT_TYPE lowerBracket = FLT_MIN;   //the largest value we know of with a positive d1 (relative to inital scale of 1.0!)
+	FLOAT_TYPE incr;
+
+	while(1){
+		//reversed this now so the reduction in scale is done first when getting the
+		//derivs.  This works better if some blens are at DEF_MAX_BLEN because the
+		//scaling up causes them to hit the max and the relative blens to change
+
+#ifdef SINGLE_PRECISION_FLOATS
+		incr=0.005f;
+#else
+		incr=0.0001;
+#endif
+
+		scale=ONE_POINT_ZERO-incr;
+
+		//ScaleWholeTree(scale);
+		mod->SetRelativeNucRate(5, scale);
+		MakeAllNodesDirty();
+		Score();
+		cur=lnL;
+		//ScaleWholeTree(ONE_POINT_ZERO/scale);//return the tree to its original scale
+		mod->SetRelativeNucRate(5, ONE_POINT_ZERO/scale);
+		FLOAT_TYPE d12=(cur-prev)/-incr;
+
+		scale=ONE_POINT_ZERO + incr;
+		//ScaleWholeTree(scale);
+		mod->SetRelativeNucRate(5, scale);
+		MakeAllNodesDirty();
+		Score();
+		cur=lnL;
+		//ScaleWholeTree(ONE_POINT_ZERO/scale);//return the tree to its original scale
+		mod->SetRelativeNucRate(5, ONE_POINT_ZERO/scale);
+		MakeAllNodesDirty();
+		FLOAT_TYPE d11=(cur-prev)/incr;
+
+		FLOAT_TYPE d1=(d11+d12)*ZERO_POINT_FIVE;
+		FLOAT_TYPE d2=(d11-d12)/incr;
+
+		FLOAT_TYPE est = -d1/d2;
+		FLOAT_TYPE estImprove = d1*est + d2*(est*est*ZERO_POINT_FIVE);
+
+		//return conditions.  Leave if the estimated improvement is < precision of if the points straddle the optimum
+		if((d11 - d12) == ZERO_POINT_ZERO || (d11 > ZERO_POINT_ZERO && d12 < ZERO_POINT_ZERO) || (d11 < ZERO_POINT_ZERO && d12 > ZERO_POINT_ZERO) || (estImprove < optPrecision && d2 < ZERO_POINT_ZERO)){
+			lnL = prev;
+			return prev-start;
+			}
+
+		if(d2 < ZERO_POINT_ZERO){
+			est = max(min((FLOAT_TYPE)0.1, est), (FLOAT_TYPE)-0.1);
+			t=ONE_POINT_ZERO + est;
+			}
+		else{//if we have lots of data, move
+			//very slowly here
+			//if(data->NInformative() > 500){
+			if(0){
+				if(d1 > ZERO_POINT_ZERO) t=(FLOAT_TYPE)1.01;
+				else t=(FLOAT_TYPE)0.99;
+				}
+			else{
+				if(d1 > ZERO_POINT_ZERO) t=(FLOAT_TYPE)1.05;
+				else t=(FLOAT_TYPE)0.95;
+				}
+			}
+
+		//update the brackets
+		if(d1 <= ZERO_POINT_ZERO && effectiveScale < upperBracket)
+			upperBracket = effectiveScale;
+		else if(d1 > ZERO_POINT_ZERO && effectiveScale > lowerBracket)
+			lowerBracket = effectiveScale;
+
+		//if the surface is wacky and we are going to shoot past one of our brackets
+		//take evasive action by going halfway to the bracket
+		if((effectiveScale * t) <= lowerBracket){
+			t = (lowerBracket + effectiveScale) * ZERO_POINT_FIVE / effectiveScale;
+			}
+		else if((effectiveScale * t) >= upperBracket){
+			t = (upperBracket + effectiveScale) * ZERO_POINT_FIVE / effectiveScale;
+			}
+
+		scale=t;
+		effectiveScale *= scale;
+		//ScaleWholeTree(scale);
+		mod->SetRelativeNucRate(5, scale);
+		MakeAllNodesDirty();
+		Score();
+		cur=lnL;
+		lastChange = cur - prev;
+		prev=cur;
+		}
+	return -1;
+	}
+
 FLOAT_TYPE Tree::OptimizeAlpha(FLOAT_TYPE optPrecision){
 
 #ifdef DEBUG_ALPHA_OPT

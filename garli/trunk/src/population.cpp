@@ -1671,7 +1671,7 @@ void Population::FinalOptimization(){
 		if(i != bestIndiv) indiv[i].treeStruct->RemoveTreeFromAllClas();
 		}
 
-	outman.UserMessage("Performing final branch optimization...");
+	outman.UserMessage("Performing final optimizations...");
 #ifdef MAC_FRONTEND
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	[[MFEInterfaceClient sharedClient] didBeginBranchOptimization];
@@ -1680,13 +1680,39 @@ void Population::FinalOptimization(){
 	int pass=1;
 	FLOAT_TYPE incr;
 
-	double paramOpt, paramTot;
+	double paramOpt, paramTot, freqOptImprove = ZERO_POINT_ZERO, nucRateOptImprove = ZERO_POINT_ZERO, pinvOptImprove = ZERO_POINT_ZERO, alphaOptImprove = ZERO_POINT_ZERO;
 	paramTot = ZERO_POINT_ZERO;
+
+	FLOAT_TYPE precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
+	FLOAT_TYPE paramPrecThisPass = max(adap->branchOptPrecision*0.1, 0.01);
+
 	do{
 		paramOpt = ZERO_POINT_ZERO;
-		if(modSpec.IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(max(adap->branchOptPrecision*0.1, 0.001));
-		else if(modSpec.IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(max(adap->branchOptPrecision*0.1, 0.001));
+		if(modSpec.IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
+		else if(modSpec.IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
 		paramTot += paramOpt;
+#ifdef MORE_DETERM_PARAM_OPT
+		if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false){
+			double tempTot = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
+			paramOpt += tempTot;
+			freqOptImprove += tempTot;
+			}
+		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
+			double tempTot = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
+			paramOpt += tempTot;
+			nucRateOptImprove += tempTot;
+			}
+		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites){
+			double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
+			paramOpt += tempTot;
+			pinvOptImprove += tempTot;
+			}
+		if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false){
+			double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
+			paramOpt += tempTot;
+			alphaOptImprove += tempTot;
+			}
+#endif
 		}while(paramOpt > 1.0e-2);
 
 	if(modSpec.IsFlexRateHet()){
@@ -1695,18 +1721,55 @@ void Population::FinalOptimization(){
 	else if(modSpec.IsCodon()){
 		outman.UserMessage("Omega optimization: %f", paramTot);
 		}
+#ifdef MORE_DETERM_PARAM_OPT
+	if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
+		outman.UserMessage("Equil freqs optimization: %f", freqOptImprove);
+	if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+		outman.UserMessage("Rel rates optimization: %f", nucRateOptImprove);
+	if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites)
+		outman.UserMessage("Pinv optimization: %f", pinvOptImprove);
+	if(modSpec.fixAlpha == false)
+		outman.UserMessage("Alpha optimization: %f", alphaOptImprove);
+#endif
 	do{
-		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10));
+		precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
+		paramPrecThisPass = max(precThisPass, 1e-4);
+
+		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
 
 		indiv[bestIndiv].CalcFitness(0);
 		outman.UserMessage("\tpass %d %.4f", pass++, indiv[bestIndiv].Fitness());
 		//optimize omega more often, since it can be very strongly correlated with blens
 		if(modSpec.IsCodon() && pass % 2 == 0) {
-			paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(max(adap->branchOptPrecision*0.1, 0.001));
+			paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
 			outman.UserMessage("Omega optimization: %f", paramOpt);
 			incr += paramOpt;
 			}
-		}while(incr > .00001 || pass < 10);
+#ifdef MORE_DETERM_PARAM_OPT
+		if((pass + 1) % 2 == 0) {
+			if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false){
+				paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
+				outman.UserMessage("Equil freqs optimization: %f", paramOpt);
+				incr += paramOpt;
+				}
+			if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
+				paramOpt = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
+				outman.UserMessage("Rel rates optimization: %f", paramOpt);
+				incr += paramOpt;
+				}
+			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites){
+				paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
+				outman.UserMessage("Pinv optimization: %f", paramOpt);
+				incr += paramOpt;
+				}
+			if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false){
+				paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
+				outman.UserMessage("Alpha optimization: %f", paramOpt);
+				incr += paramOpt;
+				}
+			}
+#endif
+		}while(incr > 1.0e-5 || pass < 10);
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	unsigned totalSecs = stopwatch.SplitTime();
 	unsigned secs = totalSecs % 60;
