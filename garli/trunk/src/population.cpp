@@ -1702,12 +1702,12 @@ void Population::FinalOptimization(){
 			paramOpt += tempTot;
 			nucRateOptImprove += tempTot;
 			}
-		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites){
+		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false){
 			double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
 			paramOpt += tempTot;
 			pinvOptImprove += tempTot;
 			}
-		if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false){
+		if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && && modSpec.IsCodon() == false){
 			double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 			paramOpt += tempTot;
 			alphaOptImprove += tempTot;
@@ -1757,12 +1757,12 @@ void Population::FinalOptimization(){
 				outman.UserMessage("Rel rates optimization: %f", paramOpt);
 				incr += paramOpt;
 				}
-			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites){
+			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false){
 				paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
 				outman.UserMessage("Pinv optimization: %f", paramOpt);
 				incr += paramOpt;
 				}
-			if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false){
+			if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && && modSpec.IsCodon() == false){
 				paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 				outman.UserMessage("Alpha optimization: %f", paramOpt);
 				incr += paramOpt;
