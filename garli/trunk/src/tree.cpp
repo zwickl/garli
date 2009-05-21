@@ -6036,6 +6036,68 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 */	return omegaImprove;
 	}
 
+FLOAT_TYPE Tree::OptimizeEquilibriumFreqs(FLOAT_TYPE prec){
+	FLOAT_TYPE freqImprove=ZERO_POINT_ZERO;
+	FLOAT_TYPE minVal = 1.0e-5;
+	int i=0;
+
+	//limiting change in any one pass
+	double maxFreqChange = 0.05;	
+
+	for(i=0;i < mod->NStates();i++){
+		freqImprove += OptimizeBoundedParameter(prec, mod->StateFreq(i), i, 
+			max(0.01, mod->StateFreq(i) - maxFreqChange),
+			min(0.96, mod->StateFreq(i) + maxFreqChange),
+			&Model::SetEquilibriumFreq);
+		}
+	return freqImprove;
+	}
+
+FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
+	FLOAT_TYPE rateImprove=ZERO_POINT_ZERO;
+	FLOAT_TYPE minVal = 1.0e-5;
+	int i=0;
+
+	//limiting change in any one pass
+	double maxPropChange = 5.0;	
+	
+	assert(mod->Nst() > 1);
+	if(mod->Nst() == 2){
+		rateImprove += OptimizeBoundedParameter(prec, mod->Rates(0), 0, 
+				max(0.05, mod->Rates(0) / maxPropChange),
+				min(999.0, mod->Rates(0) * maxPropChange),
+				&Model::SetRelativeNucRate);
+		}
+	else{
+		//DEBUG
+/*		char temp[100];
+		int oprec = 4;
+		sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
+		outman.UserMessage("%s", temp);
+*/		for(i=0;i < 5;i++){
+			bool skip = false;
+			if(modSpec.IsArbitraryRateMatrix()){
+				if(mod->GetArbitraryRateMatrixIndeces()[i] == mod->GetArbitraryRateMatrixIndeces()[5]) skip = true;
+				}
+			if(!skip){
+				rateImprove += OptimizeBoundedParameter(prec, mod->Rates(i), i, 
+					max(0.05, mod->Rates(i) / maxPropChange),
+					min(999.0, mod->Rates(i) * maxPropChange),
+					&Model::SetRelativeNucRate);
+				//DEBUG
+/*				sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
+				outman.UserMessage("%s", temp);
+*/				}
+			}
+		//the reference rate fixed at 1 needs to have its own opt function
+		rateImprove += OptimizeReferenceRelativeRate(prec);
+/*		//DEBUG
+		sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
+		outman.UserMessage("%s", temp);
+*/		}
+	return rateImprove;
+	}
+
 FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 	FLOAT_TYPE flexImprove=ZERO_POINT_ZERO;
 	FLOAT_TYPE minVal = 1.0e-5;

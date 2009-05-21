@@ -625,14 +625,15 @@ void Individual::GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int ran
 	}
 
 void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
-	if(optModel && mod->NRateCats() > 1 && modSpec.IsNonsynonymousRateHet() == false && modSpec.gotFlexFromFile == false) outman.UserMessage("optimizing starting branch lengths and rate heterogeneity parameters...");
-	else if(modSpec.IsCodon()) outman.UserMessage("optimizing starting branch lengths and dN/dS (aka omega) parameters...");
+	//if(optModel && mod->NRateCats() > 1 && modSpec.IsNonsynonymousRateHet() == false && modSpec.gotFlexFromFile == false) outman.UserMessage("optimizing starting branch lengths and rate heterogeneity parameters...");
+	//else if(modSpec.IsCodon()) outman.UserMessage("optimizing starting branch lengths and dN/dS (aka omega) parameters...");
+	if(optModel) outman.UserMessage("optimizing starting branch lengths and model parameters...");
 	else outman.UserMessage("optimizing starting branch lengths...");
 	FLOAT_TYPE improve=(FLOAT_TYPE)999.9;
 	CalcFitness(0);
 
 	for(int i=1;improve > branchPrec;i++){
-		FLOAT_TYPE rateOptImprove=0.0, pinvOptImprove = 0.0, optImprove=0.0, scaleImprove=0.0;
+		FLOAT_TYPE rateOptImprove=0.0, pinvOptImprove = 0.0, optImprove=0.0, scaleImprove=0.0, freqOptImprove=0.0, nucRateOptImprove=0.0;
 		
 		CalcFitness(0);
 		FLOAT_TYPE passStart=Fitness();
@@ -657,29 +658,31 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			}
 
 		CalcFitness(0);
-		if(optModel){
+		//if there are still massive score changes due to blens, don't mess with the other params yet because their lnL surfaces
+		//can be rather numerically unstable.
+		if(optModel && (scaleImprove + trueImprove) < 1000.0){
 			if(modSpec.IsCodon())//optimize omega even if there is only 1
 				rateOptImprove = treeStruct->OptimizeOmegaParameters(branchPrec);
 			else if(mod->NRateCats() > 1){
 				if(modSpec.IsFlexRateHet()){//Flex rates
 					rateOptImprove = ZERO_POINT_ZERO;
-					//no longer doing alpha first, it was too hard to know if the flex rates had been partially optimized
-					//already during making of a stepwise tree
-					//if(i == 1) rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
-					//if(i == 1 && modSpec.gotFlexFromFile==false) rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 1.0e-8, 999.9, &Model::SetAlpha);
 					rateOptImprove += treeStruct->OptimizeFlexRates(branchPrec);
 					}
 				else if(modSpec.fixAlpha == false){//normal gamma
-					//rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
 					//do NOT let alpha go too low here - on bad or random starting trees the branch lengths get crazy long
-					//rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 1.0e-8, 999.9, &Model::SetAlpha);
 					rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 					}
 				}
 			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites)
 				pinvOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, &Model::SetPinv);
+#ifdef MORE_DETERM_PARAM_OPT
+			if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
+				freqOptImprove = treeStruct->OptimizeEquilibriumFreqs(branchPrec);
+			if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+				nucRateOptImprove = treeStruct->OptimizeRelativeNucRates(branchPrec);
+#endif
 			}
-		improve=scaleImprove + trueImprove + rateOptImprove + pinvOptImprove;
+		improve=scaleImprove + trueImprove + rateOptImprove + pinvOptImprove + freqOptImprove + nucRateOptImprove;
 		outman.precision(8);
 		outman.UserMessageNoCR("pass %-2d: +%10.4f (branch=%7.2f scale=%6.2f", i, improve, trueImprove, scaleImprove);
 		if(optModel && modSpec.IsCodon()) outman.UserMessageNoCR(" omega=%6.2f", rateOptImprove);
@@ -688,6 +691,12 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			else if(modSpec.IsFlexRateHet() && modSpec.gotFlexFromFile == false) outman.UserMessageNoCR(" flex rates=%6.2f", rateOptImprove);
 			}
 		if(optModel && modSpec.includeInvariantSites && !modSpec.fixInvariantSites) outman.UserMessageNoCR(" pinv=%6.2f", pinvOptImprove);
+#ifdef MORE_DETERM_PARAM_OPT
+		if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
+			outman.UserMessageNoCR(" equil freqs=%6.2f", freqOptImprove);
+		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+			outman.UserMessageNoCR(" rel rates=%6.2f", nucRateOptImprove);
+#endif
 		outman.UserMessage(")");
 		}
 
