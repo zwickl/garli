@@ -368,7 +368,6 @@ void Population::CheckForIncompatibleConfigEntries(){
 		if(modSpec.includeInvariantSites == true && modSpec.fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
 		if(modSpec.IsAminoAcid() == false && modSpec.Nst() > 1 && modSpec.fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
 		if(modSpec.numRateCats > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
-		if(modSpec.IsCodon() && modSpec.gotOmegasFromFile == false) throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
 		}
 
 	if(conf->inferInternalStateProbs && (modSpec.IsNucleotide() == false))
@@ -992,6 +991,8 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 		}
+	if(conf->modWeight == ZERO_POINT_ZERO)
+		if(modSpec.IsCodon() && modSpec.gotOmegasFromFile == false) throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
 
 	assert(indiv[0].treeStruct != NULL);
 	bool foundPolytomies = indiv[0].treeStruct->ArbitrarilyBifurcate();
