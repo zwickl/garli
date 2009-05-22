@@ -367,7 +367,8 @@ void Population::CheckForIncompatibleConfigEntries(){
 		if(modSpec.fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
 		if(modSpec.includeInvariantSites == true && modSpec.fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
 		if(modSpec.IsAminoAcid() == false && modSpec.Nst() > 1 && modSpec.fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
-		if(modSpec.numRateCats > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
+		if(modSpec.numRateCats > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
+		if(modSpec.IsCodon() && modSpec.gotOmegasFromFile == false) throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
 		}
 
 	if(conf->inferInternalStateProbs && (modSpec.IsNucleotide() == false))
@@ -1685,7 +1686,7 @@ void Population::FinalOptimization(){
 
 	FLOAT_TYPE precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
 	FLOAT_TYPE paramPrecThisPass = max(adap->branchOptPrecision*0.1, 0.01);
-	bool optAnyModel = !(FloatingPointEquals(conf->modWeight, ZERO_POINT_ZERO, 1e-8));
+	bool optAnyModel = FloatingPointEquals(conf->modWeight, ZERO_POINT_ZERO, 1e-8) == false;
 
 	if(optAnyModel){
 		do{
