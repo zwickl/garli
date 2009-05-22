@@ -366,7 +366,7 @@ void Population::CheckForIncompatibleConfigEntries(){
 	if(conf->modWeight == ZERO_POINT_ZERO){
 		if(modSpec.fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
 		if(modSpec.includeInvariantSites == true && modSpec.fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
-		if(modSpec.Nst() > 1 && modSpec.fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
+		if(modSpec.IsAminoAcid() == false && modSpec.Nst() > 1 && modSpec.fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
 		if(modSpec.numRateCats > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
 		}
 
@@ -1685,52 +1685,55 @@ void Population::FinalOptimization(){
 
 	FLOAT_TYPE precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
 	FLOAT_TYPE paramPrecThisPass = max(adap->branchOptPrecision*0.1, 0.01);
+	bool optAnyModel = !(FloatingPointEquals(conf->modWeight, ZERO_POINT_ZERO, 1e-8));
 
-	do{
-		paramOpt = ZERO_POINT_ZERO;
-		if(modSpec.IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
-		else if(modSpec.IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
-		paramTot += paramOpt;
+	if(optAnyModel){
+		do{
+			paramOpt = ZERO_POINT_ZERO;
+			if(modSpec.IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
+			else if(modSpec.IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
+			paramTot += paramOpt;
 #ifdef MORE_DETERM_PARAM_OPT
-		if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false){
-			double tempTot = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
-			paramOpt += tempTot;
-			freqOptImprove += tempTot;
-			}
-		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
-			double tempTot = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
-			paramOpt += tempTot;
-			nucRateOptImprove += tempTot;
-			}
-		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false){
-			double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
-			paramOpt += tempTot;
-			pinvOptImprove += tempTot;
-			}
-		if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false){
-			double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
-			paramOpt += tempTot;
-			alphaOptImprove += tempTot;
-			}
+			if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false){
+				double tempTot = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
+				paramOpt += tempTot;
+				freqOptImprove += tempTot;
+				}
+			if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
+				double tempTot = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
+				paramOpt += tempTot;
+				nucRateOptImprove += tempTot;
+				}
+			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false){
+				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
+				paramOpt += tempTot;
+				pinvOptImprove += tempTot;
+				}
+			if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false){
+				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
+				paramOpt += tempTot;
+				alphaOptImprove += tempTot;
+				}
 #endif
-		}while(paramOpt > 1.0e-2);
+			}while(paramOpt > 1.0e-2);
 
-	if(modSpec.IsFlexRateHet()){
-		outman.UserMessage("Flex optimization: %f", paramTot);
-		}
-	else if(modSpec.IsCodon()){
-		outman.UserMessage("Omega optimization: %f", paramTot);
-		}
+		if(modSpec.IsFlexRateHet()){
+			outman.UserMessage("Flex optimization: %f", paramTot);
+			}
+		else if(modSpec.IsCodon()){
+			outman.UserMessage("Omega optimization: %f", paramTot);
+			}
 #ifdef MORE_DETERM_PARAM_OPT
-	if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
-		outman.UserMessage("Equil freqs optimization: %f", freqOptImprove);
-	if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
-		outman.UserMessage("Rel rates optimization: %f", nucRateOptImprove);
-	if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false)
-		outman.UserMessage("Pinv optimization: %f", pinvOptImprove);
-	if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false)
-		outman.UserMessage("Alpha optimization: %f", alphaOptImprove);
+		if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
+			outman.UserMessage("Equil freqs optimization: %f", freqOptImprove);
+		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+			outman.UserMessage("Rel rates optimization: %f", nucRateOptImprove);
+		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false)
+			outman.UserMessage("Pinv optimization: %f", pinvOptImprove);
+		if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false)
+			outman.UserMessage("Alpha optimization: %f", alphaOptImprove);
 #endif
+		}
 	do{
 		precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
 		paramPrecThisPass = max(precThisPass, 1e-4);
@@ -1740,35 +1743,37 @@ void Population::FinalOptimization(){
 		indiv[bestIndiv].CalcFitness(0);
 		outman.UserMessage("\tpass %d %.4f", pass++, indiv[bestIndiv].Fitness());
 		//optimize omega more often, since it can be very strongly correlated with blens
-		if(modSpec.IsCodon() && pass % 2 == 0) {
-			paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
-			outman.UserMessage("Omega optimization: %f", paramOpt);
-			incr += paramOpt;
-			}
+		if(optAnyModel){
+			if(modSpec.IsCodon() && pass % 2 == 0) {
+				paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
+				outman.UserMessage("Omega optimization: %f", paramOpt);
+				incr += paramOpt;
+				}
 #ifdef MORE_DETERM_PARAM_OPT
-		if((pass + 1) % 2 == 0) {
-			if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false){
-				paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
-				outman.UserMessage("Equil freqs optimization: %f", paramOpt);
-				incr += paramOpt;
+			if((pass + 1) % 2 == 0) {
+				if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false){
+					paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
+					outman.UserMessage("Equil freqs optimization: %f", paramOpt);
+					incr += paramOpt;
+					}
+				if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
+					paramOpt = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
+					outman.UserMessage("Rel rates optimization: %f", paramOpt);
+					incr += paramOpt;
+					}
+				if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false){
+					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
+					outman.UserMessage("Pinv optimization: %f", paramOpt);
+					incr += paramOpt;
+					}
+				if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false){
+					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
+					outman.UserMessage("Alpha optimization: %f", paramOpt);
+					incr += paramOpt;
+					}
 				}
-			if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
-				paramOpt = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
-				outman.UserMessage("Rel rates optimization: %f", paramOpt);
-				incr += paramOpt;
-				}
-			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false){
-				paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
-				outman.UserMessage("Pinv optimization: %f", paramOpt);
-				incr += paramOpt;
-				}
-			if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false){
-				paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
-				outman.UserMessage("Alpha optimization: %f", paramOpt);
-				incr += paramOpt;
-				}
-			}
 #endif
+			}
 		}while(incr > 1.0e-5 || pass < 10);
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	unsigned totalSecs = stopwatch.SplitTime();
@@ -2055,6 +2060,10 @@ void Population::PerformSearch(){
 			indiv[bestIndiv].treeStruct->sitelikeLevel = conf->outputSitelikelihoods;
 			indiv[bestIndiv].treeStruct->ofprefix = conf->ofprefix;
 			indiv[bestIndiv].treeStruct->Score();
+			string oname = conf->ofprefix + ".ordSiteLikes.log";
+			ofstream ordered;
+			ordered.open(oname.c_str(), ios::app);
+			ordered << "1\t" << indiv[bestIndiv].treeStruct->lnL;
 			}
 
 		int best=0;
@@ -2206,6 +2215,43 @@ void Population::PerformSearch(){
 		}
 
 	ClearStoredTrees();
+	}
+
+void Population::OptimizeInputAndWriteSitelikelihoods(){
+	//find out how many trees we have
+	GarliReader & reader = GarliReader::GetInstance();
+	const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
+	assert(treesblock != NULL);
+	int numTrees = treesblock->GetNumTrees();
+
+	string oname = conf->ofprefix + ".ordSiteLikes.log";
+	ofstream ordered;
+	ordered.open(oname.c_str());
+	ordered << "Tree\t-lnL\tSite\t-lnL\n";
+	ordered.close();
+
+	adap->branchOptPrecision = 0.01;
+	bestIndiv = 0;
+	//loop over the trees
+	for(int t = 1;t <= numTrees;t++){
+		this->currentSearchRep = t;
+		outman.UserMessage("Optimizing tree %d ...", t);
+
+		SeedPopulationWithStartingTree(t);
+		bestIndiv = 0;
+		FinalOptimization();
+
+		outman.UserMessage("Writing site likelihoods for tree %d ...", t);
+		indiv[0].treeStruct->sitelikeLevel = -1;
+		indiv[0].treeStruct->ofprefix = conf->ofprefix;
+		indiv[0].treeStruct->Score();
+		
+		ordered.open(oname.c_str(), ios::app);
+		ordered.precision(10);
+		ordered << t << "\t" << -indiv[0].treeStruct->lnL << "\n";
+		ordered.close();
+		Reset();
+		}
 	}
 
 void Population::VariableStartingTreeOptimization(bool reducing){

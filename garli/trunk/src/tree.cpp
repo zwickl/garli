@@ -4772,32 +4772,38 @@ FLOAT_TYPE Tree::CountClasInUse(){
 void Tree::OutputSiteLikelihoods(vector<double> &likes, const int *under1, const int *under2){
 	//output level 1 is user-level output, just site nums and site likes
 	//output level 2 is for debugging, includes underflow multipliers and output of site likes in packed order
+	assert(sitelikeLevel != 0);
+	//a negative sitelike level means append, but the absolute value meanings are the same
+	bool append = sitelikeLevel < 0;
+	sitelikeLevel = abs(sitelikeLevel);
 	ofstream ordered, packed;
 	string oname = ofprefix + ".ordSiteLikes.log";
-	ordered.open(oname.c_str());
+	ordered.open(oname.c_str(), (append == true ? ios::app : ios::out));
 	if(sitelikeLevel > 1){
 		string pname = ofprefix + ".packedSiteLikes.log";
-		packed.open(pname.c_str());
+		packed.open(pname.c_str(), (append == true ? ios::app : ios::out));
 		}
 
 	assert(sitelikeLevel > 0);
 	assert(likes.size() == data->NChar());;
-	ordered << "site#\tsitelnL";
-	if(sitelikeLevel > 1) 
-		ordered << "\tunder1\tunder2";
-	ordered << "\n";
+	if(!append){
+		ordered << "Tree\t-lnL\tSite\t-lnL\n";
+		if(sitelikeLevel > 1) 
+			ordered << "\tunder1\tunder2";
+		ordered << "\n";
+		}
 	ordered.precision(10);
 	packed.precision(10);
 	
 	for(int site = 0;site < data->GapsIncludedNChar();site++){
 		int col = data->Number(site);
 		if(col == -1){
-			ordered << site+1 << "\tgap";
+			ordered << "\t\t" << site+1 << "\t-";
 			if(sitelikeLevel > 1) ordered << "\t-\t-";
 			ordered << "\n";
 			}
 		else{
-			ordered << site+1 << "\t" << likes[col];
+			ordered << "\t\t" << site+1 << "\t" << -likes[col];
 			if(sitelikeLevel > 1){
 				ordered << "\t" << under1[col];
 				if(under2 != NULL)
@@ -4949,10 +4955,10 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				totallnL = ZERO_POINT_ZERO;
 				}
 #endif
-			if(sitelikeLevel > 0)
+			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-		if(sitelikeLevel > 0){
+		if(sitelikeLevel != 0){
 			OutputSiteLikelihoods(siteLikes, underflow_mult, NULL);
 			}
 		}
@@ -5027,10 +5033,10 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				totallnL = ZERO_POINT_ZERO;
 				}
 #endif
-			if(sitelikeLevel > 0)
+			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-		if(sitelikeLevel > 0){
+		if(sitelikeLevel != 0){
 			OutputSiteLikelihoods(siteLikes, underflow_mult, NULL);
 			}
 		}
@@ -5157,10 +5163,10 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 			totallnL = ZERO_POINT_ZERO;
 			}
 #endif
-			if(sitelikeLevel > 0)
+			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-	if(sitelikeLevel > 0){
+	if(sitelikeLevel != 0){
 		OutputSiteLikelihoods(siteLikes, underflow_mult, NULL);
 		}
 #ifdef LUMP_LIKES
@@ -5253,10 +5259,10 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 			totallnL = ZERO_POINT_ZERO;
 			}
 #endif
-		if(sitelikeLevel > 0)
+		if(sitelikeLevel != 0)
 			siteLikes.push_back(unscaledlnL);
 		}
-	if(sitelikeLevel > 0){
+	if(sitelikeLevel != 0){
 		OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2);
 		}
 #ifdef LUMP_LIKES
@@ -5355,10 +5361,10 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				totallnL = ZERO_POINT_ZERO;
 				}
 #endif
-			if(sitelikeLevel > 0)
+			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-		if(sitelikeLevel > 0){
+		if(sitelikeLevel != 0){
 			OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2);
 			}
 		}
@@ -5427,10 +5433,10 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				totallnL = ZERO_POINT_ZERO;
 				}
 #endif
-			if(sitelikeLevel > 0)
+			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-		if(sitelikeLevel > 0){
+		if(sitelikeLevel != 0){
 			OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2);
 			}
 		}
