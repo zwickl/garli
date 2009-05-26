@@ -2065,6 +2065,7 @@ void Population::PerformSearch(){
 			string oname = conf->ofprefix + ".ordSiteLikes.log";
 			ofstream ordered;
 			ordered.open(oname.c_str(), ios::app);
+			ord.precision(12);
 			ordered << "1\t" << indiv[bestIndiv].treeStruct->lnL;
 			}
 
