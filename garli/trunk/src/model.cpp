@@ -626,6 +626,52 @@ void Model::UpdateQMatCodon(){
 		blen_multiplier[i] = blen_multiplier[0];
 	}
 
+//This just duplicates what happens at the end of UpdateQmatCodon, where the total rate is summed
+//across the matrix to calc the blens scaler.  Here it sums the rates for S and NS cells separately
+//and returns a vector with (S rate sum) / ((S rate sum) + (NS rate sum)) for each w set and then
+//over all categories
+void Model::CalcSynonymousBranchlengthProportions(vector<FLOAT_TYPE> &results){
+	results.clear();
+	UpdateQMatCodon();
+
+//calc the S and NS blens separately
+	vector<double> sumS, sumNS;
+	sumS.resize(NRateCats());
+	sumNS.resize(NRateCats());	
+	
+	double weightedSumS, weightedSumNS;
+	double tempSumS, tempSumNS;
+	for(int w=0;w<NRateCats();w++){
+		weightedSumS = weightedSumNS = 0.0;
+		for(int x=0;x<nstates;x++){
+			tempSumS = tempSumNS = 0.0;
+			for(int y=0;y<nstates;y++){
+				if(x!=y){
+					if(qmatLookup[x*nstates+y]&4)
+						tempSumNS += qmat[w][x][y];
+					else
+						tempSumS += qmat[w][x][y];
+					}
+				}
+			//qmat[w][x][x]=-sum;
+			weightedSumS += tempSumS * *stateFreqs[x];
+			weightedSumNS += tempSumNS * *stateFreqs[x];
+			}
+		sumS[w] = weightedSumS * *omegaProbs[w];
+		sumNS[w] = weightedSumNS * *omegaProbs[w];
+		results.push_back((sumS[w] / (sumS[w] + sumNS[w])));
+		}
+		
+	double totSumS = 0.0, totSumNS = 0.0;
+	for(int w=0;w<NRateCats();w++){
+		totSumS += sumS[w];
+		totSumNS += sumNS[w];
+		}
+	//verify that this all makes sense given the already calc'ed blen mults 
+	assert(FloatingPointEquals(blen_multiplier[0], (ONE_POINT_ZERO / (totSumS + totSumNS)), 1e-6));	
+	outman.UserMessage("w = %f S = %f NS = %f, propS = %f", *omegas[0], totSumS, totSumNS, (totSumS / (totSumS + totSumNS)));
+	results.push_back(totSumS / (totSumS + totSumNS));
+	}
 
 void Model::UpdateQMatAminoAcid(){
 
