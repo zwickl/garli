@@ -768,6 +768,7 @@ class Model{
 	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pr);
 	void UpdateQMat();
 	void UpdateQMatCodon();
+	void CalcSynonymousBranchlengthProportions(vector<FLOAT_TYPE> &results);
 	void UpdateQMatAminoAcid();
 	void DiscreteGamma(FLOAT_TYPE *, FLOAT_TYPE *, FLOAT_TYPE);
 	bool IsModelEqual(const Model *other) const ;	

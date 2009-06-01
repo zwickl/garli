@@ -1790,6 +1790,11 @@ void Population::FinalOptimization(){
 		outman.UserMessage("Time used so far = %d hours, %d minutes and %d seconds", hours, min, secs);
 
 	log << "Score after final optimization: " << indiv[bestIndiv].Fitness() << endl;
+	if(modSpec.IsCodon()){
+		vector<FLOAT_TYPE> sProps;
+		indiv[bestIndiv].treeStruct->mod->CalcSynonymousBranchlengthProportions(sProps);
+		outman.UserMessage("Proportion of branchlengths that are Synonymous: %.5f", sProps[sProps.size()-1]); 
+		}
 #ifdef MAC_FRONTEND
 	pool = [[NSAutoreleasePool alloc] init];
 	[[MFEInterfaceClient sharedClient] reportFinalScore:BestFitness()];
