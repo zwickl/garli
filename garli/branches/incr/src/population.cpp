@@ -1183,15 +1183,8 @@ void Population::SeedPopulationWithStartingTree(int rep) {
 	//check the current likelihood now to know how accurate we can expect them to be later
 	const FLOAT_TYPE ePrec = Population::CheckPrecision();
 	outman.UserMessage("expected likelihood precision = %.4e", ePrec);
-
-	//if there are not mutable params in the model, remove any weight assigned to the model
-	if(indiv[0].mod->NumMutatableParams() == 0) {
-		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
-			outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
-		adap->modelMutateProb=ZERO_POINT_ZERO;
-		adap->UpdateProbs();
-		}
-
+	
+	this->ReconfigureAdaptationParams();
 	outman.precision(10);
 	outman.UserMessage("Initial ln Likelihood: %.4f", indiv[0].Fitness());
 
@@ -1563,7 +1556,6 @@ void Population::ReadPopulationCheckpoint(){
 	}
 
 void Population::Run(){
-//	calcCount=0;
 	optCalcs=0;
 
 #ifdef VARIABLE_OPTIMIZATION
@@ -1687,7 +1679,6 @@ void Population::Run(){
 
 	if(conf->bootstrapReps==0) outman.UserMessage("finished");
 
-	//outman.UserMessage("%d conditional likelihood calculations\n%d branch optimization passes", calcCount, optCalcs);
 #ifdef BOINC
 	boinc_fraction_done(1.0);
 #endif
@@ -1885,13 +1876,15 @@ int Population::EvaluateStoredTrees(bool report){
 						break;
 					}
 				else
-					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)) break;
+					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root))
+						break;
 				}
 			if(r == (unsigned) bestRep)
 				outman.UserMessageNoCR("Replicate %d : %.4f (best)", r+1, storedTrees[r]->Fitness());
 			else
 				outman.UserMessageNoCR("Replicate %d : %.4f       ", r+1, storedTrees[r]->Fitness());
-			if(r2 < r) outman.UserMessage(" (same topology as %d)", r2+1);
+			if(r2 < r)
+				outman.UserMessage(" (same topology as %d)", r2+1);
 			else outman.UserMessage("");
 			}
 		if(conf->bootstrapReps == 0){
@@ -2753,8 +2746,6 @@ void Population::PerformMutation(int indNum){
 			//remote nodes
 			recomPerformed=SubtreeRecombination(indNum);
 			if(recomPerformed==false) ind->mutation_type=0;
-//			ind->treeStruct->calcs=calcCount;
-//			calcCount=0;
 			ind->CalcFitness(0);
 			break;
 
@@ -2766,14 +2757,12 @@ void Population::PerformMutation(int indNum){
 				recompar->treeStruct->CalcBipartitions(false);
 				ind->CrossOverWith( *recompar, adap->branchOptPrecision);
 				ind->accurateSubtrees=false;
-//				ind->treeStruct->calcs=calcCount;
-//				calcCount=0;
 				}
 			if(ind->recombinewith==-1){//all types of "normal" mutation that occur at the inidividual level
 				if(rank==0){//if we are the master
 				 	if(ind->accurateSubtrees==false || paraMan->subtreeModeActive==false){
 
-			       		ind->Mutate(adap->branchOptPrecision, adap);
+			       		ind->Mutate(adap->branchOptPrecision, *adap);
 
 						if(output_tree){
 							treeLog << "  tree gen" << gen <<  "." << indNum << "= [&U] [" << ind->Fitness() << "][ ";
@@ -2804,7 +2793,8 @@ void Population::PerformMutation(int indNum){
 */						}
 					}
 				else{//if we are a remote node
-				 	if(subtreeNode==0) ind->Mutate(adap->branchOptPrecision, adap);
+				 	if(subtreeNode==0)
+				 		ind->Mutate(adap->branchOptPrecision, *adap);
 					else{
 						assert(0);
 						//ind->SubtreeMutate(subtreeNode, adap->branchOptPrecision, subtreeMemberNodes, adap);

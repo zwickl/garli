@@ -20,8 +20,7 @@
 #define ADAPTION_H
 
 #include <fstream>
-
-using namespace std;
+#include <vector>
 
 #include "configoptions.h"
 #include "hashdefines.h"
@@ -69,51 +68,50 @@ class Adaptation{
 
 	unsigned limSPRrange;
 
-	//the arrays. All will be of length intervalsToStore
-	FLOAT_TYPE *improvetotal;
+	//the vectors. All will be of length intervalsToStore
+	std::vector<FLOAT_TYPE> improvetotal;
 
-	FLOAT_TYPE *randNNI;
-	int *randNNInum;
+	std::vector<FLOAT_TYPE> randNNI;
+	std::vector<int> randNNInum;
 	
-	FLOAT_TYPE *exNNI;
-	int *exNNInum;
+	std::vector<FLOAT_TYPE> exNNI;
+	std::vector<int> exNNInum;
 
-	FLOAT_TYPE *randSPR;
-	int *randSPRnum;
+	std::vector<FLOAT_TYPE> randSPR;
+	std::vector<int> randSPRnum;
 	
-	FLOAT_TYPE *limSPR;
-	int *limSPRnum;
+	std::vector<FLOAT_TYPE> limSPR;
+	std::vector<int> limSPRnum;
 
-	FLOAT_TYPE *exlimSPR;
-	int *exlimSPRnum;
+	std::vector<FLOAT_TYPE> exlimSPR;
+	std::vector<int> exlimSPRnum;
 
-	FLOAT_TYPE *randRecom;
-	int *randRecomnum;
+	std::vector<FLOAT_TYPE> randRecom;
+	std::vector<int> randRecomnum;
 	
-	FLOAT_TYPE *bipartRecom;
-	int *bipartRecomnum;
+	std::vector<FLOAT_TYPE> bipartRecom;
+	std::vector<int> bipartRecomnum;
 
-	FLOAT_TYPE *onlyBrlen;
-	int *onlyBrlennum;
+	std::vector<FLOAT_TYPE> onlyBrlen;
+	std::vector<int> onlyBrlennum;
 
-	FLOAT_TYPE *anyModel;
-	int *anyModelnum;
+	std::vector<FLOAT_TYPE> anyModel;
+	std::vector<int> anyModelnum;
 	
 #ifdef MPI_VERSION
-	FLOAT_TYPE *fromRemoteSubtree;
-	FLOAT_TYPE *fromRemoteNonSubtree;
-	int *bestFromRemoteNum;
-	FLOAT_TYPE *bestFromRemote;
+	std::vector<FLOAT_TYPE> fromRemoteSubtree;
+	std::vector<FLOAT_TYPE> fromRemoteNonSubtree;
+	std::vector<int> bestFromRemoteNum;
+	std::vector<FLOAT_TYPE> bestFromRemote;
 #endif
 
 	Adaptation(const GeneralGamlConfig *gc);
-	~Adaptation();
 	public:
 	void SetChangeableVariablesFromConfAfterReadingCheckpoint(const GeneralGamlConfig *gc);
 	void PrepareForNextInterval();
 	void UpdateProbs();
-	void OutputProbs(ofstream &plog, int gen);
-	void BeginProbLog(ofstream &plot, int gen);
+	void OutputProbs(std::ostream &plog, int gen);
+	void BeginProbLog(std::ostream &plot, int gen);
 	bool ReducePrecision(){
 		if(FloatingPointEquals(branchOptPrecision, minOptPrecision, 1e-10) || numPrecReductions == 0) return false;
 		if(topoMutateProb > .01 || FloatingPointEquals(topoWeight, 0.0, 1e-10)){
@@ -128,7 +126,7 @@ class Adaptation{
 
 	void WriteToCheckpoint(OUTPUT_CLASS &) const;
 	void ReadFromCheckpoint(FILE *);
-
+	void NormalizeMutateProbs();
 };
 
 #endif
