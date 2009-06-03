@@ -92,7 +92,9 @@ class Individual
 		Individual();
 		Individual(const Individual *other);
 		~Individual();
-
+		
+		Individual & operator=(const Individual &);
+		
 		// getters and setters
 		const int GetTopo() const { 
 			return this->topologyInt;
@@ -104,6 +106,11 @@ class Individual
 
 
 		FLOAT_TYPE Fitness() const { return fitness; }
+		FLOAT_TYPE GetFitness() { 
+			if (this->dirty)
+				CalcFitness(0);
+			return this->fitness; 
+		}
 		void SetDirty() { dirty = true; }
 		bool IsDirty() const { return dirty; }
 
@@ -119,10 +126,6 @@ class Individual
 		void ReadTreeFromFile(istream & inf);
 
 		
-//		void Mutate(int, FLOAT_TYPE);
-		void Mutate(FLOAT_TYPE optPrecision, Adaptation *adap);
-//		void SubtreeMutate(int subdomain, FLOAT_TYPE optPrecision, vector<int> const &subtreeList, Adaptation *adap);
-//		void NonSubtreeMutate(const ParallelManager *, FLOAT_TYPE optPrecision, Adaptation *adap);
 		
 		void CrossOverWith( Individual& so, FLOAT_TYPE optPrecision);
 		
@@ -135,6 +138,15 @@ class Individual
 		void MakeStepwiseTree(unsigned nTax, unsigned attemptsPerTaxon, FLOAT_TYPE optPrecision );
 		void ContinueBuildingStepwiseTree(unsigned nTax, unsigned attachesPerTaxon, FLOAT_TYPE optPrecision, Individual & scratchI, std::set<unsigned> & taxset, int &placeInAllNodes, Bipartition & mask);
 		void FinishIncompleteTreeByStepwiseAddition(unsigned nTax, unsigned attachesPerTaxon, FLOAT_TYPE optPrecision , Individual & scratchI);
+
+
+		void Mutate(FLOAT_TYPE optPrecision, const Adaptation & adap);
+
+		void DoBrLenMutation();
+		bool DoTopoMutation(FLOAT_TYPE optPrecision, const Adaptation & adap);
+		void DoModelMutation();
+
+
 	};
 
 

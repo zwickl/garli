@@ -122,7 +122,7 @@ bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLO
 	#endif
 #else
 	#define WRITE_TO_FILE(ptr, size, count) write((const char *) ptr, (streamsize) size*count)
-	#define OUTPUT_CLASS ofstream
+	#define OUTPUT_CLASS std::ofstream
 #endif
 
 //mpi message tags

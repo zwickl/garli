@@ -816,7 +816,7 @@ class Model{
 	void MutateRateMults();
 	
 	//Accessor functions
-	FLOAT_TYPE StateFreq(int p) const{ return *stateFreqs[p];}
+	FLOAT_TYPE StateFreq(int p) const {return *stateFreqs[p];}
 	FLOAT_TYPE TRatio() const;
 	FLOAT_TYPE Rates(int r) const { return *relNucRates[r];}
 	int NRateCats() const {return modSpec.numRateCats;}
@@ -824,7 +824,7 @@ class Model{
 	FLOAT_TYPE Alpha() const {return *alpha;}
 	FLOAT_TYPE PropInvar() const { return *propInvar;}
 	bool NoPinvInModel() const { return ! (modSpec.includeInvariantSites);}
-	FLOAT_TYPE MaxPinv() const{return maxPropInvar;}
+	FLOAT_TYPE MaxPinv() const {return maxPropInvar;}
 	int NStates() const {return nstates;}
 	int NumMutatableParams() const {return (int) paramsToMutate.size();}
 

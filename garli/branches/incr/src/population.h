@@ -544,21 +544,20 @@ private:
 		ContinuationCode AdaptPrec();
 		
 		// functions hacked in to support the addtaxon run mode
-		unsigned RefillTreeBuffer(GarliReader &reader, unsigned treeNum);
+		std::pair<unsigned, unsigned> RefillTreeBuffer(GarliReader &reader, unsigned treeNum);
 		void ResetTerminationVariables();
 		void RunImplForAddTaxonRunMode();
-		void NextAddTaxonRound(const NxsFullTreeDescription & treeDesc,
+		void NextAddTaxonRound(Individual & scratchIndividual,
 							   unsigned attachmentsPerTaxonVar,
 							   FLOAT_TYPE branchOptPrecisionVar, 
-							   Individual & scratchIndividual,
 							   unsigned repN,
 							   unsigned nReps);
-		void AddTaxonSwap(const NxsFullTreeDescription & treeDesc,
-							   unsigned attachmentsPerTaxonVar,
-							   FLOAT_TYPE branchOptPrecisionVar, 
-							   Individual & scratchIndividual,
-							   unsigned repN,
-							   unsigned nReps);
-
+		void AddTaxonSwap(	Individual & scratchIndividual,
+							unsigned attachmentsPerTaxonVar,
+							FLOAT_TYPE branchOptPrecisionVar, 
+							unsigned repN,
+							unsigned nReps);
+		void ReconfigureAdaptationParams();
+		void AfterRunHook(unsigned nReps);
 };
 #endif
