@@ -27,6 +27,8 @@ class Tree;
 class ParallelManager;
 class Adaptation;
 
+
+extern bool gOptimizePlausibleDuringStepwise;
 class Individual
 {
 	FLOAT_TYPE fitness;

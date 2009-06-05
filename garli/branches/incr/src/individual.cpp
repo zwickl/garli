@@ -381,6 +381,11 @@ void Individual::FinishIncompleteTreeByStepwiseAddition(unsigned nTax,
 	else
 		{
 		outman.UserMessage("number of taxa added:");
+
+		// MTH lets get the branch lengths approximately correct
+		//scratchI.treeStruct->Score();
+		//scratchI.treeStruct->OptimizeAllBranches(optPrecision);
+				
 		this->ContinueBuildingStepwiseTree(nTax, attachesPerTaxon, optPrecision, scratchI, taxaIndicesToAdd, placeInAllNodes, mask);
 		}
 }
@@ -473,6 +478,7 @@ void Individual::ContinueBuildingStepwiseTree(unsigned nTax,
 
 	CopySecByRearrangingNodesOfFirst(treeStruct, &scratchI, true);
 	
+
 	
 	unsigned i = nTax - taxaIndicesToAdd.size();
 	while (!taxaIndicesToAdd.empty()) {
@@ -480,7 +486,7 @@ void Individual::ContinueBuildingStepwiseTree(unsigned nTax,
 		unsigned k = PopRandom(taxaIndicesToAdd, rnd);
 
 		//add the node randomly - this is a little odd, but for the existing swap collecting machinery
-		//to work right, the taxon to be added needs to already be in the tree
+		//		to work right, the taxon to be added needs to already be in the tree
 		if(treeStruct->constraints.empty())
 			scratchT->AddRandomNode(k, placeInAllNodes );
 		else
@@ -492,7 +498,12 @@ void Individual::ContinueBuildingStepwiseTree(unsigned nTax,
 
 		//backup what we have now
 		CopySecByRearrangingNodesOfFirst(treeStruct, &scratchI, true);
+
+		FLOAT_TYPE bestBeforeOpt = scratchT->lnL;
+		if (gOptimizePlausibleDuringStepwise)
+			scratchT->OptimizeAllBranches(optPrecision);
 		FLOAT_TYPE bestScore = scratchT->lnL;
+		FLOAT_TYPE biggestOptDiff = abs(bestScore - bestBeforeOpt);
 		
 		//collect reconnection points - this will automatically filter for constraints
 		scratchT->GatherValidReconnectionNodes(scratchT->data->NTax()*2, added, NULL, &mask);
@@ -508,6 +519,23 @@ void Individual::ContinueBuildingStepwiseTree(unsigned nTax,
 			listIt broken = scratchT->sprRang.NthElement(connectNum);
 			//try a reattachment point
 			scratchT->SPRMutate(added->nodeNum, &(*broken), optPrecision, 0);
+			
+			
+			FLOAT_TYPE currBeforeOpt = scratchT->lnL;
+			FLOAT_TYPE beforeOptDiffFromBest = bestBeforeOpt - beforeOptDiffFromBest;
+			
+			if (gOptimizePlausibleDuringStepwise 
+				&& (beforeOptDiffFromBest < 100.0 || beforeOptDiffFromBest < 2*biggestOptDiff) ) {
+				scratchT->OptimizeAllBranches(optPrecision);
+				FLOAT_TYPE scoreDiff = abs(currBeforeOpt - scratchT->lnL);
+				if (scoreDiff > biggestOptDiff)
+					biggestOptDiff = scoreDiff;
+				if (bestBeforeOpt < currBeforeOpt)
+					currBeforeOpt = bestBeforeOpt;
+				}
+
+			Population::RecordStepwiseAdditionTree(*scratchT);
+
 			//record the score
 			broken->chooseProb = scratchT->lnL;
 			attempted.AddNode(*broken);
@@ -533,10 +561,10 @@ void Individual::ContinueBuildingStepwiseTree(unsigned nTax,
 			}
 
 		//if we didn't find anything better than the initial random attachment we don't need to do anything
-		if(best != NULL){
+		if(best != NULL) 
 			scratchT->SPRMutate(added->nodeNum, best, optPrecision, 0);
-			}
-		else scratchT->Score();
+		else
+			scratchT->Score();
 		scratchI.CalcFitness(0);
 
 //		stepout << scratchT->lnL << endl;
