@@ -41,7 +41,14 @@ bool gModelIsFixed;
 unsigned gCurrIGarliResultIndex = 0;
 bool gGetTreesFromReader = true;
 std::string gModelString;
-// end globals hacked in for the AddTaxonRunMode version: 
+typedef std::pair<double, std::string> ScoreStringPair;
+typedef std::vector< ScoreStringPair > ScoreStringPairList;
+ScoreStringPairList gSuboptimalTreeList;
+char * gTreeBufferString = 0L;
+bool gOptimizePlausibleDuringStepwise = true;
+	
+unsigned gMaxSuboptimalTreesToStore = 0;
+// end globals hacked in for the AddTaxonRunMode version:
 ////////////////////////////////////////////////////////////////////////////////
 
 MultiFormatReader * createConstraintFileReader() {
@@ -49,6 +56,34 @@ MultiFormatReader * createConstraintFileReader() {
 	return mfr;
 }
 
+void suboptimalTreesToWrapper();
+void ResetSuboptimalTreesList() {
+	gSuboptimalTreeList.clear();
+	gSuboptimalTreeList.reserve(gMaxSuboptimalTreesToStore + 1);
+}
+
+void Population::RecordStepwiseAdditionTree(const Tree &tree) {
+	assert(gTreeBufferString);
+	if (gMaxSuboptimalTreesToStore == 0)
+		return;
+	ScoreStringPair ssp(-tree.lnL, std::string() );
+	const ScoreStringPairList::iterator gstlEnd =  gSuboptimalTreeList.end();
+	ScoreStringPairList::iterator lb = std::lower_bound(gSuboptimalTreeList.begin(), gstlEnd, ssp);
+	if (lb == gstlEnd) {
+		if (gSuboptimalTreeList.size() < gMaxSuboptimalTreesToStore) {
+			tree.root->MakeNewick(gTreeBufferString, false, true);
+			ssp.second.assign(gTreeBufferString);
+			gSuboptimalTreeList.push_back(ssp);
+		}
+	}
+	else {
+		tree.root->MakeNewick(gTreeBufferString, false, true);
+		ssp.second.assign(gTreeBufferString);
+		gSuboptimalTreeList.insert(lb, ssp);
+		if (gSuboptimalTreeList.size() > gMaxSuboptimalTreesToStore)
+			gSuboptimalTreeList.pop_back();
+	}
+}
 
 NxsFullTreeDescription readConstraintTreeDesc(const char * nexusContent, NxsTaxaBlock *tb) {
 	if (gConstraintReader == 0L)
@@ -60,7 +95,7 @@ NxsFullTreeDescription readConstraintTreeDesc(const char * nexusContent, NxsTaxa
 	gConstraintReader->ClearContent();
 	if (tb)
 		gConstraintReader->AddReadTaxaBlock(tb);
-	
+
 	gConstraintReader->ReadStringAsNexusContent(nexusContent);
 	unsigned nt = gConstraintReader->GetNumTreesBlocks(tb);
 	if (nt == 0)
@@ -79,7 +114,7 @@ NxsFullTreeDescription readConstraintTreeDesc(const char * nexusContent, NxsTaxa
 
 std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, unsigned treeNum) {
 	unsigned endTreeNum = UINT_MAX;
-	int nSleeps = 0; 
+	int nSleeps = 0;
 	std::string nextLine;
 	for (;;) {
 		GeneralGamlConfig c(*(this->conf));
@@ -96,7 +131,7 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 					//finalize anything that needs it at the end of the repset
 					if(currentSearchRep == conf->searchReps)
 						FinalizeOutputStreams(1);
-				}				
+				}
 				continue;
 			}
 		}
@@ -120,7 +155,7 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 			}
 			else if (NxsString::case_insensitive_equals(nextLine.c_str(), "quit")
 					|| NxsString::case_insensitive_equals(nextLine.c_str(), "q")
-					|| NxsString::case_insensitive_equals(nextLine.c_str(), "exit")) {					
+					|| NxsString::case_insensitive_equals(nextLine.c_str(), "exit")) {
 				if (gGetTreesFromReader)
 					return std::pair<unsigned, unsigned>(reader.GetNumTrees(), 0);
 				return std::pair<unsigned, unsigned>(this->storedTrees.size(), 0);
@@ -156,7 +191,7 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 				}
 				else if (NxsString::case_insensitive_equals(nextLine.c_str(), "quit")
 						|| NxsString::case_insensitive_equals(nextLine.c_str(), "q")
-						|| NxsString::case_insensitive_equals(nextLine.c_str(), "exit")) {					
+						|| NxsString::case_insensitive_equals(nextLine.c_str(), "exit")) {
 					if (gGetTreesFromReader)
 						return std::pair<unsigned, unsigned>(reader.GetNumTrees(), 0);
 					return std::pair<unsigned, unsigned>(this->storedTrees.size(), 0);
@@ -193,6 +228,20 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 						treeNum = (unsigned) tn;
 					else
 						endTreeNum = (unsigned)tn;
+				}
+				else if (NxsString::case_insensitive_equals(key, "keep")) {
+					long tn = -1;
+					if (!NxsString::to_long(value, &tn) || tn < 0) {
+						throw ErrorException("Expecting a non-negative integer to follow \"keep\"");
+					}
+					gMaxSuboptimalTreesToStore  = (unsigned) tn;
+				}
+				else if (NxsString::case_insensitive_equals(key, "optplausible")) {
+					long tn = -1;
+					if (!NxsString::to_long(value, &tn) || tn < 0) {
+						throw ErrorException("Expecting a non-negative integer to follow \"optplausible\"");
+					}
+					gOptimizePlausibleDuringStepwise  = bool(tn != 0);
 				}
 				else if (NxsString::case_insensitive_equals(key, "search"))
 					gInteractive_mode_action = SEARCH_ACTION;
@@ -238,9 +287,9 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 	}
 	return std::pair<unsigned, unsigned>(treeNum, endTreeNum);
 }
-	
+
 bool ShouldWriteResults(bool prematureTermination, Population::output_details od, unsigned currRep, unsigned nReps) {
-	if (prematureTermination) 
+	if (prematureTermination)
 		return (od & Population::WRITE_PREMATURE);
 	if (od & Population::WRITE_REP_TERM)
 		return true;
@@ -255,12 +304,12 @@ bool ShouldWriteResults(bool prematureTermination, Population::output_details od
 	void Population::AddTaxonRunMode() {
 		throw ErrorException("SWAP_BASED_TERMINATION support for the AddTaxonRunMode has not been added");
 	}
-#elif defined (BOINC) 
-	
+#elif defined (BOINC)
+
 	void Population::AddTaxonRunMode() {
 		throw ErrorException("BOINC support for the AddTaxonRunMode has not been added");
 	}
-	
+
 #else
 void Population::AddTaxonRunMode() {
 	if (conf->restart)
@@ -284,12 +333,17 @@ void Population::AddTaxonRunMode() {
 	GetRepNums(s);
 	if(s.length() > 0)
 		outman.UserMessage("\n>>>%s<<<", s.c_str());
-	
-	
+
+	const FLOAT_TYPE taxsize = log10((FLOAT_TYPE) ((FLOAT_TYPE)data->NTax())*data->NTax()*2);
+	const unsigned stringSize=(int)((data->NTax()*2)*(10+DEF_PRECISION)+taxsize);
+	if (gTreeBufferString)
+		delete gTreeBufferString;
+	gTreeBufferString = new char[stringSize];
+
 	GarliReader & reader = GarliReader::GetInstance();
 	Individual scratchIndividual;// used in INCOMPLETE_FROM_FILE_START mode
-	
-	
+
+
 	for(unsigned i = 0; i < total_size; i++){
 		if(indiv[i].treeStruct != NULL)
 			indiv[i].treeStruct->RemoveTreeFromAllClas();
@@ -330,11 +384,11 @@ void Population::AddTaxonRunMode() {
 				outman.UserMessage("MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)");
 				indiv[0].mod->OutputHumanReadableModelReportWithParams();
 				}
-				
+
 			numTrees = reader.GetNumTrees();
 			totalNumTrees += numTrees;
 		}
-		
+
 		stopwatch.Restart();
 		ResetTerminationVariables();
 		if (gGetTreesFromReader) {
@@ -354,12 +408,16 @@ void Population::AddTaxonRunMode() {
 				scratchIndividual = *storedTrees[treeNum];
 			}
 		}
-		this->Reset();
+
+		this->Reset(); // this triggers the creation of a new adap object -- among other things
+
 		if (!gModelString.empty()) {
 			indiv[0].mod->ReadGarliFormattedModelString(gModelString);
 			gModelString.clear();
 		}
 		scratchIndividual.SetDirty();
+
+		ResetSuboptimalTreesList();
 
 		outman.UserMessage("Obtained incomplete starting tree %d from Nexus", treeNum+1);
 		if (gInteractive_mode_action == FINISH_STEPADD_ACTION)
@@ -370,9 +428,9 @@ void Population::AddTaxonRunMode() {
 		else if (gInteractive_mode_action == SWAP_ACTION) {
 			this->AddTaxonSwap(scratchIndividual, attachmentsPerTaxonVar, branchOptPrecisionVar, numTrees, totalNumTrees);
 		}
-		
+
 		AfterRunHook(totalNumTrees);
-		
+
 		if(s.length() > 0)
 			outman.UserMessage("\n>>>Completed %s<<<", s.c_str());
 
@@ -419,15 +477,11 @@ void Population::AfterRunHook(unsigned nReps) {
 		best = EvaluateStoredTrees(true);
 		}
 
-	if (ShouldWriteResults(prematureTermination, all_best_output, currentSearchRep, nReps)) {
-		if(storedTrees.size() > 0)
-			WriteStoredTrees(besttreefile.c_str());
-		}
-	if (ShouldWriteResults(prematureTermination, best_output, currentSearchRep, nReps)) {
-		WriteTreeFile(besttreefile.c_str());
-	}
+	WriteTreeFile(besttreefile.c_str());
+	
 	treeToWrapper(this->treeString, this->indiv[bestIndiv]);
-
+	suboptimalTreesToWrapper();
+	
 	if(prematureTermination == true)
 		return;
 	if(conf->inferInternalStateProbs == true){
@@ -479,7 +533,7 @@ void Population::AddTaxonSwap(Individual & scratchIndividual,
 								   FLOAT_TYPE branchOptPrecisionVar,
 								   unsigned repN,
 								   unsigned nReps) {
-
+	indiv[0] = scratchIndividual;
 	outman.UserMessage("Starting swapping seed=%d\n", rnd.seed());
 	globalBest = ZERO_POINT_ZERO;
 	bool foundPolytomies = indiv[0].treeStruct->ArbitrarilyBifurcate();
@@ -490,7 +544,7 @@ void Population::AddTaxonSwap(Individual & scratchIndividual,
 	indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->SetModel(indiv[0].mod);
 	indiv[0].CalcFitness(0);
-	
+
 	FLOAT_TYPE ePrec = 0.0;
 	if (repN == 0)
 		ePrec = Population::CheckPrecision();
@@ -515,7 +569,7 @@ void Population::AddTaxonSwap(Individual & scratchIndividual,
 		}
 
 	ReconfigureAdaptationParams();
-	
+
 	this->SwapToCompletion(SWAPPER_BY_DIST_NOT_FURTHEST_RUN_MODE, branchOptPrecisionVar);
 }
 
@@ -523,12 +577,23 @@ void treeToWrapper(char * treeString, Individual & ind) {
 	std::cerr << "[iGarli "<< gCurrIGarliResultIndex++ << " ] ";
 	writeGarliIndividualDescription(treeString, ind);
 }
+
+void suboptimalTreesToWrapper() {
+	std::cerr.setf( ios::floatfield, ios::fixed );
+	std::cerr.setf( ios::showpoint );
+	ScoreStringPairList::const_iterator it = gSuboptimalTreeList.begin();
+	for (; it != gSuboptimalTreeList.end() ; ++it) {
+		std::cerr << "[iGarli "<< gCurrIGarliResultIndex++;
+		std::cerr << " ] tree best = [&U][!GarliScore " << -(it->first) << "] " << it->second << '\n';
+	}
+}
+
 void writeGarliIndividualDescription(char * treeString, Individual & ind) {
 	std::cerr << "tree best = [&U][!GarliScore ";
-	if (ind.IsDirty()) 
-		std::cerr << "-0.0" ; 
+	if (ind.IsDirty())
+		std::cerr << "-0.0" ;
 	else
-		std::cerr << ind.Fitness() ; 
+		std::cerr << ind.Fitness() ;
 	std::string modstr;
 	ind.mod->FillGarliFormattedModelString(modstr);
 	std::cerr << "][!GarliModel " <<  modstr <<  "] ";
@@ -549,14 +614,16 @@ void Population::NextAddTaxonRound(Individual & scratchIndividual,
 	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
 	if(Tree::constraints.empty())
 		outman.UserMessage("using stepwise addition to complete the starting tree...");
-	else 
+	else
 		outman.UserMessage("using stepwise addition to complete the starting tree (compatible with constraints)...");
 
 	globalBest = ZERO_POINT_ZERO;
-	
+
 	std::cerr << "\nStarting individual:\n";
 	writeGarliIndividualDescription(this->treeString, scratchIndividual);
 	const unsigned nTax = data->NTax();
+	
+	
 	indiv[0].FinishIncompleteTreeByStepwiseAddition(nTax, attachmentsPerTaxonVar, branchOptPrecisionVar, scratchIndividual);
 	indiv[0].SetTopo(0);
 
@@ -565,9 +632,9 @@ void Population::NextAddTaxonRound(Individual & scratchIndividual,
 		msg  = "state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!";
 	else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile)
 		msg = "alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!";
-	else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) 
+	else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile)
 		msg = "proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!";
-	else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) 
+	else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile)
 		msg = "relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!";
 	if (msg)
 		throw ErrorException(msg, conf->GetTreeFilename(), conf->datafname.c_str());
@@ -663,7 +730,8 @@ void Population::RunImplForAddTaxonRunMode() {
 	outman.UserMessage("%-10s%-15s%-10s%-15s", "gen", "current_lnL", "precision", "last_tree_imp");
 	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
 	OutputLog();
-	if(conf->outputMostlyUselessFiles) OutputFate();
+	if(conf->outputMostlyUselessFiles)
+		OutputFate();
 
 	CatchInterrupt();
 
@@ -677,9 +745,9 @@ void Population::RunImplForAddTaxonRunMode() {
 			OutputFate();
 		if(conf->logevery > 0 && !(gen % conf->logevery))
 			OutputLog();
-		if(conf->saveevery > 0 && !(gen % conf->saveevery)) 
+		if(conf->saveevery > 0 && !(gen % conf->saveevery))
 			OutputSave();
-			
+
 
 		prematureTermination = CheckForUserSignal();
 		if(prematureTermination)

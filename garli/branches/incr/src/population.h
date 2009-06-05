@@ -559,5 +559,8 @@ private:
 							unsigned nReps);
 		void ReconfigureAdaptationParams();
 		void AfterRunHook(unsigned nReps);
+		
+		static void RecordStepwiseAdditionTree(const Tree &);
+
 };
 #endif
