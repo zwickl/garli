@@ -94,7 +94,7 @@ const SequenceData *Tree::data;
 unsigned Tree::rescaleEvery;
 FLOAT_TYPE Tree::rescaleBelow;
 FLOAT_TYPE Tree::treeRejectionThreshold;
-vector<Constraint> Tree::constraints;
+std::vector<Constraint> Tree::constraintsVec;
 AttemptedSwapList Tree::attemptedSwaps;
 FLOAT_TYPE Tree::uniqueSwapBias;
 FLOAT_TYPE Tree::distanceSwapBias;
@@ -121,6 +121,7 @@ FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, int ncha
 void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree);
 FLOAT_TYPE CalculatePDistance(const char *str1, const char *str2, int nchar);
 inline FLOAT_TYPE CallBranchLike(TreeNode *thisnode, Tree *thistree, FLOAT_TYPE blen, bool brak);
+
 
 
 void Tree::CopyClaIndeces(const Tree *from, bool remove){
@@ -276,8 +277,10 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 
 	//deal with the outgroup specification, if there is one
 	if(conf->outgroupString.length() > 0){
-		if(outgroup) outgroup->ClearBipartition();
-		else outgroup = new Bipartition();
+		if(outgroup)
+			outgroup->Clear();
+		else
+			outgroup = new Bipartition();
 
 		GarliReader &reader = GarliReader::GetInstance();
 		if(reader.GetTaxaBlock(0)->GetNTax() > 0){
@@ -567,7 +570,6 @@ Tree::Tree(){
 	allNodes.assign(nNodes, (TreeNode *) 0L);
 	for(int i=0;i<nNodes;i++){
 		allNodes[i]=new TreeNode(i);
-		allNodes[i]->bipart=new Bipartition();
 		}
 	root=allNodes[0];
 	root->SetAttached(true);
@@ -609,7 +611,6 @@ void Tree::AllocateTree(){
 	allNodes.assign(nNodes, (TreeNode *) 0L);
 	for(int i=0;i<nNodes;i++){
 		allNodes[i]=new TreeNode(i);
-		allNodes[i]->bipart=new Bipartition();
 		}
 	root=allNodes[0];
 	for(int i=1;i<=data->NTax();i++){
@@ -981,10 +982,11 @@ void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipar
 			otherDes = root->FindNode( k );
 			compat=true;
 			CalcBipartitions(true);
-			proposed.FillWithXORComplement(*(nd->bipart), *(otherDes->bipart));
-			for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+			proposed.FillWithXORComplement(nd->bipart, otherDes->bipart);
+			vector<Constraint>::const_iterator conit = Tree::GetConstraints().begin();
+			for(;conit != Tree::GetConstraints().end();conit++){
 				//if the taxon being added isn't in the backbone, it can go anywhere
-				if(((*conit).IsBackbone() == false) || (*conit).GetBackboneMask()->ContainsTaxon(nd->nodeNum)){
+				if(((*conit).IsBackbone() == false) || (*conit).GetBackboneMask().ContainsTaxon(nd->nodeNum)){
 					ReconNode broken(otherDes->nodeNum, 0, 0.0, false);
 					compat = SwapAllowedByConstraint((*conit), nd, &broken, proposed, mask);
 					if(compat == false) break;
@@ -1005,7 +1007,7 @@ void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipar
 	numTipsAdded++;
 	}
 
-void Tree::MimicTopologyButNotInternNodeNums(TreeNode *copySource,TreeNode *replicate,int &placeInAllNodes){
+void Tree::MimicTopologyButNotInternNodeNums(const TreeNode *copySource,TreeNode *replicate,int &placeInAllNodes){
 	//used in recombine so internal node nodeNums don't have to match
 	TreeNode *tempno=copySource->left;
 	assert(copySource->left);
@@ -1111,7 +1113,7 @@ void Tree::RecombineWith( Tree *t, bool sameModel, FLOAT_TYPE optPrecision ){
 	OptimizeBranchesAroundNode(connector, optPrecision, 0);
 	}
 
-TreeNode *Tree::ContainsBipartition(const Bipartition &bip){
+const TreeNode *Tree::ContainsBipartition(const Bipartition &bip) const {
 	//note that this doesn't work for terminals (but there's no reason to call for them anyway)
 	//find a taxon that appears "on" in the bipartition
 
@@ -1123,14 +1125,14 @@ TreeNode *Tree::ContainsBipartition(const Bipartition &bip){
 	//TreeNode *nd=allNodes[1]->anc;
 	TreeNode *nd=allNodes[tax]->anc;
 	while(nd->anc){
-		if(nd->bipart->IsASubsetOf(bip) == false) return NULL;
-		else if(nd->bipart->EqualsEquals(bip)) return nd;
+		if(nd->bipart.IsASubsetOf(bip) == false) return NULL;
+		else if(nd->bipart.EqualsEquals(bip)) return nd;
 		else nd=nd->anc;
 		}
 	return NULL;
 	}
 
-TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition &bip){
+const TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition &bip)  const {
 	//this version will detect if the same bipartition exists in the trees, even
 	//if it is in different orientation, which could happen due to rooting
 	//differences
@@ -1154,8 +1156,8 @@ TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition &bip){
 	//then its anc
 	TreeNode *nd=allNodes[tax];
 	while(nd->anc){
-		if(nd->bipart->IsASubsetOf(bip) == false) break;
-		else if(nd->bipart->EqualsEquals(bip)) return nd;
+		if(nd->bipart.IsASubsetOf(bip) == false) break;
+		else if(nd->bipart.EqualsEquals(bip)) return nd;
 		else nd=nd->anc;
 		}
 
@@ -1168,18 +1170,18 @@ TreeNode *Tree::ContainsBipartitionOrComplement(const Bipartition &bip){
 	//then its anc
 	nd=allNodes[tax];
 	while(nd->anc){
-		//if(nd->bipart->ComplementIsASubsetOf(bip) == false){
-		if(bip.IsASubsetOf(*nd->bipart) == false){
+		//if(nd->bipart.ComplementIsASubsetOf(bip) == false){
+		if(bip.IsASubsetOf(nd->bipart) == false){
 			return NULL;
 			}
-		else if(nd->bipart->EqualsEquals(bip)) return nd;
+		else if(nd->bipart.EqualsEquals(bip)) return nd;
 		else nd=nd->anc;
 		}
 
 	return NULL;
 	}
 
-TreeNode *Tree::ContainsMaskedBipartitionOrComplement(const Bipartition &bip, const Bipartition &mask){
+const TreeNode *Tree::ContainsMaskedBipartitionOrComplement(const Bipartition &bip, const Bipartition &mask) const {
 	//as in ContainsMaskedBipartitionOrComplement, but bits not on in the
 	//mask are ignored
 
@@ -1204,8 +1206,8 @@ TreeNode *Tree::ContainsMaskedBipartitionOrComplement(const Bipartition &bip, co
 	temp = bip;
 	temp.Complement();
 	while(nd->anc){
-		if(nd->bipart->MaskedEqualsEquals(bip, mask)) return nd;
-		if(nd->bipart->MaskedEqualsEquals(temp, mask)) return nd;
+		if(nd->bipart.MaskedEqualsEquals(bip, mask)) return nd;
+		if(nd->bipart.MaskedEqualsEquals(temp, mask)) return nd;
 		else nd=nd->anc;
 		}
 
@@ -1221,8 +1223,8 @@ TreeNode *Tree::ContainsMaskedBipartitionOrComplement(const Bipartition &bip, co
 	temp = bip;
 	temp.Complement();
 	while(nd->anc){
-		if(nd->bipart->MaskedEqualsEquals(bip, mask)) return nd;
-		if(nd->bipart->MaskedEqualsEquals(temp, mask)) return nd;
+		if(nd->bipart.MaskedEqualsEquals(bip, mask)) return nd;
+		if(nd->bipart.MaskedEqualsEquals(temp, mask)) return nd;
 		else nd=nd->anc;
 		}
 
@@ -1283,7 +1285,7 @@ bool Tree::IdenticalSubtreeTopology(const TreeNode *other){
 
 	if(other->IsRoot() == false){
 		if(other->IsTerminal()) return true;
-		identical=(ContainsBipartition(*other->bipart) != NULL);
+		identical=(ContainsBipartition(other->bipart) != NULL);
 		if(identical==true){
 			identical=IdenticalSubtreeTopology(other->left);
 			if(identical==true)
@@ -1310,7 +1312,7 @@ bool Tree::IdenticalTopology(const TreeNode *other){
 
 	if(other->IsRoot() == false){
 		if(other->IsTerminal()) return true;
-		identical= (ContainsBipartition(*other->bipart) != NULL);
+		identical= (ContainsBipartition(other->bipart) != NULL);
 		if(identical==true){
 			identical=IdenticalTopology(other->left);
 			if(identical==true)
@@ -1346,7 +1348,7 @@ bool Tree::IdenticalTopologyAllowingRerooting(const TreeNode *other){
 
 	if(other->IsTerminal()) return true;
 	if(other->IsRoot() == false)
-		identical = (ContainsBipartitionOrComplement(*other->bipart) != NULL);
+		identical = (ContainsBipartitionOrComplement(other->bipart) != NULL);
 	TreeNode *nd=other->left;
 	while(identical && nd != NULL){
 		identical = IdenticalTopologyAllowingRerooting(nd);
@@ -1379,7 +1381,8 @@ bool Tree::IdenticalTopologyAllowingRerooting(const TreeNode *other){
 
 int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE optPrecision){
 	//find a bipartition that is shared between the trees
-	TreeNode *tonode, *fromnode;
+	const TreeNode *fromnode;
+	TreeNode *tonode;
 	bool found=false;
 	int tries=0;
 	CalcBipartitions(true);
@@ -1391,9 +1394,7 @@ int Tree::BipartitionBasedRecombination( Tree *t, bool sameModel, FLOAT_TYPE opt
 			//WTF!!!  How did this work?
 			}while((allNodes[i]->left->IsTerminal() && allNodes[i]->right->IsTerminal()));
 			//}while((t->allNodes[i]->left->IsTerminal() && t->allNodes[i]->right->IsTerminal()));
-		//fromnode=t->ContainsBipartition(allNodes[i]->bipart);
-		//fromnode=t->ContainsBipartition(*allNodes[i]->bipart);
-		fromnode=t->ContainsBipartitionOrComplement(*allNodes[i]->bipart);
+		fromnode=t->ContainsBipartitionOrComplement(allNodes[i]->bipart);
 		if(fromnode != NULL){
 			//OK the biparts match, but see if they share the same clas!!!!
 			//Not much point in scoring them then.
@@ -1527,7 +1528,7 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 			bool unique=false;
 			Bipartition proposed;
 			CalcBipartitions(true);
-			proposed.FillWithXORComplement(*cut->bipart, *tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart);
+			proposed.FillWithXORComplement(cut->bipart, tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart);
 			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 
 			if(unique){
@@ -1614,7 +1615,7 @@ bool Tree::DeterministicSwapByDistAroundNode(
 		bool unique=false;
 		Bipartition proposed;
 		CalcBipartitions(true);
-		proposed.FillWithXORComplement(*cut->bipart, *allNodes[broken->nodeNum]->bipart);
+		proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
 		unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 
 		if(unique){
@@ -1822,7 +1823,7 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 		newBest = false;
 		Bipartition proposed;
 		CalcBipartitions(true);
-		proposed.FillWithXORComplement(*(cut->bipart), *(tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart));
+		proposed.FillWithXORComplement(cut->bipart, tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart);
 		unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 
 		if(unique){
@@ -1921,7 +1922,7 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 			if( ! ((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)){
 				Bipartition proposed;
 				CalcBipartitions(true);
-				proposed.FillWithXORComplement(*(cut->bipart), *(allNodes[broken->nodeNum]->bipart));
+				proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
 				unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
 				uniqueSwapTried = uniqueSwapTried || unique;
 				//uniqueSwapTried = uniqueSwapTried || attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
@@ -2079,16 +2080,17 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 
 #ifdef CONSTRAINTS
 	//now deal with constraints, if any
-	if(constraints.size() > 0){
-		if(sprRang.size() != 0){
+	if (IsUsingConstraints()) {
+		if(sprRang.size() != 0) {
 			Bipartition proposed;
 			listIt it=sprRang.begin();
 			do{
 				TreeNode* broken=allNodes[it->nodeNum];
 				CalcBipartitions(true);
-				proposed.FillWithXORComplement(*(cut->bipart), *(allNodes[broken->nodeNum]->bipart));
+				proposed.FillWithXORComplement(cut->bipart, allNodes[broken->nodeNum]->bipart);
 				bool allowed = true;
-				for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+				vector<Constraint>::const_iterator conit = Tree::GetConstraints().begin();
+				for(; conit != Tree::GetConstraints().end(); conit++){
 					allowed = SwapAllowedByConstraint((*conit), cut, &*it, proposed, partialMask);
 					if(!allowed) break;
 					}
@@ -2194,10 +2196,10 @@ void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNo
 
 #ifdef CONSTRAINTS
 	//now deal with constraints, if any
-	if(constraints.size() > 0){
+	if(IsUsingConstraints()){
 		Bipartition scratch;
-
-		for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+		vector<Constraint>::const_iterator conit=Tree::GetConstraints().begin();
+		for(;conit!=Tree::GetConstraints().end();conit++){
 			if(thisList.size() != 0){
 				listIt it=thisList.begin();
 				do{
@@ -2226,7 +2228,7 @@ bool Tree::AssignWeightsToSwaps(TreeNode *cut){
 	for(listIt it = sprRang.begin();it != sprRang.end();it++){
 		bool found;
 		CalcBipartitions(true);
-		proposed.FillWithXORComplement(*(cut->bipart), *(allNodes[(*it).nodeNum]->bipart));
+		proposed.FillWithXORComplement(cut->bipart, allNodes[(*it).nodeNum]->bipart);
 		tmp.Setup(proposed, cut->nodeNum, (*it).nodeNum, (*it).reconDist);
 		thisSwap = attemptedSwaps.FindSwap(tmp, found);
 
@@ -2631,7 +2633,7 @@ void Tree::ReadNewickConstraint(const char * newick, bool numericalTaxa, bool is
 
 	//BACKBONE - see if all taxa appear in this constraint or if its a backbone
 	if(contree.numTipsAdded < contree.numTipsTotal) {
-		Bipartition mask = *(contree.root->bipart);
+		Bipartition mask = contree.root->bipart;
 		//complement the mask if necessary
 		TreeNode *n = contree.root;
 		while(n->IsInternal())
@@ -2640,113 +2642,26 @@ void Tree::ReadNewickConstraint(const char * newick, bool numericalTaxa, bool is
 			mask.Complement();
 
 		for(vector<Bipartition>::iterator bit=bip.begin();bit!=bip.end();bit++) {
-			constraints.push_back(Constraint(&(*bit), &mask, isPositive));
+			const Constraint constraint(*bit, mask, isPositive);
+			Tree::AddConstraint(constraint);
 		}
 	}
 	else {
 		for(vector<Bipartition>::iterator bit=bip.begin();bit!=bip.end();bit++) {
-			constraints.push_back(Constraint(&(*bit), isPositive));
+			const Constraint constraint(*bit, isPositive);
+			Tree::AddConstraint(constraint);
 		}
 	}
 }
-void Tree::LoadConstraints(ifstream &con, int nTaxa) {
-	string temp;//=new char[numTipsTotal + 100];
-	Constraint constr;
-	do {
-		temp.clear();
-		char c;
-		con.get(c);
-		do {
-			temp += c;
-			con.get(c);
-		}
-		while(c != '\n' && c!= '\r' && con.eof() == false);
-		
-		while((con.peek() == '\n' || con.peek() == '\r') && con.eof() == false) {
-			con.get(c);
-		}
 
-		//getline works strangely on some compilers.  temp should end with ; or \0 , but
-		//might end with \r or \n
-		size_t len=temp.length();
-		char last=temp.c_str()[len-1];
-		while(last == '\r' || last == '\n' || last == ' ') {
-			temp.erase(len-1, 1);
-			len--;
-			last=temp.c_str()[len-1];
-		}
-		if(temp[0] != '\0') {
-			if(temp[0] != '+' && temp[0] != '-')
-				throw ErrorException("constraint string must start with \'+\' (positive constraint) or \'-\' (negative constraint)");
-			if(temp[1] == '.' || temp[1] == '*') {//if individual biparts are specified in *. format
-				//while(temp[temp.length()-1] == ' ') temp.erase(temp.length()-1);//eat any spaces at the end
-				if(len != nTaxa+1)
-					throw ErrorException("constraint # %d does not have the correct number of characters!\n(has %d) constraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format.  \nNote that backbone constraints cannot be specified in ...*** format.", constraints.size(), len);
-				constr.ReadDotStarConstraint(temp.c_str());
-				constraints.push_back(constr);
-			}
-			else if(temp[1] == '(') {//if a constraint tree in parenthetical notation is used
-				bool numericalTaxa=true;
-				for(unsigned i=0;i<len;i++) {//see if we are dealing with a treestring with taxa as # or names
-					if(isalpha(temp[i])) {
-						numericalTaxa=false;
-						break;
-					}
-				}
-				const bool isPositive = (temp[0] == '+');
-				ReadNewickConstraint(temp.c_str() + 1, numericalTaxa, isPositive);
-			}
-			else {
-				throw ErrorException("problem with constraint # %d\nconstraint strings must start with \n\'+\' (positive constraint) or \'-\' (negative constraint)\nfollowed by either a ...*** type specification\nor a constraint in newick format", constraints.size(), len);
-			}
-		}
-	}
-	while(!con.eof());
-
-	//make sure the constraints are compatible with each other!
-	if(constraints.size() > 1) {
-		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++) {
-			for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++) {
-				if((*first).IsPositive() != (*sec).IsPositive())
-					throw ErrorException("cannot mix positive and negative constraints!");
-				if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false))
-					throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
-				if((*first).ConstraintIsCompatibleWithConstraint((*sec)) == false)
-					throw ErrorException("constraints are not compatible with one another!");
-			}
-		}
-	}
-	//summarize the constraint info to the screen
-	string str;
-	int num=1;
-	if(constraints[0].IsPositive()) {
-		outman.UserMessage("Found %d positively constrained bipartition(s)", constraints.size());
-		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++) {
-			(*first).NumericalOutput(str);
-			if((*first).IsBackbone())
-				outman.UserMessage("     Bipartition %d (backbone): %s", num, str.c_str());
-			else
-				outman.UserMessage("     Bipartition %d: %s", num, str.c_str());
-			num++;
-		}
-	}
-	else {
-		outman.UserMessage("Found 1 negatively (conversely) constrained bipartition");
-		constraints[0].NumericalOutput(str);
-		if(constraints[0].IsBackbone())
-			outman.UserMessage("     Bipartition %d (backbone): %s", num, str.c_str());
-		else
-			outman.UserMessage("     Bipartition %d: %s", num, str.c_str());
-	}
-}
 
 //this just "fakes" the swapping of the subtree rooted at cut to a postition as the sister of broken by adjusting the
 //biparts across the tree.  This should only be used for NORMAL SPR's not subtree reorient SPR's
 void Tree::AdjustBipartsForSwap(int cut, int broken){
 	//first be sure the biparts are current
 	CalcBipartitions(true);
-	if(allNodes[cut]->anc->IsNotRoot()) allNodes[cut]->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(*(allNodes[cut]->bipart));
-	if(allNodes[broken]->anc->IsNotRoot()) allNodes[broken]->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(*(allNodes[cut]->bipart));
+	if(allNodes[cut]->anc->IsNotRoot()) allNodes[cut]->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(allNodes[cut]->bipart);
+	if(allNodes[broken]->anc->IsNotRoot()) allNodes[broken]->anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(allNodes[cut]->bipart);
 	bipartCond = TEMP_ADJUSTED;
 	}
 
@@ -2783,7 +2698,7 @@ bool Tree::SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, Reco
 			propTree.MimicTopo(this);
 			propTree.ReorientSubtreeSPRMutate(cut->nodeNum, broken, -1.0);
 
-			compat = (constr.IsPositive()) == (propTree.ContainsMaskedBipartitionOrComplement(*constr.GetBipartition(), jointMask) != NULL);
+			compat = (constr.IsPositive()) == (propTree.ContainsMaskedBipartitionOrComplement(constr.GetBipartition(), jointMask) != NULL);
 			}
 		return compat;
 		}
@@ -2857,7 +2772,7 @@ bool Tree::TaxonAdditionAllowedByNegativeBackboneConstraintWithMask(Constraint *
 bool Tree::RecursiveAllowedByConstraintWithMask(const Constraint &constr, const Bipartition *jointMask, const TreeNode *nd){
 	bool compat = true;
 	if(nd->IsNotRoot())
-		compat = constr.BipartitionIsCompatibleWithConstraint(*nd->bipart, jointMask);
+		compat = constr.BipartitionIsCompatibleWithConstraint(nd->bipart, jointMask);
 	if(compat==false) return compat;
 
 	if(nd->left->IsInternal()) compat=RecursiveAllowedByConstraintWithMask(constr, jointMask, nd->left);
@@ -3010,7 +2925,7 @@ void Tree::MimicTopo(const Tree *source){
 //this version is used for just copying a subtree,
 //but assumes that the nodenums will match.  Automatically
 //copys the cla indeces too
-void Tree::MimicTopo(TreeNode *nd, bool firstNode, bool sameModel){
+void Tree::MimicTopo(const TreeNode *nd, bool firstNode, bool sameModel){
 	//firstNode will be true if this is the base of the subtree to be copied.
 	//if it is true, the anc, next and prev should not be copied for that node
 	//Above the firstNode, nodes will be assumed to be the same nodenum in both trees.  This
@@ -3999,7 +3914,7 @@ void Tree::CheckBalance(){
 */		}while(1);
 	}
 
-void Tree::SwapAndFreeNodes(TreeNode *cop){
+void Tree::SwapAndFreeNodes(const TreeNode *cop){
 	assert(cop->left);//only swap internal nodes
 	int tofree=cop->nodeNum;
 	//we need to actually swap the memory addresses of the nodes in the allnodes array so that all other node pointers in the
@@ -4046,7 +3961,7 @@ void Tree::SwapAndFreeNodes(TreeNode *cop){
 	if(cop->right->left) SwapAndFreeNodes(cop->right);
 	}
 
-void Tree::CalcBipartitions(bool standardize){
+void Tree::CalcBipartitions(bool standardize) const {
 	if(!(bipartCond == CLEAN_STANDARDIZED && standardize == true) &&
 		!(bipartCond == CLEAN_UNSTANDARDIZED && standardize == false)){
 
@@ -4057,7 +3972,6 @@ void Tree::CalcBipartitions(bool standardize){
 		if(standardize)	bipartCond = CLEAN_STANDARDIZED;
 		else bipartCond = CLEAN_UNSTANDARDIZED;
 		}
-//	root->VerifyBipartition(standardize);
 	}
 
 void Tree::OutputBipartitions(){

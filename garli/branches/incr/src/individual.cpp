@@ -270,7 +270,7 @@ void Individual::MakeRandomTree(unsigned nTax){
 		
 	int placeInAllNodes = n + 1;
 	
-	if(treeStruct->constraints.empty() == true){
+	if(!Tree::IsUsingConstraints()){
 		// add nodes randomly
 		for( unsigned i = 0; i < n; i++ ) {
 			unsigned k = PopRandom(taxset, rnd);
@@ -350,7 +350,7 @@ void Individual::FinishIncompleteTreeByStepwiseAddition(unsigned nTax,
 			int nn = (unsigned) nd->nodeNum;
 			assert (nn >= 0 && nn <= (int)nTax);
 			taxaIndicesToAdd.erase((unsigned) nn);
-			if(!(treeStruct->constraints.empty())) {
+			if (Tree::IsUsingConstraints()) {
 				mask += temp.TerminalBipart(nn);
 				}
 			if (nd->next) {
@@ -414,7 +414,7 @@ void Individual::MakeStepwiseTree(unsigned nTax, unsigned attachesPerTaxon, FLOA
 	Bipartition mask;//mask is used for constrained trees
 	for(unsigned i = 0; i < 3; i++){//add the first 3
 		unsigned k = PopRandom(taxaIndicesToAdd, rnd);
-		if(treeStruct->constraints.empty())
+		if(!Tree::IsUsingConstraints())
 			scratchT->AddRandomNode(k, placeInAllNodes  );
 		else
 			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
@@ -487,7 +487,7 @@ void Individual::ContinueBuildingStepwiseTree(unsigned nTax,
 
 		//add the node randomly - this is a little odd, but for the existing swap collecting machinery
 		//		to work right, the taxon to be added needs to already be in the tree
-		if(treeStruct->constraints.empty())
+		if(!Tree::IsUsingConstraints())
 			scratchT->AddRandomNode(k, placeInAllNodes );
 		else
 			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
@@ -719,19 +719,15 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 
 		//now allowing polytomies, since they will be taken care of in Population::SeedPopulationWithStartingTree
 		treeStruct=new Tree(treeString.c_str(), numericalTaxa, true);
-		//treeStruct=new Tree(treeString.c_str(), numericalTaxa);
 
-		//check that any defined constraints are present in the starting tree
-		int conNum=1;
-		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
-			TreeNode *check = NULL;
-			if((*conit).IsBackbone())
-				check = treeStruct->ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
-			else
-				check = treeStruct->ContainsBipartitionOrComplement(*(*conit).GetBipartition());
-			if(((*conit).IsPositive() && check == NULL) || ((*conit).IsPositive() == false  && check != NULL))
-				throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
-			}
+		std::string violCon;
+		if (!treeStruct->ObeysConstraints(&violCon)) {
+			std::string msg = "Starting tree is not compatible with the constraint:\n";
+			msg.append(violCon);
+			msg.append(1, '\n');
+			throw ErrorException(msg.c_str());
+		}
+
 		treeStruct->AssignCLAsFromMaster();
 		}
 
@@ -799,17 +795,14 @@ void Individual::ReadNxsFullTreeDescription(const NxsFullTreeDescription &t, boo
 	ts += ";";
 	treeStruct=new Tree(ts.c_str(), true, true, !demandAllTaxa);
 
-	//check that any defined constraints are present in the starting tree
-	int conNum=1;
-	for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
-		TreeNode *check = NULL;
-		if((*conit).IsBackbone())
-			check = treeStruct->ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
-		else
-			check = treeStruct->ContainsBipartitionOrComplement(*(*conit).GetBipartition());
-		if(((*conit).IsPositive() && check == NULL) || ((*conit).IsPositive() == false  && check != NULL))
-			throw ErrorException("Starting tree not compatible with constraint number %d!!!", conNum);
-		}
+	std::string violCon;
+	if (!treeStruct->ObeysConstraints(&violCon)) {
+		std::string msg = "Starting tree is not compatible with the constraint:\n";
+		msg.append(violCon);
+		msg.append(1, '\n');
+		throw ErrorException(msg.c_str());
+	}
+
 	treeStruct->AssignCLAsFromMaster();
 
 	mod->UpdateQMat();

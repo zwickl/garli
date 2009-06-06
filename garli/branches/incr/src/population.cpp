@@ -468,8 +468,6 @@ Population::~Population()
 		}
 #endif
 
-	if(Bipartition::str!=NULL) delete []Bipartition::str;
-
 	for(vector<Tree*>::iterator delit=unusedTrees.begin();delit!=unusedTrees.end();delit++)
 		delete *delit;
 
@@ -1114,7 +1112,7 @@ void Population::SeedPopulationWithStartingTree(int rep) {
 	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
 	//A random tree specified, or a starting file was specified but contained no tree
 	if(startMode == GeneralGamlConfig::STEPWISE_ADDITION_START){
-		if(Tree::constraints.empty())
+		if(!Tree::IsUsingConstraints())
 			outman.UserMessage("creating likelihood stepwise addition starting tree...");
 		else 
 			outman.UserMessage("creating likelihood stepwise addition starting tree (compatible with constraints)...");
@@ -1128,7 +1126,7 @@ void Population::SeedPopulationWithStartingTree(int rep) {
 		indiv[0].MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 		}
 	else if(startMode == GeneralGamlConfig::INCOMPLETE_FROM_FILE_START) {
-		if(Tree::constraints.empty())
+		if(!Tree::IsUsingConstraints())
 			outman.UserMessage("using stepwise addition to complete the starting tree...");
 		else 
 			outman.UserMessage("using stepwise addition to complete the starting tree (compatible with constraints)...");
@@ -1137,8 +1135,10 @@ void Population::SeedPopulationWithStartingTree(int rep) {
 		indiv[0].SetTopo(0);
 		}
 	else if( startMode == GeneralGamlConfig::RANDOM_START || indiv[0].treeStruct == NULL){
-		if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
-		else outman.UserMessage("creating random starting tree (compatible with constraints)...");
+		if(!Tree::IsUsingConstraints())
+			outman.UserMessage("creating random starting tree...");
+		else 
+			outman.UserMessage("creating random starting tree (compatible with constraints)...");
 		indiv[0].MakeRandomTree(data->NTax());
 		indiv[0].SetDirty();
 		}
@@ -3069,7 +3069,7 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 	ind->treeStruct->CalcBipartitions(true);
 	Bipartition b = *(Tree::outgroup);
 	b.Standardize();
-	TreeNode *r = ind->treeStruct->ContainsBipartitionOrComplement(b);
+	const TreeNode *r = ind->treeStruct->ContainsBipartitionOrComplement(b);
 
 	if(r == NULL){
 		//this means that there isn't a bipartition separating the outgroup and ingroup
@@ -3077,20 +3077,22 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 		return false;
 		}
 
-	TreeNode *temp = r;
-	while(temp->IsTerminal() == false) temp=temp->left;
-	if(Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal()) r = r->anc;
-	if(r->IsNotRoot()){
+	const TreeNode *temp = r;
+	while (temp->IsTerminal() == false)
+		temp = temp->left;
+	if (Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal())
+		r = r->anc;
+	if (r->IsNotRoot()) {
 		ind->treeStruct->RerootHere(r->nodeNum);
-		if(indnum != -1){
+		if(indnum != -1) {
 			AssignNewTopology(indiv, indnum);
 			ind->SetDirty();
 			ind->CalcFitness(0);
-			}
-		return true;
 		}
-	else return false;
+		return true;
 	}
+	return false;
+}
 
 void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	int k;
