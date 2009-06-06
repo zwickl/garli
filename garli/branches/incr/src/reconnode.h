@@ -233,7 +233,7 @@ public:
 	//default constructor does not initialize the bipart, since there would be some overhead
 	Swap() : count(0), cutnum(0), brokenum(0), reconDist(0){}
 	Swap(Bipartition &swap, int cut, int broke, int dist){
-		b=&swap;
+		b = swap;
 		count=1;
 		cutnum=cut;
 		brokenum=broke;
@@ -250,7 +250,7 @@ public:
 	//this is just like the constructor, but doesn't require the bipartition
 	//to be allocated every time
 	void Setup(Bipartition &swap, int cut, int broke, int dist){
-		b=&swap;
+		b = swap;
 		count=1;
 		cutnum=cut;
 		brokenum=broke;

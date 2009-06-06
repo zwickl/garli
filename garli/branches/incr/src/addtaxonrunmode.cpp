@@ -248,7 +248,8 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 				else if (NxsString::case_insensitive_equals(key, "swap"))
 					gInteractive_mode_action = SWAP_ACTION;
 				else if (NxsString::case_insensitive_equals(key, "clearconstraints")) {
-						Tree::constraints.clear();
+					Tree::ClearConstraints();
+					std::cerr << "constraints cleared\n";
 				}
 				else if (NxsString::case_insensitive_equals(key, "treesource")) {
 					if (NxsString::case_insensitive_equals(value, "results"))
@@ -426,6 +427,7 @@ void Population::AddTaxonRunMode() {
 			throw ErrorException("Not implemented yet");
 		}
 		else if (gInteractive_mode_action == SWAP_ACTION) {
+			assert(0);
 			this->AddTaxonSwap(scratchIndividual, attachmentsPerTaxonVar, branchOptPrecisionVar, numTrees, totalNumTrees);
 		}
 
@@ -584,7 +586,7 @@ void suboptimalTreesToWrapper() {
 	ScoreStringPairList::const_iterator it = gSuboptimalTreeList.begin();
 	for (; it != gSuboptimalTreeList.end() ; ++it) {
 		std::cerr << "[iGarli "<< gCurrIGarliResultIndex++;
-		std::cerr << " ] tree best = [&U][!GarliScore " << -(it->first) << "] " << it->second << '\n';
+		std::cerr << " ] tree best = [&U][!GarliScore " << -(it->first) << "] " << it->second << " ;\n";
 	}
 }
 
@@ -600,7 +602,7 @@ void writeGarliIndividualDescription(char * treeString, Individual & ind) {
 	std::cerr.setf( ios::floatfield, ios::fixed );
 	std::cerr.setf( ios::showpoint );
 	ind.treeStruct->root->MakeNewick(treeString, false, true);
-	std::cerr << treeString << '\n';
+	std::cerr << treeString << " ;\n";
 }
 
 // should only be called by AddTaxonRunMode
@@ -612,7 +614,7 @@ void Population::NextAddTaxonRound(Individual & scratchIndividual,
 	{
 
 	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
-	if(Tree::constraints.empty())
+	if(Tree::IsUsingConstraints())
 		outman.UserMessage("using stepwise addition to complete the starting tree...");
 	else
 		outman.UserMessage("using stepwise addition to complete the starting tree (compatible with constraints)...");

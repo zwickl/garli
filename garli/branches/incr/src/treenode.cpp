@@ -42,7 +42,7 @@ void TreeNode::SetAttached(bool v)
 }
 
 TreeNode::TreeNode( const int no )
-	: left(0), right(0), next(0), prev(0), anc(0), isAttached(false), tipData(0L), bipart(0L)
+	: left(0), right(0), next(0), prev(0), anc(0), isAttached(false), tipData(0L)
 {	
 	claIndexDown=-1;
 	claIndexUL=-1;
@@ -58,7 +58,6 @@ TreeNode::TreeNode( const int no )
 }
 
 TreeNode::~TreeNode(){
-	if(bipart!=NULL) delete bipart;
 }
 
 TreeNode* TreeNode::AddDes(TreeNode *d){
@@ -530,54 +529,28 @@ void TreeNode::OutputNodeConnections(){
 		}
 	}
 
-Bipartition* TreeNode::VerifyBipartition(bool standardize){	
-	Bipartition before = *bipart;
+void TreeNode::CalcBipartition(bool standardize){	
 	if(IsInternal()){//not terminal
 		TreeNode *nd=left;
-		*bipart = nd->CalcBipartition(standardize);
+		nd->CalcBipartition(standardize);
+		bipart = nd->bipart;
 		//the standardization needs to happen AFTER the child unstandardized bipart is used here
 		if(standardize)
-			nd->bipart->Standardize();
+			nd->bipart.Standardize();
 		nd=nd->next;
 		do{
-			*bipart += nd->CalcBipartition(standardize);
+			nd->CalcBipartition(standardize);
+			bipart += nd->bipart;
 			//the standardization needs to happen AFTER the child unstandardized bipart is used here
 			if(standardize)
-				nd->bipart->Standardize();
+				nd->bipart.Standardize();
 			nd=nd->next;
-			}while(nd != NULL);
-		assert(bipart->EqualsEquals(before));
-		return bipart;
+			}
+		while(nd != NULL);
 		}
 	else if(IsNotRoot()){//terminal
-		bipart=bipart->TerminalBipart(nodeNum);	
-		return bipart;
+		bipart.TerminalBipart(nodeNum);	
 		}
-	return NULL;
-	}
-
-Bipartition* TreeNode::CalcBipartition(bool standardize){	
-	if(IsInternal()){//not terminal
-		TreeNode *nd=left;
-		*bipart = nd->CalcBipartition(standardize);
-		//the standardization needs to happen AFTER the child unstandardized bipart is used here
-		if(standardize)
-			nd->bipart->Standardize();
-		nd=nd->next;
-		do{
-			*bipart += nd->CalcBipartition(standardize);
-			//the standardization needs to happen AFTER the child unstandardized bipart is used here
-			if(standardize)
-				nd->bipart->Standardize();
-			nd=nd->next;
-			}while(nd != NULL);
-		return bipart;
-		}
-	else if(IsNotRoot()){//terminal
-		bipart=bipart->TerminalBipart(nodeNum);	
-		return bipart;
-		}
-	return NULL;
 	}
 
 void TreeNode::StandardizeBipartition(){
@@ -588,7 +561,7 @@ void TreeNode::StandardizeBipartition(){
 			nd=nd->next;
 			}while(nd != NULL);
 		}
-	bipart->Standardize();
+	bipart.Standardize();
 	}
 
 void TreeNode::GatherConstrainedBiparitions(vector<Bipartition> &biparts) {
@@ -599,7 +572,7 @@ void TreeNode::GatherConstrainedBiparitions(vector<Bipartition> &biparts) {
 			nd=nd->next;
 			}while(nd != NULL);
 		if(IsNotRoot()){
-			Bipartition b(*bipart);
+			Bipartition b(bipart);
 			biparts.push_back(b);
 			}
 		}
@@ -609,7 +582,7 @@ void TreeNode::OutputBipartition(ostream &out){
 	if(left&&anc){
 		left->OutputBipartition(out);
 		left->next->OutputBipartition(out);
-		out << bipart->Output() << endl;
+		out << bipart.Output() << endl;
 		}
 	else if(!anc){
 		left->OutputBipartition(out);
@@ -701,7 +674,7 @@ void TreeNode::RecursivelyAddOrRemoveSubtreeFromBipartitions(const Bipartition &
 	//that a taxon is in their subtree by flipping its bit in the bipartition
 	//this obviously needs to be undone by calcing the biparts if the true
 	//tree bipartitions are needed
-	bipart->FlipBits(subtree);
+	bipart.FlipBits(subtree);
 	if(anc->IsNotRoot()) anc->RecursivelyAddOrRemoveSubtreeFromBipartitions(subtree);
 	}
 

@@ -78,7 +78,6 @@ class Tree{
 		static ClaManager *claMan;
 		static const SequenceData *data;
 		static FLOAT_TYPE treeRejectionThreshold;
-		static vector<Constraint> constraints;
 		static AttemptedSwapList attemptedSwaps;
 		static FLOAT_TYPE uniqueSwapBias;
 		static FLOAT_TYPE distanceSwapBias;
@@ -112,14 +111,24 @@ class Tree{
 		ROOT = 4
 		};
 
-	enum{
+	mutable enum {
 		DIRTY = 0,
 		CLEAN_STANDARDIZED = 1,
 		CLEAN_UNSTANDARDIZED = 2,
 		TEMP_ADJUSTED = 3
-		}bipartCond;
+		} bipartCond; 
 		
-	public: 
+		static std::vector<Constraint> constraintsVec;
+		static void ClearConstraints() {constraintsVec.clear();}
+		static void AddConstraint(const Constraint &);
+	public:
+	
+			//functions for dealing with constraints and bipartitions
+		static void LoadConstraints(ifstream &con, int nTaxa);
+		static void ReadNewickConstraint(const char * newick, bool numericalTaxa, bool isPositive);
+		static const vector<Constraint> & GetConstraints() {return constraintsVec;}
+		static bool IsUsingConstraints() {return !GetConstraints().empty();}
+
 		//construction and allocation functions
 		Tree();
 		Tree(NucleotideData*,CondLikeArray **sharedcl);
@@ -147,6 +156,8 @@ class Tree{
 			this->mod = m;
 			}
 		//functions for manipulating and making trees
+		bool ObeysConstraints(std::string *violated) const;
+
 		void AddRandomNode(int nodenum, int & );
 		void AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition *mask);
 		void MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned);
@@ -162,13 +173,13 @@ class Tree{
 		void RerootHere(int newroot);
 		void SwapNodeDataForReroot(TreeNode *nroot);
 		void CheckBalance();
-		void SwapAndFreeNodes(TreeNode *cop);
+		void SwapAndFreeNodes(const TreeNode *cop);
 		void OutputBinaryFormattedTree(OUTPUT_CLASS &) const;
 		void ReadBinaryFormattedTree(FILE *);
 
 		//functions for copying trees
-		void MimicTopologyButNotInternNodeNums(TreeNode *copySource,TreeNode *replicate,int &placeInAllNodes);
-		void MimicTopo(TreeNode *, bool firstNode, bool sameModel);	
+		void MimicTopologyButNotInternNodeNums(const TreeNode *copySource,TreeNode *replicate,int &placeInAllNodes);
+		void MimicTopo(const TreeNode *, bool firstNode, bool sameModel);	
      	void MimicTopo(const Tree *source);
         void CopyBranchLens(const Tree *s);
 		void CopyClaIndeces(const Tree *source, bool remove);
@@ -203,9 +214,6 @@ class Tree{
 		int SubtreeBasedRecombination( Tree *t, int recomNodeNum, bool sameModel, FLOAT_TYPE optPrecision);
 		void RecombineWith( Tree *t, bool sameModel , FLOAT_TYPE optPrecision );
 
-		//functions for dealing with constraints and bipartitions
-		static void LoadConstraints(ifstream &con, int nTaxa);
-		static void ReadNewickConstraint(const char * newick, bool numericalTaxa, bool isPositive);
 
 		bool SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, ReconNode *broken, const Bipartition &proposed, const Bipartition *partialMask);
 		
@@ -219,11 +227,11 @@ class Tree{
 		
 		bool RecursiveAllowedByConstraintWithMask(const Constraint &constr, const Bipartition *partialMask, const TreeNode *nd);
 		//bool RecursiveAllowedByNegativeConstraintWithMask(Constraint *constr, Bipartition *mask, TreeNode *nd);
-		void CalcBipartitions(bool standardize);
+		void CalcBipartitions(bool standardize) const;
 		void OutputBipartitions();
-		TreeNode *ContainsBipartition(const Bipartition &bip);
-		TreeNode *ContainsBipartitionOrComplement(const Bipartition &bip);
-		TreeNode *ContainsMaskedBipartitionOrComplement(const Bipartition &bip, const Bipartition &mask);
+		const TreeNode *ContainsBipartition(const Bipartition &bip) const ;
+		const TreeNode *ContainsBipartitionOrComplement(const Bipartition &bip) const ;
+		const TreeNode *ContainsMaskedBipartitionOrComplement(const Bipartition &bip, const Bipartition &mask) const ;
 		void AdjustBipartsForSwap(int cut, int broken);
 
 		// functions for computing likelihood

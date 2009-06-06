@@ -45,7 +45,7 @@ class TreeNode{
  		FLOAT_TYPE dlen;
 		bool isAttached;
 		bool alreadyOptimized;
-		Bipartition *bipart;
+		Bipartition bipart;
 		char *tipData;
 #ifdef OPEN_MP
 		unsigned *ambigMap;
@@ -96,8 +96,7 @@ class TreeNode{
 			}
 		void CalcDepth(int &dep);
 		void CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, int dir);
-		Bipartition* CalcBipartition(bool standardize);
-		Bipartition* VerifyBipartition(bool standardize);
+		void CalcBipartition(bool standardize);
 		void StandardizeBipartition();
 		void GatherConstrainedBiparitions(vector<Bipartition> &biparts);
 		void OutputBipartition(ostream &out);
