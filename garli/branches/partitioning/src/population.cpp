@@ -334,8 +334,10 @@ Population::~Population()
 
 	Tree::attemptedSwaps.ClearAttemptedSwaps();
 
-	if(rawPart != NULL)
-		rawPart->Delete();
+//This shouldn't have been getting deleted.  It was created as a local in main and then just
+//aliased in Population
+//	if(rawPart != NULL)
+//		rawPart->Delete();
 		
 }
 
