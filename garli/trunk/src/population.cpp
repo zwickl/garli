@@ -1510,7 +1510,7 @@ void Population::Run(){
 				outman.UserMessage("opt. precision reduced, optimizing branchlengths:%.4f -> %.4f", before, bestFitness);
 
 				before = bestFitness;
-				if(modSpec.IsCodon()) {
+				if(modSpec.IsCodon() && !(FloatingPointEquals(adap->modWeight, ZERO_POINT_ZERO, 1e-8))) {
 					indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
 					indiv[bestIndiv].SetDirty();	
 					CalcAverageFitness();
