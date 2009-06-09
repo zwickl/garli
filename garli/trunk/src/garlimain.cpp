@@ -415,6 +415,8 @@ int main( int argc, char* argv[] )	{
 				if(modSpec.IsF1x4StateFrequencies()) d->SetF1X4Freqs();
 				else if(modSpec.IsF3x4StateFrequencies()) d->SetF3X4Freqs();
 				else if(modSpec.IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
+				//this is a hack that makes user-specified fixed codon freqs work
+				else if(modSpec.IsUserSpecifiedStateFrequencies()) d->SetCodonTableFreqs();
 				}
 			else if(modSpec.IsCodonAminoAcid()){
 				AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);

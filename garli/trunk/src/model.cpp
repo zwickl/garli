@@ -669,7 +669,7 @@ void Model::CalcSynonymousBranchlengthProportions(vector<FLOAT_TYPE> &results){
 		}
 	//verify that this all makes sense given the already calc'ed blen mults 
 	assert(FloatingPointEquals(blen_multiplier[0], (ONE_POINT_ZERO / (totSumS + totSumNS)), 1e-6));	
-	outman.UserMessage("w = %f S = %f NS = %f, propS = %f", *omegas[0], totSumS, totSumNS, (totSumS / (totSumS + totSumNS)));
+	//outman.UserMessage("w = %f S = %f NS = %f, propS = %f", *omegas[0], totSumS, totSumNS, (totSumS / (totSumS + totSumNS)));
 	results.push_back(totSumS / (totSumS + totSumNS));
 	}
 
