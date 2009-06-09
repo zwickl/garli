@@ -6052,7 +6052,7 @@ FLOAT_TYPE Tree::OptimizeEquilibriumFreqs(FLOAT_TYPE prec){
 
 	for(i=0;i < mod->NStates();i++){
 		freqImprove += OptimizeBoundedParameter(prec, mod->StateFreq(i), i, 
-			max(0.01, mod->StateFreq(i) - maxFreqChange),
+			max((mod->NStates() > 4 ? 0.0001 : 0.01), mod->StateFreq(i) - maxFreqChange),
 			min(0.96, mod->StateFreq(i) + maxFreqChange),
 			&Model::SetEquilibriumFreq);
 		}

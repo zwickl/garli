@@ -678,6 +678,9 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 #ifdef MORE_DETERM_PARAM_OPT
 			if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
 				freqOptImprove = treeStruct->OptimizeEquilibriumFreqs(branchPrec);
+			//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
+			if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
+				freqOptImprove = treeStruct->OptimizeEquilibriumFreqs(branchPrec);
 			if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
 				nucRateOptImprove = treeStruct->OptimizeRelativeNucRates(branchPrec);
 #endif
@@ -694,6 +697,8 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 #ifdef MORE_DETERM_PARAM_OPT
 		if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
 			outman.UserMessageNoCR(" equil freqs=%6.2f", freqOptImprove);
+		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
+			outman.UserMessageNoCR(" codon freqs=%6.2f", freqOptImprove);
 		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
 			outman.UserMessageNoCR(" rel rates=%6.2f", nucRateOptImprove);
 #endif

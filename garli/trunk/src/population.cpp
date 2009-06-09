@@ -1701,6 +1701,12 @@ void Population::FinalOptimization(){
 				paramOpt += tempTot;
 				freqOptImprove += tempTot;
 				}
+			//codon frequency ML estimation - it is something of a hack and requires simultaneous empirical and unfixed freqs
+			if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true){
+				double tempTot = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
+				paramOpt += tempTot;
+				freqOptImprove += tempTot;
+				}
 			if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
 				double tempTot = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
 				paramOpt += tempTot;
@@ -1728,6 +1734,8 @@ void Population::FinalOptimization(){
 #ifdef MORE_DETERM_PARAM_OPT
 		if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
 			outman.UserMessage("Equil freqs optimization: %f", freqOptImprove);
+		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
+			outman.UserMessage("Codon freqs optimization: %f", freqOptImprove);
 		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
 			outman.UserMessage("Rel rates optimization: %f", nucRateOptImprove);
 		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false)
@@ -1756,6 +1764,12 @@ void Population::FinalOptimization(){
 				if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
 					outman.UserMessage("Equil freqs optimization: %f", paramOpt);
+					incr += paramOpt;
+					}
+				//codon frequency ML estimation - it is something of a hack and requires simultaneous empirical and unfixed freqs
+				if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true){
+					paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
+					outman.UserMessage("Codon freqs optimization: %f", paramOpt);
 					incr += paramOpt;
 					}
 				if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
