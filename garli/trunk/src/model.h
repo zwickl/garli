@@ -443,6 +443,14 @@ public:
 		fixStateFreqs=true;
 		}
 
+	//this is a hack to allow estimation of codon frequencies
+	//other parts of the code break if stateFreqs aren't f1x4/f3x4/emp in a codon model
+	//but leaving fixStateFreqs as false allows them to be estimated
+	void SetFakeEmpiricalStateFreqs(){
+		stateFrequencies = EMPIRICAL;
+		fixStateFreqs=false;
+		}
+
 	void SetEqualStateFreqs(){
 		stateFrequencies = EQUAL;
 		fixStateFreqs=true;
@@ -572,6 +580,13 @@ public:
 			if(datatype == CODON) throw ErrorException("Sorry, ML estimation of equilibrium frequencies is not available under\ncodon models.  Try statefrequencies = empirical");
 			else if(datatype == AMINOACID || datatype == CODONAMINOACID) outman.UserMessage("\nWARNING: to obtain good ML estimates of equilibrium aminoacid frequencies you\n\tmay need to run for a very long time or increase the modweight.\n\tConsider statefrequencies = empirical instead.\n");
 			SetEstimateStateFreqs();
+			}
+		else if(_stricmp(str, "estimateF") == 0){
+			//HACK - unfix freqs for codons, to cause estimation
+			if(datatype != CODON) 
+				throw ErrorException("Sorry, forced estimation of frequencies (estimateF) is only for codon models");
+			SetFakeEmpiricalStateFreqs();
+			outman.UserMessage("\n\n\nCUSTOM USAGE - ESTIMATING CODON FREQS BY ML\n\n\n");
 			}
 		else if(_stricmp(str, "empirical") == 0) SetEmpiricalStateFreqs();
 		else if(_stricmp(str, "fixed") == 0) SetUserSpecifiedStateFreqs();
