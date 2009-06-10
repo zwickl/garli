@@ -534,7 +534,7 @@ void Individual::ContinueBuildingStepwiseTree(unsigned nTax,
 					currBeforeOpt = bestBeforeOpt;
 				}
 
-			Population::RecordStepwiseAdditionTree(*scratchT);
+			Population::RecordTreeFoundDuringSearch(*scratchT);
 
 			//record the score
 			broken->chooseProb = scratchT->lnL;

@@ -180,7 +180,7 @@ char AskUser(std::string s)
 ContinuationCode Population::AdaptPrec() {
 	outman.precision(10);
 	bool reduced=false;
-	if(gen-(max(lastTopoImprove, lastPrecisionReduction)) >= adap->intervalsToStore*adap->intervalLength){
+	if(gen-(max(GetLastTopoImprove(), lastPrecisionReduction)) >= adap->intervalsToStore*adap->intervalLength){
 		//this allows the program to bail if numPrecReductions < 0, which can be handy to get to this point
 		//with checkpointing in and then restart from the same checkpoint with various values of numPrecReductions
 		if(adap->numPrecReductions < 0)
@@ -220,7 +220,7 @@ ContinuationCode Population::AdaptPrec() {
 	//termination conditions
 
 	if(conf->enforceTermConditions == true) {
-		const bool betterImprove = gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh;
+		const bool betterImprove = gen-max(GetLastTopoImprove(), lastPrecisionReduction) > conf->lastTopoImproveThresh;
 #		ifdef SWAP_BASED_TERMINATION
 			const bool c = (gen - lastUniqueSwap > 200 || ( betterImprove|| FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))));
 #		else
@@ -230,7 +230,7 @@ ContinuationCode Population::AdaptPrec() {
 			  && adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
 			  && (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)) {
 			if(adap->topoMutateProb > ZERO_POINT_ZERO)
-				outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
+				outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", GetLastTopoImprove());
 			else
 				outman.UserMessage("Reached termination condition!\n");
 			outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
@@ -252,9 +252,9 @@ void Population::OutputSave() {
 		}
 
 #	ifdef SWAP_BASED_TERMINATION
-		outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove, indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
+		outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d%-15d", gen, BestFitness(), adap->branchOptPrecision, GetLastTopoImprove(), indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
 #	else
-		outman.UserMessage("%-10d%-15.4f%-10.3f%-8d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+		outman.UserMessage("%-10d%-15.4f%-10.3f%-8d", gen, BestFitness(), adap->branchOptPrecision, GetLastTopoImprove());
 #	endif
 
 
@@ -302,7 +302,7 @@ Population::Population():
 	bestSinceRestart(NULL)
 #endif
 	{
-	lastTopoImprove = 0;
+	SetLastTopoImprove(0);
 	lastPrecisionReduction = 0;
 	}
 	
@@ -744,7 +744,8 @@ void Population::LoadNexusStartingConditions(){
 
 
 void Population::ResetTerminationVariables() {
-	lastTopoImprove = lastPrecisionReduction = gen = 0;
+	SetLastTopoImprove(0);
+	lastPrecisionReduction = gen = 0;
 	//conf->restart indicates whether the current rep was restarted, so if we complete one rep and then
 	//move on to another it should be false
 	conf->restart = false;
@@ -1584,7 +1585,7 @@ void Population::Run(){
 #else
 	outman.UserMessage("%-10s%-15s%-10s%-15s", "gen", "current_lnL", "precision", "last_tree_imp");
 #endif
-	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, GetLastTopoImprove());
 	OutputLog();
 	if(conf->outputMostlyUselessFiles) OutputFate();
 
@@ -1706,7 +1707,7 @@ void Population::UpdateFractionDone(){
 			//we've entered the home stretch.  But, it's hard to judge progress here because a new tree can always be found
 			//that would reset the number of generations left to go.  So, be conservative, because we aren't allowed to reduce
 			//the percentage
-			unsigned genSinceImprove = gen-max(lastTopoImprove, lastPrecisionReduction);
+			unsigned genSinceImprove = gen-max(GetLastTopoImprove(), lastPrecisionReduction);
 			unsigned num_chunks = 5;
 			unsigned chunk_length = (unsigned) (conf->lastTopoImproveThresh / num_chunks);
 			FLOAT_TYPE chunkFracSize = 0.29 / (FLOAT_TYPE) num_chunks;
@@ -1854,7 +1855,8 @@ void Population::FinalOptimization(){
 int Population::EvaluateStoredTrees(bool report){
 	double bestL=-FLT_MAX;
 	int bestRep;
-	if(report) outman.UserMessage("\nCompleted %d replicate runs (of %d).\nResults:", storedTrees.size(), conf->searchReps);
+	if(report)
+		outman.UserMessage("\nCompleted %d replicate runs (of %d).\nResults:", storedTrees.size(), conf->searchReps);
 	for(unsigned r=0;r<storedTrees.size();r++){
 		storedTrees[r]->treeStruct->CalcBipartitions(true);
 		if(storedTrees[r]->Fitness() > bestL){
@@ -1885,7 +1887,8 @@ int Population::EvaluateStoredTrees(bool report){
 				outman.UserMessageNoCR("Replicate %d : %.4f       ", r+1, storedTrees[r]->Fitness());
 			if(r2 < r)
 				outman.UserMessage(" (same topology as %d)", r2+1);
-			else outman.UserMessage("");
+			else
+				outman.UserMessage("");
 			}
 		if(conf->bootstrapReps == 0){
 			outman.UserMessage("Final result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
@@ -4200,7 +4203,11 @@ void Population::keepTrack(){
 							indiv[0].treeStruct->CalcBipartitions(true);
 							indiv[i].treeStruct->CalcBipartitions(true);
 							if(indiv[0].treeStruct->IdenticalTopology(indiv[i].treeStruct->root)==false){
-								lastTopoImprove=gen;
+								SetLastTopoImprove(gen);
+
+								// the IGNORE_SMALL_TOPO_IMP has not been tested since this was added
+								RecordTreeFoundDuringSearch(*indiv[0].treeStruct); // here we record the previous tree topology so that MTH's hacked nbest-style option will work.
+
 								if(i == bestIndiv){
 									AppendTreeToTreeLog(indiv[bestIndiv].mutation_type);
 									}
@@ -4233,7 +4240,10 @@ void Population::keepTrack(){
 							//if this is a new best, it is a different topology and it is significantly better
 							//update the lastTopoImprove
 							if(sameTopo == false){
-								lastTopoImprove=gen;
+								SetLastTopoImprove(gen);
+								
+								RecordTreeFoundDuringSearch(*indiv[0].treeStruct); // here we record the previous tree topology so that MTH's hacked nbest-style option will work.
+								
 								if(isBest){
 									AppendTreeToTreeLog(indiv[bestIndiv].mutation_type);
 									}
@@ -5847,7 +5857,12 @@ void Population::FindLostClas(){
         if(indiv[0].treeStruct->IdenticalTopology(indiv[ind].treeStruct->root) == false){
 			debug_mpi("\ttopo different from prev best");
 			AppendTreeToTreeLog(-1, ind);
-			if(scorediff > significantTopoChange) lastTopoImprove=gen;
+			if(scorediff > significantTopoChange) 
+				SetLastTopoImprove(gen);
+
+				// the MPI_VERSION has not been tested since this was added
+				RecordTreeFoundDuringSearch(*indiv[0].treeStruct); // here we record the previous tree topology so that MTH's hacked nbest-style option will work.
+				
 			}
 		else{
 			debug_mpi("\ttopo same as prev best");
