@@ -49,6 +49,7 @@ bool gOptimizePlausibleDuringStepwise = true;
 bool gDoOutputSiteLike = false;
 bool gIsFinalScoring = false;
 unsigned gMaxSuboptimalTreesToStore = 0;
+std::vector<unsigned> gPrevCharWt;
 // end globals hacked in for the AddTaxonRunMode version:
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -128,7 +129,7 @@ void Population::PatternCountsToWrapper()
 	std::cerr << "[igarlipatterncounts "; 
 	for (unsigned i = 0; i < nc; ++i)
 		std::cerr << countit[i] << ' ';
-	std::cerr << "\n";
+	std::cerr << "]\n";
 }
 std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, unsigned treeNum) {
 	unsigned endTreeNum = UINT_MAX;
@@ -184,7 +185,8 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 			}
 			else {
 				const char * key = parseResult.second.first.c_str();
-				const char * value = parseResult.second.second.c_str();
+				const std::string & valueStr = parseResult.second.second;
+				const char * value = valueStr.c_str();
 				if (NxsString::case_insensitive_equals(key, "clear")) {
 					NxsTaxaBlock * currTaxa = reader.GetTaxaBlock(0);
 					assert (currTaxa);
@@ -275,6 +277,60 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 					}
 					if (bool(tn != 0) )
 						PatternCountsToWrapper();
+				}
+				else if (NxsString::case_insensitive_equals(key, "setpatterncounts")) {
+					std::list<std::string> cList;
+					NxsString::split(valueStr, &cList);
+					std::vector<unsigned> countsRead;
+					countsRead.reserve(cList.size());
+					for (std::list<std::string>::const_iterator cIt = cList.begin(); cIt != cList.end(); ++cIt) {
+						long tn = -1;
+						if (!NxsString::to_long(cIt->c_str(), &tn) || tn < 0)
+							throw ErrorException("Expecting non-negative integers after setpatterncounts");
+						countsRead.push_back((unsigned) tn);
+					}
+					if (!data)
+						throw ErrorException("No data in memory");
+					if (data->NChar() != countsRead.size())
+						throw ErrorException("Incorrect number of pattern counts specified");
+					unsigned patIndex = 0;
+					std::vector<unsigned>::const_iterator ucIt = countsRead.begin();
+					for (; ucIt != countsRead.end(); ++ucIt, ++patIndex)
+						data->SetCount(patIndex, *ucIt);
+				}
+				else if (NxsString::case_insensitive_equals(key, "setcharintwts")){
+					std::list<std::string> cList;
+					NxsString::split(valueStr, &cList);
+					std::vector<unsigned> countsRead;
+					countsRead.reserve(cList.size());
+					for (std::list<std::string>::const_iterator cIt = cList.begin(); cIt != cList.end(); ++cIt) {
+						long tn = -1;
+						if (!NxsString::to_long(cIt->c_str(), &tn) || tn < 0)
+							throw ErrorException("Expecting non-negative integers after setcharintwts");
+						countsRead.push_back((unsigned) tn);
+					}
+					if (!data)
+						throw ErrorException("No data in memory");
+					if (data->GapsIncludedNChar() != countsRead.size())
+						throw ErrorException("Incorrect number of character weights specified");
+					unsigned charIndex = 0;
+					std::vector<unsigned>::const_iterator ucIt = countsRead.begin();
+					if (gPrevCharWt.empty())
+						gPrevCharWt.assign(data->GapsIncludedNChar(), 1);
+					for (; ucIt != countsRead.end(); ++ucIt, ++charIndex) {
+						const int newWt = (int)*ucIt;
+						const int oldWt = (int)gPrevCharWt[charIndex];
+						if (newWt != oldWt) {
+							int number = data->Number(charIndex); // great name!
+							if (number >= 0) {
+								const int oldCount = data->Count(number);
+								const int diff = newWt - oldWt ;
+								const int newCount = oldCount + diff;
+								data->SetCount(number, newCount);
+							}
+						}						
+						gPrevCharWt[charIndex] = newWt;
+					}
 				}
 				else if (NxsString::case_insensitive_equals(key, "search"))
 					gInteractive_mode_action = SEARCH_ACTION;
