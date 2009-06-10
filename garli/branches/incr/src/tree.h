@@ -352,7 +352,7 @@ class Tree{
 		void FindNearestTerminalsDown(TreeNode *start, TreeNode *from, TreeNode *&term1, TreeNode *&term2, FLOAT_TYPE &dist1, FLOAT_TYPE &dist2);
 		void OutputTreeStructure(TreeNode *);
 		void GetInternalStateString(char *string, int nodeNum);
-		void RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out);	
+		void RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream *out);	
 		void InferAllInternalStateProbs(const char *ofprefix);
 
 		static void SetTreeStatics(ClaManager *, const SequenceData *, const GeneralGamlConfig *);

@@ -46,7 +46,8 @@ typedef std::vector< ScoreStringPair > ScoreStringPairList;
 ScoreStringPairList gSuboptimalTreeList;
 char * gTreeBufferString = 0L;
 bool gOptimizePlausibleDuringStepwise = true;
-	
+bool gDoOutputSiteLike = false;
+bool gIsFinalScoring = false;
 unsigned gMaxSuboptimalTreesToStore = 0;
 // end globals hacked in for the AddTaxonRunMode version:
 ////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +63,11 @@ void ResetSuboptimalTreesList() {
 	gSuboptimalTreeList.reserve(gMaxSuboptimalTreesToStore + 1);
 }
 
-void Population::RecordStepwiseAdditionTree(const Tree &tree) {
+bool Population::GetOutputSiteLikes() {
+	return gDoOutputSiteLike && gIsFinalScoring;
+}
+
+void Population::RecordTreeFoundDuringSearch(const Tree &tree) {
 	assert(gTreeBufferString);
 	if (gMaxSuboptimalTreesToStore == 0)
 		return;
@@ -112,6 +117,19 @@ NxsFullTreeDescription readConstraintTreeDesc(const char * nexusContent, NxsTaxa
 	return t;
 }
 
+void Population::PatternCountsToWrapper()
+{
+	if (!data) {
+		std::cerr << "No data in memory\n";
+		return;
+	}
+	const unsigned nc = data->NChar();
+	const int * countit = data->GetCounts();
+	std::cerr << "[igarlipatterncounts "; 
+	for (unsigned i = 0; i < nc; ++i)
+		std::cerr << countit[i] << ' ';
+	std::cerr << "\n";
+}
 std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, unsigned treeNum) {
 	unsigned endTreeNum = UINT_MAX;
 	int nSleeps = 0;
@@ -229,19 +247,34 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 					else
 						endTreeNum = (unsigned)tn;
 				}
-				else if (NxsString::case_insensitive_equals(key, "keep")) {
+				else if (NxsString::case_insensitive_equals(key, "nbest")) {
 					long tn = -1;
 					if (!NxsString::to_long(value, &tn) || tn < 0) {
-						throw ErrorException("Expecting a non-negative integer to follow \"keep\"");
+						throw ErrorException("Expecting a non-negative integer to follow \"nbest\"");
 					}
 					gMaxSuboptimalTreesToStore  = (unsigned) tn;
 				}
 				else if (NxsString::case_insensitive_equals(key, "optplausible")) {
 					long tn = -1;
 					if (!NxsString::to_long(value, &tn) || tn < 0) {
-						throw ErrorException("Expecting a non-negative integer to follow \"optplausible\"");
+						throw ErrorException("Expecting 1 or 0 after \"optplausible\"");
 					}
 					gOptimizePlausibleDuringStepwise  = bool(tn != 0);
+				}
+				else if (NxsString::case_insensitive_equals(key, "sitelikes")) {
+					long tn = -1;
+					if (!NxsString::to_long(value, &tn) || tn < 0) {
+						throw ErrorException("Expecting 1 or 0 after \"sitelikes\"");
+					}
+					gDoOutputSiteLike  = bool(tn != 0);
+				}
+				else if (NxsString::case_insensitive_equals(key, "patterncounts")) {
+					long tn = -1;
+					if (!NxsString::to_long(value, &tn) || tn < 0) {
+						throw ErrorException("Expecting 1 or 0 after \"patterncounts\"");
+					}
+					if (bool(tn != 0) )
+						PatternCountsToWrapper();
 				}
 				else if (NxsString::case_insensitive_equals(key, "search"))
 					gInteractive_mode_action = SEARCH_ACTION;
@@ -428,6 +461,7 @@ void Population::AddTaxonRunMode() {
 		}
 		else if (gInteractive_mode_action == SWAP_ACTION) {
 			assert(0);
+			throw ErrorException("Not implemented yet");
 			this->AddTaxonSwap(scratchIndividual, attachmentsPerTaxonVar, branchOptPrecisionVar, numTrees, totalNumTrees);
 		}
 
@@ -474,30 +508,31 @@ void Population::AfterRunHook(unsigned nReps) {
 		outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
 		}
 
-	int best = 0;
-	if(storedTrees.size() > 1) {
-		best = EvaluateStoredTrees(true);
-		}
+	//if(storedTrees.size() > 1) {
+	//	EvaluateStoredTrees(true);
+	//	}
 
 	WriteTreeFile(besttreefile.c_str());
 	
+	if (gDoOutputSiteLike) {
+		gIsFinalScoring = true;
+		std::cerr << "in gDoOutputSiteLike conditional branch\n";
+		assert(this->indiv[bestIndiv].treeStruct);
+		Tree & bestTree = *(this->indiv[bestIndiv].treeStruct);
+		bestTree.ConditionalLikelihoodRateHet(Tree::ROOT, bestTree.root, false);
+//		bestTree.AssignCLAsFromMaster();
+//		bestTree.RecursivelyCalculateInternalStateProbs(bestTree.root, 0L); // this triggers the site likelihood output
+
+		gIsFinalScoring = false;
+		
+	}
 	treeToWrapper(this->treeString, this->indiv[bestIndiv]);
 	suboptimalTreesToWrapper();
 	
 	if(prematureTermination == true)
 		return;
-	if(conf->inferInternalStateProbs == true){
-		if(prematureTermination == false && currentSearchRep == conf->searchReps){
-			if(storedTrees.size() > 0){//careful here, the trees in the storedTrees array don't have clas assigned
-				outman.UserMessage("Inferring internal state probabilities on best tree....");
-				storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
-				}
-			}
-		else if(prematureTermination){
-			outman.UserMessage(">>>Internal state probabilities not inferred due to premature termination<<<");
-			}
-		}
-
+	if (conf->inferInternalStateProbs == true)
+		throw ErrorException("inferInternalStateProbs is not supported in the addtaxonrunmode");
 	//write a checkpoint that will indicate that the rep is done and results have been written to file
 	//the gen will be UINT_MAX, as it is after a rep has terminated, which will tell the function that reads
 	//the checkpoint to set finishedrep = true.  This automatically happens in the BOINC case
@@ -584,10 +619,13 @@ void suboptimalTreesToWrapper() {
 	std::cerr.setf( ios::floatfield, ios::fixed );
 	std::cerr.setf( ios::showpoint );
 	ScoreStringPairList::const_iterator it = gSuboptimalTreeList.begin();
-	for (; it != gSuboptimalTreeList.end() ; ++it) {
+	unsigned suboptN = 1;
+	for (; it != gSuboptimalTreeList.end() ; ++it, ++suboptN) {
 		std::cerr << "[iGarli "<< gCurrIGarliResultIndex++;
-		std::cerr << " ] tree best = [&U][!GarliScore " << -(it->first) << "] " << it->second << " ;\n";
+		std::cerr << " ] tree subopt" << suboptN << " = [&U][!GarliScore " << -(it->first) << "] " << it->second << " ;\n";
 	}
+	if (gSuboptimalTreeList.empty())
+		std::cerr << "iGarli -- no suboptimal trees recorded"<<  std::endl;
 }
 
 void writeGarliIndividualDescription(char * treeString, Individual & ind) {
@@ -730,7 +768,7 @@ void Population::RunImplForAddTaxonRunMode() {
 
 	outman.precision(6);
 	outman.UserMessage("%-10s%-15s%-10s%-15s", "gen", "current_lnL", "precision", "last_tree_imp");
-	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, GetLastTopoImprove());
 	OutputLog();
 	if(conf->outputMostlyUselessFiles)
 		OutputFate();

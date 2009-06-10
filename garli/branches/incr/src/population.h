@@ -292,7 +292,7 @@ private:
 	int lastBootstrapSeed;
 	unsigned currentSearchRep;
 	//termination related variables
-	unsigned lastTopoImprove;
+	unsigned lastTopologyImprove;
 	unsigned lastPrecisionReduction;
 	unsigned lastUniqueSwap;
 	
@@ -311,6 +311,12 @@ public:
 	Individual* indiv;
 
 private:
+	void SetLastTopoImprove(unsigned num) {
+		this->lastTopologyImprove = num;
+	}
+	unsigned GetLastTopoImprove() const {
+		return this->lastTopologyImprove;
+	}
 	Individual* newindiv;
 	vector<int> subtreeMemberNodes;
 #ifdef INCLUDE_PERTURBATION
@@ -560,7 +566,10 @@ private:
 		void ReconfigureAdaptationParams();
 		void AfterRunHook(unsigned nReps);
 		
-		static void RecordStepwiseAdditionTree(const Tree &);
+		static void RecordTreeFoundDuringSearch(const Tree &);
+		static bool GetOutputSiteLikes();
+		void PatternCountsToWrapper();
+
 
 };
 #endif

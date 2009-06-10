@@ -208,11 +208,11 @@ int MasterMaster(MasterGamlConfig& conf, NucleotideData& data)	{
 			if(pop.gen % pop.params->saveEvery == 0) pop.CreateTreeFile( pop.params->treefname );
 			if(pop.gen % pop.adap->intervalLength == 0){
 	            	bool reduced=false;
-	    	        if(pop.gen-pop.lastTopoImprove >= pop.adap->intervalsToStore*pop.adap->intervalLength){
+	    	        if(pop.gen-pop.GetLastTopoImprove() >= pop.adap->intervalsToStore*pop.adap->intervalLength){
 	         	           reduced=pop.adap->ReducePrecision();
 	            	        }
 	    	        if(reduced){
-	            	        pop.lastTopoImprove=pop.gen;
+	            	        pop.SetLastTopoImprove(pop.gen);
 	                	   pop.indiv[pop.bestIndiv].treeStruct->OptimizeAllBranches(pop.adap->branchOptPrecision);
 	                   	   pop.indiv[pop.bestIndiv].SetDirty();
 	                   	   pop.CalcAverageFitness();
@@ -229,11 +229,11 @@ int MasterMaster(MasterGamlConfig& conf, NucleotideData& data)	{
 	                            }
 */
 				if(pop.enforceTermConditions == true
-					&& pop.gen-pop.lastTopoImprove > pop.lastTopoImproveThresh 
+					&& pop.gen-pop.GetLastTopoImprove() > pop.lastTopoImproveThresh 
 					&& pop.adap->improveOverStoredIntervals < pop.improveOverStoredIntervalsThresh
 					&& pop.adap->branchOptPrecision == pop.adap->minOptPrecision){
 			//		&& pop.paraMan->updateThresh == pop.paraMan->minUpdateThresh){
-					cout << "Reached termination condition!\nlast topological improvement at gen " << pop.lastTopoImprove << endl;
+					cout << "Reached termination condition!\nlast topological improvement at gen " << pop.GetLastTopoImprove() << endl;
 					cout << "Improvement over last " << pop.adap->intervalsToStore*pop.adap->intervalLength << " gen = " << pop.adap->improveOverStoredIntervals << endl;
 					g_quit_time=true;
 					break;
@@ -1145,11 +1145,11 @@ int RemoteSubtreeWorker(Population& pop, const GeneralGamlConfig& conf){
 
 	           if(pop.gen % pop.adap->intervalLength == 0){
 	                bool reduced=false;
-	                if(pop.gen-pop.lastTopoImprove >= pop.adap->intervalsToStore*pop.adap->intervalLength){
+	                if(pop.gen-pop.GetLastTopoImprove() >= pop.adap->intervalsToStore*pop.adap->intervalLength){
 	                   reduced=pop.adap->ReducePrecision();
 	                   }
 	                if(reduced){
-	                   pop.lastTopoImprove=pop.gen;
+	                   pop.SetLastTopoImprove(pop.gen);
 	                   pop.indiv[pop.bestIndiv].treeStruct->OptimizeAllBranches(pop.adap->branchOptPrecision);
 	                   pop.indiv[pop.bestIndiv].SetDirty();
 	                   pop.CalcAverageFitness();
