@@ -16,6 +16,7 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
+#include <csignal>
 #include <sstream>
 #include <ctime>
 #include "adaptation.h"
