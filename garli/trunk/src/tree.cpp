@@ -6069,10 +6069,17 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 	
 	assert(mod->Nst() > 1);
 	if(mod->Nst() == 2){
+		//this was wrong - it should be Rates(1) i.e., K that is being optimized here
+		rateImprove += OptimizeBoundedParameter(prec, mod->Rates(1), 1, 
+				max(0.05, mod->Rates(1) / maxPropChange),
+				min(999.0, mod->Rates(1) * maxPropChange),
+				&Model::SetRelativeNucRate);
+/*				
 		rateImprove += OptimizeBoundedParameter(prec, mod->Rates(0), 0, 
 				max(0.05, mod->Rates(0) / maxPropChange),
 				min(999.0, mod->Rates(0) * maxPropChange),
 				&Model::SetRelativeNucRate);
+*/
 		}
 	else{
 		//DEBUG
