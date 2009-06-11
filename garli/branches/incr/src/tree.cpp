@@ -1967,12 +1967,13 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 		}while(err);
 
 #ifndef NDEBUG
-	for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
-		TreeNode *check = NULL;
+	vector<Constraint>::const_iterator conit=GetConstraints().begin();
+	for(;conit!=GetConstraints().end();conit++){
+		const TreeNode *check = NULL;
 		if((*conit).IsBackbone())
-			check = ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
+			check = ContainsMaskedBipartitionOrComplement(conit->GetBipartition(), conit->GetBackboneMask());
 		else
-			check = ContainsBipartitionOrComplement(*(*conit).GetBipartition());
+			check = ContainsBipartitionOrComplement(conit->GetBipartition());
 		if((*conit).IsPositive()) assert(check != NULL);
 		else assert(check == NULL);
 		}
