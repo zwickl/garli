@@ -182,15 +182,6 @@ int main( int argc, char* argv[] )	{
 	string svnRev = GetSvnRev();
 	string svnDate = GetSvnDate();
 
-#ifdef OLD_SUBROUTINE_GARLI
-	char name[12];
-	sprintf(name, "run%d.conf", rank);
-	conf_name = name;
-#elif defined(SUBROUTINE_GARLI)
-	conf_name = "garli.conf";
-#else
-	conf_name = "garli.conf";
-#endif
 
 #if defined(UNIX) || defined(BOINC)
 	interactive=false;
@@ -248,12 +239,26 @@ int main( int argc, char* argv[] )	{
 				else if (command_fname.empty())
 					command_fname = argv[curarg];
 				else {
+					std::cerr << "conf file = " << conf_name << '\n';
+					std::cerr << "command file = " << command_fname << '\n';
 					std::cerr << "Expecting at most 2 arguments (other than flags)\n";
 					return 1;
 					}
 	        curarg++;
 			}
 		}
+	if (conf_name.empty()) {
+#		ifdef OLD_SUBROUTINE_GARLI
+			char name[12];
+			sprintf(name, "run%d.conf", rank);
+			conf_name = name;
+#		elif defined(SUBROUTINE_GARLI)
+			conf_name = "garli.conf";
+#		else
+			conf_name = "garli.conf";
+#		endif
+		}
+
 	ifstream cmdFile;
 	if (!command_fname.empty()) {
 		cmdFile.open(command_fname.c_str());
