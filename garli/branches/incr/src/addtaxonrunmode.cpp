@@ -51,6 +51,8 @@ bool gDoOutputSiteLike = false;
 bool gIsFinalScoring = false;
 unsigned gMaxSuboptimalTreesToStore = 0;
 std::vector<unsigned> gPrevCharWt;
+std::istream * Population::cmdFilePtr = 0L;
+
 // end globals hacked in for the AddTaxonRunMode version:
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -140,26 +142,38 @@ std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, 
 		GeneralGamlConfig c(*(this->conf));
 		std::cerr << "iGarli[0 - " << gCurrIGarliResultIndex  << "]>" << std::endl;
 		nextLine.clear();
-		std::getline(std::cin, nextLine);
-		if (nextLine.empty()) {
-			std::cerr << "getline failed\n";
-			if (nSleeps++ > 100) {
-				sleep(1);
-				if (nSleeps == 1) {
-					//finalize anything that needs it at rep end
-					FinalizeOutputStreams(0);
-					//finalize anything that needs it at the end of the repset
-					if(currentSearchRep == conf->searchReps)
-						FinalizeOutputStreams(1);
+		if (Population::cmdFilePtr) {
+			while (nextLine.empty() && cmdFilePtr->good()) {
+				std::getline(*cmdFilePtr, nextLine);
 				}
-				continue;
-			}
+			if (nextLine.empty()) {
+				if (gGetTreesFromReader)
+					return std::pair<unsigned, unsigned>(reader.GetNumTrees(), 0);
+				return std::pair<unsigned, unsigned>(this->storedTrees.size(), 0);
+				}
 		}
-		else {
-			if (nSleeps == 1) {
-				InitializeOutputStreams();
+		else {	
+			std::getline(std::cin, nextLine);
+			if (nextLine.empty()) {
+				std::cerr << "getline failed\n";
+				if (nSleeps++ > 100) {
+					sleep(1);
+					if (nSleeps == 1) {
+						//finalize anything that needs it at rep end
+						FinalizeOutputStreams(0);
+						//finalize anything that needs it at the end of the repset
+						if(currentSearchRep == conf->searchReps)
+							FinalizeOutputStreams(1);
+					}
+					continue;
+				}
 			}
-			nSleeps = 0;
+			else {
+				if (nSleeps == 1) {
+					InitializeOutputStreams();
+				}
+				nSleeps = 0;
+			}
 		}
 		try {
 			if (NxsString::case_insensitive_equals(nextLine.c_str(), "run") || NxsString::case_insensitive_equals(nextLine.c_str(), "r")) {

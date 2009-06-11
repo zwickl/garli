@@ -32,6 +32,8 @@
 #include <conio.h>
 #endif
 
+#include <fstream>
+
 #include "defs.h"
 #include "population.h"
 #include "individual.h"
@@ -175,6 +177,7 @@ int main( int argc, char* argv[] )	{
 	#endif
 
 	string conf_name;
+	string command_fname;
 
 	string svnRev = GetSvnRev();
 	string svnDate = GetSvnDate();
@@ -240,10 +243,26 @@ int main( int argc, char* argv[] )	{
 						}
 					}
 				//if anything else appears, we'll assume that it's a config file
-				else conf_name = argv[curarg];
+				else if (conf_name.empty())
+					conf_name = argv[curarg];
+				else if (command_fname.empty())
+					command_fname = argv[curarg];
+				else {
+					std::cerr << "Expecting at most 2 arguments (other than flags)\n";
+					return 1;
+					}
 	        curarg++;
 			}
 		}
+	ifstream cmdFile;
+	if (!command_fname.empty()) {
+		cmdFile.open(command_fname.c_str());
+		if (!cmdFile.good()) {
+			std::cerr << "Could not open " << command_fname << "\n";
+			return 2;
+			}
+		Population::cmdFilePtr = &cmdFile;
+	}
 #ifdef GANESH
 	if(Tree::random_p==false) Tree::ComputeRealCatalan();
 #endif

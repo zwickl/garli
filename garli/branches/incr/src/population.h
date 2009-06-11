@@ -570,6 +570,6 @@ private:
 		static bool GetOutputSiteLikes();
 		void PatternCountsToWrapper();
 
-
+		static std::istream * cmdFilePtr;
 };
 #endif
