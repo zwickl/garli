@@ -285,12 +285,13 @@ void Individual::MakeRandomTree(unsigned nTax){
 			treeStruct->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
 			}
 #ifndef NDEBUG
-		for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
-			TreeNode *check = NULL;
+		vector<Constraint>::const_iterator conit=treeStruct->GetConstraints().begin();
+		for(;conit!=treeStruct->GetConstraints().end();conit++){
+			const TreeNode *check = NULL;
 			if((*conit).IsBackbone())
-				check = treeStruct->ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
+				check = treeStruct->ContainsMaskedBipartitionOrComplement(conit->GetBipartition(), conit->GetBackboneMask());
 			else
-				check = treeStruct->ContainsBipartitionOrComplement(*(*conit).GetBipartition());
+				check = treeStruct->ContainsBipartitionOrComplement(conit->GetBipartition());
 			if((*conit).IsPositive()) assert(check != NULL);
 			else assert(check == NULL);
 			}

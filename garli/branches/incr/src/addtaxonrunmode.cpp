@@ -97,7 +97,7 @@ NxsFullTreeDescription readConstraintTreeDesc(const char * nexusContent, NxsTaxa
 		gConstraintReader = createConstraintFileReader();
 	else {
 		assert(gConstraintReader->GetNumTaxaBlocks() == 1);
-		assert(gConstraintReader->GetTaxaBlock(N) == 1);
+		assert(gConstraintReader->GetTaxaBlock(0));
 	}
 	gConstraintReader->ClearContent();
 	if (tb)
