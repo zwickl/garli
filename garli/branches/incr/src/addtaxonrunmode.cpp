@@ -135,11 +135,17 @@ void Population::PatternCountsToWrapper()
 	std::cerr << "]\n";
 }
 std::pair<unsigned, unsigned> Population::RefillTreeBuffer(GarliReader &reader, unsigned treeNum) {
+	static unsigned linecount = 1;
 	unsigned endTreeNum = UINT_MAX;
 	int nSleeps = 0;
 	std::string nextLine;
+//	if (linecount == 1)
+//		rnd.set_seed(1668168684);
 	for (;;) {
 		GeneralGamlConfig c(*(this->conf));
+		
+		std::cerr << "linecount = " << linecount++ << " seed = " << rnd.seed() << '\n';
+		
 		std::cerr << "iGarli[0 - " << gCurrIGarliResultIndex  << "]>" << std::endl;
 		nextLine.clear();
 		if (Population::cmdFilePtr) {
@@ -555,7 +561,6 @@ void Population::AddTaxonRunMode() {
 }
 
 void Population::AfterRunHook(unsigned nReps) {
-	globalBest = bestFitness = prevBestFitness = indiv[0].Fitness();
 	//this rep is over
 	if (prematureTermination == false) {
 		//not sure where this should best go
@@ -795,6 +800,7 @@ void Population::NextAddTaxonRound(Individual & scratchIndividual,
 		outman.UserMessage("lnL after optimization: %.4f", indiv[0].Fitness());
 		}
 
+	globalBest = bestFitness = prevBestFitness = indiv[0].Fitness();
 
 #	ifndef INPUT_RECOMBINATION
 		for(unsigned i = 1; i < total_size; i++){
@@ -817,7 +823,11 @@ void Population::NextAddTaxonRound(Individual & scratchIndividual,
 			indiv[i].CalcFitness(0);
 			}
 #	endif
-
+	
+#	if !defined(NDEBUG)
+		this->CheckAllTrees();
+#	endif
+	
 	UpdateTopologyList(indiv);
 	CalcAverageFitness();
 	ReconfigureAdaptationParams();
@@ -905,8 +915,9 @@ void Population::RunImplForAddTaxonRunMode() {
 #		endif
 		}
 
+	CalcAverageFitness();
 	FinalOptimization();
-	gen = UINT_MAX;
+ //gen = UINT_MAX;
 	OutputLog();
 
 	if(conf->bootstrapReps == 0)
