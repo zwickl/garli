@@ -892,6 +892,14 @@ void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipar
 			compat=true;
 			CalcBipartitions(true);
 			proposed.FillWithXORComplement(*(nd->bipart), *(otherDes->bipart));
+
+			//6/23/09 This call was moved here from within SwapAllowedByConstraint.  This saves a lot
+			//of work when looping over many constraints for a single swap that really only requires a single adjustment.
+			//Doing the adjustment isn't necessary for constraints with no mask (and will be slower in that case)
+			//but doing this here will be much, much faster for backbone constraints when there are lots of them.
+			//There will always be a mask here since we're building a partial tree.
+			AdjustBipartsForSwap(nd->nodeNum, otherDes->nodeNum);
+
 			for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
 				//if the taxon being added isn't in the backbone, it can go anywhere
 				if(((*conit).IsBackbone() == false) || (*conit).GetBackboneMask()->ContainsTaxon(nd->nodeNum)){
@@ -2068,6 +2076,13 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 				CalcBipartitions(true);
 				proposed.FillWithXORComplement(*(cut->bipart), *(allNodes[broken->nodeNum]->bipart));
 				bool allowed = true;
+				
+				//6/23/09 This call was moved here from within SwapAllowedByConstraint.  This saves a lot
+				//of work when looping over many constraints for a single swap that really only requires a single adjustment.
+				//Doing the adjustment isn't necessary for positive non-backbone constraints with no mask (and will be slower in that case)
+				//but they don't require much work anyway
+				AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
+
 				for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
 					allowed = SwapAllowedByConstraint((*conit), cut, &*it, proposed, partialMask);
 					if(!allowed) break;
@@ -2082,7 +2097,9 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 	}
 
 //same as the normal GatherValidReconnectionNodes, but fills ReconList passed in, not the normal tree one
+//6/23/09 I don't think that this has been updated for the most recent constraint implementation, so shouldn't be being used
 void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNode *cut, const TreeNode *subtreeNode, Bipartition *partialMask /*=NULL*/){
+	assert(0);
 	const TreeNode *center=cut->anc;
 
 	//add the descendent branches
@@ -2735,8 +2752,10 @@ bool Tree::SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, Reco
 			compat = constr.BipartitionIsCompatibleWithConstraint(proposed, &jointMask);
 			if(compat == false) return compat;
 
-			//this screws up the biparitions, so they need to be recalculated before returning
-			AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
+			//6/23/09 This call was moved up one level, so that it MUST called in AddRandomNodeWithConstraints or GatherValidReconnectionNodes
+			//before calling SwapAllowedByConstraint.  This saves a lot of work when looping over many constraints for a single swap
+			//that really only requires a single adjustment
+			//AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
 
 			compat = RecursiveAllowedByConstraintWithMask(constr, &jointMask, root);
 			}
