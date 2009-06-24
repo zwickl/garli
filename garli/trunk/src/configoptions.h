@@ -46,6 +46,7 @@ class GeneralGamlConfig{
 	int randseed;
 	string streefname;
 	bool refineStart;
+	bool refineEnd;
 
 	//general run details
 	string datafname;

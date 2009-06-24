@@ -1594,7 +1594,9 @@ void Population::Run(){
 	boinc_fraction_done(0.99);
 #endif
 
-	FinalOptimization();
+	if(conf->refineEnd)
+		FinalOptimization();
+	finishedRep = true;
 	gen = UINT_MAX;
 	OutputLog();
 
@@ -1816,7 +1818,6 @@ void Population::FinalOptimization(){
 #endif
 
 	outman.unsetf(ios::fixed);
-	finishedRep = true;
 
 	if(conf->outputTreelog && treeLog.is_open())
 		AppendTreeToTreeLog(-1);
