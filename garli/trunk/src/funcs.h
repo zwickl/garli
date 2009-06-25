@@ -65,6 +65,8 @@ float max(const double first, const float second);
 float max(const float first, const double second);
 #endif
 
+void OutputImportantDefines();
+
 int FileExists(const char* s);
 bool FileIsFasta(const char *name);
 bool FileIsNexus(const char *name);
