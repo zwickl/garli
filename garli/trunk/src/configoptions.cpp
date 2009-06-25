@@ -149,7 +149,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetStringOption("constraintfile", constraintfile, true);
 	errors += cr.GetIntNonZeroOption("randseed", randseed);
 	errors += cr.GetBoolOption("refinestart", refineStart);
-	errors += cr.GetBoolOption("refineend", refineEnd, true);
+	cr.GetBoolOption("refineend", refineEnd, true);
 	errors += cr.GetBoolOption("outputeachbettertopology", outputTreelog);
 	errors += cr.GetBoolOption("enforcetermconditions", enforceTermConditions);
 	errors += cr.GetUnsignedNonZeroOption("genthreshfortopoterm", lastTopoImproveThresh);
