@@ -2086,7 +2086,12 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				for(int i=0;i<nstates-1;i++) tot += b[i];
 				b[nstates-1] = ONE_POINT_ZERO - b[0] - b[1] - b[2];
 				}
-			SetPis(&b[0], true);
+			//in this case we're "forcing" estimation of state frequencies but providing starting values, 
+			//and because this is rather a hack we can't actually do the validation without crapping out 
+			if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEmpiricalStateFrequencies())
+				SetPis(&b[0], false);
+			else
+				SetPis(&b[0], true);
 			modSpec.gotStateFreqsFromFile=true;
 			}
 		else if(c == 'A' || c == 'a'){//alpha shape
