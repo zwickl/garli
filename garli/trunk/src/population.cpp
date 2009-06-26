@@ -918,6 +918,8 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			//file contained multiple trees blocks was already done in LoadNexusStartingConditions
 			const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
 			assert(treesblock != NULL);
+			//this should verify some aspects of the tree description and change everything to taxon numbers
+			treesblock->ProcessAllTrees();
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
 				int treeNum = (rank+rep-1) % numTrees;

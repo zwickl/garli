@@ -264,6 +264,10 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	//a trifurcating root), so use an allocation function that is guaranteed to have enough room and then
 	//trifurcate and delete if necessary
 
+	//this should strip out any crap in the tree string, although much of it would be disregarded below anyway
+	string editedString = NxsString::strip_whitespace(s);
+	s = editedString.c_str();
+	
 	AllocateTree();
 	TreeNode *temp=root;
 	root->attached=true;
@@ -409,14 +413,14 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 								}
 							}
 						if(taxonnodeNum < 0){
-							throw ErrorException("Unknown taxon \"%s\" encountered in tree description!", name.c_str());
+							throw ErrorException("Unknown taxon \"%s\" encountered in tree description!\nIf you have spaces in your taxon names, try replacing them with underscores.", name.c_str());
 							}
 						}
 	                temp=temp->AddDes(allNodes[taxonnodeNum]);
 	                numNodesAdded++;
 					numTipsAdded++;
 	                s++;
-					while(*s == ' ') s++;;//eat any spaces here
+					while(*s == ' ' || *s == '\t') s++;;//eat any spaces here
 
 					if(*s!=':' && *s!=',' && *s!=')'){
 						throw ErrorException("Problem parsing tree string!  Expecting \":\" or \",\" or \")\", found %c", *s);
