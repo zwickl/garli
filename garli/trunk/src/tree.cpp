@@ -895,9 +895,8 @@ void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipar
 
 			//6/23/09 This call was moved here from within SwapAllowedByConstraint.  This saves a lot
 			//of work when looping over many constraints for a single swap that really only requires a single adjustment.
-			//Doing the adjustment isn't necessary for constraints with no mask (and will be slower in that case)
-			//but doing this here will be much, much faster for backbone constraints when there are lots of them.
-			//There will always be a mask here since we're building a partial tree.
+			//Doing the adjustment isn't necessary for positive non-backbone constraints with no mask (and isn't always
+			//necessary when there is a mask either), but there will always be a mask here since we're building a partial tree.
 			AdjustBipartsForSwap(nd->nodeNum, otherDes->nodeNum);
 
 			for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
@@ -2067,6 +2066,12 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 
 #ifdef CONSTRAINTS
 	//now deal with constraints, if any
+	bool anyBackbone = false;
+	for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+		if(conit->IsBackbone()) anyBackbone = true;
+		break;
+		}
+
 	if(constraints.size() > 0){
 		if(sprRang.size() != 0){
 			Bipartition proposed;
@@ -2079,9 +2084,10 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 				
 				//6/23/09 This call was moved here from within SwapAllowedByConstraint.  This saves a lot
 				//of work when looping over many constraints for a single swap that really only requires a single adjustment.
-				//Doing the adjustment isn't necessary for positive non-backbone constraints with no mask (and will be slower in that case)
-				//but they don't require much work anyway
-				AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
+				//Doing the adjustment isn't necessary for positive non-backbone constraints with no mask (and isn't always
+				//necessary when there is a mask either) so skip this if we can
+				if(partialMask || anyBackbone)
+					AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
 
 				for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
 					allowed = SwapAllowedByConstraint((*conit), cut, &*it, proposed, partialMask);
