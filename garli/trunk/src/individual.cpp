@@ -631,6 +631,29 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	else outman.UserMessage("optimizing starting branch lengths...");
 	FLOAT_TYPE improve=(FLOAT_TYPE)999.9;
 	CalcFitness(0);
+	bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates;
+	optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = false;
+	if(optModel){
+		if(modSpec.IsCodon())
+			optOmega = true;
+		if(modSpec.numRateCats > 1){
+			if(modSpec.IsFlexRateHet())
+				optFlex = true;
+			else 
+				optAlpha = true;
+			}
+		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites)
+			optPinv = true;
+#ifdef MORE_DETERM_PARAM_OPT
+		if(modSpec.IsCodon() == false && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false)
+			optFreqs = true;
+		//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
+		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
+			optFreqs = true;
+		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+			optRelRates = true;
+#endif
+		}
 
 	for(int i=1;improve > branchPrec;i++){
 		FLOAT_TYPE rateOptImprove=0.0, pinvOptImprove = 0.0, optImprove=0.0, scaleImprove=0.0, freqOptImprove=0.0, nucRateOptImprove=0.0;
@@ -661,7 +684,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		//if there are still massive score changes due to blens, don't mess with the other params yet because their lnL surfaces
 		//can be rather numerically unstable.
 		if(optModel && (scaleImprove + trueImprove) < 1000.0){
-			if(modSpec.IsCodon())//optimize omega even if there is only 1
+			if(optOmega)//optimize omega even if there is only 1
 				rateOptImprove = treeStruct->OptimizeOmegaParameters(branchPrec);
 			else if(mod->NRateCats() > 1){
 				if(modSpec.IsFlexRateHet()){//Flex rates
@@ -675,36 +698,28 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 				}
 			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites)
 				pinvOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, &Model::SetPinv);
-#ifdef MORE_DETERM_PARAM_OPT
-			if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
+			if(optFreqs)
 				freqOptImprove = treeStruct->OptimizeEquilibriumFreqs(branchPrec);
-			//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
-			if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
-				freqOptImprove = treeStruct->OptimizeEquilibriumFreqs(branchPrec);
-			if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+			if(optRelRates)
 				nucRateOptImprove = treeStruct->OptimizeRelativeNucRates(branchPrec);
-#endif
 			}
 		improve=scaleImprove + trueImprove + rateOptImprove + pinvOptImprove + freqOptImprove + nucRateOptImprove;
 		outman.precision(8);
 		outman.UserMessageNoCR("pass %-2d: +%10.4f (branch=%7.2f scale=%6.2f", i, improve, trueImprove, scaleImprove);
-		if(optModel && modSpec.IsCodon()) outman.UserMessageNoCR(" omega=%6.2f", rateOptImprove);
-		else if(optModel && mod->NRateCats() > 1){
-			if(modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false) outman.UserMessageNoCR(" alpha=%6.2f", rateOptImprove);
-			else if(modSpec.IsFlexRateHet() && modSpec.gotFlexFromFile == false) outman.UserMessageNoCR(" flex rates=%6.2f", rateOptImprove);
-			}
-		if(optModel && modSpec.includeInvariantSites && !modSpec.fixInvariantSites) outman.UserMessageNoCR(" pinv=%6.2f", pinvOptImprove);
-#ifdef MORE_DETERM_PARAM_OPT
-		if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
+		if(optOmega) 
+			outman.UserMessageNoCR(" omega=%6.2f", rateOptImprove);
+		if(optAlpha) 
+			outman.UserMessageNoCR(" alpha=%6.2f", rateOptImprove);
+		if(optFlex) 
+			outman.UserMessageNoCR(" flex rates=%6.2f", rateOptImprove);
+		if(optPinv) 
+			outman.UserMessageNoCR(" pinv=%6.2f", pinvOptImprove);
+		if(optFreqs)
 			outman.UserMessageNoCR(" equil freqs=%6.2f", freqOptImprove);
-		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
-			outman.UserMessageNoCR(" codon freqs=%6.2f", freqOptImprove);
-		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+		if(optRelRates)
 			outman.UserMessageNoCR(" rel rates=%6.2f", nucRateOptImprove);
-#endif
 		outman.UserMessage(")");
 		}
-
 	treeStruct->nodeOptVector.clear();
 	}
 

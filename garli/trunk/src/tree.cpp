@@ -416,7 +416,10 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 							throw ErrorException("Unknown taxon \"%s\" encountered in tree description!\nIf you have spaces in your taxon names, try replacing them with underscores.", name.c_str());
 							}
 						}
-	                temp=temp->AddDes(allNodes[taxonnodeNum]);
+					if(allNodes[taxonnodeNum]->attached == true)
+						throw ErrorException("Taxon \"%s\" seems to appear in the tree description twice!\nCheck the tree string.", name.c_str());
+					else
+						temp=temp->AddDes(allNodes[taxonnodeNum]);
 	                numNodesAdded++;
 					numTipsAdded++;
 	                s++;
