@@ -27,6 +27,10 @@ unsigned int Bipartition::allBitsOn;
 char * Bipartition::str;
 unsigned int Bipartition::partialBlockMask;
 
+bool Constraint::allBackbone;
+bool Constraint::anyBackbone;
+bool Constraint::sharedMask;
+
 //note that this is "less than" for sorting purposes, not in a subset sense
 bool BipartitionLessThan(const Bipartition &lhs, const Bipartition &rhs){
 	int i;
@@ -37,6 +41,12 @@ bool BipartitionLessThan(const Bipartition &lhs, const Bipartition &rhs){
 		
 	if(((lhs.rep[i]) & lhs.partialBlockMask) > ((rhs.rep[i]) & lhs.partialBlockMask)) return false;
 	else return true;
+	}
+
+void Constraint::SetConstraintStatics(bool allBack, bool anyBack, bool oneMask){
+	Constraint::allBackbone = allBack;
+	Constraint::anyBackbone = anyBack;
+	Constraint::sharedMask = oneMask;
 	}
 
 void Bipartition::SetBipartitionStatics(int nt){

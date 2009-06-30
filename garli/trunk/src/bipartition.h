@@ -554,6 +554,11 @@ class Constraint{
 	//an outgroup is a special type of positive constraint
 	bool outgroup;
 public:
+	//if these are true (and they almost always will be), it makes checking constraint validity much easier
+	static bool allBackbone;
+	static bool anyBackbone;
+	static bool sharedMask;
+
 	Constraint() {
 		backbone=false;
 		};
@@ -569,6 +574,8 @@ public:
 		backbone=true;
 		backboneMask = m;
 		}
+
+	static void SetConstraintStatics(bool allBack, bool anyBack, bool oneMask);
 
 	bool IsPositive() const {return positive;}
 
