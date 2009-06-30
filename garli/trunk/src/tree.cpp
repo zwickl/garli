@@ -2073,14 +2073,23 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 
 #ifdef CONSTRAINTS
 	//now deal with constraints, if any
-	bool anyBackbone = false;
-	for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
-		if(conit->IsBackbone()) anyBackbone = true;
-		break;
-		}
-
 	if(constraints.size() > 0){
-		if(sprRang.size() != 0){
+/*		int ok =0;
+		int bad = 0;
+		int calls = 0;
+		int attach = sprRang.size();
+*/		bool bypass = false;
+
+		//6/30/09 If all constraints are backbone on the same set of taxa, check that both sides of the split where the tree was broken
+		//actually appear in the backbone mask.  Otherwise the swap is always valid and we can skip the whole following loop.
+		//This is very helpful when, for example, a terminal taxon not in the backbone is cut.
+		CalcBipartitions(true);
+		if(Constraint::allBackbone && Constraint::sharedMask){
+			if(!(constraints[0].GetBackboneMask()->HasIntersection(*cut->bipart, NULL)) || !(constraints[0].GetBackboneMask()->HasIntersectionWithComplement(*cut->bipart, NULL))){
+				bypass = true;
+				}
+			}
+		if(!bypass && sprRang.size() != 0){
 			Bipartition proposed;
 			listIt it=sprRang.begin();
 			do{
@@ -2093,19 +2102,25 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 				//of work when looping over many constraints for a single swap that really only requires a single adjustment.
 				//Doing the adjustment isn't necessary for positive non-backbone constraints with no mask (and isn't always
 				//necessary when there is a mask either) so skip this if we can
-				if(partialMask || anyBackbone)
+				if(it->withinCutSubtree == false && (partialMask || Constraint::anyBackbone))
 					AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
 
 				for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+//					calls++;
 					allowed = SwapAllowedByConstraint((*conit), cut, &*it, proposed, partialMask);
 					if(!allowed) break;
 					}
+//				if(allowed) ok++;
+//				else bad++;
 				if(!allowed) it=sprRang.RemoveElement(it);
 				else it++;
 				}while(it != sprRang.end());
 			}
-		else return;
-		}
+/*		if(bypass)
+			outman.UserMessage("%d max range, %d attach, %d calls, %d ok, %d bad, BYPASSED", maxDist, attach, calls, ok, bad);
+		else
+			outman.UserMessage("%d max range, %d attach, %d calls, %d ok, %d bad", maxDist, attach, calls, ok, bad);
+*/		}
 #endif
 	}
 
@@ -2703,18 +2718,42 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 		}while(con.eof() == false);
 
 	//make sure the constraints are compatible with each other!
+	bool allBackbone = true;
+	bool anyBackbone = false;
+	bool sameMask = true;
 	if(conNum > 1){
 		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
+			if(first->IsBackbone() == false){
+				allBackbone = false;
+				sameMask = false;
+				}
+			else 
+				anyBackbone = true;
 			for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++){
 				if((*first).IsPositive() != (*sec).IsPositive()) throw ErrorException("cannot mix positive and negative constraints!");
 				if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
 				if((*first).ConstraintIsCompatibleWithConstraint((*sec)) == false) throw ErrorException("constraints are not compatible with one another!");
-			}
+				if(allBackbone && sameMask && first->IsBackbone() && sec->IsBackbone() && first == constraints.begin()){
+					if(first->GetBackboneMask()->EqualsEquals(*sec->GetBackboneMask()) == false)
+						sameMask = false;
+					}
+				}
 			}
 		}
+	Constraint::SetConstraintStatics(allBackbone, anyBackbone, sameMask);
 	//summarize the constraint info to the screen
 	string str;
 	int num=1;
+
+	if(allBackbone){
+		outman.UserMessage("All constraints are backbone");
+		if(sameMask)
+			outman.UserMessage("All constraints involve the same backbone set of taxa");
+		else 
+			outman.UserMessage("Constraints involve differing sets of taxa");
+		}
+	else if(anyBackbone)
+		outman.UserMessage("Some constraints are backbone");
 	if(constraints[0].IsPositive()){
 		outman.UserMessage("Found %d positively constrained bipartition(s)", constraints.size());
 		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
@@ -2756,7 +2795,8 @@ bool Tree::SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, Reco
 		/*(check for meaningful intersection of constraint and partial/backbone mask here)*/
 		Bipartition jointMask;
 		bool meaningfulIntersection = jointMask.MakeJointMask(constr, partialMask);
-		if(!meaningfulIntersection) return true;
+		if(!meaningfulIntersection) 
+			return true;
 
 		if(!broken->withinCutSubtree){
 			//if this is a normal SPR swap in which the cut subtree has the same orientation after the swap then we can
