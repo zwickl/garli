@@ -4859,7 +4859,7 @@ void Tree::OutputSiteLikelihoods(vector<double> &likes, const int *under1, const
 	assert(sitelikeLevel > 0);
 	assert(likes.size() == data->NChar());;
 	if(!append){
-		ordered << "Tree\t-lnL\tSite\t-lnL\n";
+		ordered << "Tree\t-lnL\tSite\t-lnL";
 		if(sitelikeLevel > 1) 
 			ordered << "\tunder1\tunder2";
 		ordered << "\n";
