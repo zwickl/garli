@@ -290,7 +290,8 @@ private:
 
 	FLOAT_TYPE bestFitness;
 	FLOAT_TYPE prevBestFitness;
-	FLOAT_TYPE fraction_done;//make sure this remains the last scalar in the class for checkpointing to work
+	FLOAT_TYPE tot_fraction_done;
+	FLOAT_TYPE rep_fraction_done;//make sure this remains the last scalar in the class for checkpointing to work
 
 public:
 	GeneralGamlConfig *conf;
@@ -387,7 +388,7 @@ private:
 			bestFitness(-(FLT_MAX)), bestIndiv(0), currentSearchRep(1), 
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
-			treeString(NULL), adap(NULL), fraction_done(ZERO_POINT_ZERO),
+			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
 			topologies(NULL), prematureTermination(false), currentBootstrapRep(0),
 			finishedRep(false), lastBootstrapSeed(0), data(NULL), rawData(NULL)
 #ifdef INCLUDE_PERTURBATION			 

@@ -1312,7 +1312,7 @@ void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 	//data member) rather than counting the number of each type and adding it up
 	//manually.  This should make it work irrespective of things like memory padding
 	//for data member alignment, which could vary between platforms and compilers
-	intptr_t scalarSize = (intptr_t) &fraction_done - (intptr_t) this + sizeof(fraction_done);
+	intptr_t scalarSize = (intptr_t) &rep_fraction_done - (intptr_t) this + sizeof(rep_fraction_done);
 	out.WRITE_TO_FILE(this, (streamsize) scalarSize, 1);
 
 	//save the current members of the population
@@ -1356,7 +1356,7 @@ void Population::ReadPopulationCheckpoint(){
 	//data member) rather than counting the number of each type and adding it up
 	//manually.  This should make it work irrespective of things like memory padding
 	//for data member alignment, which could vary between platforms and compilers
-	intptr_t scalarSize = (intptr_t) &fraction_done - (intptr_t) this + sizeof(fraction_done);
+	intptr_t scalarSize = (intptr_t) &rep_fraction_done - (intptr_t) this + sizeof(rep_fraction_done);
 	fread(this, scalarSize, 1, pin);
 
 	//if were restarting a bootstrap run we need to change to the bootstrapped data
@@ -1441,7 +1441,9 @@ void Population::Run(){
 	CatchInterrupt();
 #endif
 
+	if(gen == 0) rep_fraction_done = 0.01;
 	gen++;
+	UpdateFractionDone();
 	for (; gen < conf->stopgen+1; ++gen){
 
 		NextGeneration();
@@ -1592,8 +1594,10 @@ void Population::Run(){
 #endif
 		}
 
+	rep_fraction_done = 0.99;
+	UpdateFractionDone();
 #ifdef BOINC
-	boinc_fraction_done(0.99);
+	boinc_fraction_done(tot_fraction_done);
 #endif
 
 	if(conf->refineEnd)
@@ -1607,42 +1611,64 @@ void Population::Run(){
 	if(conf->bootstrapReps==0) outman.UserMessage("finished");
 
 	//outman.UserMessage("%d conditional likelihood calculations\n%d branch optimization passes", calcCount, optCalcs);
+	rep_fraction_done = 1.0;
+	UpdateFractionDone();
 #ifdef BOINC
-	boinc_fraction_done(1.0);
+	boinc_fraction_done(tot_fraction_done);
 #endif
 	}
 
 void Population::UpdateFractionDone(){
 	//update the proportion done.  This is mainly for BOINC, but might be used elsewhere.
 	//The algorithm used to determine the progress is fairly arbitrary
-	FLOAT_TYPE fract = 0.0;
-	FLOAT_TYPE current_fract = fraction_done;
+	//CAREFUL about multiple reps/bootstrap reps.  The stored fraction_done is for this
+	//replicate, so it needs to be manually prorated for the expected number of reps
+	FLOAT_TYPE fract = 0.01;
+	FLOAT_TYPE current_fract = rep_fraction_done;
+	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
+
+	bool willReduce = (FloatingPointEquals(adap->startOptPrecision, adap->minOptPrecision, 1e-6) == false) 
+		&& (adap->numPrecReductions > 0);
+	int reduction_number = willReduce ? (adap->startOptPrecision - adap->branchOptPrecision) / adap->precReductionFactor : 0;
+	int remaining_reductions = willReduce ? adap->numPrecReductions - reduction_number : 0;
+	
+	FLOAT_TYPE minFract = min(current_fract, max((double) stopwatch.SplitTime() / conf->stoptime, (double) gen / conf->stopgen));
+	int minTotalRunLength = conf->lastTopoImproveThresh + (willReduce ? (adap->numPrecReductions * (adap->intervalLength * adap->intervalsToStore)) : 0);
+	int minRemainingRunLength = conf->lastTopoImproveThresh + (willReduce ? (remaining_reductions * (adap->intervalLength * adap->intervalsToStore)) : 0);
+	int fivePercent = max(50, (int)(0.005 * minTotalRunLength)*10);
+	FLOAT_TYPE firstBreak;
+	FLOAT_TYPE secondBreak;
+	if(willReduce){
+		firstBreak = 0.25;
+		secondBreak = min(firstBreak + (0.05 * adap->numPrecReductions), 0.6);
+		}
+	else firstBreak = secondBreak = 0.10;
 
 	if(conf->enforceTermConditions){
-		if(adap->branchOptPrecision == adap->startOptPrecision){
+		if(willReduce && remaining_reductions == adap->numPrecReductions){
 			//we've done a decent number of gen, but haven't yet reduced the prec
-			fract = min(0.01 + 0.01 * (double) (gen / 2000), 0.1);
+			fract = min(0.01 + 0.01 * (double) gen / (adap->intervalLength * adap->intervalsToStore), firstBreak);
 			}
 
-		else if(adap->branchOptPrecision < adap->startOptPrecision){
-			//divide the rest of the way up to 70% evenly among the precision reductions
-			FLOAT_TYPE reduction_number = (adap->startOptPrecision - adap->branchOptPrecision) / adap->precReductionFactor;
-			fract = 0.1 + ((reduction_number - 1) / (FLOAT_TYPE) (adap->numPrecReductions - 1)) * 0.6;
+		else if(willReduce && remaining_reductions > 0){
+			//divide the rest of the way up to the second break evenly among the precision reductions
+			fract = firstBreak + ((reduction_number - 1) / (FLOAT_TYPE) (adap->numPrecReductions - 1)) * (secondBreak - firstBreak);
 			}
 
-		else if(adap->branchOptPrecision == adap->minOptPrecision){
+		else if(remaining_reductions == 0){
 			//we've entered the home stretch.  But, it's hard to judge progress here because a new tree can always be found
 			//that would reset the number of generations left to go.  So, be conservative, because we aren't allowed to reduce
 			//the percentage
+			fract = max(secondBreak, current_fract);
 			unsigned genSinceImprove = gen-max(lastTopoImprove, lastPrecisionReduction);
-			unsigned num_chunks = 5;
+			unsigned num_chunks = 10;
 			unsigned chunk_length = (unsigned) (conf->lastTopoImproveThresh / num_chunks);
-			FLOAT_TYPE chunkFracSize = 0.29 / (FLOAT_TYPE) num_chunks;
+			FLOAT_TYPE chunkFracSize = (1 - secondBreak - 0.01) / (FLOAT_TYPE) num_chunks;
 			unsigned currentChunkNum = (unsigned) (genSinceImprove / chunk_length);
 			if(currentChunkNum > 0){//if we're above the first chunk boundary
 				if(genSinceImprove % chunk_length <= adap->intervalLength){//if we've just entered this chunk
-					FLOAT_TYPE baseChunkFrac = 0.70 + currentChunkNum * chunkFracSize;
-					FLOAT_TYPE maxAllowedFrac = baseChunkFrac + chunkFracSize;
+					FLOAT_TYPE baseChunkFrac = secondBreak + currentChunkNum * chunkFracSize;
+					FLOAT_TYPE maxAllowedFrac = min(baseChunkFrac + chunkFracSize, 0.99);
 					if(current_fract - maxAllowedFrac < -1.0e-3){//this is effectively maxAllowedFrac > currentBoincFrac
 						fract = min(max(current_fract + 0.01, baseChunkFrac), maxAllowedFrac);
 						}
@@ -1650,11 +1676,20 @@ void Population::UpdateFractionDone(){
 				}
 			}
 		}
+	if(fract < minFract) fract = minFract;
+	assert(fract >= current_fract);
 	if(fract != current_fract){
-		fraction_done = fract;
+		rep_fraction_done = fract;
 		}
+	int totSearches = conf->searchReps * (conf->bootstrapReps > 0 ? conf->bootstrapReps : 1);
+	int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
+	FLOAT_TYPE repFract = 1.0 / totSearches;
+	FLOAT_TYPE t_fraction_done = (curSearch - 1) * repFract + (repFract * rep_fraction_done);
+	assert(t_fraction_done >= tot_fraction_done);
+	tot_fraction_done = t_fraction_done;
+	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
 #ifdef BOINC
-	boinc_fraction_done(fraction_done);
+	boinc_fraction_done(tot_fraction_done);
 #endif
 	}
 
@@ -2022,7 +2057,11 @@ void Population::PerformSearch(){
 
 	for(;currentSearchRep<=conf->searchReps;currentSearchRep++){
 		string s;
-		if(conf->restart == false && currentSearchRep > 1) Reset();
+		if(conf->restart == false && currentSearchRep > 1){
+			Reset();
+			//this just changes what the rng has stored as the init seed ix0, for output purposes
+			rnd.set_seed(rnd.seed());
+			}
 
 		//ensure that the user can ctrl-c kill the program during creation of each stepwise addition tree
 		//the signal handling will be returned to the custom message below
