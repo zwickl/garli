@@ -2181,6 +2181,8 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
+	vector<double> siteLikes;
+
 #ifdef UNIX
 	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
@@ -2309,6 +2311,9 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 				}
 			}
 #endif
+		if(sitelikeLevel != 0){
+			siteLikes.push_back(siteL);
+			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
 			grandSumL += totL;
@@ -2319,6 +2324,9 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 #else
 		}
 #endif
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, partialCLA->underflow_mult, NULL);
+		}
 
 	d1Tot = tot1;
 	d2Tot = tot2;
@@ -2715,6 +2723,8 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
+	vector<double> siteLikes;
+
 #ifdef CUDA_GPU
 	if (cudaman->GetGPUDerivEnabled()) {
 		cudaman->ComputeGPUDeriv(partialCLA->arr, childCLA->arr,
@@ -2814,6 +2824,9 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	//		CL1+=4*nRateCats;
 			}
 #endif
+		if(sitelikeLevel != 0){
+			siteLikes.push_back(siteL);
+			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
 			grandSumL += totL;
@@ -2824,6 +2837,9 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 #else
 		}
 #endif
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, childCLA->underflow_mult, partialCLA->underflow_mult);
+		}
 
 	d1Tot = tot1;
 	d2Tot = tot2;
