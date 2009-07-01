@@ -360,6 +360,19 @@ void Model::FillQMatLookup(){
 				}
 			}
 		}
+#ifdef CODON_QMAT_HACK
+	//Put in whatever ad hoc alterations to the codon matrix
+	//Hack in single changes for serine -> serine double hits
+	//giving them a rate of omega X the first pos change
+	//AGC->TCC
+	tempqmatLookup[629] = 1 | 4 | 32;
+	//AGT->TCT
+	tempqmatLookup[759] = 1 | 4 | 32;
+	//TCT->AGT
+	tempqmatLookup[3531] = 1 | 4 | 32;
+	//TCC->AGC
+	tempqmatLookup[3401] = 1 | 4 | 32;
+#endif
 
 	//remove the columns and rows representing stops
 	int reducedCell = 0;
