@@ -206,15 +206,18 @@ public:
 	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
+		if(*vals[rateToChange]<minv) *vals[rateToChange]=minv;
 		if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;
 		}
 	};
 
 class AlphaShape:public BaseParameter{
 public:
-	AlphaShape(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, ALPHASHAPE, 1, (FLOAT_TYPE)1e-5, (FLOAT_TYPE)999.9){};
+	AlphaShape(const char *c, FLOAT_TYPE **dv):BaseParameter(c, dv, ALPHASHAPE, 1, (FLOAT_TYPE)0.05, (FLOAT_TYPE)999.9){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
+		if(*vals[0]<minv) *vals[0]=minv;
+		if(*vals[0]>maxv) *vals[0]=maxv;
 		}
 	};
 

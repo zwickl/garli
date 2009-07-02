@@ -1753,12 +1753,12 @@ void Population::FinalOptimization(){
 				nucRateOptImprove += tempTot;
 				}
 			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false){
-				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
+				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 0.0, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
 				paramOpt += tempTot;
 				pinvOptImprove += tempTot;
 				}
 			if(indiv[bestIndiv].treeStruct->mod->NRateCats() > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false){
-				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
+				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, min(0.05, indiv[bestIndiv].treeStruct->mod->Alpha()), max(999.9, indiv[bestIndiv].treeStruct->mod->Alpha()), &Model::SetAlpha);
 				paramOpt += tempTot;
 				alphaOptImprove += tempTot;
 				}
