@@ -361,17 +361,43 @@ void Model::FillQMatLookup(){
 			}
 		}
 #ifdef CODON_QMAT_HACK
+//WHEN PLAYING HERE, REMEMBER THAT THESE INDECES ARE WITH RESPECT TO THE
+//WHOLE 64X64 MATRIX
 	//Put in whatever ad hoc alterations to the codon matrix
 	//Hack in single changes for serine -> serine double hits
 	//giving them a rate of omega X the first pos change
 	//AGC->TCC
-	tempqmatLookup[629] = 1 | 4 | 32;
+/*	tempqmatLookup[629] = 1 | 4 | 32;
 	//AGT->TCT
 	tempqmatLookup[759] = 1 | 4 | 32;
 	//TCT->AGT
 	tempqmatLookup[3531] = 1 | 4 | 32;
 	//TCC->AGC
 	tempqmatLookup[3401] = 1 | 4 | 32;
+*/
+//all transitions between
+//the two sets of serine codons
+	//AGC->TCN
+	tempqmatLookup[628] = 1 | 4 | 32;
+	tempqmatLookup[629] = 1 | 4 | 32;
+	tempqmatLookup[630] = 1 | 4 | 32;
+	tempqmatLookup[631] = 1 | 4 | 32;
+	//AGT->TCN
+	tempqmatLookup[756] = 1 | 4 | 32;
+	tempqmatLookup[757] = 1 | 4 | 32;
+	tempqmatLookup[758] = 1 | 4 | 32;
+	tempqmatLookup[759] = 1 | 4 | 32;
+	//TCN->AGC
+	tempqmatLookup[3337] = 1 | 4 | 32;
+	tempqmatLookup[3401] = 1 | 4 | 32;
+	tempqmatLookup[3465] = 1 | 4 | 32;
+	tempqmatLookup[3529] = 1 | 4 | 32;
+	//TCN->AGT
+	tempqmatLookup[3339] = 1 | 4 | 32;
+	tempqmatLookup[3403] = 1 | 4 | 32;
+	tempqmatLookup[3467] = 1 | 4 | 32;
+	tempqmatLookup[3531] = 1 | 4 | 32;
+	
 #endif
 
 	//remove the columns and rows representing stops
@@ -2044,30 +2070,43 @@ void Model::ReadModelFromFile(NexusToken &token){
 */	
 	
 void Model::ReadGarliFormattedModelString(string &modString){
-	stringstream stf(stringstream::in | stringstream::out);
-	stf << modString;
+	istringstream stf(modString, stringstream::in);
 
 	char c;
-	char temp[100];
+	NxsString temp;
 	c=stf.get();
 	do{//read parameter values identified by single letter identifier.  Each section should
 		//take care of advancing to the following letter 
 		if(c == 'R' || c == 'r'){//rate parameters
-			if(modSpec.IsAminoAcid()) throw ErrorException("Rate matrix parameters can only be specified for nucleotide or codon models");
+			if(modSpec.IsAminoAcid()) 
+				throw ErrorException("Rate matrix parameters can only be specified for nucleotide or codon models");
 			FLOAT_TYPE r[6];
 			for(int i=0;i<5;i++){
+				temp.clear();
 				stf >> temp;
-				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading rate matrix parameters from file.\nExamine file and check manual for format.\n"));
-				r[i]=(FLOAT_TYPE)atof(temp);
+
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading rate matrix parameters.\nExamine file and check manual for format.\n"));
+				if(temp[0] != '.' && (!isdigit(temp[0]))) 
+					throw(ErrorException("Problem reading rate matrix parameters from file.\nExamine file and check manual for format.\n"));
+				r[i]=(FLOAT_TYPE)atof(temp.c_str());
 				}
-			do{c=stf.get();}while(c==' ');
+			do{
+				c=stf.get();
+				}while(!stf.eof() && (c == ' ' || c == '\t'));	
 			if(isdigit(c) || c=='.'){//read the GT rate, if specified
 				string v;
 				v = c;
-				stf >> temp;
-				v += temp;
+				while(!isalpha(c) && !stf.eof()){
+					c=stf.get();
+					if(isdigit(c) || c=='.')
+						v += c;
+					else if(c == ' ' || c == '\t'){
+						c=stf.get();
+						break;
+						}
+					}
 				r[5] = atof(v.c_str());
-				c=stf.get();
 				}
 			else r[5] = ONE_POINT_ZERO;
 			SetRmat(r, true);
@@ -2081,23 +2120,36 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			int nstates = modSpec.nstates;
 			vector<FLOAT_TYPE> b(nstates);
 			for(int i=0;i<nstates-1;i++){
+				temp.clear();
 				stf >> temp;
-				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading equilirium state frequency parameters from file.\nExamine file and check manual for format.\n"));
-				b[i]=(FLOAT_TYPE)atof(temp);
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading equilibrium frequency parameters.\nExamine file and check manual for format.\n"));
+				if(temp[0] != '.' && (!isdigit(temp[0]))) 
+					throw(ErrorException("Problem reading equilirium state frequency parameters from file.\nExamine file and check manual for format.\n"));
+				b[i]=(FLOAT_TYPE)atof(temp.c_str());
 				}
-			do{c=stf.get();}while(c==' ');
+			do{
+				c=stf.get();
+				}while(!stf.eof() && (c == ' ' || c == '\t'));	
 			if(isdigit(c) || c=='.'){
 				string v;
 				v = c;
-				stf >> temp;
-				v += temp;
+				while(!isalpha(c) && !stf.eof()){
+					c=stf.get();
+					if(isdigit(c) || c=='.')
+						v += c;
+					else if(c == ' ' || c == '\t'){
+						c=stf.get();
+						break;
+						}
+					}
 				b[nstates-1]=(FLOAT_TYPE)atof(v.c_str());
-				do{c=stf.get();}while(c==' ');				
 				}
 			else{
 				FLOAT_TYPE tot = ZERO_POINT_ZERO;
-				for(int i=0;i<nstates-1;i++) tot += b[i];
-				b[nstates-1] = ONE_POINT_ZERO - b[0] - b[1] - b[2];
+				for(int i=0;i<nstates-1;i++) 
+					tot += b[i];
+				b[nstates-1] = ONE_POINT_ZERO - tot;
 				}
 			//in this case we're "forcing" estimation of state frequencies but providing starting values, 
 			//and because this is rather a hack we can't actually do the validation without crapping out 
@@ -2108,33 +2160,52 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			modSpec.gotStateFreqsFromFile=true;
 			}
 		else if(c == 'A' || c == 'a'){//alpha shape
-			if(modSpec.IsFlexRateHet()) throw(ErrorException("Config file specifies ratehetmodel = flex, but starting model contains alpha!\n"));
-			if(modSpec.IsNonsynonymousRateHet()) throw(ErrorException("Config file specifies ratehetmodel = nonsynonymous, but starting model contains alpha!\n"));
+			if(modSpec.IsFlexRateHet()) 
+				throw(ErrorException("Config file specifies ratehetmodel = flex, but starting model contains alpha!\n"));
+			if(modSpec.IsNonsynonymousRateHet()) 
+				throw(ErrorException("Config file specifies ratehetmodel = nonsynonymous, but starting model contains alpha!\n"));
+			temp.clear();
 			stf >> temp;
-			if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading alpha parameter from file.\nExamine file and check manual for format.\n"));
-			SetAlpha((FLOAT_TYPE)atof(temp), true);
+			if(temp.size() == 0)
+				throw(ErrorException("Unexpected end of model string while reading alpha parameter.\nExamine file and check manual for format.\n"));
+			if(temp[0] != '.' && (!isdigit(temp[0]))) 
+				throw(ErrorException("Problem reading alpha parameter from file.\nExamine file and check manual for format.\n"));
+			SetAlpha((FLOAT_TYPE)atof(temp.c_str()), true);
 			c=stf.get();
 			modSpec.gotAlphaFromFile=true;
 			}				
 		else if(c == 'P' || c == 'p' || c == 'i' || c == 'I'){//proportion invariant
+			temp.clear();
 			stf >> temp;
-			if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading proportion of invariant sites parameter from file.\nExamine file and check manual for format.\n"));
-			FLOAT_TYPE p=(FLOAT_TYPE)atof(temp);
+			if(temp.size() == 0)
+				throw(ErrorException("Unexpected end of model string while reading proportion of invariant sites parameter.\nExamine file and check manual for format.\n"));
+			if(temp[0] != '.' && (!isdigit(temp[0]))) 
+				throw(ErrorException("Problem reading proportion of invariant sites parameter from file.\nExamine file and check manual for format.\n"));
+			FLOAT_TYPE p=(FLOAT_TYPE)atof(temp.c_str());
 			SetPinv(p, true);
 			c=stf.get();
 			modSpec.gotPinvFromFile=true;
 			}
 		else if(c == 'F' || c == 'f'){//flex rates
-			if(modSpec.IsFlexRateHet()==false) throw(ErrorException("Flex rate parameters specified, but ratehetmodel is not flex!\n"));
+			if(modSpec.IsFlexRateHet()==false) 
+				throw(ErrorException("Flex rate parameters specified, but ratehetmodel is not flex!\n"));
 			FLOAT_TYPE rates[20];
 			FLOAT_TYPE probs[20];
 			for(int i=0;i<NRateCats();i++){
+				temp.clear();
 				stf >> temp;
-				if(isalpha(temp[0])) throw ErrorException("Problem with flex rates specification in starting condition file");
-				rates[i]=(FLOAT_TYPE)atof(temp);
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading flex rate parameters.\nExamine file and check manual for format.\n"));
+				if(isalpha(temp[0])) 
+					throw ErrorException("Problem with flex rates specification in starting condition file");
+				rates[i]=(FLOAT_TYPE)atof(temp.c_str());
+				temp.clear();
 				stf >> temp;
-				if(isalpha(temp[0])) throw ErrorException("Problem with flex rates specification in starting condition file");
-				probs[i]=(FLOAT_TYPE)atof(temp);
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading flex rate parameters.\nExamine file and check manual for format.\n"));
+				if(isalpha(temp[0])) 
+					throw ErrorException("Problem with flex rates specification in starting condition file");
+				probs[i]=(FLOAT_TYPE)atof(temp.c_str());
 				}		
 			SetFlexRates(rates, probs);
 			NormalizeRates();
@@ -2142,37 +2213,60 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			modSpec.gotFlexFromFile=true;
 			}
 		else if(c == 'O' || c == 'o'){//omega parameters
-			if(modSpec.IsCodon() == false) throw ErrorException("Omega parameters specified for non-codon model?");
+			if(modSpec.IsCodon() == false) 
+				throw ErrorException("Omega parameters specified for non-codon model?");
 			FLOAT_TYPE rates[20];
 			FLOAT_TYPE probs[20];
 			if(NRateCats() == 1){//just a single omega value to get, maybe with a proportion of 1.0 following it
+				temp.clear();
 				stf >> temp;
-				if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
-				rates[0]=(FLOAT_TYPE)atof(temp);
-				do{c=stf.get();}while(c==' ');
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading omega parameters.\nExamine file and check manual for format.\n"));
+				if(isalpha(temp[0])) 
+					throw ErrorException("Problem with omega parameter specification in starting condition file");
+				rates[0]=(FLOAT_TYPE)atof(temp.c_str());
+				do{
+					c=stf.get();
+					}while(!stf.eof() && (c == ' ' || c == '\t'));	
 				if(isdigit(c) || c=='.'){
 					string v;
 					v = c;
+					temp.clear();
 					stf >> temp;
+					if(temp.size() == 0)
+						throw(ErrorException("Unexpected end of model string while reading omega parameters.\nExamine file and check manual for format.\n"));
 					v += temp;
 					if(FloatingPointEquals(atof(v.c_str()), ONE_POINT_ZERO, 1.0e-5) == false)
 						throw ErrorException("Problem with omega parameter specification in starting condition file\n(wrong number of rate cats specified in config?)");
-					do{c=stf.get();}while(c==' ');		
-					if(isdigit(c) || c == '.') throw ErrorException("Problem with omega parameter specification in starting condition file");
+					do{
+						c=stf.get();
+						}while(!stf.eof() && (c == ' ' || c == '\t'));		
+					if(isdigit(c) || c == '.') 
+						throw ErrorException("Problem with omega parameter specification in starting condition file");
 					}
 				probs[0] = ONE_POINT_ZERO;
 				SetOmegas(rates, probs);
 				}
 			else{
 				for(int i=0;i<NRateCats();i++){
+					temp.clear();
 					stf >> temp;
-					if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
-					rates[i]=(FLOAT_TYPE)atof(temp);
+					if(temp.size() == 0)
+						throw(ErrorException("Unexpected end of model string while reading omega parameters.\nExamine file and check manual for format.\n"));
+					if(isalpha(temp[0])) 
+						throw ErrorException("Problem with omega parameter specification in starting condition file");
+					rates[i]=(FLOAT_TYPE)atof(temp.c_str());
+					temp.clear();
 					stf >> temp;
-					if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
-					probs[i]=(FLOAT_TYPE)atof(temp);
+					if(temp.size() == 0)
+						throw(ErrorException("Unexpected end of model string while reading omega parameters.\nExamine file and check manual for format.\n"));
+					if(isalpha(temp[0])) 
+						throw ErrorException("Problem with omega parameter specification in starting condition file");
+					probs[i]=(FLOAT_TYPE)atof(temp.c_str());
 					}
-				do{c=stf.get();}while(c==' ');		
+				do{
+					c=stf.get();
+					}while(!stf.eof() && (c == ' ' || c == '\t'));			
 				if(isdigit(c) || c == '.') throw ErrorException("Problem with omega parameter specification in starting condition file");
 				SetOmegas(rates, probs);
 				}
@@ -2183,7 +2277,8 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			c=stf.get();
 			assert(0);
 			}
-		else if(isalpha(c)) throw(ErrorException("Unknown model parameter specification in file.\nExamine file and check manual for format.\n"));
+		else if(isalpha(c)) 
+			throw(ErrorException("Unknown model parameter specification in file.\nExamine file and check manual for format.\n"));
 		else if(c != '(') c=stf.get();
 		}while(c != '(' && c != '\r' && c != '\n' && !stf.eof());
 	}
