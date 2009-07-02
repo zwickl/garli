@@ -106,6 +106,25 @@ FLOAT_TYPE Tree::OptimizeAllBranches(FLOAT_TYPE optPrecision){
 	return improve;
 	}
 
+int Tree::PushBranchlengthsToMin(){
+	int num = 0;
+	pair<FLOAT_TYPE, FLOAT_TYPE> derivs;
+	for(int i=1;i < numNodesTotal;i++){
+		if(allNodes[i]->dlen < 1.1e-4){
+			derivs = CalcDerivativesRateHet(allNodes[i], allNodes[i]->anc);
+			if(derivs.first < ZERO_POINT_ZERO){
+				SetBranchLength(allNodes[i], min_brlen);
+				num++;
+//				if(num == 1) 
+//					MakeAllNodesDirty();
+				}
+			else
+				outman.UserMessage("%f\t%f", allNodes[i]->dlen, derivs.first);
+			}
+		}
+	return num;
+	}
+
 FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
 	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) Score();
 	Score();

@@ -248,6 +248,7 @@ class Tree{
 		
 		FLOAT_TYPE OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, bool goodGuess);
 		FLOAT_TYPE OptimizeAllBranches(FLOAT_TYPE optPrecision);
+		int PushBranchlengthsToMin();
 		void OptimizeBranchesAroundNode(TreeNode *nd, FLOAT_TYPE optPrecision, int subtreeNode);
 		void OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, int subtreeNode, TreeNode *prune);
 		void OptimizeBranchesInArray(int *nodes, int numNodes, FLOAT_TYPE optPrecision);
