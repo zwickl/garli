@@ -1595,7 +1595,8 @@ void Population::Run(){
 		}
 
 	rep_fraction_done = 0.99;
-	UpdateFractionDone();
+	if(!prematureTermination)
+		UpdateFractionDone();
 #ifdef BOINC
 	boinc_fraction_done(tot_fraction_done);
 #endif
@@ -1848,6 +1849,18 @@ void Population::FinalOptimization(){
 		indiv[bestIndiv].treeStruct->mod->CalcSynonymousBranchlengthProportions(sProps);
 		outman.UserMessage("Proportion of branchlengths that are Synonymous: %.5f", sProps[sProps.size()-1]); 
 		}
+#ifdef PUSH_TO_MIN_BLEN
+	//DEBUG
+	double init = indiv[bestIndiv].treeStruct->lnL;
+	int num = indiv[bestIndiv].treeStruct->PushBranchlengthsToMin();
+	indiv[bestIndiv].treeStruct->Score();
+	double aft = indiv[bestIndiv].treeStruct->lnL;
+	double imp=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
+	indiv[bestIndiv].treeStruct->Score();
+	double fin = indiv[bestIndiv].treeStruct->lnL;
+	outman.UserMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
+#endif
+
 #ifdef MAC_FRONTEND
 	pool = [[NSAutoreleasePool alloc] init];
 	[[MFEInterfaceClient sharedClient] reportFinalScore:BestFitness()];
