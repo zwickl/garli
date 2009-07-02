@@ -6143,8 +6143,8 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 	if(mod->Nst() == 2){
 		//this was wrong - it should be Rates(1) i.e., K that is being optimized here
 		rateImprove += OptimizeBoundedParameter(prec, mod->Rates(1), 1, 
-				max(0.05, mod->Rates(1) / maxPropChange),
-				min(999.0, mod->Rates(1) * maxPropChange),
+				max(min(0.05, mod->Rates(1)), mod->Rates(1) / maxPropChange),
+				min(max(999.0, mod->Rates(1)), mod->Rates(1) * maxPropChange),
 				&Model::SetRelativeNucRate);
 /*				
 		rateImprove += OptimizeBoundedParameter(prec, mod->Rates(0), 0, 
@@ -6166,8 +6166,8 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 				}
 			if(!skip){
 				rateImprove += OptimizeBoundedParameter(prec, mod->Rates(i), i, 
-					max(0.05, mod->Rates(i) / maxPropChange),
-					min(999.0, mod->Rates(i) * maxPropChange),
+					max(min(0.05, mod->Rates(i)), mod->Rates(i) / maxPropChange),
+					min(max(999.0, mod->Rates(i)), mod->Rates(i) * maxPropChange),
 					&Model::SetRelativeNucRate);
 				//DEBUG
 /*				sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
