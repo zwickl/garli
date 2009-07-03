@@ -107,6 +107,20 @@ void Individual::CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const 
 	treeStruct->mod=mod;
 	}
 
+void Individual::DuplicateIndivWithoutCLAs(const Individual *sourceOfInformation){
+	CopyNonTreeFields(sourceOfInformation);
+	if(treeStruct == NULL)
+		treeStruct = new Tree;
+
+	for(int i=treeStruct->getNumTipsTotal()+1;i<(2*treeStruct->getNumTipsTotal()-2);i++)
+		treeStruct->allNodes[i]->attached=false;
+		
+	treeStruct->MimicTopo(sourceOfInformation->treeStruct);
+	dirty=true;
+	treeStruct->lnL=sourceOfInformation->fitness;
+	treeStruct->mod=mod;
+	}
+
 void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 	//this is the original version of mutate, and will be called by both 
 	//master and remote when they are mutating a tree that does not have
@@ -426,6 +440,18 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 	scratchI.treeStruct->RemoveTreeFromAllClas();
 	delete scratchI.treeStruct;
 	scratchI.treeStruct=NULL;
+
+#ifndef NDEBUG
+	for(vector<Constraint>::iterator conit=treeStruct->constraints.begin();conit!=treeStruct->constraints.end();conit++){
+		TreeNode *check = NULL;
+		if((*conit).IsBackbone())
+			check = treeStruct->ContainsMaskedBipartitionOrComplement(*(*conit).GetBipartition(), *(*conit).GetBackboneMask());
+		else
+			check = treeStruct->ContainsBipartitionOrComplement(*(*conit).GetBipartition());
+		if((*conit).IsPositive()) assert(check != NULL);
+		else assert(check == NULL);
+		}
+#endif
 	}
 
 
