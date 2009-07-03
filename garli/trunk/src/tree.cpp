@@ -2102,7 +2102,7 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 				//of work when looping over many constraints for a single swap that really only requires a single adjustment.
 				//Doing the adjustment isn't necessary for positive non-backbone constraints with no mask (and isn't always
 				//necessary when there is a mask either) so skip this if we can
-				if(it->withinCutSubtree == false && (partialMask || Constraint::anyBackbone))
+				if(it->withinCutSubtree == false && (partialMask || Constraint::anyBackbone || constraints[0].IsPositive() == false))
 					AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
 
 				for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
@@ -2721,22 +2721,23 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 	bool allBackbone = true;
 	bool anyBackbone = false;
 	bool sameMask = true;
-	if(conNum > 1){
-		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
-			if(first->IsBackbone() == false){
-				allBackbone = false;
-				sameMask = false;
-				}
-			else 
-				anyBackbone = true;
-			for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++){
-				if((*first).IsPositive() != (*sec).IsPositive()) throw ErrorException("cannot mix positive and negative constraints!");
-				if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
-				if((*first).ConstraintIsCompatibleWithConstraint((*sec)) == false) throw ErrorException("constraints are not compatible with one another!");
-				if(allBackbone && sameMask && first->IsBackbone() && sec->IsBackbone() && first == constraints.begin()){
-					if(first->GetBackboneMask()->EqualsEquals(*sec->GetBackboneMask()) == false)
-						sameMask = false;
-					}
+	for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
+		if(first->IsBackbone() == false){
+			allBackbone = false;
+			sameMask = false;
+			}
+		else 
+			anyBackbone = true;
+		for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++){
+			if((*first).IsPositive() != (*sec).IsPositive()) 
+				throw ErrorException("cannot mix positive and negative constraints!");
+			if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false)) 
+				throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
+			if((*first).ConstraintIsCompatibleWithConstraint((*sec)) == false) 
+				throw ErrorException("constraints are not compatible with one another!");
+			if(allBackbone && sameMask && first->IsBackbone() && sec->IsBackbone() && first == constraints.begin()){
+				if(first->GetBackboneMask()->EqualsEquals(*sec->GetBackboneMask()) == false)
+					sameMask = false;
 				}
 			}
 		}
