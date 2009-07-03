@@ -430,7 +430,7 @@ private:
 		void WriteStateFiles();
 		bool ReadStateFiles();
 		void GetConstraints();
-		void WriteTreeFile( const char* treefname, int indnum = -1);
+		void WriteTreeFile( const char* treefname, int indnum, bool collapse = false);
 		void WritePhylipTree(ofstream &phytree);
 
 		void Setup(GeneralGamlConfig *conf, SequenceData *, int nprocs = 1, int rank = 0);

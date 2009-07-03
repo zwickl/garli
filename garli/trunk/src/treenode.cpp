@@ -805,6 +805,10 @@ void TreeNode::CollapseMinLengthBranches(int &num){
 		do{
 			if(FloatingPointEquals(nd->dlen, DEF_MIN_BRLEN, 2e-8) && nd->IsInternal()){
 				TreeNode *childNode = nd->left;
+				//Note that Prune requires that the subtree pruned is not part of a polytomy
+				//this means that the collapsing must start at the root and work upward.
+				//Also note that Prune automatically detatches the anc of the pruned subtree
+				//since it then only has one child.
 				childNode->Prune();
 				AddDes(childNode);
 				//this resets the node checking to the left des of the current node
