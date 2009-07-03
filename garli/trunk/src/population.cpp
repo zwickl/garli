@@ -289,8 +289,7 @@ Population::~Population()
 	if( newindiv!=NULL )
 		MEM_DELETE_ARRAY(newindiv); // newindiv has length params.nindivs
 
-	for(vector<Individual *>::iterator vit = storedTrees.begin() ; vit != storedTrees.end() ; vit++)
-		delete *vit;
+	ClearStoredTrees();
 
 	if( cumfit!=NULL ) {
 		for( unsigned i = 0; i < total_size; i++ )
@@ -678,7 +677,7 @@ void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
 
 	bestIndiv = 0;
 	FinalOptimization();
-	WriteTreeFile(besttreefile.c_str());
+	WriteTreeFile(besttreefile.c_str(), -1);
 /*	double imp = 999.9;
 	do{
 		imp = indiv[0].treeStruct->OptimizeAllBranches(optPrecision);
@@ -1460,7 +1459,7 @@ void Population::Run(){
 			if(best_output & WRITE_CONTINUOUS){
 				string outname = besttreefile;
 				outname += ".current";
-				WriteTreeFile( outname.c_str() );
+				WriteTreeFile( outname.c_str(), -1);
 				}
 
 #ifdef SWAP_BASED_TERMINATION
@@ -1850,7 +1849,6 @@ void Population::FinalOptimization(){
 		outman.UserMessage("Proportion of branchlengths that are Synonymous: %.5f", sProps[sProps.size()-1]); 
 		}
 #ifdef PUSH_TO_MIN_BLEN
-	//DEBUG
 	double init = indiv[bestIndiv].treeStruct->lnL;
 	int num = indiv[bestIndiv].treeStruct->PushBranchlengthsToMin();
 	indiv[bestIndiv].treeStruct->Score();
@@ -2109,8 +2107,9 @@ void Population::PerformSearch(){
 			if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
 			Individual *repResult = new Individual(&indiv[bestIndiv]);
 			if(conf->collapseBranches){
+				Individual repResultColl(&indiv[bestIndiv]);
 				int numCollapsed = 0;
-				repResult->treeStruct->root->CollapseMinLengthBranches(numCollapsed);
+				repResultColl.treeStruct->root->CollapseMinLengthBranches(numCollapsed);
 				outman.UserMessage("\nNOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");\
 				if(numCollapsed == 0)
 					outman.UserMessage("    No branches were short enough to be collapsed.");
@@ -2198,15 +2197,15 @@ void Population::PerformSearch(){
 			(prematureTermination == false && (currentSearchRep == conf->searchReps) && (best_output & WRITE_REPSET_TERM)) ||
 			(prematureTermination && (best_output & WRITE_PREMATURE))){
 			if(conf->searchReps > 1 && storedTrees.size() > 0){
-				WriteTreeFile(besttreefile.c_str(), best);
+				WriteTreeFile(besttreefile.c_str(), best, conf->collapseBranches);
 				}
 			//this was also a bug, like the one just below for single rep bootstrap runs.  Collapsed tree was not being written
 			//to file
 			//else WriteTreeFile(besttreefile.c_str());
 			else if(storedTrees.size() == 1)
-				WriteTreeFile(besttreefile.c_str(), 0);
+				WriteTreeFile(besttreefile.c_str(), 0, conf->collapseBranches);
 			else
-				WriteTreeFile(besttreefile.c_str());
+				WriteTreeFile(besttreefile.c_str(), -1, conf->collapseBranches);
 			}
 
 		if(conf->bootstrapReps > 0){
@@ -3199,17 +3198,38 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 
 	if(treeLog.is_open() == false || conf->outputTreelog==false) return;
 
-	Individual *ind;
+	const Individual *ind;
 	int i = (indNum >= 0 ? indNum : bestIndiv);
 
 	ind=&indiv[i];
 
-	if(Tree::outgroup != NULL) OutgroupRoot(ind, i);
+//	if(Tree::outgroup != NULL) 
+//		OutgroupRoot(ind, i);
 
-	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
-	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
-	ind->mod->OutputGarliFormattedModel(treeLog);
-	ind->treeStruct->root->MakeNewick(treeString, false, true);
+	int num = 0;
+	Individual tempInd;
+	const Individual *theInd;
+	if(Tree::outgroup != NULL || conf->collapseBranches){
+		tempInd.DuplicateIndivWithoutCLAs(ind);
+		if(Tree::outgroup != NULL)
+			OutgroupRoot(&tempInd, -1);
+/*		//Can't decide if these should be collapsed or not here.  Thinking no.
+		if(conf->collapseBranches){
+			tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+			outman.UserMessage("%d COLLAPSED", num);
+			}
+*/
+		theInd = &tempInd;
+		}
+	else
+		theInd = ind;
+
+	if(gen == UINT_MAX)
+		treeLog << "  tree final= [&U] [" << theInd->Fitness() << "][ ";
+	else 
+		treeLog << "  tree gen" << gen <<  "= [&U] [" << theInd->Fitness() << "\tmut=" << mutType << "][ ";
+	theInd->mod->OutputGarliFormattedModel(treeLog);
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	treeLog << "]" << treeString << ";" << endl;
 	}
 
@@ -3218,13 +3238,27 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 
 	if(bootLog.is_open() == false) return;
 
-	if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
+	int num = 0;
+	Individual tempInd;
+	const Individual *theInd;
+	if(Tree::outgroup != NULL || conf->collapseBranches){
+		tempInd.DuplicateIndivWithoutCLAs(ind);
+		if(Tree::outgroup != NULL)
+			OutgroupRoot(&tempInd, -1);
+		if(conf->collapseBranches){
+			tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+//			outman.UserMessage("%d COLLAPSED", num);
+			}
+		theInd = &tempInd;
+		}
+	else
+		theInd = ind;
 
-	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << ind->Fitness() << " ";
+	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << theInd->Fitness() << " ";
 
-	ind->mod->OutputGarliFormattedModel(bootLog);
+	theInd->mod->OutputGarliFormattedModel(bootLog);
 
-	ind->treeStruct->root->MakeNewick(treeString, false, true);
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	bootLog << "] " << treeString << ";" << endl;
 
 	if(conf->outputPhylipTree == true){
@@ -3234,6 +3268,7 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 
 bool Population::OutgroupRoot(Individual *ind, int indnum){
 	//if indnum != -1 the individual is in the indiv array, and a few extra things need to be done
+	ind->treeStruct->root->CheckforPolytomies();
 
 	ind->treeStruct->CalcBipartitions(true);
 	Bipartition b = *(Tree::outgroup);
@@ -3247,9 +3282,12 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 		}
 
 	TreeNode *temp = r;
-	while(temp->IsTerminal() == false) temp=temp->left;
-	if(Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal()) r = r->anc;
+	while(temp->IsTerminal() == false) 
+		temp=temp->left;
+	if(Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal()) 
+		r = r->anc;
 	if(r->IsNotRoot()){
+//		outman.UserMessage("REROOTED");
 		ind->treeStruct->RerootHere(r->nodeNum);
 		if(indnum != -1){
 			AssignNewTopology(indiv, indnum);
@@ -3261,7 +3299,7 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 	else return false;
 	}
 
-void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
+void Population::WriteTreeFile( const char* treefname, int indnum, bool collapse /*=false*/ ){
 	int k;
 
 	assert( treefname );
@@ -3270,16 +3308,30 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 
 	//output an individual from the storedTrees if an indnum is passed in
 	//otherwise the best in the population
-	Individual *ind;
+	const Individual *ind;
 	if(indnum == -1){
 		ind = &indiv[bestIndiv];
-		if(Tree::outgroup != NULL) OutgroupRoot(ind, bestIndiv);
 		}
 	else{
 		assert(indnum < storedTrees.size());
 		ind = storedTrees[indnum];
-		if(Tree::outgroup != NULL) OutgroupRoot(ind, -1);
 		}
+
+	int num = 0;
+	Individual tempInd;
+	const Individual *theInd;
+	if(Tree::outgroup != NULL || (conf->collapseBranches && collapse)){
+		tempInd.DuplicateIndivWithoutCLAs(ind);
+		if(Tree::outgroup != NULL)
+			OutgroupRoot(&tempInd, -1);
+		if(conf->collapseBranches && collapse){
+			tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+//			outman.UserMessage("%d COLLAPSED", num);
+			}
+		theInd = &tempInd;
+		}
+	else
+		theInd = ind;
 
 #ifdef INCLUDE_PERTURBATION
 	if(allTimeBest != NULL){
@@ -3298,39 +3350,28 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	outf.precision(8);
 #endif
 	string str;
-	char temp[101];//the max taxon name is 100 (defined as MAX_TAXON_LABEL in datamatr.cpp)
-	str = "#nexus\n\n";
-
-	int ntaxa = data->NTax();
-	str += "begin trees;\ntranslate\n";
-	for(k=0;k<ntaxa;k++){
-		NxsString tnstr = data->TaxonLabel(k);
-		tnstr.BlanksToUnderscores();
-		sprintf(temp, " %d %s", k+1, tnstr.c_str());
-		str += temp;
-		if(k < ntaxa-1)
-			str += ",\n";
-		}
-
-	str += ";\n";
+	char temp[101];
+	data->BeginNexusTreesBlock(outf);
 	if(prematureTermination == true){
 		if(indnum == -1)
 			str += "[NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!]\n";
 		else
 			str += "[NOTE: GARLI Run was terminated before full completion!  This is the best tree from a completed replicate.]\n";
 		}
-	if(indnum == -1) sprintf(temp, "tree best = [&U][!GarliScore %f][!GarliModel ", ind->Fitness());
-	else sprintf(temp, "tree bestREP%d = [&U][!GarliScore %f][!GarliModel ", indnum+1, ind->Fitness());
+	if(indnum == -1) 
+		sprintf(temp, "tree best = [&U][!GarliScore %f][!GarliModel ", theInd->Fitness());
+	else 
+		sprintf(temp, "tree bestREP%d = [&U][!GarliScore %f][!GarliModel ", indnum+1, theInd->Fitness());
 	str += temp;
 	string modstr;
-	ind->mod->FillGarliFormattedModelString(modstr);
+	theInd->mod->FillGarliFormattedModelString(modstr);
 	str += modstr;
 	str += "]";
 
 #ifdef BOINC
 	const char *s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
-	ind->treeStruct->root->MakeNewick(treeString, false, true);
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	size_t len = strlen(treeString);
 	outf.write(treeString, sizeof(char), len);
 	str = ";\nend;\n";
@@ -3340,14 +3381,14 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	outf << str;
 	outf.setf( ios::floatfield, ios::fixed );
 	outf.setf( ios::showpoint );
-	ind->treeStruct->root->MakeNewick(treeString, false, true);
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	outf << treeString << ";\n";
 	outf << "end;\n";
 #endif
 	//add a paup block setting the model params
 	str = "";
 	if(modSpec.IsNucleotide()){
-		ind->mod->FillPaupBlockStringForModel(str, filename.c_str());
+		theInd->mod->FillPaupBlockStringForModel(str, filename.c_str());
 		}
 #ifdef BOINC
 	s = str.c_str();
@@ -3372,12 +3413,6 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 		WritePhylipTree(phytree);
 		phytree.close();
 		}
-
-//if using the UD serial version, just output the best tree in phylip format, with it's score before it
-/*	best->treeStruct->root->MakeNewick(treeString, false);
-	outf << best->treeStruct->lnL << "\t" << best->kappa << "\t" << treeString << ";";
-	outf.close();
-*/
 	}
 
 void Population::WriteStoredTrees( const char* treefname ){
@@ -3389,20 +3424,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 	ofstream outf( name.c_str() );
 	outf.precision(8);
 
-	outf << "#nexus" << endl << endl;
-
-	int ntaxa = data->NTax();
-	outf << "begin trees;\ntranslate\n";
-	for(int k=0;k<ntaxa;k++){
-		outf << "  " << (k+1);
-		NxsString tnstr = data->TaxonLabel(k);
-		tnstr.BlanksToUnderscores();
-		outf << "  " << tnstr.c_str();
-		if(k < ntaxa-1)
-			outf << ",\n";
-		}
-
-	outf << ";\n";
+	data->BeginNexusTreesBlock(outf);
 
 	ofstream phytree;
 	if(conf->outputPhylipTree){
@@ -3413,15 +3435,53 @@ void Population::WriteStoredTrees( const char* treefname ){
 		}
 
 	int bestRep = EvaluateStoredTrees(false);
+	
+	Individual tempInd;
 	for(unsigned r=0;r<storedTrees.size();r++){
-		if(r == bestRep) outf << "tree rep" << r+1 << "BEST = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
-		else outf << "tree rep" << r+1 << " = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
+		const Individual *curInd;
+		if(Tree::outgroup != NULL || conf->collapseBranches){
+			tempInd.DuplicateIndivWithoutCLAs(storedTrees[r]);
+			if(Tree::outgroup != NULL)
+				OutgroupRoot(&tempInd, -1);
+			if(conf->collapseBranches){
+				int num = 0;
+				tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+//				outman.UserMessage("%d COLLAPSED", num);
+				}
+			curInd = &tempInd;
+			}
+		else
+			curInd = storedTrees[r];
+		if(r == bestRep) 
+			outf << "tree rep" << r+1 << "BEST = [&U][!GarliScore " << curInd->Fitness() << "][!GarliModel ";
+		else 
+			outf << "tree rep" << r+1 << " = [&U][!GarliScore " << curInd->Fitness() << "][!GarliModel ";
+		curInd->mod->OutputGarliFormattedModel(outf);
+		outf << "]";
+
+		outf.setf( ios::floatfield, ios::fixed );
+		outf.setf( ios::showpoint );
+		curInd->treeStruct->root->MakeNewick(treeString, false, true);
+		outf << treeString << ";\n";
+
+		if(conf->outputPhylipTree){//output a phylip formatted tree if requested
+			WritePhylipTree(phytree);
+			}
+		}
+
+/*
+	for(unsigned r=0;r<storedTrees.size();r++){
+		if(r == bestRep) 
+			outf << "tree rep" << r+1 << "BEST = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
+		else 
+			outf << "tree rep" << r+1 << " = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
 		storedTrees[r]->mod->OutputGarliFormattedModel(outf);
 		outf << "]";
 
 		outf.setf( ios::floatfield, ios::fixed );
 		outf.setf( ios::showpoint );
-		if(Tree::outgroup != NULL) OutgroupRoot(storedTrees[r], -1);
+		if(Tree::outgroup != NULL) 
+			OutgroupRoot(storedTrees[r], -1);
 		storedTrees[r]->treeStruct->root->MakeNewick(treeString, false, true);
 		outf << treeString << ";\n";
 
@@ -3429,6 +3489,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 			WritePhylipTree(phytree);
 			}
 		}
+*/
 	outf << "end;\n";
 	if(modSpec.IsNucleotide()){
 		//add a paup block setting the model params
