@@ -406,32 +406,31 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		outman.UserMessageNoCR(" %d ", i+1);
 		outman.flush();
 		//when we've added half the taxa optimize alpha, flex or omega 
-		if(i == (n/2) && (modSpec.IsCodon() || mod->NRateCats() > 1) && modSpec.fixAlpha == false){
-			FLOAT_TYPE rateOptImprove = 0.0;
-			if(modSpec.IsCodon())//optimize omega even if there is only 1
-				rateOptImprove = scratchT->OptimizeOmegaParameters(optPrecision);
-			else if(mod->NRateCats() > 1){
-				if(modSpec.IsFlexRateHet()){//Flex rates
-					rateOptImprove = ZERO_POINT_ZERO;
-					//for the first pass, use gamma to get in the right ballpark
-					//rateOptImprove = scratchT->OptimizeAlpha(optPrecision);
-					rateOptImprove = treeStruct->OptimizeBoundedParameter(optPrecision, mod->Alpha(), 0, 0.1, 999.9, &Model::SetAlpha);
-					rateOptImprove += scratchT->OptimizeFlexRates(optPrecision);
+		if(i == (n/2)){
+			if((modSpec.IsCodon() || mod->NRateCats() > 1) && modSpec.fixAlpha == false){
+				FLOAT_TYPE rateOptImprove = 0.0;
+				if(modSpec.IsCodon())//optimize omega even if there is only 1
+					rateOptImprove = scratchT->OptimizeOmegaParameters(optPrecision);
+				else if(mod->NRateCats() > 1){
+					if(modSpec.IsFlexRateHet()){//Flex rates
+						rateOptImprove = ZERO_POINT_ZERO;
+						//for the first pass, use gamma to get in the right ballpark
+						//rateOptImprove = scratchT->OptimizeAlpha(optPrecision);
+						rateOptImprove = treeStruct->OptimizeBoundedParameter(optPrecision, mod->Alpha(), 0, 0.1, 999.9, &Model::SetAlpha);
+						rateOptImprove += scratchT->OptimizeFlexRates(optPrecision);
+						}
+					else if(modSpec.fixAlpha == false){//normal gamma
+						//rateOptImprove = scratchT->OptimizeAlpha(optPrecision);
+						rateOptImprove = treeStruct->OptimizeBoundedParameter(optPrecision, mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
+						}
 					}
-				else if(modSpec.fixAlpha == false){//normal gamma
-					//rateOptImprove = scratchT->OptimizeAlpha(optPrecision);
-					rateOptImprove = treeStruct->OptimizeBoundedParameter(optPrecision, mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
-					}
+				outman.UserMessage("\nOptimizing parameters... improved %f lnL", rateOptImprove);
 				}
-			outman.UserMessage("\nOptimizing parameters... improved %f lnL", rateOptImprove);
-		//	this used to depend on param improvement - not sure why
-		//	if(rateOptImprove > 0.0){
-				scratchT->Score();
-				FLOAT_TYPE start=scratchT->lnL;
-				scratchT->OptimizeAllBranches(optPrecision);
-				FLOAT_TYPE bimprove = scratchT->lnL - start;
-				outman.UserMessage("\nOptimizing branchlengths... improved %f lnL", bimprove);
-	//			}
+			scratchT->Score();
+			FLOAT_TYPE start=scratchT->lnL;
+			scratchT->OptimizeAllBranches(optPrecision);
+			FLOAT_TYPE bimprove = scratchT->lnL - start;
+			outman.UserMessage("\nOptimizing branchlengths... improved %f lnL", bimprove);
 			}
 		}		
 
