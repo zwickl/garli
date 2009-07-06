@@ -1427,12 +1427,25 @@ void Population::Run(){
 	CalcAverageFitness();
 
 	outman.precision(6);
+
+	outman.UserMessageNoCR("%-8s %-14s %-8s  %-14s ", "gen", "current_lnL", "precision", "last_tree_imp");
 #ifdef SWAP_BASED_TERMINATION
-	outman.UserMessage("%-10s%-15s%-10s%-15s%-15s", "gen", "current_lnL", "precision", "last_tree_imp", "swaps_on_cur");
-#else
-	outman.UserMessage("%-10s%-15s%-10s%-15s", "gen", "current_lnL", "precision", "last_tree_imp");
+	outman.UserMessageNoCR("%-14s ", "swaps_on_cur");
 #endif
-	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+#ifdef OUTPUT_PROP_DONE
+	outman.UserMessageNoCR("%-14s ", "prop_done");
+#endif
+	outman.UserMessage("");
+
+	outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+#ifdef SWAP_BASED_TERMINATION
+	outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
+#endif
+#ifdef OUTPUT_PROP_DONE
+	outman.UserMessageNoCR("%11.0f%% ", tot_fraction_done * 100);
+#endif
+	outman.UserMessage("");
+
 	OutputLog();
 	if(conf->outputMostlyUselessFiles) OutputFate();
 
@@ -1462,11 +1475,14 @@ void Population::Run(){
 				WriteTreeFile( outname.c_str(), -1);
 				}
 
+			outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
 #ifdef SWAP_BASED_TERMINATION
-			outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove, indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
-#else
-			outman.UserMessage("%-10d%-15.4f%-10.3f%-8d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+			outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
 #endif
+#ifdef OUTPUT_PROP_DONE
+			outman.UserMessageNoCR("%11.0f%% ", tot_fraction_done * 100);
+#endif
+			outman.UserMessage("");
 
 			if(conf->outputMostlyUselessFiles){
 #ifdef DETAILED_SWAP_REPORT
@@ -1629,7 +1645,8 @@ void Population::UpdateFractionDone(){
 
 	bool willReduce = (FloatingPointEquals(adap->startOptPrecision, adap->minOptPrecision, 1e-6) == false) 
 		&& (adap->numPrecReductions > 0);
-	int reduction_number = willReduce ? (adap->startOptPrecision - adap->branchOptPrecision) / adap->precReductionFactor : 0;
+	//the 0.45 here is for rounding purposes.  Don't want to round down if precReductionFactor ends up being slightly more than the diff due to floating point rep
+	int reduction_number = willReduce ? (int) (0.45 + ((adap->startOptPrecision - adap->branchOptPrecision) / adap->precReductionFactor)) : 0;
 	int remaining_reductions = willReduce ? adap->numPrecReductions - reduction_number : 0;
 	
 	FLOAT_TYPE minFract = min(current_fract, max((double) stopwatch.SplitTime() / conf->stoptime, (double) gen / conf->stopgen));
