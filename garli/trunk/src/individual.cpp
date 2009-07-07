@@ -661,7 +661,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	if(optModel){
 		if(modSpec.IsCodon())
 			optOmega = true;
-		if(modSpec.numRateCats > 1){
+		else if(modSpec.numRateCats > 1){
 			if(modSpec.IsFlexRateHet())
 				optFlex = true;
 			else 
