@@ -38,7 +38,7 @@
 #include "adaptation.h"
 #include "sequencedata.h"
 #include "garlireader.h"
-
+ 
 #include "funcs.h"
 #include "mpifuncs.h"
 #include "hashdefines.h"
