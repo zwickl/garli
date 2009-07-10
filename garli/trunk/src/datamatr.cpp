@@ -556,6 +556,7 @@ void DataMatrix::BeginNexusTreesBlock(ofstream &treeout) const{
 		else
 			treeout << ",\n";
 		}
+	treeout.flush();
 	}
 
 //
