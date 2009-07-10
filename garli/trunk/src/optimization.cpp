@@ -110,14 +110,12 @@ int Tree::PushBranchlengthsToMin(){
 	int num = 0;
 	pair<FLOAT_TYPE, FLOAT_TYPE> derivs;
 	for(int i=1;i < numNodesTotal;i++){
-		if(allNodes[i]->dlen < 2.0e-4 && !(FloatingPointEquals(allNodes[i]->dlen, min_brlen, 1e-9))){
+		if(allNodes[i]->dlen < 1.0e-4 && !(FloatingPointEquals(allNodes[i]->dlen, min_brlen, 1e-9))){
 			derivs = CalcDerivativesRateHet(allNodes[i]->anc, allNodes[i]);
 			if(derivs.first < ZERO_POINT_ZERO){
 				outman.UserMessage("(branch %d: %.9f -> %.9f", i, allNodes[i]->dlen, 1e-8);
 				SetBranchLength(allNodes[i], min_brlen);
 				num++;
-//				if(num == 1) 
-//					MakeAllNodesDirty();
 				}
 			else
 				outman.UserMessage("pos d1\t%.9f\t%.9f", allNodes[i]->dlen, derivs.first);
