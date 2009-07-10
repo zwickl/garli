@@ -559,9 +559,16 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 			}while(c != '\n' && c!= '\r' && stf.eof() == false);
 		while((stf.peek() == '\n' || stf.peek() == '\r') && stf.eof() == false) stf.get(c);
 
+		//the call to the tree constructor can change the seed because random branch lengths are generated when the tree doesn't
+		//have them.  So, store and restore the seed, mainly for output purposes (the seed output to the screen happens after this
+		//call
+		int seed = rnd.seed();
+
 		//now allowing polytomies, since they will be taken care of in Population::SeedPopulationWithStartingTree
 		treeStruct=new Tree(treeString.c_str(), numericalTaxa, true);
 		//treeStruct=new Tree(treeString.c_str(), numericalTaxa);
+
+		rnd.set_seed(seed);
 
 		//check that any defined constraints are present in the starting tree
 		int conNum=1;
@@ -625,6 +632,11 @@ void Individual::GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int ran
 
 	int effectiveRank = rank % totalTrees;
 	
+	//the call to the tree constructor can change the seed because random branch lengths are generated when the tree doesn't
+	//have them.  So, store and restore the seed, mainly for output purposes (the seed output to the screen happens after this
+	//call
+	int seed = rnd.seed();
+
 	//we will get the tree string from NCL with taxon numbers (starting at 1), regardless of how it was initially read in 
 	const NxsFullTreeDescription &t = treesblock->GetFullTreeDescription(effectiveRank);
 	if(t.AllTaxaAreIncluded() == false)
@@ -632,6 +644,8 @@ void Individual::GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int ran
 	string ts = t.GetNewick();
 	ts += ";";
 	treeStruct=new Tree(ts.c_str(), true, true);
+
+	rnd.set_seed(seed);
 
 	//check that any defined constraints are present in the starting tree
 	int conNum=1;
