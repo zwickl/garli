@@ -1012,7 +1012,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 #else
 	Tree::expectedPrecision = pow(10.0, - (double) ((int) DBL_DIG - ceil(log10(-indiv[0].Fitness()))));
 #endif
-	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
+//	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	if(indiv[0].mod->NumMutatableParams() == 0) {
@@ -1535,6 +1535,14 @@ void Population::Run(){
 					outman.UserMessage("\t\t\toptimizing omega parameters:%.4f -> %.4f", before, bestFitness);
 					}
 
+				before = bestFitness;
+				if(modSpec.IsFlexRateHet() && !(FloatingPointEquals(adap->modWeight, ZERO_POINT_ZERO, 1e-8))) {
+					indiv[bestIndiv].treeStruct->OptimizeFlexRates(adap->branchOptPrecision);
+					indiv[bestIndiv].SetDirty();	
+					CalcAverageFitness();
+					outman.UserMessage("\t\t\toptimizing flex rates:%.4f -> %.4f", before, bestFitness);
+					}
+
 /*				if(modSpec.IsCodon()){
 					before=bestFitness;
 					indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
@@ -1838,7 +1846,7 @@ void Population::FinalOptimization(){
 		assert(trueImprove >= -1.0e-4);
 
 		//sprintf(temp, "(branch=%4.4f true=%4.4f prec=%.4f pprec=%.4f", incr, trueImprove, precThisPass, paramPrecThisPass);
-		sprintf(temp, "(branch=%4.4f", trueImprove);
+		sprintf(temp, "(branch= %4.4f", trueImprove);
 		outString = temp;
 
 		indiv[bestIndiv].CalcFitness(0);
@@ -1848,7 +1856,7 @@ void Population::FinalOptimization(){
 			if(optOmega) {
 				paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
 				//outman.UserMessage("Omega optimization: %f", paramOpt);
-				sprintf(temp, " omega=%4.4f", paramOpt);
+				sprintf(temp, "  omega= %4.4f", paramOpt);
 				outString += temp;
 				incr += paramOpt;
 				}
@@ -1857,28 +1865,34 @@ void Population::FinalOptimization(){
 				if(optFreqs){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
 					//outman.UserMessage("Equil freqs optimization: %f", paramOpt);
-					sprintf(temp, " freqs=%4.4f", paramOpt);
+					sprintf(temp, "  equil freqs= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
 				if(optRelRates){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
 					//outman.UserMessage("Rel rates optimization: %f", paramOpt);
-					sprintf(temp, " rel rates=%4.4f", paramOpt);
+					sprintf(temp, "  rel rates= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
 				if(optPinv){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
 					//outman.UserMessage("Pinv optimization: %f", paramOpt);
-					sprintf(temp, " pinv=%4.4f", paramOpt);
+					sprintf(temp, "  pinv= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
 				if(optAlpha){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 					//outman.UserMessage("Alpha optimization: %f", paramOpt);
-					sprintf(temp, " alpha=%4.4f", paramOpt);
+					sprintf(temp, "  alpha= %4.4f", paramOpt);
+					outString += temp;
+					incr += paramOpt;
+					}
+				if(optFlex){
+					paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
+					sprintf(temp, "  flex rates= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
