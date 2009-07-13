@@ -91,6 +91,18 @@ void OutputImportantDefines(){
 #else
 	outman.UserMessage("ADAPTIVE_BOUNDED_OPT = no");
 #endif
+
+#ifdef PUSH_TO_MIN_BLEN
+	outman.UserMessage("PUSH_TO_MIN_BLEN = yes");
+#else
+	outman.UserMessage("PUSH_TO_MIN_BLEN = no");
+#endif
+
+#ifdef DEBUG_MESSAGES
+	outman.UserMessage("DEBUG_MESSAGES = yes");
+#else
+	outman.UserMessage("DEBUG_MESSAGES = no");
+#endif
 	outman.UserMessage("#####\n");
 	}
 
