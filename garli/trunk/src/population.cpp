@@ -1746,108 +1746,147 @@ void Population::FinalOptimization(){
 	FLOAT_TYPE paramPrecThisPass = max(adap->branchOptPrecision*0.1, 0.01);
 	bool optAnyModel = FloatingPointEquals(conf->modWeight, ZERO_POINT_ZERO, 1e-8) == false;
 
+	bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates;
+	optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = false;
 	if(optAnyModel){
+		if(modSpec.IsCodon())
+			optOmega = true;
+		else if(modSpec.numRateCats > 1){
+			if(modSpec.IsFlexRateHet())
+				optFlex = true;
+			else 
+				optAlpha = true;
+			}
+		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites)
+			optPinv = true;
+#ifdef MORE_DETERM_PARAM_OPT
+		if(modSpec.IsCodon() == false && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false)
+			optFreqs = true;
+		//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
+		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
+			optFreqs = true;
+		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+			optRelRates = true;
+#endif
+		}
+
+	//there isn't any point of this separate initial opt anymore, since I'm doing param opt on every pass below anyway
+	//if(optAnyModel){
+	if(0){
 		do{
 			paramOpt = ZERO_POINT_ZERO;
-			if(modSpec.IsFlexRateHet()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
-			else if(modSpec.IsCodon()) paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
+			if(optFlex) 
+				paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
+			if(optOmega) 
+				paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
 			paramTot += paramOpt;
-#ifdef MORE_DETERM_PARAM_OPT
-			if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false){
+
+			if(optFreqs){
 				double tempTot = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
 				paramOpt += tempTot;
 				freqOptImprove += tempTot;
 				}
-			//codon frequency ML estimation - it is something of a hack and requires simultaneous empirical and unfixed freqs
-			if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true){
-				double tempTot = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
-				paramOpt += tempTot;
-				freqOptImprove += tempTot;
-				}
-			if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
+			if(optRelRates){
 				double tempTot = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
 				paramOpt += tempTot;
 				nucRateOptImprove += tempTot;
 				}
-			if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false){
+			if(optPinv){
 				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 0.0, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
 				paramOpt += tempTot;
 				pinvOptImprove += tempTot;
 				}
-			if(indiv[bestIndiv].treeStruct->mod->NRateCats() > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false){
+			if(optAlpha){
 				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, min(0.05, indiv[bestIndiv].treeStruct->mod->Alpha()), max(999.9, indiv[bestIndiv].treeStruct->mod->Alpha()), &Model::SetAlpha);
 				paramOpt += tempTot;
 				alphaOptImprove += tempTot;
 				}
-#endif
 			}while(paramOpt > 1.0e-2);
-
-		if(modSpec.IsFlexRateHet()){
-			outman.UserMessage("Flex optimization: %f", paramTot);
+/*
+		if(optFlex){
+			outman.UserMessage("Flex optimization: %.4f", paramTot);
 			}
-		else if(modSpec.IsCodon()){
-			outman.UserMessage("Omega optimization: %f", paramTot);
+		else if(optOmega){
+			outman.UserMessage("Omega optimization: %f.4", paramTot);
 			}
-#ifdef MORE_DETERM_PARAM_OPT
-		if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false)
-			outman.UserMessage("Equil freqs optimization: %f", freqOptImprove);
-		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
-			outman.UserMessage("Codon freqs optimization: %f", freqOptImprove);
-		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
-			outman.UserMessage("Rel rates optimization: %f", nucRateOptImprove);
-		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false)
-			outman.UserMessage("Pinv optimization: %f", pinvOptImprove);
-		if(indiv[bestIndiv].treeStruct->mod->NRateCats() > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false)
-			outman.UserMessage("Alpha optimization: %f", alphaOptImprove);
-#endif
+		if(optFreqs){
+			outman.UserMessage("Equil freqs optimization: %.4f", freqOptImprove);
+			}
+		if(optRelRates)
+			outman.UserMessage("Rel rates optimization: %.4f", nucRateOptImprove);
+		if(optPinv)
+			outman.UserMessage("Pinv optimization: %.4f", pinvOptImprove);
+		if(optAlpha)
+			outman.UserMessage("Alpha optimization: %.4f", alphaOptImprove);
+*/
+		outman.UserMessage("Initial parameter optimization: %.4f", paramOpt);
 		}
 	do{
 		precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
 		paramPrecThisPass = max(precThisPass, 1e-4);
 
+		string outString;
+		char temp[50];
+		FLOAT_TYPE passStart=indiv[bestIndiv].Fitness();
+
+		//remember that what is returned from OptAllBranches isn't the true increase in score, just an estimate
 		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
+		indiv[bestIndiv].CalcFitness(0);
+
+		FLOAT_TYPE trueImprove= indiv[bestIndiv].Fitness() - passStart;
+		incr = trueImprove;
+		assert(trueImprove >= -1.0e-4);
+
+		//sprintf(temp, "(branch=%4.4f true=%4.4f prec=%.4f pprec=%.4f", incr, trueImprove, precThisPass, paramPrecThisPass);
+		sprintf(temp, "(branch=%4.4f", trueImprove);
+		outString = temp;
 
 		indiv[bestIndiv].CalcFitness(0);
-		outman.UserMessage("\tpass %d %.4f", pass++, indiv[bestIndiv].Fitness());
-		//optimize omega more often, since it can be very strongly correlated with blens
+//		outman.UserMessage("\tpass %d %.4f", pass++, indiv[bestIndiv].Fitness());
 		if(optAnyModel){
-			if(modSpec.IsCodon() && pass % 2 == 0) {
+			//if(optOmega && pass % 2 == 0) {
+			if(optOmega) {
 				paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
-				outman.UserMessage("Omega optimization: %f", paramOpt);
+				//outman.UserMessage("Omega optimization: %f", paramOpt);
+				sprintf(temp, " omega=%4.4f", paramOpt);
+				outString += temp;
 				incr += paramOpt;
 				}
-#ifdef MORE_DETERM_PARAM_OPT
-			if((pass + 1) % 2 == 0) {
-				if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false && modSpec.IsCodon() == false){
+			//if((pass + 1) % 2 == 0) {
+			if(1){
+				if(optFreqs){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
-					outman.UserMessage("Equil freqs optimization: %f", paramOpt);
+					//outman.UserMessage("Equil freqs optimization: %f", paramOpt);
+					sprintf(temp, " freqs=%4.4f", paramOpt);
+					outString += temp;
 					incr += paramOpt;
 					}
-				//codon frequency ML estimation - it is something of a hack and requires simultaneous empirical and unfixed freqs
-				if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true){
-					paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
-					outman.UserMessage("Codon freqs optimization: %f", paramOpt);
-					incr += paramOpt;
-					}
-				if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false){
+				if(optRelRates){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
-					outman.UserMessage("Rel rates optimization: %f", paramOpt);
+					//outman.UserMessage("Rel rates optimization: %f", paramOpt);
+					sprintf(temp, " rel rates=%4.4f", paramOpt);
+					outString += temp;
 					incr += paramOpt;
 					}
-				if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites && modSpec.IsCodon() == false){
+				if(optPinv){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
-					outman.UserMessage("Pinv optimization: %f", paramOpt);
+					//outman.UserMessage("Pinv optimization: %f", paramOpt);
+					sprintf(temp, " pinv=%4.4f", paramOpt);
+					outString += temp;
 					incr += paramOpt;
 					}
-				if(indiv[bestIndiv].treeStruct->mod->NRateCats() > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false){
+				if(optAlpha){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
-					outman.UserMessage("Alpha optimization: %f", paramOpt);
+					//outman.UserMessage("Alpha optimization: %f", paramOpt);
+					sprintf(temp, " alpha=%4.4f", paramOpt);
+					outString += temp;
 					incr += paramOpt;
 					}
 				}
-#endif
 			}
-		}while(incr > 1.0e-5 || pass < 10);
+		outString += ")";
+		outman.UserMessage("pass %-2d: %.4f %s", pass++, indiv[bestIndiv].Fitness(), outString.c_str());
+		}while(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass < 10);
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	unsigned totalSecs = stopwatch.SplitTime();
 	unsigned secs = totalSecs % 60;
