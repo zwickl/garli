@@ -1453,11 +1453,10 @@ void Population::Run(){
 	CatchInterrupt();
 #endif
 
-	if(gen == 0) rep_fraction_done = 0.01;
+	if(gen == 0) 
+		rep_fraction_done = 0.01;
 	gen++;
-	UpdateFractionDone();
 	for (; gen < conf->stopgen+1; ++gen){
-
 		NextGeneration();
 #ifdef SWAP_BASED_TERMINATION
 		if(uniqueSwapTried){
@@ -1546,6 +1545,9 @@ void Population::Run(){
 */				}
 
 			UpdateFractionDone();
+#ifdef BOINC
+			boinc_fraction_done(tot_fraction_done);
+#endif
 
 /*			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
 				FLOAT_TYPE before=bestFitness;
@@ -1705,9 +1707,6 @@ void Population::UpdateFractionDone(){
 	assert(t_fraction_done >= tot_fraction_done);
 	tot_fraction_done = t_fraction_done;
 	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
-#ifdef BOINC
-	boinc_fraction_done(tot_fraction_done);
-#endif
 	}
 
 void Population::FinalOptimization(){
@@ -1725,10 +1724,12 @@ void Population::FinalOptimization(){
 		}
 #endif
 
-	for(unsigned i=0;i<total_size;i++){
+	//This was a little dangerous since any subsequent scoring of any of the trees would cause problems
+	//probably not that important anyway.
+/*	for(unsigned i=0;i<total_size;i++){
 		if(i != bestIndiv) indiv[i].treeStruct->RemoveTreeFromAllClas();
 		}
-
+*/
 	outman.UserMessage("Performing final optimizations...");
 #ifdef MAC_FRONTEND
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -1873,7 +1874,8 @@ void Population::FinalOptimization(){
 	double imp=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
 	indiv[bestIndiv].treeStruct->Score();
 	double fin = indiv[bestIndiv].treeStruct->lnL;
-	outman.UserMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
+	indiv[bestIndiv].CalcFitness(0);
+	outman.DebugMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
 #endif
 
 #ifdef MAC_FRONTEND
