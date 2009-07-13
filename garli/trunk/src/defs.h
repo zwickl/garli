@@ -66,6 +66,11 @@
 #undef MONITORING_ALLOCATION
 #include "memchk.h"
 
+//7-09 A few newer features that aren't 100% tested to my satisfaction   
+#define ADAPTIVE_BOUNDED_OPT
+#define MORE_DETERM_PARAM_OPT
+#define PUSH_TO_MIN_BLEN
+
 #define CONSTRAINTS
 #define STOCHASTIC_STARTING_BLENS
 #undef IGNORE_SMALL_TOPO_IMP
