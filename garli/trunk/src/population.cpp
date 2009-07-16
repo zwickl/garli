@@ -1850,7 +1850,7 @@ void Population::FinalOptimization(){
 		outString = temp;
 
 		indiv[bestIndiv].CalcFitness(0);
-//		outman.UserMessage("\tpass %d %.4f", pass++, indiv[bestIndiv].Fitness());
+
 		if(optAnyModel){
 			//if(optOmega && pass % 2 == 0) {
 			if(optOmega) {
@@ -1862,27 +1862,6 @@ void Population::FinalOptimization(){
 				}
 			//if((pass + 1) % 2 == 0) {
 			if(1){
-				if(optFreqs){
-					paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
-					//outman.UserMessage("Equil freqs optimization: %f", paramOpt);
-					sprintf(temp, "  equil freqs= %4.4f", paramOpt);
-					outString += temp;
-					incr += paramOpt;
-					}
-				if(optRelRates){
-					paramOpt = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
-					//outman.UserMessage("Rel rates optimization: %f", paramOpt);
-					sprintf(temp, "  rel rates= %4.4f", paramOpt);
-					outString += temp;
-					incr += paramOpt;
-					}
-				if(optPinv){
-					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
-					//outman.UserMessage("Pinv optimization: %f", paramOpt);
-					sprintf(temp, "  pinv= %4.4f", paramOpt);
-					outString += temp;
-					incr += paramOpt;
-					}
 				if(optAlpha){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 					//outman.UserMessage("Alpha optimization: %f", paramOpt);
@@ -1895,6 +1874,27 @@ void Population::FinalOptimization(){
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
 					paramOpt += indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
 					sprintf(temp, "  flex rates= %4.4f", paramOpt);
+					outString += temp;
+					incr += paramOpt;
+					}
+				if(optPinv){
+					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
+					//outman.UserMessage("Pinv optimization: %f", paramOpt);
+					sprintf(temp, "  pinv= %4.4f", paramOpt);
+					outString += temp;
+					incr += paramOpt;
+					}
+				if(optFreqs){
+					paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
+					//outman.UserMessage("Equil freqs optimization: %f", paramOpt);
+					sprintf(temp, "  equil freqs= %4.4f", paramOpt);
+					outString += temp;
+					incr += paramOpt;
+					}
+				if(optRelRates){
+					paramOpt = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
+					//outman.UserMessage("Rel rates optimization: %f", paramOpt);
+					sprintf(temp, "  rel rates= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
@@ -2022,6 +2022,21 @@ int Population::EvaluateStoredTrees(bool report){
 			if(r2 < r) outman.UserMessage(" (same topology as %d)", r2+1);
 			else outman.UserMessage("");
 			}
+
+		outman.UserMessage("\nParameter estimates across search replicates:");
+			if(storedTrees[0]->mod->paramsToMutate.size() > 0){
+				string s;
+				storedTrees[0]->mod->FillModelOrHeaderStringForTable(s, false);
+				outman.UserMessage("       %s", s.c_str());
+				for(unsigned i=0;i<storedTrees.size();i++){
+					storedTrees[i]->mod->FillModelOrHeaderStringForTable(s, true);
+					outman.UserMessage("rep%2d: %s", i+1, s.c_str());
+					}
+				}
+			else{
+				outman.UserMessage("\t Model contains no estimated parameters");
+				}
+
 		if(conf->bootstrapReps == 0){
 			outman.UserMessage("Final result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
 			outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
