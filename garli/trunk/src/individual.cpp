@@ -678,7 +678,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		else if(modSpec.numRateCats > 1){
 			if(modSpec.IsFlexRateHet())
 				optFlex = true;
-			else 
+			else if(modSpec.fixAlpha == false)
 				optAlpha = true;
 			}
 		if(modSpec.includeInvariantSites && !modSpec.fixInvariantSites)
