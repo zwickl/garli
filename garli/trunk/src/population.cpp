@@ -1831,7 +1831,7 @@ void Population::FinalOptimization(){
 		}
 	do{
 		precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
-		paramPrecThisPass = max(precThisPass, 1e-4);
+		paramPrecThisPass = max(precThisPass, 1e-5);
 
 		string outString;
 		char temp[50];
@@ -1891,7 +1891,9 @@ void Population::FinalOptimization(){
 					incr += paramOpt;
 					}
 				if(optFlex){
+					//Flex opt is tough, give it two passes
 					paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
+					paramOpt += indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
 					sprintf(temp, "  flex rates= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;

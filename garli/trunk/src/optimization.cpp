@@ -493,36 +493,52 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 #ifdef SINGLE_PRECISION_FLOATS
 	FLOAT_TYPE baseIncr = max(0.001*optPrecision, 0.005f);
 #else
-	FLOAT_TYPE baseIncr = 0.0001*optPrecision;
+	FLOAT_TYPE baseIncr = max(0.001*optPrecision, 1.0e-6);
 #endif
+	FLOAT_TYPE incrLimit;
+	bool limited = false;
 	while(1){
 		//baseIncr will be a sort of ideal increment, but it may be limited because of closeness
 		//to a min or max bracket
-		incr=min(baseIncr, min(prevVal - lowerBracket, upperBracket - prevVal));
+		incrLimit = min(prevVal - lowerBracket, upperBracket - prevVal);
+		incr = baseIncr;
+		if(incr > incrLimit){
+			incr = incrLimit;
+			limited = true;
+			}
 		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal+incr);
 		MakeAllNodesDirty();
 		Score();
 
 #ifdef ADAPTIVE_BOUNDED_OPT
 		bool cont = false;
-		//check the incr on the first pass, but only if it wasn't already limited by a bracket
-		while(pass == 0 && !cont && FloatingPointEquals(incr, baseIncr, 1e-5)){
-			//we want differences in likelihood of greater than 8 orders of magnitude
-			//less than the total likelihoods, or 5 orders in single precision
+		//There are a few things that could happen here
+		//1. The incr has already be limited by closeness to a bound above - move on
+		//2. Test lnL diffs.  
+		//	2a. The difference in lnLs values is sufficiently large for accurate derivatives - move on
+		//	2b. The difference in lnLs is not sufficient - increase incr
+		//		2b1. The increased incr is still within any bounds - go bck to 2
+		//		2b2. The increased incr is greater than allowed by one bound.  Limit it and break.
+		while(pass == 0 && !cont && !limited){
+			//we want differences in likelihood of greater than 10 orders of magnitude
+			//less than the total likelihoods (this is plenty safe), or 5 orders in single 
+			//precision (this is not good, and will mean that SP optimization can't be as
+			//rigorous)
 #ifdef SINGLE_PRECISION_FLOATS
 			if(log10(-prev / fabs(prev - lnL)) > 5.0){
 #else
-			if(log10(-prev / fabs(prev - lnL)) > 8.0){
+			if(log10(-prev / fabs(prev - lnL)) > 10.0){
 #endif
 				baseIncr *= 5.0;
 				//if the increased increment would be greater than what we are allowed
 				//by our bound we'll have to use the limited incr.  We'll try the increased baseIncr
 				//on the next pass.
-				if(baseIncr > min(prevVal - lowerBracket, upperBracket - prevVal)){
-					incr = min(prevVal - lowerBracket, upperBracket - prevVal);
+				if(baseIncr > incrLimit){
+					incr = incrLimit;
 					cont = true;
 					}
-				else incr = baseIncr;
+				else 
+					incr = baseIncr;
 				//apply the new increment
 				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal+incr);
 				MakeAllNodesDirty();
