@@ -800,6 +800,7 @@ class Model{
 	void OutputBinaryFormattedModel(OUTPUT_CLASS &) const;
 	void ReadGarliFormattedModelString(string &);
 	void OutputHumanReadableModelReportWithParams() const;
+	void FillModelOrHeaderStringForTable(string &s, bool m) const;
 
 	void ReadBinaryFormattedModel(FILE *);
 	static void FillQMatLookup();

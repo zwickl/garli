@@ -1865,6 +1865,112 @@ void Model::OutputGarliFormattedModel(ostream &outf) const{
 	outf << " ";
 	}
 
+void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{	
+	s.clear();
+	char cStr[500];
+	if(modSpec.IsCodon()){
+		for(int i=0;i<omegas.size();i++){
+			if(model){
+				sprintf(cStr,"%5.3f %5.3f", *omegas[i], *omegaProbs[i]);
+				s += cStr;
+				}
+			else{
+				char oStr[50];
+				sprintf(oStr, "w(%d) ", i);
+				sprintf(cStr,"%5s ", oStr);
+				s += cStr;
+				sprintf(oStr, "p(%d) ", i);
+				sprintf(cStr,"%5s ", oStr);
+				s += cStr;
+				}
+			}
+		}
+	if(modSpec.IsNucleotide() || modSpec.IsCodon()){
+		if(model){
+			sprintf(cStr, "%5.2f %5.2f %5.2f %5.2f %5.2f %5.2f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
+			s += cStr;
+			}
+		else{
+			char rStr[50];
+			sprintf(rStr, "r(AC)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(AG)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(AT)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(CG)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(CT)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			sprintf(rStr, "r(GT)");
+			sprintf(cStr,"%5s ", rStr);
+			s += cStr;
+			}
+		}
+	if(modSpec.IsNucleotide()){
+		if(model){
+			sprintf(cStr," %5.3f %5.3f %5.3f %5.3f ", StateFreq(0), StateFreq(1), StateFreq(2), StateFreq(3));
+			s += cStr;
+			}
+		else{
+			char pStr[50];
+			sprintf(pStr, "pi(A)");
+			sprintf(cStr,"%5s ", pStr);
+			s += cStr;
+			sprintf(pStr, "pi(C)");
+			sprintf(cStr,"%5s ", pStr);
+			s += cStr;
+			sprintf(pStr, "pi(G)");
+			sprintf(cStr,"%5s ", pStr);
+			s += cStr;
+			sprintf(pStr, "pi(T)");
+			sprintf(cStr,"%5s ", pStr);
+			s += cStr;
+			}
+		}
+
+	if(modSpec.IsFlexRateHet()){
+		for(int i=0;i<NRateCats();i++){
+			if(model){
+				sprintf(cStr, "%5.3f %5.3f ", rateMults[i], rateProbs[i]);
+				s += cStr;
+				}
+			else{
+				char fStr[50];
+				sprintf(fStr, "fr(%d)", i);
+				sprintf(cStr,"%5s ", fStr);
+				s += cStr;
+				sprintf(fStr, "p(%d)", i);
+				sprintf(cStr,"%5s ", fStr);
+				s += cStr;
+				}
+			}
+		}
+	else{
+		if(modSpec.IsGammaRateHet()){
+			if(model)
+				sprintf(cStr, "%5.3f ", Alpha());
+			else{
+				sprintf(cStr, "%5s ", "alpha");
+				}
+			s += cStr;
+			}
+		}
+	if(PropInvar()!=ZERO_POINT_ZERO){
+		if(model)
+			sprintf(cStr, "%5.3f", PropInvar());
+		else{
+			sprintf(cStr, "%5s ", "pinv");
+			}
+		s += cStr;
+		}
+	}
+
 void Model::OutputHumanReadableModelReportWithParams() const{
 	//Report on the model setup and parameter values - like a beefed up version of Population::ModelReport
 	if(modSpec.IsCodon()){
