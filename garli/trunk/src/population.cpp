@@ -2006,12 +2006,22 @@ int Population::EvaluateStoredTrees(bool report){
 			unsigned r2;
 			for(r2=0;r2<r;r2++){
 				if(conf->collapseBranches){
-					//DEBUG **** I don't think that this is working right currently 5/20/08 ****
-					//The IdenticalTopologyAllowingRerooting function really expects fully bifurcating trees, so
-					//if one tree contains all of the branches of the other plus some extra then it will return
-					//true.  Just doing the reverse comparison should take care of that
-					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)
+/*					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)
 						&& storedTrees[r2]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r]->treeStruct->root))
+						break;
+*/		
+					//This is where only collapsing branches upon output gets annoying.  We really want to check
+					//whether the collapsed trees are the same, but we're no longer storing them.  So, generate the collapsed
+					//trees and check.  A set of collapsed trees could be generated in adavance, so doing this every time is 
+					//a bit of extra work
+					Individual tempInd, tempInd2;
+					tempInd.DuplicateIndivWithoutCLAs(storedTrees[r]);
+					tempInd2.DuplicateIndivWithoutCLAs(storedTrees[r2]);
+					int num = 0;
+					tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+					tempInd2.treeStruct->root->CollapseMinLengthBranches(num);
+					if(tempInd.treeStruct->IdenticalTopologyAllowingRerooting(tempInd2.treeStruct->root)
+						&& tempInd2.treeStruct->IdenticalTopologyAllowingRerooting(tempInd.treeStruct->root))
 						break;
 					}
 				else
