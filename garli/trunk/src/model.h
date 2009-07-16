@@ -922,8 +922,11 @@ class Model{
 		FLOAT_TYPE tot = ZERO_POINT_ZERO;
 		for(int r=0;r<NRateCats();r++)
 			tot += rateProbs[r];
-		if(!FloatingPointEquals(tot, ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
+		if(!FloatingPointEquals(tot, ONE_POINT_ZERO, max(1.0e-3, GARLI_FP_EPS * 2.0)))
 			throw ErrorException("Specified Flex rate proportions don't add to 1.0!\n\tCorrect spec. is f rate1 prop1 rate2 prop2, etc.");
+		//make the proportions exactly 1
+		for(int r=0;r<NRateCats();r++)
+			rateProbs[r] /= tot;
 		}
 
 	FLOAT_TYPE FlexRate(int which){
