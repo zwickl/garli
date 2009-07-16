@@ -1202,7 +1202,13 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 	for(vector<BaseParameter*>::iterator pit=paramsToMutate.begin();pit != paramsToMutate.end();pit++){
 		(*pit)->SetToDefaultValues();
 		}
-	if(modSpec.numRateCats > 1 && modSpec.IsNonsynonymousRateHet() == false) DiscreteGamma(rateMults, rateProbs, *alpha);
+	if(modSpec.numRateCats > 1 && modSpec.IsNonsynonymousRateHet() == false){
+		if(modSpec.IsFlexRateHet()){
+			//if alpha is only being used to manipulate the flex rates, it wouldn't be reset above
+			SetAlpha(0, 0.5);
+			}
+		DiscreteGamma(rateMults, rateProbs, *alpha);
+		}
 
 	if((modSpec.IsEqualStateFrequencies() == false && (modSpec.IsCodon() && modSpec.IsUserSpecifiedStateFrequencies()) == false && modSpec.IsDayhoffAAFreqs() == false && modSpec.IsWAGAAFreqs() == false && modSpec.IsJonesAAFreqs() == false && modSpec.IsMtMamAAFreqs() == false && modSpec.IsMtRevAAFreqs() == false)
 		|| (modSpec.IsF3x4StateFrequencies() || modSpec.IsF1x4StateFrequencies())){
@@ -1231,7 +1237,8 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 		else{
 			SetPinv((FLOAT_TYPE)0.25 * ((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NVarUninform())), false);
 			SetMaxPinv((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NVarUninform()));
-			if(modSpec.IsFlexRateHet()) NormalizeRates();
+			if(modSpec.IsFlexRateHet()) 
+				NormalizeRates();
 			else AdjustRateProportions();
 			}
 		}
