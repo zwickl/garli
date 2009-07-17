@@ -1871,10 +1871,16 @@ void Population::FinalOptimization(){
 					incr += paramOpt;
 					}
 				if(optFlex){
-					//Flex opt is tough, give it two passes
-					paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
-					paramOpt += indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
+					//Flex opt is tough, give it more passes if they are helping
+					FLOAT_TYPE p = 0.0;
+					paramOpt = 0.0;
+					int innerPass = 0;
+					do{
+						p = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
+						paramOpt += p;
+						}while(p > trueImprove && innerPass++ < 5);
 					sprintf(temp, "  flex rates= %4.4f", paramOpt);
+					//sprintf(temp, "  flex rates(%d)= %4.4f", innerPass, paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
@@ -1903,7 +1909,7 @@ void Population::FinalOptimization(){
 			indiv[bestIndiv].CalcFitness(0);
 			}
 		outString += ")";
-		outman.UserMessage("pass %-2d: %.4f %s", pass++, indiv[bestIndiv].Fitness(), outString.c_str());
+		outman.UserMessage("pass %-2d: %.4f   %s", pass++, indiv[bestIndiv].Fitness(), outString.c_str());
 		}while(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass < 10);
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	unsigned totalSecs = stopwatch.SplitTime();
