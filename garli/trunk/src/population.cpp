@@ -2022,6 +2022,8 @@ int Population::EvaluateStoredTrees(bool report){
 					int num = 0;
 					tempInd.treeStruct->root->CollapseMinLengthBranches(num);
 					tempInd2.treeStruct->root->CollapseMinLengthBranches(num);
+					tempInd.treeStruct->CalcBipartitions(true);
+					tempInd2.treeStruct->CalcBipartitions(true);
 					if(tempInd.treeStruct->IdenticalTopologyAllowingRerooting(tempInd2.treeStruct->root)
 						&& tempInd2.treeStruct->IdenticalTopologyAllowingRerooting(tempInd.treeStruct->root))
 						break;
