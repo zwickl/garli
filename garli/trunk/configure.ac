@@ -335,6 +335,19 @@ AC_TRY_LINK(
 [], 
 [AC_MSG_ERROR([NCL must be compiled with the NCL_CONST_FUNCS macro defined. Usually adding -DNCL_CONST_FUNCS to CPPFLAGS in your invocation of the NCL configure script is the solution.])]) 
 
+AC_COMPILE_IFELSE( 
+[#include "ncl/nxsdefs.h" 
+# if ! defined(NCL_MAJOR_VERSION) ||  NCL_MAJOR_VERSION < 2
+#	error "need at least v2"
+# else
+# 	 if ! defined(NCL_MINOR_VERSION) ||  NCL_MINOR_VERSION < 1
+#		error "need at least v2.1"
+#	 endif
+# endif
+], 
+[], 
+[AC_MSG_ERROR([Sorry. NCL 2.1 or greater is required.])]) 
+
 GARLI_LIBS="-lncl"
 
 
