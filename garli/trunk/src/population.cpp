@@ -1391,6 +1391,7 @@ void Population::ReadPopulationCheckpoint(){
 		ind->SetDirty();
 		ind->treeStruct->root->CheckTreeFormation();
 		ind->CalcFitness(0);
+		ind->treeStruct->RemoveTreeFromAllClas();
 		storedTrees.push_back(ind);
 		}
 
@@ -1899,6 +1900,7 @@ void Population::FinalOptimization(){
 					incr += paramOpt;
 					}
 				}
+			indiv[bestIndiv].CalcFitness(0);
 			}
 		outString += ")";
 		outman.UserMessage("pass %-2d: %.4f %s", pass++, indiv[bestIndiv].Fitness(), outString.c_str());

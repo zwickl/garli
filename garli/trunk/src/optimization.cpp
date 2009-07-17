@@ -566,18 +566,6 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 #endif
 
 		FLOAT_TYPE d1=(d11+d12)*ZERO_POINT_FIVE;
-		//if the evaluation points straddle the optimum, leave now
-		if((d11 - d12) == ZERO_POINT_ZERO || (d11 > ZERO_POINT_ZERO && d12 < ZERO_POINT_ZERO) || (d11 < ZERO_POINT_ZERO && d12 > ZERO_POINT_ZERO)){
-			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);;
-			MakeAllNodesDirty();
-			lnL = prev;
-#ifdef OPT_BOUNDED_LTRACE
-			curves << "return1" << endl;
-			curves.close();
-#endif
-			return prev-start;
-			}
-
 		FLOAT_TYPE d2=(d11-d12)/incr;
 
 		FLOAT_TYPE est=-d1/d2;
@@ -587,6 +575,24 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 #ifdef OPT_BOUNDED_LTRACE
 		curves << d1 << "\t" << d2 << "\t" << est << "\t" << proposed << "\t";
 #endif
+
+		//if the two derivative estimates are equal d2 is zero or undefined and bad things happen.  This is a bit of a hack, but works since it kicks in the pos d2 machinery 
+		if(d11 - d12 == 0){ 
+			d2 = 42.0;
+			outman.DebugMessage("***equal d1's: %f", d11);
+			}
+
+		//if the evaluation points straddle the optimum, leave now
+		if((d11 > ZERO_POINT_ZERO && d12 < ZERO_POINT_ZERO) || (d11 < ZERO_POINT_ZERO && d12 > ZERO_POINT_ZERO)){
+			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);;
+			MakeAllNodesDirty();
+			lnL = prev;
+#ifdef OPT_BOUNDED_LTRACE
+			curves << "return1" << endl;
+			curves.close();
+#endif
+			return prev-start;
+			}
 
 		if(d2 > ZERO_POINT_ZERO){
 			//second derivative is positive, so can't use NR.  Bump the value arbitrarily.
