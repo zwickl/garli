@@ -16,7 +16,7 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
-  
+ 
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION 0.96
 #define MINOR_VERSION "1b"
