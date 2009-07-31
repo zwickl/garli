@@ -431,13 +431,22 @@ Tree::Tree(){
 	#ifdef OPEN_MP
 				//allNodes[t]->ambigMap=static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1);
 				allNodes[t]->ambigMap.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1));
+				outman.UserMessage("subset %d", c);
 	#endif
 				}
-			else
+			else{
 				//allNodes[t]->tipData=(char *)(curData)->GetRow(t-1);
 				allNodes[t]->tipData.push_back((char *)(curData)->GetRow(t-1));
+	#ifdef OPEN_MP
+				//even though there is no ambig map for non-nuc data, we need to put a dummy into the vector
+				//so that the data index matches up with the correct element in the vector
+				allNodes[t]->ambigMap.push_back(NULL);
+				outman.UserMessage("subset NULL");
+	#endif
+				}
 			}
 		}
+	assert(allNodes[1]->ambigMap.size() == claSpecs.size());
 	
 	numTipsAdded=0;
 	numNodesAdded=1;//root
@@ -488,12 +497,19 @@ void Tree::AllocateTree(){
 				//allNodes[t]->ambigMap=static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1);
 				allNodes[t]->ambigMap.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1));
 #endif
-			}
-			else
+				}
+			else{
 				//allNodes[t]->tipData=(char *)(curData)->GetRow(t-1);
 				allNodes[t]->tipData.push_back((char *)(curData)->GetRow(t-1));
+	#ifdef OPEN_MP
+				//even though there is no ambig map for non-nuc data, we need to put a dummy into the vector
+				//so that the data index matches up with the correct element in the vector
+				allNodes[t]->ambigMap.push_back(NULL);
+	#endif
+				}
+			}
 		}
-	}
+	assert(allNodes[1]->ambigMap.size() == claSpecs.size());
 	
 	numTipsAdded=0;
 	numNodesAdded=1;//root
@@ -3601,7 +3617,15 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 				}
 			else{
 	#ifdef OPEN_MP
-				assert(firstChild->ambigMap.size() > (*specs).dataIndex || secChild->ambigMap.size() > (*specs).dataIndex);
+				if(firstCLA==NULL){
+					assert(firstChild->ambigMap.size() > (*specs).dataIndex);
+					assert(firstChild->ambigMap[(*specs).dataIndex] != NULL);					
+					}
+				else{
+					assert(secChild->ambigMap.size() > (*specs).dataIndex);
+					assert(secChild->ambigMap[(*specs).dataIndex] != NULL);	
+					}
+
 				if(firstCLA==NULL)
 					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], firstChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 					//CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData, firstChild->ambigMap, (*specs).modelIndex, (*specs).dataIndex);
