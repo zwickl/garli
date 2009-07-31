@@ -881,8 +881,10 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 					GetDerivsPartialTerminalNState(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
 				}
 			else
-	#ifdef OPEN_MP
-				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, modIndex, nd2->ambigMap, (*specs).modelIndex, (*specs).dataIndex);
+	#ifdef OPEN_MP	
+				assert(nd2->ambigMap.size() > (*specs).dataIndex);
+				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex, nd2->ambigMap[(*specs).dataIndex]);
+//				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, modIndex, nd2->ambigMap, (*specs).modelIndex, (*specs).dataIndex);
 	#else
 				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
 	#endif
