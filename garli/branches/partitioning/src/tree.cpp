@@ -3601,10 +3601,13 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 				}
 			else{
 	#ifdef OPEN_MP
+				assert(firstChild->ambigMap.size() > (*specs).dataIndex || secChild->ambigMap.size() > (*specs).dataIndex);
 				if(firstCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData, firstChild->ambigMap, (*specs).modelIndex, (*specs).dataIndex););
+					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], firstChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+					//CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData, firstChild->ambigMap, (*specs).modelIndex, (*specs).dataIndex);
 				else
-					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData, secChild->ambigMap, (*specs).modelIndex, (*specs).dataIndex););
+					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], secChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+					//CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData, secChild->ambigMap, (*specs).modelIndex, (*specs).dataIndex);
 				}
 	#else
 				if(firstCLA==NULL)

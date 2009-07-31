@@ -48,7 +48,8 @@ class TreeNode{
 		Bipartition *bipart;
 		vector<char *> tipData;
 #ifdef OPEN_MP
-		unsigned *ambigMap;
+		//unsigned *ambigMap;
+		vector<unsigned *> ambigMap;
 #endif
 
 		TreeNode( const int i = -1 );
