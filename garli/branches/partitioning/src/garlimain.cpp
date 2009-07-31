@@ -19,7 +19,7 @@
 
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION 0.96
-#define MINOR_VERSION "r396"
+#define MINOR_VERSION "r553"
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
@@ -166,7 +166,7 @@ int main( int argc, char* argv[] )	{
 #endif				
 					else if(argv[curarg][1]=='t') runTests = true;
 					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
-						outman.UserMessage("%s Version %.2f.%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION);
+						outman.UserMessage("%s PARTITION Version %.2f.%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION);
 #ifdef SUBROUTINE_GARLI
 						outman.UserMessage("MPI run distributing version");
 #endif
@@ -272,7 +272,7 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 			
-			outman.UserMessage("Running BOINC GARLI, version %.2f.%s (Partitioning Branch) (Dec 2008)\n", MAJOR_VERSION, MINOR_VERSION);
+			outman.UserMessage("Running BOINC GARLI, PARTITION version %.2f.%s (Partitioning Branch) (July 2009)\n", MAJOR_VERSION, MINOR_VERSION);
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -291,12 +291,12 @@ int main( int argc, char* argv[] )	{
 			else outman.SetLogFile(temp_buf);
 	#ifdef SUBROUTINE_GARLI
 			//MPI search forking version
-			outman.UserMessage("Running GARLI, version %.2f.%s (Partitioning Branch) (Dec 2008)\n", MAJOR_VERSION, MINOR_VERSION);
+			outman.UserMessage("Running GARLI, PARTITION version %.2f.%s (Partitioning Branch) (July 2009)\n", MAJOR_VERSION, MINOR_VERSION);
 			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
 	#else	//nonMPI version
-			outman.UserMessage("Running GARLI, version %.2f.%s (Partitioning Branch) (Dec 2008)\n", MAJOR_VERSION, MINOR_VERSION);
+			outman.UserMessage("Running GARLI, PARTITION version %.2f.%s (Partitioning Branch) (July 2009)\n", MAJOR_VERSION, MINOR_VERSION);
 	#endif
 
 #endif //end of BOINC / nonBOINC
