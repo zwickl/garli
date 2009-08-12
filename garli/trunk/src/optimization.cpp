@@ -2232,7 +2232,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	FLOAT_TYPE D1a, D1c, D1g, D1t;
 	FLOAT_TYPE D2a, D2c, D2g, D2t;
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
-	FLOAT_TYPE totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;
+	FLOAT_TYPE totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO, unscaledlnL=ZERO_POINT_ZERO;
 
 #ifdef OMP_TERMDERIV
 	#ifdef LUMP_LIKES
@@ -2333,7 +2333,8 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 				outman.UserMessage("tempD1 = %f", tempD1);
 				}
 #else
-			totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];
+			unscaledlnL = log(siteL) - partialCLA->underflow_mult[i];
+			totL += unscaledlnL * countit[i];
 			tot1+= countit[i] * tempD1;
 			FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
@@ -2352,7 +2353,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			}
 #endif
 		if(sitelikeLevel != 0){
-			siteLikes.push_back(siteL);
+			siteLikes.push_back(unscaledlnL);
 			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
@@ -2397,12 +2398,14 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
+	vector<double> siteLikes;
+
 #ifdef UNIX
 	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
-	FLOAT_TYPE siteL, siteD1, siteD2;
+	FLOAT_TYPE siteL, siteD1, siteD2, unscaledlnL=ZERO_POINT_ZERO;
 
 #undef OUTPUT_DERIVS
 
@@ -2471,8 +2474,8 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 					siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]));
 					}
-
-				totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];
+				unscaledlnL = log(siteL) - partialCLA->underflow_mult[i];
+				totL += unscaledlnL * countit[i];
 
 				siteD1 /= siteL;
 				tot1 += countit[i] * siteD1;
@@ -2495,6 +2498,9 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				partial+=nstates*nRateCats;
 #endif
 				Ldata++;
+				}
+			if(sitelikeLevel != 0){
+				siteLikes.push_back(unscaledlnL);
 				}
 #ifdef LUMP_LIKES
 			if((i + 1) % LUMP_FREQ == 0){
@@ -2554,8 +2560,8 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 					siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]));
 					}
-
-				totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];
+				unscaledlnL = log(siteL) - partialCLA->underflow_mult[i];
+				totL += unscaledlnL * countit[i];
 				siteD1 /= siteL;
 				tot1 += countit[i] * siteD1;
 				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
@@ -2570,6 +2576,9 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				partial += nstates * nRateCats;
 #endif
 				Ldata++;
+				}
+			if(sitelikeLevel != 0){
+				siteLikes.push_back(unscaledlnL);
 				}
 #ifdef LUMP_LIKES
 			if((i + 1) % LUMP_FREQ == 0){
@@ -2586,7 +2595,9 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 #ifdef OUTPUT_DERIVS
 	out.close();
 #endif
-
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, partialCLA->underflow_mult, NULL);
+		}
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL = totL;
@@ -2617,11 +2628,13 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
+	vector<double> siteLikes;
+
 #ifdef UNIX
 	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO, unscaledlnL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE rateL, rateD1, rateD2;
@@ -2700,8 +2713,8 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 					siteL += (prI*freqs[conStates[i]] * (exp((FLOAT_TYPE)partialCLA->underflow_mult[i])));
 					}
-
-				totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];
+				unscaledlnL = (log(siteL) - partialCLA->underflow_mult[i]);
+				totL +=  unscaledlnL * countit[i];
 				siteD1 /= siteL;
 				tot1 += countit[i] * siteD1;
 				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
@@ -2717,6 +2730,9 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 #endif
 				Ldata++;
 				}
+			if(sitelikeLevel != 0){
+				siteLikes.push_back(unscaledlnL);
+				}
 #ifdef LUMP_LIKES
 			if((i + 1) % LUMP_FREQ == 0){
 				grandSumL += totL;
@@ -2731,7 +2747,9 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 #ifdef OUTPUT_DERIVS
 	out.close();
 #endif
-
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, partialCLA->underflow_mult, NULL);
+		}
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL = totL;
@@ -2788,7 +2806,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	FLOAT_TYPE D1a, D1c, D1g, D1t;
 	FLOAT_TYPE D2a, D2c, D2g, D2t;
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
-	FLOAT_TYPE totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;
+	FLOAT_TYPE totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO, unscaledlnL=ZERO_POINT_ZERO;
 
 #ifdef OMP_INTDERIV
 	#ifdef LUMP_LIKES
@@ -2851,7 +2869,8 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 #else
 			assert(d1Tot == d1Tot);
 			FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
-			totL += (log(siteL) - childCLA->underflow_mult[i] - partialCLA->underflow_mult[i]) * countit[i];
+			unscaledlnL = (log(siteL) - childCLA->underflow_mult[i] - partialCLA->underflow_mult[i]);
+			totL += unscaledlnL * countit[i];
 			tot1 += countit[i] * tempD1;
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
 #endif
@@ -2865,7 +2884,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 			}
 #endif
 		if(sitelikeLevel != 0){
-			siteLikes.push_back(siteL);
+			siteLikes.push_back(unscaledlnL);
 			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
@@ -2884,6 +2903,9 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL = totL;
+#ifdef OPT_DEBUG
+	opt << "GetDerivsPartialInternal" << endl;
+#endif
 
 #ifdef CUDA_GPU
 	}
@@ -2916,6 +2938,8 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
+	vector<double> siteLikes;
+
 #ifdef CUDA_GPU
 	if (cudaman->GetGPUDerivEnabled()) {
 		cudaman->ComputeGPUDeriv(partialCLA->arr, childCLA->arr,
@@ -2934,7 +2958,7 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO, grandSumL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO, grandSumL = ZERO_POINT_ZERO, unscaledlnL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
@@ -2983,12 +3007,16 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 				siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i])  *  exp((FLOAT_TYPE)childCLA->underflow_mult[i]));
 				}
-			totL += (log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i]) * countit[i];
+			unscaledlnL = (log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i]);
+			totL += unscaledlnL * countit[i];
 			siteD1 /= siteL;
 			tot1 += countit[i] * siteD1;
 			tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
 			assert(tot1 == tot1);
 			assert(tot2 == tot2);
+			}
+		if(sitelikeLevel != 0){
+			siteLikes.push_back(unscaledlnL);
 			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
@@ -3000,7 +3028,9 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 #else
 		}
 #endif
-
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, childCLA->underflow_mult, partialCLA->underflow_mult);
+		}
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL = totL;
@@ -3037,6 +3067,8 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
+	vector<double> siteLikes;
+
 #ifdef CUDA_GPU
 	if (cudaman->GetGPUDerivEnabled()) {
 		cudaman->ComputeGPUDeriv(partialCLA->arr, childCLA->arr,
@@ -3055,7 +3087,7 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO, grandSumL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO, grandSumL = ZERO_POINT_ZERO, unscaledlnL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
@@ -3094,8 +3126,8 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 				siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]) * exp((FLOAT_TYPE)childCLA->underflow_mult[i]));
 				}
-
-			totL += (log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i]) * countit[i];
+			unscaledlnL = (log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i]) ;
+			totL += unscaledlnL * countit[i];
 			siteD1 /= siteL;
 			tot1 += countit[i] * siteD1;
 			tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
@@ -3104,6 +3136,9 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 
 			partial += nstates;
 			CL1 += nstates;
+			}
+		if(sitelikeLevel != 0){
+			siteLikes.push_back(unscaledlnL);
 			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
@@ -3115,7 +3150,9 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 #else
 		}
 #endif
-
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, childCLA->underflow_mult, partialCLA->underflow_mult);
+		}
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL = totL;
