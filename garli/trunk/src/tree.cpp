@@ -4865,8 +4865,9 @@ void Tree::OutputSiteLikelihoods(vector<double> &likes, const int *under1, const
 			ordered << "\tunder1\tunder2";
 		ordered << "\n";
 		}
-	ordered.precision(10);
-	packed.precision(10);
+	ordered.setf(ios::fixed, ios::floatfield);
+	ordered.precision(8);
+	packed.precision(8);
 	
 	for(int site = 0;site < data->GapsIncludedNChar();site++){
 		int col = data->Number(site);
@@ -5031,9 +5032,6 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-		if(sitelikeLevel != 0){
-			OutputSiteLikelihoods(siteLikes, underflow_mult, NULL);
-			}
 		}
 	else{//multiple rates
 		FLOAT_TYPE rateL;
@@ -5109,14 +5107,13 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-		if(sitelikeLevel != 0){
-			OutputSiteLikelihoods(siteLikes, underflow_mult, NULL);
-			}
 		}
 #ifdef LUMP_LIKES
 	totallnL += grandSumlnL;
 #endif
-
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, underflow_mult, NULL);
+		}
 	delete []freqs;
 	return totallnL;
 	}
@@ -5239,12 +5236,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-	if(sitelikeLevel != 0){
-		OutputSiteLikelihoods(siteLikes, underflow_mult, NULL);
-		}
 #ifdef LUMP_LIKES
 	totallnL += grandSumlnL;
 #endif
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, underflow_mult, NULL);
+		}
 	return totallnL;
 	}
 
@@ -5335,13 +5332,13 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 		if(sitelikeLevel != 0)
 			siteLikes.push_back(unscaledlnL);
 		}
-	if(sitelikeLevel != 0){
-		OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2);
-		}
+
 #ifdef LUMP_LIKES
 	totallnL += grandSumlnL;
 #endif
-
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2);
+		}
 	return totallnL;
 	}
 
@@ -5437,9 +5434,6 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-		if(sitelikeLevel != 0){
-			OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2);
-			}
 		}
 	else{
 		FLOAT_TYPE siteL, tempL, rateL;
@@ -5509,14 +5503,13 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 			if(sitelikeLevel != 0)
 				siteLikes.push_back(unscaledlnL);
 			}
-		if(sitelikeLevel != 0){
-			OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2);
-			}
 		}
 #ifdef LUMP_LIKES
 	totallnL += grandSumlnL;
 #endif
-
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2);
+		}
 	delete []freqs;
 	return totallnL;
 	}
