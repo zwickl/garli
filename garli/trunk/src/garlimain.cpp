@@ -376,9 +376,8 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("Using %s\n", NCL_NAME_AND_VERSION);
 #endif
 
-#ifdef DEBUG_MESSAGES
 			OutputImportantDefines();
-#endif
+
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 

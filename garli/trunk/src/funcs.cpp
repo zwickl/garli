@@ -47,63 +47,82 @@ bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLO
 
 //this is for sticking info about what is defined into log files, for later checking
 void OutputImportantDefines(){
-	outman.UserMessage("#####\nThe following are/are not defined:");
+	outman.DebugMessage("#####\nThe following are/are not defined:");
 
 #ifdef RESCALE_ARRAY_LENGTH
-	outman.UserMessage("RESCALE_ARRAY_LENGTH = %d", RESCALE_ARRAY_LENGTH);
+	outman.DebugMessage("RESCALE_ARRAY_LENGTH = %d", RESCALE_ARRAY_LENGTH);
 #endif
 
-	outman.UserMessageNoCR("LUMP_LIKES : ");
+	outman.DebugMessageNoCR("LUMP_LIKES : ");
 #ifdef LUMP_LIKES
-	outman.UserMessage("%d", LUMP_FREQ);
+	outman.DebugMessage("%d", LUMP_FREQ);
 #else
-	outman.UserMessage("no");
+	outman.DebugMessage("no");
 #endif
 
 #ifdef DEBUG_SCORES
-	outman.UserMessage("DEBUG_SCORES");
+	outman.DebugMessage("DEBUG_SCORES");
 #endif
 
 #ifdef OPT_DEBUG
-	outman.UserMessage("OPT_DEBUG");
+	outman.DebugMessage("OPT_DEBUG");
 #endif
 
 #ifdef VARIABLE_OPTIMIZATION
-	outman.UserMessage("VARIABLE_OPTIMIZATION");
+	outman.DebugMessage("VARIABLE_OPTIMIZATION");
 #endif
 
 #ifdef NO_EVOLUTION
-	outman.UserMessage("NO_EVOLUTION");
+	outman.DebugMessage("NO_EVOLUTION");
 #endif
 
 #ifdef SWAP_BASED_TERMINATION
-	outman.UserMessage("SWAP_BASED_TERMINATION");
+	outman.DebugMessage("SWAP_BASED_TERMINATION");
 #endif
 
 #ifdef MORE_DETERM_PARAM_OPT
-	outman.UserMessage("MORE_DETERM_PARAM_OPT = yes");
+	outman.DebugMessage("MORE_DETERM_PARAM_OPT = yes");
 #else
-	outman.UserMessage("MORE_DETERM_PARAM_OPT = no");
+	outman.DebugMessage("MORE_DETERM_PARAM_OPT = no");
 #endif
 
 #ifdef ADAPTIVE_BOUNDED_OPT
-	outman.UserMessage("ADAPTIVE_BOUNDED_OPT = yes");
+	outman.DebugMessage("ADAPTIVE_BOUNDED_OPT = yes");
 #else
-	outman.UserMessage("ADAPTIVE_BOUNDED_OPT = no");
+	outman.DebugMessage("ADAPTIVE_BOUNDED_OPT = no");
 #endif
 
 #ifdef PUSH_TO_MIN_BLEN
-	outman.UserMessage("PUSH_TO_MIN_BLEN = yes");
+	outman.DebugMessage("PUSH_TO_MIN_BLEN = yes");
 #else
-	outman.UserMessage("PUSH_TO_MIN_BLEN = no");
+	outman.DebugMessage("PUSH_TO_MIN_BLEN = no");
 #endif
 
 #ifdef DEBUG_MESSAGES
-	outman.UserMessage("DEBUG_MESSAGES = yes");
+	outman.DebugMessage("DEBUG_MESSAGES = yes");
 #else
-	outman.UserMessage("DEBUG_MESSAGES = no");
+	outman.DebugMessage("DEBUG_MESSAGES = no");
 #endif
-	outman.UserMessage("#####\n");
+
+#ifdef BOUND_DIGITS
+	outman.DebugMessage("BOUND_DIGITS = %d", BOUND_DIGITS);
+#else
+	outman.DebugMessage("BOUND_DIGITS = default");
+#endif
+
+#ifdef OPT_BOUNDED_RESTORE
+	outman.DebugMessage("OPT_BOUNDED_RESTORE = yes");
+#else
+	outman.DebugMessage("OPT_BOUNDED_RESTORE = no");
+#endif
+
+#ifdef FINAL_RESTORE_BLENS
+	outman.DebugMessage("FINAL_RESTORE_BLENS = yes");
+#else
+	outman.DebugMessage("FINAL_RESTORE_BLENS = no");
+#endif
+
+	outman.DebugMessage("#####\n");
 	}
 
 #ifdef BROOK_GPU
