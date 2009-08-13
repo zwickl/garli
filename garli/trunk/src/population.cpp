@@ -1778,6 +1778,8 @@ void Population::FinalOptimization(){
 			optRelRates = true;
 #endif
 		}
+	Individual *optInd = &indiv[bestIndiv];
+	Tree *optTree = optInd->treeStruct;
 
 	//there isn't any point of this separate initial opt anymore, since I'm doing param opt on every pass below anyway
 	//if(optAnyModel){
@@ -1785,28 +1787,28 @@ void Population::FinalOptimization(){
 		do{
 			paramOpt = ZERO_POINT_ZERO;
 			if(optFlex) 
-				paramOpt = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
+				paramOpt = optTree->OptimizeFlexRates(paramPrecThisPass);
 			if(optOmega) 
-				paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
+				paramOpt = optTree->OptimizeOmegaParameters(paramPrecThisPass);
 			paramTot += paramOpt;
 
 			if(optFreqs){
-				double tempTot = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
+				double tempTot = optTree->OptimizeEquilibriumFreqs(paramPrecThisPass);
 				paramOpt += tempTot;
 				freqOptImprove += tempTot;
 				}
 			if(optRelRates){
-				double tempTot = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
+				double tempTot = optTree->OptimizeRelativeNucRates(paramPrecThisPass);
 				paramOpt += tempTot;
 				nucRateOptImprove += tempTot;
 				}
 			if(optPinv){
-				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 0.0, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
+				double tempTot = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->PropInvar(), 0, 0.0, optTree->mod->maxPropInvar, &Model::SetPinv);
 				paramOpt += tempTot;
 				pinvOptImprove += tempTot;
 				}
 			if(optAlpha){
-				double tempTot = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, min(0.05, indiv[bestIndiv].treeStruct->mod->Alpha()), max(999.9, indiv[bestIndiv].treeStruct->mod->Alpha()), &Model::SetAlpha);
+				double tempTot = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->Alpha(), 0, min(0.05, optTree->mod->Alpha()), max(999.9, optTree->mod->Alpha()), &Model::SetAlpha);
 				paramOpt += tempTot;
 				alphaOptImprove += tempTot;
 				}
@@ -1836,17 +1838,17 @@ void Population::FinalOptimization(){
 
 		string outString;
 		char temp[50];
-		FLOAT_TYPE passStart=indiv[bestIndiv].Fitness();
+		FLOAT_TYPE passStart=optInd->Fitness();
 
 		//back up the current branch lengths in case something goes wrong in the blen optimization
 		vector<FLOAT_TYPE> blens;
-		indiv[bestIndiv].treeStruct->StoreBranchlengths(blens);
+		optTree->StoreBranchlengths(blens);
 
 		//remember that what is returned from OptAllBranches isn't the true increase in score, just an estimate
-		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
-		indiv[bestIndiv].CalcFitness(0);
+		incr=optTree->OptimizeAllBranches(precThisPass);
+		optInd->CalcFitness(0);
 
-		FLOAT_TYPE trueImprove= indiv[bestIndiv].Fitness() - passStart;
+		FLOAT_TYPE trueImprove= optInd->Fitness() - passStart;
 		incr = trueImprove;
 
 #ifdef FINAL_RESTORE_BLENS
@@ -1855,10 +1857,10 @@ void Population::FinalOptimization(){
 		//the last set of changes and pretend they never happened.
 		if(trueImprove < ZERO_POINT_ZERO){
 			outman.DebugMessage("OptimizeAllBranches worsened score by %f.  Restoring previous branch lengths...", trueImprove);
-			indiv[bestIndiv].treeStruct->RestoreBranchlengths(blens);
+			optTree->RestoreBranchlengths(blens);
 			trueImprove = ZERO_POINT_ZERO;
-			indiv[bestIndiv].SetDirty();
-			indiv[bestIndiv].CalcFitness(0);
+			optInd->SetDirty();
+			optInd->CalcFitness(0);
 			}
 #endif
 
@@ -1866,12 +1868,12 @@ void Population::FinalOptimization(){
 		sprintf(temp, "(branch= %4.4f", trueImprove);
 		outString = temp;
 
-		indiv[bestIndiv].CalcFitness(0);
+		optInd->CalcFitness(0);
 
 		if(optAnyModel){
 			//if(optOmega && pass % 2 == 0) {
 			if(optOmega) {
-				paramOpt = indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(paramPrecThisPass);
+				paramOpt = optTree->OptimizeOmegaParameters(paramPrecThisPass);
 				//outman.UserMessage("Omega optimization: %f", paramOpt);
 				sprintf(temp, "  omega= %4.4f", paramOpt);
 				outString += temp;
@@ -1880,7 +1882,7 @@ void Population::FinalOptimization(){
 			//if((pass + 1) % 2 == 0) {
 			if(1){
 				if(optAlpha){
-					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
+					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 					//outman.UserMessage("Alpha optimization: %f", paramOpt);
 					sprintf(temp, "  alpha= %4.4f", paramOpt);
 					outString += temp;
@@ -1892,7 +1894,7 @@ void Population::FinalOptimization(){
 					paramOpt = 0.0;
 					int innerPass = 0;
 					do{
-						p = indiv[bestIndiv].treeStruct->OptimizeFlexRates(paramPrecThisPass);
+						p = optTree->OptimizeFlexRates(paramPrecThisPass);
 						paramOpt += p;
 						}while(p > trueImprove && innerPass++ < 5);
 					sprintf(temp, "  flex rates= %4.4f", paramOpt);
@@ -1901,31 +1903,31 @@ void Population::FinalOptimization(){
 					incr += paramOpt;
 					}
 				if(optPinv){
-					paramOpt = indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(paramPrecThisPass, indiv[bestIndiv].treeStruct->mod->PropInvar(), 0, 1.0e-8, indiv[bestIndiv].treeStruct->mod->maxPropInvar, &Model::SetPinv);
+					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->PropInvar(), 0, 1.0e-8, optTree->mod->maxPropInvar, &Model::SetPinv);
 					//outman.UserMessage("Pinv optimization: %f", paramOpt);
 					sprintf(temp, "  pinv= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
 				if(optFreqs){
-					paramOpt = indiv[bestIndiv].treeStruct->OptimizeEquilibriumFreqs(paramPrecThisPass);
+					paramOpt = optTree->OptimizeEquilibriumFreqs(paramPrecThisPass);
 					//outman.UserMessage("Equil freqs optimization: %f", paramOpt);
 					sprintf(temp, "  equil freqs= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
 				if(optRelRates){
-					paramOpt = indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(paramPrecThisPass);
+					paramOpt = optTree->OptimizeRelativeNucRates(paramPrecThisPass);
 					//outman.UserMessage("Rel rates optimization: %f", paramOpt);
 					sprintf(temp, "  rel rates= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
 				}
-			indiv[bestIndiv].CalcFitness(0);
+			optInd->CalcFitness(0);
 			}
 		outString += ")";
-		outman.UserMessage("pass %-2d: %.4f   %s", pass++, indiv[bestIndiv].Fitness(), outString.c_str());
+		outman.UserMessage("pass %-2d: %.4f   %s", pass++, optInd->Fitness(), outString.c_str());
 		}while(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass < 10);
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	unsigned totalSecs = stopwatch.SplitTime();
