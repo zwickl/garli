@@ -509,7 +509,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 		if(incr > incrLimit){
 			incr = incrLimit;
 			limited = true;
-			outman.DebugMessage("OptimizeBoundedParameter: incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f incr=%.10f baseIncr=%.6f", pass, start, lnL, initialVal, prevVal, incr, baseIncr);
+			outman.DebugMessage("OptimizeBoundedParameter: incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f lbound=%.6f hbound=%.6f incr=%.10f baseIncr=%.6f", pass, start, lnL, initialVal, prevVal, lowerBracket, upperBracket, incr, baseIncr);
 			}
 		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal+incr);
 		MakeAllNodesDirty();
@@ -595,10 +595,10 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 		//if the evaluation points straddle the optimum, leave now
 		//in cases where the likelihood is unstable we can apparently straddle but end up with a worse likelihood
 		//than what we had initially.  In that case there isn't a lot we can do.  Restore the initial value and exit.
-		if((d11 > ZERO_POINT_ZERO && d12 < ZERO_POINT_ZERO) || (d11 < ZERO_POINT_ZERO && d12 > ZERO_POINT_ZERO)){
+		if((d11 * d12 < ZERO_POINT_ZERO)){
 #ifdef OPT_BOUNDED_RESTORE
-			if(lnL < start){
-				outman.DebugMessage("OptimizeBoundedParameter: optimum straddled, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, start, lnL, initialVal, prevVal, d11, d12, incr, baseIncr);
+			if(prev < start){
+				outman.DebugMessage("OptimizeBoundedParameter: optimum straddled, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, start, prev, initialVal, prevVal, d11, d12, incr, baseIncr);
 				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
 				prev = start;
 				}
@@ -631,7 +631,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 			//if we're already very close to that bound, exit, unless we've somehow worsened the score
 			//if(prevVal - lowerBracket - epsilon < epsilon * ZERO_POINT_FIVE){
 			if(prevVal - lowerBracket - baseIncr < ZERO_POINT_ZERO){
-				if(lnL < start){
+				if(prev < start){
 					outman.DebugMessage("OptimizeBoundedParameter: near min bound, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f", pass, start, lnL, initialVal, prevVal, d11, d12, incr);
 					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
 					prev = start;
@@ -663,7 +663,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 			//if we're already very close to that bound, exit, unless we've somehow worsened the score
 			//if(upperBracket - epsilon - prevVal < epsilon * ZERO_POINT_FIVE){
 			if(upperBracket - baseIncr - prevVal < ZERO_POINT_ZERO){
-				if(lnL < start){
+				if(prev < start){
 					outman.DebugMessage("OptimizeBoundedParameter: near max bound, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f", pass, start, lnL, initialVal, prevVal, d11, d12, incr);
 					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
 					prev = start;
