@@ -1838,13 +1838,29 @@ void Population::FinalOptimization(){
 		char temp[50];
 		FLOAT_TYPE passStart=indiv[bestIndiv].Fitness();
 
+		//back up the current branch lengths in case something goes wrong in the blen optimization
+		vector<FLOAT_TYPE> blens;
+		indiv[bestIndiv].treeStruct->StoreBranchlengths(blens);
+
 		//remember that what is returned from OptAllBranches isn't the true increase in score, just an estimate
 		incr=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
 		indiv[bestIndiv].CalcFitness(0);
 
 		FLOAT_TYPE trueImprove= indiv[bestIndiv].Fitness() - passStart;
 		incr = trueImprove;
-		assert(trueImprove >= -1.0e-4);
+
+#ifdef FINAL_RESTORE_BLENS
+		//In very rare cases the score can come out very slightly worse (or apparently worse due to numerical instability issues) after
+		//optimizing all of the branches.  In general this is taken care of at a lower level, but if it percolates up to here we'll ignore
+		//the last set of changes and pretend they never happened.
+		if(trueImprove < ZERO_POINT_ZERO){
+			outman.DebugMessage("OptimizeAllBranches worsened score by %f.  Restoring previous branch lengths...", trueImprove);
+			indiv[bestIndiv].treeStruct->RestoreBranchlengths(blens);
+			trueImprove = ZERO_POINT_ZERO;
+			indiv[bestIndiv].SetDirty();
+			indiv[bestIndiv].CalcFitness(0);
+			}
+#endif
 
 		//sprintf(temp, "(branch=%4.4f true=%4.4f prec=%.4f pprec=%.4f", incr, trueImprove, precThisPass, paramPrecThisPass);
 		sprintf(temp, "(branch= %4.4f", trueImprove);

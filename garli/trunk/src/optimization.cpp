@@ -596,6 +596,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 		//in cases where the likelihood is unstable we can apparently straddle but end up with a worse likelihood
 		//than what we had initially.  In that case there isn't a lot we can do.  Restore the initial value and exit.
 		if((d11 > ZERO_POINT_ZERO && d12 < ZERO_POINT_ZERO) || (d11 < ZERO_POINT_ZERO && d12 > ZERO_POINT_ZERO)){
+#ifdef OPT_BOUNDED_RESTORE
 			if(lnL < start){
 				outman.DebugMessage("OptimizeBoundedParameter: optimum straddled, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, start, lnL, initialVal, prevVal, d11, d12, incr, baseIncr);
 				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
@@ -604,6 +605,9 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 			else{
 				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
 				}
+#else
+			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
+#endif
 			MakeAllNodesDirty();
 			lnL = prev;
 #ifdef OPT_BOUNDED_LOG
