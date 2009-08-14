@@ -492,22 +492,21 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 #ifdef OPT_BOUNDED_LOG
 	ofstream log("optbounded.log", ios::app);
 	log.precision(12);
+#endif
 
-/*	ofstream curves("lcurve.log", ios::app);
+#ifdef OPT_BOUNDED_TRACE
+	ofstream curves("lcurve.log", ios::app);
 	curves.precision(12);
-	curves << endl;
-//	for(double c = max(prevVal - 0.01, lowBound); c < min(1.5, highBound) ; c += 0.001){
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, c);
-		MakeAllNodesDirty();
-		Score();
-		curves << c << "\t" << lnL << endl;;
+	curves << "\n";
+	for(double c = max(curVal - 2 * 1.0e-6, lowBound); c <= min(curVal + 2 * 1.0e-6, highBound) ; c += 1.0e-6){
+		FLOAT_TYPE v = SetAndEvaluateParameter(which, c, SetParam);
+		curves << c << "\t" << v << "\n";
 		}
 	curves.close();
 
-	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
+	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
 	MakeAllNodesDirty();
 	Score();
-*/
 #endif
 
 #ifdef SINGLE_PRECISION_FLOATS
@@ -578,7 +577,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		lowerEvalScore = SetAndEvaluateParameter(which, lowerEval, SetParam);
 
 #ifdef OPT_BOUNDED_LOG
-		log << incr << "\t" << lowBound << "\t" << lowerBracket << "\t" << lowerEval << "\t" << curVal << "\t" << upperBracket << "\t" << higherEval << "\t" << highBound << "\t" << lowerEvalScore << "\t" << curScore << "\t" << higherEvalScore << "\t";
+		log << incr << "\t" << lowBound << "\t" << lowerBracket << "\t" << lowerEval << "\t" << curVal << "\t" << higherEval << "\t" << upperBracket << "\t" << highBound << "\t" << lowerEvalScore << "\t" << curScore << "\t" << higherEvalScore << "\t";
 		outman.UserMessage("%.10f", curScore);
 #endif
 
