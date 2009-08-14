@@ -262,6 +262,7 @@ class Tree{
 		FLOAT_TYPE OptimizeEquilibriumFreqs(FLOAT_TYPE prec);
 		FLOAT_TYPE OptimizeRelativeNucRates(FLOAT_TYPE prec);
 		FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE));
+		FLOAT_TYPE SetAndEvaluateParameter(int which, FLOAT_TYPE val, void (Model::*SetParam)(int, FLOAT_TYPE));
 		FLOAT_TYPE OptimizeTreeScale(FLOAT_TYPE);
 		FLOAT_TYPE OptimizeReferenceRelativeRate(FLOAT_TYPE optPrecision);
 		FLOAT_TYPE OptimizePinv();
