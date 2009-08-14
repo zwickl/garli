@@ -437,33 +437,49 @@ FLOAT_TYPE Tree::OptimizeAlpha(FLOAT_TYPE optPrecision){
 	return -1;
 	}
 
-FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE)){
+FLOAT_TYPE Tree::SetAndEvaluateParameter(int which, FLOAT_TYPE val, void (Model::*SetParam)(int, FLOAT_TYPE)){
+	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, val);
+	MakeAllNodesDirty();
+	Score();
+	return lnL;
+	}
 
-	FLOAT_TYPE initialVal = prevVal;
+FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE initialVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE)){
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) 
+		Score();
 
 	FLOAT_TYPE epsilon = min(optPrecision, 1.0e-5);
-
-	assert(prevVal > lowBound - epsilon && prevVal < highBound + epsilon);
+	assert(initialVal > lowBound - epsilon && initialVal < highBound + epsilon);
+	FLOAT_TYPE curVal = initialVal;
+	FLOAT_TYPE initialScore, curScore;
+	initialScore = curScore = lnL;
 
 	//if the initial value is already very near or equal to a bound, bump it off a tad so the emirical derivs below work right.
 	//if the optimum really is at the bound it should be optimized back to it
-	if(prevVal - lowBound < epsilon){
-		outman.DebugMessage("OptimizeBoundedParameter: value bumped off low bound %.6f -> %.6f", prevVal, lowBound + epsilon);
-		prevVal = lowBound + epsilon;
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
-		MakeAllNodesDirty();
+	if(initialVal - lowBound < epsilon){
+		outman.DebugMessage("OptimizeBoundedParameter: value bumped off low bound %.6f -> %.6f", initialVal, lowBound + epsilon);
+		curVal = lowBound + epsilon;
+		curScore = SetAndEvaluateParameter(which, curVal, SetParam);
+		//CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
+		//MakeAllNodesDirty();
 		}
-	else if(highBound - prevVal < epsilon){
-		outman.DebugMessage("OptimizeBoundedParameter: value bumped off high bound %.6f -> %.6f", prevVal, highBound - epsilon);
-		prevVal = highBound - epsilon;
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
+	else if(highBound - initialVal < epsilon){
+		outman.DebugMessage("OptimizeBoundedParameter: value bumped off high bound %.6f -> %.6f", initialVal, highBound - epsilon);
+		curVal = highBound - epsilon;
+		curScore = SetAndEvaluateParameter(which, curVal, SetParam);
+		//CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
+		//MakeAllNodesDirty();
+		}
+	//if the bounds are so tight that we can't be > epsilon from both, exit
+	if(curVal - lowBound < epsilon || highBound - curVal < epsilon){
+		outman.DebugMessage("OptimizeBoundedParameter: bounds fully constrain parameter %.6f <- %.6f -> %.6f", lowBound, curVal, highBound);
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
 		MakeAllNodesDirty();
+		return 0.0;
 		}
 
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) 
-		Score();
-	FLOAT_TYPE start, prev, cur;
-	prev = start = cur = lnL;
+	FLOAT_TYPE lowerEval, higherEval;
+	FLOAT_TYPE lowerEvalScore, higherEvalScore;
 	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
 	FLOAT_TYPE upperBracket = highBound;   //the smallest value we know of with a negative d1, or the minimum allowed value
 	FLOAT_TYPE lowerBracket = lowBound;   //the largest value we know of with a positive d1 , or the maximum allowed value
@@ -501,19 +517,20 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 #endif
 	FLOAT_TYPE incrLimit;
 	bool limited = false;
+	//we'll always know what the current score is at the top of this loop
 	while(1){
 		//baseIncr will be a sort of ideal increment, but it may be limited because of closeness
 		//to a min or max bracket
-		incrLimit = min(prevVal - lowerBracket, upperBracket - prevVal);
+		incrLimit = min(curVal - lowerBracket, upperBracket - curVal);
 		incr = baseIncr;
 		if(incr > incrLimit){
 			incr = incrLimit;
 			limited = true;
-			outman.DebugMessage("OptimizeBoundedParameter: incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f lbound=%.6f hbound=%.6f incr=%.10f baseIncr=%.6f", pass, start, lnL, initialVal, prevVal, lowerBracket, upperBracket, incr, baseIncr);
+			outman.DebugMessage("OptimizeBoundedParameter: incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f lbound=%.6f hbound=%.6f incr=%.10f baseIncr=%.6f", pass, initialScore, lnL, initialVal, curVal, lowerBracket, upperBracket, incr, baseIncr);
 			}
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal+incr);
-		MakeAllNodesDirty();
-		Score();
+		//evaluate a point just above the current value
+		higherEval = curVal+incr;
+		higherEvalScore = SetAndEvaluateParameter(which, higherEval, SetParam);
 
 #ifdef ADAPTIVE_BOUNDED_OPT
 		bool cont = false;
@@ -530,12 +547,12 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 			//precision (this is not good, and will mean that SP optimization can't be as
 			//rigorous)
 #ifdef SINGLE_PRECISION_FLOATS
-			if(log10(-prev / fabs(prev - lnL)) > 5.0){
+			if(log10(-curScore / fabs(curScore - higherEvalScore)) > 5.0){
 #else
 	#ifdef BOUND_DIGITS
-			if(log10(-prev / fabs(prev - lnL)) > BOUND_DIGITS){
+			if(log10(-curScore / fabs(curScore - higherEvalScore)) > BOUND_DIGITS){
 	#else
-			if(log10(-prev / fabs(prev - lnL)) > 10.0){
+			if(log10(-curScore / fabs(curScore - higherEvalScore)) > 10.0){
 	#endif
 #endif
 				baseIncr *= 5.0;
@@ -545,42 +562,32 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 				if(baseIncr > incrLimit){
 					incr = incrLimit;
 					cont = true;
-					outman.DebugMessage("OptimizeBoundedParameter: adaptive increaase in incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f incr=%.10f baseIncr=%.6f", pass, start, lnL, initialVal, prevVal, incr, baseIncr);
+					outman.DebugMessage("OptimizeBoundedParameter: adaptive increaase in incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f incr=%.10f baseIncr=%.6f", pass, initialScore, curScore, initialVal, curVal, incr, baseIncr);
 					}
 				else 
 					incr = baseIncr;
-				//apply the new increment
-				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal+incr);
-				MakeAllNodesDirty();
-				Score();
+				//apply the new increment and check score difference again
+				higherEval = curVal+incr;
+				higherEvalScore = SetAndEvaluateParameter(which, higherEval, SetParam);
 				}
 			else cont = true;
-			}
+			} 
 #endif
-		cur=lnL;
-		FLOAT_TYPE d11=(cur-prev)/incr;
+		//evaluate a point just below the current value
+		lowerEval = curVal-incr;
+		lowerEvalScore = SetAndEvaluateParameter(which, lowerEval, SetParam);
 
 #ifdef OPT_BOUNDED_LOG
-		double high = lnL;
+		log << incr << "\t" << lowBound << "\t" << lowerBracket << "\t" << lowerEval << "\t" << curVal << "\t" << upperBracket << "\t" << higherEval << "\t" << highBound << "\t" << lowerEvalScore << "\t" << curScore << "\t" << higherEvalScore << "\t";
+		outman.UserMessage("%.10f", curScore);
 #endif
 
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal-incr);
-		MakeAllNodesDirty();
-		Score();
-		cur=lnL;
-		FLOAT_TYPE d12=(cur-prev)/-incr;
-
-#ifdef OPT_BOUNDED_LOG
-		log << incr << "\t" << lowBound << "\t" << lowerBracket << "\t" << prevVal << "\t" << upperBracket << "\t" << highBound << "\t" << lnL << "\t" << prev << "\t" << high << "\t";
-		outman.UserMessage("%.10f", prev);
-#endif
-
+		FLOAT_TYPE d11=(higherEvalScore-curScore)/incr;
+		FLOAT_TYPE d12=(lowerEvalScore-curScore)/-incr;
 		FLOAT_TYPE d1=(d11+d12)*ZERO_POINT_FIVE;
 		FLOAT_TYPE d2=(d11-d12)/incr;
-
 		FLOAT_TYPE est=-d1/d2;
-
-		FLOAT_TYPE proposed = prevVal + est;
+		FLOAT_TYPE proposed = curVal + est;
 
 #ifdef OPT_BOUNDED_LOG
 		log << d1 << "\t" << d2 << "\t" << est << "\t" << proposed << "\t";
@@ -589,63 +596,63 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 		//if the two derivative estimates are equal d2 is zero or undefined and bad things happen.  This is a bit of a hack, but works since it kicks in the pos d2 machinery 
 		if(d11 - d12 == 0){ 
 			d2 = 42.0;
-			outman.DebugMessage("***equal d1's: %f", d11);
+			outman.DebugMessage("***equal d1's: %.4f", d11);
 			}
 
-		//if the evaluation points straddle the optimum, leave now
+		//if the evaluation points straddle the optimum (or minimum), leave now
 		//in cases where the likelihood is unstable we can apparently straddle but end up with a worse likelihood
 		//than what we had initially.  In that case there isn't a lot we can do.  Restore the initial value and exit.
 		if((d11 * d12 < ZERO_POINT_ZERO)){
 #ifdef OPT_BOUNDED_RESTORE
-			if(prev < start){
-				outman.DebugMessage("OptimizeBoundedParameter: optimum straddled, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, start, prev, initialVal, prevVal, d11, d12, incr, baseIncr);
+			if(curScore < initialScore){
+				outman.DebugMessage("OptimizeBoundedParameter: optimum straddled, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr, baseIncr);
 				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
-				prev = start;
+				curScore = initialScore;
 				}
 			else{
-				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
+				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
 				}
 #else
-			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
+			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
 #endif
 			MakeAllNodesDirty();
-			lnL = prev;
+			lnL = curScore;
 #ifdef OPT_BOUNDED_LOG
 			log << "return1" << endl;
 			log.close();
 #endif
-			return prev-start;
+			return curScore-initialScore;
 			}
 
 		//second derivative is positive, so can't use NR.  Bump the value arbitrarily.
 		if(d2 > ZERO_POINT_ZERO){
 			positiveD2Num++;
 			if(d1 > ZERO_POINT_ZERO) 
-				proposed=prevVal*(FLOAT_TYPE)(ONE_POINT_ZERO+0.01*positiveD2Num);
+				proposed=curVal*(FLOAT_TYPE)(ONE_POINT_ZERO+0.01*positiveD2Num);
 			else 
-				proposed=prevVal*(FLOAT_TYPE)(ONE_POINT_ZERO-0.01*positiveD2Num);
+				proposed=curVal*(FLOAT_TYPE)(ONE_POINT_ZERO-0.01*positiveD2Num);
 			}
 
 		//we're proposing below the bound
-		if(d1 < ZERO_POINT_ZERO && proposed < (lowerBracket + epsilon)){
+		if(d1 < ZERO_POINT_ZERO && proposed < (lowerBracket + baseIncr)){
 			//if we're already very close to that bound, exit, unless we've somehow worsened the score
 			//if(prevVal - lowerBracket - epsilon < epsilon * ZERO_POINT_FIVE){
-			if(prevVal - lowerBracket - baseIncr < ZERO_POINT_ZERO){
-				if(prev < start){
-					outman.DebugMessage("OptimizeBoundedParameter: near min bound, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f", pass, start, lnL, initialVal, prevVal, d11, d12, incr);
+			if(curVal - lowerBracket - baseIncr <= ZERO_POINT_ZERO){
+				if(curScore < initialScore){
+					outman.DebugMessage("OptimizeBoundedParameter: near min bound, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr);
 					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
-					prev = start;
+					curScore = initialScore;
 					}
 				else{
-					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
+					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
 					}
 				MakeAllNodesDirty();
-				lnL = prev;
+				lnL = curScore;
 #ifdef OPT_BOUNDED_LOG
 				log << "return2" << endl;
 				log.close();
 #endif
-				return prev-start;
+				return curScore-initialScore;
 				}
 			lowBoundOvershoot++;
 			//The previous behavior for low/high bracket overshooting caused rare problems because it automatically
@@ -655,73 +662,92 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE pr
 			if(lowBoundOvershoot == 2)
 				proposed = lowerBracket + baseIncr;
 			else
-				proposed = (prevVal + lowerBracket) * ZERO_POINT_FIVE;
+				proposed = (curVal + lowerBracket) * ZERO_POINT_FIVE;
 			}
 
 		//we're proposing above the bound
-		else if(d1 > ZERO_POINT_ZERO && proposed > upperBracket - epsilon){
+		else if(d1 > ZERO_POINT_ZERO && proposed > upperBracket - baseIncr){
 			//if we're already very close to that bound, exit, unless we've somehow worsened the score
 			//if(upperBracket - epsilon - prevVal < epsilon * ZERO_POINT_FIVE){
-			if(upperBracket - baseIncr - prevVal < ZERO_POINT_ZERO){
-				if(prev < start){
-					outman.DebugMessage("OptimizeBoundedParameter: near max bound, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f", pass, start, lnL, initialVal, prevVal, d11, d12, incr);
+			if(upperBracket - baseIncr - curVal <= ZERO_POINT_ZERO){
+				if(curScore < initialScore){
+					outman.DebugMessage("OptimizeBoundedParameter: near max bound, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr);
 					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
-					prev = start;
+					curScore = initialScore;
 					}
 				else{
-					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);
+					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
 					}
 				MakeAllNodesDirty();
-				lnL = prev;
+				lnL = curScore;
 #ifdef OPT_BOUNDED_LOG
 				log << "return3" << endl;
 				log.close();
 #endif
-				return prev-start;
+				return curScore-initialScore;
 				}
 			upperBoundOvershoot++;
 			if(upperBoundOvershoot == 2)
 				proposed = upperBracket - baseIncr;
 			else
-				proposed = (prevVal + upperBracket) * ZERO_POINT_FIVE;
+				proposed = (curVal + upperBracket) * ZERO_POINT_FIVE;
 			}
 
 		FLOAT_TYPE estImprove;
 		if(d2 < ZERO_POINT_ZERO) 
-			estImprove = d1*(proposed - prevVal) + (d2 * (proposed - prevVal) * (proposed - prevVal)) * ZERO_POINT_FIVE;
+			estImprove = d1*(proposed - curVal) + (d2 * (proposed - curVal) * (proposed - curVal)) * ZERO_POINT_FIVE;
 		else estImprove = 9999.9;
 
 		//require that we didn't significantly worsen the likelihood overall or on the last pass
-		if(estImprove < optPrecision && prev >= start - 1.0e-6 && lastChange > - 1.0e-6){
-			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, prevVal);;
+		if(estImprove < optPrecision && curScore >= initialScore - 1.0e-6 && lastChange > -1.0e-6){
+			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);;
 			MakeAllNodesDirty();
-			lnL = prev;
+			lnL = curScore;
 #ifdef OPT_BOUNDED_LOG
 			log << "return4" << endl;
 			log.close();			
 #endif
-			return prev-start;
+			return curScore-initialScore;
 			}
 
 		//don't allow infinite looping if something goes wrong
 		if(pass > 1000){
-			throw ErrorException("too many passes in OptimizeBoundedParameter");
+			if(curScore < initialScore){
+				outman.UserMessage("OptimizeBoundedParameter: 1000 passes, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr, baseIncr);
+				outman.UserMessage("****Please report this message to garli.support@gmail.com****");
+				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
+				curScore = initialScore;
+				}
+			else{
+				outman.UserMessage("OptimizeBoundedParameter: 1000 passes without termination.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr, baseIncr);
+				outman.UserMessage("****Please report this message to garli.support@gmail.com****");
+				CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
+				}
+			MakeAllNodesDirty();
+			lnL = curScore;
+			return curScore-initialScore;
+			//throw ErrorException("too many passes in OptimizeBoundedParameter");
 			}
 
 		//update the brackets
-		if(d1 <= ZERO_POINT_ZERO && prevVal < upperBracket)
-			upperBracket = prevVal;
-		else if(d1 > ZERO_POINT_ZERO && prevVal > lowerBracket)
-			lowerBracket = prevVal;
+		if(d1 <= ZERO_POINT_ZERO && curVal < upperBracket)
+			upperBracket = curVal;
+		else if(d1 > ZERO_POINT_ZERO && curVal > lowerBracket)
+			lowerBracket = curVal;
 #ifdef OPT_BOUNDED_LOG
 		log << proposed << endl;
 #endif
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, proposed);;
+/*		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, proposed);;
 		MakeAllNodesDirty();
 		Score();
 		lastChange = lnL - prev;
 		prev=lnL;
 		prevVal=proposed;
+*/		
+		FLOAT_TYPE proposedScore = SetAndEvaluateParameter(which, proposed, SetParam);
+		lastChange = proposedScore - curScore;
+		curScore = proposedScore;
+		curVal = proposed;
 		pass++;
 		}
 	return -1;
