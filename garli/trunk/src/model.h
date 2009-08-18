@@ -379,6 +379,7 @@ public:
 		nstates = 61;//this might be overridden if a nonstandard code is set
 		numRateCats = 1;
 		fixRelativeRates=false;
+		RemoveInvariantSites();
 		}
 
 	void SetAminoAcid(){
@@ -628,7 +629,11 @@ public:
 			}
 		}
 	void SetProportionInvariant(const char *str){
-		if(_stricmp(str, "none") == 0) RemoveInvariantSites();
+		//if the entry didn't appear, depend on the correct default being set by the datatype specification
+		if(_stricmp(str, "unspecified") == 0)
+			return;
+		if(_stricmp(str, "none") == 0) 
+			RemoveInvariantSites();
 		//else if(datatype == CODON || datatype == AMINOACID) throw(ErrorException("Sorry, invariant sites not yet supported with Codon/Aminoacid data"));
 		else if(datatype == CODON){
 			if(_stricmp(str, "fixed") == 0 || _stricmp(str, "estimate") == 0) 
