@@ -1635,7 +1635,7 @@ void Population::Run(){
 
 	//outman.UserMessage("Maximum # clas used = %d out of %d", claMan->MaxUsedClas(), claMan->NumClas());
 
-	if(conf->bootstrapReps==0) outman.UserMessage("finished");
+//	if(conf->bootstrapReps==0) outman.UserMessage("finished");
 
 	//outman.UserMessage("%d conditional likelihood calculations\n%d branch optimization passes", calcCount, optCalcs);
 	rep_fraction_done = 1.0;
@@ -1929,6 +1929,18 @@ void Population::FinalOptimization(){
 		outString += ")";
 		outman.UserMessage("pass %-2d: %.4f   %s", pass++, optInd->Fitness(), outString.c_str());
 		}while(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass < 10);
+#ifdef PUSH_TO_MIN_BLEN
+	double init = indiv[bestIndiv].treeStruct->lnL;
+	int num = indiv[bestIndiv].treeStruct->PushBranchlengthsToMin();
+	indiv[bestIndiv].treeStruct->Score();
+	double aft = indiv[bestIndiv].treeStruct->lnL;
+	double imp=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
+	indiv[bestIndiv].treeStruct->Score();
+	double fin = indiv[bestIndiv].treeStruct->lnL;
+	indiv[bestIndiv].CalcFitness(0);
+	outman.DebugMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
+#endif
+
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
 	unsigned totalSecs = stopwatch.SplitTime();
 	unsigned secs = totalSecs % 60;
@@ -1947,17 +1959,6 @@ void Population::FinalOptimization(){
 		indiv[bestIndiv].treeStruct->mod->CalcSynonymousBranchlengthProportions(sProps);
 		outman.UserMessage("Proportion of branchlengths that are Synonymous: %.5f", sProps[sProps.size()-1]); 
 		}
-#ifdef PUSH_TO_MIN_BLEN
-	double init = indiv[bestIndiv].treeStruct->lnL;
-	int num = indiv[bestIndiv].treeStruct->PushBranchlengthsToMin();
-	indiv[bestIndiv].treeStruct->Score();
-	double aft = indiv[bestIndiv].treeStruct->lnL;
-	double imp=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
-	indiv[bestIndiv].treeStruct->Score();
-	double fin = indiv[bestIndiv].treeStruct->lnL;
-	indiv[bestIndiv].CalcFitness(0);
-	outman.DebugMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
-#endif
 
 #ifdef MAC_FRONTEND
 	pool = [[NSAutoreleasePool alloc] init];
@@ -2019,7 +2020,12 @@ void Population::FinalOptimization(){
 int Population::EvaluateStoredTrees(bool report){
 	double bestL=-FLT_MAX;
 	int bestRep;
-	if(report) outman.UserMessage("\nCompleted %d replicate runs (of %d).\nResults:", storedTrees.size(), conf->searchReps);
+	if(report){
+		outman.UserMessage("\n#######################################################\n\nCompleted %d replicate runs (of %d).", storedTrees.size(), conf->searchReps);
+		if(conf->searchReps > 1)
+			outman.UserMessage("\nNOTE: Unless the following output indicates that search replicates found the\n\tsame topology, you should assume that they found different topologies.");
+		outman.UserMessage("Results:");
+		}
 	for(unsigned r=0;r<storedTrees.size();r++){
 		storedTrees[r]->treeStruct->CalcBipartitions(true);
 		if(storedTrees[r]->Fitness() > bestL){
@@ -2055,29 +2061,37 @@ int Population::EvaluateStoredTrees(bool report){
 				else
 					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)) break;
 				}
-			if(r == bestRep) outman.UserMessageNoCR("Replicate %d : %.4f (best)", r+1, storedTrees[r]->Fitness());
-			else outman.UserMessageNoCR("Replicate %d : %.4f       ", r+1, storedTrees[r]->Fitness());
-			if(r2 < r) outman.UserMessage(" (same topology as %d)", r2+1);
-			else outman.UserMessage("");
+			if(r == bestRep && conf->searchReps > 1) 
+				outman.UserMessageNoCR("Replicate %d : %.4f (best)", r+1, storedTrees[r]->Fitness());
+			else 
+				outman.UserMessageNoCR("Replicate %d : %.4f       ", r+1, storedTrees[r]->Fitness());
+			if(r2 < r) 
+				outman.UserMessage(" (same topology as %d)", r2+1);
+			else 
+				outman.UserMessage("");
 			}
 
-		outman.UserMessage("\nParameter estimates across search replicates:");
-			if(storedTrees[0]->mod->paramsToMutate.size() > 0){
-				string s;
-				storedTrees[0]->mod->FillModelOrHeaderStringForTable(s, false);
-				outman.UserMessage("       %s", s.c_str());
-				for(unsigned i=0;i<storedTrees.size();i++){
-					storedTrees[i]->mod->FillModelOrHeaderStringForTable(s, true);
-					outman.UserMessage("rep%2d: %s", i+1, s.c_str());
-					}
+		if(conf->searchReps > 1)
+			outman.UserMessage("\nParameter estimates across search replicates:");
+		else 
+			outman.UserMessage("\nParameter estimates:");
+		if(storedTrees[0]->mod->paramsToMutate.size() > 0){
+			string s;
+			storedTrees[0]->mod->FillModelOrHeaderStringForTable(s, false);
+			outman.UserMessage("       %s", s.c_str());
+			for(unsigned i=0;i<storedTrees.size();i++){
+				storedTrees[i]->mod->FillModelOrHeaderStringForTable(s, true);
+				outman.UserMessage("rep%2d: %s", i+1, s.c_str());
 				}
-			else{
-				outman.UserMessage("\t Model contains no estimated parameters");
-				}
+			}
+		else{
+			outman.UserMessage("\t Model contains no estimated parameters");
+			}
 
 		if(conf->bootstrapReps == 0){
-			outman.UserMessage("Final result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
-			outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
+			outman.UserMessage("\nFinal result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
+			if(conf->searchReps > 1)
+				outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
 			}
 		}
 	return bestRep;
@@ -2227,7 +2241,8 @@ void Population::PerformSearch(){
 
 		//this rep is over
 		if(prematureTermination == false){
-			if(s.length() > 0) outman.UserMessage(">>>Completed %s<<<\n", s.c_str());
+			if(s.length() > 0) outman.UserMessage(">>>Completed %s<<<", s.c_str());
+			outman.UserMessage("");
 			//not sure where this should best go
 			outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
 			indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
@@ -2237,7 +2252,7 @@ void Population::PerformSearch(){
 				Individual repResultColl(&indiv[bestIndiv]);
 				int numCollapsed = 0;
 				repResultColl.treeStruct->root->CollapseMinLengthBranches(numCollapsed);
-				outman.UserMessage("\nNOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");\
+				outman.UserMessage("NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");\
 				if(numCollapsed == 0)
 					outman.UserMessage("    No branches were short enough to be collapsed.");
 				else
@@ -2271,7 +2286,7 @@ void Population::PerformSearch(){
 
 		int best=0;
 		if((currentSearchRep == conf->searchReps) || prematureTermination){
-			if(storedTrees.size() > 1){
+//			if(storedTrees.size() > 1){
 				best=EvaluateStoredTrees(true);
 				//recombine final trees
 	/*			if(total_size > 2){
@@ -2312,7 +2327,7 @@ void Population::PerformSearch(){
 				Individual *repResult = new Individual(&indiv[0]);
 				storedTrees.push_back(repResult);
 				outman.UserMessage("Best topology created by recombination: %f", indiv[0].Fitness());
-	*/			}
+	*///		}
 			}
 
 		if( (prematureTermination == false && (all_best_output & WRITE_REP_TERM)) ||

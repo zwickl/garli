@@ -1871,7 +1871,7 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 	if(modSpec.IsCodon()){
 		for(int i=0;i<omegas.size();i++){
 			if(model){
-				sprintf(cStr,"%5.3f %5.3f", *omegas[i], *omegaProbs[i]);
+				sprintf(cStr,"%5.3f %5.3f ", *omegas[i], *omegaProbs[i]);
 				s += cStr;
 				}
 			else{
