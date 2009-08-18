@@ -187,7 +187,8 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetUnsignedOption("numratecats", numRateCats, true);	
 	cr.GetStringOption("statefrequencies", stateFrequencies, true);
 	cr.GetStringOption("ratematrix", rateMatrix, true);
-	cr.GetStringOption("invariantsites", proportionInvariant, true);
+	if(cr.GetStringOption("invariantsites", proportionInvariant, true) == -1)
+		proportionInvariant = "unspecified";
 	cr.GetStringOption("datatype", datatype, true);
 	cr.GetStringOption("geneticcode", geneticCode, true);
 
