@@ -1443,7 +1443,7 @@ void Population::Run(){
 	outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
 #endif
 #ifdef OUTPUT_FRACTION_DONE
-	outman.UserMessageNoCR("%13.0f%% %13.0f%%", rep_fraction_done * 100, tot_fraction_done * 100);
+	outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
 #endif
 	outman.UserMessage("");
 
@@ -1478,7 +1478,7 @@ void Population::Run(){
 			outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
 #endif
 #ifdef OUTPUT_FRACTION_DONE
-			outman.UserMessageNoCR("%13.0f%% %13.0f%%", rep_fraction_done * 100, tot_fraction_done * 100);
+			outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
 #endif
 			outman.UserMessage("");
 
@@ -1772,7 +1772,7 @@ void Population::UpdateFractionDone(int phase){
 				//this is linear until we get past the absolute minimum point that the run could have finished
 				FLOAT_TYPE remaining = thirdBreak - secondBreak;
 				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
-				double split = 0.25;
+				double split = 0.5;
 				if(sinceLastReduction <=  conf->lastTopoImproveThresh){
 					new_fract = secondBreak + remaining * split * (sinceLastReduction / (FLOAT_TYPE) conf->lastTopoImproveThresh);
 					}
@@ -4094,7 +4094,7 @@ void Population::OutputLog()	{
 	if(gen < UINT_MAX) {
 		log << gen << "\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision;
 #ifdef OUTPUT_FRACTION_DONE
-		log << "\t" << rep_fraction_done << "\t" << tot_fraction_done;
+		log << "\t" << 0.01 * (int) ceil(rep_fraction_done * 100) << "\t" << 0.01 * (int) ceil(tot_fraction_done * 100);
 #endif
 		log << endl;
 #ifdef MAC_FRONTEND
