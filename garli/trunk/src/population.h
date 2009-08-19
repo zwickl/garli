@@ -443,7 +443,7 @@ private:
 		void DetermineParentage();
 		void FindTreeStructsForNextGeneration();
 		void PerformMutation(int indNum);
-		void UpdateFractionDone();
+		void UpdateFractionDone(int phase);
 		bool OutgroupRoot(Individual *ind, int indnum);
 		void LoadNexusStartingConditions();
 		void VariableStartingTreeOptimization(bool reducing);
