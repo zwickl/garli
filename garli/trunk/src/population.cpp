@@ -1717,7 +1717,7 @@ void Population::UpdateFractionDone(int phase){
 		//figure out what proportion of the run the reduction period is vs the final period before termination (minimally)
 		double minPhase2 = (adap->numPrecReductions - 1) * evalInterval;
 		//since the final portion will be slower per gen because of the lower prec, downweight the reduction phase further
-		FLOAT_TYPE p = 0.75 * (minPhase2 / (double) (minPhase2 + conf->lastTopoImproveThresh));
+		FLOAT_TYPE p = 0.9 * (minPhase2 / (double) (minPhase2 + conf->lastTopoImproveThresh));
 		secondBreak = firstBreak + (thirdBreak - firstBreak) * p;
 		}
 	else{
@@ -1740,7 +1740,7 @@ void Population::UpdateFractionDone(int phase){
 			if(willReduce && remaining_reductions == adap->numPrecReductions){
 				//we've done a decent number of gen, but haven't yet reduced the prec
 
-				//this will be linear to halfway to the first break, when the minimum possible
+				//this will be linear to "split" proportion of the way to the first break, when the minimum possible
 				//number of generations before a prec reduction could happen have passed
 				//then it will be asymptotic toward the first break
 				FLOAT_TYPE split = 0.5;
@@ -1755,7 +1755,7 @@ void Population::UpdateFractionDone(int phase){
 			else if(willReduce && remaining_reductions > 0){
 				//divide the rest of the way up to the second break evenly among the precision reductions
 				FLOAT_TYPE perReduction = (secondBreak - firstBreak) / ((FLOAT_TYPE) adap->numPrecReductions - 1.0);
-				//again, linear to halfway, then asymptotic
+				//again, linear to "split" proportion, then asymptotic
 				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
 				FLOAT_TYPE split = 0.5;
 				if(sinceLastReduction <= evalInterval){
@@ -1767,12 +1767,10 @@ void Population::UpdateFractionDone(int phase){
 				}
 	
 			else if(remaining_reductions == 0){
-				//the new way
-				//Use the first half of X for the time up until we actually reach (gen - lastPrecisionReduction) == conf->lastTopoImproveThresh
-				//this is linear until we get past the absolute minimum point that the run could have finished
+				//this is linear to "split" proportion until we get past the absolute minimum point that the run could have finished
 				FLOAT_TYPE remaining = thirdBreak - secondBreak;
 				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
-				double split = 0.5;
+				double split = 0.6;
 				if(sinceLastReduction <=  conf->lastTopoImproveThresh){
 					new_fract = secondBreak + remaining * split * (sinceLastReduction / (FLOAT_TYPE) conf->lastTopoImproveThresh);
 					}
