@@ -1553,27 +1553,11 @@ void Population::Run(){
 					CalcAverageFitness();
 					outman.UserMessage("\t\t\toptimizing flex rates:%.4f -> %.4f", before, bestFitness);
 					}
-
-/*				if(modSpec.IsCodon()){
-					before=bestFitness;
-					indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
-					indiv[bestIndiv].SetDirty();
-					CalcAverageFitness();
-					outman.UserMessage("optimizing omega parameters:%.4f -> %.4f", before, bestFitness);
-					}
-*/				}
+				}
 
 			UpdateFractionDone(2);
 
-/*			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
-				FLOAT_TYPE before=bestFitness;
-				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-				indiv[bestIndiv].SetDirty();
-				CalcAverageFitness();
-				outman.UserMessage("optimizing branchlengths...\t%.4f %.4f", before, bestFitness);
-				}
-*/
-			//termination conditions
+			//automatic termination conditions
 			if(conf->enforceTermConditions == true
 #ifdef SWAP_BASED_TERMINATION
 				&& (gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))))
@@ -1673,40 +1657,7 @@ void Population::UpdateFractionDone(int phase){
 	int remaining_reductions = willReduce ? adap->numPrecReductions - reduction_number : 0;
 	
 	FLOAT_TYPE minFract = min(current_fract, max((double) stopwatch.SplitTime() / conf->stoptime, (double) gen / conf->stopgen));
-	FLOAT_TYPE startPoint, initialBreak, firstBreak, secondBreak, thirdBreak, fourthBreak;
-
-//	int minTotalRunLength = conf->lastTopoImproveThresh + (willReduce ? (adap->numPrecReductions * (adap->intervalLength * adap->intervalsToStore)) : 0);
-//	int minRemainingRunLength = conf->lastTopoImproveThresh + (willReduce ? (remaining_reductions * (adap->intervalLength * adap->intervalsToStore)) : 0);
-//	int fivePercent = max(50, (int)(0.005 * minTotalRunLength)*10);
-
-	/*when the prec will be reduced, we have:
-	(add something for stepwise and initial opt?  5%)
-	 0-25 : before first reduction
-	25-60(or less) : before min prec
-	60-99 : after reaching min prec
-	99-100 : final opt (increase?)
-	
-	EDIT - WE already have lastPrecisionReduction for this:
-	Probably need to add something like minPrecAtGen variable to Population, which will allow unambiguous calculation of
-	progress after second break.  It won't be able to take reseting of the remaining gen thresh, but I don't see a way 
-	around that.
-	Just after min has been reached reset is much more likely, so don't want progress that is linear with gen since min
-	prec.
-	If X is the percentage that we have to play with (1.0 - secondBreak - whateverForFinalOpt)
-	//maybe linear would be best with this
-	if((gen - lastPrecisionReduction) <  conf->lastTopoImproveThresh)
-		fract = secondBreak + X/2 * ((gen - lastPrecisionReduction) / conf->lastTopoImproveThresh);
-	//	fract = secondBreak + X/2 * sqrt((gen - lastPrecisionReduction) / conf->lastTopoImproveThresh);
-	Since the actual (gen - lastPrecisionReduction) may be much larger than the conf->lastTopoImproveThresh,
-	Use the first half of X for the time up until we actually reach (gen - lastPrecisionReduction) == conf->lastTopoImproveThresh
-	
-	//this is linear until we get past the absolute minimum point that the run could have finished
-	if((gen - lastPrecisionReduction) <=  conf->lastTopoImproveThresh)
-		fract = secondBreak + X/2 * ((gen - lastPrecisionReduction) / conf->lastTopoImproveThresh);
-	//thereafter it is conservatively asymtotic
-	else
-		fract = secondBreak + X/2 + X/2 * (conf->lastTopoImproveThresh / (gen - lastPrecisionReduction));
-	*/
+	FLOAT_TYPE startPoint, initialBreak, firstBreak, secondBreak, thirdBreak, t_fraction_done;
 	
 	double evalInterval = (adap->intervalLength * adap->intervalsToStore);
 	
@@ -1714,31 +1665,36 @@ void Population::UpdateFractionDone(int phase){
 	initialBreak = 0.05;
 	thirdBreak = 0.95;
 
-	if(willReduce){
-		firstBreak = 0.15;
-		//figure out what proportion of the run the reduction period is vs the final period before termination (minimally)
-		double minPhase2 = (adap->numPrecReductions - 1) * evalInterval;
-		//since the final portion will be slower per gen because of the lower prec, downweight the reduction phase further
-		FLOAT_TYPE p = 0.9 * (minPhase2 / (double) (minPhase2 + conf->lastTopoImproveThresh));
-		secondBreak = firstBreak + (thirdBreak - firstBreak) * p;
+	if(!conf->enforceTermConditions){
+		//proportion done is just this
+		t_fraction_done = max((FLOAT_TYPE) gen / conf->stopgen, (FLOAT_TYPE) stopwatch.SplitTime() / conf->stoptime);
+		//this can't really be calculated, but it doesn't really matter
+		rep_fraction_done = t_fraction_done / 2.0;
 		}
-	else{
-		initialBreak = firstBreak = secondBreak = 0.10;
-		}
+	else {
+		if(willReduce){
+			firstBreak = 0.15;
+			//figure out what proportion of the run the reduction period is vs the final period before termination (minimally)
+			double minPhase2 = (adap->numPrecReductions - 1) * evalInterval;
+			//since the final portion will be slower per gen because of the lower prec, downweight the reduction phase further
+			FLOAT_TYPE p = 0.9 * (minPhase2 / (double) (minPhase2 + conf->lastTopoImproveThresh));
+			secondBreak = firstBreak + (thirdBreak - firstBreak) * p;
+			}
+		else{
+			initialBreak = firstBreak = secondBreak = 0.10;
+			}
 
-	if(phase == 0){
-		//reading of the data and memory allocation are done, but not much else
-		new_fract = startPoint;
-		}
-	else if(phase == 1){
-		//the population has been seeding and is at gen 0
-		new_fract = initialBreak;
-		}
-	else if(phase == 2){
-		//the normal generation cycle has started.
-		//The function will now start doing its own calculations of the fraction done.
-		//WE ACTUALLY WANT TO KNOW IF THE RUN WILL BE LIMITED BY TIME OR GEN LIMIT, NOT IF ENFORCE_TERM IS ON
-		if(conf->enforceTermConditions){
+		if(phase == 0){
+			//reading of the data and memory allocation are done, but not much else
+			new_fract = startPoint;
+			}
+		else if(phase == 1){
+			//the population has been seeding and is at gen 0
+			new_fract = initialBreak;
+			}
+		else if(phase == 2){
+			//the normal generation cycle has started.
+			//The function will now start doing its own calculations of the fraction done.
 			if(willReduce && remaining_reductions == adap->numPrecReductions){
 				//we've done a decent number of gen, but haven't yet reduced the prec
 
@@ -1787,32 +1743,28 @@ void Population::UpdateFractionDone(int phase){
 					}
 				}
 			}
-		else{
-			assert(0);
+		else if(phase == 3){
+			//the generations are over, and we're ready for final optimization
+			new_fract = thirdBreak;
 			}
-		//outman.DebugMessage("Fraction done calculated as %f", new_fract);
-		}
-	else if(phase == 3){
-		//the generations are over, and we're ready for final optimization
-		new_fract = thirdBreak;
-		}
-	else{
-		//we're fully done
-		assert(phase == 4);
-		new_fract = 1.0;
-		}
+		else{
+			//we're fully done
+			assert(phase == 4);
+			new_fract = 1.0;
+			}
 
-	if(! (new_fract >= current_fract)){
-		outman.DebugMessage("new_fract less than current_fract: %.4f vs %.4f", new_fract, current_fract);
-		}
-	rep_fraction_done = new_fract;
+		if(! (new_fract >= current_fract)){
+			outman.DebugMessage("new_fract less than current_fract: %.4f vs %.4f", new_fract, current_fract);
+			}
+		rep_fraction_done = new_fract;
 
-	//now figure out the total proportion done from the amount of this rep that is done and the current rep #
-	int totSearches = conf->searchReps * (conf->bootstrapReps > 0 ? conf->bootstrapReps : 1);
-	int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
-	FLOAT_TYPE repFract = 1.0 / totSearches;
-	FLOAT_TYPE t_fraction_done = (curSearch - 1) * repFract + (repFract * rep_fraction_done);
-	assert(t_fraction_done >= tot_fraction_done);
+		//now figure out the total proportion done from the amount of this rep that is done and the current rep #
+		int totSearches = conf->searchReps * (conf->bootstrapReps > 0 ? conf->bootstrapReps : 1);
+		int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
+		FLOAT_TYPE repFract = 1.0 / totSearches;
+		t_fraction_done = (curSearch - 1) * repFract + (repFract * rep_fraction_done);
+		assert(t_fraction_done >= tot_fraction_done);
+		}
 	tot_fraction_done = t_fraction_done;
 	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
 #ifdef BOINC
