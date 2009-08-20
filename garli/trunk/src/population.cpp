@@ -1770,7 +1770,11 @@ void Population::UpdateFractionDone(int phase){
 				//this is linear to "split" proportion until we get past the absolute minimum point that the run could have finished
 				FLOAT_TYPE remaining = thirdBreak - secondBreak;
 				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
-				double split = 0.6;
+				//double split = 0.6;
+				//the chance of going over the minimum # gen in the last phase is small with lower # of taxa, which makes for a big jump
+				//in proportion because the asymptotic phase isn't entered at all.  Scale the proportion where the asymp phase starts
+				//with the # of taxa
+				double split = max(0.6, 0.9 - 0.10 * (data->NTax() / 50));
 				if(sinceLastReduction <=  conf->lastTopoImproveThresh){
 					new_fract = secondBreak + remaining * split * (sinceLastReduction / (FLOAT_TYPE) conf->lastTopoImproveThresh);
 					}
