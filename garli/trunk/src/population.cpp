@@ -2330,13 +2330,11 @@ void Population::PerformSearch(){
 			else{
 				outman.UserMessage("WARNING: Site likelihoods being output on prematurely terminated run ...");
 				}
-			indiv[bestIndiv].treeStruct->sitelikeLevel = conf->outputSitelikelihoods;
+			if(currentSearchRep > 1)
+				indiv[bestIndiv].treeStruct->sitelikeLevel = -conf->outputSitelikelihoods;
+			else
+				indiv[bestIndiv].treeStruct->sitelikeLevel = conf->outputSitelikelihoods;
 			indiv[bestIndiv].treeStruct->ofprefix = conf->ofprefix;
-			if(conf->searchReps > 1){
-				char temp[6];
-				sprintf(temp, ".rep%d", currentSearchRep);
-				indiv[bestIndiv].treeStruct->ofprefix += temp;
-				}
 			indiv[bestIndiv].treeStruct->Score();
 			string oname = indiv[bestIndiv].treeStruct->ofprefix + ".sitelikes.log";
 			ofstream ordered;
