@@ -387,8 +387,8 @@ void Population::CheckForIncompatibleConfigEntries(){
 		throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
 	if(conf->outputSitelikelihoods > 0 && conf->bootstrapReps > 0) 
 		throw(ErrorException("You cannont output site likelihoods during a bootstrap run!"));
-	if(conf->outputSitelikelihoods > 0 && conf->searchReps > 1)
-		throw(ErrorException("You cannont output site likelihoods during a multi-rep run (searchreps > 1)!"));
+//	if(conf->outputSitelikelihoods > 0 && conf->searchReps > 1)
+//		throw(ErrorException("You cannont output site likelihoods during a multi-rep run (searchreps > 1)!"));
 	}
 
 void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r){
@@ -2302,6 +2302,8 @@ void Population::PerformSearch(){
 			indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
 			if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
 			Individual *repResult = new Individual(&indiv[bestIndiv]);
+			//Note that the collapsed individual is intentionally not stored here.  It will be re-collapsed on
+			//output to file, and the collapsing here is just for this message
 			if(conf->collapseBranches){
 				Individual repResultColl(&indiv[bestIndiv]);
 				int numCollapsed = 0;
@@ -2321,7 +2323,7 @@ void Population::PerformSearch(){
 
 		//output site likelihoods if requested
 		if(conf->outputSitelikelihoods > 0){
-			assert(conf->searchReps == 1 && conf->bootstrapReps == 0);
+			//assert(conf->searchReps == 1 && conf->bootstrapReps == 0);
 			if(prematureTermination == false){
 				outman.UserMessage("Outputting site likelihoods ...");
 				}
@@ -2330,17 +2332,23 @@ void Population::PerformSearch(){
 				}
 			indiv[bestIndiv].treeStruct->sitelikeLevel = conf->outputSitelikelihoods;
 			indiv[bestIndiv].treeStruct->ofprefix = conf->ofprefix;
+			if(conf->searchReps > 1){
+				char temp[6];
+				sprintf(temp, ".rep%d", currentSearchRep);
+				indiv[bestIndiv].treeStruct->ofprefix += temp;
+				}
 			indiv[bestIndiv].treeStruct->Score();
-			string oname = conf->ofprefix + ".ordSiteLikes.log";
+			string oname = indiv[bestIndiv].treeStruct->ofprefix + ".sitelikes.log";
 			ofstream ordered;
 			ordered.open(oname.c_str(), ios::app);
 			ordered.precision(12);
-			ordered << "1\t" << indiv[bestIndiv].treeStruct->lnL;
+			ordered << currentSearchRep << "\t" << indiv[bestIndiv].treeStruct->lnL << "\n";
+			ordered.close();
 			}
 
 		int best=0;
 		if((currentSearchRep == conf->searchReps) || prematureTermination){
-//			if(storedTrees.size() > 1){
+			if(storedTrees.size() > 0){
 				best=EvaluateStoredTrees(true);
 				//recombine final trees
 	/*			if(total_size > 2){
@@ -2381,7 +2389,8 @@ void Population::PerformSearch(){
 				Individual *repResult = new Individual(&indiv[0]);
 				storedTrees.push_back(repResult);
 				outman.UserMessage("Best topology created by recombination: %f", indiv[0].Fitness());
-	*///		}
+				
+		*/		}
 			}
 
 		if( (prematureTermination == false && (all_best_output & WRITE_REP_TERM)) ||

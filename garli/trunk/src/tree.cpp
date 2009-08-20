@@ -4850,7 +4850,7 @@ void Tree::OutputSiteLikelihoods(vector<double> &likes, const int *under1, const
 	bool append = sitelikeLevel < 0;
 	sitelikeLevel = abs(sitelikeLevel);
 	ofstream ordered, packed;
-	string oname = ofprefix + ".ordSiteLikes.log";
+	string oname = ofprefix + ".sitelikes.log";
 	ordered.open(oname.c_str(), (append == true ? ios::app : ios::out));
 	if(sitelikeLevel > 1){
 		string pname = ofprefix + ".packedSiteLikes.log";
