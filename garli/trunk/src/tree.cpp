@@ -6007,6 +6007,15 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 
 #undef DEBUG_OMEGA_OPT
 
+	//codon models can be a little unstable, so make the difference in scores that we're looking for in OptBounded a bit larger.  9 is the default value.
+	//it really shouldn't matter in almost all cases.
+	FLOAT_TYPE scoreDiffTarget;
+#ifdef SINGLE_PRECISION_FLOATS
+	scoreDiffTarget = 4.0;
+#else
+	scoreDiffTarget = 7.0;
+#endif
+
 	//limiting change in any one pass
 	double maxRateChangeProp = 0.5;
 	double maxProbChange = 0.10;
@@ -6016,12 +6025,12 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), 0,
 			max(minVal, mod->Omega(0)*0.333),
 			min(9999.9, mod->Omega(0)+mod->Omega(0)*0.333),
-			&Model::SetOmega);
+			&Model::SetOmega, scoreDiffTarget);
 	else{
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i,
 			max(minVal, mod->Omega(i)*maxRateChangeProp),
 			min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp),
-			&Model::SetOmega);
+			&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 		for(int j=0;j<mod->NRateCats();j++)
@@ -6031,7 +6040,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
 			max(minVal, mod->OmegaProb(i)-maxProbChange),
 			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange),
-			&Model::SetOmegaProb);
+			&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 		for(int j=0;j<mod->NRateCats();j++)
@@ -6042,7 +6051,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 			omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i,
 				max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
 				min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp),
-				&Model::SetOmega);
+				&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 			for(int j=0;j<mod->NRateCats();j++)
@@ -6052,7 +6061,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 			omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
 				max(minVal, mod->OmegaProb(i)-maxProbChange),
 				min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange),
-				&Model::SetOmegaProb);
+				&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 			for(int j=0;j<mod->NRateCats();j++)
@@ -6062,7 +6071,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i,
 			max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
 			min(9999.9, mod->Omega(i)+mod->Omega(i)*maxRateChangeProp),
-			&Model::SetOmega);
+			&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 		for(int j=0;j<mod->NRateCats();j++)
@@ -6072,7 +6081,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
 			max(minVal, mod->OmegaProb(i)-maxProbChange),
 			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange),
-			&Model::SetOmegaProb);
+			&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 		for(int j=0;j<mod->NRateCats();j++)
@@ -6130,6 +6139,21 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 	FLOAT_TYPE minVal = 1.0e-5;
 	int i=0;
 
+	//codon models can be a little unstable, so make the difference in scores that we're looking for in OptBounded a bit larger.  9 is the default value.
+	//it really shouldn't matter in almost all cases.
+	FLOAT_TYPE scoreDiffTarget;
+#ifdef SINGLE_PRECISION_FLOATS
+	if(modSpec.IsCodon())
+		scoreDiffTarget = 4.0;
+	else
+		scoreDiffTarget = 5.0;
+#else
+	if(modSpec.IsCodon())
+		scoreDiffTarget = 7.0;
+	else
+		scoreDiffTarget = 9.0;
+#endif
+
 	//limiting change in any one pass
 	double maxPropChange = 5.0;	
 	
@@ -6139,7 +6163,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 		rateImprove += OptimizeBoundedParameter(prec, mod->Rates(1), 1, 
 				max(min(0.05, mod->Rates(1)), mod->Rates(1) / maxPropChange),
 				min(max(999.0, mod->Rates(1)), mod->Rates(1) * maxPropChange),
-				&Model::SetRelativeNucRate);
+				&Model::SetRelativeNucRate, scoreDiffTarget);
 /*				
 		rateImprove += OptimizeBoundedParameter(prec, mod->Rates(0), 0, 
 				max(0.05, mod->Rates(0) / maxPropChange),
@@ -6162,7 +6186,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 				rateImprove += OptimizeBoundedParameter(prec, mod->Rates(i), i, 
 					max(min(0.05, mod->Rates(i)), mod->Rates(i) / maxPropChange),
 					min(max(999.0, mod->Rates(i)), mod->Rates(i) * maxPropChange),
-					&Model::SetRelativeNucRate);
+					&Model::SetRelativeNucRate, scoreDiffTarget);
 				//DEBUG
 /*				sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
 				outman.UserMessage("%s", temp);
@@ -6187,33 +6211,41 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 	double maxRateChangeProp = 0.75;
 	double maxProbChange = 0.20;
 
+	//very tight increments really seems to help flex optimization
+	FLOAT_TYPE scoreDiffTarget;
+#ifdef SINGLE_PRECISION_FLOATS
+	scoreDiffTarget = 5.0;
+#else
+	scoreDiffTarget = 10.0;
+#endif
+
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i,
 		max(minVal, mod->FlexRate(i)*maxRateChangeProp),
 		min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),
-		&Model::SetFlexRate);
+		&Model::SetFlexRate, scoreDiffTarget);
 
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i,
 		max(minVal, mod->FlexProb(i)-maxProbChange),
 		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
-		&Model::SetFlexProb);
+		&Model::SetFlexProb, scoreDiffTarget);
 	for(i=1;i < mod->NRateCats()-1;i++){
 		flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i,
 			max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp),
 			min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),
-			&Model::SetFlexRate);
+			&Model::SetFlexRate, scoreDiffTarget);
 		flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i,
 			max(minVal, mod->FlexProb(i)-maxProbChange),
 			min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
-			&Model::SetFlexProb);
+			&Model::SetFlexProb, scoreDiffTarget);
 		}
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i,
 		max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp),
 		min(999.9, mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),
-		&Model::SetFlexRate);
+		&Model::SetFlexRate, scoreDiffTarget);
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i,
 		max(minVal, mod->FlexProb(i)-maxProbChange),
 		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
-		&Model::SetFlexProb);
+		&Model::SetFlexProb, scoreDiffTarget);
 
 
 /*
