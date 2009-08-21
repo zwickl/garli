@@ -444,7 +444,7 @@ FLOAT_TYPE Tree::SetAndEvaluateParameter(int which, FLOAT_TYPE val, void (Model:
 	return lnL;
 	}
 
-FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE initialVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE)){
+FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE initialVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE targetScoreDigits /* DP = 9, SP = 5 */){
 	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) 
 		Score();
 
@@ -471,7 +471,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		//MakeAllNodesDirty();
 		}
 	//if the bounds are so tight that we can't be > epsilon from both, exit
-	if(curVal - lowBound < epsilon || highBound - curVal < epsilon){
+	if(curVal - lowBound < epsilon && highBound - curVal < epsilon){
 		outman.DebugMessage("OptimizeBoundedParameter: bounds fully constrain parameter %.6f <- %.6f -> %.6f", lowBound, curVal, highBound);
 		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
 		MakeAllNodesDirty();
@@ -545,15 +545,23 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 			//less than the total likelihoods (this is plenty safe), or 5 orders in single 
 			//precision (this is not good, and will mean that SP optimization can't be as
 			//rigorous)
+
+/*
 #ifdef SINGLE_PRECISION_FLOATS
-			if(log10(-curScore / fabs(curScore - higherEvalScore)) > 5.0){
+			if(log10(-curScore / fabs(curScore - higherEvalScore)) > 5){
 #else
+			scoreDiffRatio = fabs(curScore / (curScore - higherEvalScore));
+			diffDigits = log10(-curScore / fabs(curScore - higherEvalScore));
 	#ifdef BOUND_DIGITS
-			if(log10(-curScore / fabs(curScore - higherEvalScore)) > BOUND_DIGITS){
+			if(diffDigits > BOUND_DIGITS){
 	#else
 			if(log10(-curScore / fabs(curScore - higherEvalScore)) > 10.0){
 	#endif
 #endif
+*/
+			diffDigits = log10(-curScore / fabs(curScore - higherEvalScore));
+			if(diffDigits > targetScoreDigits){
+				incrIncreases++;
 				baseIncr *= 5.0;
 				//if the increased increment would be greater than what we are allowed
 				//by our bound we'll have to use the limited incr.  We'll try the increased baseIncr
@@ -561,7 +569,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 				if(baseIncr > incrLimit){
 					incr = incrLimit;
 					cont = true;
-					outman.DebugMessage("OptimizeBoundedParameter: adaptive increaase in incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f incr=%.10f baseIncr=%.6f", pass, initialScore, curScore, initialVal, curVal, incr, baseIncr);
+					outman.DebugMessage("OptimizeBoundedParameter: adaptive increase in incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f incr=%.10f baseIncr=%.6f", pass, initialScore, curScore, initialVal, curVal, incr, baseIncr);
 					}
 				else 
 					incr = baseIncr;
@@ -577,7 +585,8 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		lowerEvalScore = SetAndEvaluateParameter(which, lowerEval, SetParam);
 
 #ifdef OPT_BOUNDED_LOG
-		log << incr << "\t" << lowBound << "\t" << lowerBracket << "\t" << lowerEval << "\t" << curVal << "\t" << higherEval << "\t" << upperBracket << "\t" << highBound << "\t" << lowerEvalScore << "\t" << curScore << "\t" << higherEvalScore << "\t";
+		log << incr << "\t" << incrIncreases << "\t" << diffDigits << "\t";
+		log << lowBound << "\t" << lowerBracket << "\t" << lowerEval << "\t" << curVal << "\t" << higherEval << "\t" << upperBracket << "\t" << highBound << "\t" << lowerEvalScore << "\t" << curScore << "\t" << higherEvalScore << "\t";
 		outman.UserMessage("%.10f", curScore);
 #endif
 
@@ -636,7 +645,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		if(d1 < ZERO_POINT_ZERO && proposed < (lowerBracket + baseIncr)){
 			//if we're already very close to that bound, exit, unless we've somehow worsened the score
 			//if(prevVal - lowerBracket - epsilon < epsilon * ZERO_POINT_FIVE){
-			if(curVal - lowerBracket - baseIncr <= ZERO_POINT_ZERO){
+			if(curVal - lowerBracket - baseIncr * ZERO_POINT_FIVE <= ZERO_POINT_ZERO){
 				if(curScore < initialScore){
 					outman.DebugMessage("OptimizeBoundedParameter: near min bound, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr);
 					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
@@ -659,7 +668,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 			//the low and high brackets propose a value past the other, this can ping-pong back and forth making only
 			//very tiny moves inward, and crap out once 1000 reps have been completed.  Now just try near the bound once
 			if(lowBoundOvershoot == 2)
-				proposed = lowerBracket + baseIncr;
+				proposed = lowerBracket + baseIncr * ZERO_POINT_FIVE;
 			else
 				proposed = (curVal + lowerBracket) * ZERO_POINT_FIVE;
 			}
@@ -668,7 +677,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		else if(d1 > ZERO_POINT_ZERO && proposed > upperBracket - baseIncr){
 			//if we're already very close to that bound, exit, unless we've somehow worsened the score
 			//if(upperBracket - epsilon - prevVal < epsilon * ZERO_POINT_FIVE){
-			if(upperBracket - baseIncr - curVal <= ZERO_POINT_ZERO){
+			if(upperBracket - baseIncr * ZERO_POINT_FIVE - curVal <= ZERO_POINT_ZERO){
 				if(curScore < initialScore){
 					outman.DebugMessage("OptimizeBoundedParameter: near max bound, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr);
 					CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
@@ -687,7 +696,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 				}
 			upperBoundOvershoot++;
 			if(upperBoundOvershoot == 2)
-				proposed = upperBracket - baseIncr;
+				proposed = upperBracket - baseIncr * ZERO_POINT_FIVE;
 			else
 				proposed = (curVal + upperBracket) * ZERO_POINT_FIVE;
 			}
