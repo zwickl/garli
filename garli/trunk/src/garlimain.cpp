@@ -91,6 +91,10 @@ std::string GetSvnDate(){
 	return ret;
 	}
 
+void OutputVersion(){
+	outman.UserMessage("%s Version %.2f%s.r%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
+	}
+
 int CheckRestartNumber(const string str){
 	int num=1;
 	char temp_buf[100];
@@ -104,6 +108,7 @@ int CheckRestartNumber(const string str){
 
 void UsageMessage(char *execName){
 #ifdef SUBROUTINE_GARLI
+	OutputVersion();
 	outman.UserMessage("This MPI version is for doing a large number of search replicates or bootstrap");
 	outman.UserMessage("replicates, each using the SAME config file.  The results will be exactly");
  	outman.UserMessage("identical to those obtained by executing the config file a comparable number");
@@ -115,6 +120,7 @@ void UsageMessage(char *execName){
 	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
 	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs\n");
 #elif defined (OLD_SUBROUTINE_GARLI)
+	OutputVersion();
 	outman.UserMessage("This MPI version is for doing a large number of independent jobs in batch, each");
 	outman.UserMessage("using a DIFFERENT config file.  This might be useful for analyzing a large");
 	outman.UserMessage("number of simulated datasets or for analyzing a single dataset under a variety");
@@ -222,7 +228,7 @@ int main( int argc, char* argv[] )	{
 #endif
 					else if(argv[curarg][1]=='t') runTests = true;
 					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
-						outman.UserMessage("%s Version %.2f%s.r%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str());
+						OutputVersion();
 #ifdef SUBROUTINE_GARLI
 						outman.UserMessage("MPI run distributing version");
 #endif
