@@ -1667,13 +1667,22 @@ void Population::UpdateFractionDone(int phase){
 
 	if(!conf->enforceTermConditions){
 		//proportion done is just this
-		t_fraction_done = max((FLOAT_TYPE) gen / conf->stopgen, (FLOAT_TYPE) stopwatch.SplitTime() / conf->stoptime);
-		//this can't really be calculated, but it doesn't really matter
+		FLOAT_TYPE timeFract = (FLOAT_TYPE) stopwatch.SplitTime() / conf->stoptime;
+
+		FLOAT_TYPE repGenFract = (FLOAT_TYPE) gen / conf->stopgen;
+		int totSearches = conf->searchReps * (conf->bootstrapReps > 0 ? conf->bootstrapReps : 1);
+		int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
+		FLOAT_TYPE perRep = 1.0 / totSearches;
+		FLOAT_TYPE totGenFract = (curSearch - 1) * perRep + repGenFract * perRep;
+
+		t_fraction_done = max(timeFract, totGenFract);
+		//this can't really be calculated in the time limited case, but it doesn't really matter since it isn't output
 		rep_fraction_done = t_fraction_done / 2.0;
 		}
 	else {
 		if(willReduce){
-			firstBreak = 0.15;
+			//let the period between gen 0 and the first reduction be larger for larger datasets
+			firstBreak = 0.15 + min(0.1, 0.01 * (data->NTax() / 50));
 			//figure out what proportion of the run the reduction period is vs the final period before termination (minimally)
 			double minPhase2 = (adap->numPrecReductions - 1) * evalInterval;
 			//since the final portion will be slower per gen because of the lower prec, downweight the reduction phase further
@@ -1702,11 +1711,12 @@ void Population::UpdateFractionDone(int phase){
 				//number of generations before a prec reduction could happen have passed
 				//then it will be asymptotic toward the first break
 				FLOAT_TYPE split = 0.5;
+				FLOAT_TYPE remainingFract = (firstBreak - initialBreak);
 				if(gen <= evalInterval){
-					new_fract = initialBreak + split * (firstBreak - initialBreak) * (gen / evalInterval);
+					new_fract = initialBreak + (split * remainingFract * (gen / evalInterval));
 					}
 				else{
-					new_fract = initialBreak + (split * (firstBreak - initialBreak)) + (1.0 - split) * (firstBreak - initialBreak) * (1.0 - (evalInterval / (gen + evalInterval)));
+					new_fract = initialBreak + (split * remainingFract) + (1.0 - split) * remainingFract * (1.0 - (evalInterval / (FLOAT_TYPE) gen));
 					}
 				}
 	
@@ -1717,29 +1727,28 @@ void Population::UpdateFractionDone(int phase){
 				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
 				FLOAT_TYPE split = 0.5;
 				if(sinceLastReduction <= evalInterval){
-					new_fract = firstBreak + ((reduction_number - 1) * perReduction) + (split * (perReduction * ((FLOAT_TYPE) sinceLastReduction / evalInterval)));
+					new_fract = firstBreak + ((reduction_number - 1) * perReduction) + (split * perReduction * ((FLOAT_TYPE) sinceLastReduction / evalInterval));
 					}
 				else{
-					new_fract = firstBreak + ((reduction_number - 1) * perReduction) + (split * perReduction) + (1.0 - split) * (perReduction * (1.0 - (evalInterval / ((FLOAT_TYPE) sinceLastReduction + evalInterval))));
+					new_fract = firstBreak + ((reduction_number - 1) * perReduction) + (split * perReduction) + (1.0 - split) * perReduction * (1.0 - (evalInterval / (FLOAT_TYPE) sinceLastReduction));
 					}
 				}
 	
 			else if(remaining_reductions == 0){
 				//this is linear to "split" proportion until we get past the absolute minimum point that the run could have finished
-				FLOAT_TYPE remaining = thirdBreak - secondBreak;
+				FLOAT_TYPE remainingFract = thirdBreak - secondBreak;
 				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
-				//double split = 0.6;
 				//the chance of going over the minimum # gen in the last phase is small with lower # of taxa, which makes for a big jump
 				//in proportion because the asymptotic phase isn't entered at all.  Scale the proportion where the asymp phase starts
 				//with the # of taxa
-				double split = max(0.6, 0.9 - 0.10 * (data->NTax() / 50));
+				double split = max(0.5, 0.9 - 0.10 * (data->NTax() / 50));
 				if(sinceLastReduction <=  conf->lastTopoImproveThresh){
-					new_fract = secondBreak + remaining * split * (sinceLastReduction / (FLOAT_TYPE) conf->lastTopoImproveThresh);
+					new_fract = secondBreak + remainingFract * split * (sinceLastReduction / (FLOAT_TYPE) conf->lastTopoImproveThresh);
 					}
 				//thereafter it is conservatively asymtotic
 				else{
 					assert( (1.0 - (conf->lastTopoImproveThresh / (FLOAT_TYPE) sinceLastReduction)) >= 0.0);
-					new_fract = secondBreak + remaining * split + remaining * (1 - split) * min(1.0, (1.0 - (conf->lastTopoImproveThresh / (FLOAT_TYPE) sinceLastReduction)));
+					new_fract = secondBreak + remainingFract * split + remainingFract * (1 - split) * min(1.0, (1.0 - (conf->lastTopoImproveThresh / (FLOAT_TYPE) sinceLastReduction)));
 					}
 				}
 			}
@@ -1753,7 +1762,7 @@ void Population::UpdateFractionDone(int phase){
 			new_fract = 1.0;
 			}
 
-		if(! (new_fract >= current_fract)){
+		if(phase != 0 && !(new_fract >= current_fract)){
 			outman.DebugMessage("new_fract less than current_fract: %.4f vs %.4f", new_fract, current_fract);
 			}
 		rep_fraction_done = new_fract;
