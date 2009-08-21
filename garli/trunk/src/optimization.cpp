@@ -483,11 +483,11 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
 	FLOAT_TYPE upperBracket = highBound;   //the smallest value we know of with a negative d1, or the minimum allowed value
 	FLOAT_TYPE lowerBracket = lowBound;   //the largest value we know of with a positive d1 , or the maximum allowed value
-	FLOAT_TYPE incr;
+	FLOAT_TYPE incr, diffDigits;
 	int lowBoundOvershoot = 0;
 	int upperBoundOvershoot = 0;
 	int positiveD2Num = 0;
-	int pass = 0;
+	int pass = 0, incrIncreases = 0;
 
 #ifdef OPT_BOUNDED_LOG
 	ofstream log("optbounded.log", ios::app);

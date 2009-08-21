@@ -1945,7 +1945,7 @@ void Population::FinalOptimization(){
 			//if((pass + 1) % 2 == 0) {
 			if(1){
 				if(optAlpha){
-					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
+					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->Alpha(), 0, min(0.05, optTree->mod->Alpha()), max(999.9, optTree->mod->Alpha()), &Model::SetAlpha);
 					//outman.UserMessage("Alpha optimization: %f", paramOpt);
 					sprintf(temp, "  alpha= %4.4f", paramOpt);
 					outString += temp;
@@ -1966,7 +1966,7 @@ void Population::FinalOptimization(){
 					incr += paramOpt;
 					}
 				if(optPinv){
-					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->PropInvar(), 0, 1.0e-8, optTree->mod->maxPropInvar, &Model::SetPinv);
+					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->PropInvar(), 0, min(1.0e-8,optTree->mod->PropInvar()), optTree->mod->maxPropInvar, &Model::SetPinv);
 					//outman.UserMessage("Pinv optimization: %f", paramOpt);
 					sprintf(temp, "  pinv= %4.4f", paramOpt);
 					outString += temp;
