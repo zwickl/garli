@@ -25,6 +25,8 @@
 	#include <sys/mman.h>
 #endif
 
+#define OUTPUT_SITELIKES
+
 using namespace std;
 
 #include "defs.h"
@@ -457,6 +459,7 @@ Tree::Tree(){
 	lnL=0.0;
 
 	calcs=0;
+	sitelikeLevel = 0;
 	numBranchesAdded=0;
 	taxtags=new int[numTipsTotal+1];
 	bipartCond = DIRTY;
@@ -474,6 +477,7 @@ Tree::Tree(){
 void Tree::AllocateTree(){
 
 	calcs=0;
+	sitelikeLevel = 0;
 	allNodes=new TreeNode*[2*dataPart->NTax()-1];
 	for(int i=0;i<2*dataPart->NTax()-1;i++){
 		allNodes[i]=new TreeNode(i);
@@ -3476,7 +3480,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		//PARTITION
 		//GetScore here
 		GetTotalScore(partialCLA, childCLA, child, blen1);
-
 /*
 		mod->CalcPmats(blen1, -1.0, Lprmat, Rprmat);
 
@@ -3539,6 +3542,14 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 	FLOAT_TYPE modlnL;
 	lnL = ZERO_POINT_ZERO;
 
+	//the individual score functions will just cat onto the sitelike files for each subset, so clear them here
+	if(sitelikeLevel > 0){
+		ofstream ord, packed;
+		ord.open("orderedSiteLikes.log");
+		if(sitelikeLevel > 1)
+			packed.open("packedSiteLikes.log");
+		}
+
 	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
 		Model *mod = modPart->GetModel((*specs).modelIndex);
 		mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
@@ -3569,6 +3580,8 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 			}
 		lnL += modlnL;
 		}
+	//sitelike output is non-persistent, so clear it out here
+	sitelikeLevel = 0;
 	}
 
 void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAset, CondLikeArraySet *secCLAset, TreeNode *firstChild, TreeNode *secChild, FLOAT_TYPE blen1, FLOAT_TYPE blen2){
@@ -4890,34 +4903,69 @@ FLOAT_TYPE Tree::CountClasInUse(){
 	return inUse;
 	}
 
-void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *under1, const int *under2, ofstream &ordered, ofstream &packed){
+void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *under1, const int *under2){
+	//output level 1 is user-level output, just site nums and site likes
+	//output level 2 is for debugging, includes underflow multipliers and output of site likes in packed order
 	const SequenceData *data = dataPart->GetSubset(partNum);
-	
+	assert(sitelikeLevel != 0);
+	//a negative sitelike level means append, but the absolute value meanings are the same
+	bool append = sitelikeLevel < 0;
+	sitelikeLevel = abs(sitelikeLevel);
+	ofstream ordered, packed;
+	string oname = ofprefix + ".sitelikes.log";
+	ordered.open(oname.c_str(), (append == true ? ios::app : ios::out));
+	if(sitelikeLevel > 1){
+		string pname = ofprefix + ".packedSiteLikes.log";
+		packed.open(pname.c_str(), (append == true ? ios::app : ios::out));
+		}
+	assert(sitelikeLevel > 0);
 	assert(likes.size() == data->NChar());;
-	ordered << "Partition subset " << partNum << "\nsite#\ttruelnL\tunder1\tunder2" << endl;
-	packed << "Partition subset " << partNum << "\npackedIndex\ttruelnL\tunder1\tunder2" << endl;
-	ordered.precision(10);
-	packed.precision(10);
+	if(!append){
+		ordered << "Tree\t-lnL\tSite\t-lnL";
+		if(sitelikeLevel > 1) 
+			ordered << "\tunder1\tunder2";
+		ordered << "\n";
+		}
+	ordered.setf(ios::fixed, ios::floatfield);
+	ordered.precision(8);
+	packed.precision(8);
 	
 	for(int site = 0;site < data->GapsIncludedNChar();site++){
 		int col = data->Number(site);
-		if(col == -1)
-			ordered << site+1 << "\tgap\t-\t-";
+		if(col == -1){
+			ordered << "\t\t" << site+1 << "\t-";
+			if(sitelikeLevel > 1) ordered << "\t-\t-";
+			ordered << "\n";
+			}
 		else{
-			ordered << site+1 << "\t" << likes[col] << "\t" << under1[col];
-			if(under2 != NULL)
-				ordered << "\t" << under2[col] << endl;
-			else
-				ordered << "\t-" << endl;
+			ordered << "\t\t" << site+1 << "\t" << -likes[col];
+			if(sitelikeLevel > 1){
+				ordered << "\t" << under1[col];
+				if(under2 != NULL)
+					ordered << "\t" << under2[col];
+				else
+					ordered << "\t-";
+				}
+			ordered << "\n";
 			}
 		}
-	for(int c = 0;c < data->NChar();c++){
-		packed << c << "\t" << likes[c] << "\t" << under1[c];
-		if(under2 != NULL)
-			packed << "\t" << under2[c] << endl;
-		else
-			packed << "\t-" << endl;
+	if(sitelikeLevel > 1){
+		packed << "Partition subset " << partNum << "\npackedIndex\ttruelnL\tunder1\tunder2" << endl;
+		for(int c = 0;c < data->NChar();c++){
+			packed << c << "\t" << likes[c] << "\t" << under1[c];
+			if(under2 != NULL)
+				packed << "\t" << under2[c] << endl;
+			else
+				packed << "\t-" << endl;
+			}
 		}
+	//sitelike output is non-persistent, so clear it out here
+	//can't do this here in partitioned version
+//	sitelikeLevel = 0;
+	ordered.close();
+	if(packed.is_open())
+		packed.close();
+
 	}
 
 void Tree::OutputSiteDerivatives(int partNum, vector<double> &likes, vector<double> &d1s, vector<double> &d2s, const int *under1, const int *under2, ofstream &ordered, ofstream &packed){
@@ -4975,16 +5023,13 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE siteL, totallnL=0.0;
-	FLOAT_TYPE MkvScaler=0.0;
+	FLOAT_TYPE siteL, totallnL = ZERO_POINT_ZERO, unscaledlnL = ZERO_POINT_ZERO;
+	FLOAT_TYPE MkvScaler = ZERO_POINT_ZERO;
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-#ifdef OUTPUT_SITELIKES
-	ofstream sit("sitelikes.log");
-	sit.precision(15);
-#endif
+	vector<FLOAT_TYPE> siteLikes;
 
 	if(siteToScore > 0) Ldat += siteToScore;
 
@@ -5026,7 +5071,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 					else 
 						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult[i]);
 					}
-				FLOAT_TYPE unscaledlnL = (log(siteL) - underflow_mult[i]);
+				unscaledlnL = (log(siteL) - underflow_mult[i]);
 				assert(siteL > ZERO_POINT_ZERO);//this should be positive
 				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
 				//rounding error in multiplying a site that is fully ambiguous across the tree
@@ -5058,14 +5103,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 			else{//nothing needs to be done if the count for this site is 0
 				}
 			Ldata++;
-	#ifndef OUTPUT_SITELIKES
+			if(sitelikeLevel > 0)
+				siteLikes.push_back(unscaledlnL+MkvScaler);
 			}
-	#else
-//			for(int q=0;q<countit[i];q++)
-				sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
+		if(sitelikeLevel > 0){
+			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
 			}
-		sit.close();
-	#endif
 		}
 	else{//multiple rates
 		FLOAT_TYPE rateL;
@@ -5143,14 +5186,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 #endif
 				}
 			Ldata++;
-	#ifndef OUTPUT_SITELIKES
+			if(sitelikeLevel > 0)
+				siteLikes.push_back(unscaledlnL+MkvScaler);
 			}
-	#else
-//			for(int q=0;q<*(countit-1);q++)
-				sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
+		if(sitelikeLevel > 0){
+			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
 			}
-		sit.close();
-	#endif
 		}
 
 	delete []freqs;
@@ -5187,12 +5228,10 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	if(siteToScore > 0) Ldata = AdvanceDataPointer(Ldata, siteToScore);
 #endif
 
-	FLOAT_TYPE siteL, totallnL=0.0;
+	FLOAT_TYPE siteL, totallnL = ZERO_POINT_ZERO, unscaledlnL = ZERO_POINT_ZERO;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 
-#ifdef OUTPUT_SITELIKES
-	ofstream sit("sitelikes.log");
-#endif
+	vector<FLOAT_TYPE> siteLikes;
 
 	for(int i=0;i<nchar;i++){
 #ifdef USE_COUNTS_IN_BOOT
@@ -5248,8 +5287,9 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 				}
 			else
 				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
-
-			totallnL += (countit[i] * (log(siteL) - underflow_mult[i]));
+			
+			unscaledlnL = (log(siteL) - underflow_mult[i]);
+			totallnL += (countit[i] * unscaledlnL);
 
 #ifdef ALLOW_SINGLE_SITE
 			if(siteToScore > -1) break;
@@ -5270,13 +5310,13 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 					}while (states-- > 0);
 				}
 			}
-#ifndef OUTPUT_SITELIKES
+
+		if(sitelikeLevel > 0)
+			siteLikes.push_back(unscaledlnL);
 		}
-#else
-		sit << siteL << "\t" << underflow_mult[i] << "\t" << totallnL << "\n";
+	if(sitelikeLevel > 0){
+		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
 		}
-	sit.close();
-#endif
 	return totallnL;
 	}
 	
@@ -5310,12 +5350,10 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE siteL, totallnL=0.0;
+	FLOAT_TYPE siteL, totallnL = ZERO_POINT_ZERO, unscaledlnL = ZERO_POINT_ZERO;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 
-#ifdef OUTPUT_SITELIKES
-	ofstream sit("sitelikes.log");
-#endif
+	vector<FLOAT_TYPE> siteLikes;
 
 	for(int i=0;i<nchar;i++){
 #ifdef USE_COUNTS_IN_BOOT
@@ -5347,7 +5385,8 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 			else
 				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));	
 			
-			totallnL += (countit[i] * (log(siteL) - underflow_mult1[i] - underflow_mult2[i]));
+			unscaledlnL = (log(siteL) - underflow_mult1[i] - underflow_mult2[i]);
+			totallnL += (countit[i] * unscaledlnL);
 
 #ifdef ALLOW_SINGLE_SITE
 			if(siteToScore > -1) break;
@@ -5362,13 +5401,13 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 			CL1+=4*nRateCats;
 #endif
 			}
-#ifndef OUTPUT_SITELIKES
+
+		if(sitelikeLevel > 0)
+			siteLikes.push_back(unscaledlnL);
 		}
-#else
-		sit << siteL << "\t" << underflow_mult1[i] << "\t" << underflow_mult2[i] << "\t" << totallnL << "\n";
+	if(sitelikeLevel > 0){
+		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
 		}
-	sit.close();
-#endif
 	return totallnL;
 	}
 
@@ -5405,9 +5444,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-#ifdef OUTPUT_SITELIKES
-vector<FLOAT_TYPE> siteLikes;
-#endif
+	vector<FLOAT_TYPE> siteLikes;
 
 	if(nRateCats == 1){
 #ifdef OMP_INTSCORE_NSTATE
@@ -5474,17 +5511,12 @@ vector<FLOAT_TYPE> siteLikes;
 			else{//nothing needs to be done if the count for this site is 0
 				}
 
-#ifndef OUTPUT_SITELIKES
+			if(sitelikeLevel > 0)
+				siteLikes.push_back(unscaledlnL+MkvScaler);
 			}
-#else
-			siteLikes.push_back(unscaledlnL+MkvScaler);
+		if(sitelikeLevel > 0){
+			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
 			}
-		ofstream ord("orderedSiteLikes.int.log");
-		ofstream packed("packedSiteLikes.int.log");
-		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2, ord, packed);
-		ord.close();
-		packed.close();
-#endif		
 		}
 	else{
 		FLOAT_TYPE siteL, tempL, rateL;
@@ -5556,17 +5588,13 @@ vector<FLOAT_TYPE> siteLikes;
 				}
 			else{ //nothing needs to be done if the count of this site is 0
 				}
-#ifndef OUTPUT_SITELIKES
+
+			if(sitelikeLevel > 0)
+				siteLikes.push_back(unscaledlnL+MkvScaler);
 			}
-#else
-			siteLikes.push_back(unscaledlnL);
+		if(sitelikeLevel > 0){
+			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
 			}
-		ofstream ord("orderedSiteLikes.log");
-		ofstream packed("packedSiteLikes.log");
-		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2, ord, packed);
-		ord.close();
-		packed.close();
-#endif
 		}
 
 	delete []freqs;
