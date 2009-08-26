@@ -251,6 +251,7 @@ class Tree{
 		FLOAT_TYPE OptimizeSubsetRates(FLOAT_TYPE prec);
 		FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, int modnum, void (Model::*SetParam)(int, FLOAT_TYPE));
 		template<class T> FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, T *obj, void (T::*SetParam)(int, FLOAT_TYPE));
+		template<class T> void TraceParameterLikelihood(ofstream &out, int which, FLOAT_TYPE prevVal, FLOAT_TYPE startVal, FLOAT_TYPE endVal, FLOAT_TYPE incr, T *obj, void (T::*SetParam)(int, FLOAT_TYPE));
 
 		FLOAT_TYPE OptimizeTreeScale(FLOAT_TYPE);
 		FLOAT_TYPE OptimizePinv();
@@ -534,6 +535,19 @@ inline int Tree::NodesToRoot(TreeNode *nd){
 	return i;
 	}
 
+template<class T>
+void Tree::TraceParameterLikelihood(ofstream &out, int which, FLOAT_TYPE prevVal, FLOAT_TYPE startVal, FLOAT_TYPE endVal, FLOAT_TYPE incr, T *obj, void (T::*SetParam)(int, FLOAT_TYPE)){
+	for(FLOAT_TYPE val = startVal;val <=endVal;val += incr){
+		CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, val);
+		MakeAllNodesDirty();
+		Score();
+		out << val << "\t" << lnL << endl;
+		}
+	CALL_SET_PARAM_FUNCTION(*obj, SetParam)(which, prevVal);
+	MakeAllNodesDirty();
+	Score();
+	out << prevVal << "\t" << lnL << endl;
+	}
 
 //a templated version
 template<class T>

@@ -58,6 +58,10 @@ class OutputManager{
 
 		void SetLogFile(const char *logname){
 			log=true;
+			if(logOut.is_open()){
+				logOut.close();
+				logOut.clear();
+				}
 			logOut.open(logname);
 			}
 
@@ -73,6 +77,10 @@ class OutputManager{
 
 		void SetLogFileForAppend(const char *logname){
 			log=true;
+			if(logOut.is_open()){
+				logOut.close();
+				logOut.clear();
+				}
 			logOut.open(logname, ios::app);
 			}
 
@@ -101,78 +109,192 @@ class OutputManager{
 
 		void UserMessage(const char *fmt, ...){
 			va_list vl;
-			va_start(vl, fmt);
 			
+			va_start(vl, fmt);
 			int len = vsnprintf(message, BUFFER_LENGTH, fmt, vl);
+			va_end(vl);
 
 			if(len > -1 && len < BUFFER_LENGTH){
 				Print(*defaultOut);
 				}
 			else{//default buffer is not long enough or there was an error
-				char *longmessage;
-				if(len > -1){//on unix systems vsnprintf returns the required length
-					longmessage = new char[len+1];
-					vsnprintf(longmessage, len, fmt, vl);
+				char *longmessage = NULL;
+				if(len > -1){//on unix systems vsnprintf returns the required length.  There is some
+					//some ambiguity about whether it includes the null termination or not, but
+					//the number passed to vsnprintf should definitely include it.
+						
+					longmessage = new char[len+2];
+					va_start(vl, fmt);
+					vsnprintf(longmessage, len+1, fmt, vl);
+					va_end(vl);
 					}
 				else{
 #if defined(_MSC_VER)
 					//on windows a negative value means that the length wasn't engough
 					int len2 = BUFFER_LENGTH * 2;
 					longmessage = new char[len2+1];
+					va_start(vl, fmt);
 					while(vsnprintf(longmessage, len2, fmt, vl) < 0){
 						delete []longmessage;
 						len2 *= 2;
 						longmessage = new char[len2+1];
+						va_end(vl);
+						va_start(vl, fmt);
 						}
+					va_end(vl);
 #else
 					//otherwise negative means a formatting error
 					Print(*defaultOut, "(problem formatting some program output...)");
-					va_end(vl);
+					if(longmessage) delete []longmessage;
 					return;
 #endif
 					}
 				Print(*defaultOut, longmessage);
-				delete []longmessage;
+				if(longmessage) delete []longmessage;
 				}
-			va_end(vl);
 			}
 
 		void UserMessageNoCR(const char *fmt, ...){
 			va_list vl;
-			va_start(vl, fmt);
-			
+
+			va_start(vl, fmt);	
 			int len = vsnprintf(message, BUFFER_LENGTH, fmt, vl);
+			va_end(vl);
 
 			if(len > -1 && len < BUFFER_LENGTH){
 				PrintNoCR(*defaultOut);
 				}
 			else{//default buffer is not long enough or there was an error
-				char *longmessage;
-				if(len > -1){//on unix systems vsnprintf returns the required length
-					longmessage = new char[len+1];
-					vsnprintf(longmessage, len, fmt, vl);
+				char *longmessage = NULL;
+				if(len > -1){//on unix systems vsnprintf returns the required length.  There is some
+					//some ambiguity about whether it includes the null termination or not, but
+					//the number passed to vsnprintf should definitely include it.
+					longmessage = new char[len+2];
+					va_start(vl, fmt);
+					vsnprintf(longmessage, len+1, fmt, vl);
+					va_end(vl);
 					}
 				else{
 #if defined(_MSC_VER)
 					//on windows a negative value means that the length wasn't engough
 					int len2 = BUFFER_LENGTH * 2;
 					longmessage = new char[len2+1];
+					va_start(vl, fmt);
 					while(vsnprintf(longmessage, len2, fmt, vl) < 0){
 						delete []longmessage;
 						len2 *= 2;
 						longmessage = new char[len2+1];
+						va_end(vl);
+						va_start(vl, fmt);
 						}
+					va_end(vl);
 #else
 					//otherwise negative means a formatting error
 					Print(*defaultOut, "(problem formatting some program output...)");
-					va_end(vl);
+					if(longmessage) delete []longmessage;
 					return;
 #endif
 					}
 				PrintNoCR(*defaultOut, longmessage);
-				delete []longmessage;
+				if(longmessage) delete []longmessage;
 				}
+			}
+
+		void DebugMessage(const char *fmt, ...){
+#ifdef DEBUG_MESSAGES
+			va_list vl;
+			
+			va_start(vl, fmt);
+			int len = vsnprintf(message, BUFFER_LENGTH, fmt, vl);
 			va_end(vl);
+
+			if(len > -1 && len < BUFFER_LENGTH){
+				Print(*defaultOut);
+				}
+			else{//default buffer is not long enough or there was an error
+				char *longmessage = NULL;
+				if(len > -1){//on unix systems vsnprintf returns the required length.  There is some
+					//some ambiguity about whether it includes the null termination or not, but
+					//the number passed to vsnprintf should definitely include it.
+						
+					longmessage = new char[len+2];
+					va_start(vl, fmt);
+					vsnprintf(longmessage, len+1, fmt, vl);
+					va_end(vl);
+					}
+				else{
+#if defined(_MSC_VER)
+					//on windows a negative value means that the length wasn't engough
+					int len2 = BUFFER_LENGTH * 2;
+					longmessage = new char[len2+1];
+					va_start(vl, fmt);
+					while(vsnprintf(longmessage, len2, fmt, vl) < 0){
+						delete []longmessage;
+						len2 *= 2;
+						longmessage = new char[len2+1];
+						va_end(vl);
+						va_start(vl, fmt);
+						}
+					va_end(vl);
+#else
+					//otherwise negative means a formatting error
+					Print(*defaultOut, "(problem formatting some program output...)");
+					if(longmessage) delete []longmessage;
+					return;
+#endif
+					}
+				Print(*defaultOut, longmessage);
+				if(longmessage) delete []longmessage;
+				}
+#endif
+			}
+
+		void DebugMessageNoCR(const char *fmt, ...){
+#ifdef DEBUG_MESSAGES
+			va_list vl;
+
+			va_start(vl, fmt);	
+			int len = vsnprintf(message, BUFFER_LENGTH, fmt, vl);
+			va_end(vl);
+
+			if(len > -1 && len < BUFFER_LENGTH){
+				PrintNoCR(*defaultOut);
+				}
+			else{//default buffer is not long enough or there was an error
+				char *longmessage = NULL;
+				if(len > -1){//on unix systems vsnprintf returns the required length.  There is some
+					//some ambiguity about whether it includes the null termination or not, but
+					//the number passed to vsnprintf should definitely include it.
+					longmessage = new char[len+2];
+					va_start(vl, fmt);
+					vsnprintf(longmessage, len+1, fmt, vl);
+					va_end(vl);
+					}
+				else{
+#if defined(_MSC_VER)
+					//on windows a negative value means that the length wasn't engough
+					int len2 = BUFFER_LENGTH * 2;
+					longmessage = new char[len2+1];
+					va_start(vl, fmt);
+					while(vsnprintf(longmessage, len2, fmt, vl) < 0){
+						delete []longmessage;
+						len2 *= 2;
+						longmessage = new char[len2+1];
+						va_end(vl);
+						va_start(vl, fmt);
+						}
+					va_end(vl);
+#else
+					//otherwise negative means a formatting error
+					Print(*defaultOut, "(problem formatting some program output...)");
+					if(longmessage) delete []longmessage;
+					return;
+#endif
+					}
+				PrintNoCR(*defaultOut, longmessage);
+				if(longmessage) delete []longmessage;
+				}
+#endif
 			}
 
 /*		void UserMessageNoCR(const char *fmt, ...){
