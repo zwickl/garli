@@ -446,7 +446,9 @@ Tree::Tree(){
 				}
 			}
 		}
+#ifdef OPEN_MP
 	assert(allNodes[1]->ambigMap.size() == claSpecs.size());
+#endif
 	
 	numTipsAdded=0;
 	numNodesAdded=1;//root
@@ -509,8 +511,10 @@ void Tree::AllocateTree(){
 				}
 			}
 		}
+	#ifdef OPEN_MP
 	assert(allNodes[1]->ambigMap.size() == claSpecs.size());
-	
+	#endif
+
 	numTipsAdded=0;
 	numNodesAdded=1;//root
 	numTipsTotal=dataPart->NTax();
