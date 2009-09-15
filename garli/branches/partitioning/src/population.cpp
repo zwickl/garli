@@ -2115,6 +2115,40 @@ void Population::PerformSearch(){
 			outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
 			}
 
+		//output site likelihoods if requested
+		if(conf->outputSitelikelihoods > 0){
+			//assert(conf->searchReps == 1 && conf->bootstrapReps == 0);
+			if(prematureTermination == false){
+				outman.UserMessage("Outputting site likelihoods ...");
+				}
+			else{
+				outman.UserMessage("WARNING: Site likelihoods being output on prematurely terminated run ...");
+				}
+
+			//This has to work somewhat differently for partitioning.  As far as the tree functions know we will always
+			//be in append mode for the sitelike output (negative sitelike value).  The pop will have to nuke any 
+			//existing file here the first time through and put in the header
+			indiv[bestIndiv].treeStruct->sitelikeLevel = -conf->outputSitelikelihoods;
+
+			ofstream ordered;
+			indiv[bestIndiv].treeStruct->ofprefix = conf->ofprefix;
+			string oname = indiv[bestIndiv].treeStruct->ofprefix + ".sitelikes.log";
+			if(currentSearchRep == 1){
+				ordered.open(oname.c_str());
+				ordered << "Tree\t-lnL\tSite\t-lnL";
+				if(conf->outputSitelikelihoods > 1) 
+					ordered << "\tunder1\tunder2";
+				ordered << "\n";
+				ordered.close();
+				}
+	
+			indiv[bestIndiv].treeStruct->Score();
+			ordered.open(oname.c_str(), ios::app);
+			ordered.precision(12);
+			ordered << currentSearchRep << "\t" << indiv[bestIndiv].treeStruct->lnL << "\n";
+			ordered.close();
+			}
+
 		int best=0;
 		if((currentSearchRep == conf->searchReps) || prematureTermination){
 			if(storedTrees.size() > 1){
