@@ -2472,7 +2472,7 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE rateL, rateD1, rateD2;
-	FLOAT_TYPE constL, constD1, constD2, pC, pV, MkvScaler;
+	FLOAT_TYPE constL, constD1, constD2, pC, pV, MkvScaler, unscaledlnL;
 
 #undef OUTPUT_DERIVS
 
@@ -2545,7 +2545,7 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 					siteL += (prI*freqs[conStates[i]] * (exp((FLOAT_TYPE)partialCLA->underflow_mult[i])));
 					}
 
-				FLOAT_TYPE unscaledlnL=log(siteL) - partialCLA->underflow_mult[i];
+				unscaledlnL=log(siteL) - partialCLA->underflow_mult[i];
 
 				if(mod->IsNStateV()){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
@@ -2932,8 +2932,9 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
-	FLOAT_TYPE constL, constD1, constD2, pV, pC, MkvScaler;
 	FLOAT_TYPE unscaledlnL;
+	FLOAT_TYPE constL, constD1, constD2, pV, pC, MkvScaler;
+
 
 #ifdef OUTPUT_SITEDERIVS
 	vector<double> siteLikes;
