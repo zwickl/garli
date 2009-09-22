@@ -46,6 +46,17 @@
 #include "errorexception.h"
 #include "outputman.h"
 
+#ifdef WIN32
+#include <process.h>
+#define PID_FUNC() _getpid()
+typedef int pid_type;
+#else
+#include <sys/types.h>
+#include <unistd.h>
+#define PID_FUNC() getpid()
+typedef pid_t pid_type;
+#endif
+
 #ifdef MAC_FRONTEND
 #import <Foundation/Foundation.h>
 #import "MFEInterfaceClient.h"
@@ -282,8 +293,12 @@ int main( int argc, char* argv[] )	{
 			// now set the random seed
 			int randomSeed;
 			if(conf.randseed < 1){
-				srand((unsigned)time(NULL));
-				randomSeed = RandomInt(1, 100000);
+				//Add in the pid with the time to get the seed.  Otherwise forking a bunch
+				//of runs simultaneously has a good chance of giving identical seeds
+				//I believe unsigned overflow is guaranteed to wrap around safely
+				pid_type pid = PID_FUNC();
+				srand((unsigned)time(NULL) + (unsigned)pid);
+				randomSeed = RandomInt(1, 1000000);
 				}
 			else randomSeed=conf.randseed;
 			rnd.set_seed(randomSeed);
