@@ -7140,10 +7140,10 @@ void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondL
 	else{
 		for(int i=0;i<nchar;i++){
 			for(int r=0;r<nRateCats;r++){
-				*(dest++) = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * *(partial++);
-				*(dest++) = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * *(partial++);
-				*(dest++) = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * *(partial++);
-				*(dest++) = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+0]*CL1[0]+pr1[16*r+1]*CL1[1]+pr1[16*r+2]*CL1[2]+pr1[16*r+3]*CL1[3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+4]*CL1[0]+pr1[16*r+5]*CL1[1]+pr1[16*r+6]*CL1[2]+pr1[16*r+7]*CL1[3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+8]*CL1[0]+pr1[16*r+9]*CL1[1]+pr1[16*r+10]*CL1[2]+pr1[16*r+11]*CL1[3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+12]*CL1[0]+pr1[16*r+13]*CL1[1]+pr1[16*r+14]*CL1[2]+pr1[16*r+15]*CL1[3]) * *(partial++);
 				CL1+=4;
 				assert(*(dest-1)>ZERO_POINT_ZERO);
 				}
