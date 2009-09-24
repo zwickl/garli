@@ -7134,7 +7134,7 @@ void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondL
 			*(dest++) = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * *(partial++);
 			*(dest++) = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * *(partial++);
 			CL1+=16;
-			assert(*(dest-1)>ZERO_POINT_ZERO);
+			assert(*(dest-1)>=ZERO_POINT_ZERO);
 			}
 		}
 	else{
@@ -7145,7 +7145,7 @@ void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondL
 				*(dest++) = ( pr1[16*r+8]*CL1[0]+pr1[16*r+9]*CL1[1]+pr1[16*r+10]*CL1[2]+pr1[16*r+11]*CL1[3]) * *(partial++);
 				*(dest++) = ( pr1[16*r+12]*CL1[0]+pr1[16*r+13]*CL1[1]+pr1[16*r+14]*CL1[2]+pr1[16*r+15]*CL1[3]) * *(partial++);
 				CL1+=4;
-				assert(*(dest-1)>ZERO_POINT_ZERO);
+				assert(*(dest-1)>=ZERO_POINT_ZERO);
 				}
 			}
 		}
@@ -7176,7 +7176,7 @@ void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondL
 				*(dest++) = Lpr[(*Ldata+4)+16*i] * *(partial++);
 				*(dest++) = Lpr[(*Ldata+8)+16*i] * *(partial++);
 				*(dest++) = Lpr[(*Ldata+12)+16*i] * *(partial++);
-//				assert(*(dest-1)>ZERO_POINT_ZERO);
+//				assert(*(dest-1)>=ZERO_POINT_ZERO);
 				}
 			Ldata++;
 			}
@@ -7195,7 +7195,7 @@ void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondL
 					*(dest+(i*4)+1) += Lpr[(*Ldata+4)+16*i];
 					*(dest+(i*4)+2) += Lpr[(*Ldata+8)+16*i];
 					*(dest+(i*4)+3) += Lpr[(*Ldata+12)+16*i];
-//					assert(*(dest-1)>ZERO_POINT_ZERO);
+//					assert(*(dest-1)>=ZERO_POINT_ZERO);
 					}
 				Ldata++;
 				}
