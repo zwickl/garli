@@ -483,7 +483,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
 	FLOAT_TYPE upperBracket = highBound;   //the smallest value we know of with a negative d1, or the minimum allowed value
 	FLOAT_TYPE lowerBracket = lowBound;   //the largest value we know of with a positive d1 , or the maximum allowed value
-	FLOAT_TYPE incr, diffDigits;
+	FLOAT_TYPE incr, diffDigits = 100.0;
 	int lowBoundOvershoot = 0;
 	int upperBoundOvershoot = 0;
 	int positiveD2Num = 0;
@@ -541,25 +541,13 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		//		2b1. The increased incr is still within any bounds - go bck to 2
 		//		2b2. The increased incr is greater than allowed by one bound.  Limit it and break.
 		while(pass == 0 && !cont && !limited){
-			//we want differences in likelihood of greater than 10 orders of magnitude
-			//less than the total likelihoods (this is plenty safe), or 5 orders in single 
-			//precision (this is not good, and will mean that SP optimization can't be as
-			//rigorous)
-
-/*
-#ifdef SINGLE_PRECISION_FLOATS
-			if(log10(-curScore / fabs(curScore - higherEvalScore)) > 5){
-#else
-			scoreDiffRatio = fabs(curScore / (curScore - higherEvalScore));
-			diffDigits = log10(-curScore / fabs(curScore - higherEvalScore));
-	#ifdef BOUND_DIGITS
-			if(diffDigits > BOUND_DIGITS){
-	#else
-			if(log10(-curScore / fabs(curScore - higherEvalScore)) > 10.0){
-	#endif
-#endif
-*/
-			diffDigits = log10(-curScore / fabs(curScore - higherEvalScore));
+			//we want differences in likelihood of greater than targetScoreDigits orders of magnitude
+			//less than the total likelihoods. The determination of this amount will be taken care
+			//of by the caller, and will vary by DP or SP (currently mostly 9 and 5) or the parameter
+			//begin optimized (lower for codon)
+			FLOAT_TYPE diff = fabs(curScore - higherEvalScore);
+			if(diff != ZERO_POINT_ZERO)//otherwise diffDigits has been initialized to 100 above to force incr increase
+				diffDigits = log10(-curScore / diff);
 			if(diffDigits > targetScoreDigits){
 				incrIncreases++;
 				baseIncr *= 5.0;
@@ -734,8 +722,9 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 			MakeAllNodesDirty();
 			lnL = curScore;
 			return curScore-initialScore;
-			//throw ErrorException("too many passes in OptimizeBoundedParameter");
 			}
+
+		assert(proposed >= lowerBracket && proposed <= upperBracket);
 
 		//update the brackets
 		if(d1 <= ZERO_POINT_ZERO && curVal < upperBracket)
@@ -745,13 +734,6 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 #ifdef OPT_BOUNDED_LOG
 		log << proposed << endl;
 #endif
-/*		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, proposed);;
-		MakeAllNodesDirty();
-		Score();
-		lastChange = lnL - prev;
-		prev=lnL;
-		prevVal=proposed;
-*/		
 		FLOAT_TYPE proposedScore = SetAndEvaluateParameter(which, proposed, SetParam);
 		lastChange = proposedScore - curScore;
 		curScore = proposedScore;
