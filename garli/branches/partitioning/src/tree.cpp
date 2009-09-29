@@ -213,7 +213,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	//a trifurcating root), so use an allocation function that is guaranteed to have enough room and then
 	//trifurcate and delete if necessary
 	
-	AllocateTree();
+	AllocateTree(true);
 	TreeNode *temp=root;
 	root->attached=true;
 	int current=numTipsTotal+1;
@@ -398,62 +398,35 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	bipartCond = DIRTY;
 	} 
 
-//DZ 10-31-02
-//separating general tree construction stuff from CLA assignment/allocation
-//which will happend differently if the CLAs are shared or not
 Tree::Tree(){
+	AllocateTree(false);
+	}
 
-	allNodes=new TreeNode*[2*dataPart->NTax()-2];
-	for(int i=0;i<2*dataPart->NTax()-2;i++){
+//we might want the extra node here if we are reading in a user tree that could be rooted (with a basal bifurcation rather than trifurcation)
+//the standard Tree() constructor used to be hard coded to take care of the withExtraNode = no case, while AllocateTree did yes.  Otherwise
+//they were almost identical, so have been combined
+void Tree::AllocateTree(bool withExtraNode){
+	if(withExtraNode)
+		numNodesTotal = 2*dataPart->NTax()-1;
+	else 
+		numNodesTotal = 2*dataPart->NTax()-2;
+
+	allNodes=new TreeNode*[numNodesTotal];
+	for(int i=0;i<numNodesTotal;i++){
 		allNodes[i]=new TreeNode(i);
 		allNodes[i]->bipart=new Bipartition();
 		}
 	root=allNodes[0];
 	root->attached=true;
-	//assign data to tips
 
 	//PARTITION
 	modPart = NULL;
-	//this assumes that num specs = num data subsets
-	//ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
-	//bool isNucleotide = modSpecSet.GetModSpec(0)->IsNucleotide();
-	
-	//DEBUG
-	//for(int m = 0;m < dataPart->NumSubsets();m++){
-	//TODO FOR MIXING - this assumes that 1 data subset = one cla
-	for(int c = 0;c < claSpecs.size();c++){
-		SequenceData *curData = dataPart->GetSubset(c);
-		for(int t=1;t<=dataPart->NTax();t++){
-			//if(isNucleotide){
-			if(modSpecSet.GetModSpec(claSpecs[c].modelIndex)->IsNucleotide()){
-				//allNodes[t]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1);
-				allNodes[t]->tipData.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1));
-	#ifdef OPEN_MP
-				//allNodes[t]->ambigMap=static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1);
-				allNodes[t]->ambigMap.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1));
-				outman.UserMessage("subset %d", c);
-	#endif
-				}
-			else{
-				//allNodes[t]->tipData=(char *)(curData)->GetRow(t-1);
-				allNodes[t]->tipData.push_back((char *)(curData)->GetRow(t-1));
-	#ifdef OPEN_MP
-				//even though there is no ambig map for non-nuc data, we need to put a dummy into the vector
-				//so that the data index matches up with the correct element in the vector
-				allNodes[t]->ambigMap.push_back(NULL);
-				outman.UserMessage("subset NULL");
-	#endif
-				}
-			}
-		}
-#ifdef OPEN_MP
-	assert(allNodes[1]->ambigMap.size() == claSpecs.size());
-#endif
+
+	AssignDataToTips();
 	
 	numTipsAdded=0;
 	numNodesAdded=1;//root
 	numTipsTotal=dataPart->NTax();
-	numNodesTotal=2*dataPart->NTax()-2;
 	lnL=0.0;
 
 	calcs=0;
@@ -472,29 +445,13 @@ Tree::Tree(){
 #endif
 	}
 
-void Tree::AllocateTree(){
-
-	calcs=0;
-	sitelikeLevel = 0;
-	allNodes=new TreeNode*[2*dataPart->NTax()-1];
-	for(int i=0;i<2*dataPart->NTax()-1;i++){
-		allNodes[i]=new TreeNode(i);
-		allNodes[i]->bipart=new Bipartition();
-		}
-	root=allNodes[0];
-	
-	
-	//PARTITION
-	modPart = NULL;
-	//this assumes that num specs = num data subsets
-	//ModelSpecification *modSpec = modSpecSet.GetModSpec(0);
-	//bool isNucleotide = modSpecSet.GetModSpec(0)->IsNucleotide();
-	
-	for(int m = 0;m < dataPart->NumSubsets();m++){
-		SequenceData *curData = dataPart->GetSubset(m);
-		bool isNucleotide = modSpecSet.GetModSpec(m)->IsNucleotide();
+void Tree::AssignDataToTips(){
+	//TODO FOR MIXING - this assumes that 1 data subset = one cla
+	for(int c = 0;c < claSpecs.size();c++){
+		SequenceData *curData = dataPart->GetSubset(c);
 		for(int t=1;t<=dataPart->NTax();t++){
-			if(isNucleotide){
+			//if(isNucleotide){
+			if(modSpecSet.GetModSpec(claSpecs[c].modelIndex)->IsNucleotide()){
 				//allNodes[t]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1);
 				allNodes[t]->tipData.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1));
 #ifdef OPEN_MP
@@ -516,14 +473,6 @@ void Tree::AllocateTree(){
 	#ifdef OPEN_MP
 	assert(allNodes[1]->ambigMap.size() == claSpecs.size());
 	#endif
-
-	numTipsAdded=0;
-	numNodesAdded=1;//root
-	numTipsTotal=dataPart->NTax();
-	numNodesTotal=2*dataPart->NTax()-1;
-	lnL=0.0;
-	numBranchesAdded=0;
-	taxtags=new int[numTipsTotal+1];
 	}
 
 Tree::~Tree(){
