@@ -6157,11 +6157,11 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 	//limiting change in any one pass
 	double maxPropChange = 5.0;	
 	
-	assert(mod->Nst() > 1);
+	//assert(mod->Nst() > 1);
 	if(mod->Nst() == 2){
 		//this was wrong - it should be Rates(1) i.e., K that is being optimized here
 		rateImprove += OptimizeBoundedParameter(prec, mod->Rates(1), 1, 
-				max(min(0.05, mod->Rates(1)), mod->Rates(1) / maxPropChange),
+				max(min(1.0e-3, mod->Rates(1)), mod->Rates(1) / maxPropChange),
 				min(max(999.0, mod->Rates(1)), mod->Rates(1) * maxPropChange),
 				&Model::SetRelativeNucRate, scoreDiffTarget);
 /*				
@@ -6171,8 +6171,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 				&Model::SetRelativeNucRate);
 */
 		}
-	else{
-		//DEBUG
+	else if(modSpec.IsAminoAcid()==false){
 /*		char temp[100];
 		int oprec = 4;
 		sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
@@ -6184,21 +6183,69 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 				}
 			if(!skip){
 				rateImprove += OptimizeBoundedParameter(prec, mod->Rates(i), i, 
-					max(min(0.05, mod->Rates(i)), mod->Rates(i) / maxPropChange),
+					max(min(1.0e-3, mod->Rates(i)), mod->Rates(i) / maxPropChange),
 					min(max(999.0, mod->Rates(i)), mod->Rates(i) * maxPropChange),
 					&Model::SetRelativeNucRate, scoreDiffTarget);
-				//DEBUG
-/*				sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
-				outman.UserMessage("%s", temp);
-*/				}
+				}
 			}
+		}
+	else{
+		list<int> reopt;
+		//ofstream vals("rmatVals.log", ios::app);
+		for(i=0;i < mod->NumRelRates() - 1;i++){
+			//DEBUG
+			double beflnL = lnL;
+			double befval = mod->Rates(i);
+			FLOAT_TYPE minV = max(min(1.0e-3, mod->Rates(i)), mod->Rates(i) / maxPropChange);
+			if(minV < 0.01)
+				minV = 1.0e-3;
+			FLOAT_TYPE maxV = min(max(9999.0, mod->Rates(i)), mod->Rates(i) * maxPropChange);
+			if(maxV < 0.01)
+				maxV = 0.01;
+			rateImprove += OptimizeBoundedParameter(prec, mod->Rates(i), i, 
+				minV, maxV,
+				&Model::SetRelativeNucRate, scoreDiffTarget);
+			//vals << i << "\t" << befval << "\t" << mod->Rates(i) << "\t" << lnL - beflnL << endl;
+			if(!FloatingPointEquals(beflnL, lnL, 1e-8))
+				reopt.push_back(i);
+			}
+		int pass = 0;
+		while(reopt.size() != 0 && pass < 4){
+			double beflnL = lnL;
+			list<int>::iterator it = reopt.begin();
+			int num = reopt.size();
+			while(it != reopt.end()){
+				double beflnL = lnL;
+				double befval = mod->Rates(*it);
+				FLOAT_TYPE minV = max(min(1.0e-3, mod->Rates(*it)), mod->Rates(*it) / maxPropChange);
+				if(minV < 0.01)
+					minV = 1.0e-3;
+				FLOAT_TYPE maxV = min(max(9999.0, mod->Rates(*it)), mod->Rates(*it) * maxPropChange);
+				if(maxV < 0.01)
+					maxV = 0.01;
+				rateImprove += OptimizeBoundedParameter(prec, mod->Rates(*it), *it, 
+					minV, maxV,
+					&Model::SetRelativeNucRate, scoreDiffTarget);
+				//vals << *it << "\t" << befval << "\t" << mod->Rates(*it) << "\t" << lnL - beflnL << endl;
+				if(FloatingPointEquals(lnL, beflnL, 1e-8)){
+					list<int>::iterator del=it;
+					it++;
+					reopt.erase(del);
+					}
+				else it++;				
+				}
+			outman.DebugMessage("reoptimized %d. improvement %.6f", num, lnL - beflnL);
+			pass++;
+			}
+		//vals.close();
+		}
 		//the reference rate fixed at 1 needs to have its own opt function
 		//This only ends up causing problems.  It shouldn't be that critical, so I'm taking it out
 //		rateImprove += OptimizeReferenceRelativeRate(prec);
 /*		//DEBUG
 		sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
 		outman.UserMessage("%s", temp);
-*/		}
+*/		
 	return rateImprove;
 	}
 

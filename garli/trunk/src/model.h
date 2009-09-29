@@ -154,7 +154,8 @@ public:
 class RelativeRates:public BaseParameter{
 public:
 	// 5/9/06 now enforcing non-zero minimum relative rate to avoid problems in the linear algebra functions
-	RelativeRates(const char *c, FLOAT_TYPE **dv, int numE):BaseParameter(c, dv, RELATIVERATES, numE, (FLOAT_TYPE)1.0e-6, (FLOAT_TYPE)999.9){};
+	RelativeRates(const char *c, FLOAT_TYPE **dv, int numE, FLOAT_TYPE min, FLOAT_TYPE max):BaseParameter(c, dv, RELATIVERATES, numE, min, max){};
+	//RelativeRates(const char *c, FLOAT_TYPE **dv, int numE):BaseParameter(c, dv, RELATIVERATES, numE, (FLOAT_TYPE)1.0e-6, (FLOAT_TYPE)999.9){};
 
 	void Mutator(FLOAT_TYPE mutationShape){
 		if(numElements > 1){
@@ -317,6 +318,7 @@ public:
 		WAGMAT = 8,
 		MTMAMMAT = 9,
 		MTREVMAT = 10,
+		ESTIMATEDAAMAT = 11,
 		USERSPECIFIEDMAT = 20
 		}rateMatrix;
 	
@@ -542,6 +544,11 @@ public:
 		fixRelativeRates=true;
 		}	
 
+	void SetEstimatedAAMatrix(){
+		rateMatrix = ESTIMATEDAAMAT;
+		fixRelativeRates=false;
+		}
+
 	void SetJonesAAFreqs(){
 		stateFrequencies = JONES;
 		fixStateFreqs=true;
@@ -575,7 +582,8 @@ public:
 		else if(rateMatrix == NST2) return 2;
 		else if(rateMatrix == NST6 || rateMatrix == ARBITRARY) return 6;
 		else if(rateMatrix == USERSPECIFIEDMAT && datatype != AMINOACID && datatype != CODONAMINOACID) return 6;
-		else assert(0);
+		//estimation of AA matrices is now legal
+		//else assert(0);
 		return -1;
 		}
 
@@ -589,6 +597,7 @@ public:
 	bool IsMtMamAAMatrix() {return (rateMatrix == MTMAMMAT);}
 	bool IsMtRevAAFreqs() {return (stateFrequencies == MTREV);}
 	bool IsMtRevAAMatrix() {return (rateMatrix == MTREVMAT);}
+	bool IsEstimateAAMatrix() {return (rateMatrix == ESTIMATEDAAMAT);}
 	bool IsVertMitoCode() {return (geneticCode == VERTMITO);}
 	bool IsInvertMitoCode() {return (geneticCode == INVERTMITO);}
 	bool IsPoissonAAMatrix() {return (rateMatrix == POISSON);}
@@ -640,6 +649,7 @@ public:
 			else if(_stricmp(str, "wag") == 0) SetWAGAAMatrix();
 			else if(_stricmp(str, "mtmam") == 0) SetMtMamAAMatrix();
 			else if(_stricmp(str, "mtrev") == 0) SetMtRevAAMatrix();
+			else if(_stricmp(str, "estimateF") == 0) SetEstimatedAAMatrix();
 			else throw(ErrorException("Sorry, %s is not a valid aminoacid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag, mtmam, mtrev)", str));
 			}
 		else{
@@ -835,6 +845,7 @@ class Model{
 	void ReadGarliFormattedModelString(string &);
 	void OutputHumanReadableModelReportWithParams() const;
 	void FillModelOrHeaderStringForTable(string &s, bool m) const;
+	void OutputAminoAcidRMatrixArray(ostream &out);
 
 	void ReadBinaryFormattedModel(FILE *);
 	static void FillQMatLookup();
@@ -861,6 +872,7 @@ class Model{
 	FLOAT_TYPE StateFreq(int p) const{ return *stateFreqs[p];}
 	FLOAT_TYPE TRatio() const;
 	FLOAT_TYPE Rates(int r) const { return *relNucRates[r];}
+	int NumRelRates() const {return relNucRates.size();}
 	int NRateCats() const {return modSpec.numRateCats;}
 	FLOAT_TYPE *GetRateMults() {return rateMults;}
 	FLOAT_TYPE Alpha() const {return *alpha;}
@@ -875,8 +887,7 @@ class Model{
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
 	void SetRmat(FLOAT_TYPE *r, bool checkValidity){
-		assert(modSpec.IsAminoAcid() == false);
-		if(checkValidity == true){
+		if(checkValidity == true && modSpec.IsAminoAcid() == false){
 			if(nst==1){
 				if((FloatingPointEquals(r[0], r[1], 1.0e-5) &&
 					FloatingPointEquals(r[1], r[2], 1.0e-5) &&
@@ -903,13 +914,23 @@ class Model{
 					}
 				}
 			}
-		if(FloatingPointEquals(r[5], ONE_POINT_ZERO, 1.0e-5) == false){
+/*		if(FloatingPointEquals(r[5], ONE_POINT_ZERO, 1.0e-5) == false){
 			//if an alternate GTR paramterization is used in which GT != 1.0, rescale the rates
 			for(int i=0;i<5;i++)
 				r[i] /= r[5];
 			}
 		for(int i=0;i<5;i++) *relNucRates[i]=r[i];
 		*relNucRates[5]=1.0;
+		eigenDirty=true;
+*/
+		int refRate = relNucRates.size()-1;
+		if(FloatingPointEquals(r[refRate], ONE_POINT_ZERO, 1.0e-5) == false){
+			for(int i=0;i<relNucRates.size();i++)
+				r[i] /= r[refRate];
+			}
+		for(int i=0;i<relNucRates.size();i++)
+			*relNucRates[i]=r[i];
+		*relNucRates[refRate]=1.0;
 		eigenDirty=true;
 		}
 	void SetPis(FLOAT_TYPE *b, bool checkValidity){
@@ -990,20 +1011,21 @@ class Model{
 	void SetRelativeNucRate(int which, FLOAT_TYPE val){
 		//this has the potential to do GT (fixed at 1.0) although that won't work with
 		//OptBounded currently
-		//DEBUG
-		assert(which < 6);
+		//DEBUG - Allow estimated AA matrices
+		//assert(which < 6);
 		//note that for arbitrary rate matrices mutation
 		//of a rate other than GT might actually alter GT, so we need to actually check
 		//whether it is 1.0 or not
 		*relNucRates[which] = val;
-		if(FloatingPointEquals(*relNucRates[5], ONE_POINT_ZERO, 1.0e-12) == false){
-			FLOAT_TYPE scaler = ONE_POINT_ZERO / *relNucRates[5];
-			for(int i=0;i<6;i++){
-				if(relNucRates[i] != relNucRates[5]){
+		int refRate = NumRelRates() - 1;
+		if(FloatingPointEquals(*relNucRates[refRate], ONE_POINT_ZERO, 1.0e-12) == false){
+			FLOAT_TYPE scaler = ONE_POINT_ZERO / *relNucRates[refRate];
+			for(int i=0;i<NumRelRates();i++){
+				if(relNucRates[i] != relNucRates[refRate]){//this is checking whether the rate params are aliased to one another
 					*relNucRates[i] *= scaler;
 					}
 				}
-			*relNucRates[5] *= scaler;
+			*relNucRates[refRate] *= scaler;
 			}
 		eigenDirty = true;
 		}
