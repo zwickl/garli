@@ -1837,7 +1837,7 @@ void Population::FinalOptimization(){
 		//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
 		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
 			optFreqs = true;
-		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+		if((modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false) || modSpec.IsEstimateAAMatrix())
 			optRelRates = true;
 #endif
 		}
@@ -2145,6 +2145,20 @@ int Population::EvaluateStoredTrees(bool report){
 			for(unsigned i=0;i<storedTrees.size();i++){
 				storedTrees[i]->mod->FillModelOrHeaderStringForTable(s, true);
 				outman.UserMessage("rep%2d: %s", i+1, s.c_str());
+
+				vector<FLOAT_TYPE> r(400, 0.0);
+				if(modSpec.IsEstimateAAMatrix() && conf->bootstrapReps == 0){
+					string n = conf->ofprefix.c_str();
+					n += ".AArmatrix.dat";
+					ofstream mat;
+					if(i == 0)
+						mat.open(n.c_str());
+					else
+						mat.open(n.c_str(), ios::app);
+					storedTrees[i]->mod->OutputAminoAcidRMatrixArray(mat);
+					mat << endl;
+					mat.close();
+					}
 				}
 			}
 		else{
@@ -2155,6 +2169,9 @@ int Population::EvaluateStoredTrees(bool report){
 			outman.UserMessage("\nFinal result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
 			if(conf->searchReps > 1)
 				outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
+			if(modSpec.IsEstimateAAMatrix()){
+				outman.UserMessage("Estimated amino acid rate matrix/matrices written to %s.AArmatrix.dat", conf->ofprefix.c_str());
+				}
 			}
 		}
 	return bestRep;

@@ -689,7 +689,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
 		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
 			optFreqs = true;
-		if(modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false)
+		if(modSpec.fixRelativeRates == false && (modSpec.Nst() > 1 || modSpec.IsEstimateAAMatrix()) )
 			optRelRates = true;
 #endif
 		}
