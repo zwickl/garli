@@ -121,7 +121,8 @@ class Tree{
 		Tree();
 		Tree(NucleotideData*,CondLikeArray **sharedcl);
 		Tree(const char*, bool numericalTaxa, bool allowPolytomies=false, bool allowMissingTaxa=false);
-		void AllocateTree();
+		void AllocateTree(bool withExtraNode);
+		void AssignDataToTips();
 		void AssignCLAsFromMaster();
 	
 		//destructor
