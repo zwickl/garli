@@ -1926,8 +1926,8 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 			else
 				states="ACGT";
 			char rStr[50];
-			for(int from=0;from<NStates();from++){
-				for(int to=from+1;to<NStates();to++){
+			for(int from=0;from<(modSpec.IsCodon() ? 6 : NStates());from++){
+				for(int to=from+1;to<(modSpec.IsCodon() ? 6 : NStates());to++){
 					sprintf(rStr, "r(%c%c)", states[from], states[to]);
 					sprintf(cStr," %5s", rStr);
 					s += cStr;
@@ -2002,7 +2002,7 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 	if(modSpec.IsFlexRateHet()){
 		for(int i=0;i<NRateCats();i++){
 			if(model){
-				sprintf(cStr, "%5.3f %5.3f ", rateMults[i], rateProbs[i]);
+				sprintf(cStr, " %5.3f %5.3f", rateMults[i], rateProbs[i]);
 				s += cStr;
 				}
 			else{
