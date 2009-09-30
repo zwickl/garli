@@ -1022,9 +1022,16 @@ void Model::OutputPmats(ofstream &deb){
 	}
 
 void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&one, FLOAT_TYPE ***&two){
+/*	double before = *omegas[0];
+	if(dlen < 0.011 && dlen > 0.009)
+		SetOmega(0, 1.0);
+*/
 	if(eigenDirty==true)
 		CalcEigenStuff();
-
+/*
+	if(dlen < 0.011 && dlen > 0.009)
+		SetOmega(0, before);
+*/
 	for(int rate=0;rate<NRateCats();rate++){
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
@@ -1110,9 +1117,16 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 bool DoubleAbsLessThan(double &first, double &sec){return fabs(first) <= fabs(sec);}
 
 void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
+/*	double before = *omegas[0];
+	if(dlen < 0.011 && dlen > 0.009)
+		SetOmega(0, 1.0);
+*/
 	if(eigenDirty==true)
 		CalcEigenStuff();
-
+/*
+	if(dlen < 0.011 && dlen > 0.009)
+		SetOmega(0, before);
+*/
 	for(int rate=0;rate<NRateCats();rate++){
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
@@ -1926,8 +1940,8 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 			else
 				states="ACGT";
 			char rStr[50];
-			for(int from=0;from<(modSpec.IsCodon() ? 6 : NStates());from++){
-				for(int to=from+1;to<(modSpec.IsCodon() ? 6 : NStates());to++){
+			for(int from=0;from<(modSpec.IsCodon() ? 4 - 1 : NStates() - 1);from++){
+				for(int to=from+1;to<(modSpec.IsCodon() ? 4 : NStates());to++){
 					sprintf(rStr, "r(%c%c)", states[from], states[to]);
 					sprintf(cStr," %5s", rStr);
 					s += cStr;
