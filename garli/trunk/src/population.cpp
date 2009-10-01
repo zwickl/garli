@@ -389,6 +389,9 @@ void Population::CheckForIncompatibleConfigEntries(){
 		throw(ErrorException("You cannont output site likelihoods during a bootstrap run!"));
 //	if(conf->outputSitelikelihoods > 0 && conf->searchReps > 1)
 //		throw(ErrorException("You cannont output site likelihoods during a multi-rep run (searchreps > 1)!"));
+
+	if(conf->startOptPrec < conf->minOptPrec)
+		throw ErrorException("startoptprec must be equal to or greater than minoptprec");
 	}
 
 void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r){
