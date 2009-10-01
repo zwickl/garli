@@ -1907,6 +1907,12 @@ void Population::FinalOptimization(){
 		vector<FLOAT_TYPE> blens;
 		optTree->StoreBranchlengths(blens);
 
+/*		optTree->OptimizeBranchLength(precThisPass, optTree->allNodes[5], true);
+		optInd->CalcFitness(0);
+		FLOAT_TYPE trueImprove= optInd->Fitness() - passStart;
+		incr = trueImprove;
+*/		
+
 		//remember that what is returned from OptAllBranches isn't the true increase in score, just an estimate
 		incr=optTree->OptimizeAllBranches(precThisPass);
 		optInd->CalcFitness(0);
