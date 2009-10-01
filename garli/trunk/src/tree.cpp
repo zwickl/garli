@@ -6024,7 +6024,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 	if(mod->NRateCats() == 1) //allow a bit more change for a single omega
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), 0,
 			max(minVal, mod->Omega(0)*0.333),
-			min(9999.9, mod->Omega(0)+mod->Omega(0)*0.333),
+			max(min(9999.9, mod->Omega(0)+mod->Omega(0)*0.333), 0.01),
 			&Model::SetOmega, scoreDiffTarget);
 	else{
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i,
@@ -6050,7 +6050,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 		for(i=1;i < mod->NRateCats()-1;i++){
 			omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i,
 				max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
-				min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp),
+				max(min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), 0.01),
 				&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6119,16 +6119,15 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 
 FLOAT_TYPE Tree::OptimizeEquilibriumFreqs(FLOAT_TYPE prec){
 	FLOAT_TYPE freqImprove=ZERO_POINT_ZERO;
-	FLOAT_TYPE minVal = 1.0e-5;
 	int i=0;
 
-	//limiting change in any one pass
-	double maxFreqChange = 0.05;	
+	//limiting change in any one pass much more
+	double maxPropChange = 1.2;
 
 	for(i=0;i < mod->NStates();i++){
 		freqImprove += OptimizeBoundedParameter(prec, mod->StateFreq(i), i, 
-			min(max((mod->NStates() > 4 ? 0.0001 : 0.01), mod->StateFreq(i) - maxFreqChange), mod->StateFreq(i)),
-			max(min(0.96, mod->StateFreq(i) + maxFreqChange), mod->StateFreq(i)),
+			min(max((mod->NStates() > 4 ? 0.0001 : 0.01), mod->StateFreq(i) * (1.0/maxPropChange)), mod->StateFreq(i)),
+			max(min(0.96, mod->StateFreq(i) * maxPropChange), mod->StateFreq(i)),
 			&Model::SetEquilibriumFreq);
 		}
 	return freqImprove;
