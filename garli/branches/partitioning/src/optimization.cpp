@@ -2161,7 +2161,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			else
 				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
 
-			assert(La > 0.0f && Lc > 0.0f && Lg > 0.0f && Lt > 0.0f);
+			assert(La >= 0.0f && Lc >= 0.0f && Lg >= 0.0f && Lt >= 0.0f);
 			assert(La < 1.0e30 && Lc < 1.0e30 && Lg < 1.0e30 && Lt < 1.0e30);
 
 			FLOAT_TYPE tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
