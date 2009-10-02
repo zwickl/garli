@@ -681,12 +681,20 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 			positiveD2Num++;
 			FLOAT_TYPE amtToBump;
 			if(d1 > ZERO_POINT_ZERO){
-				//proposed=curVal*(FLOAT_TYPE)(ONE_POINT_ZERO+0.02*positiveD2Num);
-				amtToBump = max(closeToBound, (curVal * (FLOAT_TYPE)(0.02*positiveD2Num)));
-				proposed = curVal + amtToBump;
+				if((positiveD2Num + 1) % 3 == 0){
+					amtToBump = ((upperBracket + curVal) * ZERO_POINT_FIVE) - curVal;
+#ifdef OPT_BOUNDED_LOG
+					log << "B1/2";
+#endif
+					}
+				else{
+					//proposed=curVal*(FLOAT_TYPE)(ONE_POINT_ZERO+0.02*positiveD2Num);
+					amtToBump = max(closeToBound, (curVal * (FLOAT_TYPE)(0.02*positiveD2Num)));
+					proposed = curVal + amtToBump;
 #ifdef OPT_BOUNDED_LOG
 					log << "B2P";
 #endif
+					}
 				}
 			else {//cycle through a number of arbitrary value changes here
 				if(positiveD2Num % 3 == 0 || (pass == 0 && boundBumped > ZERO_POINT_ZERO)){
@@ -702,7 +710,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 #endif
 					}
 				else if((positiveD2Num + 1) % 3 == 0){
-					amtToBump = curVal - ((curVal - lowerBracket) * ZERO_POINT_FIVE);
+					amtToBump = curVal - ((curVal + lowerBracket) * ZERO_POINT_FIVE);
 #ifdef OPT_BOUNDED_LOG
 					log << "B1/2";
 #endif
