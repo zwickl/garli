@@ -690,11 +690,11 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 				else{
 					//proposed=curVal*(FLOAT_TYPE)(ONE_POINT_ZERO+0.02*positiveD2Num);
 					amtToBump = max(closeToBound, (curVal * (FLOAT_TYPE)(0.02*positiveD2Num)));
-					proposed = curVal + amtToBump;
 #ifdef OPT_BOUNDED_LOG
 					log << "B2P";
 #endif
 					}
+				proposed = curVal + amtToBump;
 				}
 			else {//cycle through a number of arbitrary value changes here
 				if(positiveD2Num % 3 == 0 || (pass == 0 && boundBumped > ZERO_POINT_ZERO)){
