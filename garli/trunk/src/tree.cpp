@@ -6191,23 +6191,53 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 	else{
 		list<int> reopt;
 		//ofstream vals("rmatVals.log", ios::app);
+
+#ifdef SUM_REL_RATES
+		mod->NormalizeSumConstrainedRelativeRates();
+		for(i=0;i < mod->NumRelRates();i++){
+#else
 		for(i=0;i < mod->NumRelRates() - 1;i++){
+#endif
 			//DEBUG
 			double beflnL = lnL;
 			double befval = mod->Rates(i);
+#ifdef SUM_REL_RATES
+			FLOAT_TYPE minV = max(min(SUM_TO * 1.0e-6/190.0, mod->Rates(i)), mod->Rates(i) / maxPropChange);
+			if(minV < SUM_TO * 1.0e-3){
+				minV = min(mod->Rates(i), SUM_TO * 1.0e-6/190.0);
+				}
+			FLOAT_TYPE maxV = min(max(SUM_TO * 1.0e6/190.0, mod->Rates(i)), mod->Rates(i) * maxPropChange);
+			if(maxV < SUM_TO * 1.0e-3)
+				maxV = SUM_TO * 1.0e-3;
+			rateImprove += OptimizeBoundedParameter(prec, mod->Rates(i), i, 
+				minV, maxV,
+				&Model::SetSumConstrainedRelativeRate, scoreDiffTarget);
+#else
 			FLOAT_TYPE minV = max(min(1.0e-3, mod->Rates(i)), mod->Rates(i) / maxPropChange);
-			if(minV < 0.01)
-				minV = 1.0e-3;
+			if(minV < 0.01){
+				minV = min(mod->Rates(i), 1.0e-3);
+				}
 			FLOAT_TYPE maxV = min(max(9999.0, mod->Rates(i)), mod->Rates(i) * maxPropChange);
 			if(maxV < 0.01)
 				maxV = 0.01;
 			rateImprove += OptimizeBoundedParameter(prec, mod->Rates(i), i, 
 				minV, maxV,
 				&Model::SetRelativeNucRate, scoreDiffTarget);
-			//vals << i << "\t" << befval << "\t" << mod->Rates(i) << "\t" << lnL - beflnL << endl;
+#endif
+
 			if(!FloatingPointEquals(beflnL, lnL, 1e-8))
 				reopt.push_back(i);
 			}
+		string s;
+		mod->FillModelOrHeaderStringForTable(s, true);
+		ofstream tab("valTable.log", ios::app);
+		tab << lnL << "\t" << s.c_str() << "\t" << endl;
+		tab.close();
+
+#ifdef SUM_REL_RATES
+		mod->NormalizeSumConstrainedRelativeRates();
+#endif
+
 		int pass = 0;
 		while(reopt.size() != 0 && pass < 4){
 			double beflnL = lnL;
@@ -6216,16 +6246,28 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 			while(it != reopt.end()){
 				double beflnL = lnL;
 				double befval = mod->Rates(*it);
+#ifdef SUM_REL_RATES
+				FLOAT_TYPE minV = max(min(SUM_TO * 1.0e-6/190.0, mod->Rates(*it)), mod->Rates(*it) / maxPropChange);
+				if(minV < SUM_TO * 1.0e-3){
+					minV = min(mod->Rates(*it), SUM_TO * 1.0e-6/190.0);
+					}
+				FLOAT_TYPE maxV = min(max(SUM_TO * 1.0e6/190.0, mod->Rates(*it)), mod->Rates(*it) * maxPropChange);
+				if(maxV < SUM_TO * 1.0e-3)
+					maxV = SUM_TO * 1.0e-3;
+				rateImprove += OptimizeBoundedParameter(prec, mod->Rates(*it), *it, 
+					minV, maxV,
+					&Model::SetSumConstrainedRelativeRate, scoreDiffTarget);
+#else
 				FLOAT_TYPE minV = max(min(1.0e-3, mod->Rates(*it)), mod->Rates(*it) / maxPropChange);
 				if(minV < 0.01)
-					minV = 1.0e-3;
+					minV = min(mod->Rates(*it), 1.0e-3);
 				FLOAT_TYPE maxV = min(max(9999.0, mod->Rates(*it)), mod->Rates(*it) * maxPropChange);
 				if(maxV < 0.01)
 					maxV = 0.01;
 				rateImprove += OptimizeBoundedParameter(prec, mod->Rates(*it), *it, 
 					minV, maxV,
 					&Model::SetRelativeNucRate, scoreDiffTarget);
-				//vals << *it << "\t" << befval << "\t" << mod->Rates(*it) << "\t" << lnL - beflnL << endl;
+#endif
 				if(FloatingPointEquals(lnL, beflnL, 1e-8)){
 					list<int>::iterator del=it;
 					it++;
@@ -6234,6 +6276,18 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 				else it++;				
 				}
 			outman.DebugMessage("reoptimized %d. improvement %.6f", num, lnL - beflnL);
+		//DEBUG
+/*		mod->ResetCurrentRefRateScale();
+		FLOAT_TYPE refImprove = OptimizeBoundedParameter(prec, mod->Rates(i), i, 
+			1.0/maxPropChange, maxPropChange,
+			&Model::SetReferenceRelativeNucRate, scoreDiffTarget);
+		rateImprove += refImprove;
+		outman.DebugMessage("Ref improve = %.6f", refImprove);
+*/		string s;
+		mod->FillModelOrHeaderStringForTable(s, true);
+		ofstream tab("valTable.log", ios::app);
+		tab << lnL << "\t" << s.c_str() << endl;
+		tab.close();
 			pass++;
 			}
 		//vals.close();

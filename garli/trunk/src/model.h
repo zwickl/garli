@@ -754,6 +754,8 @@ class Model{
 
 	vector<FLOAT_TYPE*> stateFreqs;
 	vector<FLOAT_TYPE*> relNucRates;
+	//this is essentially a temporary scratch variable used during optimization.  See SetReferenceRelativeNucRate
+	FLOAT_TYPE currentRefRateScale;
 	int arbitraryMatrixIndeces[6];//this just keeps track of which rate parameters are aliased to single parameters
 	vector<FLOAT_TYPE*> omegas;
 	vector<FLOAT_TYPE*> omegaProbs;
@@ -1028,6 +1030,42 @@ class Model{
 			*relNucRates[refRate] *= scaler;
 			}
 		eigenDirty = true;
+		}
+	//
+	void SetReferenceRelativeNucRate(int which, FLOAT_TYPE val){
+		FLOAT_TYPE newVal = val / currentRefRateScale;
+		SetRelativeNucRate(NumRelRates() - 1, newVal);
+		currentRefRateScale = val;
+		}
+	void ResetCurrentRefRateScale(){
+		currentRefRateScale = 1.0;
+		}
+
+#ifndef SUM_TO
+#define SUM_TO 1.0
+#endif
+//these should really only be getting called when SUM_REL_RATES is defined
+	void SetSumConstrainedRelativeRate(int which, FLOAT_TYPE val){
+		FLOAT_TYPE initial = *relNucRates[which];
+		*relNucRates[which] = val;
+		for(int i=0;i<NumRelRates();i++){
+			if(i != which)
+				*relNucRates[i] *= ((SUM_TO - val) / (SUM_TO - initial));
+			}
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+		for(int i=0;i<NumRelRates();i++)
+			sum += *relNucRates[i];
+		assert(FloatingPointEquals(sum, SUM_TO, 1e-8));
+
+		eigenDirty = true;
+		}
+
+	void NormalizeSumConstrainedRelativeRates(){
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+		for(int i=0;i<NumRelRates();i++)
+			sum += *relNucRates[i];
+		for(int i=0;i<NumRelRates();i++)
+			*relNucRates[i] *= SUM_TO / sum;
 		}
 
 	void SetPinv(int which, FLOAT_TYPE val){
