@@ -184,29 +184,44 @@ public:
 #else
 				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-12));
 #endif
-
 				}
-	/*		if(rateToChange<numElements-1){
-				*vals[rateToChange] *= rnd.gamma( mutationShape );
-				if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;
-				if(*vals[rateToChange]<minv) *vals[rateToChange]=minv;
-				}
-			else{//if we alter the reference rate, which we are assuming
-				//is the last one (GT for DNA models, fixed to 1.0)
-				//scale all of the other rates
-				FLOAT_TYPE scaler= rnd.gamma( mutationShape );
-				for(int i=0;i<numElements-1;i++){
-					*vals[i] /= scaler;
-					if(*vals[i]>maxv) *vals[i]=maxv;
-					if(*vals[i]<minv) *vals[i]=minv;
-					}
-				}
-	*/		}
+			}
 		else {
 			*vals[0] *= rnd.gamma( mutationShape );
 			if(*vals[0]>maxv) *vals[0]=maxv;
 			if(*vals[0]<minv) *vals[0]=minv;
 			}
+		}
+	};
+
+class SumConstrainedRelativeRates:public BaseParameter{
+public:
+	FLOAT_TYPE sumTo;
+	SumConstrainedRelativeRates(const char *c, FLOAT_TYPE **dv, int numE, FLOAT_TYPE min, FLOAT_TYPE max, FLOAT_TYPE sum):BaseParameter(c, dv, RELATIVERATES, numE, min, max){sumTo = sum;};
+
+	void Mutator(FLOAT_TYPE mutationShape){
+		assert(numElements > 1);
+		int rateToChange=int(rnd.uniform()*(numElements));
+
+		FLOAT_TYPE newVal = *vals[rateToChange] * rnd.gamma( mutationShape );
+		if(newVal>maxv) 
+			newVal=maxv;
+		if(newVal<minv) 
+			newVal=minv;			
+		*vals[rateToChange] = newVal;
+
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+		for(int i=0;i<numElements;i++)
+			sum += *vals[i];
+		for(int i=0;i<numElements;i++)
+			*vals[i] *= sumTo / sum;
+
+#ifndef NDEBUG
+		sum = ZERO_POINT_ZERO;
+		for(int i=0;i<numElements;i++)
+			sum += *vals[i];
+		assert(FloatingPointEquals(sum, sumTo, 1e-8));
+#endif
 		}
 	};
 

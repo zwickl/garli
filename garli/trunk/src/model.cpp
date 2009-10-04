@@ -2073,7 +2073,7 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 	char str[100];
 	for(int from=1;from<20;from++){
 		for(int to=0;to<from;to++){
-			sprintf(str, "%.1f", (el[from * 20 + to] * (19000.0/tot)));
+			sprintf(str, "%.3f", (el[from * 20 + to] * (19000.0/tot)));
 			out << str;
 			if(to != from -1)
 				out << "\t";
@@ -2719,7 +2719,12 @@ void Model::CreateModelFromSpecification(int modnum){
 					*d = max(rnd.gamma(1), 0.0001);
 				relNucRates.push_back(d);
 				}
+#ifdef SUM_REL_RATES
+			SumConstrainedRelativeRates *r = new SumConstrainedRelativeRates("Rate matrix", &relNucRates[0], 190, SUM_TO * 1.0e-6/190.0, SUM_TO * 1.0e6/190.0, SUM_TO);
+#else
 			RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 190, 1e-3, 9999.9);
+#endif
+			
 			r->SetWeight(190);
 			paramsToMutate.push_back(r);
 			}
