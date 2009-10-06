@@ -3587,9 +3587,11 @@ void Population::WriteTreeFile( const char* treefname, int indnum, bool collapse
 	outf.open( filename.c_str() );
 	outf.precision(8);
 #endif
+	string trans;
 	string str;
-	char temp[101];
-	data->BeginNexusTreesBlock(outf);
+	data->BeginNexusTreesBlock(trans);
+	//data->BeginNexusTreesBlock(outf);
+	char temp[101];	
 	if(prematureTermination == true){
 		if(indnum == -1)
 			str += "[NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!]\n";

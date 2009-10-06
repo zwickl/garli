@@ -543,13 +543,32 @@ void DataMatrix::SwapCharacters( int i, int j ){
 		}
 	}
 
+void DataMatrix::BeginNexusTreesBlock(string &trans) const{
+	//this outputs everything up through the translate table
+	trans = "#NEXUS\n\nbegin trees;\ntranslate\n";
+
+	char temp[500];
+	for(int k=0;k<nTax;k++){
+		//NxsString tnstr = TaxonLabel(k);
+		//tnstr.BlanksToUnderscores();
+		NxsString tnstr = NxsString::GetEscaped(TaxonLabel(k)).c_str();
+		//tnstr = NxsString::GetEscaped(tnstr);
+		if( k == nTax-1 )
+			sprintf(temp, " %d %s;\n", (k+1), tnstr.c_str());
+		else
+			sprintf(temp, " %d %s,\n", (k+1), tnstr.c_str());
+
+		}
+	}
+
 void DataMatrix::BeginNexusTreesBlock(ofstream &treeout) const{
 	//this outputs everything up through the translate table
 	treeout << "#NEXUS\n\nbegin trees;\ntranslate\n";
 	for(int k=0;k<nTax;k++){
 		treeout << "  " << (k+1);
-		NxsString tnstr = TaxonLabel(k);
-		tnstr.BlanksToUnderscores();
+//		NxsString tnstr = TaxonLabel(k);
+//		tnstr.BlanksToUnderscores();
+		NxsString tnstr = NxsString::GetEscaped(TaxonLabel(k)).c_str();
 		treeout << "  " << tnstr.c_str();
 		if( k == nTax-1 )
 			treeout << ";\n";
