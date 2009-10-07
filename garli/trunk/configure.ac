@@ -93,6 +93,15 @@ if test "$enable_openmp" = yes; then
 	   ])
 fi
 
+# Compile BOINC version
+AC_ARG_ENABLE(boinc,
+        AC_HELP_STRING([--enable-boinc],[build BOINC version (requires BOINC library and api installation)]), , [enable_boinc=no])
+if test "$enable_boinc" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling BOINC version
+           ])
+fi
+
 # Mpi run forking version
 AC_ARG_ENABLE(mpi,
 	AC_HELP_STRING([--enable-mpi],[build MPI run distributing version]), , [enable_mpi=no])
@@ -163,6 +172,13 @@ if test  "$enable_openmp" = yes; then
 	fi
 fi
 
+#BOINC compilation
+if test  "$enable_boinc" = yes; then
+        CXXFLAGS="$CXXFLAGS -DBOINC"
+		LIBS="$LIBS -lpthread -lboinc -lboinc_api"
+fi
+
+#Compiler choice
 if test "$CC" = "icc" -o "$CC" = "icc" ; then
 #	Intel C compiler for Linux
 	if test "$enable_debugging" = no; then
@@ -285,6 +301,29 @@ fi
 
 CXXFLAGS="$CXXFLAGS $CXXFLAGS_OPTIM_SPEED"
 
+#Location of BOINC library and include files
+BOINC_INSTALL="/usr"
+AC_ARG_WITH(
+	[boinc],
+	AC_HELP_STRING(
+		[--with-boinc=DIR],
+		[Specify the root directory for the BOINC library (parent of the include/boinc and lib directories). Omit this flag to use a system level install of BOINC.]
+		),        
+	[
+	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
+		BOINC_INSTALL="$withval"
+	fi
+	])
+
+if test  "$enable_boinc" = yes; then
+	BOINC_INCL="$BOINC_INSTALL/include/boinc"
+	BOINC_LIB_DIR="$BOINC_INSTALL/lib"
+	if ! test -d "$BOINC_INSTALL" ; then
+		AC_MSG_ERROR([A BOINC library and api installation is required for building the BOINC version of GARLI. Expecting a directory called $BOINC_INCL and libboinc library files in $BOINC_LIB_DIR. Use the --with-boinc flag with configure to specify a location other than /usr/local, or verify that the specified location is correct.])
+	fi
+	CXXFLAGS="$CXXFLAGS -I$BOINC_INCL"
+	LDFLAGS="$LDFLAGS -L$BOINC_LIB_DIR"
+fi
 
 ################################################################################
 #	By default, use the bundled ncl code from source, 
@@ -317,9 +356,6 @@ if ! test -d "$NCL_LIB_DIR" ; then
 	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
 fi
 
-
-
-
 CPPFLAGS="$CPPFLAGS -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
 
 if test -d "$NCL_LIB_DIR/ncl" ; then
@@ -327,6 +363,16 @@ if test -d "$NCL_LIB_DIR/ncl" ; then
 else
 	LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR"
 fi
+
+AC_TRY_LINK(
+[],
+[int foo=2;],
+[],
+[AC_MSG_ERROR([Problem with link flags.  Most likely a library cannot be found.  
+Check that any libraries listed below can be found in a system default location or a location specified in LDFLAGS with a -L. 
+LIBS=$LIBS
+LDFLAGS=$LDFLAGS
+])])
 
 LIBS="$LIBS -lncl"
 AC_TRY_LINK( 
