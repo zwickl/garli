@@ -1067,10 +1067,12 @@ class Model{
 			if(i != which)
 				*relNucRates[i] *= ((SUM_TO - val) / (SUM_TO - initial));
 			}
+#ifndef NDEBUG
 		FLOAT_TYPE sum = ZERO_POINT_ZERO;
 		for(int i=0;i<NumRelRates();i++)
 			sum += *relNucRates[i];
 		assert(FloatingPointEquals(sum, SUM_TO, 1e-8));
+#endif
 
 		eigenDirty = true;
 		}
@@ -1128,12 +1130,17 @@ class Model{
 		FLOAT_TYPE newTot = 1.0 - *omegaProbs[which];
 		FLOAT_TYPE oldTot = 0.0;
 		for(int i=0;i<NRateCats();i++)
-			if(i != which) oldTot += *omegaProbs[i];
+			if(i != which) 
+				oldTot += *omegaProbs[i];
 		for(int i=0;i<NRateCats();i++)
-			if(i != which) *omegaProbs[i] *= newTot / oldTot;
+			if(i != which) 
+				*omegaProbs[i] *= newTot / oldTot;
+#ifdef NDEBUG
 		newTot = 0.0;
-		for(int i=0;i<NRateCats();i++) newTot += *omegaProbs[i];
+		for(int i=0;i<NRateCats();i++) 
+			newTot += *omegaProbs[i];
 		assert(FloatingPointEquals(newTot, ONE_POINT_ZERO, 1.0e-5));
+#endif
 		eigenDirty = true;
 		}
 
@@ -1221,7 +1228,8 @@ class Model{
 
 	void AdjustRateProportions(){
 		//this will change the gamma class probs when pinv changes
-		for(int i=0;i<NRateCats();i++) rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
+		for(int i=0;i<NRateCats();i++) 
+			rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
 #ifndef NDEBUG
 		FLOAT_TYPE sum=0.0;
 		for(int i=0;i<NRateCats();i++){

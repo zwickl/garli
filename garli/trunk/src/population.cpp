@@ -3609,7 +3609,9 @@ void Population::WriteTreeFile( const char* treefname, int indnum, bool collapse
 	str += "]";
 
 #ifdef BOINC
-	const char *s = str.c_str();
+	const char *s = trans.c_str();
+	outf.write(s, sizeof(char), trans.length());
+	s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
 	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	size_t len = strlen(treeString);
@@ -3618,6 +3620,7 @@ void Population::WriteTreeFile( const char* treefname, int indnum, bool collapse
 	s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
 #else
+	outf << trans;
 	outf << str;
 	outf.setf( ios::floatfield, ios::fixed );
 	outf.setf( ios::showpoint );

@@ -557,7 +557,7 @@ void DataMatrix::BeginNexusTreesBlock(string &trans) const{
 			sprintf(temp, " %d %s;\n", (k+1), tnstr.c_str());
 		else
 			sprintf(temp, " %d %s,\n", (k+1), tnstr.c_str());
-
+		trans += temp;
 		}
 	}
 
