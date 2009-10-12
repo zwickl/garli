@@ -171,7 +171,7 @@ void AminoacidData::CalcEmpiricalFreqs(){
 	bool allPresent = true;
 	for(int j=0;j<maxNumStates;j++) if(empStateFreqs[j] == ZERO_POINT_ZERO) allPresent = false;
 	if(!allPresent){
-		outman.UserMessage("WARNING: Not all amino acids were observed in this dataset.\n\tOne pseudo-count will be added to each amino acid for calculation of the\n\tempirical frequencies. You should probably use\n\ta statefrequencies setting other than emprical.\n");
+		outman.UserMessage("WARNING: Not all amino acids were observed in this dataset.\n\tIf the \"empirical\" statefrequencies setting is used one pseudo-count\n\twill be added to each amino acid for calculation of the empirical frequencies.\n\tYou should probably not use the emprical statefrequencies setting with this dataset.\n");
 		for(int j=0;j<maxNumStates;j++) empStateFreqs[j] += ONE_POINT_ZERO;
 		total += (FLOAT_TYPE) maxNumStates;
 		}

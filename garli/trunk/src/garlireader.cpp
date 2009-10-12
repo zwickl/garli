@@ -1128,6 +1128,10 @@ void GarliBlock::Read(
 		//1. endblock is reached, sucessfully exiting the garli block
 		//2. something besides an endblock is read.  This is interpreted as part of the model string, with minimal error checking
 		//3. eof is hit before an endblock
+		
+		//we want to allow hyphens in parenthetical notation, since otherwise they are individual nexus tokens.
+		//this gets reset after every read
+		token.SetLabileFlagBit(NxsToken::hyphenNotPunctuation);
 		token.GetNextToken();
 
 		if (token.Abbreviation("ENdblock"))
