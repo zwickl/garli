@@ -723,7 +723,7 @@ void Model::UpdateQMatAminoAcid(){
 	else if(modSpec.IsWAGAAMatrix()) MultiplyByWAGAAMatrix();
 	else if(modSpec.IsMtMamAAMatrix()) MultiplyByMtMamAAMatrix();
 	else if(modSpec.IsMtRevAAMatrix()) MultiplyByMtRevAAMatrix();
-	else if(modSpec.IsEstimateAAMatrix()){
+	else if(modSpec.IsEstimateAAMatrix() || modSpec.IsUserSpecifiedRateMatrix()){
 		vector<FLOAT_TYPE *>::iterator r = relNucRates.begin();
 		for(int from=0;from<19;from++){
 			for(int to=from+1;to<20;to++){
@@ -1364,7 +1364,7 @@ void Model::CopyModel(const Model *from){
 			*omegaProbs[i]=*(from->omegaProbs[i]);
 		}
 
-	if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix())
+	if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix() || (modSpec.IsAminoAcid() && modSpec.IsUserSpecifiedRateMatrix()))
 		for(int i=0;i<relNucRates.size();i++)
 			*relNucRates[i]=*(from->relNucRates[i]);
 	
@@ -2132,6 +2132,7 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		else if(modSpec.IsMtMamAAMatrix()) outman.UserMessage("MtMam");
 		else if(modSpec.IsMtRevAAMatrix()) outman.UserMessage("MtRev");
 		else if(modSpec.IsEstimateAAMatrix()) outman.UserMessage("Estimated (189 free parameters)");
+		else if(modSpec.IsUserSpecifiedRateMatrix()) outman.UserMessage(" values specified by user (fixed)");
 		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
@@ -2225,7 +2226,7 @@ void Model::FillGarliFormattedModelString(string &s) const{
 			s += temp;
 			}
 		}
-	if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix()){
+	if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix() || (modSpec.IsAminoAcid() && modSpec.IsUserSpecifiedRateMatrix())){
 		//sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", prec, Rates(0), prec, Rates(1), prec, Rates(2), prec, Rates(3), prec, Rates(4));
 		//s += temp;
 		s += " r ";
@@ -2320,7 +2321,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 		//take care of advancing to the following letter 
 		if(c == 'R' || c == 'r'){//rate parameters
 			if(modSpec.IsAminoAcid() && modSpec.IsEstimateAAMatrix() == false && modSpec.IsUserSpecifiedRateMatrix() == false) 
-				throw ErrorException("Rate matrix parameters can only be specified for nucleotide or codon models");
+				throw ErrorException("Amino acid rate matrix parameters cannot be specified unless \"ratematrix = fixed\" or \"ratematrix = estimate\" are used.");
 			//FLOAT_TYPE r[6];
 			vector<FLOAT_TYPE> r;
 			//for(int i=0;i<5;i++){
@@ -2679,6 +2680,7 @@ void Model::CreateModelFromSpecification(int modnum){
 				}
 			if(modSpec.fixRelativeRates == false){
 				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 6, 1e-3, 999.9);
+	
 				r->SetWeight(6);
 				paramsToMutate.push_back(r);
 				}
@@ -2708,25 +2710,30 @@ void Model::CreateModelFromSpecification(int modnum){
 				relNucRates.push_back(a);
 			}
 		}
-	else{//estimating the aminoacid rate matrix
-		if(modSpec.fixRelativeRates == false){
+	else{//estimating or fixing the aminoacid rate matrix
+		if(modSpec.fixRelativeRates == false || modSpec.IsUserSpecifiedRateMatrix()){
 			for(int i=0;i<190;i++){
 				FLOAT_TYPE *d=new FLOAT_TYPE;
 				//*d = ONE_POINT_ZERO;
 				if(i == 189)
 					*d = 1.0;
 				else
-					*d = max(rnd.gamma(1), 0.0001);
+					*d = max(rnd.gamma(1), MIN_REL_RATE);
 				relNucRates.push_back(d);
 				}
-#ifdef SUM_REL_RATES
-			SumConstrainedRelativeRates *r = new SumConstrainedRelativeRates("Rate matrix", &relNucRates[0], 190, SUM_TO * 1.0e-6/190.0, SUM_TO * 1.0e6/190.0, SUM_TO);
-#else
-			RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 190, 1e-3, 9999.9);
+#ifdef SUM_REL_RATES	
+			this->NormalizeSumConstrainedRelativeRates(true, -1);
 #endif
-			
-			r->SetWeight(190);
-			paramsToMutate.push_back(r);
+			if(! modSpec.IsUserSpecifiedRateMatrix()){
+#ifdef SUM_REL_RATES
+				SumConstrainedRelativeRates *r = new SumConstrainedRelativeRates("Rate matrix", &relNucRates[0], 190, SUM_TO * 1.0e-6/190.0, SUM_TO * 1.0e6/190.0, SUM_TO);
+#else
+				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 190, 1e-3, 9999.9);
+#endif
+				
+				r->SetWeight(190);
+				paramsToMutate.push_back(r);
+				}
 			}
 		}
 
@@ -3029,8 +3036,12 @@ void Model::OutputBinaryFormattedModel(OUTPUT_CLASS &out) const{
 
 void Model::OutputBinaryFormattedModel(OUTPUT_CLASS &out) const{
 	FLOAT_TYPE *r = new FLOAT_TYPE;
-	if(modSpec.IsAminoAcid() == false){
-		for(int i=0;i<5;i++){
+	if(modSpec.IsAminoAcid() == false || modSpec.IsUserSpecifiedRateMatrix() || modSpec.IsEstimateAAMatrix()){
+		if(modSpec.IsAminoAcid())
+			assert(NumRelRates() == 190);
+		else
+			assert(NumRelRates() == 6);
+		for(int i=0;i<NumRelRates();i++){
 			*r = Rates(i);
 			out.WRITE_TO_FILE(r, sizeof(FLOAT_TYPE), 1);
 			}
@@ -3069,14 +3080,19 @@ void Model::OutputBinaryFormattedModel(OUTPUT_CLASS &out) const{
 	}
 
 void Model::ReadBinaryFormattedModel(FILE *in){
-	if(modSpec.IsAminoAcid() == false){
-		FLOAT_TYPE r[6];
-		for(int i=0;i<5;i++){
+	if(modSpec.IsAminoAcid() == false || modSpec.IsUserSpecifiedRateMatrix() || modSpec.IsEstimateAAMatrix()){
+		if(modSpec.IsAminoAcid())
+			assert(NumRelRates() == 190);
+		else
+			assert(NumRelRates() == 6);
+		FLOAT_TYPE *r = new FLOAT_TYPE[NumRelRates()];
+		for(int i=0;i<NumRelRates();i++){
 			assert(ferror(in) == false);
 			fread(r+i, sizeof(FLOAT_TYPE), 1, in);
 			}
-		r[5] = ONE_POINT_ZERO;
+		//r[5] = ONE_POINT_ZERO;
 		SetRmat(r, false);
+		delete []r;
 		}
 
 	if(modSpec.IsCodon()){
