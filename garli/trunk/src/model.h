@@ -41,6 +41,15 @@ extern rng rnd;
 extern ModelSpecification modSpec;
 extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
 
+#ifndef SUM_TO
+#define SUM_TO 1900.0
+#endif
+
+//min rate is 1.0e6 times less than the mean
+//max is just less than SUM_TO
+#define MIN_REL_RATE (SUM_TO * (1.0e-6/190.0))
+#define MAX_REL_RATE (SUM_TO - (189.0 * MIN_REL_RATE))
+
 	enum{//the types
 		STATEFREQS = 1,
 		RELATIVERATES = 2,
@@ -664,8 +673,9 @@ public:
 			else if(_stricmp(str, "wag") == 0) SetWAGAAMatrix();
 			else if(_stricmp(str, "mtmam") == 0) SetMtMamAAMatrix();
 			else if(_stricmp(str, "mtrev") == 0) SetMtRevAAMatrix();
-			else if(_stricmp(str, "estimateF") == 0) SetEstimatedAAMatrix();
-			else throw(ErrorException("Sorry, %s is not a valid aminoacid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag, mtmam, mtrev)", str));
+			else if(_stricmp(str, "estimate") == 0) SetEstimatedAAMatrix();
+			else if(_stricmp(str, "fixed") == 0) SetUserSpecifiedRateMatrix();
+			else throw(ErrorException("Sorry, %s is not a valid aminoacid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag, mtmam, mtrev, estimate, fixed)", str));
 			}
 		else{
 			if(_stricmp(str, "6rate") == 0) rateMatrix = NST6;
@@ -940,6 +950,10 @@ class Model{
 		*relNucRates[5]=1.0;
 		eigenDirty=true;
 */
+		
+#ifdef SUM_REL_RATES
+		this->NormalizeSumConstrainedRelativeRates(true, -1);
+#else
 		int refRate = relNucRates.size()-1;
 		if(FloatingPointEquals(r[refRate], ONE_POINT_ZERO, 1.0e-5) == false){
 			for(int i=0;i<relNucRates.size();i++)
@@ -948,6 +962,7 @@ class Model{
 		for(int i=0;i<relNucRates.size();i++)
 			*relNucRates[i]=r[i];
 		*relNucRates[refRate]=1.0;
+#endif
 		eigenDirty=true;
 		}
 	void SetPis(FLOAT_TYPE *b, bool checkValidity){
@@ -1056,33 +1071,132 @@ class Model{
 		currentRefRateScale = 1.0;
 		}
 
-#ifndef SUM_TO
-#define SUM_TO 1.0
-#endif
 //these should really only be getting called when SUM_REL_RATES is defined
+//note that the rates are not actually renormalized such that they sum to one here
+//this should be ok since only one rate is being optimized at a time and renormalization
+//can happen between each.  Normalizing here would be a pain because other rates could
+//be pushed below the minimum, which will do odd things to the likelihood function
 	void SetSumConstrainedRelativeRate(int which, FLOAT_TYPE val){
-		FLOAT_TYPE initial = *relNucRates[which];
+#ifndef SUM_REL_RATES
+		assert(0);
+#endif
+		assert(val - 1.0e-8 <= MAX_REL_RATE && val + 1.0e-8 >= MIN_REL_RATE);
 		*relNucRates[which] = val;
+
+		NormalizeSumConstrainedRelativeRates(true, which);
+/*
+		FLOAT_TYPE initial = *relNucRates[which];
+		FLOAT_TYPE rescale = ((SUM_TO - val) / (SUM_TO - initial));
+
+		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
+		FLOAT_TYPE nonMin = ZERO_POINT_ZERO;
+		bool someMin = false;
+
 		for(int i=0;i<NumRelRates();i++){
-			if(i != which)
-				*relNucRates[i] *= ((SUM_TO - val) / (SUM_TO - initial));
+			if(i != which){
+				*relNucRates[i] *= rescale;
+				if(*relNucRates[i] < MIN_REL_RATE){
+					*relNucRates[i] = MIN_REL_RATE;
+					minSum += MIN_REL_RATE;
+					someMin = true;
+					}
+				else
+					nonMin += *relNucRates[i];
+				}
 			}
+		if(someMin){
+			FLOAT_TYPE unfixedTarget = SUM_TO - val - minSum;
+			rescale = unfixedTarget / nonMin;
+			for(int i=0;i<NumRelRates();i++){
+				if(i != which && !FloatingPointEquals(*relNucRates[i], MIN_REL_RATE, 1e-8))
+					*relNucRates[i] *= rescale;
+				}
+			}
+		
 #ifndef NDEBUG
 		FLOAT_TYPE sum = ZERO_POINT_ZERO;
 		for(int i=0;i<NumRelRates();i++)
 			sum += *relNucRates[i];
 		assert(FloatingPointEquals(sum, SUM_TO, 1e-8));
 #endif
-
+*/
 		eigenDirty = true;
 		}
 
-	void NormalizeSumConstrainedRelativeRates(){
+	void NormalizeSumConstrainedRelativeRates(bool enforceBounds, int toNotChange){
+#ifndef SUM_REL_RATES
+		assert(0);
+#endif
+		bool someMin = false;
+		
+		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
 		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+
+		for(int i=0;i<NumRelRates();i++){
+			if(i != toNotChange){
+				sum += *relNucRates[i];
+				}
+			}
+		do{
+			FLOAT_TYPE unfixedTarget = SUM_TO - (toNotChange < 0 ? ZERO_POINT_ZERO : *relNucRates[toNotChange]) - minSum;
+			FLOAT_TYPE rescale = unfixedTarget / sum;
+			someMin = false;
+			sum = ZERO_POINT_ZERO;
+			for(int i=0;i<NumRelRates();i++){
+				if(i != toNotChange){
+					if(*relNucRates[i] > ZERO_POINT_ZERO){
+						*relNucRates[i] *= rescale;
+						if(*relNucRates[i] < MIN_REL_RATE){
+							*relNucRates[i] = -1.0;
+							minSum += MIN_REL_RATE;
+							someMin = true;
+							}
+						else
+							sum += *relNucRates[i];
+						}
+					}
+				}
+			}while(someMin);
+
+		for(int i=0;i<NumRelRates();i++)
+			if(*relNucRates[i] < ZERO_POINT_ZERO)
+				*relNucRates[i]= MIN_REL_RATE;
+
+#ifndef NDEBUG
+		sum = ZERO_POINT_ZERO;
 		for(int i=0;i<NumRelRates();i++)
 			sum += *relNucRates[i];
+		assert(FloatingPointEquals(sum, SUM_TO, 1e-8));
+#endif
+		/*
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
+		for(int i=0;i<NumRelRates();i++){
+			if(*relNucRates[i] < MIN_REL_RATE && enforceBounds){
+				*relNucRates[i] = MIN_REL_RATE;
+				minSum += MIN_REL_RATE;
+				}
+			//the max rate is a little weird in this context, since after
+			//rescaling it will no longer be at that rate.  I don't think 
+			//that this should cause problems.
+			else if(*relNucRates[i] > MAX_REL_RATE && enforceBounds){
+				*relNucRates[i] = MAX_REL_RATE;
+				sum += *relNucRates[i];
+				}
+			else{
+				sum += *relNucRates[i];
+				}
+			}
+		FLOAT_TYPE nonMinTarget = SUM_TO - minSum;
 		for(int i=0;i<NumRelRates();i++)
 			*relNucRates[i] *= SUM_TO / sum;
+		if(enforceBounds){
+			for(int i=0;i<NumRelRates();i++){
+				if(*relNucRates[i] < MIN_REL_RATE)
+					*relNucRates[i] = MIN_REL_RATE;
+				}
+			}
+			*/		
 		}
 
 	void SetPinv(int which, FLOAT_TYPE val){

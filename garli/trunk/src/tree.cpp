@@ -6189,6 +6189,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 			}
 		}
 	else{
+/*
 		list<int> reopt;
 		//ofstream vals("rmatVals.log", ios::app);
 
@@ -6228,18 +6229,26 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 			if(!FloatingPointEquals(beflnL, lnL, 1e-8))
 				reopt.push_back(i);
 			}
+*/
+#ifdef DEBUG_MESSAGES
 		string s;
 		mod->FillModelOrHeaderStringForTable(s, true);
 		ofstream tab("valTable.log", ios::app);
 		tab << lnL << "\t" << s.c_str() << "\t" << endl;
 		tab.close();
-
-#ifdef SUM_REL_RATES
-		mod->NormalizeSumConstrainedRelativeRates();
 #endif
-
+	
+		list<int> reopt;
+#ifdef SUM_REL_RATES
+		mod->NormalizeSumConstrainedRelativeRates(true, -1);
+		for(i=0;i < mod->NumRelRates();i++)
+			reopt.push_back(i);
+#else
+		for(i=0;i < mod->NumRelRates()-1;i++)
+			reopt.push_back(i);
+#endif
 		int pass = 0;
-		while(reopt.size() != 0 && pass < 4){
+		while(reopt.size() != 0 && pass < 5){
 			double beflnL = lnL;
 			list<int>::iterator it = reopt.begin();
 			int num = reopt.size();
@@ -6247,11 +6256,11 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 				double beflnL = lnL;
 				double befval = mod->Rates(*it);
 #ifdef SUM_REL_RATES
-				FLOAT_TYPE minV = max(min(SUM_TO * 1.0e-6/190.0, mod->Rates(*it)), mod->Rates(*it) / maxPropChange);
+				FLOAT_TYPE minV = max(MIN_REL_RATE, mod->Rates(*it) / maxPropChange);
 				if(minV < SUM_TO * 1.0e-3/190.0){
-					minV = min(mod->Rates(*it), SUM_TO * 1.0e-6/190.0);
+					minV = min(mod->Rates(*it), MIN_REL_RATE);
 					}
-				FLOAT_TYPE maxV = min(max(SUM_TO * 1.0e6/190.0, mod->Rates(*it)), mod->Rates(*it) * maxPropChange);
+				FLOAT_TYPE maxV = min(MAX_REL_RATE, mod->Rates(*it) * maxPropChange);
 				if(maxV < SUM_TO * 1.0e-3/190.0)
 					maxV = SUM_TO * 1.0e-3/190.0;
 				rateImprove += OptimizeBoundedParameter(prec, mod->Rates(*it), *it, 
@@ -6275,30 +6284,17 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 					}
 				else it++;				
 				}
-			outman.DebugMessage("reoptimized %d. improvement %.6f", num, lnL - beflnL);
-		//DEBUG
-/*		mod->ResetCurrentRefRateScale();
-		FLOAT_TYPE refImprove = OptimizeBoundedParameter(prec, mod->Rates(i), i, 
-			1.0/maxPropChange, maxPropChange,
-			&Model::SetReferenceRelativeNucRate, scoreDiffTarget);
-		rateImprove += refImprove;
-		outman.DebugMessage("Ref improve = %.6f", refImprove);
-*/		string s;
-		mod->FillModelOrHeaderStringForTable(s, true);
-		ofstream tab("valTable.log", ios::app);
-		tab << lnL << "\t" << s.c_str() << endl;
-		tab.close();
 			pass++;
+			outman.DebugMessage("reoptimized %d. improvement %.6f", num, lnL - beflnL);
+#ifdef DEBUG_MESSAGES
+			string s;
+			mod->FillModelOrHeaderStringForTable(s, true);
+			ofstream tab("valTable.log", ios::app);
+			tab << lnL << "\t" << s.c_str() << endl;
+			tab.close();
+#endif
 			}
-		//vals.close();
 		}
-		//the reference rate fixed at 1 needs to have its own opt function
-		//This only ends up causing problems.  It shouldn't be that critical, so I'm taking it out
-//		rateImprove += OptimizeReferenceRelativeRate(prec);
-/*		//DEBUG
-		sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
-		outman.UserMessage("%s", temp);
-*/		
 	return rateImprove;
 	}
 

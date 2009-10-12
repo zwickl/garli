@@ -1088,6 +1088,8 @@ exit(0);
 	}
 
 void Population::OutputModelReport(){
+	//this version is deprecated in favor of Model::OutputHumanReadableModelReportWithParams()
+	assert(0);
 	//Report on the model setup
 	outman.UserMessage("MODEL REPORT:");
 	if(modSpec.IsCodon()){
