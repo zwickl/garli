@@ -2342,9 +2342,9 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			if(isdigit(c) || c=='.'){//read the GT rate, if specified
 				string v;
 				v = c;
-				while(!isalpha(c) && !stf.eof()){
+				while((!isalpha(c) || c=='e' || c == 'E') && !stf.eof()){
 					c=stf.get();
-					if(isdigit(c) || c=='.')
+					if(isdigit(c) || c=='.' || c=='e' || c=='E' || c == '-')
 						v += c;
 					else if(c == ' ' || c == '\t'){
 						c=stf.get();
@@ -2378,7 +2378,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				if(temp.size() == 0)
 					throw(ErrorException("Unexpected end of model string while reading equilibrium frequency parameters.\nExamine file and check manual for format.\n"));
 				if(temp[0] != '.' && (!isdigit(temp[0]))) 
-					throw(ErrorException("Problem reading equilirium state frequency parameters from file.\nExamine file and check manual for format.\n"));
+					throw(ErrorException("Problem reading equilibrium state frequency parameters from file.\nExamine file and check manual for format.\n"));
 				b[i]=(FLOAT_TYPE)atof(temp.c_str());
 				}
 			do{
