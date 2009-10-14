@@ -1249,7 +1249,7 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 		//if using the F3x4 or F1x4 flavors, they should have already be calculated and stored in the data empirical frequency field
 		FLOAT_TYPE *f = new FLOAT_TYPE[modSpec.nstates];
 		data->GetEmpiricalFreqs(f);
-		SetPis(f, false);
+		SetPis(f, false, true);
 		delete []f;
 		}
 
@@ -2362,7 +2362,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				else
 					throw ErrorException("Incorrect number of relative rates specified in model string.\t6 rates should be specified, (or 5 rates if the G-T rate is assumed to be 1.0).");
 				}
-			SetRmat(&r[0], true);
+			SetRmat(&r[0], true, true);
 			modSpec.gotRmatFromFile=true;
 			}
 		else if(c == 'E' || c == 'e' || c == 'b' || c == 'B'){//base freqs
@@ -2407,9 +2407,9 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			//in this case we're "forcing" estimation of state frequencies but providing starting values, 
 			//and because this is rather a hack we can't actually do the validation without crapping out 
 			if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEmpiricalStateFrequencies())
-				SetPis(&b[0], false);
+				SetPis(&b[0], false, true);
 			else
-				SetPis(&b[0], true);
+				SetPis(&b[0], true, true);
 			modSpec.gotStateFreqsFromFile=true;
 			}
 		else if(c == 'A' || c == 'a'){//alpha shape
@@ -3090,8 +3090,7 @@ void Model::ReadBinaryFormattedModel(FILE *in){
 			assert(ferror(in) == false);
 			fread(r+i, sizeof(FLOAT_TYPE), 1, in);
 			}
-		//r[5] = ONE_POINT_ZERO;
-		SetRmat(r, false);
+		SetRmat(r, false, false);
 		delete []r;
 		}
 
@@ -3109,7 +3108,7 @@ void Model::ReadBinaryFormattedModel(FILE *in){
 	for(int i=0;i<NStates();i++){
 		fread((char*) &(b[i]), sizeof(FLOAT_TYPE), 1, in);
 		}
-	SetPis(b, false);
+	SetPis(b, false, false);
 	delete []b;
 
 	if(modSpec.IsFlexRateHet()){

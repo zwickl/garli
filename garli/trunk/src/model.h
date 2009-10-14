@@ -914,7 +914,7 @@ class Model{
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
-	void SetRmat(FLOAT_TYPE *r, bool checkValidity){
+	void SetRmat(FLOAT_TYPE *r, bool checkValidity, bool renormalize){
 		if(checkValidity == true && modSpec.IsAminoAcid() == false){
 			if(nst==1){
 				if((FloatingPointEquals(r[0], r[1], 1.0e-5) &&
@@ -951,31 +951,38 @@ class Model{
 		*relNucRates[5]=1.0;
 		eigenDirty=true;
 */
+		//if we're reading in from a binary checkpoint we may not want to renormalize if were close because
+		//the scores need to match exactly
 
-	//if we're constraining the matrix by summing the rates AND this is an AA model, do that
-	//otherwise do the normal fix at 1.0 constraint
-	if(modSpec.IsAminoAcid())
-		assert(modSpec.IsEstimateAAMatrix() || modSpec.IsUserSpecifiedRateMatrix());
-#ifdef SUM_REL_RATES
-	if(modSpec.IsAminoAcid()){
-		this->NormalizeSumConstrainedRelativeRates(true, -1);
-		}
-	else{
-#else
-	if(1){
-#endif
-		int refRate = relNucRates.size()-1;
-		if(FloatingPointEquals(r[refRate], ONE_POINT_ZERO, 1.0e-5) == false){
+			//if we're constraining the matrix by summing the rates AND this is an AA model, do that
+			//otherwise do the normal fix at 1.0 constraint
+		if(modSpec.IsAminoAcid())
+			assert(modSpec.IsEstimateAAMatrix() || modSpec.IsUserSpecifiedRateMatrix());
+	#ifdef SUM_REL_RATES
+		if(modSpec.IsAminoAcid()){
 			for(int i=0;i<relNucRates.size();i++)
-				r[i] /= r[refRate];
+				*relNucRates[i]=r[i];
+			if(renormalize)
+				this->NormalizeSumConstrainedRelativeRates(true, -1);
 			}
-		for(int i=0;i<relNucRates.size();i++)
-			*relNucRates[i]=r[i];
-		*relNucRates[refRate]=1.0;
+		else{
+	#else
+		if(1){
+	#endif
+			if(renormalize){
+				int refRate = relNucRates.size()-1;
+				if(FloatingPointEquals(r[refRate], ONE_POINT_ZERO, 1.0e-5) == false){
+					for(int i=0;i<relNucRates.size();i++)
+						r[i] /= r[refRate];
+					}
+				r[refRate] = ONE_POINT_ZERO;
+				}
+			for(int i=0;i<relNucRates.size();i++)
+				*relNucRates[i]=r[i];
+			}
+		eigenDirty=true;
 		}
-	eigenDirty=true;
-	}
-	void SetPis(FLOAT_TYPE *b, bool checkValidity){
+	void SetPis(FLOAT_TYPE *b, bool checkValidity, bool renormalize){
 		//7/12/07 we'll now assume that all freqs have been passed in, rather than calcing the last
 		//from the others
 		if(checkValidity == true){
@@ -996,7 +1003,7 @@ class Model{
 		if(FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-3) == false)
 			throw(ErrorException("State frequencies do not appear to add up to 1.0!\n"));
 		//if the total is near 1, make it exactly 1
-		else if(FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-6) == false){
+		else if(renormalize && FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-6) == false){
 			for(int i=0;i<nstates;i++){
 				*stateFreqs[i] /= freqTot;
 				}
@@ -1145,28 +1152,32 @@ class Model{
 		for(int i=0;i<NumRelRates();i++){
 			if(i != toNotChange){
 				sum += *relNucRates[i];
+				if(*relNucRates[i] < MIN_REL_RATE)
+					someMin = true;
 				}
 			}
-		do{
-			FLOAT_TYPE unfixedTarget = SUM_TO - (toNotChange < 0 ? ZERO_POINT_ZERO : *relNucRates[toNotChange]) - minSum;
-			FLOAT_TYPE rescale = unfixedTarget / sum;
-			someMin = false;
-			sum = ZERO_POINT_ZERO;
-			for(int i=0;i<NumRelRates();i++){
-				if(i != toNotChange){
-					if(*relNucRates[i] > ZERO_POINT_ZERO){
-						*relNucRates[i] *= rescale;
-						if(*relNucRates[i] < MIN_REL_RATE){
-							*relNucRates[i] = -1.0;
-							minSum += MIN_REL_RATE;
-							someMin = true;
+		if(someMin || !(FloatingPointEquals(sum, SUM_TO, 1.0e-5))){
+			do{
+				FLOAT_TYPE unfixedTarget = SUM_TO - (toNotChange < 0 ? ZERO_POINT_ZERO : *relNucRates[toNotChange]) - minSum;
+				FLOAT_TYPE rescale = unfixedTarget / sum;
+				someMin = false;
+				sum = ZERO_POINT_ZERO;
+				for(int i=0;i<NumRelRates();i++){
+					if(i != toNotChange){
+						if(*relNucRates[i] > ZERO_POINT_ZERO){
+							*relNucRates[i] *= rescale;
+							if(*relNucRates[i] < MIN_REL_RATE){
+								*relNucRates[i] = -1.0;
+								minSum += MIN_REL_RATE;
+								someMin = true;
+								}
+							else
+								sum += *relNucRates[i];
 							}
-						else
-							sum += *relNucRates[i];
 						}
 					}
-				}
-			}while(someMin);
+				}while(someMin);
+			}
 
 		for(int i=0;i<NumRelRates();i++)
 			if(*relNucRates[i] < ZERO_POINT_ZERO)
