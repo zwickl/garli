@@ -490,9 +490,9 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		Score();
 
 #ifdef SINGLE_PRECISION_FLOATS
-	FLOAT_TYPE baseIncr = max(0.001*optPrecision, 0.005f);
+	FLOAT_TYPE baseIncr = min(max(0.001*optPrecision, 1.0e-5f), initialVal * 0.01);
 #else
-	FLOAT_TYPE baseIncr = max(0.001*optPrecision, 1.0e-6);
+	FLOAT_TYPE baseIncr = min(max(0.001*optPrecision, 1.0e-6), initialVal * 0.01);
 #endif
 
 	//this first bit of checking and bumping used to use epsilon rather than the default baseIncr
@@ -505,18 +505,30 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 
 	//the new version
 	FLOAT_TYPE boundBumped = -1.0;
-	//bump enough that we could have one legal increase in incr below to allow sufficient lnL diffs
+	//if possible, bump enough that we could have one legal increase in incr below to allow sufficient lnL diffs
 	FLOAT_TYPE bumpAmt = baseIncr * 5.0001;
 	if(initialVal - lowBound < bumpAmt){
+		if(lowBound + bumpAmt > highBound)
+			bumpAmt = baseIncr * 1.0001;
 //		outman.DebugMessage("NEW: OptimizeBoundedParameter: value bumped off low bound %.6f -> %.6f", initialVal, lowBound + bumpAmt);
 		boundBumped = fabs(curVal - (lowBound + bumpAmt));
 		curVal = lowBound + bumpAmt;
+		if(curVal > highBound){
+			outman.DebugMessage("Bumped past other (high) bound!");
+			curVal = initialVal;
+			}
 		curScore = SetAndEvaluateParameter(which, curVal, bestKnownScore, bestKnownVal, SetParam);
 		}
 	else if(highBound - initialVal < bumpAmt){
-//		outman.DebugMessage("NEW: OptimizeBoundedParameter: value bumped off high bound %.6f -> %.6f", initialVal, highBound - bumpAmt);
+//		outman.DebugMessage("NEW: OptimizeBoundedParameter: value bumped off high bound %.6f -> %.6f", initialVal, highBound - bumpAmt);s
+		if(highBound - bumpAmt < lowBound)
+			bumpAmt = baseIncr * 1.0001;
 		boundBumped = fabs(curVal - (highBound - bumpAmt));
 		curVal = highBound - bumpAmt;
+		if(curVal < lowBound){
+			outman.DebugMessage("Bumped past other (low) bound!");
+			curVal = initialVal;
+			}
 		curScore = SetAndEvaluateParameter(which, curVal, bestKnownScore, bestKnownVal, SetParam);
 		}
 	//if the bounds are so tight that we can't be > baseIncr from both, exit
@@ -524,7 +536,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 	//us too near the opposite bound.  give up in that case
 	if(curVal - lowBound < baseIncr || highBound - curVal < baseIncr){
 		outman.DebugMessage("NEW: OptimizeBoundedParameter: bounds fully constrain parameter %.6f <- %.6f -> %.6f, desired amount = %.6f", lowBound, curVal, highBound, bumpAmt * 2);
-		SetAndEvaluateParameter(which, curVal, bestKnownScore, bestKnownVal, SetParam);
+		SetAndEvaluateParameter(which, initialVal, bestKnownScore, bestKnownVal, SetParam);
 		return 0.0;
 		}
 
@@ -568,7 +580,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		incrLimit = min(curVal - lowerBracket, upperBracket - curVal);
 		incr = baseIncr;
 		if(incr > incrLimit){
-			incr = incrLimit;
+			incr = incrLimit / 1.0001;
 			limited = true;
 			//outman.DebugMessage("OptimizeBoundedParameter: incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f lbound=%.6f hbound=%.6f incr=%.10f baseIncr=%.6f", pass, initialScore, lnL, initialVal, curVal, lowerBracket, upperBracket, incr, baseIncr);
 			if(baseIncr/incrLimit > 100.0)
@@ -601,7 +613,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 				//if the increased increment would be greater than what we are allowed by our bound
 				//we'll have to use the limited incr.  We'll try the increased baseIncr on the next pass.
 				if(baseIncr > incrLimit){
-					incr = incrLimit;
+					incr = incrLimit / 1.0001;
 					cont = true;
 					outman.DebugMessage("OptimizeBoundedParameter: adaptive increase in incr limited by bound (%s).\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f incr=%.10f baseIncr=%.6f", (boundBumped > ZERO_POINT_ZERO ? "boundBumped" : "no boundBump"), pass, initialScore, curScore, initialVal, curVal, incr, baseIncr);
 					}
