@@ -236,7 +236,7 @@ public:
 
 class RateProportions:public BaseParameter{
 public:
-	RateProportions(FLOAT_TYPE **dv, int numE):BaseParameter("Rate props", dv, RATEPROPS, numE, 1e-5, 0.999){};
+	RateProportions(FLOAT_TYPE **dv, int numE):BaseParameter("Rate props", dv, RATEPROPS, numE, 1e-5, 0.999){maxv = 1.0 - (numE * minv);};
 	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
@@ -951,10 +951,19 @@ class Model{
 		*relNucRates[5]=1.0;
 		eigenDirty=true;
 */
-		
+
+	//if we're constraining the matrix by summing the rates AND this is an AA model, do that
+	//otherwise do the normal fix at 1.0 constraint
+	if(modSpec.IsAminoAcid())
+		assert(modSpec.IsEstimateAAMatrix() || modSpec.IsUserSpecifiedRateMatrix());
 #ifdef SUM_REL_RATES
+	if(modSpec.IsAminoAcid()){
 		this->NormalizeSumConstrainedRelativeRates(true, -1);
+		}
+	else{
 #else
+	if(1){
+#endif
 		int refRate = relNucRates.size()-1;
 		if(FloatingPointEquals(r[refRate], ONE_POINT_ZERO, 1.0e-5) == false){
 			for(int i=0;i<relNucRates.size();i++)
@@ -963,9 +972,9 @@ class Model{
 		for(int i=0;i<relNucRates.size();i++)
 			*relNucRates[i]=r[i];
 		*relNucRates[refRate]=1.0;
-#endif
-		eigenDirty=true;
 		}
+	eigenDirty=true;
+	}
 	void SetPis(FLOAT_TYPE *b, bool checkValidity){
 		//7/12/07 we'll now assume that all freqs have been passed in, rather than calcing the last
 		//from the others
@@ -1240,6 +1249,8 @@ class Model{
 
 	void SetOmegaProb(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
+		assert(val >= 0.0);
+		assert(val == val);
 		*omegaProbs[which] = val;
 
 		FLOAT_TYPE newTot = 1.0 - *omegaProbs[which];
@@ -1248,9 +1259,11 @@ class Model{
 			if(i != which) 
 				oldTot += *omegaProbs[i];
 		for(int i=0;i<NRateCats();i++)
-			if(i != which) 
+			if(i != which){
+				assert(*omegaProbs[i] * newTot / oldTot > 0.0);
 				*omegaProbs[i] *= newTot / oldTot;
-#ifdef NDEBUG
+				}
+#ifndef NDEBUG
 		newTot = 0.0;
 		for(int i=0;i<NRateCats();i++) 
 			newTot += *omegaProbs[i];
@@ -1276,11 +1289,15 @@ class Model{
 
 	FLOAT_TYPE Omega(int which) const{
 		assert(which < NRateCats());
+		assert(*omegas[which] >= 0.0);
+		assert(*omegas[which] == *omegas[which]);
 		return *omegas[which];
 		}
 
 	FLOAT_TYPE OmegaProb(int which) const{
 		assert(which < NRateCats());
+		assert(*omegaProbs[which] >= 0.0);
+		assert(*omegaProbs[which] == *omegaProbs[which]);
 		return *omegaProbs[which];
 		}
 

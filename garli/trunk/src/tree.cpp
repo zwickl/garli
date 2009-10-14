@@ -3146,7 +3146,7 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 		madvise(destination, sizeof(FLOAT_TYPE)*4*nRateCats*nsites, MADV_SEQUENTIAL);
 		madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
 #endif
-		FLOAT_TYPE large1, large2;
+		FLOAT_TYPE large1 = 0.0, large2 = 0.0;
 		for(int i=0;i<nsites;i++){
 #ifdef USE_COUNTS_IN_BOOT
 			if(c[i] > 0){
@@ -3278,7 +3278,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 	madvise(destination, sizeof(FLOAT_TYPE)*nstates*nRateCats*nsites, MADV_SEQUENTIAL);
 	madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
 #endif
-	FLOAT_TYPE large1;
+	FLOAT_TYPE large1 = 0.0;
 	for(int i=0;i<nsites;i++){
 #ifdef USE_COUNTS_IN_BOOT
 		if(c[i] > 0){
@@ -3303,6 +3303,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 					large1 = destination[j];
 					}
 				}
+			assert(largest_abs > 0);
 #else
 
 			large1 = (destination[0] > destination[1]) ? destination[0] :  destination[1];
@@ -6039,7 +6040,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 
 		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
 			max(minVal, mod->OmegaProb(i)-maxProbChange),
-			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange),
+			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  mod->OmegaProb(i)+maxProbChange),
 			&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6060,7 +6061,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 
 			omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
 				max(minVal, mod->OmegaProb(i)-maxProbChange),
-				min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange),
+				min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  mod->OmegaProb(i)+maxProbChange),
 				&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6080,7 +6081,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 
 		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
 			max(minVal, mod->OmegaProb(i)-maxProbChange),
-			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange),
+			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  mod->OmegaProb(i)+maxProbChange),
 			&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6322,7 +6323,7 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i,
 		max(minVal, mod->FlexProb(i)-maxProbChange),
-		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
+		min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))), mod->FlexProb(i) + maxProbChange),
 		&Model::SetFlexProb, scoreDiffTarget);
 	for(i=1;i < mod->NRateCats()-1;i++){
 		flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i,
@@ -6331,7 +6332,7 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 			&Model::SetFlexRate, scoreDiffTarget);
 		flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i,
 			max(minVal, mod->FlexProb(i)-maxProbChange),
-			min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
+			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))), mod->FlexProb(i) + maxProbChange),
 			&Model::SetFlexProb, scoreDiffTarget);
 		}
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i,
@@ -6340,7 +6341,7 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 		&Model::SetFlexRate, scoreDiffTarget);
 	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i,
 		max(minVal, mod->FlexProb(i)-maxProbChange),
-		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange),
+		min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))), mod->FlexProb(i) + maxProbChange),
 		&Model::SetFlexProb, scoreDiffTarget);
 
 
