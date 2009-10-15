@@ -1220,6 +1220,54 @@ class Model{
 			*/		
 		}
 
+	void NormalizeSumConstrainedValues(FLOAT_TYPE **vals, int numVals, FLOAT_TYPE targetSum, FLOAT_TYPE minVal, int toNotChange){
+		bool someMin = false;
+		
+		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+
+		for(int i=0;i<numVals;i++){
+			if(i != toNotChange){
+				sum += *vals[i];
+				if(*vals[i] < MIN_REL_RATE)
+					someMin = true;
+				}
+			}
+		if(someMin || !(FloatingPointEquals(sum, targetSum, minVal * 0.01))){
+			do{
+				FLOAT_TYPE unfixedTarget = targetSum - (toNotChange < 0 ? ZERO_POINT_ZERO : *vals[toNotChange]) - minSum;
+				FLOAT_TYPE rescale = unfixedTarget / sum;
+				someMin = false;
+				sum = ZERO_POINT_ZERO;
+				for(int i=0;i<numVals;i++){
+					if(i != toNotChange){
+						if(*vals[i] > ZERO_POINT_ZERO){
+							*vals[i] *= rescale;
+							if(*vals[i] < MIN_REL_RATE){
+								*vals[i] = -1.0;
+								minSum += MIN_REL_RATE;
+								someMin = true;
+								}
+							else
+								sum += *vals[i];
+							}
+						}
+					}
+				}while(someMin);
+			}
+
+		for(int i=0;i<numVals;i++)
+			if(*vals[i] < ZERO_POINT_ZERO)
+				*vals[i]= MIN_REL_RATE;
+
+#ifndef NDEBUG
+		sum = ZERO_POINT_ZERO;
+		for(int i=0;i<numVals;i++)
+			sum += *vals[i];
+		assert(FloatingPointEquals(sum, targetSum, minVal * 0.01));
+#endif
+		}
+
 	void SetPinv(int which, FLOAT_TYPE val){
 		assert(which == 0);
 		*propInvar=val;
@@ -1264,6 +1312,8 @@ class Model{
 		assert(val == val);
 		*omegaProbs[which] = val;
 
+		NormalizeSumConstrainedValues(&omegaProbs[0], NRateCats(), ONE_POINT_ZERO, 1.0e-5, which);
+/*
 		FLOAT_TYPE newTot = 1.0 - *omegaProbs[which];
 		FLOAT_TYPE oldTot = 0.0;
 		for(int i=0;i<NRateCats();i++)
@@ -1280,6 +1330,7 @@ class Model{
 			newTot += *omegaProbs[i];
 		assert(FloatingPointEquals(newTot, ONE_POINT_ZERO, 1.0e-5));
 #endif
+*/
 		eigenDirty = true;
 		}
 
