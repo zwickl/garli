@@ -2712,6 +2712,7 @@ void Model::CreateModelFromSpecification(int modnum){
 		}
 	else{//estimating or fixing the aminoacid rate matrix
 		if(modSpec.fixRelativeRates == false || modSpec.IsUserSpecifiedRateMatrix()){
+			int seed = rnd.seed();
 			for(int i=0;i<190;i++){
 				FLOAT_TYPE *d=new FLOAT_TYPE;
 				//*d = ONE_POINT_ZERO;
@@ -2721,6 +2722,7 @@ void Model::CreateModelFromSpecification(int modnum){
 					*d = max(rnd.gamma(1), MIN_REL_RATE);
 				relNucRates.push_back(d);
 				}
+			rnd.set_seed(seed);
 #ifdef SUM_REL_RATES	
 			this->NormalizeSumConstrainedRelativeRates(true, -1);
 #endif
