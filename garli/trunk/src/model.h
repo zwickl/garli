@@ -1187,7 +1187,7 @@ class Model{
 		sum = ZERO_POINT_ZERO;
 		for(int i=0;i<NumRelRates();i++)
 			sum += *relNucRates[i];
-		assert(FloatingPointEquals(sum, SUM_TO, 1e-8));
+		assert(FloatingPointEquals(sum, SUM_TO, MIN_REL_RATE * 0.1));
 #endif
 		/*
 		FLOAT_TYPE sum = ZERO_POINT_ZERO;
@@ -1264,7 +1264,7 @@ class Model{
 		sum = ZERO_POINT_ZERO;
 		for(int i=0;i<numVals;i++)
 			sum += *vals[i];
-		assert(FloatingPointEquals(sum, targetSum, minVal * 0.01));
+		assert(FloatingPointEquals(sum, targetSum, minVal * 0.1));
 #endif
 		}
 
