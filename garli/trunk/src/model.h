@@ -1156,7 +1156,7 @@ class Model{
 					someMin = true;
 				}
 			}
-		if(someMin || !(FloatingPointEquals(sum, SUM_TO, 1.0e-5))){
+		if(someMin || !(FloatingPointEquals(sum, SUM_TO, MIN_REL_RATE * 0.01))){
 			do{
 				FLOAT_TYPE unfixedTarget = SUM_TO - (toNotChange < 0 ? ZERO_POINT_ZERO : *relNucRates[toNotChange]) - minSum;
 				FLOAT_TYPE rescale = unfixedTarget / sum;
