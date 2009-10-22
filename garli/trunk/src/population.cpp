@@ -1365,6 +1365,9 @@ void Population::ReadPopulationCheckpoint(){
 
 	long seed;
 	fread((char *) &seed, sizeof(seed), 1, pin);
+	if(ferror(pin) || feof(pin)){//this mainly checks for a zero-byte file
+		throw ErrorException("Error reading checkpoint file %s.\n\tA problem may have occured writing the file to disk, or the file may have been overwritten or truncated.\n\tUnfortunately you'll need to start the run again from scratch.", str);
+		}
 	rnd.set_seed(seed);
 
 	int t;
