@@ -1164,7 +1164,7 @@ class Model{
 				sum = ZERO_POINT_ZERO;
 				for(int i=0;i<NumRelRates();i++){
 					if(i != toNotChange){
-						if(*relNucRates[i] > ZERO_POINT_ZERO){
+						if(*relNucRates[i] >= ZERO_POINT_ZERO){
 							*relNucRates[i] *= rescale;
 							if(*relNucRates[i] < MIN_REL_RATE){
 								*relNucRates[i] = -1.0;
