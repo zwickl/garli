@@ -23,7 +23,7 @@
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
 #define SVN_REV "$Rev$"
 #define SVN_DATE "$Date$"
-  
+   
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
 #define INSTANTIATE_MEMCHK
