@@ -1391,31 +1391,43 @@ class Model{
 		}
 
 	void CheckAndCorrectRateOrdering(){
+		//if a rate gets bumped past two others we might need to pass over the rates twice
+		//this is certainly not the most efficient sorting algorithm, but it doesn't really matter
 		assert(NRateCats() > 1);
 		if(modSpec.IsNonsynonymousRateHet()){
-			for(int f=0;f<NRateCats()-1;f++){
-				if(*omegas[f] > *omegas[f+1]){
-					//outman.UserMessage("prevented: %f %f", *omegas[f], *omegas[f+1]); 
-					FLOAT_TYPE dum = *omegas[f+1];
-					*omegas[f+1] = *omegas[f];
-					*omegas[f] = dum;
-					dum = *omegaProbs[f+1];
-					*omegaProbs[f+1] = *omegaProbs[f];
-					*omegaProbs[f] = dum;
+			bool done;
+			do{
+				done = true;
+				for(int f=0;f<NRateCats()-1;f++){
+					if(*omegas[f] > *omegas[f+1]){
+						//outman.UserMessage("prevented: %f %f", *omegas[f], *omegas[f+1]); 
+						FLOAT_TYPE dum = *omegas[f+1];
+						*omegas[f+1] = *omegas[f];
+						*omegas[f] = dum;
+						dum = *omegaProbs[f+1];
+						*omegaProbs[f+1] = *omegaProbs[f];
+						*omegaProbs[f] = dum;
+						done = false;
+						}
 					}
-				}
+				}while(!done);
 			}
 		else if(modSpec.IsFlexRateHet()){
-			for(int f=0;f<NRateCats()-1;f++){
-				if(rateMults[f] > rateMults[f+1]){
-					FLOAT_TYPE dum = rateMults[f+1];
-					rateMults[f+1] = rateMults[f];
-					rateMults[f] = dum;
-					dum = rateProbs[f+1];
-					rateProbs[f+1] = rateProbs[f];
-					rateProbs[f] = dum;
+			bool done;
+			do{
+				done = true;
+				for(int f=0;f<NRateCats()-1;f++){
+					if(rateMults[f] > rateMults[f+1]){
+						FLOAT_TYPE dum = rateMults[f+1];
+						rateMults[f+1] = rateMults[f];
+						rateMults[f] = dum;
+						dum = rateProbs[f+1];
+						rateProbs[f+1] = rateProbs[f];
+						rateProbs[f] = dum;
+						done = false;
+						}
 					}
-				}
+				}while(!done);
 			}
 		else assert(0);
 		}
