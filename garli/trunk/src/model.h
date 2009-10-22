@@ -958,7 +958,7 @@ class Model{
 			//otherwise do the normal fix at 1.0 constraint
 		if(modSpec.IsAminoAcid())
 			assert(modSpec.IsEstimateAAMatrix() || modSpec.IsUserSpecifiedRateMatrix());
-	#ifdef SUM_REL_RATES
+	#ifdef SUM_AA_REL_RATES
 		if(modSpec.IsAminoAcid()){
 			for(int i=0;i<relNucRates.size();i++)
 				*relNucRates[i]=r[i];
@@ -1088,13 +1088,13 @@ class Model{
 		currentRefRateScale = 1.0;
 		}
 
-//these should really only be getting called when SUM_REL_RATES is defined
+//these should really only be getting called when SUM_AA_REL_RATES is defined
 //note that the rates are not actually renormalized such that they sum to one here
 //this should be ok since only one rate is being optimized at a time and renormalization
 //can happen between each.  Normalizing here would be a pain because other rates could
 //be pushed below the minimum, which will do odd things to the likelihood function
 	void SetSumConstrainedRelativeRate(int which, FLOAT_TYPE val){
-#ifndef SUM_REL_RATES
+#ifndef SUM_AA_REL_RATES
 		assert(0);
 #endif
 		assert(val - 1.0e-8 <= MAX_REL_RATE && val + 1.0e-8 >= MIN_REL_RATE);
@@ -1141,7 +1141,7 @@ class Model{
 		}
 
 	void NormalizeSumConstrainedRelativeRates(bool enforceBounds, int toNotChange){
-#ifndef SUM_REL_RATES
+#ifndef SUM_AA_REL_RATES
 		assert(0);
 #endif
 		bool someMin = false;

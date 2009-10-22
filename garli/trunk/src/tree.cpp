@@ -6194,7 +6194,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 		list<int> reopt;
 		//ofstream vals("rmatVals.log", ios::app);
 
-#ifdef SUM_REL_RATES
+#ifdef SUM_AA_REL_RATES
 		mod->NormalizeSumConstrainedRelativeRates();
 		for(i=0;i < mod->NumRelRates();i++){
 #else
@@ -6203,7 +6203,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 			//DEBUG
 			double beflnL = lnL;
 			double befval = mod->Rates(i);
-#ifdef SUM_REL_RATES
+#ifdef SUM_AA_REL_RATES
 			FLOAT_TYPE minV = max(min(SUM_TO * 1.0e-6/190.0, mod->Rates(i)), mod->Rates(i) / maxPropChange);
 			if(minV < SUM_TO * 1.0e-3/190.0){
 				minV = min(mod->Rates(i), SUM_TO * 1.0e-6/190.0);
@@ -6240,7 +6240,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 #endif
 	
 		list<int> reopt;
-#ifdef SUM_REL_RATES
+#ifdef SUM_AA_REL_RATES
 		mod->NormalizeSumConstrainedRelativeRates(true, -1);
 		for(i=0;i < mod->NumRelRates();i++)
 			reopt.push_back(i);
@@ -6256,7 +6256,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 			while(it != reopt.end()){
 				double beflnL = lnL;
 				double befval = mod->Rates(*it);
-#ifdef SUM_REL_RATES
+#ifdef SUM_AA_REL_RATES
 				FLOAT_TYPE minV = max(MIN_REL_RATE, mod->Rates(*it) / maxPropChange);
 				if(minV < SUM_TO * 1.0e-3/190.0){
 					minV = min(mod->Rates(*it), MIN_REL_RATE);

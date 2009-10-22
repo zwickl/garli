@@ -2723,11 +2723,11 @@ void Model::CreateModelFromSpecification(int modnum){
 				relNucRates.push_back(d);
 				}
 			rnd.set_seed(seed);
-#ifdef SUM_REL_RATES	
+#ifdef SUM_AA_REL_RATES	
 			this->NormalizeSumConstrainedRelativeRates(true, -1);
 #endif
 			if(! modSpec.IsUserSpecifiedRateMatrix()){
-#ifdef SUM_REL_RATES
+#ifdef SUM_AA_REL_RATES
 				SumConstrainedRelativeRates *r = new SumConstrainedRelativeRates("Rate matrix", &relNucRates[0], 190, SUM_TO * 1.0e-6/190.0, SUM_TO * 1.0e6/190.0, SUM_TO);
 #else
 				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 190, 1e-3, 9999.9);
