@@ -262,6 +262,9 @@ void Adaptation::ReadFromCheckpoint(FILE *in){
 	intptr_t scalarSize = (intptr_t) &improvetotal - (intptr_t) this;
 
 	fread((char *) this, 1, scalarSize, in);
+	if(ferror(in) || feof(in)){//this mainly checks for a zero-byte file
+		throw ErrorException("Error reading checkpoint file <ofprefix>.adap.check.\n\tA problem may have occured writing the file to disk, or the file may have been overwritten or truncated.\n\tUnfortunately you'll need to start the run again from scratch.");
+		}
 
 	//now the arrays, which should be of length intervalsToStore
 	fread((char *) improvetotal, sizeof(FLOAT_TYPE), intervalsToStore, in);
