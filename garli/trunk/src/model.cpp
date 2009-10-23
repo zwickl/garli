@@ -2106,7 +2106,12 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
 	if(modSpec.IsAminoAcid() == false){
-		if(modSpec.IsCodon() && modSpec.numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega) = %f\n", Omega(0));
+		if(modSpec.IsCodon() && modSpec.numRateCats == 1){
+			if(!modSpec.fixOmega)
+				outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega) = %f\n", Omega(0));
+			else
+				outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega).\n    Value provided by user (fixed) = %f\n", Omega(0));
+			}
 		if(modSpec.IsCodon()) outman.UserMessage("  Nucleotide Relative Rate Matrix Assumed by Codon Model:     ");
 		else outman.UserMessage("  Nucleotide Relative Rate Matrix: ");
 		if(modSpec.Nst() == 6){
@@ -2183,7 +2188,12 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 	else{
 		outman.UserMessageNoCR("    %d ", modSpec.numRateCats);
 		if(modSpec.IsNonsynonymousRateHet()){
-			outman.UserMessage("nonsynonymous rate categories, rate and proportion of each estimated\n     (this is effectively the M3 model of PAML)");
+			if(!modSpec.fixOmega){
+				outman.UserMessage("nonsynonymous rate categories, rate and proportion of each estimated\n     (this is effectively the M3 model of PAML)");
+				}
+			else{
+				outman.UserMessage("nonsynonymous rate categories, rate and proportion of each provided by user (fixed)\n     (this is effectively the M3 model of PAML)");
+				}
 			outman.UserMessage("      dN/dS\tProportion");
 			for(int i=0;i<modSpec.numRateCats;i++)
 				outman.UserMessage("      %5.4f\t%5.4f", Omega(i), OmegaProb(i));
@@ -2790,17 +2800,18 @@ void Model::CreateModelFromSpecification(int modnum){
 		rateProbs[2] = 0.03436;
 */
 		//*relNucRates[1] = 2.89288;
-	
-		if(NRateCats() > 1){
-			RateProportions *omegaP=new RateProportions(&omegaProbs[0], NRateCats());
-			omegaP->SetWeight((FLOAT_TYPE)NRateCats());
-			paramsToMutate.push_back(omegaP);
+
+		if(!modSpec.fixOmega){
+			if(NRateCats() > 1){
+				RateProportions *omegaP=new RateProportions(&omegaProbs[0], NRateCats());
+				omegaP->SetWeight((FLOAT_TYPE)NRateCats());
+				paramsToMutate.push_back(omegaP);
+				}
+				
+			RateMultipliers *omegaM=new RateMultipliers(&omegas[0], NRateCats());
+			omegaM->SetWeight((FLOAT_TYPE)NRateCats());
+			paramsToMutate.push_back(omegaM);
 			}
-			
-		RateMultipliers *omegaM=new RateMultipliers(&omegas[0], NRateCats());
-		omegaM->SetWeight((FLOAT_TYPE)NRateCats());
-		paramsToMutate.push_back(omegaM);
-		
 
 /*		FLOAT_TYPE *NS=new FLOAT_TYPE;
 		*NS = 0.5;
