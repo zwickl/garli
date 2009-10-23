@@ -409,8 +409,10 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		if(i == (n/2)){
 			if((modSpec.IsCodon() || mod->NRateCats() > 1) && modSpec.fixAlpha == false){
 				FLOAT_TYPE rateOptImprove = 0.0;
-				if(modSpec.IsCodon())//optimize omega even if there is only 1
-					rateOptImprove = scratchT->OptimizeOmegaParameters(optPrecision);
+				if(modSpec.IsCodon()){//optimize omega even if there is only 1
+					if(!modSpec.fixOmega)
+						rateOptImprove = scratchT->OptimizeOmegaParameters(optPrecision);
+					}
 				else if(mod->NRateCats() > 1){
 					if(modSpec.IsFlexRateHet()){//Flex rates
 						rateOptImprove = ZERO_POINT_ZERO;
@@ -673,9 +675,9 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates;
 	optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = false;
 	if(optModel){
-		if(modSpec.IsCodon())
+		if(modSpec.IsCodon() && !modSpec.fixOmega)
 			optOmega = true;
-		else if(modSpec.numRateCats > 1){
+		else if(modSpec.numRateCats > 1 && !modSpec.IsCodon()){
 			if(modSpec.IsFlexRateHet())
 				optFlex = true;
 			else if(modSpec.fixAlpha == false)
@@ -725,7 +727,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		if(optModel && (scaleImprove + trueImprove) < 1000.0){
 			if(optOmega)//optimize omega even if there is only 1
 				rateOptImprove = treeStruct->OptimizeOmegaParameters(branchPrec);
-			else if(mod->NRateCats() > 1){
+			else if(mod->NRateCats() > 1 && !modSpec.IsCodon()){
 				if(modSpec.IsFlexRateHet()){//Flex rates
 					rateOptImprove = ZERO_POINT_ZERO;
 					rateOptImprove += treeStruct->OptimizeFlexRates(branchPrec);

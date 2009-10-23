@@ -378,7 +378,7 @@ void Population::CheckForIncompatibleConfigEntries(){
 		if(modSpec.fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
 		if(modSpec.includeInvariantSites == true && modSpec.fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
 		if(modSpec.IsAminoAcid() == false && modSpec.Nst() > 1 && modSpec.fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
-		if(modSpec.numRateCats > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
+		if((modSpec.numRateCats > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false) || (modSpec.IsCodon() && !modSpec.fixOmega)) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed, nonsynonymousfixed or none!"));
 		}
 
 	if(conf->inferInternalStateProbs && (modSpec.IsNucleotide() == false))
@@ -1000,12 +1000,14 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.IsCodon() && modSpec.fixOmega && !modSpec.gotOmegasFromFile) throw(ErrorException("rate het model set to nonsynonymousfixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 		}
 	else{
 		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.IsCodon() && modSpec.fixOmega && !modSpec.gotOmegasFromFile) throw ErrorException("rate het model set to nonsynonymousfixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 		}
 	if(conf->modWeight == ZERO_POINT_ZERO)
 		if(modSpec.IsCodon() && modSpec.gotOmegasFromFile == false) throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
@@ -1103,7 +1105,12 @@ void Population::OutputModelReport(){
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 
 	if(modSpec.IsAminoAcid() == false){
-		if(modSpec.IsCodon() && modSpec.numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega)\n");
+		if(modSpec.IsCodon() && modSpec.numRateCats == 1){
+			if(!modSpec.fixOmega)
+				outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega)\n");
+			else
+				outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega). Value provided by user (fixed)\n");
+			}
 		if(modSpec.IsCodon()) outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model:\n     ");
 		else outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix: ");
 		if(modSpec.Nst() == 6){
@@ -1158,7 +1165,12 @@ void Population::OutputModelReport(){
 	else{
 		outman.UserMessageNoCR("    %d ", modSpec.numRateCats);
 		if(modSpec.IsNonsynonymousRateHet()){
-			outman.UserMessage("nonsynonymous rate categories, rate and proportion of each estimated\n     (this is effectively the M3 model of PAML)");
+			if(!modSpec.fixOmega){
+				outman.UserMessage("nonsynonymous rate categories, rate and proportion of each estimated\n     (this is effectively the M3 model of PAML)");
+				}
+			else{
+				outman.UserMessage("nonsynonymous rate categories, rate and proportion of each provided by user (fixed)\n     (this is effectively the M3 model of PAML)");
+				}
 			}
 		else if(modSpec.IsFlexRateHet() == false){
 			if(modSpec.fixAlpha == true) outman.UserMessage("discrete gamma distributed rate cats,\n    alpha param specified by user (fixed)");
@@ -1547,7 +1559,7 @@ void Population::Run(){
 				outman.UserMessage("opt. precision reduced, optimizing branchlengths:%.4f -> %.4f", before, bestFitness);
 
 				before = bestFitness;
-				if(modSpec.IsCodon() && !(FloatingPointEquals(adap->modWeight, ZERO_POINT_ZERO, 1e-8))) {
+				if(modSpec.IsCodon() && !modSpec.fixOmega && !(FloatingPointEquals(adap->modWeight, ZERO_POINT_ZERO, 1e-8))) {
 					indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
 					indiv[bestIndiv].SetDirty();	
 					CalcAverageFitness();
@@ -1829,9 +1841,9 @@ void Population::FinalOptimization(){
 	bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates;
 	optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = false;
 	if(optAnyModel){
-		if(modSpec.IsCodon())
+		if(modSpec.IsCodon() && !modSpec.fixOmega)
 			optOmega = true;
-		else if(modSpec.numRateCats > 1){
+		else if(modSpec.numRateCats > 1 && !modSpec.IsCodon()){
 			if(modSpec.IsFlexRateHet())
 				optFlex = true;
 			else if(modSpec.fixAlpha == false)
@@ -2014,8 +2026,9 @@ void Population::FinalOptimization(){
 	double imp=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
 	indiv[bestIndiv].treeStruct->Score();
 	double fin = indiv[bestIndiv].treeStruct->lnL;
+	outman.UserMessage("Looking for minimum length branches...");
 	indiv[bestIndiv].CalcFitness(0);
-	outman.DebugMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
+	//outman.DebugMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
 #endif
 
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
@@ -2335,7 +2348,6 @@ void Population::PerformSearch(){
 
 		//this rep is over
 		if(prematureTermination == false){
-			if(s.length() > 0) outman.UserMessage(">>>Completed %s<<<", s.c_str());
 			outman.UserMessage("");
 			//not sure where this should best go
 			outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
@@ -2355,6 +2367,8 @@ void Population::PerformSearch(){
 					outman.UserMessage("    %d branches were collapsed.", numCollapsed);
 				}
 			storedTrees.push_back(repResult);
+			if(s.length() > 0) 
+				outman.UserMessage(">>>Completed %s<<<", s.c_str());
 			}
 		else{
 			if(s.length() > 0) outman.UserMessage(">>>Terminated %s<<<\n", s.c_str());
@@ -2371,7 +2385,7 @@ void Population::PerformSearch(){
 				outman.UserMessage("WARNING: Site likelihoods being output on prematurely terminated run ...");
 				}
 			if(currentSearchRep > 1)
-				indiv[bestIndiv].treeStruct->sitelikeLevel = -conf->outputSitelikelihoods;
+				indiv[bestIndiv].treeStruct->sitelikeLevel = -(int)conf->outputSitelikelihoods;
 			else
 				indiv[bestIndiv].treeStruct->sitelikeLevel = conf->outputSitelikelihoods;
 			indiv[bestIndiv].treeStruct->ofprefix = conf->ofprefix;

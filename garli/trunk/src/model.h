@@ -300,6 +300,7 @@ public:
 
 	bool fixInvariantSites;
 	bool fixAlpha;
+	bool fixOmega;
 	bool includeInvariantSites;
 	
 	bool gotRmatFromFile;
@@ -475,13 +476,16 @@ public:
 					throw(ErrorException("ratehetmodel set to \"gammafixed\", but numratecats is equal to 1!"));
 				else if(rateHetType == FLEX)
 					throw(ErrorException("ratehetmodel set to \"flex\", but numratecats is equal to 1!"));
-				else if(rateHetType == NONSYN)
-					throw(ErrorException("ratehetmodel set to \"nonsynonymous\", but numratecats is equal to 1!"));				
+				//now allowing this to signify a single omega param
+//				else if(rateHetType == NONSYN)
+//					throw(ErrorException("ratehetmodel set to \"nonsynonymous\", but numratecats is equal to 1!"));				
 				}
 			}
 		
-		if(nrates < 1) throw(ErrorException("1 is the minimum value for numratecats."));
-		if(nrates > 20) throw(ErrorException("20 is the maximum value for numratecats."));
+		if(nrates < 1) 
+			throw(ErrorException("1 is the minimum value for numratecats."));
+		if(nrates > 20) 
+			throw(ErrorException("20 is the maximum value for numratecats."));
 		numRateCats=nrates;
 		}
 
@@ -596,9 +600,16 @@ public:
 		fixStateFreqs=true;
 		}
 
-	void SetM3Model(){
+	void SetOmegaModel(){
 		rateHetType = NONSYN;
 		numRateCats = 3;
+		fixOmega = false;
+		}
+
+	void SetFixedOmegaModel(){
+		rateHetType = NONSYN;
+		numRateCats = 3;
+		fixOmega = true;
 		}
 
 	int Nst() const {
@@ -712,13 +723,16 @@ public:
 	void SetRateHetModel(const char *str){
 	//	if((datatype != DNA) && (datatype != AMINOACID) && _stricmp(str, "none")) throw(ErrorException("Sorry, rate heterogeneity not yet supported with Codon/Aminoacid data"));
 		if(datatype == CODON){
-			if(_stricmp(str, "nonsynonymous") == 0) SetM3Model();
+			if(_stricmp(str, "nonsynonymous") == 0) 
+				SetOmegaModel();
+			else if(_stricmp(str, "nonsynonymousfixed") == 0) 
+				SetFixedOmegaModel();
 			else if(_stricmp(str, "none") == 0){
 				SetNumRateCats(1, false);
 				rateHetType = NONE;
 				}
 			else if(_stricmp(str, "gamma") == 0) throw ErrorException("Gamma rate heterogeneity cannot be used with codon models.\n     Try ratehetmodel = nonsynonymous to allow dN/dS variation across sites");
-			else throw(ErrorException("Unknown setting for ratehetmodel: %s\n\t(options for codon datatype are: nonsynonymous, none)", str));
+			else throw(ErrorException("Unknown setting for ratehetmodel: %s\n\t(options for codon datatype are: nonsynonymous, nonsynonymousfixed, none)", str));
 			}
 		else{			
 			if(_stricmp(str, "gamma") == 0) SetGammaRates();

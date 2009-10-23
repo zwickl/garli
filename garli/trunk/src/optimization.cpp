@@ -113,7 +113,7 @@ int Tree::PushBranchlengthsToMin(){
 		if(allNodes[i]->dlen < 1.0e-4 && !(FloatingPointEquals(allNodes[i]->dlen, min_brlen, 1e-9))){
 			derivs = CalcDerivativesRateHet(allNodes[i]->anc, allNodes[i]);
 			if(derivs.first < ZERO_POINT_ZERO){
-				outman.DebugMessage("(branch %d: %.9f -> %.9f", i, allNodes[i]->dlen, 1e-8);
+				//outman.DebugMessage("(branch %d: %.9f -> %.9f", i, allNodes[i]->dlen, 1e-8);
 				SetBranchLength(allNodes[i], min_brlen);
 				num++;
 				}
