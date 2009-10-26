@@ -6029,8 +6029,8 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 			&Model::SetOmega, scoreDiffTarget);
 	else{
 		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i,
-			max(minVal, mod->Omega(i)*maxRateChangeProp),
-			min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp),
+			max(minVal, mod->Omega(i)*0.1),
+			min(mod->Omega(i+1), max(mod->Omega(i)+mod->Omega(i)*maxRateChangeProp, 0.01)), 
 			&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6051,7 +6051,7 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec){
 		for(i=1;i < mod->NRateCats()-1;i++){
 			omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i,
 				max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
-				max(min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), 0.01),
+				min(mod->Omega(i+1), max(mod->Omega(i)+mod->Omega(i)*maxRateChangeProp, 0.01)), 
 				&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
