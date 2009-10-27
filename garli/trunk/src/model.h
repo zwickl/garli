@@ -1464,7 +1464,16 @@ class Model{
 		//optionally, pass the number of one of the rate/prob pairs to hold constant
 
 		FLOAT_TYPE sum=0.0;
+		FLOAT_TYPE minVal = 1e-5;
 
+		//FLOAT_TYPE **aliasedRates = new FLOAT_TYPE*[NRateCats()];
+		vector<FLOAT_TYPE *> aliasedRates;
+		for(int i=0;i<NRateCats();i++){
+			aliasedRates.push_back(&rateProbs[i]);
+			}
+		NormalizeSumConstrainedValues(&aliasedRates[0], NRateCats(), ONE_POINT_ZERO, minVal, toRemainConstant);
+
+/*
 		for(int i=0;i<NRateCats();i++){
 			if(i != toRemainConstant) sum += rateProbs[i];
 			}
@@ -1474,10 +1483,13 @@ class Model{
 			sum = sum / (FLOAT_TYPE)(1.0-*propInvar);
 			}
 
-		if(toRemainConstant > -1) sum /= (ONE_POINT_ZERO - rateProbs[toRemainConstant]);
+		if(toRemainConstant > -1) 
+			sum /= (ONE_POINT_ZERO - rateProbs[toRemainConstant]);
+
 		for(int i=0;i<NRateCats();i++)	{
 			if(i != toRemainConstant) rateProbs[i] /= sum;
 			}
+*/
 
 		//3/17/09 - it is possible for mult rescaling to cause two rates to "cross" if one is being held constant.  If
 		//that happens, try again without holding it constant.  It isn't safe to call CheckAndCorrectRateOrdering()
