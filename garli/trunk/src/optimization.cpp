@@ -503,6 +503,46 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 	FLOAT_TYPE bestKnownScore = initialScore;
 	FLOAT_TYPE bestKnownVal = initialVal;
 
+#ifdef NEW_BUMPING
+	FLOAT_TYPE requiredWindow = (baseIncr * 1.0001) * 2.0;
+	FLOAT_TYPE actualWindow = highBound - lowBound;
+	if(actualWindow < requiredWindow){
+	//if the bounds are so tight that we can't be > baseIncr * 1.0001 from both, exit
+		outman.DebugMessage("NEWER: OptimizeBoundedParameter: bounds fully constrain parameter %.6f <- %.6f -> %.6f, desired amount = %.6f", lowBound, curVal, highBound, requiredWindow);
+		//SetAndEvaluateParameter(which, initialVal, bestKnownScore, bestKnownVal, SetParam);
+		return 0.0;
+		}
+
+	//the new version
+	FLOAT_TYPE boundBumped = -1.0;
+	//if possible, bump enough that we could have one legal increase in incr below to allow sufficient lnL diffs
+	FLOAT_TYPE bumpAmt = baseIncr * 5.0001;
+	//if(initialVal - lowBound < bumpAmt){
+	if(lowBound + bumpAmt > initialVal){
+		//were closer than we'd like to be to the low bound
+		//but, if we bump what we would like we might go past the other bound, in that case decrease bump
+		if(lowBound + bumpAmt > highBound - bumpAmt){
+			bumpAmt = actualWindow / 2.0; 
+			outman.DebugMessage("halved: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, bumpAmt * 5.0001, bumpAmt); 
+			}
+		else
+//			outman.DebugMessage("bumped full: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, bumpAmt * 5.0001, bumpAmt); 
+		boundBumped = fabs(curVal - (lowBound + bumpAmt));
+		curVal = lowBound + bumpAmt;
+		curScore = SetAndEvaluateParameter(which, curVal, bestKnownScore, bestKnownVal, SetParam);
+		}
+	else if(highBound - bumpAmt < initialVal){
+		if(highBound - bumpAmt < lowBound + bumpAmt){
+			bumpAmt = actualWindow / 2.0; 
+			outman.DebugMessage("halved: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, bumpAmt * 5.0001, bumpAmt);
+			}
+		else
+//			outman.DebugMessage("bumped full: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, bumpAmt * 5.0001, bumpAmt); 
+		curVal = highBound - bumpAmt;
+		boundBumped = initialVal - curVal;
+		curScore = SetAndEvaluateParameter(which, curVal, bestKnownScore, bestKnownVal, SetParam);
+		}
+#else
 	//the new version
 	FLOAT_TYPE boundBumped = -1.0;
 	//if possible, bump enough that we could have one legal increase in incr below to allow sufficient lnL diffs
@@ -539,6 +579,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		SetAndEvaluateParameter(which, initialVal, bestKnownScore, bestKnownVal, SetParam);
 		return 0.0;
 		}
+#endif
 
 	FLOAT_TYPE lowerEval, higherEval;
 	FLOAT_TYPE lowerEvalScore, higherEvalScore;
