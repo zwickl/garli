@@ -5273,7 +5273,9 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
+	//DEBUG
+	//FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
+	double siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 
 	vector<double> siteLikes;
@@ -6292,10 +6294,14 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 		outman.UserMessage("%f\t%f", mod->FlexRate(j), mod->FlexProb(j));
 #endif
 
+	//the EffectiveXXXFlexBound functions here just give the values at
+	//which the rate currently being optimized would cross the one above
+	//or below it due to rescaling of the rates to keep the mean rate 1.0
+
 	curVal = mod->FlexRate(i);
 	flexImprove += OptimizeBoundedParameter(prec, curVal, i,
 		max(min(minVal, curVal), curVal / maxRateChangeProp),
-		min(mod->FlexRate(i+1), curVal * maxRateChangeProp),
+		min(mod->EffectiveUpperFlexBound(i), curVal * maxRateChangeProp),
 		&Model::SetFlexRate, scoreDiffTarget);
 
 #ifdef DEBUG_FLEX_OPT
@@ -6320,8 +6326,8 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 
 		curVal = mod->FlexRate(i);
 		flexImprove += OptimizeBoundedParameter(prec, curVal, i,
-			max(mod->FlexRate(i-1), curVal / maxRateChangeProp),
-			min(mod->FlexRate(i+1), curVal * maxRateChangeProp),
+			max(mod->EffectiveLowerFlexBound(i), curVal / maxRateChangeProp),
+			min(mod->EffectiveUpperFlexBound(i), curVal * maxRateChangeProp),
 			&Model::SetFlexRate, scoreDiffTarget);
 
 #ifdef DEBUG_FLEX_OPT
@@ -6345,7 +6351,7 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec){
 
 	curVal = mod->FlexRate(i);
 	flexImprove += OptimizeBoundedParameter(prec, curVal, i,
-		max(mod->FlexRate(i-1), curVal / maxRateChangeProp),
+		max(mod->EffectiveLowerFlexBound(i), curVal / maxRateChangeProp),
 		min(max(curVal, 999.9), curVal * maxRateChangeProp),
 		&Model::SetFlexRate, scoreDiffTarget);
 
