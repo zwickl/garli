@@ -1339,14 +1339,16 @@ class Model{
 	void SetFlexRate(int which, FLOAT_TYPE val){ 
 		assert(which < NRateCats());
 		rateMults[which] = val;
-		NormalizeRates(which);
+		NormalizeRates(which, which);
 		eigenDirty = true;
 		}
 
 	void SetFlexProb(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
 		rateProbs[which] = val;
-		NormalizeRates(which);
+		//here the proportion that changed should remain constant, but there isn't anything wrong with
+		//the corresponding rate changing when rescaling
+		NormalizeRates(which, -1);
 		eigenDirty = true;
 		}
 
@@ -1496,7 +1498,7 @@ class Model{
 #endif
 		}
 
-	void NormalizeRates(int toRemainConstant = -1){
+	void NormalizeRates(int probToRemainConstant = -1, int rateToRemainConstant = -1){
 		//optionally, pass the number of one of the rate/prob pairs to hold constant
 
 		FLOAT_TYPE sum=0.0;
@@ -1507,7 +1509,7 @@ class Model{
 		for(int i=0;i<NRateCats();i++){
 			aliasedRates.push_back(&rateProbs[i]);
 			}
-		NormalizeSumConstrainedValues(&aliasedRates[0], NRateCats(), ONE_POINT_ZERO, minVal, toRemainConstant);
+		NormalizeSumConstrainedValues(&aliasedRates[0], NRateCats(), ONE_POINT_ZERO, minVal, probToRemainConstant);
 
 /*
 		for(int i=0;i<NRateCats();i++){
@@ -1537,21 +1539,21 @@ class Model{
 		for(int r=0;r<NRateCats();r++)
 			backup_mults[r] = rateMults[r];
 		do{
-			double toRemainConstantContrib;
+			double rateToRemainConstantContrib;
 			sum=0.0;
-			if(toRemainConstant > -1){
-				toRemainConstantContrib = rateMults[toRemainConstant]*rateProbs[toRemainConstant];
+			if(rateToRemainConstant > -1){
+				rateToRemainConstantContrib = rateMults[rateToRemainConstant]*rateProbs[rateToRemainConstant];
 				//this means that it isn't possible to rescale and keep one of the rate/probs constant
-				if(toRemainConstantContrib > ONE_POINT_ZERO)
-					toRemainConstant = -1;
+				if(rateToRemainConstantContrib > ONE_POINT_ZERO)
+					rateToRemainConstant = -1;
 				}
 				
 			for(int i=0;i<NRateCats();i++){
-				if(i != toRemainConstant) sum += rateMults[i]*rateProbs[i];
+				if(i != rateToRemainConstant) sum += rateMults[i]*rateProbs[i];
 				}
-			if(toRemainConstant > -1) sum /= (ONE_POINT_ZERO - (rateMults[toRemainConstant] * rateProbs[toRemainConstant]));
+			if(rateToRemainConstant > -1) sum /= (ONE_POINT_ZERO - (rateMults[rateToRemainConstant] * rateProbs[rateToRemainConstant]));
 			for(int i=0;i<NRateCats();i++){
-				if(i != toRemainConstant) rateMults[i] /= sum;
+				if(i != rateToRemainConstant) rateMults[i] /= sum;
 				}
 			//check if the rates are ordered properly
 			int r = 1;
@@ -1561,11 +1563,11 @@ class Model{
 					break;
 					}
 			if(r == NRateCats()) OK = true;
-			if(toRemainConstant == -1) assert(OK);
+			if(rateToRemainConstant == -1) assert(OK);
 			if(!OK){//restore the rates and try again
 				for(int r=0;r<NRateCats();r++)
 					rateMults[r] = backup_mults[r];
-				toRemainConstant = -1;
+				rateToRemainConstant = -1;
 				}
 			}while(!OK);
 
