@@ -1730,7 +1730,7 @@ if(nd->nodeNum == 8){
 			//as the iterations go on.  If possible we'd still like to see very close scores, but if we're having
 			//trouble getting close after many iterations we don't want to terminate the program.  If something is
 			//horribly wrong with the scores this will still cause termination.
-			if(estScoreDelta < precision1 && (iter == 0 || lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, GARLI_FP_EPS * 10)) >= initialL)){
+			if(estScoreDelta < precision1 && (iter == 0 || lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, GARLI_FP_EPS * 10.0)) >= initialL)){
 #endif
 														#ifdef OPT_DEBUG
 														opt << "delta < prec, return\n";
@@ -1846,7 +1846,22 @@ if(nd->nodeNum == 8){
 					FLOAT_TYPE proposed = (knownMin + nd->dlen) * ZERO_POINT_FIVE;
 					FLOAT_TYPE deltaToMin=proposed-nd->dlen;
 					FLOAT_TYPE scoreDeltaToMin = (deltaToMin * d1 + (deltaToMin*deltaToMin*d2*ZERO_POINT_FIVE));
+
+#ifdef ALT_NR_BAIL
+					//For exit, this used to not require that the lnL had improved from the starting value, only that the expected improvement
+					//for the next jump was small.  Now require improvement, but with a bit of scoring error tolerance.  This will probbably
+					//only come up with SP, in which case the max number of passes will be taken and then the initial blen will be restored below
 					if(scoreDeltaToMin < precision1){
+						outman.DebugMessage("would have bailed\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f", lnL, knownMin, nd->dlen, scoreDeltaToMin, (lnL - initialL));
+						#ifdef OPT_DEBUG		
+							opt << "would have bailed\t" <<  scoreDeltaToMin << "\t" << (lnL - initialL);
+						#endif
+						}	
+					outman.DebugMessage("would have bailed\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f", lnL, knownMin, nd->dlen, scoreDeltaToMin, (lnL - initialL));
+					if(scoreDeltaToMin < precision1 &&  lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, GARLI_FP_EPS * 10.0)) >= initialL){
+#else
+					if(scoreDeltaToMin < precision1){
+#endif
 						#ifdef OPT_DEBUG
 						opt << "imp to knownMIN < prec, return\n";
 						#endif
@@ -1877,7 +1892,20 @@ if(nd->nodeNum == 8){
 					FLOAT_TYPE proposed = (knownMax + nd->dlen) * ZERO_POINT_FIVE;
 					FLOAT_TYPE deltaToMax=proposed-nd->dlen;
 					FLOAT_TYPE scoreDeltaToMax = (deltaToMax * d1 + (deltaToMax*deltaToMax*d2*ZERO_POINT_FIVE));
+#ifdef ALT_NR_BAIL
+					//For exit, this used to not require that the lnL had improved from the starting value, only that the expected improvement
+					//for the next jump was small.  Now require improvement, but with a bit of scoring error tolerance.  This will probbably
+					//only come up with SP, in which case the max number of passes will be taken and then the initial blen will be restored below
 					if(scoreDeltaToMax < precision1){
+						outman.DebugMessage("would have bailed\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f", lnL, knownMin, nd->dlen, scoreDeltaToMax, (lnL - initialL));
+						#ifdef OPT_DEBUG		
+							opt << "would have bailed\t" <<  scoreDeltaToMax << "\t" << (lnL - initialL);
+						#endif
+						}	
+					if(scoreDeltaToMax < precision1 &&  lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, GARLI_FP_EPS * 10.0)) >= initialL){
+#else
+					if(scoreDeltaToMax < precision1){
+#endif
 						#ifdef OPT_DEBUG
 						opt << "imp to knownMAX < prec, return\n";
 						#endif
@@ -1949,8 +1977,33 @@ if(nd->nodeNum == 8){
 			deb.close();
 */
 			if(iter == 51) outman.UserMessage("Notice: possible problem with branchlength optimization.\nIf you see this message frequently, please report it to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum);
+#ifndef SINGLE_PRECISION_FLOATS
 			if(iter > 100)
 				throw(ErrorException("Problem with branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
+#else
+			if(iter > 100){
+				outman.DebugMessage("100 passes in NR!");
+				Score(nd->anc->nodeNum);
+
+				outman.DebugMessage(">>>>%.6f  %.6f <<<<", initialL, lnL);
+				if(lnL > initialL){
+					outman.DebugMessage("Score improved by %.6f, exiting", initialL - lnL);
+#ifdef OPT_DEBUG
+					opt << "100 passes, score improved, keeping blen " << v << endl;
+#endif
+					return totalEstImprove;
+					}
+				else{
+					outman.DebugMessage("Score worsened by %.6f, restoring blen, exiting", initialL - lnL);
+#ifdef OPT_DEBUG
+					opt << "100 passes, score worsened, restoring initial blen " << v_onEntry << endl;
+#endif
+					SetBranchLength(nd, v_onEntry);
+					return ZERO_POINT_ZERO;
+					}
+				}
+#endif
+
 /*
 				ofstream scr("NRcurve.log");
 				scr.precision(20);
