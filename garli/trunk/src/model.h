@@ -1313,7 +1313,7 @@ class Model{
 		}
 
 	//these are the bounds on a particular rate that keep it from crossing a neighboring rate when rescaling happens
-	FLOAT_TYPE Model::EffectiveLowerFlexBound(int which){
+	FLOAT_TYPE EffectiveLowerFlexBound(int which){
 		assert(which != 0);
 		assert(which < NRateCats());
 		FLOAT_TYPE whichProd = rateMults[which] * rateProbs[which];
@@ -1325,7 +1325,7 @@ class Model{
 		return rateMults[which] * factor;
 		}
 
-	FLOAT_TYPE Model::EffectiveUpperFlexBound(int which){
+	FLOAT_TYPE EffectiveUpperFlexBound(int which){
 		assert(which < NRateCats() - 1);
 		FLOAT_TYPE whichProd = rateMults[which] * rateProbs[which];
 		FLOAT_TYPE factor = rateMults[which + 1] / ((rateMults[which] * (1.0 - whichProd)) + (whichProd * rateMults[which + 1]));
