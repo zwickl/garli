@@ -1846,7 +1846,7 @@ if(nd->nodeNum == 8){
 					FLOAT_TYPE proposed = (knownMin + nd->dlen) * ZERO_POINT_FIVE;
 					FLOAT_TYPE deltaToMin=proposed-nd->dlen;
 					FLOAT_TYPE scoreDeltaToMin = (deltaToMin * d1 + (deltaToMin*deltaToMin*d2*ZERO_POINT_FIVE));
-
+#define ALT_NR_BAIL
 #ifdef ALT_NR_BAIL
 					//For exit, this used to not require that the lnL had improved from the starting value, only that the expected improvement
 					//for the next jump was small.  Now require improvement, but with a bit of scoring error tolerance.  This will probbably
@@ -1856,8 +1856,7 @@ if(nd->nodeNum == 8){
 						#ifdef OPT_DEBUG		
 							opt << "would have bailed\t" <<  scoreDeltaToMin << "\t" << (lnL - initialL);
 						#endif
-						}	
-					outman.DebugMessage("would have bailed\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f", lnL, knownMin, nd->dlen, scoreDeltaToMin, (lnL - initialL));
+						}
 					if(scoreDeltaToMin < precision1 &&  lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, GARLI_FP_EPS * 10.0)) >= initialL){
 #else
 					if(scoreDeltaToMin < precision1){
