@@ -1318,22 +1318,20 @@ class Model{
 		assert(which < NRateCats());
 		FLOAT_TYPE whichProd = rateMults[which] * rateProbs[which];
 		FLOAT_TYPE factor = rateMults[which - 1] / ((rateMults[which] * (1.0 - whichProd)) + (whichProd * rateMults[which - 1]));
-		assert(FloatingPointEquals(
-			rateMults[which] * factor, 
-			rateMults[which - 1] * (1.0 - factor * rateMults[which] * rateProbs[which]) / (1.0 - rateMults[which] * rateProbs[which]), 
-			1e-6));
-		return rateMults[which] * factor;
+		FLOAT_TYPE thisVal = rateMults[which] * factor;
+		FLOAT_TYPE lowerVal = rateMults[which - 1] * (1.0 - factor * rateMults[which] * rateProbs[which]) / (1.0 - rateMults[which] * rateProbs[which]);
+		assert(FloatingPointEquals(thisVal, lowerVal, 1e-4));
+		return max(thisVal, lowerVal)  + GARLI_FP_EPS;
 		}
 
 	FLOAT_TYPE EffectiveUpperFlexBound(int which){
 		assert(which < NRateCats() - 1);
 		FLOAT_TYPE whichProd = rateMults[which] * rateProbs[which];
 		FLOAT_TYPE factor = rateMults[which + 1] / ((rateMults[which] * (1.0 - whichProd)) + (whichProd * rateMults[which + 1]));
-		assert(FloatingPointEquals(
-			rateMults[which] * factor, 
-			rateMults[which + 1] * (1.0 - factor * rateMults[which] * rateProbs[which]) / (1.0 - rateMults[which] * rateProbs[which]), 
-			1e-6));
-		return rateMults[which] * factor;
+		FLOAT_TYPE thisVal = rateMults[which] * factor;
+		FLOAT_TYPE upperVal = rateMults[which + 1] * (1.0 - factor * rateMults[which] * rateProbs[which]) / (1.0 - rateMults[which] * rateProbs[which]);
+		assert(FloatingPointEquals(thisVal, upperVal, 1e-4));
+		return min(thisVal, upperVal) - GARLI_FP_EPS;
 		}
 
 	void SetFlexRate(int which, FLOAT_TYPE val){ 
