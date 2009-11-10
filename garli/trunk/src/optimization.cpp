@@ -35,6 +35,13 @@ Profiler ProfModDeriv ("ModDeriv      ");
 Profiler ProfNewton   ("Newton-Raphson");
 extern Profiler ProfEQVectors;
 
+#if !defined(STEP_TOL)
+	#ifdef SINGLE_PRECISION_FLOATS
+		#define STEP_TOL 1.0e-6
+	#else
+		#define STEP_TOL 1.0e-8
+	#endif
+#endif
 
 extern FLOAT_TYPE globalBest;
 
@@ -450,12 +457,18 @@ FLOAT_TYPE Tree::SetAndEvaluateParameter(int which, FLOAT_TYPE val, FLOAT_TYPE &
 
 bool Tree::CheckScoreAndRestore(int which, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE curScore, FLOAT_TYPE curVal, FLOAT_TYPE initialScore, FLOAT_TYPE initialVal){
 	bool restored = false;
-	if(curScore < initialScore){
+	if(curScore + STEP_TOL < initialScore){
+//		outman.DebugMessage("Rest %.12f", curScore - initialScore);
 		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
 		curScore = initialScore;
 		restored = true;
 		}
 	else{
+		if(curScore < initialScore)
+			outman.DebugMessage("Stay %.12f (would have gone)", curScore - initialScore);
+/*		else 
+			outman.DebugMessage("Stay %.12f", curScore - initialScore);
+*/
 		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
 		}
 	MakeAllNodesDirty();
