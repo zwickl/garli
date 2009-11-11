@@ -2457,7 +2457,7 @@ void Population::PerformSearch(){
 			//if we restarted, the fraction should already have been set when reading the state files
 			UpdateFractionDone(0);
 			if(s.length() > 0) outman.UserMessage("\n>>>%s<<<", s.c_str());
-			if(conf->bootstrapReps > 0 && currentSearchRep == 0)//it makes more sense to have this here
+			if(conf->bootstrapReps > 0 && currentSearchRep == 1)//it makes more sense to have this here
 				outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
 			SeedPopulationWithStartingTree(currentSearchRep);
 			UpdateFractionDone(1);
