@@ -1859,7 +1859,7 @@ if(nd->nodeNum == 8){
 					FLOAT_TYPE proposed = (knownMin + nd->dlen) * ZERO_POINT_FIVE;
 					FLOAT_TYPE deltaToMin=proposed-nd->dlen;
 					FLOAT_TYPE scoreDeltaToMin = (deltaToMin * d1 + (deltaToMin*deltaToMin*d2*ZERO_POINT_FIVE));
-#define ALT_NR_BAIL
+
 #ifdef ALT_NR_BAIL
 					//For exit, this used to not require that the lnL had improved from the starting value, only that the expected improvement
 					//for the next jump was small.  Now require improvement, but with a bit of scoring error tolerance.  This will probbably
