@@ -426,13 +426,13 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 						rateOptImprove = treeStruct->OptimizeBoundedParameter(optPrecision, mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 						}
 					}
-				outman.UserMessage("\nOptimizing parameters... improved %f lnL", rateOptImprove);
+				outman.UserMessageNoCR("\nOptimizing parameters... improved %.3f lnL", rateOptImprove);
 				}
 			scratchT->Score();
 			FLOAT_TYPE start=scratchT->lnL;
 			scratchT->OptimizeAllBranches(optPrecision);
 			FLOAT_TYPE bimprove = scratchT->lnL - start;
-			outman.UserMessage("\nOptimizing branchlengths... improved %f lnL", bimprove);
+			outman.UserMessage("\nOptimizing branchlengths... improved %.3f lnL", bimprove);
 			}
 		}		
 

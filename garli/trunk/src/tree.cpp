@@ -200,7 +200,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 			NxsUnsignedSet iset;
 			try{
 				NxsSetReader::ReadSetDefinition(tok, *reader.GetTaxaBlock(0), "outgroup", "GARLI configuration", &iset);
-				outman.UserMessage("Found outgroup specification: %s\n", NxsSetReader::GetSetAsNexusString(iset).c_str());
+				outman.UserMessage("Found outgroup specification: %s", NxsSetReader::GetSetAsNexusString(iset).c_str());
 				}
 			catch (const NxsException & x){
 				throw ErrorException("%s", x.msg.c_str());
@@ -232,6 +232,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const SequenceData *data, const Ge
 			outman.UserMessage("\n");
 			outgroup->BipartFromNodenums(nums);
 			}
+		outman.UserMessage("\n#######################################################");
 		}
 	}
 
