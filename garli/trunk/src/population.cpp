@@ -541,8 +541,7 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 		outman.UserMessage("**Your memory level is: very low\n\t(if possible, you should increase the availablememory setting)**");
 	else if(memLevel == -1)
 		outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
-	outman.UserMessage("");
-
+	outman.UserMessage("\n#######################################################");
 /*
 	outman.precision(4);
 	outman.UserMessage("allocating memory...\nusing %.1f MB for conditional likelihood arrays.  Memlevel= %d", (FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB, memLevel);
@@ -2494,7 +2493,7 @@ void Population::PerformSearch(){
 				repResultColl.treeStruct->root->CollapseMinLengthBranches(numCollapsed);
 				outman.UserMessage("NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");\
 				if(numCollapsed == 0)
-					outman.UserMessage("    No branches were short enough to be collapsed.");
+					outman.UserMessage("    No branches were short enough to be collapsed.\n");
 				else
 					outman.UserMessage("    %d branches were collapsed.", numCollapsed);
 				}
@@ -2615,6 +2614,7 @@ void Population::PerformSearch(){
 					FinishBootstrapRep(storedTrees[0], currentBootstrapRep);
 				else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
 				outman.UserMessage(">>>Completed Bootstrap rep %d<<<", currentBootstrapRep);
+				outman.UserMessage("#######################################################");
 				}
 			else if(prematureTermination && !(bootlog_output & WRITE_PREMATURE)) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
 			}

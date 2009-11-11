@@ -351,7 +351,7 @@ int main( int argc, char* argv[] )	{
 			else
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC %s Version %.2f%s.r%s (%s)\n", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running BOINC %s Version %.2f%s.r%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -365,7 +365,7 @@ int main( int argc, char* argv[] )	{
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running %s Version %.2f%s.r%s (%s)\n", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running %s Version %.2f%s.r%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
 
 #endif
 
@@ -406,7 +406,7 @@ int main( int argc, char* argv[] )	{
 #endif
 
 			OutputImportantDefines();
-
+			outman.UserMessage("\n#######################################################");
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
@@ -455,8 +455,9 @@ int main( int argc, char* argv[] )	{
 				data = d;
 				}
 
+			outman.UserMessage("\n#######################################################");
 			data->Summarize();
-			outman.UserMessage("\nSummary of dataset:");
+			outman.UserMessage("Summary of dataset:");
 			outman.UserMessage(" %d sequences.", data->NTax());
 			outman.UserMessage(" %d constant characters.", data->NConstant());
 			outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
@@ -472,7 +473,7 @@ int main( int argc, char* argv[] )	{
 
 			data->Collapse();
 			outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
-
+			outman.UserMessage("#######################################################");
 #ifdef CUDA_GPU
 			cudaman = new CudaManager(modSpec.nstates, modSpec.numRateCats, data->NChar(),
 					cuda_device_number, CUDA_TEST_ITERATIONS, CUDA_PRINT_TESTS, CUDA_PRINT_DEVICE_QUERY);
