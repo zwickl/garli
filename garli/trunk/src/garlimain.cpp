@@ -152,6 +152,8 @@ void UsageMessage(char *execName){
 	outman.UserMessage("  -v, --version		print version information and exit");
 	outman.UserMessage("  -h, --help		print this help and exit");
 	outman.UserMessage("  -t			run internal tests (requires dataset and config file)");
+	outman.UserMessage("  -V			validate: load config file and data, validate config file, data, starting trees"); 
+	outman.UserMessage("					and constraint files, print required memory and selected model, then exit");
 #ifdef CUDA_GPU
 	outman.UserMessage("  --device d_number	use specified CUDA device");
 #endif
@@ -217,6 +219,7 @@ int main( int argc, char* argv[] )	{
 #endif
 
 	bool runTests = false;
+	bool validateMode = false;
     if (argc > 1) {
     	int curarg=1;
         while(curarg<argc){
@@ -238,7 +241,7 @@ int main( int argc, char* argv[] )	{
 						[pool release];
 #endif
 					else if(argv[curarg][1]=='t') runTests = true;
-					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
+					else if(!strcmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
 						OutputVersion();
 #ifdef SUBROUTINE_GARLI
 						outman.UserMessage("MPI run distributing version");
@@ -254,6 +257,11 @@ int main( int argc, char* argv[] )	{
 						UsageMessage(argv[0]);
 						exit(0);
 						}
+
+					else if(!strcmp(argv[curarg], "-V"))
+						//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
+						//which is essentially a stripped down version of pop::SeedPopWithStartingTree
+						validateMode = true;
 #ifdef CUDA_GPU
 					else if(!_stricmp(argv[curarg], "--device")) cuda_device_number = atoi(argv[++curarg]);
 #endif
@@ -475,7 +483,7 @@ int main( int argc, char* argv[] )	{
 
 			data->DetermineConstantSites();
 
-			pop.Setup(&conf, data, 1, 0);
+			pop.Setup(&conf, data, 1, (validateMode == true ? -1 : 0));
 			pop.SetOutputDetails();
 
 			if(runTests){
@@ -484,8 +492,14 @@ int main( int argc, char* argv[] )	{
 				outman.UserMessage("******Successfully completed tests.******");
 				return 0;
 				}
-
-			if(conf.runmode != 0){
+			
+			if(validateMode){
+				//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
+				//which is essentially a stripped down version of pop::SeedPopWithStartingTree
+				pop.ValidateInput(0);
+				outman.UserMessage("VALIDATION COMPLETE. Check output above for information and possible errors.");
+				}
+			else if(conf.runmode != 0){
 				if(conf.runmode == 1)
 					pop.ApplyNSwaps(10);
 				else if(conf.runmode == 7)

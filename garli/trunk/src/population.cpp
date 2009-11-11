@@ -395,6 +395,11 @@ void Population::CheckForIncompatibleConfigEntries(){
 	}
 
 void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r){
+	bool validateMode = false;
+	if(r < 0){
+		validateMode = true;
+		r = 0;
+		}
 	stopwatch.Start();
 
 	//most of the allocation occurs here or in children
@@ -548,7 +553,8 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)));
 	outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB))-1);
 */
-	if(memLevel==-1) throw ErrorException("Not enough memory specified in config file (availablememory)!");
+	if(memLevel==-1 && !validateMode) 
+		throw ErrorException("Not enough memory specified in config file (availablememory)!");
 
 	//process the data a bit
 	data->CalcEmpiricalFreqs();
@@ -556,7 +562,8 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 	//if we do tons of recombination
 	idealClas *= 2;
-	claMan=new ClaManager(data->NTax()-2, numClas, idealClas, sites, modSpec.numRateCats);
+	if(!validateMode)
+		claMan=new ClaManager(data->NTax()-2, numClas, idealClas, sites, modSpec.numRateCats);
 
 	//setup the bipartition statics
 	Bipartition::SetBipartitionStatics(data->NTax());
@@ -879,6 +886,129 @@ void Population::GetConstraints(){
 			outman.UserMessage("Loading constraints from file %s", conf->constraintfile.c_str());
 			Tree::LoadConstraints(con, data->NTax());
 			}
+		}
+	}
+
+//This is a stripped down version of SeedPopWithStartingTree that loads and validates
+//starting conditions but doesn't score or require CLAs to have been allocated
+void Population::ValidateInput(int rep){
+	//create the first indiv, and then copy the tree and clas
+	indiv[0].mod->SetDefaultModelParameters(data);
+
+	//This is getting very complicated.  Here are the allowable combinations.
+	//streefname not specified (random or stepwise)
+		//Case 1 - no gblock in datafile
+		//Case 2 - found gblock in datafile
+	//streefname specified
+		//specified file is same as datafile
+			//Case 3 - Found trees block only
+			//Case 4 - Found gblock only (create random tree)
+			//Case 5 - Found both
+		//specified file not same as datafile
+			//NOTE that all of these are also possible with a gblock found in the datafile
+			//3/25/08 Change - a second gblock is not allowed (it will throw an exception
+			//upon reading the second in GarliReader::EnteringBlock), nor are both a garli block
+			//with the data and model params in the old format in the streefname
+			//specified streefname is Nexus
+				//Case 6 - Found trees block only
+				//Case 7 - Found gblock only (create random tree) (if a gblock was already read it will crap out)
+				//Case 8 - Found both (if a gblock was already read it will crap out)
+			//specified streefname is not Nexus
+				//Case 9 - found a tree
+				//Case 10 - found a model (create random tree) (if a gblock was already read it will crap out)
+				//Case 11 - found both (if a gblock was already read it will crap out)
+
+	GarliReader & reader = GarliReader::GetInstance();
+
+#ifdef INPUT_RECOMBINATION
+	if(0){
+#else
+	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0)){
+		//some starting file has been specified - Cases 3-11
+#endif
+		//we already checked in Setup whether NCL has trees for us.  A starting model in Garli block will
+		//be handled below, although both a garli block (in the data) and an old style model specification
+		//are not allowed
+		if(startingTreeInNCL){//cases 3, 5, 6 and 8
+			//CAREFUL here - we may have more than one trees block because a tree could appear with the
+			//dataset and in a different starting tree file.  The factory api allows this fine, so we
+			//need to be sure to grab the last trees block.  Checking for whether the starting tree
+			//file contained multiple trees blocks was already done in LoadNexusStartingConditions
+			const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
+			assert(treesblock != NULL);
+			//this should verify some aspects of the tree description and change everything to taxon numbers
+			treesblock->ProcessAllTrees();
+			int numTrees = treesblock->GetNumTrees();
+			if(numTrees > 0){
+				int treeNum = (rank+rep-1) % numTrees;
+				indiv[0].GetStartingTreeFromNCL(treesblock, (rank + rep - 1), data->NTax());
+				outman.UserMessage("Obtained starting tree %d from Nexus", treeNum+1);
+				}
+			else throw ErrorException("Problem getting tree(s) from NCL!");
+			}
+		else if(strcmp(conf->streefname.c_str(), conf->datafname.c_str()) != 0 && !FileIsNexus(conf->streefname.c_str())){
+			//cases 9-11 if the streef file is not the same as the datafile, and it isn't Nexus
+			//use the old garli starting model/tree format
+			outman.UserMessage("Obtaining starting conditions from file %s", conf->streefname.c_str());
+			indiv[0].GetStartingConditionsFromFile(conf->streefname.c_str(), rank + rep - 1, data->NTax());
+			}
+		indiv[0].SetDirty();
+		}
+
+	if(reader.FoundModelString()) startingModelInNCL = true;
+	if(startingModelInNCL){
+		//crap out if we already got some parameters above in an old style starting conditions file
+#ifndef SUBROUTINE_GARLI
+		if(modSpec.GotAnyParametersFromFile() && (currentSearchRep == 1 && (conf->bootstrapReps == 0 || currentBootstrapRep == 1)))
+			throw ErrorException("Found model parameters specified in a Nexus GARLI block with the dataset,\n\tand in the starting condition file (streefname).\n\tPlease use one or the other.");
+#endif
+		//model string from garli block, which could have come either in starting condition file
+		//or in file with Nexus dataset.  Cases 2, 4, 5, 7 and 8 come through here.
+		string modString = reader.GetModelString();
+		indiv[0].mod->ReadGarliFormattedModelString(modString);
+		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
+		}
+
+	//The model params should be set to their initial values by now, so report them
+	if(conf->bootstrapReps == 0 || (currentBootstrapRep == 1 && currentSearchRep == 1)){
+		outman.UserMessage("MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)");
+		indiv[0].mod->OutputHumanReadableModelReportWithParams();
+		}
+
+	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
+
+	//Here we'll error out if something was fixed but didn't appear
+	if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
+		//if no streefname file was specified, the param values should be in a garli block with the dataset
+		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.IsCodon() && modSpec.fixOmega && !modSpec.gotOmegasFromFile) throw(ErrorException("rate het model set to nonsynonymousfixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		}
+	else{
+		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.IsCodon() && modSpec.fixOmega && !modSpec.gotOmegasFromFile) throw ErrorException("rate het model set to nonsynonymousfixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		}
+	if(conf->modWeight == ZERO_POINT_ZERO)
+		if(modSpec.IsCodon() && modSpec.gotOmegasFromFile == false) throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
+
+	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0)){
+		bool foundPolytomies = indiv[0].treeStruct->ArbitrarilyBifurcate();
+		if(foundPolytomies) outman.UserMessage("WARNING: Polytomies found in start tree.  These were arbitrarily resolved.");
+		indiv[0].treeStruct->root->CheckTreeFormation();
+		indiv[0].treeStruct->root->CheckforPolytomies();
+		}
+
+	//if there are not mutable params in the model, remove any weight assigned to the model
+	if(indiv[0].mod->NumMutatableParams() == 0) {
+		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
+			outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
+		adap->modelMutateProb=ZERO_POINT_ZERO;
+		adap->UpdateProbs();
 		}
 	}
 
@@ -2226,7 +2356,7 @@ void Population::Bootstrap(){
 #endif
 		if(conf->restart == false){
 			lastBootstrapSeed = data->BootstrapReweight(0, conf->resampleProportion);
-			outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
+			//outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
 			}
 
 #if defined CUDA_GPU && !defined OPEN_MP
@@ -2328,6 +2458,8 @@ void Population::PerformSearch(){
 			//if we restarted, the fraction should already have been set when reading the state files
 			UpdateFractionDone(0);
 			if(s.length() > 0) outman.UserMessage("\n>>>%s<<<", s.c_str());
+			if(conf->bootstrapReps > 0 && currentSearchRep == 0)//it makes more sense to have this here
+				outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
 			SeedPopulationWithStartingTree(currentSearchRep);
 			UpdateFractionDone(1);
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
@@ -2367,7 +2499,9 @@ void Population::PerformSearch(){
 					outman.UserMessage("    %d branches were collapsed.", numCollapsed);
 				}
 			storedTrees.push_back(repResult);
-			if(s.length() > 0) 
+			if(s.length() > 0 && (conf->bootstrapReps == 0 || (conf->bootstrapReps > 0 && conf->searchReps > 1)))
+				//I think that this should only be reported here if there is > 1 search rep per boot rep, since it should really be noting that
+				//a given SEARCH rep has finished, and the overall boot rep doesn't really finish until after the summary across search reps
 				outman.UserMessage(">>>Completed %s<<<", s.c_str());
 			}
 		else{
@@ -2480,6 +2614,7 @@ void Population::PerformSearch(){
 				else if(storedTrees.size() == 1)
 					FinishBootstrapRep(storedTrees[0], currentBootstrapRep);
 				else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
+				outman.UserMessage(">>>Completed Bootstrap rep %d<<<", currentBootstrapRep);
 				}
 			else if(prematureTermination && !(bootlog_output & WRITE_PREMATURE)) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
 			}
