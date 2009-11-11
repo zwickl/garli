@@ -1865,7 +1865,7 @@ if(nd->nodeNum == 8){
 					//for the next jump was small.  Now require improvement, but with a bit of scoring error tolerance.  This will probbably
 					//only come up with SP, in which case the max number of passes will be taken and then the initial blen will be restored below
 					if(scoreDeltaToMin < precision1){
-						outman.DebugMessage("would have bailed\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f", lnL, knownMin, nd->dlen, scoreDeltaToMin, (lnL - initialL));
+//						outman.DebugMessage("would have bailed\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f", lnL, knownMin, nd->dlen, scoreDeltaToMin, (lnL - initialL));
 						#ifdef OPT_DEBUG		
 							opt << "would have bailed\t" <<  scoreDeltaToMin << "\t" << (lnL - initialL);
 						#endif
@@ -1909,7 +1909,7 @@ if(nd->nodeNum == 8){
 					//for the next jump was small.  Now require improvement, but with a bit of scoring error tolerance.  This will probbably
 					//only come up with SP, in which case the max number of passes will be taken and then the initial blen will be restored below
 					if(scoreDeltaToMax < precision1){
-						outman.DebugMessage("would have bailed\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f", lnL, knownMin, nd->dlen, scoreDeltaToMax, (lnL - initialL));
+//						outman.DebugMessage("would have bailed\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f", lnL, knownMin, nd->dlen, scoreDeltaToMax, (lnL - initialL));
 						#ifdef OPT_DEBUG		
 							opt << "would have bailed\t" <<  scoreDeltaToMax << "\t" << (lnL - initialL);
 						#endif
