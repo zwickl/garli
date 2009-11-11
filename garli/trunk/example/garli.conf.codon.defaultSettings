@@ -19,6 +19,8 @@ outputphyliptree = 0
 outputmostlyuselessfiles = 0
 writecheckpoints = 0
 restart = 0
+outputsitelikelihoods = 0
+collapsebranches = 1
 searchreps = 2
 
 datatype = codon

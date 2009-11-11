@@ -20,6 +20,8 @@ outputmostlyuselessfiles = 0
 writecheckpoints = 0
 restart = 0
 outgroup = 1
+outputsitelikelihoods = 0
+collapsebranches = 1
 searchreps = 2
 
 datatype = nucleotide
