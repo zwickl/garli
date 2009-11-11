@@ -2607,25 +2607,12 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			assert(La < 1.0e30 && Lc < 1.0e30 && Lg < 1.0e30 && Lt < 1.0e30);
 
 			FLOAT_TYPE tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
-#ifdef SINGLE_PRECISION_FLOATS
-			if(fabs(tempD1) < 1.0e8f){
-				totL += (log(siteL) - partialCLA->underflow_mult[i]) * countit[i];
-				tot1+= countit[i] * tempD1;
-				FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
-				tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
-				}
-			//DEBUG
-			else{
-				outman.UserMessage("tempD1 = %f", tempD1);
-				}
-#else
+
 			unscaledlnL = log(siteL) - partialCLA->underflow_mult[i];
 			totL += unscaledlnL * countit[i];
 			tot1+= countit[i] * tempD1;
 			FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
-#endif
-//			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
 			}
 #ifndef OMP_TERMDERIV
 		else{
@@ -3144,24 +3131,15 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 			else
 				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
 			FLOAT_TYPE tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
-#ifdef SINGLE_PRECISION_FLOATS
-			if(fabs(tempD1) < 1.0e8f){
-				assert(d1Tot == d1Tot);
-				FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
-				totL += (log(siteL) - childCLA->underflow_mult[i] - partialCLA->underflow_mult[i]) * countit[i];
-				tot1 += countit[i] * tempD1;
-				tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
-				}
-#else
+
 			assert(d1Tot == d1Tot);
 			FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
 			unscaledlnL = (log(siteL) - childCLA->underflow_mult[i] - partialCLA->underflow_mult[i]);
 			totL += unscaledlnL * countit[i];
 			tot1 += countit[i] * tempD1;
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
-#endif
+
 			assert(d2Tot == d2Tot);
-//			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
 			}
 #ifndef OMP_INTDERIV
 		else{
@@ -3544,21 +3522,13 @@ void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const 
 			else
 				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
 			FLOAT_TYPE tempD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
-#ifdef SINGLE_PRECISION_FLOATS
-			if(fabs(tempD1) < 1.0e8f){
-				assert(d1Tot == d1Tot);
-				FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
-				tot1 += countit[i] * tempD1;
-				tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
-				}
-#else
+
 			assert(d1Tot == d1Tot);
 			FLOAT_TYPE siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]));
 			tot1 += countit[i] * tempD1;
 			tot2 += countit[i] * ((siteD2 / siteL) - tempD1*tempD1);
-#endif
+
 			assert(d2Tot == d2Tot);
-//			assert(tot1 < 1.0e10 && tot2 < 1.0e10);
 			}
 		else{
 			partial+=4*nRateCats;

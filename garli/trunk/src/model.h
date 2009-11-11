@@ -203,7 +203,7 @@ public:
 #ifdef SINGLE_PRECISION_FLOATS
 				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-6));
 #else
-				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-12));
+				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-10));
 #endif
 				}
 			}
