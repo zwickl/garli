@@ -496,7 +496,7 @@ int main( int argc, char* argv[] )	{
 			if(validateMode){
 				//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
 				//which is essentially a stripped down version of pop::SeedPopWithStartingTree
-				pop.ValidateInput(0);
+				pop.ValidateInput(1);
 				outman.UserMessage("VALIDATION COMPLETE. Check output above for information and possible errors.");
 				}
 			else if(conf.runmode != 0){
