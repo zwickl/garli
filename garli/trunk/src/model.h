@@ -697,7 +697,10 @@ public:
 			else if(_stricmp(str, "wag") == 0) SetWAGAAMatrix();
 			else if(_stricmp(str, "mtmam") == 0) SetMtMamAAMatrix();
 			else if(_stricmp(str, "mtrev") == 0) SetMtRevAAMatrix();
-			else if(_stricmp(str, "estimate") == 0) SetEstimatedAAMatrix();
+			else if(_stricmp(str, "estimate") == 0){
+				outman.UserMessage("\nWARNING: to obtain good ML estimates of the aminoacid rate matrix (189 free parameters)\n\tyou may need to run for a very long time or increase the modweight.\n\tDo not attempt this unless you have a very large amount of data.\n");
+				SetEstimatedAAMatrix();
+				}
 			else if(_stricmp(str, "fixed") == 0) SetUserSpecifiedRateMatrix();
 			else throw(ErrorException("Sorry, %s is not a valid aminoacid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag, mtmam, mtrev, estimate, fixed)", str));
 			}
