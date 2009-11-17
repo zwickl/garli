@@ -3378,7 +3378,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 	destCLA->rescaleRank=0;
 	}
 
-int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA /*=false*/){
+int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool returnUnscaledSitePosteriors /*=false*/){
 	//note that fillFinalCLA just refers to whether we actually want to calc a CLA
 	//representing the contribution of the entire tree vs just calcing the score
 	//The only reason I can think of for doing that is to calc internal state probs
@@ -3566,7 +3566,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			}
 		mod->CalcPmats(blen1, -1.0, Lprmat, Rprmat);
 
-		if(fillFinalCLA==false){
+		if(returnUnscaledSitePosteriors == false){
 			if(childCLA!=NULL){//if child is internal
 				ProfScoreInt.Start();
 				if(modSpec.IsNucleotide())
@@ -3589,14 +3589,17 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 
 		else{
 			//this is only for inferring internal states
-			//careful!  This will have to be returned manually!!
+			//careful!  The cla will have to be returned manually by the caller
 			int wholeTreeIndex=claMan->AssignClaHolder();
 			claMan->FillHolder(wholeTreeIndex, ROOT);
 			claMan->ReserveCla(wholeTreeIndex);
-			if(childCLA!=NULL)//if child is internal
-				CalcFullCLAPartialInternalRateHet(claMan->GetCla(wholeTreeIndex), childCLA, &Lprmat[0], partialCLA);
-			else
-				CalcFullCLAPartialTerminalRateHet(claMan->GetCla(wholeTreeIndex), partialCLA, &Lprmat[0], child->tipData);
+			//note that the NState functions are used here for both nuc and other datatypes
+			if(childCLA!=NULL){//if child is internal
+				GetStatewiseUnscaledPosteriorsPartialInternalNState(claMan->GetCla(wholeTreeIndex), partialCLA, childCLA, &Lprmat[0]);
+				}
+			else{
+				GetStatewiseUnscaledPosteriorsPartialTerminalNState(claMan->GetCla(wholeTreeIndex), partialCLA, &Lprmat[0], child->tipData);
+				}
 
 			return wholeTreeIndex;
 			}
@@ -4770,40 +4773,45 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 	if(nd->next) RecursivelyCalculateInternalStateProbs(nd->next, out);
 
 	if(nd->IsInternal()){
-		int wholeTreeIndex=ConditionalLikelihoodRateHet(ROOT, nd, true);
-		vector<InternalState *> *stateProbs=InferStatesFromCla(claMan->GetCla(wholeTreeIndex)->arr, data->NChar(), mod->NRateCats());
+		//what this now returns is really the unscaled posterior values for each state, marginalized across rates (including any invariant class).
+		//thus, the state frqeuencies have already been figured in and nothing needs to be done in InferStatesFromCla besides divide each by the sum
+		//note that this clas then only uses the first nstates x nchar portion, instead of the usual nstates x nchar x nrates
+		int wholeTreeIndex = ConditionalLikelihoodRateHet(ROOT, nd, true);
+		vector<InternalState> stateProbs;
+		InferStatesFromCla(stateProbs, claMan->GetCla(wholeTreeIndex)->arr, data->NChar(), mod->NStates());
 
-		char subtreeString[50000];
-		nd->MakeNewickForSubtree(subtreeString);
-		out << "node " << nd->nodeNum << "\t" << subtreeString << "\t";
-		char *loc=subtreeString;
-		NxsString temp;
+		//output newick strings with both names and numbers indicating which node this corresponds to
+		string subtreeString;
+		nd->MakeNewickForSubtree(subtreeString, data, false, false, false);	
+		out << "node " << nd->nodeNum << "\t" << subtreeString.c_str() << "\t";
+		subtreeString.clear();
+		nd->MakeNewickForSubtree(subtreeString, data, false, false, true);	
+		out << subtreeString.c_str() << endl;
 
-		while(*loc){
-			if(isdigit(*loc) == false) out << *loc++;
-			else{
-				while(isdigit(*loc))
-					temp += *loc++;
-				out << data->TaxonLabel(atoi(temp.c_str())-1);
-				temp="";
-				}
-			}
-		out << "\n";
+		//this just maps the indecies used in the clas to actual states
+		StateSet *states;
+		if(modSpec.IsNucleotide())
+			states = new StateSet(4);
+		else if(modSpec.IsAminoAcid())
+			states = new StateSet(20);
+		else
+			states = new StateSet(mod->GetGeneticCode());
 
+		states->OutputInternalStateHeader(out);
+
+		//now map the posteriors of each packed state to the original char order
 		for(int s=0;s<data->GapsIncludedNChar();s++){
 			out << s+1 << "\t";
 			if(data->Number(s) > -1)
-				(*stateProbs)[data->Number(s)]->Output(out);
-			else out << "Entirely uninformative character (gaps,N's or ?'s)\n";
+				stateProbs[data->Number(s)].Output(out, *states);
+			else 
+				out << "Entirely uninformative character (gaps,N's or ?'s)\n";
 			}
-
+		
+		//return the cla that we used temporarily
 		claMan->ClearTempReservation(wholeTreeIndex);
 		claMan->DecrementCla(wholeTreeIndex);
-
-		for(vector<InternalState*>::iterator delit=stateProbs->begin();delit!=stateProbs->end();delit++){
-			delete *(delit);
-			}
-		delete stateProbs;
+		delete states;
 		}
 	}
 
@@ -5516,6 +5524,236 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 		}
 	delete []freqs;
 	return totallnL;
+	}
+
+void Tree::GetStatewiseUnscaledPosteriorsPartialInternalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat){
+	
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *CL1=childCLA->arr;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult1=partialCLA->underflow_mult;
+	const int *underflow_mult2=childCLA->underflow_mult;
+
+	const int nchar=data->NChar();
+	const int *countit=data->GetCounts();
+	const int nRateCats = mod->NRateCats();
+	const int nstates = mod->NStates();
+
+	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+	const FLOAT_TYPE prI=mod->PropInvar();
+	const int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
+
+#ifdef UNIX
+	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
+
+	memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+
+	for(int i=0;i<nchar;i++){
+		for(int rate=0;rate<nRateCats;rate++){
+			int rateOffset = rate*nstates*nstates;
+			for(int from=0;from<nstates;from++){
+				FLOAT_TYPE temp = ZERO_POINT_ZERO;
+				int offset = from * nstates;
+				for(int to=0;to<nstates;to++){
+					temp += prmat[rateOffset + offset + to] * CL1[to];
+					}
+				dest[from] += temp * partial[from] * freqs[from] * rateProb[rate];
+				}
+			partial += nstates;
+			CL1 += nstates;
+			}
+
+		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+			//conStates has different meaning with nuc and other models.  
+			//With nuc it is the base in 1, 2, 4, 8 notation (possibly mulitple bits set if ambiguity)
+			//With other models it is the state index, starting at 0
+			FLOAT_TYPE pinvRescaler = ONE_POINT_ZERO;
+			//if the site is constant but was rescaled, this must be done 
+			if((underflow_mult1[i] + underflow_mult2[i]) != 0)
+				pinvRescaler = exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
+			if(nstates > 4){
+				dest[conStates[i]] += prI * freqs[conStates[i]] * pinvRescaler;
+				}
+			else{
+				if(conStates[i]&1)
+					dest[0] += prI * freqs[0] * pinvRescaler;
+				if(conStates[i]&2) 
+					dest[1] += prI * freqs[1] * pinvRescaler;
+				if(conStates[i]&4) 
+					dest[2] += prI * freqs[2] * pinvRescaler;
+				if(conStates[i]&8) 
+					dest[3] += prI * freqs[3] * pinvRescaler;
+				}
+			}
+		dest += nstates;
+		}
+	delete []freqs;
+	}
+
+//this isn't currently used, with nuc models also going through the nstate version
+void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//fi0rst rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult=partialCLA->underflow_mult;
+
+	const int nstates = mod->NStates();
+	const int nchar=data->NChar();
+	const int nRateCats = mod->NRateCats();
+
+	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+
+	const int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
+	const FLOAT_TYPE prI=mod->PropInvar();
+
+	FLOAT_TYPE freqs[4];
+	for(int i=0;i<4;i++) 
+		freqs[i]=mod->StateFreq(i);
+
+#ifdef UNIX
+	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	//were only using nstates per char (not char x rate cats) so only zero out this much
+	memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+
+	for(int i=0;i<nchar;i++){
+		if(*Ldata > -1){ //no ambiguity
+			for(int i=0;i<nRateCats;i++){
+				dest[0]  += prmat[(*Ldata)+16*i] * partial[0] * rateProb[i] * freqs[0];
+				dest[1]  += prmat[(*Ldata+4)+16*i] * partial[1] * rateProb[i] * freqs[1];
+				dest[2]  += prmat[(*Ldata+8)+16*i] * partial[2] * rateProb[i] * freqs[2];
+				dest[3]  += prmat[(*Ldata+12)+16*i] * partial[3] * rateProb[i] * freqs[3];
+				partial += 4;
+				}
+			Ldata++;
+			}
+
+		else if(*Ldata == -4){ //total ambiguity
+			for(int i=0;i<nRateCats;i++){
+				dest[0] += partial[0] * rateProb[i] * freqs[0];
+				dest[1] += partial[1] * rateProb[i] * freqs[1];
+				dest[2] += partial[2] * rateProb[i] * freqs[2];
+				dest[3] += partial[3] * rateProb[i] * freqs[3];
+				partial += 4;
+				}
+			Ldata++;
+			}
+		else{ //partial ambiguity
+			char nstates=-1 * *(Ldata++);
+			for(int i=0;i<nstates;i++){
+				for(int i=0;i<nRateCats;i++){
+					dest[0] += prmat[(*Ldata)+16*i]  * partial[4*i] * rateProb[i] * freqs[0];;
+					dest[1] += prmat[(*Ldata+4)+16*i] * partial[1+4*i] * rateProb[i] * freqs[1];;
+					dest[2] += prmat[(*Ldata+8)+16*i]* partial[2+4*i] * rateProb[i] * freqs[2];;
+					dest[3] += prmat[(*Ldata+12)+16*i]* partial[3+4*i] * rateProb[i] * freqs[3];;
+					}
+				Ldata++;
+				}
+			partial+=4*nRateCats;
+			}
+		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+			FLOAT_TYPE pinvRescaler = ONE_POINT_ZERO;
+			//if the site is constant but was rescaled, this must be done 
+			if(underflow_mult[i] != 0)
+				pinvRescaler = exp((FLOAT_TYPE)underflow_mult[i]);
+			if(conStates[i]&1)
+				dest[0] += prI * freqs[0] * pinvRescaler;
+			if(conStates[i]&2) 
+				dest[1] += prI * freqs[1] * pinvRescaler;
+			if(conStates[i]&4) 
+				dest[2] += prI * freqs[2] * pinvRescaler;
+			if(conStates[i]&8) 
+				dest[3] += prI * freqs[3] * pinvRescaler;
+			}
+		dest += nstates;
+		}
+	}
+
+void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata){
+	//this function assumes that the pmat is arranged with the nstates^2 entries for the
+	//first rate, followed by nstates^2 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult=partialCLA->underflow_mult;
+
+	const int nstates = mod->NStates();
+	const int nRateCats = mod->NRateCats();
+	const int nchar = data->NChar();
+
+	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+	const int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
+	const FLOAT_TYPE prI=mod->PropInvar();
+
+#ifdef UNIX
+	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, unscaledlnL, grandSumlnL=ZERO_POINT_ZERO;
+
+	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
+
+	//were only using nstates per char (not char x rate cats) so only zero out this much
+	memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+
+	for(int i=0;i<nchar;i++){
+		if(*Ldata < nstates){ //no ambiguity
+			for(int rate=0;rate<nRateCats;rate++){
+				const int rateOffset = rate * nstates * nstates;
+				for(int from=0;from<nstates;from++){
+					const int offset = from * nstates;
+					dest[from] += prmat[rateOffset + offset + (*Ldata)] * partial[from] * freqs[from] * rateProb[rate];
+					}
+				partial += nstates;
+				}
+			}
+		else{ //total ambiguity
+			for(int rate=0;rate<nRateCats;rate++){
+				for(int from=0;from<nstates;from++){
+					dest[from] += partial[from] * freqs[from] * rateProb[rate];
+					}
+				partial += nstates;
+				}
+			}
+
+		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+			//conStates has different meaning with nuc and other models.  
+			//With nuc it is the base in 1, 2, 4, 8 notation (possibly mulitple bits set if ambiguity)
+			//With other models it is the state index, starting at 0
+			FLOAT_TYPE pinvRescaler = ONE_POINT_ZERO;
+			//if the site is constant but was rescaled, this must be done 
+			if(underflow_mult[i] != 0)
+				pinvRescaler = exp((FLOAT_TYPE)underflow_mult[i]);
+			if(nstates > 4){
+				dest[conStates[i]] += prI * freqs[conStates[i]] * pinvRescaler;
+				}
+			else{
+				if(conStates[i]&1)
+					dest[0] += prI * freqs[0] * pinvRescaler;
+				if(conStates[i]&2) 
+					dest[1] += prI * freqs[1] * pinvRescaler;
+				if(conStates[i]&4) 
+					dest[2] += prI * freqs[2] * pinvRescaler;
+				if(conStates[i]&8) 
+					dest[3] += prI * freqs[3] * pinvRescaler;
+				}
+			}
+
+		Ldata++;
+		dest += nstates;
+		}
 	}
 
 void Tree::LocalMove(){
@@ -7258,6 +7496,41 @@ void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondL
 		}
 	}
 
+//this isn't currently used, and may not even work
+void Tree::CalcFullCLAPartialInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pmat, CondLikeArray *partialCLA){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *LCL=LCLA->arr;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+
+	const int nRateCats = mod->NRateCats();
+	const int nstates = mod->NStates();
+	const int nchar = data->NChar();
+
+#ifdef UNIX
+	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void *)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	for(int i=0;i<nchar;i++) {
+		for(int rate=0;rate<nRateCats;rate++){
+			for(int from=0;from<nstates;from++){
+				FLOAT_TYPE fromTot = ZERO_POINT_ZERO;
+				for(int to=0;to<nstates;to++){
+					fromTot += pmat[rate*nstates*nstates + from*nstates + to] * LCL[to];
+					}
+				dest[from] = fromTot * partial[from];
+				}
+			partial += nstates;
+			LCL += nstates;
+			dest += nstates;
+			}
+		assert(dest[-nstates*nRateCats] >= 0.0);
+		assert(dest[-nstates*nRateCats] == dest[-nstates*nRateCats]);
+		}
+	}
+
 void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
@@ -7315,6 +7588,45 @@ void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondL
 	for(int i=0;i<nchar;i++)
 		destCLA->underflow_mult[i]=partialCLA->underflow_mult[i];
 }
+
+//this isn't currently used, and may not even work
+void Tree::CalcFullCLAPartialTerminalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata){
+	//this function assumes that the pmat is arranged with the nstates^2 entries for the
+	//first rate, followed by nstates^2 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+
+	const int nstates = mod->NStates();
+	const int nRateCats = mod->NRateCats();
+	const int nchar = data->NChar();
+
+#ifdef UNIX
+	madvise((void*)dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	for(int i=0;i<nchar;i++){
+		if(*Ldata < nstates){ //no ambiguity
+			for(int rate=0;rate<nRateCats;rate++){
+				const int rateOffset = rate * nstates * nstates;
+				for(int from=0;from<nstates;from++){
+					const int offset = from * nstates;
+					*dest++ = prmat[rateOffset + offset + (*Ldata)] * partial[from];
+					}
+				partial += nstates;
+				}
+			}
+		else{ //total ambiguity
+			for(int rate=0;rate<nRateCats;rate++){
+				for(int from=0;from<nstates;from++){
+					*dest++ = partial[from];
+					}
+				partial += nstates;
+				}
+			}
+		Ldata++;
+		}
+	}
 
 //SINGLE SITE FUNCTIONS
 

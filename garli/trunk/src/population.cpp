@@ -381,8 +381,8 @@ void Population::CheckForIncompatibleConfigEntries(){
 		if((modSpec.numRateCats > 1 && modSpec.IsFlexRateHet() == false && modSpec.fixAlpha == false && modSpec.IsCodon() == false) || (modSpec.IsCodon() && !modSpec.fixOmega)) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed, nonsynonymousfixed or none!"));
 		}
 
-	if(conf->inferInternalStateProbs && (modSpec.IsNucleotide() == false))
-		throw ErrorException("Sorry, internal state reconstruction not yet implemented for non-nucleotide models.\nPAML does a good job of this with fixed trees, so you might try using your best GARLI tree there.");
+//	if(conf->inferInternalStateProbs && (modSpec.IsNucleotide() == false))
+//		throw ErrorException("Sorry, internal state reconstruction not yet implemented for non-nucleotide models.\nPAML does a good job of this with fixed trees, so you might try using your best GARLI tree there.");
 	if(conf->inferInternalStateProbs && conf->bootstrapReps > 0) 
 		throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
 	if(conf->outputSitelikelihoods > 0 && conf->bootstrapReps > 0) 
@@ -3942,7 +3942,7 @@ void Population::WritePhylipTree(ofstream &phytree){
 char * Population::MakeNewick(int i, bool internalNodes)
 {
 	indiv[i].treeStruct->root->MakeNewick(treeString, internalNodes, true);
-	assert(!treeString[stringSize]);
+	assert(!treeString[stringSize-1]);
 	return treeString;
 }
 

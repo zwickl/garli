@@ -940,6 +940,7 @@ class Model{
 	int NumMutatableParams() const {return (int) paramsToMutate.size();}
 	int Nst() const {return nst;}
 	const int *GetArbitraryRateMatrixIndeces() const {return arbitraryMatrixIndeces;}
+	const GeneticCode *GetGeneticCode(){return code;}
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
