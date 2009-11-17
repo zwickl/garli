@@ -2342,7 +2342,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				if(temp.size() == 0)
 					throw(ErrorException("Unexpected end of model string while reading rate matrix parameters.\nExamine file and check manual for format.\n"));
 				if(temp[0] != '.' && (!isdigit(temp[0]))) 
-					throw(ErrorException("Problem reading rate matrix parameters from file.\nExamine file and check manual for format.\n"));
+					throw(ErrorException("Problem reading rate matrix parameters from file (maybe too few rates?).\n\tFor amino acid models 190 rates should be specified, (or 189 rates if the last rate is assumed to be 1.0).\n\tFor nucleotide models 6 should be specified (or 5 if the last rate is assumed to be 1.0).\n\tExamine file and check manual or website for format.\n"));
 				//r[i]=(FLOAT_TYPE)atof(temp.c_str());
 				r.push_back((FLOAT_TYPE)atof(temp.c_str()));
 				}
@@ -2358,6 +2358,8 @@ void Model::ReadGarliFormattedModelString(string &modString){
 						v += c;
 					else if(c == ' ' || c == '\t'){
 						c=stf.get();
+						if(isdigit(c) || c=='.')
+							throw ErrorException("It appears that too many relative rates was specified in the model string.\n\tFor amino acid models 190 rates should be specified, (or 189 rates if the last rate is assumed to be 1.0).\n\tFor nucleotide models 6 should be specified (or 5 if the last rate is assumed to be 1.0).");
 						break;
 						}
 					}
@@ -2365,12 +2367,13 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				r.push_back((FLOAT_TYPE)atof(v.c_str()));
 				}
 			//else r[5] = ONE_POINT_ZERO;
-			else r.push_back(ONE_POINT_ZERO);
+			else 
+				r.push_back(ONE_POINT_ZERO);
 			if(r.size() != relNucRates.size()){
 				if(modSpec.IsAminoAcid())
-					throw ErrorException("Incorrect number of relative rates specified in model string.\tFor amino acid models 190 rates should be specified, (or 189 rates if the last rate is assumed to be 1.0).");
+					throw ErrorException("It appears that too few relative rates were specified in the model string (found %d).\n\tFor amino acid models 190 rates should be specified, (or 189 rates if the last rate is assumed to be 1.0).", r.size());
 				else
-					throw ErrorException("Incorrect number of relative rates specified in model string.\t6 rates should be specified, (or 5 rates if the G-T rate is assumed to be 1.0).");
+					throw ErrorException("Incorrect number of relative rates specified in the model string.\t6 rates should be specified, (or 5 rates if the G-T rate is assumed to be 1.0).");
 				}
 			SetRmat(&r[0], true, true);
 			modSpec.gotRmatFromFile=true;
@@ -2403,6 +2406,8 @@ void Model::ReadGarliFormattedModelString(string &modString){
 						v += c;
 					else if(c == ' ' || c == '\t'){
 						c=stf.get();
+						if(isdigit(c) || c=='.')
+							throw ErrorException("It appears that too many equilibrium frequencies were specified in the model string.\n\tFor amino acid models 20 should be specified, (or 19 if the last is assumed to make the sum 1.0).\n\tFor nucleotide models 4 (or 3 if the last is assumed to make the sum 1.0).");
 						break;
 						}
 					}
