@@ -2620,7 +2620,7 @@ void Population::PerformSearch(){
 			}
 
 		if(conf->inferInternalStateProbs == true){
-			if(prematureTermination == false && currentSearchRep == conf->searchReps){
+			if((prematureTermination == false && currentSearchRep == conf->searchReps) || (prematureTermination && storedTrees.size() > 0)){
 				if(storedTrees.size() > 0){//careful here, the trees in the storedTrees array don't have clas assigned
 					outman.UserMessage("Inferring internal state probabilities on best tree....");
 					storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
