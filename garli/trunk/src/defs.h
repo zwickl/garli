@@ -62,17 +62,19 @@
 //#undef OPT_DEBUG
 
 //The ONLY thing that should need to be done to turn on memcheck leak detection
-//should be defining MONITORING_ALLOCATION here
-#undef MONITORING_ALLOCATION
+//should be defining MONITORING_ALLOCATION 
+//#undef MONITORING_ALLOCATION
 #include "memchk.h"
 
-//7-09 A few newer features that aren't 100% tested to my satisfaction   
+//7-09 A few newer features now made permanant after testing
 #define ADAPTIVE_BOUNDED_OPT
 #define MORE_DETERM_PARAM_OPT
 #define PUSH_TO_MIN_BLEN
 #define FINAL_RESTORE_BLENS
 #define OPT_BOUNDED_RESTORE
 #define SUM_AA_REL_RATES
+#define NEW_BUMPING
+#define ALT_NR_BAIL
 
 #define CONSTRAINTS
 #define STOCHASTIC_STARTING_BLENS

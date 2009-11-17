@@ -575,8 +575,8 @@ int main( int argc, char* argv[] )	{
 			char filename[50];
 			#ifndef WIN32
 			int rank=0;
-			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-			sprintf(filename, "memecheck%d.txt", rank);
+	//		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+			sprintf(filename, "memcheck%d.txt", rank);
 			#else
 			strcpy(filename, "memcheck.txt");
 			#endif
