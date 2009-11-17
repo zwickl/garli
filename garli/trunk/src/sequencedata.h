@@ -202,6 +202,10 @@ class GeneticCode{
 	int codonTable[64];
 	int map64toNonStops[64];
 	vector<int> stops;
+	//this holds the correspondence between the state indeces and actual codons
+	//for display purposes.  Stops are removed and thus any mapIndexToCodonDisplay[index]
+	//gives the codon for that index
+	vector<string> mapIndexToCodonDisplay;
 
 	public:
 	GeneticCode(){
@@ -342,6 +346,8 @@ class GeneticCode{
 		stops.push_back(48);
 		stops.push_back(50);
 		stops.push_back(56);
+
+		FillIndexToCodonDisplayMap();
 		}
 		
 	void SetVertMitoCode(){
@@ -421,6 +427,8 @@ class GeneticCode{
 		stops.push_back(10);
 		stops.push_back(48);
 		stops.push_back(50);
+
+		FillIndexToCodonDisplayMap();
 		}
 		
 	void SetInvertMitoCode(){
@@ -498,6 +506,8 @@ class GeneticCode{
 		stops.clear();
 		stops.push_back(48);
 		stops.push_back(50);
+		
+		FillIndexToCodonDisplayMap();
 		}
 
 	int CodonLookup(int i){
@@ -509,6 +519,29 @@ class GeneticCode{
 		assert(map64toNonStops[i] != -1);
 		return map64toNonStops[i];
 		}
+	void FillIndexToCodonDisplayMap(){
+		//this assumes that the correct genetic code has already been set
+		mapIndexToCodonDisplay.clear();
+		char nucs[4] = {'A', 'C', 'G', 'T'};
+		//char cod[3];
+		char *cod = new char[4];
+		for(int f = 0;f < 4;f++){
+			for(int s = 0;s < 4;s++){
+				for(int t = 0;t < 4;t++){
+					if(CodonLookup(f * 16 + s * 4 + t) != 20){ 
+						sprintf(cod, "%c%c%c\0", nucs[f], nucs[s], nucs[t]);
+						mapIndexToCodonDisplay.push_back(cod);
+						}
+					}
+				}
+			}
+		delete []cod;
+		}
+	const string LookupCodonDisplayFromIndex(int index) const{
+		return mapIndexToCodonDisplay[index];
+		}
+
+	int NumStates() const {return mapIndexToCodonDisplay.size();}
 	};
 
 class CodonData : public SequenceData {

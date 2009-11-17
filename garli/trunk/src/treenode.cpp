@@ -163,12 +163,74 @@ char *TreeNode::MakeNewick(char *s, bool internalNodes, bool branchLengths, bool
 	return s;
 	}
 
+void TreeNode::MakeNewick(string &outStr, const SequenceData *data, bool internalNodes, bool branchLengths, bool taxonNames /*=false*/, bool highPrec /*=false*/) const{
+	char s[500];
+	if(left){
+		if(internalNodes==true && nodeNum!=0){
+			sprintf(s, "%d", nodeNum);
+			outStr += s;
+			}
+		outStr += '(';
+		left->MakeNewick(outStr, data, internalNodes, branchLengths, taxonNames, highPrec);
+		if(anc){
+			if(branchLengths==true){
+				outStr += ':';
+				if(highPrec == false){
+					sprintf(s, "%.8lf", dlen);
+					outStr += s;
+					}
+				else{
+					sprintf(s, "%.10lf", dlen);
+					outStr += s;
+					}
+				}
+			}
+		else
+			return;
+		}
+	else {
+		//sprintf(s, "%d", nodeNum);
+		//outStr += s;
+		if(taxonNames && data)
+			outStr += data->TaxonLabel(nodeNum - 1);
+		else{
+			sprintf(s, "%d", nodeNum);
+			outStr += s;
+			}
+		if(branchLengths==true){
+			outStr += ':';
+			if(highPrec == false)
+				sprintf(s, "%.8lf", dlen);
+			else 
+				sprintf(s, "%.10lf", dlen);
+			outStr += s;
+			}
+		}
+		
+	if(next){
+		outStr += ',';
+		next->MakeNewick(outStr, data, internalNodes, branchLengths, taxonNames, highPrec);
+		}
+	else {
+		if(anc){
+			outStr += ')';
+			}
+		}
+	}
+
 void TreeNode::MakeNewickForSubtree(char *s) const{
 	assert(left);
 	*s++='(';
 	s=left->MakeNewick(s, false, false);
 	*s++=';';
 	*s++='\0';
+	}
+
+void TreeNode::MakeNewickForSubtree(string &s, const SequenceData *data, bool internalNodes, bool branchLengths, bool taxonNames, bool highPrec) const{
+	assert(left);
+	s += '(';
+	left->MakeNewick(s, data, internalNodes, branchLengths, taxonNames, highPrec);
+	//s += ';';
 	}
 
 //MTH

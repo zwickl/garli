@@ -995,54 +995,14 @@ FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, F
 	 return fx;
 	 }
 
-void InferStatesFromCla(char *states, FLOAT_TYPE *cla, int nchar){
-	//this function takes a cla that contains the contribution of the whole tree
-	//and calculates the most probable state at each site.  The resulting array of
-	//states is placed into *states, which should already be allocated.
-	assert(0);//need to generalize this for n rates is it ever needs to be used again
-	FLOAT_TYPE stateProbs[4];
-
+void InferStatesFromCla(vector<InternalState> &stateVec, const FLOAT_TYPE *cla, int nchar, int nstates){
+	//what is passed in here is really the unscaled posterior values for each state, marginalized across rates (including any invariant class).
+	//thus, the state frqeuencies have already been figured in and nothing needs to be done in CalcProbs besides divide each by the sum
+	//note that this clas then only uses the first nstates x nchar portion, instead of the usual nstates x nchar x nrates
 	for(int c=0;c<nchar;c++){
-		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=ZERO_POINT_ZERO;
-		for(int i=0;i<4;i++){
-			for(int j=0;j<4;j++){
-				stateProbs[j] += *cla++;
-				}
-			}
-		int max=0, next=1;
-
-		while(next < 4){
-			if(stateProbs[next] > stateProbs[max]){
-				max=next;
-				}
-			next++;
-			}
-
-		states[c]=max;
+		stateVec.push_back(InternalState(nstates));
+		stateVec[stateVec.size() - 1].CalcProbs(&cla[c * nstates]);
 		}
-	}
-
-vector<InternalState *> *InferStatesFromCla(FLOAT_TYPE *cla, int nchar, int nrates){
-	FLOAT_TYPE stateProbs[4];
-
-	vector<InternalState *> *stateVec = new vector<InternalState *>;
-
-	for(int c=0;c<nchar;c++){
-		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=ZERO_POINT_ZERO;
-		for(int i=0;i<nrates;i++){
-			for(int j=0;j<4;j++){
-				stateProbs[j] += *cla++;
-				}
-			}
-		InternalState *site=new InternalState(stateProbs);
-		stateVec->push_back(site);
-
-
-	//		out << bases[(stateProbs[max1] > stateProbs[max2] ? max1 : max2)] << "\t";
-	//		out << stateProbs[0]/tot << "\t" << stateProbs[1]/tot << "\t" << stateProbs[2]/tot << "\t" << stateProbs[3]/tot << "\n";
-
-		}
-	return stateVec;
 	}
 
 FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, const int *counts, int nchar, int nstates){

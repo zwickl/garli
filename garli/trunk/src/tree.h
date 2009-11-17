@@ -213,7 +213,7 @@ class Tree{
 
 		// functions for computing likelihood
 		bool ConditionalLikelihood(int direction, TreeNode* nd);	
-		int ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA=false);
+		int ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool returnUnscaledSitePosteriors = false);
 		FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata);
 		FLOAT_TYPE GetScorePartialTerminalNState(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata);
 		FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat);
@@ -241,6 +241,16 @@ class Tree{
 
 		void CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA);
 		void CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *Lpr, char *Ldata);
+
+		//not used
+		void CalcFullCLAPartialTerminalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *pmat, const char *Ldata);
+		void CalcFullCLAPartialInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, CondLikeArray *partialCLA);
+		void GetStatewiseUnscaledPosteriorsPartialTerminalRateHet(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata);
+		
+		//for all internal state recon
+		void GetStatewiseUnscaledPosteriorsPartialInternalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat);
+		void GetStatewiseUnscaledPosteriorsPartialTerminalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata);
+		
 
 		void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr);
 		void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2);

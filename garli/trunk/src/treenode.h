@@ -78,7 +78,9 @@ class TreeNode{
 		void CollapseMinLengthBranches(int &);
 		//misc functions
 		char *MakeNewick(char *s, bool internalNodes, bool branchLengths, bool highPrec=false) const;
+		void MakeNewick(string &outStr, const SequenceData *data, bool internalNodes, bool branchLengths, bool taxonNames = false, bool highPrec = false) const;
 		void MakeNewickForSubtree(char *s) const;
+		void MakeNewickForSubtree(string &s, const SequenceData *data, bool internalNodes, bool branchLengths, bool taxonNames = false, bool highPrec = false) const;
 		bool IsGood();
 		bool IsTerminal() const{
 			return left == NULL;

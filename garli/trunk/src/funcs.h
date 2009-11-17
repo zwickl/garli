@@ -30,26 +30,90 @@
 
 extern rng rnd;
 
+class StateSet{
+	protected:
+		vector<string> states;
+		int numStates;
+	public:
+		StateSet(int ns){
+			numStates = ns;
+			assert(numStates == 4 || numStates == 20);
+			if(numStates == 4){
+				states.push_back("A");
+				states.push_back("C");
+				states.push_back("G");
+				states.push_back("T");
+				}
+			else if(numStates == 20){
+				states.push_back("A");
+				states.push_back("C");
+				states.push_back("D");
+				states.push_back("E");
+				states.push_back("F");
+				states.push_back("G");
+				states.push_back("H");
+				states.push_back("I");
+				states.push_back("K");
+				states.push_back("L");
+				states.push_back("M");
+				states.push_back("N");
+				states.push_back("P");
+				states.push_back("Q");
+				states.push_back("R");
+				states.push_back("S");
+				states.push_back("T");
+				states.push_back("V");
+				states.push_back("W");
+				states.push_back("Y");
+				}
+			}
+		StateSet(const GeneticCode *code){
+			numStates = code->NumStates();
+			for(int s = 0;s < numStates;s++)
+				states.push_back(code->LookupCodonDisplayFromIndex(s));
+			}
+		void OutputInternalStateHeader(ofstream &out) const{
+			out << "site\tbestState(prob)\t";
+			for(int s = 0;s < numStates;s++)
+				out << "prob(" << states[s] << ")\t";
+			out << endl;
+			}
+		const string GetState(int s) const{
+			return states[s];
+			}
+	};
+
 class InternalState{
-	private:
-	char best;
-	FLOAT_TYPE probs[4];
+	protected:
+		int best;
+		int numStates;
+		vector<FLOAT_TYPE> probs;
 
 	public:
-	InternalState(FLOAT_TYPE *tots){
-		char bases[4]={'A', 'C', 'G', 'T'};
+		InternalState(int ns){
+			numStates = ns;
+			probs.resize(numStates);
+			}
+		void CalcProbs(const FLOAT_TYPE *tots){
+			FLOAT_TYPE tot=0.0;
+			best = 0;
+			FLOAT_TYPE bestVal = ZERO_POINT_ZERO;
 
-		FLOAT_TYPE tot=0.0;
-		tot = tots[0] + tots[1] + tots[2] + tots[3];
-		int max1=(tots[0] > tots[1] ? 0:1);
-		int max2=(tots[2] > tots[3] ? 2:3);
-		best=bases[(tots[max1] > tots[max2] ? max1 : max2)];
-		for(int i=0;i<4;i++)
-			probs[i]=tots[i]/tot;
-		}
-	void Output(ofstream &out){
-		out << best << "\t" << probs[0] << "\t" << probs[1] <<  "\t" << probs[2] << "\t" <<  probs[3] << "\n";
-
+			for(int s = 0;s < numStates;s++)
+				tot += tots[s];
+			for(int i=0;i<numStates;i++){
+				probs[i]=tots[i]/tot;
+				if(probs[i] > bestVal){
+					bestVal = probs[i];
+					best = i;
+					}
+				}
+			}
+	void Output(ofstream &out, const StateSet &states) const{
+		out << states.GetState(best) << "(" << probs[best] << ")\t";
+		for(int s = 0;s < numStates;s++)
+			out << probs[s] << "\t";
+		out << endl;
 		}
 	};
 
@@ -81,8 +145,8 @@ int DZbrak(FLOAT_TYPE *ax, FLOAT_TYPE *bx, FLOAT_TYPE *cx, FLOAT_TYPE *fa, FLOAT
 FLOAT_TYPE brent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree);
 FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, FLOAT_TYPE fb, FLOAT_TYPE fc, FLOAT_TYPE (*f)(TreeNode *, Tree*, FLOAT_TYPE), FLOAT_TYPE tol, FLOAT_TYPE *xmin, TreeNode *thisnode, Tree *thistree);
 void DirichletRandomVariable (FLOAT_TYPE *alp, FLOAT_TYPE *z, int n);
-void InferStatesFromCla(char *states, FLOAT_TYPE *cla, int nchar);
-vector<InternalState *> *InferStatesFromCla(FLOAT_TYPE *cla, int nchar, int nrates);
+
+void InferStatesFromCla(vector<InternalState> &stateVec, const FLOAT_TYPE *cla, int nchar, int nstates);
 FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, const int *counts, int nchar, int nstates);
 
 void SampleBranchLengthCurve(FLOAT_TYPE (*func)(TreeNode*, Tree*, FLOAT_TYPE, bool), TreeNode *thisnode, Tree *thistree);
