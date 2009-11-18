@@ -5553,7 +5553,11 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialInternalNState(CondLikeArray *de
 	for(int i=0;i<nstates;i++) 
 		freqs[i]=mod->StateFreq(i);
 
-	memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+	//note that we don't need to zero the whole thing
+	//this was not guaranteed to be safe
+	//memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+	for(int d = 0;d < nchar * nstates;d++)
+		dest[d] = ZERO_POINT_ZERO;
 
 	for(int i=0;i<nchar;i++){
 		for(int rate=0;rate<nRateCats;rate++){
@@ -5623,8 +5627,11 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalRateHet(CondLikeArray *d
 	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
 #endif
 
-	//were only using nstates per char (not char x rate cats) so only zero out this much
-	memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+	//note that we don't need to zero the whole thing
+	//this was not guaranteed to be safe
+	//memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+	for(int d = 0;d < nchar * nstates;d++)
+		dest[d] = ZERO_POINT_ZERO;
 
 	for(int i=0;i<nchar;i++){
 		if(*Ldata > -1){ //no ambiguity
@@ -5705,8 +5712,11 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalNState(CondLikeArray *de
 	for(int i=0;i<nstates;i++) 
 		freqs[i]=mod->StateFreq(i);
 
-	//were only using nstates per char (not char x rate cats) so only zero out this much
-	memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+	//note that we don't need to zero the whole thing
+	//this was not guaranteed to be safe
+	//memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+	for(int d = 0;d < nchar * nstates;d++)
+		dest[d] = ZERO_POINT_ZERO;
 
 	for(int i=0;i<nchar;i++){
 		if(*Ldata < nstates){ //no ambiguity
