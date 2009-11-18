@@ -154,7 +154,8 @@ class Bipartition{
 		}
 
 	void FillAllBits(){
-		memset(rep, allBitsOn, sizeof(int) * nBlocks);
+		//the argument here is what to fill each _byte_ of the ints with
+		memset(rep, 0xFF, sizeof(int) * nBlocks);
 		}
 
 	bool EqualsEquals(const Bipartition &rhs) const{
