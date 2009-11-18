@@ -529,7 +529,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 	//the new version
 	FLOAT_TYPE boundBumped = -1.0;
 	//if possible, bump enough that we could have one legal increase in incr below to allow sufficient lnL diffs
-	FLOAT_TYPE bumpAmt = baseIncr * 5.0001;
+	FLOAT_TYPE bumpAmt = baseIncr * 25.0001;
 	//if(initialVal - lowBound < bumpAmt){
 	if(lowBound + bumpAmt > initialVal){
 		//were closer than we'd like to be to the low bound
@@ -538,7 +538,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 			bumpAmt = actualWindow / 2.0; 
 			outman.DebugMessage("halved: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, bumpAmt * 5.0001, bumpAmt); 
 			}
-		else
+//		else
 //			outman.DebugMessage("bumped full: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, bumpAmt * 5.0001, bumpAmt); 
 		boundBumped = fabs(curVal - (lowBound + bumpAmt));
 		curVal = lowBound + bumpAmt;
@@ -549,7 +549,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 			bumpAmt = actualWindow / 2.0; 
 			outman.DebugMessage("halved: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, bumpAmt * 5.0001, bumpAmt);
 			}
-		else
+//		else
 //			outman.DebugMessage("bumped full: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, bumpAmt * 5.0001, bumpAmt); 
 		curVal = highBound - bumpAmt;
 		boundBumped = initialVal - curVal;
