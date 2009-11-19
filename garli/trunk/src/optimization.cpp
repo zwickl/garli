@@ -1989,13 +1989,17 @@ if(nd->nodeNum == 8){
 			deb.close();
 */
 
-#ifndef SINGLE_PRECISION_FLOATS
-			if(iter == 51) outman.UserMessage("Notice: possible problem with branchlength optimization.\nIf you see this message frequently, please report it to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum);
-			if(iter > 100)
-				throw(ErrorException("Problem with branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
-#else
 			if(iter > 100){
 				outman.DebugMessage("100 passes in NR!");
+				//now going to allow escape after 100 passes in all SP runs, and in DP codon runs.  This should only happen due to numerical problems, and these
+				//are situations where numerical problems are known to occur.
+#ifndef SINGLE_PRECISION_FLOATS				
+				if(modSpec.IsCodon() == false)
+					throw(ErrorException("Problem with branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
+				else 
+					outman.UserMessage("Notice: possible problem with branchlength optimization.\nIf you see this message frequently, please report it to zwickl@nescent.org.\nIf you only see it ignore it.\n\tDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum);
+#endif
+
 				Score(nd->anc->nodeNum);
 
 				outman.DebugMessage(">>>>%.6f  %.6f <<<<", initialL, lnL);
@@ -2016,7 +2020,6 @@ if(nd->nodeNum == 8){
 					return ZERO_POINT_ZERO;
 					}
 				}
-#endif
 
 /*
 				ofstream scr("NRcurve.log");
