@@ -401,7 +401,7 @@ const NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const M
 	const int numCharBlocks = GetNumCharactersBlocks(taxablock);
 	outman.UserMessageNoCR("");
 	if(numCharBlocks == 0)
-		throw ErrorException("No character data was provided by NCL. There may have been a problem reading\n\tthe data file, or the data was of the wrong type. Check output above.");
+		throw ErrorException("No character data was provided by NCL. There may have been a problem reading\n\tthe data file, the data might be of the wrong type for the specified model,\n\tor the data might be in an invalid format or not aligned properly. Check output above.");
 	
 	//now check that we only have one of the charblock types that we want
 	int correctIndex = -1;
