@@ -2092,7 +2092,8 @@ void Population::FinalOptimization(){
 			//if(optOmega && pass % 2 == 0) {
 			if(optOmega) {
 				paramOpt = optTree->OptimizeOmegaParameters(paramPrecThisPass);
-				//outman.UserMessage("Omega optimization: %f", paramOpt);
+				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+					paramOpt = ZERO_POINT_ZERO;
 				sprintf(temp, "  omega= %4.4f", paramOpt);
 				outString += temp;
 				incr += paramOpt;
@@ -2101,7 +2102,8 @@ void Population::FinalOptimization(){
 			if(1){
 				if(optAlpha){
 					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->Alpha(), 0, min(0.05, optTree->mod->Alpha()), max(999.9, optTree->mod->Alpha()), &Model::SetAlpha);
-					//outman.UserMessage("Alpha optimization: %f", paramOpt);
+					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+						paramOpt = ZERO_POINT_ZERO;
 					sprintf(temp, "  alpha= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
@@ -2115,28 +2117,32 @@ void Population::FinalOptimization(){
 						p = optTree->OptimizeFlexRates(paramPrecThisPass);
 						paramOpt += p;
 						}while(p > trueImprove && innerPass++ < 5);
+					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+						paramOpt = ZERO_POINT_ZERO;
 					sprintf(temp, "  flex rates= %4.4f", paramOpt);
-					//sprintf(temp, "  flex rates(%d)= %4.4f", innerPass, paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
 				if(optPinv){
 					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->PropInvar(), 0, min(1.0e-8,optTree->mod->PropInvar()), optTree->mod->maxPropInvar, &Model::SetPinv);
-					//outman.UserMessage("Pinv optimization: %f", paramOpt);
+					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+						paramOpt = ZERO_POINT_ZERO;
 					sprintf(temp, "  pinv= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
 				if(optFreqs){
 					paramOpt = optTree->OptimizeEquilibriumFreqs(paramPrecThisPass);
-					//outman.UserMessage("Equil freqs optimization: %f", paramOpt);
+					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+						paramOpt = ZERO_POINT_ZERO;
 					sprintf(temp, "  equil freqs= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
 					}
 				if(optRelRates){
 					paramOpt = optTree->OptimizeRelativeNucRates(paramPrecThisPass);
-					//outman.UserMessage("Rel rates optimization: %f", paramOpt);
+					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+						paramOpt = ZERO_POINT_ZERO;
 					sprintf(temp, "  rel rates= %4.4f", paramOpt);
 					outString += temp;
 					incr += paramOpt;
@@ -2496,6 +2502,13 @@ void Population::PerformSearch(){
 					outman.UserMessage("    No branches were short enough to be collapsed.\n");
 				else
 					outman.UserMessage("    %d branches were collapsed.", numCollapsed);
+				if(repResult->treeStruct->constraints.empty() == false){
+					for(vector<Constraint>::iterator con=repResult->treeStruct->constraints.begin();con!=repResult->treeStruct->constraints.end();con++){
+						if(con->IsPositive()){
+							outman.UserMessage("\nNOTE: If collapsing of minimum length branches is requested (collapsebranches = 1) in a run with\n\ta positive constraint, it is possible for a constrained branch itself to be collapsed.\n\tIf you care, be careful to check whether this has happened or turn off branch collapsing.\n");\
+							}
+						}
+					}
 				}
 			storedTrees.push_back(repResult);
 			if(s.length() > 0 && (conf->bootstrapReps == 0 || (conf->bootstrapReps > 0 && conf->searchReps > 1)))
