@@ -2616,15 +2616,25 @@ void Population::PerformSearch(){
 				(prematureTermination == false && (currentSearchRep == conf->searchReps) && (bootlog_output & WRITE_REPSET_TERM)) ||
 				(prematureTermination && (bootlog_output & WRITE_PREMATURE))){
 				if(conf->searchReps > 1 && storedTrees.size() > 0){
-					outman.UserMessage("Saving best search rep (#%d) to bootstrap file", best+1);
+					char temp_buf[100];
+					char suffix[100];
+					sprintf(suffix, "boot.tre");
+					DetermineFilename(bootlog_output, temp_buf, suffix);
+					outman.UserMessage("\nSaving best search rep (#%d) to bootstrap file %s\n", best+1, temp_buf);
 					FinishBootstrapRep(storedTrees[best], currentBootstrapRep);
 					}
 				//this was a bug - when collapse was on and bootstrapping was being done with one search
 				//rep, the best tree was being written to the boot file.  The tree in the storedTrees is
 				//the one that was actually collapsed though
 				//else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
-				else if(storedTrees.size() == 1)
+				else if(storedTrees.size() == 1){
 					FinishBootstrapRep(storedTrees[0], currentBootstrapRep);
+					char temp_buf[100];
+					char suffix[100];
+					sprintf(suffix, "boot.tre");
+					DetermineFilename(bootlog_output, temp_buf, suffix);
+					outman.UserMessage("\nSaving best tree to bootstrap file %s\n", temp_buf);
+					}
 				else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
 				outman.UserMessage(">>>Completed Bootstrap rep %d<<<", currentBootstrapRep);
 				outman.UserMessage("#######################################################");
