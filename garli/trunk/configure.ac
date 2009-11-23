@@ -95,7 +95,7 @@ fi
 
 # Compile BOINC version
 AC_ARG_ENABLE(boinc,
-        AC_HELP_STRING([--enable-boinc],[build BOINC version (requires BOINC library and api installation)]), , [enable_boinc=no])
+        AC_HELP_STRING([--enable-boinc],[build BOINC version (requires BOINC library and api installation.  Building may require much fiddling.)]), , [enable_boinc=no])
 if test "$enable_boinc" = yes; then
         AC_MSG_NOTICE([
            *** NOTE: compiling BOINC version
@@ -326,8 +326,9 @@ if test  "$enable_boinc" = yes; then
 fi
 
 ################################################################################
-#	By default, use the bundled ncl code from source, 
-#		but let the --with-ncl argument override this.
+#	Require the builder to provide the --with-ncl argument,
+#	otherwise default to looking for a system level installation.
+#	ideally people should be using the build_garli.sh install script
 ################################################################################
 NCL_INC_DIR="/usr/local/include"
 NCL_LIB_DIR="/usr/local/lib"
@@ -335,7 +336,7 @@ AC_ARG_WITH(
 	[ncl],
 	AC_HELP_STRING(
 		[--with-ncl=DIR],
-		[Specify the root directory for ncl library (parent of the include/ncl and lib directories). Omit this flag to build and use the bundled version of ncl.]
+		[Specify the root directory for the ncl version 2.1 or greater library (parent of the include/ncl and lib directories).  Omit this flag and configure will look for a system level NCL installation.  You might use the build_garli.sh script to automate the build process.]
 		),
 	[
 	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
@@ -344,16 +345,42 @@ AC_ARG_WITH(
 	fi
 	])
 
+####DJZ This was to look for an NCL install in other places, but 
+#I gave up on it because the user should either use the script
+#or know what they are doing.
+#if ! test -n "$WNCL" ; then
+#	echo WITH_NCL NOT SPECIFIED
+#	if test -d "$srcdir/ncl/" ; then
+#		echo FOUND NCL DIR
+#		nl=`ls -ld $srcdir/ncl*/ | wc -l`
+#		echo ###		
+#		echo $nl
+#		echo ###
+#		if ! test $nl = 1 ; then
+#			AC_MSG_ERROR([Multiple NCL directories found.])
+#		fi
+#		NCL_BASE=`ls -d $srcdir/ncl*/`
+#		NCL_INC_DIR="$NCL_BASE/include"
+#		NCL_LIB_DIR="$NCL_BASE/lib"
+#		echo NCL_INC_DIR $NCL_INC_DIR
+#	else
+#		echo NO NCL DIR FOUND	
+#	fi
+#else
+#	echo WITH_NCL SPECIFIED
+#fi
+###
+
 if ! test -d "$NCL_INC_DIR/ncl" ; then
-	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct. You may need to manually make the directory $NCL_INC_DIR/ncl copy all of the ncl headers into that directory if you are using NCL 2.0])
+	AC_MSG_ERROR([NCL 2.1 or higher is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct.])
 else
 	if ! test -f "$NCL_INC_DIR/ncl/nxsdefs.h" ; then
-		AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct. You may need to manually make the directory $NCL_INC_DIR/ncl copy all of the ncl headers into that directory if you are using NCL 2.0])
+		AC_MSG_ERROR([NCL 2.1 or higher is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct.])
 	fi
 fi
 
 if ! test -d "$NCL_LIB_DIR" ; then
-	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
+	AC_MSG_ERROR([NCL 2.1 or higher is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
 fi
 
 CPPFLAGS="$CPPFLAGS -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl"
