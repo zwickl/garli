@@ -152,6 +152,7 @@ public:
 			//multiplier
 			else{
 				for(int b=0;b<numElements;b++){
+					assert( *vals[b] >= 1e-4);
 					if(b!=freqToChange){
 						if(*vals[b] * rescaleBy > maxv)
 							ok = false;
@@ -1078,12 +1079,26 @@ class Model{
 	//They need to have a standardized form, despite the fact that the "which" argument is unneccesary
 	//for some of them
 
+	void CheckStatefreqBounds(){
+		for(int b=0;b<nstates;b++){
+			assert( *stateFreqs[b] >= 1e-4);
+			}
+		}
+
 	void SetEquilibriumFreq(int which, FLOAT_TYPE val){
+
 		assert(which < this->nstates);
+#ifdef OLD_EQ_RESCALE
 		FLOAT_TYPE rescale = (FLOAT_TYPE)((1.0 - val)/(1.0 - *stateFreqs[which]));
 		for(int b=0;b<nstates;b++)
 			if(b!=which) *stateFreqs[b] *= rescale;
 		*stateFreqs[which] = val;
+
+#else
+
+		*stateFreqs[which] = val;
+		NormalizeSumConstrainedValues(&stateFreqs[0], nstates, 1.0, 1e-4, which);
+#endif
 		eigenDirty = true;
 		}
 
@@ -1253,16 +1268,18 @@ class Model{
 	void NormalizeSumConstrainedValues(FLOAT_TYPE **vals, int numVals, FLOAT_TYPE targetSum, FLOAT_TYPE minVal, int toNotChange){
 		bool someMin = false;
 		
+		CheckStatefreqBounds();
 		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
 		FLOAT_TYPE sum = ZERO_POINT_ZERO;
-
+		//note that sum here is the sum of everything besides toNotChange
 		for(int i=0;i<numVals;i++){
 			if(i != toNotChange){
 				sum += *vals[i];
-				if(*vals[i] < MIN_REL_RATE)
+				if(*vals[i] < minVal)
 					someMin = true;
 				}
 			}
+		//so if there is any toNotChange this will be true
 		if(someMin || !(FloatingPointEquals(sum, targetSum, minVal * 0.01))){
 			do{
 				FLOAT_TYPE unfixedTarget = targetSum - (toNotChange < 0 ? ZERO_POINT_ZERO : *vals[toNotChange]) - minSum;
@@ -1273,9 +1290,9 @@ class Model{
 					if(i != toNotChange){
 						if(*vals[i] > ZERO_POINT_ZERO){
 							*vals[i] *= rescale;
-							if(*vals[i] < MIN_REL_RATE){
+							if(*vals[i] < minVal){
 								*vals[i] = -1.0;
-								minSum += MIN_REL_RATE;
+								minSum += minVal;
 								someMin = true;
 								}
 							else
@@ -1288,12 +1305,14 @@ class Model{
 
 		for(int i=0;i<numVals;i++)
 			if(*vals[i] < ZERO_POINT_ZERO)
-				*vals[i]= MIN_REL_RATE;
+				*vals[i]= minVal;
 
 #ifndef NDEBUG
+		CheckStatefreqBounds();
 		sum = ZERO_POINT_ZERO;
-		for(int i=0;i<numVals;i++)
+		for(int i=0;i<numVals;i++){
 			sum += *vals[i];
+			}
 		assert(FloatingPointEquals(sum, targetSum, minVal * 0.1));
 #endif
 		}
