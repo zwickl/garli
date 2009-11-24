@@ -455,24 +455,31 @@ FLOAT_TYPE Tree::SetAndEvaluateParameter(int which, FLOAT_TYPE val, FLOAT_TYPE &
 	return lnL;
 	}
 
-bool Tree::CheckScoreAndRestore(int which, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE curScore, FLOAT_TYPE curVal, FLOAT_TYPE initialScore, FLOAT_TYPE initialVal){
+//This checks whether bestVal is significantly better than the otherScore, and if so takes it.  Otherwise otherVal is taken,
+//which could represent the current value that the optimizer is at, or the initial value.
+//This is ONLY called when we are about to return from OptBounded and want to know whether we should take:
+//-A step to a bracket (best) that evals slightly higher than the initial (other and current) point (first optimization pass)
+//	In this case we want the best to be significantly better than the initial=current=other.  tolerance should be > 0
+//-Revert to the best known value if we took a step and ended up worsening the score.
+//	In this case we want to take best if it is at all better than the current. tolerance == 0
+bool Tree::CheckScoreAndRestore(int which, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE otherScore, FLOAT_TYPE otherVal, FLOAT_TYPE bestScore, FLOAT_TYPE bestVal, FLOAT_TYPE tolerance){
 	bool restored = false;
-	if(curScore + STEP_TOL < initialScore){
-//		outman.DebugMessage("Rest %.12f", curScore - initialScore);
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, initialVal);
-		curScore = initialScore;
+	if(otherScore + tolerance < bestScore){
+//		outman.DebugMessage("Rest %.12f", otherScore - bestScore);
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, bestVal);
+		otherScore = bestScore;
 		restored = true;
 		}
 	else{
-		if(curScore < initialScore)
-			outman.DebugMessage("Stay %.12f (would have gone)", curScore - initialScore);
+		if(otherScore < bestScore)
+			outman.DebugMessage("Stay %.12f (would have gone)", otherScore - bestScore);
 /*		else 
-			outman.DebugMessage("Stay %.12f", curScore - initialScore);
+			outman.DebugMessage("Stay %.12f", otherScore - bestScore);
 */
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, otherVal);
 		}
 	MakeAllNodesDirty();
-	lnL = curScore;
+	lnL = otherScore;
 	return restored;
 	}
 
@@ -725,7 +732,9 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 				outman.DebugMessage("MINIMUM! %.6f %.6f %.6f", lowerEvalScore, curScore, higherEvalScore);
 				//TraceLikelihoodForParameter(which, curVal, curVal-(baseIncr * 5), curVal+(baseIncr * 5), 1e-5, SetParam, false);
 				}
-			bool restored = CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal);
+			//on the first pass here the curVal will be the best val, so this won't do anything
+			//on later passes it should also be the best, unless there are weird stability issues
+			bool restored = CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, ZERO_POINT_ZERO);
 //			if(restored) outman.DebugMessage("took best: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 //			else outman.DebugMessage("took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 #ifdef OPT_BOUNDED_LOG
@@ -793,7 +802,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 			//if we're already very close to that bound, exit
 			//if(prevVal - lowerBracket - epsilon < epsilon * ZERO_POINT_FIVE){
 			if(curVal - (lowerBracket + closeToBound) <= ZERO_POINT_ZERO){
-				bool restored = CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal);
+				bool stayed = !CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
 /*
 				if(restored) outman.DebugMessage("LOW:took bestKnown: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 				else outman.DebugMessage("LOW:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
@@ -828,7 +837,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		else if(d1 > ZERO_POINT_ZERO && proposed > upperBracket - veryCloseToBound){
 			//if we're already very close to that bound, exit
 			if(upperBracket - closeToBound - curVal <= ZERO_POINT_ZERO){
-				bool restored = CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal);
+				bool stayed = !CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
 //				if(restored) outman.DebugMessage("HIGH:took bestKnown: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 //				else outman.DebugMessage("HIGH:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 #ifdef OPT_BOUNDED_LOG
@@ -861,7 +870,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 		//The expected amount of improvement from an NR move is low
 		//require that we didn't significantly worsen the likelihood overall or on the last pass
 		if(estImprove < optPrecision && curScore >= initialScore - 1.0e-6 && lastChange > -1.0e-6){
-			bool restored = CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal);
+			bool stayed = !CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
 /*			if(bestKnownScore > curScore)
 				outman.DebugMessage("IMPROVE:took best: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 			else
@@ -875,8 +884,9 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 
 		//don't allow infinite looping if something goes wrong
 		if(pass > 1000){
-			bool restored = CheckScoreAndRestore(which, SetParam, curScore, curVal, initialScore, initialVal);
-			if(restored){
+			//bool restored = CheckScoreAndRestore(which, SetParam, curScore, curVal, initialScore, initialVal);
+			bool worsened = !CheckScoreAndRestore(which, SetParam, initialScore, initialVal, bestKnownScore, bestKnownVal, ZERO_POINT_ZERO);
+			if(worsened){
 				outman.UserMessage("OptimizeBoundedParameter: 1000 passes, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr, baseIncr);
 				outman.UserMessage("****Please report this message to garli.support@gmail.com****");
 				}
@@ -891,7 +901,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 
 		if((lowerBracket + closeToBound > proposed) && (upperBracket - closeToBound < proposed)){
 			//this means the point we moved to isn't > closeToBound from both bounds
-			bool restored = CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal);
+			bool stayed = !CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
 #ifdef OPT_BOUNDED_LOG
 				log << "\t" << bestKnownVal << "\treturn5" << (restored ? "_best" : "") << endl; log.close();
 #endif

@@ -279,7 +279,8 @@ class Tree{
 		void TraceLikelihoodForParameter(int which, FLOAT_TYPE init, FLOAT_TYPE min, FLOAT_TYPE max, FLOAT_TYPE interval, void (Model::*SetParam)(int, FLOAT_TYPE), bool append);
 		//FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE));
 		FLOAT_TYPE SetAndEvaluateParameter(int which, FLOAT_TYPE val, FLOAT_TYPE &bestKnownScore, FLOAT_TYPE &bestKnownVal, void (Model::*SetParam)(int, FLOAT_TYPE));
-		bool CheckScoreAndRestore(int which, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE curScore, FLOAT_TYPE curVal, FLOAT_TYPE initialScore, FLOAT_TYPE initialVal);
+		bool CheckScoreAndRestore(int which, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE otherScore, FLOAT_TYPE otherVal, FLOAT_TYPE bestScore, FLOAT_TYPE bestVal, FLOAT_TYPE tolerance);
+
 		FLOAT_TYPE OptimizeTreeScale(FLOAT_TYPE);
 		FLOAT_TYPE OptimizeReferenceRelativeRate(FLOAT_TYPE optPrecision);
 		FLOAT_TYPE OptimizePinv();
