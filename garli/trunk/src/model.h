@@ -1268,7 +1268,7 @@ class Model{
 	void NormalizeSumConstrainedValues(FLOAT_TYPE **vals, int numVals, FLOAT_TYPE targetSum, FLOAT_TYPE minVal, int toNotChange){
 		bool someMin = false;
 		
-		CheckStatefreqBounds();
+		//CheckStatefreqBounds();
 		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
 		FLOAT_TYPE sum = ZERO_POINT_ZERO;
 		//note that sum here is the sum of everything besides toNotChange
@@ -1308,7 +1308,7 @@ class Model{
 				*vals[i]= minVal;
 
 #ifndef NDEBUG
-		CheckStatefreqBounds();
+		//CheckStatefreqBounds();
 		sum = ZERO_POINT_ZERO;
 		for(int i=0;i<numVals;i++){
 			sum += *vals[i];
