@@ -1929,7 +1929,7 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 		if(model){
 			//sprintf(cStr, " %5.2f %5.2f %5.2f %5.2f %5.2f %5.2f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
 			for(int st = 0;st < relNucRates.size();st++){
-				sprintf(cStr," %5.3f", Rates(st));
+				sprintf(cStr," %6.3f", Rates(st));
 				s += cStr;
 				}
 			}
@@ -1943,7 +1943,7 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 			for(int from=0;from<(modSpec.IsCodon() ? 4 - 1 : NStates() - 1);from++){
 				for(int to=from+1;to<(modSpec.IsCodon() ? 4 : NStates());to++){
 					sprintf(rStr, "r(%c%c)", states[from], states[to]);
-					sprintf(cStr," %5s", rStr);
+					sprintf(cStr," %6s", rStr);
 					s += cStr;
 					}
 				}
