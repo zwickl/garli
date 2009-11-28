@@ -143,19 +143,21 @@ void UsageMessage(char *execName){
 	outman.UserMessage("This version will expect config files named \"run0.conf\", \"run1.conf\", etc.");
 	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs\n");
 #else
-	outman.UserMessage("Usage: %s [OPTION] [config filename]", execName);
-	outman.UserMessage("Options:");
-	outman.UserMessage("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
-	if(interactive) outman.UserMessage("        (interactive is the default for the version you are running)");
-	outman.UserMessage("  -b, --batch		batch mode (do not expect user input)");
-	if(!interactive) outman.UserMessage("        (batch is the default for the version you are running)");
-	outman.UserMessage("  -v, --version		print version information and exit");
-	outman.UserMessage("  -h, --help		print this help and exit");
-	outman.UserMessage("  -t			run internal tests (requires dataset and config file)");
-	outman.UserMessage("  -V			validate: load config file and data, validate config file, data, starting trees"); 
-	outman.UserMessage("					and constraint files, print required memory and selected model, then exit");
+	outman.UserMessage    ("Usage: %s [OPTION] [config filename]", execName);
+	outman.UserMessage    ("Options:");
+	outman.UserMessage    ("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
+	if(interactive) 
+		outman.UserMessage("                    (interactive is the default for the version you are running)");
+	outman.UserMessage    ("  -b, --batch       batch mode (do not expect user input)");
+	if(!interactive) 
+		outman.UserMessage("                    (batch is the default for the version you are running)");
+	outman.UserMessage    ("  -v, --version	    print version information and exit");
+	outman.UserMessage    ("  -h, --help        print this help and exit");
+	outman.UserMessage    ("  -t                run internal tests (requires dataset and config file)");
+	outman.UserMessage    ("  -V                validate: load config file and data, validate config file, data, starting trees"); 
+	outman.UserMessage    ("                    and constraint files, print required memory and selected model, then exit");
 #ifdef CUDA_GPU
-	outman.UserMessage("  --device d_number	use specified CUDA device");
+	outman.UserMessage    ("  --device d_number	use specified CUDA device");
 #endif
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"\n");
 #endif
@@ -249,7 +251,7 @@ int main( int argc, char* argv[] )	{
 #ifdef OPEN_MP
 						outman.UserMessage("OpenMP multithreaded version");
 #endif
-						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2009");
+						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2010");
 						outman.UserMessage("zwickl@nescent.org");
 						exit(0);
 						}
