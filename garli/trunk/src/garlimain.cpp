@@ -1,5 +1,5 @@
-// GARLI version 0.96b8 source code
-// Copyright 2005-2008 Derrick J. Zwickl
+// GARLI version 1.00 source code
+// Copyright 2005-2010 Derrick J. Zwickl
 // email: zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -18,8 +18,8 @@
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
   
 #define PROGRAM_NAME "GARLI"
-#define MAJOR_VERSION 0.96
-#define MINOR_VERSION "1b"
+#define MAJOR_VERSION 1
+#define MINOR_VERSION 0
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
 #define SVN_REV "$Rev$"
 #define SVN_DATE "$Date$"
@@ -103,7 +103,7 @@ std::string GetSvnDate(){
 	}
 
 void OutputVersion(){
-	outman.UserMessage("%s Version %.2f%s.r%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
+	outman.UserMessage("%s Version %d.%d.%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
 	}
 
 int CheckRestartNumber(const string str){
@@ -351,7 +351,7 @@ int main( int argc, char* argv[] )	{
 			else
 				outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running BOINC %s Version %.2f%s.r%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running BOINC %s Version %d.%d.%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -365,7 +365,7 @@ int main( int argc, char* argv[] )	{
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running %s Version %.2f%s.r%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running %s Version %d.%d.%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
 
 #endif
 
@@ -376,7 +376,7 @@ int main( int argc, char* argv[] )	{
 #if defined(OPEN_MP)
 			outman.UserMessage("->OpenMP multithreaded version for multiple processors/cores<-");
 #elif !defined(SUBROUTINE_GARLI)
-			outman.UserMessage("->Single processor version<-\n", svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("->Single processor version<-\n");
 #endif
 
 #ifdef SINGLE_PRECISION_FLOATS
@@ -387,7 +387,7 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("->CUDA GPU version<-\n");
 #endif
 
-			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
+			//outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
 			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__);
 
@@ -413,9 +413,6 @@ int main( int argc, char* argv[] )	{
 #ifdef SUBROUTINE_GARLI
 			if(conf.randseed != -1)
 				throw ErrorException("You cannot specify a random number seed with the MPI version.  This would cause all of the\n\tindependent MPI processes to give exactly identical results.  Set randomseed to -1");
-//DEBUG
-//			if(conf.checkpoint || conf.restart)
-//				throw  ErrorException("Checkpointing cannot be used with the MPI version.  Set \"writecheckpoints\" and \"restart\" to 0");
 #endif
 
 			//set up the model specification
