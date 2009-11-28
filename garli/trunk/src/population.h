@@ -323,7 +323,13 @@ private:
 	char *treeString;
 	int stringSize;
 
-	bool prematureTermination;//if the user killed the run
+	//if the user killed the run
+	bool userTermination;
+	//specified stoptime was reached.  Use of this really isn't recommended
+	bool timeTermination;
+	//specified stoptime was reached.  Note that this is PER REP, so it can be reset.
+	//the other term types cannot
+	bool genTermination;
 	bool finishedRep;//when a single search replicate is finished (not a bootstrap rep)
 
 	vector<Tree *> unusedTrees;
@@ -389,7 +395,7 @@ private:
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
-			topologies(NULL), prematureTermination(false), currentBootstrapRep(0),
+			topologies(NULL), userTermination(false), timeTermination(false), genTermination(false), currentBootstrapRep(0),
 			finishedRep(false), lastBootstrapSeed(0), data(NULL), rawData(NULL)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
@@ -544,5 +550,8 @@ private:
 		void TurnOffRatchet();
 		unsigned Gen()const {return gen;}
 		void ValidateInput(int rep);
+		string TerminationWarningMessage(){
+			return string("\nNOTE: ***Search was terminated before full auto-termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***\n");
+			}
 	};
 #endif
