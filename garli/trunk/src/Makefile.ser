@@ -1,4 +1,4 @@
-#GARLI version 0.96b6 makefile
+#GARLI version 1.0 makefile
 
 #NOTE - this is from the poor make system of version 0.951 and earlier.  The configure
 #	script mechanism should now be used instead if possible
@@ -17,13 +17,17 @@ COMPILE_TYPE = gcc_any
 
 
 #(2) these need to be adjusted to the correct path to a compiled
-#copy of Paul Lewis's Nexus Class Library
-#(NCL is available here: http://hydrodictyon.eeb.uconn.edu/ncl)
-#See the NCL documentation for details on compiling it.
+#copy of Paul Lewis and Mark Holder's Nexus Class Library
+#(NCL is available here: http://sourceforge.net/projects/ncl/)
+#you will want to run NCL configure something like this:
+# env CXXFLAGS=-DNCL_CONST_FUNCS ./configure --prefix=`pwd`/installed --disable-shared --enable-static
+#The NCL_CONST_FUNCS portion is important, and GARLI won't
+#compile without it
 #Note that you may be able to safely ignore some errors during
 #NCL compilation (Garli only needs the static library libncl.a)
-NCL_INCLUDES = ../../ncl-2.0/src
-LIB_NCL = ../../ncl-2.0/src/libncl.a
+#NCL version 2.1 or better is required
+NCL_INCLUDES = ../../ncl-2.1/src
+LIB_NCL = ../../ncl-2.1/src/libncl.a
 
 
 #(3)set this to yes to compile a version that uses MPI to fork
@@ -69,7 +73,7 @@ ifeq ($(MPI_RUN_SPLITTER), yes)
 endif
 
 
-EXEC     = Garli0.96b8
+EXEC     = Garli.1.0
 
 OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		population.o rng.o set.o\
@@ -82,7 +86,7 @@ ifeq ($(MPI_RUN_SPLITTER), yes)
 	OBJECT_LIST += mpitrick.o
 endif
 
-Garli0.96b8 : $(OBJECT_LIST) garlimain.o
+Garli.1.0 : $(OBJECT_LIST) garlimain.o
 	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) $(LIB_NCL) garlimain.o
 
 #this forces garlimain.cpp to always be recompiled, which ensures that the
