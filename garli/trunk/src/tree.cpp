@@ -6452,11 +6452,13 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 	else{
 
 #ifdef DEBUG_MESSAGES
+/*
 		string s;
 		mod->FillModelOrHeaderStringForTable(s, true);
 		ofstream tab("valTable.log", ios::app);
 		tab << lnL << "\t" << s.c_str() << "\t" << endl;
 		tab.close();
+*/
 #endif
 	
 		list<int> reopt;
@@ -6508,11 +6510,13 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec){
 			pass++;
 			outman.DebugMessage("reoptimized %d. improvement %.6f", num, lnL - beflnL);
 #ifdef DEBUG_MESSAGES
+			/*
 			string s;
 			mod->FillModelOrHeaderStringForTable(s, true);
 			ofstream tab("valTable.log", ios::app);
 			tab << lnL << "\t" << s.c_str() << endl;
 			tab.close();
+			*/
 #endif
 			}
 		}

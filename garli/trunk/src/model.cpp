@@ -2052,6 +2052,7 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 
 void Model::OutputAminoAcidRMatrixArray(ostream &out){
 	//assert(el.size() == 400);
+	//first make a full 20x20 matrix
 	assert(modSpec.IsAminoAcid());
 	vector<FLOAT_TYPE> el(400, ZERO_POINT_ZERO);
 	vector<FLOAT_TYPE *>::iterator r = relNucRates.begin();
@@ -2069,8 +2070,95 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 			}
 		}
 	assert(r == relNucRates.end());
-
 	char str[100];
+
+	out << "Estimated AA rate matrices:" << endl;;
+	out << "NOTE THAT THIS FUNCTION IS FAIRLY EXPERIMENTAL, SO CHECK YOUR OUTPUT AND LET ME KNOW OF ANY PROBLEMS\n" << endl;;
+	out << "Order of AA's is alphabetically BY SINGLE LETTER CODE, i.e.:\n ACDEFGHIKLMNPQRSTVWY" << endl;
+	out << "The correspondence with the alphabetical 3-letter code is this:" << endl;
+	out << "SingleLetter\t\tThreeLetter\n1\tA\t1\tAla\n2\tC\t15\tCys\n3\tD\t12\tAsp\n4\tE\t3\tGlu\n5\tF\t2\tPhe\n6\tG\t14\tGly\n7\tH\t4\tHis\n8\tI\t6\tIle\n9\tK\t7\tLys\n10\tL\t8\tLeu\n11\tM\t10\t";
+	out << "Met\n12\tN\t9\tAsn\n13\tP\t11\tPro\n14\tQ\t5\tGln\n15\tR\t13\tArg\n16\tS\t16\tSer\n17\tT\t17\tThr\n18\tV\t19\tVal\n19\tW\t20\tTrp\n20\tY\t18\tTyr\n" << endl;
+/*
+	out << "SingleLetter		ThreeLetter\n1	A	1	Ala\n2	C	15	Cys\n3	D	12	Asp\n4	E	3	Glu\n5	F	2	Phe\n6	G	14	Gly\n7	H	4	His\n8	I	6	Ile\n9	K	7	Lys\n10	L	8	Leu\n11	M	10	";
+	out << "Met\n12	N	9	Asn\n13	P	11	Pro\n14	Q	5	Gln\n15	R	13	Arg\n16	S	16	Ser\n17	T	17	Thr\n18	V	19	Val\n19	W	20	Trp\n20	Y	18	Tyr\n" << endl;
+*/
+
+	
+	out << "Following are the above diagonal form of the estimated matrix followed by the below diagonal form." << endl;
+	out << "The entries are scaled such that the mean rate is 100.  It can be rescaled by any constant factor without" << endl;
+	out << "changing its meaning. Enties on the diagonal are all zero, and do not appear." << endl;
+	out << "\nThe ABOVE diagonal SINGLE LETTER form is what would be fed back into GARLI as a starting condition to use this matrix in future analyses.\n" << endl;
+	out << "Here is a GARLI block that could be used to feed this matrix back into GARLI.  It can be fixed in further analyses" << endl;
+	out << "by setting \"ratematrix = fixed\" in the configuration file.  The block itself could be put in the same file as a NEXUS" << endl;
+	out << "data matrix, or put in a file (which must start with #NEXUS) specified on the streefname line of the configuarion file.\n" << endl;
+
+	out << "begin garli;" << endl;
+	out << "[this specifies an amino acid rate matrix, with AA's ordered alphabetically by SINGLE LETTER CODE]" << endl;
+	out << "[it is the above diagonal portion of the matrix, in order across each row]" << endl;
+	out << "r ";
+	
+	for(int from=0;from<19;from++){
+		for(int to=from+1;to<20;to++){
+			sprintf(str, "%.3f", (el[from * 20 + to] * (19000.0/tot)));
+			out << str << " ";
+			}
+		}
+	out << ";\nend;\n" << endl;
+
+	int cor[20] = {0, 14, 11, 2, 1, 13, 3, 5, 6, 7, 9, 8, 10, 4, 12, 15, 16, 18, 19, 17};
+
+	out << "Different software may require different state orderings and either above or below diagonal portion\nof the rate matrix as input." << endl;
+	out << "As overkill, here are four versions of the same matrix.  GARLI requires the 3rd, PAML the 2nd.\n" << endl;
+
+	out << "This is the THREE LETTER order, above diagonal matrix\n" << endl;
+	
+	for(int from=0;from<19;from++){
+		for(int to=0;to<20;to++){
+			if(to <= from)
+				out << "\t";
+			else{
+				sprintf(str, "%.3f", (el[cor[from] * 20 + cor[to]] * (19000.0/tot)));
+				out << str;
+				if(to != from -1)
+					out << "\t";
+				}
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "\nThis is the THREE LETTER order, below diagonal matrix\n" << endl;
+
+	for(int from=1;from<20;from++){
+		for(int to=0;to<from;to++){
+			sprintf(str, "%.3f", (el[cor[from] * 20 + cor[to]] * (19000.0/tot)));
+			out << str;
+			if(to != from -1)
+				out << "\t";
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "This is the SINGLE LETTER order, above diagonal matrix\n" << endl;
+	
+	for(int from=0;from<19;from++){
+		for(int to=0;to<20;to++){
+			if(to <= from)
+				out << "\t";
+			else{
+				sprintf(str, "%.3f", (el[from * 20 + to] * (19000.0/tot)));
+				out << str;
+				if(to != from -1)
+					out << "\t";
+				}
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "\nThis is the SINGLE LETTER, order below diagonal matrix\n" << endl;
+
 	for(int from=1;from<20;from++){
 		for(int to=0;to<from;to++){
 			sprintf(str, "%.3f", (el[from * 20 + to] * (19000.0/tot)));
@@ -2082,6 +2170,7 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 		}
 	out << endl;
 	
+	out << "These are AA frequencies that were used, which may have been estimated or not." << endl;
 	for(int st = 0;st < stateFreqs.size();st++){
 		out << StateFreq(st) << "\t";
 		}
