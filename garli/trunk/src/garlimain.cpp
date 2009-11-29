@@ -145,7 +145,7 @@ void UsageMessage(char *execName){
 #else
 	outman.UserMessage    ("Usage: %s [OPTION] [config filename]", execName);
 	outman.UserMessage    ("Options:");
-	outman.UserMessage    ("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
+	outman.UserMessage    ("  -i, --interactive interactive mode (allow and/or expect user feedback)");
 	if(interactive) 
 		outman.UserMessage("                    (interactive is the default for the version you are running)");
 	outman.UserMessage    ("  -b, --batch       batch mode (do not expect user input)");

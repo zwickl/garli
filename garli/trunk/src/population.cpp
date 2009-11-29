@@ -2316,7 +2316,6 @@ int Population::EvaluateStoredTrees(bool report){
 				outman.UserMessage("rep%2d: %s", i+1, s.c_str());
 
 				if(modSpec.IsEstimateAAMatrix() && conf->bootstrapReps == 0){
-					vector<FLOAT_TYPE> r(400, 0.0);
 					string n = conf->ofprefix.c_str();
 					n += ".AArmatrix.dat";
 					ofstream mat;
