@@ -1,7 +1,7 @@
 AM_CPPFLAGS = @CPPFLAGS@
 AM_LDFLAGS  = @LDFLAGS@
  
-bin_PROGRAMS = Garli@VERSION@
+bin_PROGRAMS = Garli_@VERSION@
 
 EXTRA_DIST = mpitrick.cpp \
 	threadfunc.cpp
@@ -50,7 +50,7 @@ CUDASRCS = \
 	cudaman.cpp 
 endif
 
-Garli@VERSION@_SOURCES = \
+Garli_@VERSION@_SOURCES = \
 	$(CUDASRCS) \
 	adaptation.cpp \
 	bipartition.cpp \
@@ -77,4 +77,4 @@ Garli@VERSION@_SOURCES = \
 	mpitrick.cpp 
 
 
-Garli@VERSION@_LDADD =  $(LDADD) @GARLI_LIBS@
+Garli_@VERSION@_LDADD =  $(LDADD) @GARLI_LIBS@
