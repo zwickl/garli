@@ -1,7 +1,7 @@
 AM_CPPFLAGS = @CPPFLAGS@
 AM_LDFLAGS  = @LDFLAGS@
  
-bin_PROGRAMS = Garli_@VERSION@
+bin_PROGRAMS = Garli
 
 EXTRA_DIST = mpitrick.cpp \
 	threadfunc.cpp
@@ -50,7 +50,7 @@ CUDASRCS = \
 	cudaman.cpp 
 endif
 
-Garli_@VERSION@_SOURCES = \
+Garli_SOURCES = \
 	$(CUDASRCS) \
 	adaptation.cpp \
 	bipartition.cpp \
@@ -77,4 +77,10 @@ Garli_@VERSION@_SOURCES = \
 	mpitrick.cpp 
 
 
-Garli_@VERSION@_LDADD =  $(LDADD) @GARLI_LIBS@
+Garli_LDADD =  $(LDADD) @GARLI_LIBS@
+
+install-exec-hook:
+	cd $(DESTDIR)$(bindir) && \
+	  mv -f Garli$(EXEEXT) Garli-$(VERSION)$(EXEEXT) && \
+	  $(LN_S) Garli-$(VERSION)$(EXEEXT) Garli$(EXEEXT)
+	
