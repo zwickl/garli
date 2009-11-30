@@ -22,7 +22,7 @@ AC_CANONICAL_TARGET
 ################################################################################
 AC_CONFIG_MACRO_DIR(config)
 
-AM_INIT_AUTOMAKE([1.9 foreign dist-tarZ tar-ustar filename-length-max=299])
+AM_INIT_AUTOMAKE([1.9 foreign dist-zip tar-ustar filename-length-max=299])
 
 # Checks for programs.
 AC_PROG_LN_S
