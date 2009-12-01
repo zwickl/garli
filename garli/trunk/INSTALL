@@ -11,7 +11,7 @@ problems, please email garli.support@gmail.com)
 EXTRA EASY COMPILATION INSTRUCTIONS:
 (added Sept. 2008)
 If this is a version with the NCL source code bundled (there
-will be an ncl-xxxx.tar.gz file in the same directory as this
+will be an ncl-2.1.xx.tar.gz file in the same directory as this
 file), then you should be able to very easily do a default
 compilation and static linking to NCL by typing this in the
 same directory as this file:
@@ -19,7 +19,7 @@ same directory as this file:
 ./build_garli.sh
 
 This will do all of the necessary building of the NCL library, 
-and you should eventually end up with a working Garli.#.#
+and you should eventually end up with a working Garli-#.#
 executable in the bin directory within the current directory.
 You are done.  See the QuickStart.txt file, manual or support
 website for details on running the program.
@@ -31,11 +31,21 @@ below.
 put the ncl-xxxx.tar.gz archive within this directory and the
 build_garli script will find and use it.
 
+->If you want to check out the newest version of NCL (which could
+have bug fixes) from Sourceforge and build GARLI with it, do this:
+
+./build_garli.sh --ncl-svn
+
 ->If you know what you are doing and want to use a different compiler
 (such as the intel icc compiler) instead of gcc you can invoke the 
 build_garli.sh script like this:
 
 env CC=icc CXX=icpc ./build_garli.sh
+
+->If you want to pass other arguments to GARLI's configure script, 
+(you have no reason to do so) list them at the end, e.g.
+
+./build_garli.sh [--ncl-svn] --enable-asserts
 
 ------
 MANUAL/ADVANCED COMPILATION INSTRUCTIONS:
