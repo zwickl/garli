@@ -1,7 +1,0 @@
-#!/bin/bash
-$1 $2 01.GTR.conf | tee RUNOUTPUT.log
-$1 $2 02.GTRIG.conf | tee -a RUNOUTPUT.log
-$1 $2 11.wagempI.conf | tee -a RUNOUTPUT.log
-$1 $2 12.wagempIG.conf | tee -a RUNOUTPUT.log
-$1 $2 21.OK2Pf3x4.conf | tee -a RUNOUTPUT.log
-$1 $2 22.M3K2Pemp.conf | tee -a RUNOUTPUT.log
