@@ -12,8 +12,8 @@ EXTRA_DIST = \
 SUBDIRS = src 
 
 dist-hook:
-	find "$(distdir)/doc" -depth -and -name .svn -and -type d -and -exec rm -rf {} \; 
-	find "$(distdir)/project" -depth -and -name .svn -and -type d -and -exec rm -rf {} \; 
-	find "$(distdir)/example" -depth -and -name .svn -and -type d -and -exec rm -rf {} \; 
+	find "$(distdir)/doc" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
+	find "$(distdir)/project" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
+	find "$(distdir)/example" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
 
 
