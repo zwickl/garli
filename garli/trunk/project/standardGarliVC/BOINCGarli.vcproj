@@ -40,7 +40,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
+				AdditionalIncludeDirectories="../../../../../boinc_trunk/boinc/api;../../../../../boinc_trunk/boinc/lib;&quot;../../../../../ncl-2.1&quot;;&quot;../../../../../ncl-2.1/ncl&quot;"
+				PreprocessorDefinitions="NCL_CONST_FUNCS;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -61,7 +62,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="libcmtd.lib libcpmtd.lib kernel32.lib user32.lib gdi32.lib opengl32.lib glu32.lib ole32.lib delayimp.lib"
 				LinkIncremental="2"
+				IgnoreAllDefaultLibraries="true"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				TargetMachine="1"
@@ -197,8 +200,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="../../../boinc/api;../../../boinc/lib;../../../ncl-2.0/src"
-				PreprocessorDefinitions="BOINC;WIN32;_DEBUG;_MT;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
+				AdditionalIncludeDirectories="../../../../../boinc_trunk/boinc/api;../../../../../boinc_trunk/boinc/lib;&quot;../../../../../ncl-2.1&quot;;&quot;../../../../../ncl-2.1/ncl&quot;"
+				PreprocessorDefinitions="NCL_CONST_FUNCS;BOINC;WIN32;_DEBUG;_MT;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -219,7 +222,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="libcmtd.lib libcpmtd.lib kernel32.lib user32.lib gdi32.lib opengl32.lib glu32.lib glaux.lib ole32.lib delayimp.lib"
+				AdditionalDependencies="libcmtd.lib libcpmtd.lib kernel32.lib user32.lib gdi32.lib opengl32.lib glu32.lib ole32.lib delayimp.lib"
 				LinkIncremental="2"
 				IgnoreAllDefaultLibraries="true"
 				GenerateDebugInformation="true"
@@ -280,8 +283,8 @@
 				EnableIntrinsicFunctions="false"
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="false"
-				AdditionalIncludeDirectories="../../../boinc/api;../../../boinc/lib;../../../ncl-2.0/src"
-				PreprocessorDefinitions="BOINC;WIN32;NDEBUG;_MT;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
+				AdditionalIncludeDirectories="../../../../../boinc_trunk/boinc/api;../../../../../boinc_trunk/boinc/lib;&quot;../../../../../ncl-2.1&quot;;&quot;../../../../../ncl-2.1/ncl&quot;"
+				PreprocessorDefinitions="NCL_CONST_FUNCS;BOINC;WIN32;NDEBUG;_MT;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
 				EnableEnhancedInstructionSet="0"
@@ -302,7 +305,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="kernel32.lib user32.lib gdi32.lib opengl32.lib glu32.lib glaux.lib odbc32.lib odbccp32.lib libcmt.lib libcpmt.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib"
+				AdditionalDependencies="kernel32.lib user32.lib gdi32.lib opengl32.lib glu32.lib odbc32.lib odbccp32.lib libcmt.lib libcpmt.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib"
 				LinkIncremental="1"
 				IgnoreAllDefaultLibraries="true"
 				GenerateDebugInformation="true"
