@@ -422,6 +422,12 @@ AC_COMPILE_IFELSE(
 [], 
 [AC_MSG_ERROR([Sorry. NCL 2.1 or greater is required.])]) 
 
+
+
+AC_ARG_ENABLE(profiler, AC_HELP_STRING([--enable-profiler], [built in runtime profiler]), 
+[AC_DEFINE([ENABLE_CUSTOM_PROFILER], [1], [profiler for assessing execution times])],
+[])
+
 GARLI_LIBS="-lncl"
 
 
