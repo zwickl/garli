@@ -83,4 +83,8 @@ install-exec-hook:
 	cd $(DESTDIR)$(bindir) && \
 	  mv -f Garli$(EXEEXT) Garli-$(VERSION)$(EXEEXT) && \
 	  $(LN_S) Garli-$(VERSION)$(EXEEXT) Garli$(EXEEXT)
+uninstall:
+	test "$(DESTDIR)$(bindir)/Garli$(EXEEXT)" -ef "$(DESTDIR)$(bindir)/Garli-$(VERSION)$(EXEEXT)" && rm "$(DESTDIR)$(bindir)/Garli$(EXEEXT)" || true
+	rm -f "$(DESTDIR)$(bindir)/Garli-$(VERSION)$(EXEEXT)"
+	
 	
