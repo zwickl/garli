@@ -19,6 +19,10 @@
 #ifndef DEFS
 #define DEFS
 
+#if defined(HAVE_CONFIG_H)
+	#include "config.h"
+#endif
+
 //these will be defined by either the Microsoft compiler
 //or the intel compiler when openmp support is turned on
 //by compiling with /openmp (ms) or -openmp (icc)
