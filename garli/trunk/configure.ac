@@ -424,7 +424,7 @@ AC_COMPILE_IFELSE(
 
 
 
-AC_ARG_ENABLE(profiler, AC_HELP_STRING([--enable-profiler], [built in runtime profiler]), 
+AC_ARG_ENABLE(profiler, AC_HELP_STRING([--enable-profiler], [built in runtime profiler]),
 [AC_DEFINE([ENABLE_CUSTOM_PROFILER], [1], [profiler for assessing execution times])],
 [])
 
