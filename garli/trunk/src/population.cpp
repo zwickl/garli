@@ -3827,7 +3827,7 @@ void Population::WriteTreeFile( const char* treefname, int indnum, bool collapse
 #ifdef BOINC
 	s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
-	if((userTermination || timeTermination) && (indnum == storedTrees.size() - 1))
+	if((userTermination || timeTermination) && (indnum == storedTrees.size() - 1)){
 		//str = "[!****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****\n]";
 		str = TerminationWarningMessage();
 		str += "\n";
