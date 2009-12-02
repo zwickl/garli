@@ -1,5 +1,5 @@
-// GARLI Version 0.96b8 (May 2008)
-// Copyright 2005-2008 Derrick J. Zwickl
+// GARLI Version 1.0 (Dec 2009)
+// Copyright 2005-2010 Derrick J. Zwickl
 // email: zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -15,11 +15,11 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-THIS IS A BETA VERSION - CHECK RESULTS CAREFULLY!  
 Please let me know of any problems, concerns or feedback (garli.support@gmail.com)
 
-GARLI version 0.96 is much exhanced and expanded relative to the previous
-version 0.951.  It should replace earlier versions, and should be backwards
+GARLI version 1.0 is a relatively minor update relative to version 0.96, which itself was
+a major update relative to the previous version 0.951.  
+Version 1.0 should replace earlier versions, and should be backwards
 compatible with all configuration files and datasets that were used with the
 previous version.
 
@@ -28,10 +28,32 @@ previous version.
 
 ->Example datasets and configuration files files can be found in the example folder
 
-->For compilation help see the INSTALL file.  The program now comes with a full
- configure script for *nix configuration and installation.
+->For compilation help see the INSTALL file.  Version 1.0 comes with an extremely 
+easy build script, build_garli.sh, which should make compalation trivial on linux
+or OS X machines.
 
-New in version 0.96
+***New in version 1.0***
+
+1.Ability to write sitewise log-likelihood values, in a form identical to PAUP*.
+  This can be read directly into a program like CONSEL. (outputsitelikelihoods = 1)
+2.Ability to collapse zero length branches at the end of a search, creating polytomies.
+  This can affect bootstrap values, since zero-length branches in a sense don't really 
+  exist and probably shouldn't contribute to branch support values. (collapsebranches = 1)
+3.Ability to infer full reversible amino acid rate matrices (189 free parameters)
+4.Ability to use user-specified amino acid rate matrices
+5.Ability to infer ancestral state probabilities for amino acid and codon models, in
+  addition to the previously implemented nucleotide models.
+6.Speed improvements for large constrained searches, especially backbone constraints
+7.Checkpointing of MPI parallel runs
+8.More rigorous checking of input trees, constraints and parameter values
+9.Significant improvements to parameter optimization
+10.A "verification mode", which checks that a given configuration file and datafile
+  are valid for use with GARLI, without starting an actual analysis (start GARLI with
+  "-V")
+11.Fixes to many very rare bugs in version 0.96
+
+***New in version 0.96***
+
 1.Rigorous reading of Nexus datasets using Paul Lewis and Mark Holder's Nexus
  Class Library (NCL).
 2.Ability to read Nexus starting trees using NCL.
