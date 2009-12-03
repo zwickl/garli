@@ -2145,7 +2145,7 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 		}
 	out << endl;
 
-	out << "This is the THREE LETTER code ordered (PAML) above diagonal matrix\n" << endl;
+	out << "This is the THREE LETTER code order (PAML) above diagonal matrix\n" << endl;
 	//above diagonal
 	for(int from=0;from<19;from++){
 		for(int to=0;to<20;to++){
@@ -2175,7 +2175,7 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 		}
 	out << endl;
 
-	out << "This is the FULL NAME code ordered (MrBayes) above diagonal matrix\n" << endl;
+	out << "This is the FULL NAME code order (MrBayes) above diagonal matrix\n" << endl;
 	//above diagonal
 	for(int from=0;from<19;from++){
 		for(int to=0;to<20;to++){
