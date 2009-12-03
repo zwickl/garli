@@ -19,14 +19,12 @@ mpi
 openmp
 
 other flags to test
-    ENABLE_CUSTOM_PROFILER
-    DETAILED_SWAP_REPORT
+    --enable-profiler (ENABLE_CUSTOM_PROFILER)
     NDEBUG
     NO_EVOLUTION
-    OUTPUT_FRACTION_DONE
+    --enable-progress-reporting (OUTPUT_FRACTION_DONE)
     PUSH_TO_MIN_BLEN
-    SWAP_BASED_TERMINATION
-    MONITORING_ALLOCATION
+    --enable-leak-detection (MONITORING_ALLOCATION)
 
 preprocessor defines notes:
 ===========================
@@ -108,7 +106,8 @@ POWERMAC_VERSION old
 SUBTREE_VERSION old
 _SINGLE_PRECISION_FLOATS old,weird
 PERIODIC_SCORE_DEBUG old db
-
+(done) DETAILED_SWAP_REPORT
+(done) SWAP_BASED_TERMINATION
 
 defines to convert to runtime:
 =====================
@@ -125,3 +124,5 @@ CUDA_GPU daniel
 CUDA_MEMORY_PINNED daniel
 FAKE_PARALLEL
 _BETTER_BIPART
+
+
