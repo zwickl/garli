@@ -499,6 +499,8 @@ int main( int argc, char* argv[] )	{
 				pop.ValidateInput(1);
 				outman.UserMessage("VALIDATION COMPLETE. Check output above for information and possible errors.");
 				}
+			//the runmodes are essentially a hidden way of causing different (often very different) program
+			//behavior at runtime.  not really for user consumption
 			else if(conf.runmode != 0){
 				if(conf.runmode == 1)
 					pop.ApplyNSwaps(10);

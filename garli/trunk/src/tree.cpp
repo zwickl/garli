@@ -51,6 +51,8 @@ Profiler ProfScoreInt ("ScoreInt      ");
 Profiler ProfScoreTerm("ScoreTerm     ");
 Profiler ProfEQVectors("EQVectors     ");
 
+extern bool swapBasedTerm;
+
 /*
 FLOAT_TYPE precalcThresh[30];
 FLOAT_TYPE precalcMult[30];
@@ -1893,25 +1895,18 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 		else{//only doing this on limSPR and NNI
 			err = AssignWeightsToSwaps(cut);
 			err = err && (tryNum++ < 5);
-#ifdef SWAP_BASED_TERMINATION
-			if(!err){
-#else
-			if(1){
+			if((!swapBasedTerm) || (swapBasedTerm && !err)){
 				//this was a stupid bug.  Err was being paid attention by looping over the
 				//outer do loop because it was not being reset below when returning from ReorientSubtreeSPR
 				//as it is with normal SPR
-				err = 0;
-#endif
+				if(!swapBasedTerm)
+					err = 0;
 				sprRang.CalcProbsFromWeights();
 				broken = sprRang.ChooseNodeByWeight();
 				}
 			}
 
-#ifdef SWAP_BASED_TERMINATION
-		if(!err){
-#else
-		if(1){
-#endif
+		if((!swapBasedTerm) || (swapBasedTerm && !err)){
 			//log the swap about to be performed
 			if( ! ((uniqueSwapBias == 1.0 && distanceSwapBias == 1.0) || range < 0)){
 				Bipartition proposed;
