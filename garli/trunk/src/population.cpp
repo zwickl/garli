@@ -1600,9 +1600,9 @@ void Population::Run(){
 	if(swapBasedTerm)
 		outman.UserMessageNoCR("%-14s ", "swaps_on_cur");
 
-#ifdef OUTPUT_FRACTION_DONE
-	outman.UserMessageNoCR("%-14s %-14s", "rep_prop_done", "tot_prop_done");
-#endif
+	if(conf->reportRunProgress)
+		outman.UserMessageNoCR("%-14s %-14s", "rep_prop_done", "tot_prop_done");
+
 	outman.UserMessage("");
 
 	outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
@@ -1610,9 +1610,9 @@ void Population::Run(){
 	if(swapBasedTerm)
 		outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
 
-#ifdef OUTPUT_FRACTION_DONE
-	outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
-#endif
+	if(conf->reportRunProgress)
+		outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
+
 	outman.UserMessage("");
 
 	OutputLog();
@@ -1642,9 +1642,9 @@ void Population::Run(){
 			if(swapBasedTerm)
 				outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
 
-#ifdef OUTPUT_FRACTION_DONE
-			outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
-#endif
+			if(conf->reportRunProgress)
+				outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
+
 			outman.UserMessage("");
 
 			if(conf->outputMostlyUselessFiles){
@@ -4314,9 +4314,10 @@ void Population::OutputLog()	{
 	//log << gen << "\t" << bestFitness << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
 	if(gen < UINT_MAX) {
 		log << gen << "\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision;
-#ifdef OUTPUT_FRACTION_DONE
-		log << "\t" << 0.01 * (int) ceil(rep_fraction_done * 100) << "\t" << 0.01 * (int) ceil(tot_fraction_done * 100);
-#endif
+
+		if(conf->reportRunProgress)
+			log << "\t" << 0.01 * (int) ceil(rep_fraction_done * 100) << "\t" << 0.01 * (int) ceil(tot_fraction_done * 100);
+
 		log << endl;
 #ifdef MAC_FRONTEND
 		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];

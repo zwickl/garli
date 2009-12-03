@@ -65,10 +65,6 @@ AC_ARG_ENABLE(profiler, AC_HELP_STRING([--enable-profiler], [built in runtime pr
 [AC_DEFINE([ENABLE_CUSTOM_PROFILER], [1], [profiler for assessing execution times])],
 [])
 
-AC_ARG_ENABLE(progress_reporting, AC_HELP_STRING([--enable-progress-reporting], [proportion of run completed appears in screen output]),
-[AC_DEFINE([OUTPUT_FRACTION_DONE], [1], [proportion of run completed appears in screen output])],
-[])
-
 AC_ARG_ENABLE(leak_detection, AC_HELP_STRING([--enable-leak-detection], [memory leak detection is turned on]),
 [AC_DEFINE([MONITORING_ALLOCATION], [1], [monitors all allocation/deallocation, writes report])],
 [])
