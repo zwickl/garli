@@ -60,12 +60,23 @@ AC_FUNC_MALLOC
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([floor memmove memset pow sqrt strchr strdup strtol])
 
+# A few miscelaneous features, not of general interest
+AC_ARG_ENABLE(profiler, AC_HELP_STRING([--enable-profiler], [built in runtime profiler]),
+[AC_DEFINE([ENABLE_CUSTOM_PROFILER], [1], [profiler for assessing execution times])],
+[])
+
+AC_ARG_ENABLE(progress_reporting, AC_HELP_STRING([--enable-progress-reporting], [proportion of run completed appears in screen output]),
+[AC_DEFINE([OUTPUT_FRACTION_DONE], [1], [proportion of run completed appears in screen output])],
+[])
+
+AC_ARG_ENABLE(leak_detection, AC_HELP_STRING([--enable-leak-detection], [memory leak detection is turned on]),
+[AC_DEFINE([MONITORING_ALLOCATION], [1], [monitors all allocation/deallocation, writes report])],
+[])
 
 
 #--------------------------------------------------------------------------------------------------#
 #  Set CXXFLAGS                                                                                    #
 #--------------------------------------------------------------------------------------------------#
-
 
 # Check for debugging mode.
 AC_ARG_ENABLE(debugging,
@@ -421,12 +432,6 @@ AC_COMPILE_IFELSE(
 ], 
 [], 
 [AC_MSG_ERROR([Sorry. NCL 2.1 or greater is required.])]) 
-
-
-
-AC_ARG_ENABLE(profiler, AC_HELP_STRING([--enable-profiler], [built in runtime profiler]),
-[AC_DEFINE([ENABLE_CUSTOM_PROFILER], [1], [profiler for assessing execution times])],
-[])
 
 GARLI_LIBS="-lncl"
 
