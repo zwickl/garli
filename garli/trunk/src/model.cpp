@@ -2074,22 +2074,29 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 
 	out << "Estimated AA rate matrices:" << endl;;
 	out << "NOTE THAT THIS FUNCTION IS FAIRLY EXPERIMENTAL, SO CHECK YOUR OUTPUT AND LET ME KNOW OF ANY PROBLEMS\n" << endl;;
-	out << "Order of AA's is alphabetically BY SINGLE LETTER CODE, i.e.:\n ACDEFGHIKLMNPQRSTVWY" << endl;
-	out << "The correspondence with the alphabetical 3-letter code is this:" << endl;
-	out << "SingleLetter\t\tThreeLetter\n1\tA\t1\tAla\n2\tC\t15\tCys\n3\tD\t12\tAsp\n4\tE\t3\tGlu\n5\tF\t2\tPhe\n6\tG\t14\tGly\n7\tH\t4\tHis\n8\tI\t6\tIle\n9\tK\t7\tLys\n10\tL\t8\tLeu\n11\tM\t10\t";
-	out << "Met\n12\tN\t9\tAsn\n13\tP\t11\tPro\n14\tQ\t5\tGln\n15\tR\t13\tArg\n16\tS\t16\tSer\n17\tT\t17\tThr\n18\tV\t19\tVal\n19\tW\t20\tTrp\n20\tY\t18\tTyr\n" << endl;
-/*
-	out << "SingleLetter		ThreeLetter\n1	A	1	Ala\n2	C	15	Cys\n3	D	12	Asp\n4	E	3	Glu\n5	F	2	Phe\n6	G	14	Gly\n7	H	4	His\n8	I	6	Ile\n9	K	7	Lys\n10	L	8	Leu\n11	M	10	";
-	out << "Met\n12	N	9	Asn\n13	P	11	Pro\n14	Q	5	Gln\n15	R	13	Arg\n16	S	16	Ser\n17	T	17	Thr\n18	V	19	Val\n19	W	20	Trp\n20	Y	18	Tyr\n" << endl;
-*/
+	out << "GARLI's order of AA's is alphabetically BY SINGLE LETTER CODE, i.e.:\n ACDEFGHIKLMNPQRSTVWY" << endl;
+	out << "The correspondence with the 3-letter codes and full names is this:" << endl;
 
+	out << "A\tAla\tAlanine\nC\tCys\tCysteine\nD\tAsp\tAspartic Acid\nE\tGlu\tGlutamic Acid\nF\tPhe\tPhenylalanine\nG\tGly\tGlycine\nH\tHis\tHistidine\n";
+	out << "I\tIle\tIsoleucine\nK\tLys\tLysine\nL\tLeu\tLeucine\nM\tMet\tMethionine\nN\tAsn\tAsparagine\nP\tPro\tProline\nQ\tGln\tGlutamine\nR\tArg\tArginine\n";
+	out << "S\tSer\tSerine\nT\tThr\tThreonine\nV\tVal\tValine\nW\tTrp\tTryptophan\nY\tTyr\tTyrosine\n" << endl;
+
+	out << "Unfortunately, I beleive that GARLI, PAML, and MrBayes all have different orderings of the amino acids.  PAML" << endl;
+	out << "is alphabetical by three-letter code, MrBayes is alphabetical by full name (same as PAML, but swap Gln and Glu), GARLI" << endl;
+	out << "is alphabetical by single letter code.  Additionally, I believe that PAML takes the below diagonal matrix as input,"<< endl;
+	out << "while GARLI and MrBayes take the upper." << endl;
+	out << "I COULD BE WRONG ABOUT THIS, AND YOU SHOULD VERIFY THAT THE ABOVE FACTS ARE TRUE BEFORE USING THE BELOW MATRICES" << endl;
+	out << "IN ANOTHER PROGRAM" << endl;
 	
-	out << "Following are the above diagonal form of the estimated matrix followed by the below diagonal form." << endl;
+	out << "Following are the matrix inferred by GARLI in GARLI's order, then the same matrices ordered by the other systems" << endl;
+	out << "described above.  Both the above and below diagonal versions appear for each." << endl;
+
 	out << "The entries are scaled such that the mean rate is 100.  It can be rescaled by any constant factor without" << endl;
-	out << "changing its meaning. Enties on the diagonal are all zero, and do not appear." << endl;
-	out << "\nThe ABOVE diagonal SINGLE LETTER form is what would be fed back into GARLI as a starting condition to use this matrix in future analyses.\n" << endl;
-	out << "Here is a GARLI block that could be used to feed this matrix back into GARLI.  It can be fixed in further analyses" << endl;
-	out << "by setting \"ratematrix = fixed\" in the configuration file.  The block itself could be put in the same file as a NEXUS" << endl;
+	out << "changing its meaning. Entries on the diagonal are all zero." << endl;
+	out << "\nThe ABOVE diagonal SINGLE LETTER order is what would be fed back into GARLI as a starting condition to use this matrix" << endl;
+	out << "in future analyses.  Here is a GARLI block that could be used to do this.  The values could be fixed for further analyses" << endl;
+	out << "by setting \"ratematrix = fixed\" in the configuration file, or it could be used as starting values for another run estimating" << endl;
+	out << "the full matrix by leaving \"ratematrix = estimate\".  The block itself could be put in the same file as a NEXUS" << endl;
 	out << "data matrix, or put in a file (which must start with #NEXUS) specified on the streefname line of the configuarion file.\n" << endl;
 
 	out << "begin garli;" << endl;
@@ -2105,43 +2112,11 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 		}
 	out << ";\nend;\n" << endl;
 
-	int cor[20] = {0, 14, 11, 2, 1, 13, 3, 5, 6, 7, 9, 8, 10, 4, 12, 15, 16, 18, 19, 17};
+	int corThree[20] = {0, 14, 11, 2, 1, 13, 3, 5, 6, 7, 9, 8, 10, 4, 12, 15, 16, 18, 19, 17};
+	int corFull[20] =  {0, 14, 11, 2, 1, 3, 13, 5, 6, 7, 9, 8, 10, 4, 12, 15, 16, 18, 19, 17};
 
-	out << "Different software may require different state orderings and either above or below diagonal portion\nof the rate matrix as input." << endl;
-	out << "As overkill, here are four versions of the same matrix.  GARLI requires the 3rd, PAML the 2nd.\n" << endl;
-
-	out << "This is the THREE LETTER order, above diagonal matrix\n" << endl;
-	
-	for(int from=0;from<19;from++){
-		for(int to=0;to<20;to++){
-			if(to <= from)
-				out << "\t";
-			else{
-				sprintf(str, "%.3f", (el[cor[from] * 20 + cor[to]] * (19000.0/tot)));
-				out << str;
-				if(to != from -1)
-					out << "\t";
-				}
-			}
-		out << endl;
-		}
-	out << endl;
-
-	out << "\nThis is the THREE LETTER order, below diagonal matrix\n" << endl;
-
-	for(int from=1;from<20;from++){
-		for(int to=0;to<from;to++){
-			sprintf(str, "%.3f", (el[cor[from] * 20 + cor[to]] * (19000.0/tot)));
-			out << str;
-			if(to != from -1)
-				out << "\t";
-			}
-		out << endl;
-		}
-	out << endl;
-
-	out << "This is the SINGLE LETTER order, above diagonal matrix\n" << endl;
-	
+	out << "This is the SINGLE LETTER order (GARLI), above diagonal matrix\n" << endl;
+	out << "(this is what appears in the above GARLI block)\n";
 	for(int from=0;from<19;from++){
 		for(int to=0;to<20;to++){
 			if(to <= from)
@@ -2157,7 +2132,7 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 		}
 	out << endl;
 
-	out << "\nThis is the SINGLE LETTER, order below diagonal matrix\n" << endl;
+	out << "\nThis is the SINGLE LETTER order (GARLI) below diagonal matrix\n" << endl;
 
 	for(int from=1;from<20;from++){
 		for(int to=0;to<from;to++){
@@ -2169,15 +2144,87 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 		out << endl;
 		}
 	out << endl;
+
+	out << "This is the THREE LETTER code ordered (PAML) above diagonal matrix\n" << endl;
+	//above diagonal
+	for(int from=0;from<19;from++){
+		for(int to=0;to<20;to++){
+			if(to <= from)
+				out << "\t";
+			else{
+				sprintf(str, "%.3f", (el[corThree[from] * 20 + corThree[to]] * (19000.0/tot)));
+				out << str;
+				if(to != from -1)
+					out << "\t";
+				}
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "\nThis is the THREE LETTER order (PAML), below diagonal matrix\n" << endl;
+
+	for(int from=1;from<20;from++){
+		for(int to=0;to<from;to++){
+			sprintf(str, "%.3f", (el[corThree[from] * 20 + corThree[to]] * (19000.0/tot)));
+			out << str;
+			if(to != from -1)
+				out << "\t";
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "This is the FULL NAME code ordered (MrBayes) above diagonal matrix\n" << endl;
+	//above diagonal
+	for(int from=0;from<19;from++){
+		for(int to=0;to<20;to++){
+			if(to <= from)
+				out << "\t";
+			else{
+				sprintf(str, "%.3f", (el[corFull[from] * 20 + corFull[to]] * (19000.0/tot)));
+				out << str;
+				if(to != from -1)
+					out << "\t";
+				}
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "\nThis is the FULL NAME order (MrBayes), below diagonal matrix\n" << endl;
+
+	for(int from=1;from<20;from++){
+		for(int to=0;to<from;to++){
+			sprintf(str, "%.3f", (el[corFull[from] * 20 + corFull[to]] * (19000.0/tot)));
+			out << str;
+			if(to != from -1)
+				out << "\t";
+			}
+		out << endl;
+		}
+	out << endl;
+
 	
 	out << "These are AA frequencies that were used, which may have been estimated or not." << endl;
+	string states="ACDEFGHIKLMNPQRSTVWY";
+	out << "Single letter order" << endl;
+	for(int st = 0;st < stateFreqs.size();st++){
+		out << states[st] << "\t";
+		}
+	out << endl;
 	for(int st = 0;st < stateFreqs.size();st++){
 		out << StateFreq(st) << "\t";
 		}
 	out << endl;
-	string states="ACDEFGHIKLMNPQRSTVWY";
+	out << "Three letter order" << endl;
 	for(int st = 0;st < stateFreqs.size();st++){
-		out << states[st] << "\t";
+		out << StateFreq(corThree[st]) << "\t";
+		}
+	out << endl;
+	out << "Full name order" << endl;
+	for(int st = 0;st < stateFreqs.size();st++){
+		out << StateFreq(corFull[st]) << "\t";
 		}
 	out << endl;
 	}
