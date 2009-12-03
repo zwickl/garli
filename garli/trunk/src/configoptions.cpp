@@ -71,6 +71,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	improveOverStoredIntervalsThresh = (FLOAT_TYPE)0.05;
 	stopgen = UINT_MAX;
 	stoptime = UINT_MAX;
+	swapTermThreshold = 0;
 
 	//default model is GTR+I+G
 	stateFrequencies = "estimate";
@@ -161,6 +162,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
 	cr.GetBoolOption("collapsebranches", collapseBranches, true);
+	cr.GetIntOption("genthreshforswapterm", swapTermThreshold, true);
 
 	cr.GetStringOption("arbitrarystring", arbitraryString, true);
 

@@ -67,6 +67,7 @@ class GeneralGamlConfig{
 	FLOAT_TYPE improveOverStoredIntervalsThresh;
 	unsigned stopgen;
 	unsigned stoptime;
+	int swapTermThreshold;
 
 	unsigned attachmentsPerTaxon;
 

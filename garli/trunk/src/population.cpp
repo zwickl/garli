@@ -82,6 +82,7 @@ extern CudaManager *cudaman;
 
 extern OutputManager outman;
 extern bool interactive;
+bool swapBasedTerm = false;
 
 int memLevel;
 int calcCount=0;
@@ -96,17 +97,9 @@ FLOAT_TYPE globalBest;
 
 #undef PERIODIC_SCORE_DEBUG
 
-//#undef DEBUG_SCORES
-
 #undef NNI_SPECTRUM
 
 #undef MASTER_DOES_SUBTREE
-
-//#undef VARIABLE_OPTIMIZATION
-
-//#undef DETAILED_SWAP_REPORT
-
-//#undef NO_EVOLUTION
 
 bool output_tree=false;
 
@@ -416,6 +409,12 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 
 	if(rank == 0) total_size = conf->nindivs + nprocs-1;
 	else total_size = conf->nindivs;
+	swapTermThreshold = conf->swapTermThreshold;
+	if(swapTermThreshold != 0)
+		//this is a global that Tree needs access to
+		swapBasedTerm = true;
+	else 
+		swapBasedTerm = false;
 
 	//set two model statics
 	Model::mutationShape = conf->gammaShapeModel;
@@ -1597,18 +1596,20 @@ void Population::Run(){
 	outman.precision(6);
 
 	outman.UserMessageNoCR("%-8s %-14s %-8s  %-14s ", "gen", "current_lnL", "precision", "last_tree_imp");
-#ifdef SWAP_BASED_TERMINATION
-	outman.UserMessageNoCR("%-14s ", "swaps_on_cur");
-#endif
+
+	if(swapBasedTerm)
+		outman.UserMessageNoCR("%-14s ", "swaps_on_cur");
+
 #ifdef OUTPUT_FRACTION_DONE
 	outman.UserMessageNoCR("%-14s %-14s", "rep_prop_done", "tot_prop_done");
 #endif
 	outman.UserMessage("");
 
 	outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
-#ifdef SWAP_BASED_TERMINATION
-	outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
-#endif
+
+	if(swapBasedTerm)
+		outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
+
 #ifdef OUTPUT_FRACTION_DONE
 	outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
 #endif
@@ -1620,12 +1621,12 @@ void Population::Run(){
 	gen++;
 	for (; gen < conf->stopgen+1; ++gen){
 		NextGeneration();
-#ifdef SWAP_BASED_TERMINATION
-		if(uniqueSwapTried){
-			lastUniqueSwap = gen;
-			uniqueSwapTried = false;
+		if(swapBasedTerm){
+			if(uniqueSwapTried){
+				lastUniqueSwap = gen;
+				uniqueSwapTried = false;
+				}
 			}
-#endif
 		keepTrack();
 		if(conf->outputMostlyUselessFiles) OutputFate();
 		if(conf->logevery > 0 && !(gen % conf->logevery)) OutputLog();
@@ -1637,21 +1638,18 @@ void Population::Run(){
 				}
 
 			outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
-#ifdef SWAP_BASED_TERMINATION
-			outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
-#endif
+			
+			if(swapBasedTerm)
+				outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
+
 #ifdef OUTPUT_FRACTION_DONE
 			outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
 #endif
 			outman.UserMessage("");
 
 			if(conf->outputMostlyUselessFiles){
-#ifdef DETAILED_SWAP_REPORT
 				swapLog << gen << "\t";
 				indiv[bestIndiv].treeStruct->attemptedSwaps.SwapReport(swapLog);
-#else
-				swapLog << gen << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique() << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetTotal() << endl;
-#endif
 				}
 			}
 #ifndef BOINC
@@ -1710,19 +1708,42 @@ void Population::Run(){
 			UpdateFractionDone(2);
 
 			//automatic termination conditions
-			if(conf->enforceTermConditions == true
-#ifdef SWAP_BASED_TERMINATION
-				&& (gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))))
-#else
-				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
-#endif
-				&& (gen > adap->intervalsToStore * adap->intervalLength)
-				&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
-				&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)){
-				if(adap->topoMutateProb > ZERO_POINT_ZERO) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
-				else outman.UserMessage("Reached termination condition!\n");
-				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
-				break;
+			if(conf->enforceTermConditions == true){
+				bool done = false;
+				if(swapBasedTerm && !FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
+					assert(swapTermThreshold != 0);
+					if(swapTermThreshold < 0 && (gen - lastUniqueSwap > abs(swapTermThreshold))){
+						break;
+						}
+					else {
+						if(swapTermThreshold > 0 && (gen - lastUniqueSwap > swapTermThreshold)
+						&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
+						&& (gen > adap->intervalsToStore * adap->intervalLength)
+						&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
+						&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)){
+							if(adap->topoMutateProb > ZERO_POINT_ZERO) 
+								outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
+							else 
+								outman.UserMessage("Reached termination condition!\n");
+							outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
+							outman.UserMessage("Last new topology swap at gen %d", lastUniqueSwap);
+							break;
+							}
+						}
+					}
+				else{
+					if(gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))
+					&& (gen > adap->intervalsToStore * adap->intervalLength)
+					&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
+					&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)){
+						if(adap->topoMutateProb > ZERO_POINT_ZERO) 
+							outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
+						else 
+							outman.UserMessage("Reached termination condition!\n");
+						outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
+						break;
+						}
+					}
 				}
 
 #ifdef INCLUDE_PERTURBATION
@@ -6115,7 +6136,7 @@ void Population::InitializeOutputStreams(){
 				}
 			if(conf->restart) swapLog << "Restarting from checkpoint...\n";
 			OutputRepNums(swapLog);
-			swapLog << "gen\tuniqueSwaps\ttotalSwaps\n";
+			swapLog << "gen\ttotUniqueSwaps\ttotSwaps\tuniqueDist1\ttotDist1\tuniqueDist2\ttotDist2\tetc...\n";
 			}
 		}
 
