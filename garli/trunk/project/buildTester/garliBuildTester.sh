@@ -5,7 +5,11 @@ num_failures=0
 num_attempted=0
 failed_variants=""
 
-rm garliBuildMasterTesterLog.txt
+rm -f garliBuildMasterTesterSuccesses.txt
+rm -f garliBuildMasterTesterFailures.txt
+
+parent_dir=`pwd`
+
 
 for s in `ls | grep ^build`
 do
@@ -37,16 +41,18 @@ do
 			cd -
 			if test $result -eq 1
 			then
-				echo "failure --> $s" >> garliBuildMasterTesterLog.txt
+				echo "${parent_dir}/$s" >> garliBuildMasterTesterFailures.txt
 				num_failures=`expr ${num_failures} + 1`
 			else
-				echo "success --> $s" >> garliBuildMasterTesterLog.txt
+				echo "${parent_dir}/$s" >> garliBuildMasterTesterSuccesses.txt
 			fi
 		else
 			echo "$s does not appear to be a Garli build dir ${build_file} not found"
 		fi
 	fi
 done
+
+echo "${num_failures} out of ${num_attempted} Failures" > garliBuildMasterTesterLog.txt
 
 if test $num_failures -gt 0
 then

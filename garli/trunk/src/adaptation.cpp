@@ -28,6 +28,13 @@ using namespace std;
 #include "configoptions.h"
 #include "individual.h"
 
+/* The next 3 lovely lines are used to cause the build to fail.  This is useful for making 
+   	sure that our automated build system is finding build errors
+*/
+#if defined(CAUSE_A_BUILD_ERROR) && CAUSE_A_BUILD_ERROR
+#	error "CAUSE_A_BUILD_ERROR is defined"
+#endif
+
 Adaptation::Adaptation(const GeneralGamlConfig *gc){
 
 	intervalsToStore=gc->intervalsToStore;
@@ -264,6 +271,7 @@ void Adaptation::ReadFromCheckpoint(FILE *in){
 	fread((char *) this, 1, scalarSize, in);
 	if(ferror(in) || feof(in)){//this mainly checks for a zero-byte file
 		throw ErrorException("Error reading checkpoint file <ofprefix>.adap.check.\n\tA problem may have occured writing the file to disk, or the file may have been overwritten or truncated.\n\tUnfortunately you'll need to start the run again from scratch.");
+
 		}
 
 	//now the arrays, which should be of length intervalsToStore
