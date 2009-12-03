@@ -44,6 +44,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	outputCurrentBestTopology = false;
 	collapseBranches = false;
 	outputSitelikelihoods = 0;
+	reportRunProgress = 0;
 
 	//starting the run
 	randseed = -1;
@@ -158,6 +159,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetPositiveNonZeroDoubleOption("significanttopochange", significantTopoChange, true);
 	cr.GetUnsignedNonZeroOption("attachmentspertaxon", attachmentsPerTaxon, true);
 	cr.GetUnsignedOption("outputsitelikelihoods", outputSitelikelihoods, true);
+	cr.GetBoolOption("reportrunprogress", reportRunProgress, true);
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);

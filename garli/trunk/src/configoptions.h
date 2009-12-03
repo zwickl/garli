@@ -60,6 +60,7 @@ class GeneralGamlConfig{
 	unsigned searchReps;
 	unsigned runmode;
 	unsigned outputSitelikelihoods;
+	bool reportRunProgress;
 
 	//finishing the run
 	bool enforceTermConditions;
