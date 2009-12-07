@@ -768,7 +768,7 @@ void Population::RunTests(){
 	//this only really tests for major scoring problems in the optimization functions
 	scr = ind0->treeStruct->lnL;
 	ind0->treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-	assert(ind0->treeStruct->lnL > scr);
+	assert(ind0->treeStruct->lnL >= scr - 1e-8);
 	assert(ind0->treeStruct->lnL * 2 < scr);
 
 #ifdef SINGLE_PRECISION_FLOATS
