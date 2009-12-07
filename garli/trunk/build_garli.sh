@@ -2,16 +2,16 @@
 
 if [ $# -gt 0 ]
 then
-        if [ "$1" == "--ncl-svn" ]
+        if [ "$1" = "--ncl-svn" ]
         then
 		shift # this shifts the first cmd line argument out so that the rest can be passed to GARLI configure
-                echo "***CHECKING OUT NCL LIBRARY SOURCE VIA SUBVERION***"
+                echo "***CHECKING OUT NCL LIBRARY SOURCE VIA SUBVERSION***"
                 svn co http://ncl.svn.sourceforge.net/svnroot/ncl/branches/v2.1 ncl-svn || exit
                 nclv="ncl-svn"
                 cd ${nclv} || exit
                 sh bootstrap.sh || exit
                 cd ..
-        elif [ "$1" == "-h" ] || [ "$1" == "--help" ]
+        elif [ "$1" = "-h" ] || [ "$1" = "--help" ]
 	then
                 echo "Usage ./$0 [--svn-ncl] [-h] [arguments to GALRI configure script]"
                 echo "     --ncl-svn   Check out current NCL source via anonymous svn, build NCL, then GARLI"
@@ -27,7 +27,7 @@ fi
 #if NCL wasn't checked out above
 if [ -z "${nclv}" ]
 then
-	if [ "$1" == "--ncl-dist" ]
+	if [ "$1" = "--ncl-dist" ]
 	then
 		shift # this shifts the first cmd line argument out so that the rest can be passed to GARLI configure
 	fi
