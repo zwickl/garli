@@ -1654,8 +1654,10 @@ void Population::Run(){
 			}
 #ifndef BOINC
 		userTermination = CheckForUserSignal();
-		if(userTermination) 
+		if(userTermination){
+			outman.UserMessage("NOTE: ****Run terminated by user interuption ...");
 			break;
+			}
 #endif
 
 #ifdef PERIODIC_SCORE_DEBUG
@@ -1789,7 +1791,8 @@ void Population::Run(){
 	UpdateFractionDone(3);
 	//Allow killing during FinalOpt
 	TurnOffSignalCatching();
-	if(conf->refineEnd)
+	//don't optimize if checkpointing is happening and the run was prematurely killed
+	if(conf->refineEnd  && !(conf->checkpoint && (timeTermination || userTermination)))
 		FinalOptimization();
 	finishedRep = true;
 	gen = UINT_MAX;
@@ -2468,6 +2471,21 @@ void Population::PerformSearch(){
 		InitializeOutputStreams();
 		Run();
 
+		//for most purposes, these two types of termination are premature and treated identically
+		//gen termination is treated as normal termination besides some warnings
+		bool prematureTermination = (userTermination || timeTermination);
+
+		//if we're checkpointing and terminated prematurely just bail without doing anything else
+		if(prematureTermination && conf->checkpoint){
+			outman.UserMessage("\nNOTE: A CHECKPOINTED RUN (writecheckpoints = 1) WAS PREMATURELY");
+			outman.UserMessage("TERMINATED.  OUTPUT FILES (tree files, etc.) WILL NOT BE" ); 
+			outman.UserMessage("FINALIZED SO THAT THE RUN CAN BE RESTARTED WHERE IT LEFT OFF");
+			outman.UserMessage("(set restart = 1 in the config file).  IF YOU WANT TO USE THE");
+			outman.UserMessage("PARTIAL OUTPUT FILES WITHOUT RESTARTING YOU WILL NEED TO MANUALLY");
+			outman.UserMessage("ADD \"end;\" TO THE TREE FILES AND POSSIBLY MAKE OTHER EDITS.");
+			exit(0);
+			}
+
 		outman.UserMessage("");
 		if(userTermination)
 			outman.UserMessage("MODEL REPORT - SEARCH TERMINATED BY USER");
@@ -2478,10 +2496,6 @@ void Population::PerformSearch(){
 		else
 			outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
 		indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
-
-		//for most purposes, these two types of termination are premature and treated identically
-		//gen termination is treated as normal termination besides some warnings
-		bool prematureTermination = (userTermination || timeTermination);
 
 		//this rep is over
 		//11/28/09 We will now always store the final individual in the stored trees array, 
