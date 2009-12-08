@@ -1986,12 +1986,14 @@ void Population::FinalOptimization(){
 	int pass=1;
 	FLOAT_TYPE incr;
 
-	double paramOpt, paramTot, freqOptImprove = ZERO_POINT_ZERO, nucRateOptImprove = ZERO_POINT_ZERO, pinvOptImprove = ZERO_POINT_ZERO, alphaOptImprove = ZERO_POINT_ZERO;
-	paramTot = ZERO_POINT_ZERO;
+	double freqOptImprove, nucRateOptImprove, pinvOptImprove, alphaOptImprove, omegaOptImprove, flexOptImprove;
+	double paramOpt, blenOptImprove;
+	paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = ZERO_POINT_ZERO;
 
 	FLOAT_TYPE precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
 	FLOAT_TYPE paramPrecThisPass = max(adap->branchOptPrecision*0.1, 0.01);
 	bool optAnyModel = FloatingPointEquals(conf->modWeight, ZERO_POINT_ZERO, 1e-8) == false;
+	bool goingToExit;
 
 	bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates;
 	optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = false;
@@ -2019,58 +2021,12 @@ void Population::FinalOptimization(){
 	Individual *optInd = &indiv[bestIndiv];
 	Tree *optTree = optInd->treeStruct;
 
-	//there isn't any point of this separate initial opt anymore, since I'm doing param opt on every pass below anyway
-	//if(optAnyModel){
-	if(0){
-		do{
-			paramOpt = ZERO_POINT_ZERO;
-			if(optFlex) 
-				paramOpt = optTree->OptimizeFlexRates(paramPrecThisPass);
-			if(optOmega) 
-				paramOpt = optTree->OptimizeOmegaParameters(paramPrecThisPass);
-			paramTot += paramOpt;
-
-			if(optFreqs){
-				double tempTot = optTree->OptimizeEquilibriumFreqs(paramPrecThisPass);
-				paramOpt += tempTot;
-				freqOptImprove += tempTot;
-				}
-			if(optRelRates){
-				double tempTot = optTree->OptimizeRelativeNucRates(paramPrecThisPass);
-				paramOpt += tempTot;
-				nucRateOptImprove += tempTot;
-				}
-			if(optPinv){
-				double tempTot = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->PropInvar(), 0, 0.0, optTree->mod->maxPropInvar, &Model::SetPinv);
-				paramOpt += tempTot;
-				pinvOptImprove += tempTot;
-				}
-			if(optAlpha){
-				double tempTot = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->Alpha(), 0, min(0.05, optTree->mod->Alpha()), max(999.9, optTree->mod->Alpha()), &Model::SetAlpha);
-				paramOpt += tempTot;
-				alphaOptImprove += tempTot;
-				}
-			}while(paramOpt > 1.0e-2);
-/*
-		if(optFlex){
-			outman.UserMessage("Flex optimization: %.4f", paramTot);
-			}
-		else if(optOmega){
-			outman.UserMessage("Omega optimization: %f.4", paramTot);
-			}
-		if(optFreqs){
-			outman.UserMessage("Equil freqs optimization: %.4f", freqOptImprove);
-			}
-		if(optRelRates)
-			outman.UserMessage("Rel rates optimization: %.4f", nucRateOptImprove);
-		if(optPinv)
-			outman.UserMessage("Pinv optimization: %.4f", pinvOptImprove);
-		if(optAlpha)
-			outman.UserMessage("Alpha optimization: %.4f", alphaOptImprove);
-*/
-		outman.UserMessage("Initial parameter optimization: %.4f", paramOpt);
-		}
 	do{
+		//during each pass we'll keep track of a few things
+		//  incr = total improvement this pass. this controls termination of opt
+		//  summed improvement for each param/blens since last output.  If not outputting
+		//    every pass it won't be zeroed and so will accumulate.  The output string
+		//    will be constructed each pass, but only output sometimes
 		precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
 		paramPrecThisPass = max(precThisPass, 1e-5);
 
@@ -2082,18 +2038,11 @@ void Population::FinalOptimization(){
 		vector<FLOAT_TYPE> blens;
 		optTree->StoreBranchlengths(blens);
 
-/*		optTree->OptimizeBranchLength(precThisPass, optTree->allNodes[5], true);
-		optInd->CalcFitness(0);
-		FLOAT_TYPE trueImprove= optInd->Fitness() - passStart;
-		incr = trueImprove;
-*/		
-
 		//remember that what is returned from OptAllBranches isn't the true increase in score, just an estimate
 		incr=optTree->OptimizeAllBranches(precThisPass);
 		optInd->CalcFitness(0);
 
 		FLOAT_TYPE trueImprove= optInd->Fitness() - passStart;
-		incr = trueImprove;
 
 #ifdef FINAL_RESTORE_BLENS
 		//In very rare cases the score can come out very slightly worse (or apparently worse due to numerical instability issues) after
@@ -2108,8 +2057,10 @@ void Population::FinalOptimization(){
 			}
 #endif
 
-		//sprintf(temp, "(branch=%4.4f true=%4.4f prec=%.4f pprec=%.4f", incr, trueImprove, precThisPass, paramPrecThisPass);
-		sprintf(temp, "(branch= %4.4f", trueImprove);
+		blenOptImprove += trueImprove;
+		incr = trueImprove;
+
+		sprintf(temp, "(branch= %4.4f", blenOptImprove);
 		outString = temp;
 
 		optInd->CalcFitness(0);
@@ -2120,7 +2071,8 @@ void Population::FinalOptimization(){
 				paramOpt = optTree->OptimizeOmegaParameters(paramPrecThisPass);
 				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 					paramOpt = ZERO_POINT_ZERO;
-				sprintf(temp, "  omega= %4.4f", paramOpt);
+				omegaOptImprove += paramOpt;
+				sprintf(temp, "  omega= %4.4f", omegaOptImprove);
 				outString += temp;
 				incr += paramOpt;
 				}
@@ -2130,7 +2082,8 @@ void Population::FinalOptimization(){
 					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->Alpha(), 0, min(0.05, optTree->mod->Alpha()), max(999.9, optTree->mod->Alpha()), &Model::SetAlpha);
 					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 						paramOpt = ZERO_POINT_ZERO;
-					sprintf(temp, "  alpha= %4.4f", paramOpt);
+					alphaOptImprove += paramOpt;
+					sprintf(temp, "  alpha= %4.4f", alphaOptImprove);
 					outString += temp;
 					incr += paramOpt;
 					}
@@ -2145,7 +2098,8 @@ void Population::FinalOptimization(){
 						}while(p > trueImprove && innerPass++ < 5);
 					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 						paramOpt = ZERO_POINT_ZERO;
-					sprintf(temp, "  flex rates= %4.4f", paramOpt);
+					flexOptImprove += paramOpt;
+					sprintf(temp, "  flex rates= %4.4f", flexOptImprove);
 					outString += temp;
 					incr += paramOpt;
 					}
@@ -2153,7 +2107,8 @@ void Population::FinalOptimization(){
 					paramOpt = optTree->OptimizeBoundedParameter(paramPrecThisPass, optTree->mod->PropInvar(), 0, min(1.0e-8,optTree->mod->PropInvar()), optTree->mod->maxPropInvar, &Model::SetPinv);
 					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 						paramOpt = ZERO_POINT_ZERO;
-					sprintf(temp, "  pinv= %4.4f", paramOpt);
+					pinvOptImprove += paramOpt;
+					sprintf(temp, "  pinv= %4.4f", pinvOptImprove);
 					outString += temp;
 					incr += paramOpt;
 					}
@@ -2161,7 +2116,8 @@ void Population::FinalOptimization(){
 					paramOpt = optTree->OptimizeEquilibriumFreqs(paramPrecThisPass);
 					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 						paramOpt = ZERO_POINT_ZERO;
-					sprintf(temp, "  equil freqs= %4.4f", paramOpt);
+					freqOptImprove += paramOpt;
+					sprintf(temp, "  equil freqs= %4.4f", freqOptImprove);
 					outString += temp;
 					incr += paramOpt;
 					}
@@ -2169,7 +2125,8 @@ void Population::FinalOptimization(){
 					paramOpt = optTree->OptimizeRelativeNucRates(paramPrecThisPass);
 					if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 						paramOpt = ZERO_POINT_ZERO;
-					sprintf(temp, "  rel rates= %4.4f", paramOpt);
+					nucRateOptImprove += paramOpt;
+					sprintf(temp, "  rel rates= %4.4f", nucRateOptImprove);
 					outString += temp;
 					incr += paramOpt;
 					}
@@ -2177,8 +2134,16 @@ void Population::FinalOptimization(){
 			optInd->CalcFitness(0);
 			}
 		outString += ")";
-		outman.UserMessage("pass %-2d: %.4f   %s", pass++, optInd->Fitness(), outString.c_str());
-		}while(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass < 10);
+		goingToExit = !(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass + 1 < 10);
+
+		if(pass < 20 || (pass % 10 == 0) || goingToExit){
+			if(pass > 20 || goingToExit)
+				outman.UserMessage(" optimization up to ...");
+			outman.UserMessage("pass %-2d: %.4f   %s", pass, optInd->Fitness(), outString.c_str());
+			paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = ZERO_POINT_ZERO;
+			}
+		pass++;
+		}while(!goingToExit);
 #ifdef PUSH_TO_MIN_BLEN
 	double init = indiv[bestIndiv].treeStruct->lnL;
 	int num = indiv[bestIndiv].treeStruct->PushBranchlengthsToMin();
@@ -2539,7 +2504,8 @@ void Population::PerformSearch(){
 			if(repResult->treeStruct->constraints.empty() == false){
 				for(vector<Constraint>::iterator con=repResult->treeStruct->constraints.begin();con!=repResult->treeStruct->constraints.end();con++){
 					if(con->IsPositive()){
-						outman.UserMessage("\nNOTE: If collapsing of minimum length branches is requested (collapsebranches = 1) in a run with\n\ta positive constraint, it is possible for a constrained branch itself to be collapsed.\n\tIf you care, be careful to check whether this has happened or turn off branch collapsing.\n");\
+						outman.UserMessage("\nNOTE: If collapsing of minimum length branches is requested (collapsebranches = 1) in a run with\n\ta positive constraint, it is possible for a constrained branch itself to be collapsed.\n\tIf you care, be careful to check whether this has happened or turn off branch collapsing.\n");
+						break;
 						}
 					}
 				}
