@@ -1734,9 +1734,9 @@ void Population::Run(){
 						}
 					}
 				else{
-					if(gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))
+					if((gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
 					&& (gen > adap->intervalsToStore * adap->intervalLength)
-					&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
+					&& (adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh)
 					&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)){
 						if(adap->topoMutateProb > ZERO_POINT_ZERO) 
 							outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
@@ -2482,7 +2482,7 @@ void Population::PerformSearch(){
 			outman.UserMessage("FINALIZED SO THAT THE RUN CAN BE RESTARTED WHERE IT LEFT OFF");
 			outman.UserMessage("(set restart = 1 in the config file).  IF YOU WANT TO USE THE");
 			outman.UserMessage("PARTIAL OUTPUT FILES WITHOUT RESTARTING YOU WILL NEED TO MANUALLY");
-			outman.UserMessage("ADD \"end;\" TO THE TREE FILES AND POSSIBLY MAKE OTHER EDITS.");
+			outman.UserMessage("ADD \"end;\" TO THE TREE FILES.\n");
 			exit(0);
 			}
 
