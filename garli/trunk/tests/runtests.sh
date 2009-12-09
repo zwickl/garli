@@ -33,7 +33,7 @@ echo "**************************"
 echo "Running scoring tests ..."
 echo "**************************"
 line=1
-for i in $TESTS_DIR/scoring/*.conf
+for i in $TESTS_DIR/scoring/a.conf $TESTS_DIR/scoring/a.G3.conf $TESTS_DIR/scoring/a.G4.conf $TESTS_DIR/scoring/c.conf $TESTS_DIR/scoring/c.M3x2.conf $TESTS_DIR/scoring/n.conf $TESTS_DIR/scoring/n.G4.conf $TESTS_DIR/scoring/n.G5.conf 
 do
 	base=${i/*\/}
 	base=${base/.conf/}
@@ -51,9 +51,9 @@ do
 
 	if (( $OK ))
 	then
-		echo ***Scoring OK for $i ***
+		echo "***Scoring OK for $i ***"
 	else
-		echo ***Scoring test failed for $i ***
+		echo "***Scoring test failed for $i ***"
 		exit 1
 	fi
 	line=`expr $line + 1`
@@ -128,7 +128,7 @@ do
         $NEXUS_VAL ch.$base*.tre 2> /dev/null
         if [ $? -eq 0 ]
         then
-                echo TREEFILES ARE OK
+                echo "TREEFILES ARE OK"
         else
                 $NEXUS_VAL ch.$base*.tre || exit 1
         fi
