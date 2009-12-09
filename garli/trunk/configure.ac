@@ -340,6 +340,8 @@ fi
 ################################################################################
 NCL_INC_DIR="/usr/local/include"
 NCL_LIB_DIR="/usr/local/lib"
+NCL_BIN_DIR="/usr/local/bin"
+
 AC_ARG_WITH(
 	[ncl],
 	AC_HELP_STRING(
@@ -350,6 +352,7 @@ AC_ARG_WITH(
 	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
 		NCL_INC_DIR="$withval/include"
 		NCL_LIB_DIR="$withval/lib"
+		NCL_BIN_DIR="$withval/bin"
 	fi
 	])
 
@@ -431,6 +434,7 @@ AC_COMPILE_IFELSE(
 
 GARLI_LIBS="-lncl"
 
+AC_SUBST([NCL_BIN_DIR])
 
 AC_SUBST([GARLI_LIBS])
 
@@ -446,6 +450,7 @@ AC_SUBST(CPPFLAGS)
 AC_CONFIG_FILES([
 	Makefile 			\
 	src/Makefile		\
+	tests/Makefile	\
 	])
 
 AC_OUTPUT
