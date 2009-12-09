@@ -7,13 +7,13 @@ EXTRA_DIST = \
 	example \
 	project \
 	doc \
+	tests\
 	ncl-2.1.08.tar.gz
 
-SUBDIRS = src 
+SUBDIRS = src tests
 
 dist-hook:
 	find "$(distdir)/doc" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
 	find "$(distdir)/project" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
 	find "$(distdir)/example" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
-
-
+	find "$(distdir)/tests" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
