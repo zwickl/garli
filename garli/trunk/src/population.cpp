@@ -2140,7 +2140,7 @@ void Population::FinalOptimization(){
 		goingToExit = !(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass + 1 < 10);
 
 		if(pass < 20 || (pass % 10 == 0) || goingToExit){
-			if(pass > 20 || goingToExit)
+			if(pass > 20 && (goingToExit || (pass % 10 == 0)))
 				outman.UserMessage(" optimization up to ...");
 			outman.UserMessage("pass %-2d: %.4f   %s", pass, optInd->Fitness(), outString.c_str());
 			paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = ZERO_POINT_ZERO;
@@ -2543,7 +2543,7 @@ void Population::PerformSearch(){
 			ofstream ordered;
 			ordered.open(oname.c_str(), ios::app);
 			ordered.precision(12);
-			ordered << currentSearchRep << "\t" << indiv[bestIndiv].treeStruct->lnL << "\n";
+			ordered << currentSearchRep << "\t" << -indiv[bestIndiv].treeStruct->lnL << "\n";
 			ordered.close();
 			}
 
@@ -2736,7 +2736,7 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	assert(treesblock != NULL);
 	int numTrees = treesblock->GetNumTrees();
 
-	string oname = conf->ofprefix + ".ordSiteLikes.log";
+	string oname = conf->ofprefix + ".sitelikes.log";
 	ofstream ordered;
 	ordered.open(oname.c_str());
 	ordered << "Tree\t-lnL\tSite\t-lnL\n";
