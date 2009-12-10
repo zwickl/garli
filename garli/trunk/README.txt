@@ -17,40 +17,64 @@
 
 Please let me know of any problems, concerns or feedback (garli.support@gmail.com)
 
-GARLI version 1.0 is a relatively minor update relative to version 0.96, which itself was
-a major update relative to the previous version 0.951.  
-Version 1.0 should replace earlier versions, and should be backwards
-compatible with all configuration files and datasets that were used with the
-previous version.
+GARLI 1.0 is a finalized version of the previous beta release, version 0.96b8. Version 1.0 should
+replace earlier versions, and should be backwards compatible with all configuration files and
+datasets that were used with the previous version.
 
-->See the manual or support website (http://www.nescent.org/wg_garli)
- for detailed information on using the program.
+->See the manual or support website (http://www.nescent.org/wg_garli) for detailed information on
+using the program.  For very basic usage see QuickStart.txt.
 
-->Example datasets and configuration files files can be found in the example folder
+->Example datasets and template configuration files files can be found in the example folder
 
-->For compilation help see the INSTALL file.  Version 1.0 comes with an extremely 
-easy build script, build_garli.sh, which should make compalation trivial on linux
-or OS X machines.
+->For compilation help see the INSTALL file.  Version 1.0 comes with an extremely easy build
+script, build_garli.sh, which should make compalation trivial on linux or OS X machines.
 
 ***New in version 1.0***
 
-1.Ability to write sitewise log-likelihood values, in a form identical to PAUP*.
-  This can be read directly into a program like CONSEL. (outputsitelikelihoods = 1)
-2.Ability to collapse zero length branches at the end of a search, creating polytomies.
-  This can affect bootstrap values, since zero-length branches in a sense don't really 
-  exist and probably shouldn't contribute to branch support values. (collapsebranches = 1)
-3.Ability to infer full reversible amino acid rate matrices (189 free parameters)
-4.Ability to use user-specified amino acid rate matrices
-5.Ability to infer ancestral state probabilities for amino acid and codon models, in
-  addition to the previously implemented nucleotide models.
-6.Speed improvements for large constrained searches, especially backbone constraints
-7.Checkpointing of MPI parallel runs
-8.More rigorous checking of input trees, constraints and parameter values
-9.Significant improvements to parameter optimization
-10.A "verification mode", which checks that a given configuration file and datafile
-  are valid for use with GARLI, without starting an actual analysis (start GARLI with
-  "-V")
-11.Fixes to many very rare bugs in version 0.96
+Please note that these new features are NOT documented in the pdf manual in the "doc" directory.  
+The manual was accurate up through version 0.96, but I do not plan to maintain it, choosing instead 
+to update the support wiki at http://www.nescent.org/wg_garli.
+
+This version does NOT include partitioned models, although a prototype version of GARLI allowing
+this does exist.  Email garli_support@gmail.com if you'd like to give it a try.
+
+1. Ability to write sitewise log-likelihood values for all model types, in a format identical to 
+   PAUP*.  This can be read directly into a program like CONSEL to perform statistical comparisons 
+   of topologies such as the SH or AU tests. (outputsitelikelihoods = 1)
+2. Ability to collapse zero length branches at the end of any search, creating polytomies. This is
+   now turned on by default. This setting can affect bootstrap values, since zero-length branches in
+   a sense don't exist and probably shouldn't contribute to branch support values. It also tends to
+   make trees inferred from multiple searches more similar, since trees that only differ in arbitrary
+   resolutions of zero length branches are not truly different.  (collapsebranches = 1)
+3. Ability to infer full reversible amino acid rate matrices while doing a normal searching,
+   adding 189 free parameters.  This is probably not something of general utility unless you have
+   a very large dataset. (datatype = aminoacid or codon-aminoacid, ratematrix = estimate) 
+4. Ability to use user-specified amino acid rate matrices. This allows the use of any existing
+   amino acid matrix, regardless of whether GARLI implements them internally.  Amino acid matrices 
+   estimated by GARLI can also have their parameter values fixed for use in other analyses. Note 
+   however that GARLI's matrix input format differs from other programs. (ratematrix = fixed, 
+   provide matrix in a Nexus GARLI block in the datafile or in a starting conditions file.  See the
+   file "examples/LGmodel.mod" for an example.)
+5. Ability to infer internal state probabilities (ancestral states) for amino acid and codon models,
+   in addition to the previously implemented nucleotide models. (inferinternalstateprobs = 1)
+6. Substantial speed improvements for large constrained searches, especially backbone constraints
+7. MPI parallel runs can now be checkpointed, allowing entire sets of runs to be restarted.  Be sure
+   to read the wiki page detailing the MPI version (http://www.nescent.org/wg_garli/MPI_version)
+   to understand in what cases you might want to use this version.
+8. More rigorous error checking of input trees, constraints and parameter values. 
+9. Significant improvements to the precision of parameter optimization.  GARLI now puts 
+   significant effort into returning the very most optimal parameter values at the end of a search.
+   These should be as accurate as values returned by other programs such as PAUP* or PAML.  
+   Previously the estimated parameter values were nearly optimal, but sometimes not quite there.
+10. A "verification mode", which checks that a given configuration file and datafile are valid
+    for use with GARLI, without starting an actual analysis.  This can be useful, for example, in
+    verifying that all configuration and input is proper while on your local machine before sending
+    the input files to a computer cluster.  The output will also tell you how much memory GARLI
+    will be need to be allocated for the run, which might require adjustment of the 
+    "availablememory" setting in the configuration file (start GARLI with "-V").
+11. Much easier procedure for compiling of GARLI source code.
+12. Fixes to numerous rare bugs in version 0.96
+
 
 ***New in version 0.96***
 

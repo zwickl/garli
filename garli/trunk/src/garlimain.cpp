@@ -404,7 +404,7 @@ int main( int argc, char* argv[] )	{
 #endif
 
 #ifdef NCL_NAME_AND_VERSION
-			outman.UserMessage("Using %s\n", NCL_NAME_AND_VERSION);
+			outman.UserMessage("Using %s", NCL_NAME_AND_VERSION);
 #endif
 
 			OutputImportantDefines();
