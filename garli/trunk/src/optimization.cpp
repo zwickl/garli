@@ -2516,7 +2516,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 #ifdef UNIX
 	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
@@ -2635,7 +2635,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			}
 #endif
 		if(sitelikeLevel != 0){
-			siteLikes.push_back(unscaledlnL);
+			siteLikes[i] = unscaledlnL;
 			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
@@ -2680,7 +2680,7 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 #ifdef UNIX
 	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
@@ -2782,7 +2782,7 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				Ldata++;
 				}
 			if(sitelikeLevel != 0){
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 				}
 #ifdef LUMP_LIKES
 			if((i + 1) % LUMP_FREQ == 0){
@@ -2860,7 +2860,7 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				Ldata++;
 				}
 			if(sitelikeLevel != 0){
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 				}
 #ifdef LUMP_LIKES
 			if((i + 1) % LUMP_FREQ == 0){
@@ -2910,7 +2910,7 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 #ifdef UNIX
 	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
@@ -3013,7 +3013,7 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 				Ldata++;
 				}
 			if(sitelikeLevel != 0){
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 				}
 #ifdef LUMP_LIKES
 			if((i + 1) % LUMP_FREQ == 0){
@@ -3063,7 +3063,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 #ifdef CUDA_GPU
 	if (cudaman->GetGPUDerivEnabled()) {
@@ -3157,7 +3157,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 			}
 #endif
 		if(sitelikeLevel != 0){
-			siteLikes.push_back(unscaledlnL);
+			siteLikes[i] = unscaledlnL;
 			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
@@ -3211,7 +3211,7 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 #ifdef CUDA_GPU
 	if (cudaman->GetGPUDerivEnabled()) {
@@ -3289,7 +3289,7 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 			assert(tot2 == tot2);
 			}
 		if(sitelikeLevel != 0){
-			siteLikes.push_back(unscaledlnL);
+			siteLikes[i] = unscaledlnL;
 			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
@@ -3340,7 +3340,7 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 #ifdef CUDA_GPU
 	if (cudaman->GetGPUDerivEnabled()) {
@@ -3411,7 +3411,7 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 			CL1 += nstates;
 			}
 		if(sitelikeLevel != 0){
-			siteLikes.push_back(unscaledlnL);
+			siteLikes[i] = unscaledlnL;
 			}
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
