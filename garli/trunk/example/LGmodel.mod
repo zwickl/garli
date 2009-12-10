@@ -3,6 +3,8 @@
 [ Le, S.Q., and Gascuel, O. 2008. An improved general amino acid replacement matrix.
 Mol Biol Evol 25: 1307-1320. ]
 
+
+[this entire GALRI block can be copied into your NEXUS datafile to use the LG model.  Also set ratematrix = fixed and statefrequencies = fixed in the configuration file.  If you want to use the observed AA frequencies, remove the frequecy part of the block and set statefrequencies = empirical]
 begin garli;
 
 [this is the LG model rate matrix, in GARLI format (upper triangle, alphabetical by single letter codes)]
