@@ -1593,7 +1593,7 @@ if(nd->nodeNum == 8){
 					ofstream resc("rescale.log", ios::app);
 					resc << "rescale reduced to " << rescaleEvery << endl;
 					resc.close();
-					if(rescaleEvery<2) throw(ErrorException("Problem with rescaling in branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d iter=%d neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, iter, negProposalNum));
+					if(rescaleEvery<2) throw(ErrorException("Problem with rescaling in branchlength optimization.  Please report this error to garli.support@gmail.com.\nDetails: nd=%d init=%f cur=%f prev=%d iter=%d neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, iter, negProposalNum));
 					}
 				else if(err==2){
 					//this is necessary because rarely it is possible that attempted optimization at nodes
@@ -2001,9 +2001,9 @@ if(nd->nodeNum == 8){
 				//are situations where numerical problems are known to occur.
 #ifndef SINGLE_PRECISION_FLOATS				
 				if(modSpec.IsCodon() == false)
-					throw(ErrorException("Problem with branchlength optimization.  Please report this error to zwickl@nescent.org.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
+					throw(ErrorException("Problem with branchlength optimization.  Please report this error to garli.support@gmail.com.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
 				else 
-					outman.UserMessage("Notice: possible problem with branchlength optimization.\nIf you see this message frequently, please report it to zwickl@nescent.org.\nIf you only see it ignore it.\n\tDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum);
+					outman.UserMessage("Notice: possible problem with branchlength optimization.\nIf you see this message frequently, please report it to garli.support@gmail.com.\nIf you only see it ignore it.\n\tDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum);
 #endif
 
 				Score(nd->anc->nodeNum);
