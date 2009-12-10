@@ -3645,7 +3645,7 @@ int Tree::Score(int rootNodeNum /*=0*/){
 				ofstream resc("rescale.log", ios::app);
 				resc << "rescale reduced to " << rescaleEvery << endl;
 				resc.close();
-				if(rescaleEvery<2) throw(ErrorException("Problem with rescaling during tree scoring.  Please report this error to zwickl@nescent.org."));
+				if(rescaleEvery<2) throw(ErrorException("Problem with rescaling during tree scoring.  Please report this error to garli.support.gmail.com."));
 				}
 		}while(scoreOK==false);
 

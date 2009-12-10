@@ -79,6 +79,9 @@
 /* Define to 1 if the system has the type `_Bool'. */
 #undef HAVE__BOOL
 
+/* monitors all allocation/deallocation, writes report */
+#undef MONITORING_ALLOCATION
+
 /* Name of package */
 #undef PACKAGE
 
