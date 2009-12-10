@@ -4965,7 +4965,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 	if(siteToScore > 0) Ldat += siteToScore;
 
@@ -5035,7 +5035,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				}
 #endif
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 			}
 		}
 	else{//multiple rates
@@ -5110,7 +5110,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				}
 #endif
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 			}
 		}
 #ifdef LUMP_LIKES
@@ -5154,7 +5154,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 	for(int i=0;i<nchar;i++){
 #ifdef USE_COUNTS_IN_BOOT
@@ -5239,7 +5239,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 			}
 #endif
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 			}
 #ifdef LUMP_LIKES
 	totallnL += grandSumlnL;
@@ -5282,7 +5282,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	double siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 	for(int i=0;i<nchar;i++){
 #ifdef USE_COUNTS_IN_BOOT
@@ -5337,7 +5337,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 			}
 #endif
 		if(sitelikeLevel != 0)
-			siteLikes.push_back(unscaledlnL);
+			siteLikes[i] = unscaledlnL;
 		}
 
 #ifdef LUMP_LIKES
@@ -5377,7 +5377,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 
 	if(nRateCats == 1){
 #ifdef OMP_INTSCORE_NSTATE
@@ -5439,7 +5439,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				}
 #endif
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 			}
 		}
 	else{
@@ -5508,7 +5508,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				}
 #endif
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 			}
 		}
 #ifdef LUMP_LIKES

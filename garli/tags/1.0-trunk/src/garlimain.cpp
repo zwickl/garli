@@ -27,7 +27,7 @@
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
 #define INSTANTIATE_MEMCHK
- 
+  
 #ifdef WIN32
 #include <conio.h>
 #endif
