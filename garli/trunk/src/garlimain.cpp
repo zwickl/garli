@@ -252,7 +252,7 @@ int main( int argc, char* argv[] )	{
 						outman.UserMessage("OpenMP multithreaded version");
 #endif
 						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2010");
-						outman.UserMessage("zwickl@nescent.org");
+						outman.UserMessage("garli.support@gmail.com");
 						exit(0);
 						}
 					else if(!_stricmp(argv[curarg], "-h") || !_stricmp(argv[curarg], "--help")){
