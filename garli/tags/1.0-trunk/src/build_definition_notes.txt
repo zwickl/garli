@@ -1,0 +1,129 @@
+
+
+platforms/compilers
+    Windows-CygWin
+    Windows-VS
+    Mac-gcc
+    Mac-icc
+    Linux-icc
+    Linux-xlc
+    Linux-gcc
+
+daniel - nvcc
+
+
+Single (LUMP_LIKES) vs Double precision
+
+serial
+boinc
+mpi
+     OLD_SUBROUTINE_GARLI on and off
+openmp
+
+other flags to test
+    ENABLE_CUSTOM_PROFILER (added to configure)
+    DETAILED_SWAP_REPORT (removed and made effect default)
+    NDEBUG
+    NO_EVOLUTION
+    OUTPUT_FRACTION_DONE  (added to runtime config)
+    PUSH_TO_MIN_BLEN 
+    SWAP_BASED_TERMINATION 
+    MONITORING_ALLOCATION  (added to configure)
+
+preprocessor defines notes:
+===========================
+defines that definitely need to stay:
+DEBUG_ALPHA_OPT
+DEBUG_FLEX_OPT
+DEBUG_MESSAGES
+DEBUG_OMEGA_OPT
+DEBUG_SCALE_OPT
+DEBUG_SCORES
+DETAILED_SWAP_REPORT debugging output
+LUMP_LIKES needed
+NO_EVOLUTION testing
+OLD_SUBROUTINE_GARLI mpi behaviors
+
+OMP_INTDERIV
+OMP_INTDERIV_NSTATE
+OMP_INTINTCLA
+OMP_INTINTCLA_NSTATE
+OMP_INTSCORE_NSTATE
+OMP_INTTERMCLA
+OMP_INTTERMCLA_NSTATE
+OMP_TERMDERIV
+OMP_TERMDERIV_NSTATE
+OMP_TERMSCORE_NSTATE
+
+OPTIMIZATION_INFO db
+OPT_BOUNDED_LOG db
+OPT_BOUNDED_TRACE db
+OPT_DEBUG db
+OUTPUT_ALL db
+OUTPUT_DERIVS db
+OUTPUT_FRACTION_DONE
+OUTPUT_UNIQUE_TREES db
+SPOOF_NEWTON_RAPHSON db
+VARIABLE_OPTIMIZATION db
+SWAP_BASED_TERMINATION
+PUSH_TO_MIN_BLEN
+
+
+invariant defines (could be deprecated?)
+===========================
+ADAPTIVE_BOUNDED_OPT  always on
+ALT_NR_BAIL always on
+BOUND_DIGITS range of ints
+CHECK_LNL_BEFORE_RAD always on
+CONSTRAINTS always on
+CONTIG_PRMAT always on
+FINAL_RESTORE_BLENS always on
+FLEX_RATES
+MORE_DETERM_PARAM_OPT always on
+MUTUALLY_EXCLUSIVE_MUTS always on
+NEW_BUMPING always on
+OPT_BOUNDED_RESTORE always on
+RESCALE_ARRAY_LENGTH always same int
+STOCHASTIC_STARTING_BLENS always on
+SUM_AA_REL_RATES always on
+USE_COUNTS_IN_BOOT always on
+
+
+defines to remove:
+=====================
+ALIGN_CLAS to remove
+ALIGN_MODEL to remove
+BRENT to remove
+BROOK_GPU to remove
+EQUIV_CALCS broken
+FOURTH_ROOT to remove
+GANESH to remove
+IGNORE_SMALL_TOPO_IMP old
+INCLUDE_PERTURBATION old
+INPUT_RECOMBINATION old
+MAC_FRONTEND old
+NNI_SPECTRUM old
+NR_EXIT_96 old
+OLD_EQ_RESCALE old
+PECR_SET_PARSIMONY_BRLEN old
+POWERMAC_VERSION old
+SUBTREE_VERSION old
+_SINGLE_PRECISION_FLOATS old,weird
+PERIODIC_SCORE_DEBUG old db
+
+
+defines to convert to runtime:
+=====================
+ALLOW_SINGLE_SITE to runtime
+SCORE_INITIAL_ONLY to runtime
+
+
+defines of unknown status:
+=====================
+CODON_QMAT_HACK ?
+CUDAKERNELS daniel
+CUDAMANAGER daniel
+CUDA_GPU daniel
+CUDA_MEMORY_PINNED daniel
+FAKE_PARALLEL
+_BETTER_BIPART
