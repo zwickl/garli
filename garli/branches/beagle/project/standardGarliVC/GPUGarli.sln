@@ -1,0 +1,44 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ncl", "..\..\..\ncl-2.0\vc6\libncl\libncl.vcproj", "{D984EAB8-9C35-45F0-BB6D-A59A03781171}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GPUGarli", "GPUGarli.vcproj", "{95EF3E43-E243-4B9B-940B-4D10759F96A4}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171} = {D984EAB8-9C35-45F0-BB6D-A59A03781171}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Alt_Debug|Win32 = Alt_Debug|Win32
+		Debug|Win32 = Debug|Win32
+		OMP_Debug|Win32 = OMP_Debug|Win32
+		OMP_Release|Win32 = OMP_Release|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.Alt_Debug|Win32.ActiveCfg = Debug|Win32
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.Alt_Debug|Win32.Build.0 = Debug|Win32
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.Debug|Win32.Build.0 = Debug|Win32
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.OMP_Debug|Win32.ActiveCfg = Debug|Win32
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.OMP_Debug|Win32.Build.0 = Debug|Win32
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.OMP_Release|Win32.ActiveCfg = Release|Win32
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.OMP_Release|Win32.Build.0 = Release|Win32
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.Release|Win32.ActiveCfg = Release|Win32
+		{D984EAB8-9C35-45F0-BB6D-A59A03781171}.Release|Win32.Build.0 = Release|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.Alt_Debug|Win32.ActiveCfg = Alt_Debug|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.Alt_Debug|Win32.Build.0 = Alt_Debug|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.Debug|Win32.Build.0 = Debug|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.OMP_Debug|Win32.ActiveCfg = OMP_Debug|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.OMP_Debug|Win32.Build.0 = OMP_Debug|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.OMP_Release|Win32.ActiveCfg = OMP_Release|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.OMP_Release|Win32.Build.0 = OMP_Release|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.Release|Win32.ActiveCfg = Release|Win32
+		{95EF3E43-E243-4B9B-940B-4D10759F96A4}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
