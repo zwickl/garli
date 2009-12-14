@@ -1,0 +1,1585 @@
+Running GARLI, version 0.96.r396 (Partitioning Branch) (Dec 2008)
+
+###################################################
+THIS IS A TESTING VERSION FOR PARTITIONED MODELS AND THE MKV MORPHOLOGY MODEL.
+IT APPEARS TO BE WORKING PROPERLY, BUT PLEASE LET ME KNOW OF ANY PROBLEMS AT:
+		          garli.support@gmail.com
+        see this hidden page for details on partitioned usage:
+      https://www.nescent.org/wg_garli/Partition_testing_version
+       and this page for details on Mkv mophology model usage:
+      https://www.nescent.org/wg_garli/Mkv_morphology_model
+             CHECK WITH ME BEFORE PUBLISHING WITH IT
+                         !!!!THANKS!!!!
+
+###################################################
+This version has undergone much testing, but is still a BETA VERSION.
+   - Please check results carefully! -
+Compiled Dec  3 2008 15:09:49 using Intel icc compiler version 9.10
+Using NCL version 2.1.00
+
+###################################################
+READING OF DATA
+Attempting to read data file in Nexus format (using NCL):
+	lewis2001.nex ...
+Reading CHARACTERS block... found standard data... successful
+Reading ASSUMPTIONS block... successful
+
+###################################################
+PARTITIONING OF DATA AND MODELS
+GARLI partition subset 1
+	CHARACTERS block #1 ("Untitled CHARACTERS Block 1")
+	Data read as Standard k-state data, variable only,
+	modeled as Standard k-state data, variable only
+
+Subset of data with 2 states:
+	Summary of data or data subset:
+	   30 sequences.
+	    0 constant characters.
+	   39 parsimony-informative characters.
+	    0 autapomorphic characters.
+	   39 total characters.
+	   39 unique patterns in compressed data matrix.
+
+Partially ambiguous characters of taxon Chelonus_sp. converted to full ambiguity:
+	90 
+Partially ambiguous characters of taxon Alysia_lucicola converted to full ambiguity:
+	90 
+Subset of data with 3 states:
+	Summary of data or data subset:
+	   30 sequences.
+	    0 constant characters.
+	   10 parsimony-informative characters.
+	    0 autapomorphic characters.
+	   10 total characters.
+	   10 unique patterns in compressed data matrix.
+
+Subset of data with 4 states:
+	Summary of data or data subset:
+	   30 sequences.
+	    0 constant characters.
+	    3 parsimony-informative characters.
+	    0 autapomorphic characters.
+	    3 total characters.
+	    3 unique patterns in compressed data matrix.
+
+NOTE: No characters found with 5 observed states.
+NOTE: No characters found with 6 observed states.
+
+###################################################
+NOTE: Unlike many programs, the amount of system memory that Garli will
+use can be controlled by the user.
+(This comes from the availablememory setting in the configuration file.
+Availablememory should NOT be set to more than the actual amount of 
+physical memory that your computer has installed)
+
+For this dataset:
+ Mem level		availablememory setting
+  great			    >= 1 MB
+  good			approx 0 MB to 1 MB
+  low			approx 0 MB to 1 MB
+  very low		approx 0 MB to 1 MB
+the minimum required availablememory is 1 MB
+
+You specified that Garli should use at most 512.0 MB of memory.
+
+Garli will actually use approx. 0.5 MB of memory
+**Your memory level is: great (you don't need to change anything)**
+
+###################################################
+STARTING RUN
+
+>>>Search rep 1 (of 5)<<<
+MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Starting with seed=15967
+
+creating random starting tree...
+NOTE: Model contains no mutable parameters!
+Setting model mutation weight to zero.
+
+Initial ln Likelihood: -1142.7459
+optimizing: starting branch lengths...
+pass 1:+  292.841 (branch= 292.84 scale=  0.00)
+pass 2:+   43.906 (branch=  41.92 scale=  1.98)
+pass 3:+   15.220 (branch=  13.40 scale=  1.82)
+pass 4:+    2.476 (branch=   1.27 scale=  1.20)
+pass 5:+    1.743 (branch=   1.18 scale=  0.56)
+pass 6:+    0.554 (branch=   0.55 scale=  0.00)
+pass 7:+    0.041 (branch=   0.04 scale=  0.00)
+lnL after optimization: -785.9654
+gen       current_lnL    precision last_tree_imp  
+0         -785.9654      0.500     	0              
+100       -579.4056      0.500     93      
+200       -524.3128      0.500     188     
+300       -494.9043      0.500     290     
+400       -492.4045      0.500     358     
+500       -490.7164      0.500     491     
+600       -479.6783      0.500     593     
+700       -478.4228      0.500     658     
+800       -477.2836      0.500     766     
+900       -476.2220      0.500     859     
+1000      -475.8419      0.500     859     
+1100      -475.1093      0.500     1008    
+1200      -474.7116      0.500     1008    
+1300      -474.5743      0.500     1008    
+1400      -474.3816      0.500     1327    
+1500      -474.1026      0.500     1460    
+1600      -473.7231      0.500     1536    
+1700      -473.6279      0.500     1536    
+1800      -473.3367      0.500     1726    
+1900      -473.1874      0.500     1726    
+2000      -473.0919      0.500     1726    
+2100      -472.9827      0.500     1726    
+2200      -472.9291      0.500     1726    
+2300      -472.8990      0.500     1726    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.029 lnL
+2400      -472.8181      0.451     2317    
+2500      -472.7647      0.451     2317    
+2600      -472.7331      0.451     2317    
+2700      -472.7087      0.451     2317    
+2800      -472.6923      0.451     2317    
+2900      -472.6824      0.451     2317    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.001 lnL
+3000      -472.6724      0.402     2317    
+3100      -472.6601      0.402     2317    
+3200      -472.6467      0.402     2317    
+3300      -472.6385      0.402     2317    
+3400      -472.6349      0.402     2317    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+3500      -472.6311      0.353     2317    
+3600      -472.6271      0.353     2317    
+3700      -472.6171      0.353     2317    
+3800      -472.6090      0.353     2317    
+3900      -472.6075      0.353     2317    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4000      -472.6006      0.304     2317    
+4100      -472.5941      0.304     2317    
+4200      -472.5903      0.304     2317    
+4300      -472.5878      0.304     2317    
+4400      -472.5835      0.304     2317    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4500      -472.5824      0.255     2317    
+4600      -472.5797      0.255     2317    
+4700      -472.5708      0.255     2317    
+4800      -472.5692      0.255     2317    
+4900      -472.5664      0.255     2317    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5000      -472.5649      0.206     2317    
+5100      -472.5625      0.206     2317    
+5200      -472.5607      0.206     2317    
+5300      -472.5590      0.206     2317    
+5400      -472.5564      0.206     2317    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5500      -472.5555      0.157     2317    
+5600      -472.5553      0.157     2317    
+5700      -472.5529      0.157     2317    
+5800      -472.5523      0.157     2317    
+5900      -472.5451      0.157     2317    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+6000      -472.5301      0.108     2317    
+6100      -472.5154      0.108     6067    
+6200      -472.5018      0.108     6067    
+6300      -472.4902      0.108     6067    
+6400      -472.4856      0.108     6067    
+6500      -472.4835      0.108     6067    
+6600      -472.4783      0.108     6067    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+6700      -472.4753      0.059     6067    
+6800      -472.4739      0.059     6067    
+6900      -472.4738      0.059     6067    
+7000      -472.4733      0.059     6067    
+7100      -472.4700      0.059     6067    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.052 lnL
+7200      -472.4176      0.010     6067    
+7300      -472.4173      0.010     6067    
+7400      -472.4169      0.010     6067    
+7500      -472.4169      0.010     6067    
+7600      -472.4164      0.010     6067    
+7700      -472.4164      0.010     6067    
+7800      -472.4161      0.010     6067    
+7900      -472.4160      0.010     6067    
+8000      -472.4155      0.010     6067    
+8100      -472.4154      0.010     6067    
+8200      -472.4127      0.010     6067    
+8300      -472.4126      0.010     6067    
+8400      -472.4124      0.010     6067    
+8500      -472.4121      0.010     6067    
+8600      -472.4121      0.010     6067    
+8700      -472.4120      0.010     6067    
+8800      -472.4120      0.010     6067    
+8900      -472.4120      0.010     6067    
+9000      -472.4116      0.010     6067    
+9100      -472.4114      0.010     6067    
+9200      -472.4111      0.010     6067    
+9300      -472.4111      0.010     6067    
+9400      -472.4110      0.010     6067    
+9500      -472.4109      0.010     6067    
+9600      -472.4109      0.010     6067    
+9700      -472.4109      0.010     6067    
+9800      -472.4106      0.010     6067    
+9900      -472.4106      0.010     6067    
+10000     -472.4104      0.010     6067    
+10100     -472.4101      0.010     6067    
+10200     -472.4096      0.010     6067    
+10300     -472.4094      0.010     6067    
+10400     -472.4092      0.010     6067    
+10500     -472.4090      0.010     6067    
+10600     -472.4089      0.010     6067    
+10700     -472.4087      0.010     6067    
+10800     -472.4087      0.010     6067    
+10900     -472.4086      0.010     6067    
+11000     -472.4086      0.010     6067    
+11100     -472.4085      0.010     6067    
+11200     -472.4085      0.010     6067    
+11300     -472.4085      0.010     6067    
+11400     -472.4082      0.010     6067    
+11500     -472.4081      0.010     6067    
+11600     -472.4081      0.010     6067    
+11700     -472.4079      0.010     6067    
+11800     -472.4078      0.010     6067    
+11900     -472.4077      0.010     6067    
+12000     -472.4077      0.010     6067    
+12100     -472.4074      0.010     6067    
+12200     -472.4072      0.010     6067    
+12300     -472.4072      0.010     6067    
+12400     -472.4072      0.010     6067    
+12500     -472.4071      0.010     6067    
+12600     -472.4071      0.010     6067    
+12700     -472.4071      0.010     6067    
+12800     -472.4069      0.010     6067    
+12900     -472.4068      0.010     6067    
+13000     -472.4068      0.010     6067    
+13100     -472.4065      0.010     6067    
+13200     -472.4064      0.010     6067    
+13300     -472.4063      0.010     6067    
+13400     -472.4062      0.010     6067    
+13500     -472.4061      0.010     6067    
+13600     -472.4061      0.010     6067    
+13700     -472.4059      0.010     6067    
+13800     -472.4058      0.010     6067    
+13900     -472.4058      0.010     6067    
+14000     -472.4056      0.010     6067    
+14100     -472.4055      0.010     6067    
+14200     -472.4055      0.010     6067    
+14300     -472.4053      0.010     6067    
+14400     -472.4052      0.010     6067    
+14500     -472.4052      0.010     6067    
+14600     -472.4052      0.010     6067    
+14700     -472.4051      0.010     6067    
+14800     -472.4051      0.010     6067    
+14900     -472.4051      0.010     6067    
+15000     -472.4050      0.010     6067    
+15100     -472.4050      0.010     6067    
+15200     -472.4050      0.010     6067    
+15300     -472.4049      0.010     6067    
+15400     -472.4048      0.010     6067    
+15500     -472.4047      0.010     6067    
+15600     -472.4047      0.010     6067    
+15700     -472.4047      0.010     6067    
+15800     -472.4047      0.010     6067    
+15900     -472.4047      0.010     6067    
+16000     -472.4046      0.010     6067    
+16100     -472.4046      0.010     6067    
+16200     -472.4046      0.010     6067    
+16300     -472.4044      0.010     6067    
+16400     -472.4044      0.010     6067    
+16500     -472.4043      0.010     6067    
+16600     -472.4040      0.010     6067    
+16700     -472.4039      0.010     6067    
+16800     -472.4038      0.010     6067    
+16900     -472.4038      0.010     6067    
+17000     -472.4038      0.010     6067    
+17100     -472.4037      0.010     6067    
+17200     -472.4036      0.010     6067    
+Reached termination condition!
+last topological improvement at gen 6067
+Improvement over last 500 gen = 0.00033
+Current score = -472.4036
+Performing final branch optimization...
+	pass 1 -472.4036
+	pass 2 -472.4036
+	pass 3 -472.3962
+	pass 4 -472.3923
+	pass 5 -472.3913
+	pass 6 -472.3913
+	pass 7 -472.3911
+	pass 8 -472.3909
+	pass 9 -472.3907
+	pass 10 -472.3907
+	pass 11 -472.3906
+	pass 12 -472.3906
+	pass 13 -472.3906
+	pass 14 -472.3906
+Final score = -472.3906
+Time used so far = 0 hours, 0 minutes and 41 seconds
+finished
+>>>Completed Search rep 1 (of 5)<<<
+
+MODEL REPORT - Parameter values are FINAL
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+
+NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
+    7 branches were collapsed.
+
+>>>Search rep 2 (of 5)<<<
+MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Starting with seed=848769170
+
+creating random starting tree...
+Initial ln Likelihood: -1270.9737
+optimizing: starting branch lengths...
+pass 1:+  400.688 (branch= 399.98 scale=  0.71)
+pass 2:+   25.640 (branch=  25.64 scale=  0.00)
+pass 3:+   26.800 (branch=  22.47 scale=  4.33)
+pass 4:+   12.628 (branch=  10.99 scale=  1.63)
+pass 5:+    7.651 (branch=   6.66 scale=  0.99)
+pass 6:+    4.055 (branch=   3.38 scale=  0.68)
+pass 7:+    2.741 (branch=   2.74 scale=  0.00)
+pass 8:+    4.408 (branch=   3.72 scale=  0.68)
+pass 9:+    1.078 (branch=   1.08 scale=  0.00)
+pass10:+    0.277 (branch=   0.28 scale=  0.00)
+lnL after optimization: -785.0062
+gen       current_lnL    precision last_tree_imp  
+0         -785.0062      0.500     	0              
+100       -634.6205      0.500     98      
+200       -562.2871      0.500     199     
+300       -539.7456      0.500     293     
+400       -504.3385      0.500     396     
+500       -499.0342      0.500     483     
+600       -486.2344      0.500     564     
+700       -483.2618      0.500     629     
+800       -480.7692      0.500     764     
+900       -480.1518      0.500     810     
+1000      -479.2402      0.500     968     
+1100      -479.0493      0.500     968     
+1200      -478.8063      0.500     968     
+1300      -478.5819      0.500     1214    
+1400      -478.3917      0.500     1214    
+1500      -478.1859      0.500     1214    
+1600      -477.9439      0.500     1563    
+1700      -477.8130      0.500     1563    
+1800      -477.6981      0.500     1563    
+1900      -477.5571      0.500     1563    
+2000      -477.3852      0.500     1992    
+2100      -477.0238      0.500     2080    
+2200      -476.7878      0.500     2080    
+2300      -476.6168      0.500     2080    
+2400      -476.1122      0.500     2307    
+2500      -475.9020      0.500     2307    
+2600      -475.6697      0.500     2307    
+2700      -475.5383      0.500     2307    
+2800      -475.4792      0.500     2307    
+2900      -475.3894      0.500     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+3000      -475.3507      0.451     2307    
+3100      -475.2786      0.451     2307    
+3200      -475.2188      0.451     2307    
+3300      -475.1720      0.451     2307    
+3400      -475.0822      0.451     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+3500      -475.0547      0.402     2307    
+3600      -475.0280      0.402     2307    
+3700      -475.0136      0.402     2307    
+3800      -474.9753      0.402     2307    
+3900      -474.9628      0.402     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4000      -474.9519      0.353     2307    
+4100      -474.9345      0.353     2307    
+4200      -474.9140      0.353     2307    
+4300      -474.8974      0.353     2307    
+4400      -474.8737      0.353     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4500      -474.8648      0.304     2307    
+4600      -474.8448      0.304     2307    
+4700      -474.8346      0.304     2307    
+4800      -474.8286      0.304     2307    
+4900      -474.8213      0.304     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5000      -474.8118      0.255     2307    
+5100      -474.7985      0.255     2307    
+5200      -474.7941      0.255     2307    
+5300      -474.7926      0.255     2307    
+5400      -474.7875      0.255     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5500      -474.7841      0.206     2307    
+5600      -474.7780      0.206     2307    
+5700      -474.7663      0.206     2307    
+5800      -474.7624      0.206     2307    
+5900      -474.7565      0.206     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+6000      -474.7523      0.157     2307    
+6100      -474.7501      0.157     2307    
+6200      -474.7423      0.157     2307    
+6300      -474.7377      0.157     2307    
+6400      -474.7321      0.157     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+6500      -474.7300      0.108     2307    
+6600      -474.7249      0.108     2307    
+6700      -474.7207      0.108     2307    
+6800      -474.7205      0.108     2307    
+6900      -474.7160      0.108     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+7000      -474.7132      0.059     2307    
+7100      -474.7084      0.059     2307    
+7200      -474.7074      0.059     2307    
+7300      -474.7046      0.059     2307    
+7400      -474.7043      0.059     2307    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.076 lnL
+7500      -474.6253      0.010     2307    
+7600      -474.6248      0.010     2307    
+7700      -474.6220      0.010     2307    
+7800      -474.6190      0.010     2307    
+7900      -474.6129      0.010     2307    
+8000      -474.6121      0.010     2307    
+8100      -474.6111      0.010     2307    
+8200      -474.6110      0.010     2307    
+8300      -474.6100      0.010     2307    
+8400      -474.6095      0.010     2307    
+8500      -474.6090      0.010     2307    
+8600      -474.6088      0.010     2307    
+8700      -474.6086      0.010     2307    
+8800      -474.6085      0.010     2307    
+8900      -474.6084      0.010     2307    
+9000      -474.6082      0.010     2307    
+9100      -474.6079      0.010     2307    
+9200      -474.6075      0.010     2307    
+9300      -474.6075      0.010     2307    
+9400      -474.6073      0.010     2307    
+9500      -474.6072      0.010     2307    
+9600      -474.6072      0.010     2307    
+9700      -474.6069      0.010     2307    
+9800      -474.6069      0.010     2307    
+9900      -474.6067      0.010     2307    
+10000     -474.6064      0.010     2307    
+10100     -474.6062      0.010     2307    
+10200     -474.6062      0.010     2307    
+10300     -474.6062      0.010     2307    
+10400     -474.6059      0.010     2307    
+10500     -474.6059      0.010     2307    
+10600     -474.6059      0.010     2307    
+10700     -474.6058      0.010     2307    
+10800     -474.6056      0.010     2307    
+10900     -474.6056      0.010     2307    
+11000     -474.6056      0.010     2307    
+11100     -474.6056      0.010     2307    
+11200     -474.6055      0.010     2307    
+11300     -474.6055      0.010     2307    
+11400     -474.6055      0.010     2307    
+11500     -474.6053      0.010     2307    
+11600     -474.6051      0.010     2307    
+11700     -474.6050      0.010     2307    
+11800     -474.6050      0.010     2307    
+11900     -474.6047      0.010     2307    
+12000     -474.6045      0.010     2307    
+12100     -474.6045      0.010     2307    
+12200     -474.6043      0.010     2307    
+12300     -474.6042      0.010     2307    
+12400     -474.6038      0.010     2307    
+12500     -474.6037      0.010     2307    
+12600     -474.6037      0.010     2307    
+12700     -474.6037      0.010     2307    
+12800     -474.6036      0.010     2307    
+12900     -474.6035      0.010     2307    
+13000     -474.6035      0.010     2307    
+13100     -474.6034      0.010     2307    
+13200     -474.6032      0.010     2307    
+13300     -474.6030      0.010     2307    
+13400     -474.6030      0.010     2307    
+13500     -474.6030      0.010     2307    
+13600     -474.6029      0.010     2307    
+13700     -474.6029      0.010     2307    
+13800     -474.6029      0.010     2307    
+13900     -474.6029      0.010     2307    
+14000     -474.6026      0.010     2307    
+14100     -474.6022      0.010     2307    
+14200     -474.6022      0.010     2307    
+14300     -474.6021      0.010     2307    
+14400     -474.6021      0.010     2307    
+14500     -474.6021      0.010     2307    
+14600     -474.6021      0.010     2307    
+14700     -474.6019      0.010     2307    
+14800     -474.6018      0.010     2307    
+14900     -474.6018      0.010     2307    
+15000     -474.6016      0.010     2307    
+15100     -474.6016      0.010     2307    
+15200     -474.6015      0.010     2307    
+15300     -474.6011      0.010     2307    
+15400     -474.6011      0.010     2307    
+15500     -474.6011      0.010     2307    
+15600     -474.6011      0.010     2307    
+15700     -474.6010      0.010     2307    
+15800     -474.6010      0.010     2307    
+15900     -474.6010      0.010     2307    
+16000     -474.6010      0.010     2307    
+16100     -474.6010      0.010     2307    
+16200     -474.6010      0.010     2307    
+16300     -474.6010      0.010     2307    
+16400     -474.6010      0.010     2307    
+16500     -474.6009      0.010     2307    
+16600     -474.6009      0.010     2307    
+16700     -474.6009      0.010     2307    
+16800     -474.6006      0.010     2307    
+16900     -474.6006      0.010     2307    
+17000     -474.6004      0.010     2307    
+17100     -474.6001      0.010     2307    
+17200     -474.5999      0.010     2307    
+17300     -474.5998      0.010     2307    
+17400     -474.5998      0.010     2307    
+17500     -474.5995      0.010     2307    
+Reached termination condition!
+last topological improvement at gen 2307
+Improvement over last 500 gen = 0.00092
+Current score = -474.5995
+Performing final branch optimization...
+	pass 1 -474.5995
+	pass 2 -474.5995
+	pass 3 -474.5885
+	pass 4 -474.5873
+	pass 5 -474.5869
+	pass 6 -474.5866
+	pass 7 -474.5866
+	pass 8 -474.5863
+	pass 9 -474.5861
+	pass 10 -474.5861
+	pass 11 -474.5860
+	pass 12 -474.5860
+Final score = -474.5860
+Time used so far = 0 hours, 1 minutes and 21 seconds
+finished
+>>>Completed Search rep 2 (of 5)<<<
+
+MODEL REPORT - Parameter values are FINAL
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+
+NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
+    7 branches were collapsed.
+
+>>>Search rep 3 (of 5)<<<
+MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Starting with seed=117660571
+
+creating random starting tree...
+Initial ln Likelihood: -1293.1453
+optimizing: starting branch lengths...
+pass 1:+  398.554 (branch= 397.33 scale=  1.22)
+pass 2:+   42.211 (branch=  40.32 scale=  1.89)
+pass 3:+   23.580 (branch=  19.76 scale=  3.82)
+pass 4:+    5.373 (branch=   4.80 scale=  0.57)
+pass 5:+    2.812 (branch=   1.69 scale=  1.12)
+pass 6:+    2.856 (branch=   2.05 scale=  0.81)
+pass 7:+    0.290 (branch=   0.29 scale=  0.00)
+lnL after optimization: -817.4685
+gen       current_lnL    precision last_tree_imp  
+0         -817.4685      0.500     	0              
+100       -645.0654      0.500     97      
+200       -602.0033      0.500     199     
+300       -541.7745      0.500     282     
+400       -520.6874      0.500     344     
+500       -513.3032      0.500     460     
+600       -483.1796      0.500     590     
+700       -480.9968      0.500     700     
+800       -480.8092      0.500     700     
+900       -480.3602      0.500     700     
+1000      -479.2567      0.500     994     
+1100      -478.6178      0.500     1044    
+1200      -477.3266      0.500     1193    
+1300      -476.9866      0.500     1193    
+1400      -476.7554      0.500     1193    
+1500      -476.5601      0.500     1193    
+1600      -476.3812      0.500     1193    
+1700      -476.2527      0.500     1193    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+1800      -476.1215      0.451     1193    
+1900      -476.0133      0.451     1193    
+2000      -475.8887      0.451     1193    
+2100      -475.8394      0.451     1193    
+2200      -475.6773      0.451     1193    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+2300      -475.6204      0.402     1193    
+2400      -475.5646      0.402     1193    
+2500      -475.5273      0.402     1193    
+2600      -475.4808      0.402     1193    
+2700      -475.4497      0.402     1193    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+2800      -475.4119      0.353     1193    
+2900      -475.3726      0.353     1193    
+3000      -475.3287      0.353     1193    
+3100      -475.2947      0.353     1193    
+3200      -475.2711      0.353     1193    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+3300      -475.1242      0.304     3274    
+3400      -475.0706      0.304     3274    
+3500      -475.0471      0.304     3274    
+3600      -475.0133      0.304     3274    
+3700      -474.9932      0.304     3274    
+3800      -474.9880      0.304     3274    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+3900      -474.9573      0.255     3274    
+4000      -474.9360      0.255     3274    
+4100      -474.9037      0.255     3274    
+4200      -474.8789      0.255     3274    
+4300      -474.8644      0.255     3274    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4400      -474.8560      0.206     3274    
+4500      -474.8508      0.206     3274    
+4600      -474.8330      0.206     3274    
+4700      -474.8250      0.206     3274    
+4800      -474.8147      0.206     3274    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4900      -474.8079      0.157     3274    
+5000      -474.7976      0.157     3274    
+5100      -474.7949      0.157     3274    
+5200      -474.7885      0.157     3274    
+5300      -474.7839      0.157     3274    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5400      -474.7810      0.108     3274    
+5500      -474.7742      0.108     3274    
+5600      -474.7731      0.108     3274    
+5700      -474.7680      0.108     3274    
+5800      -474.7650      0.108     3274    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5900      -474.7632      0.059     3274    
+6000      -474.7586      0.059     3274    
+6100      -474.7563      0.059     3274    
+6200      -474.7536      0.059     3274    
+6300      -474.7483      0.059     3274    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.123 lnL
+6400      -474.6221      0.010     3274    
+6500      -474.6186      0.010     3274    
+6600      -474.6177      0.010     3274    
+6700      -474.6174      0.010     3274    
+6800      -474.6159      0.010     3274    
+6900      -474.6151      0.010     3274    
+7000      -474.6137      0.010     3274    
+7100      -474.6137      0.010     3274    
+7200      -474.6136      0.010     3274    
+7300      -474.6133      0.010     3274    
+7400      -474.6128      0.010     3274    
+7500      -474.6126      0.010     3274    
+7600      -474.6124      0.010     3274    
+7700      -474.6123      0.010     3274    
+7800      -474.6120      0.010     3274    
+7900      -474.6106      0.010     3274    
+8000      -474.6099      0.010     3274    
+8100      -474.6098      0.010     3274    
+8200      -474.6097      0.010     3274    
+8300      -474.6076      0.010     3274    
+8400      -474.6074      0.010     3274    
+8500      -474.6071      0.010     3274    
+8600      -474.6069      0.010     3274    
+8700      -474.6067      0.010     3274    
+8800      -474.6066      0.010     3274    
+8900      -474.6064      0.010     3274    
+9000      -474.6063      0.010     3274    
+9100      -474.6062      0.010     3274    
+9200      -474.6062      0.010     3274    
+9300      -474.6061      0.010     3274    
+9400      -474.6061      0.010     3274    
+9500      -474.6061      0.010     3274    
+9600      -474.6061      0.010     3274    
+9700      -474.6060      0.010     3274    
+9800      -474.6060      0.010     3274    
+9900      -474.6058      0.010     3274    
+10000     -474.6054      0.010     3274    
+10100     -474.6053      0.010     3274    
+10200     -474.6051      0.010     3274    
+10300     -474.6051      0.010     3274    
+10400     -474.6050      0.010     3274    
+10500     -474.6049      0.010     3274    
+10600     -474.6049      0.010     3274    
+10700     -474.6049      0.010     3274    
+10800     -474.6048      0.010     3274    
+10900     -474.6048      0.010     3274    
+11000     -474.6043      0.010     3274    
+11100     -474.6040      0.010     3274    
+11200     -474.6036      0.010     3274    
+11300     -474.6035      0.010     3274    
+11400     -474.6034      0.010     3274    
+11500     -474.6033      0.010     3274    
+11600     -474.6033      0.010     3274    
+11700     -474.6032      0.010     3274    
+11800     -474.6028      0.010     3274    
+11900     -474.6026      0.010     3274    
+12000     -474.6026      0.010     3274    
+12100     -474.6026      0.010     3274    
+12200     -474.6025      0.010     3274    
+12300     -474.6025      0.010     3274    
+12400     -474.6024      0.010     3274    
+12500     -474.6022      0.010     3274    
+12600     -474.6021      0.010     3274    
+12700     -474.6016      0.010     3274    
+12800     -474.6016      0.010     3274    
+12900     -474.6015      0.010     3274    
+13000     -474.6011      0.010     3274    
+13100     -474.6011      0.010     3274    
+13200     -474.6009      0.010     3274    
+13300     -474.6009      0.010     3274    
+13400     -474.6008      0.010     3274    
+13500     -474.6007      0.010     3274    
+13600     -474.6006      0.010     3274    
+13700     -474.6006      0.010     3274    
+13800     -474.6006      0.010     3274    
+13900     -474.6005      0.010     3274    
+14000     -474.6005      0.010     3274    
+14100     -474.6005      0.010     3274    
+14200     -474.6005      0.010     3274    
+14300     -474.6004      0.010     3274    
+14400     -474.6003      0.010     3274    
+14500     -474.6003      0.010     3274    
+14600     -474.6002      0.010     3274    
+14700     -474.6002      0.010     3274    
+14800     -474.6002      0.010     3274    
+14900     -474.6002      0.010     3274    
+15000     -474.6001      0.010     3274    
+15100     -474.6000      0.010     3274    
+15200     -474.6000      0.010     3274    
+15300     -474.6000      0.010     3274    
+15400     -474.5999      0.010     3274    
+15500     -474.5999      0.010     3274    
+15600     -474.5999      0.010     3274    
+15700     -474.5998      0.010     3274    
+15800     -474.5997      0.010     3274    
+15900     -474.5997      0.010     3274    
+16000     -474.5996      0.010     3274    
+16100     -474.5996      0.010     3274    
+16200     -474.5993      0.010     3274    
+16300     -474.5992      0.010     3274    
+16400     -474.5991      0.010     3274    
+Reached termination condition!
+last topological improvement at gen 3274
+Improvement over last 500 gen = 0.00056
+Current score = -474.5991
+Performing final branch optimization...
+	pass 1 -474.5991
+	pass 2 -474.5991
+	pass 3 -474.5897
+	pass 4 -474.5870
+	pass 5 -474.5867
+	pass 6 -474.5865
+	pass 7 -474.5864
+	pass 8 -474.5861
+	pass 9 -474.5861
+	pass 10 -474.5860
+	pass 11 -474.5860
+	pass 12 -474.5860
+	pass 13 -474.5860
+Final score = -474.5860
+Time used so far = 0 hours, 2 minutes and 0 seconds
+finished
+>>>Completed Search rep 3 (of 5)<<<
+
+MODEL REPORT - Parameter values are FINAL
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+
+NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
+    7 branches were collapsed.
+
+>>>Search rep 4 (of 5)<<<
+MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Starting with seed=195058936
+
+creating random starting tree...
+Initial ln Likelihood: -1340.9610
+optimizing: starting branch lengths...
+pass 1:+  445.673 (branch= 444.96 scale=  0.71)
+pass 2:+   49.261 (branch=  44.80 scale=  4.46)
+pass 3:+    6.358 (branch=   5.74 scale=  0.62)
+pass 4:+    0.796 (branch=   0.80 scale=  0.00)
+pass 5:+    0.000 (branch=   0.00 scale=  0.00)
+lnL after optimization: -838.8718
+gen       current_lnL    precision last_tree_imp  
+0         -838.8718      0.500     	0              
+100       -699.7925      0.500     96      
+200       -576.4676      0.500     191     
+300       -545.1000      0.500     299     
+400       -513.1246      0.500     381     
+500       -489.6832      0.500     500     
+600       -486.1479      0.500     598     
+700       -484.3608      0.500     695     
+800       -482.0592      0.500     798     
+900       -479.4291      0.500     896     
+1000      -478.7552      0.500     937     
+1100      -478.1689      0.500     1056    
+1200      -477.6033      0.500     1151    
+1300      -477.3139      0.500     1269    
+1400      -477.2362      0.500     1269    
+1500      -476.9905      0.500     1269    
+1600      -476.7805      0.500     1269    
+1700      -476.5953      0.500     1269    
+1800      -476.4886      0.500     1269    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.002 lnL
+1900      -476.3459      0.451     1269    
+2000      -475.9542      0.451     1930    
+2100      -475.7787      0.451     1930    
+2200      -475.6296      0.451     1930    
+2300      -475.5345      0.451     1930    
+2400      -475.4552      0.451     1930    
+2500      -475.3738      0.451     1930    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.335 lnL
+2600      -474.9929      0.402     1930    
+2700      -474.9453      0.402     1930    
+2800      -474.9060      0.402     1930    
+2900      -474.8839      0.402     1930    
+3000      -474.8669      0.402     1930    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+3100      -474.8477      0.353     1930    
+3200      -474.8346      0.353     1930    
+3300      -474.8288      0.353     1930    
+3400      -474.8165      0.353     1930    
+3500      -474.8081      0.353     1930    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+3600      -474.7908      0.304     1930    
+3700      -474.7844      0.304     1930    
+3800      -474.7806      0.304     1930    
+3900      -474.7743      0.304     1930    
+4000      -474.7704      0.304     1930    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4100      -474.7656      0.255     1930    
+4200      -474.7637      0.255     1930    
+4300      -474.7558      0.255     1930    
+4400      -474.7474      0.255     1930    
+4500      -474.7385      0.255     1930    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4600      -474.7343      0.206     1930    
+4700      -474.7303      0.206     1930    
+4800      -474.7259      0.206     1930    
+4900      -474.7180      0.206     1930    
+5000      -474.7170      0.206     1930    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5100      -474.7148      0.157     1930    
+5200      -474.7143      0.157     1930    
+5300      -474.7103      0.157     1930    
+5400      -474.7084      0.157     1930    
+5500      -474.7052      0.157     1930    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5600      -474.7015      0.108     1930    
+5700      -474.6948      0.108     1930    
+5800      -474.6930      0.108     1930    
+5900      -474.6879      0.108     1930    
+6000      -474.6790      0.108     1930    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+6100      -474.6772      0.059     1930    
+6200      -474.6737      0.059     1930    
+6300      -474.6725      0.059     1930    
+6400      -474.6695      0.059     1930    
+6500      -474.6618      0.059     1930    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.040 lnL
+6600      -474.6217      0.010     1930    
+6700      -474.6168      0.010     1930    
+6800      -474.6151      0.010     1930    
+6900      -474.6141      0.010     1930    
+7000      -474.6128      0.010     1930    
+7100      -474.6124      0.010     1930    
+7200      -474.6111      0.010     1930    
+7300      -474.6108      0.010     1930    
+7400      -474.6096      0.010     1930    
+7500      -474.6091      0.010     1930    
+7600      -474.6086      0.010     1930    
+7700      -474.6083      0.010     1930    
+7800      -474.6057      0.010     1930    
+7900      -474.6055      0.010     1930    
+8000      -474.6052      0.010     1930    
+8100      -474.6048      0.010     1930    
+8200      -474.6046      0.010     1930    
+8300      -474.6043      0.010     1930    
+8400      -474.6043      0.010     1930    
+8500      -474.6042      0.010     1930    
+8600      -474.6038      0.010     1930    
+8700      -474.6038      0.010     1930    
+8800      -474.6038      0.010     1930    
+8900      -474.6038      0.010     1930    
+9000      -474.6035      0.010     1930    
+9100      -474.6035      0.010     1930    
+9200      -474.6035      0.010     1930    
+9300      -474.6035      0.010     1930    
+9400      -474.6033      0.010     1930    
+9500      -474.6031      0.010     1930    
+9600      -474.6030      0.010     1930    
+9700      -474.6027      0.010     1930    
+9800      -474.6026      0.010     1930    
+9900      -474.6026      0.010     1930    
+10000     -474.6025      0.010     1930    
+10100     -474.6025      0.010     1930    
+10200     -474.6024      0.010     1930    
+10300     -474.6022      0.010     1930    
+10400     -474.6022      0.010     1930    
+10500     -474.6020      0.010     1930    
+10600     -474.6019      0.010     1930    
+10700     -474.6017      0.010     1930    
+10800     -474.6017      0.010     1930    
+10900     -474.6013      0.010     1930    
+11000     -474.6012      0.010     1930    
+11100     -474.6010      0.010     1930    
+11200     -474.6009      0.010     1930    
+11300     -474.6007      0.010     1930    
+11400     -474.6005      0.010     1930    
+11500     -474.6004      0.010     1930    
+11600     -474.6003      0.010     1930    
+11700     -474.6002      0.010     1930    
+11800     -474.6000      0.010     1930    
+11900     -474.6000      0.010     1930    
+12000     -474.5999      0.010     1930    
+12100     -474.5999      0.010     1930    
+12200     -474.5998      0.010     1930    
+12300     -474.5998      0.010     1930    
+12400     -474.5998      0.010     1930    
+12500     -474.5997      0.010     1930    
+12600     -474.5996      0.010     1930    
+12700     -474.5996      0.010     1930    
+12800     -474.5995      0.010     1930    
+12900     -474.5995      0.010     1930    
+13000     -474.5995      0.010     1930    
+13100     -474.5995      0.010     1930    
+13200     -474.5994      0.010     1930    
+13300     -474.5994      0.010     1930    
+13400     -474.5993      0.010     1930    
+13500     -474.5992      0.010     1930    
+13600     -474.5992      0.010     1930    
+13700     -474.5992      0.010     1930    
+13800     -474.5992      0.010     1930    
+13900     -474.5992      0.010     1930    
+14000     -474.5992      0.010     1930    
+14100     -474.5990      0.010     1930    
+14200     -474.5990      0.010     1930    
+14300     -474.5988      0.010     1930    
+14400     -474.5988      0.010     1930    
+14500     -474.5987      0.010     1930    
+14600     -474.5986      0.010     1930    
+14700     -474.5985      0.010     1930    
+14800     -474.5985      0.010     1930    
+14900     -474.5985      0.010     1930    
+15000     -474.5985      0.010     1930    
+15100     -474.5985      0.010     1930    
+15200     -474.5983      0.010     1930    
+15300     -474.5983      0.010     1930    
+15400     -474.5983      0.010     1930    
+15500     -474.5983      0.010     1930    
+15600     -474.5982      0.010     1930    
+15700     -474.5981      0.010     1930    
+15800     -474.5981      0.010     1930    
+15900     -474.5981      0.010     1930    
+16000     -474.5981      0.010     1930    
+16100     -474.5980      0.010     1930    
+16200     -474.5980      0.010     1930    
+16300     -474.5979      0.010     1930    
+16400     -474.5979      0.010     1930    
+16500     -474.5977      0.010     1930    
+16600     -474.5977      0.010     1930    
+Reached termination condition!
+last topological improvement at gen 1930
+Improvement over last 500 gen = 0.00036
+Current score = -474.5977
+Performing final branch optimization...
+	pass 1 -474.5977
+	pass 2 -474.5977
+	pass 3 -474.5918
+	pass 4 -474.5875
+	pass 5 -474.5866
+	pass 6 -474.5864
+	pass 7 -474.5863
+	pass 8 -474.5861
+	pass 9 -474.5861
+	pass 10 -474.5860
+	pass 11 -474.5860
+	pass 12 -474.5860
+	pass 13 -474.5860
+Final score = -474.5860
+Time used so far = 0 hours, 2 minutes and 40 seconds
+finished
+>>>Completed Search rep 4 (of 5)<<<
+
+MODEL REPORT - Parameter values are FINAL
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+
+NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
+    7 branches were collapsed.
+
+>>>Search rep 5 (of 5)<<<
+MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Starting with seed=1243131111
+
+creating random starting tree...
+Initial ln Likelihood: -1271.7094
+optimizing: starting branch lengths...
+pass 1:+  388.708 (branch= 387.42 scale=  1.29)
+pass 2:+   70.911 (branch=  66.69 scale=  4.22)
+pass 3:+    9.254 (branch=   7.58 scale=  1.68)
+pass 4:+    2.232 (branch=   1.28 scale=  0.96)
+pass 5:+    0.911 (branch=   0.91 scale=  0.00)
+pass 6:+    0.000 (branch=   0.00 scale=  0.00)
+lnL after optimization: -799.6930
+gen       current_lnL    precision last_tree_imp  
+0         -799.6930      0.500     	0              
+100       -665.9828      0.500     99      
+200       -564.0850      0.500     196     
+300       -527.6637      0.500     300     
+400       -499.8356      0.500     399     
+500       -496.6929      0.500     479     
+600       -483.5673      0.500     576     
+700       -482.5676      0.500     700     
+800       -478.9273      0.500     797     
+900       -478.3034      0.500     826     
+1000      -477.4179      0.500     927     
+1100      -475.8116      0.500     1021    
+1200      -475.4037      0.500     1021    
+1300      -474.9875      0.500     1240    
+1400      -474.6870      0.500     1240    
+1500      -474.4864      0.500     1240    
+1600      -474.2589      0.500     1240    
+1700      -474.1508      0.500     1240    
+1800      -474.0038      0.500     1240    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.003 lnL
+1900      -473.9131      0.451     1240    
+2000      -473.8045      0.451     1240    
+2100      -473.4660      0.451     2030    
+2200      -473.3465      0.451     2030    
+2300      -473.3043      0.451     2030    
+2400      -473.1651      0.451     2309    
+2500      -473.0678      0.451     2309    
+2600      -472.9599      0.451     2309    
+2700      -472.9047      0.451     2309    
+2800      -472.8247      0.451     2309    
+2900      -472.7852      0.451     2309    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.080 lnL
+3000      -472.6354      0.402     2948    
+3100      -472.6304      0.402     2948    
+3200      -472.6258      0.402     2948    
+3300      -472.6096      0.402     2948    
+3400      -472.6040      0.402     2948    
+3500      -472.5970      0.402     2948    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+3600      -472.5928      0.353     2948    
+3700      -472.5567      0.353     3647    
+3800      -472.5502      0.353     3647    
+3900      -472.5484      0.353     3647    
+4000      -472.5406      0.353     3647    
+4100      -472.5318      0.353     3647    
+4200      -472.5272      0.353     3647    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4300      -472.5213      0.304     3647    
+4400      -472.5194      0.304     3647    
+4500      -472.5192      0.304     3647    
+4600      -472.5179      0.304     3647    
+4700      -472.5153      0.304     3647    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+4800      -472.5151      0.255     3647    
+4900      -472.5131      0.255     3647    
+5000      -472.5111      0.255     3647    
+5100      -472.5104      0.255     3647    
+5200      -472.5070      0.255     3647    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5300      -472.5063      0.206     3647    
+5400      -472.5058      0.206     3647    
+5500      -472.5044      0.206     3647    
+5600      -472.5039      0.206     3647    
+5700      -472.5037      0.206     3647    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+5800      -472.5005      0.157     3647    
+5900      -472.4992      0.157     3647    
+6000      -472.4981      0.157     3647    
+6100      -472.4975      0.157     3647    
+6200      -472.4940      0.157     3647    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+6300      -472.4902      0.108     3647    
+6400      -472.4860      0.108     3647    
+6500      -472.4849      0.108     3647    
+6600      -472.4832      0.108     3647    
+6700      -472.4810      0.108     3647    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+6800      -472.4808      0.059     3647    
+6900      -472.4805      0.059     3647    
+7000      -472.4803      0.059     3647    
+7100      -472.4726      0.059     3647    
+7200      -472.4720      0.059     3647    
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.000 lnL
+   Optimizing branchlengths... improved    0.038 lnL
+7300      -472.4304      0.010     3647    
+7400      -472.4303      0.010     3647    
+7500      -472.4289      0.010     3647    
+7600      -472.4266      0.010     3647    
+7700      -472.4217      0.010     3647    
+7800      -472.4204      0.010     3647    
+7900      -472.4191      0.010     3647    
+8000      -472.4191      0.010     3647    
+8100      -472.4188      0.010     3647    
+8200      -472.4171      0.010     3647    
+8300      -472.4170      0.010     3647    
+8400      -472.4168      0.010     3647    
+8500      -472.4164      0.010     3647    
+8600      -472.4163      0.010     3647    
+8700      -472.4157      0.010     3647    
+8800      -472.4153      0.010     3647    
+8900      -472.4150      0.010     3647    
+9000      -472.4148      0.010     3647    
+9100      -472.4146      0.010     3647    
+9200      -472.4144      0.010     3647    
+9300      -472.4140      0.010     3647    
+9400      -472.4140      0.010     3647    
+9500      -472.4137      0.010     3647    
+9600      -472.4131      0.010     3647    
+9700      -472.4126      0.010     3647    
+9800      -472.4124      0.010     3647    
+9900      -472.4124      0.010     3647    
+10000     -472.4121      0.010     3647    
+10100     -472.4120      0.010     3647    
+10200     -472.4117      0.010     3647    
+10300     -472.4116      0.010     3647    
+10400     -472.4114      0.010     3647    
+10500     -472.4112      0.010     3647    
+10600     -472.4112      0.010     3647    
+10700     -472.4111      0.010     3647    
+10800     -472.4111      0.010     3647    
+10900     -472.4110      0.010     3647    
+11000     -472.4108      0.010     3647    
+11100     -472.4107      0.010     3647    
+11200     -472.4106      0.010     3647    
+11300     -472.4104      0.010     3647    
+11400     -472.4103      0.010     3647    
+11500     -472.4101      0.010     3647    
+11600     -472.4101      0.010     3647    
+11700     -472.4100      0.010     3647    
+11800     -472.4099      0.010     3647    
+11900     -472.4099      0.010     3647    
+12000     -472.4099      0.010     3647    
+12100     -472.4097      0.010     3647    
+12200     -472.4095      0.010     3647    
+12300     -472.4094      0.010     3647    
+12400     -472.4092      0.010     3647    
+12500     -472.4092      0.010     3647    
+12600     -472.4091      0.010     3647    
+12700     -472.4089      0.010     3647    
+12800     -472.4073      0.010     3647    
+12900     -472.4071      0.010     3647    
+13000     -472.4069      0.010     3647    
+13100     -472.4069      0.010     3647    
+13200     -472.4061      0.010     3647    
+13300     -472.4060      0.010     3647    
+13400     -472.4058      0.010     3647    
+13500     -472.4056      0.010     3647    
+13600     -472.4055      0.010     3647    
+13700     -472.4054      0.010     3647    
+13800     -472.4053      0.010     3647    
+13900     -472.4051      0.010     3647    
+14000     -472.4050      0.010     3647    
+14100     -472.4049      0.010     3647    
+14200     -472.4049      0.010     3647    
+14300     -472.4048      0.010     3647    
+14400     -472.4048      0.010     3647    
+14500     -472.4047      0.010     3647    
+14600     -472.4046      0.010     3647    
+14700     -472.4045      0.010     3647    
+14800     -472.4044      0.010     3647    
+14900     -472.4044      0.010     3647    
+15000     -472.4042      0.010     3647    
+15100     -472.4041      0.010     3647    
+15200     -472.4040      0.010     3647    
+15300     -472.4039      0.010     3647    
+15400     -472.4039      0.010     3647    
+15500     -472.4038      0.010     3647    
+15600     -472.4038      0.010     3647    
+15700     -472.4038      0.010     3647    
+15800     -472.4037      0.010     3647    
+15900     -472.4036      0.010     3647    
+16000     -472.4036      0.010     3647    
+16100     -472.4034      0.010     3647    
+16200     -472.4034      0.010     3647    
+16300     -472.4033      0.010     3647    
+16400     -472.4032      0.010     3647    
+16500     -472.4032      0.010     3647    
+16600     -472.4030      0.010     3647    
+16700     -472.4029      0.010     3647    
+16800     -472.4029      0.010     3647    
+16900     -472.4027      0.010     3647    
+17000     -472.4027      0.010     3647    
+17100     -472.4027      0.010     3647    
+17200     -472.4026      0.010     3647    
+17300     -472.4025      0.010     3647    
+Reached termination condition!
+last topological improvement at gen 3647
+Improvement over last 500 gen = 0.00040
+Current score = -472.4025
+Performing final branch optimization...
+	pass 1 -472.4025
+	pass 2 -472.4025
+	pass 3 -472.3951
+	pass 4 -472.3921
+	pass 5 -472.3911
+	pass 6 -472.3911
+	pass 7 -472.3910
+	pass 8 -472.3909
+	pass 9 -472.3907
+	pass 10 -472.3907
+	pass 11 -472.3906
+	pass 12 -472.3906
+	pass 13 -472.3906
+	pass 14 -472.3906
+Final score = -472.3906
+Time used = 0 hours, 3 minutes and 22 seconds
+finished
+>>>Completed Search rep 5 (of 5)<<<
+
+MODEL REPORT - Parameter values are FINAL
+Model 0
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 1
+  Number of states = 3 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.33, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Model 2
+  Number of states = 4 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.25, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+
+NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
+    7 branches were collapsed.
+
+Completed 5 replicate runs (of 5).
+Results:
+
+NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
+     If any were collapsed, the following tests for whether the topologies from each search
+     replicate were identical may not be accurate.  Check the screen output above to see
+     if branches were actually collapsed, and if necessary compare the trees in another program.
+Replicate 1 : -472.3906 (best)
+Replicate 2 : -474.5860       
+Replicate 3 : -474.5860        (same topology as 2)
+Replicate 4 : -474.5860        (same topology as 2)
+Replicate 5 : -472.3906        (same topology as 1)
+
+Parameter estimates:
+
+Partition subset 0:
+	 Model contains no estimated parameters
+
+Partition subset 1:
+	 Model contains no estimated parameters
+
+Partition subset 2:
+	 Model contains no estimated parameters
+
+Final result of the best scoring rep (#1) stored in mkv.best.tre
+Final results of all reps stored in mkv.best.all.tre
