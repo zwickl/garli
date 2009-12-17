@@ -20,6 +20,8 @@
 #ifndef __DATAMATR_H
 #define __DATAMATR_H
 
+#include <string>
+#include <cstring>
 #include <iostream>
 #include <cassert>
 #include <stdio.h>
