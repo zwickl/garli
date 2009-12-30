@@ -772,6 +772,12 @@ void Model::CalcEigenStuff(){
 		memcpy(*teigvecs, *eigvecs[m], nstates*nstates*sizeof(MODEL_FLOAT));
 		InvertMatrix(teigvecs, nstates, col, indx, inveigvecs[m]);
 		
+		//DEBUG - rescaling the eigenvals by blen_multiplier here _should_ give same result as using it later
+		//in transition matrix calculating function.  This will be easier for passing to beagle prescaled as well
+		for(int ev = 0;ev < nstates;ev++)
+			eigvals[m][ev] *= blen_multiplier[m];
+		blen_multiplier[m] = 1.0;
+
 		//For codon models using this precalculation actually makes things things slower in CalcPmat (cache thrashing,
 		//I think) so don't bother doing it here.  In fact, don't even allocate it in the model
 		if(modSpec.IsCodon() == false)
@@ -810,6 +816,49 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 #else
 			mat2 = **pmat2;
 #endif
+			}
+//		}
+
+/*		for(int i=0;i<nstates;i++)
+		for(int j=0;j<nstates;j++)
+			assert(FloatingPointEquals(metaPmat[i*nstates+j], pmat[0][i][j], 1e-5));
+*/
+	ProfCalcPmat.Stop();
+	return;
+	
+	}
+
+//usually this will be called with 2 branch lengths to caluclate two pmats, but if only one 
+//is needed the other blen with be -1
+//NOTE: unlike the previous version of this, the arguments mat1 and mat2 are the actual destination matrices that
+//should be used to hold the resulting pmats, NOT addresses that are to be returned aliased to the two pmats
+//that are data members of Model
+void Model::CalcPmatsInProvidedMatrices(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE ***mat1, FLOAT_TYPE ***mat2){
+	ProfCalcPmat.Start();
+//	if(NStates() > 4){
+		if(!(blen1 < ZERO_POINT_ZERO)){
+			//AltCalcPmat(blen1, pmat1);
+			AltCalcPmat(blen1, mat1);
+/*
+#ifdef SINGLE_PRECISION_FLOATS
+			ChangeMatrixPrecision(modSpec.nstates * modSpec.nstates * modSpec.numRateCats, pmat1, fpmat1);
+			mat1 = **fpmat1;
+#else
+			mat1 = **pmat1;
+#endif
+*/
+			}
+		if(!(blen2 < ZERO_POINT_ZERO)){
+			//AltCalcPmat(blen2, p+mat2);
+			AltCalcPmat(blen2, mat2);
+/*
+#ifdef SINGLE_PRECISION_FLOATS
+			ChangeMatrixPrecision(modSpec.nstates * modSpec.nstates * modSpec.numRateCats, pmat2, fpmat2);
+			mat2 = **fpmat2;
+#else
+			mat2 = **pmat2;
+#endif
+*/
 			}
 //		}
 

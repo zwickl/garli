@@ -28,6 +28,7 @@ using namespace std;
 #include "condlike.h"
 #include "clamanager.h"
 #include "bipartition.h"
+#include "calculationmanager.h"
 
 /* GANESH included the following #includes */
 #include "hashdefines.h"
@@ -39,6 +40,7 @@ class TreeNode{
 	public:
 		TreeNode* left,* right,* next,* prev,* anc;
  		int nodeNum;
+		NodeClaManager myMan;
  		int claIndexDown;
  		int claIndexUL;
  		int claIndexUR;
@@ -146,7 +148,6 @@ inline void TreeNode::CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, 
 
 
 #endif
-
 
 
 

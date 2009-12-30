@@ -16,6 +16,7 @@
 
 extern OutputManager outman;
 
+/*  DJZ This is all of Daniel's old Cuda Garli functions, before beagle
 CudaManager::CudaManager() {
 	pinned_memory_enabled = gpu_cla_enabled = gpu_deriv_enabled = false;
 }
@@ -868,3 +869,4 @@ void CudaManager::TestGPUDeriv() {
 		outman.UserMessageNoCR("%s\n", (gpu_deriv_enabled) ? "yes" : "no");
 	}
 }
+*/

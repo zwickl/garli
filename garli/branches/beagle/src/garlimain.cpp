@@ -46,6 +46,10 @@
 #include "errorexception.h"
 #include "outputman.h"
 
+#ifdef USE_BEAGLE
+#include "beagle.h"
+#endif
+
 #ifdef WIN32
 #include <process.h>
 #define PID_FUNC() _getpid()
@@ -591,4 +595,3 @@ int main( int argc, char* argv[] )	{
 
 	return 0;
 };
-

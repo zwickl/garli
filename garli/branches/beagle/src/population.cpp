@@ -323,6 +323,14 @@ Population::~Population()
 		delete claMan;
 		}
 
+	if(pmatMan!=NULL){
+		delete pmatMan;
+		}
+
+	if(calcMan!=NULL){
+		delete calcMan;
+		}
+
 	if(paraMan!=NULL){
 		delete paraMan;
 		}
@@ -566,8 +574,23 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	//setup the bipartition statics
 	Bipartition::SetBipartitionStatics(data->NTax());
 
+	//new calc manager stuff
+	calcMan = new CalculationManager();
+	CalculationManager::SetClaManager(claMan);
+	pmatMan = new PmatManager(numClas, numClas,  modSpec.numRateCats, modSpec.nstates);
+	CalculationManager::SetPmatManager(pmatMan);
+
+	CalculationManager::SetData(data);
+
+#ifdef USE_BEAGLE
+	calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, modSpec.nstates, sites, modSpec.numRateCats);
+#endif
+
+	NodeClaManager::SetClaManager(claMan);
+	NodeClaManager::SetPmatManager(pmatMan);
+
 	//set the tree statics
-	Tree::SetTreeStatics(claMan, data, conf);
+	Tree::SetTreeStatics(claMan, pmatMan, calcMan, data, conf);
 
 	//load any constraints
 	GetConstraints();
@@ -3318,6 +3341,22 @@ void Population::FindTreeStructsForNextGeneration(){
 		}
 	}
 
+void Population::CheckActualClaUsage(const Individual *inds){
+	vector<int> bookCounts;
+	claMan->GetHolderUsageCountTotals(bookCounts);
+	vector<int> actualCounts(claMan->NumHolders(), 0);
+	ofstream deb("debug.log");
+	for(int i = 0;i < total_size;i++){
+		vector<int> used(claMan->NumHolders(), 0);
+		inds[i].treeStruct->GetUsedHolderList(used);
+		inds[i].treeStruct->OutputNthClaAcrossTree(deb, inds[i].treeStruct->root, 0);
+		for(int h = 0;h < claMan->NumHolders();h++)
+			actualCounts[h] += used[h];
+		}
+	for(int h = 0;h < claMan->NumHolders();h++)
+		assert(actualCounts[h] == bookCounts[h]);
+	}
+
 void Population::PerformMutation(int indNum){
 	Individual *ind=&newindiv[indNum];
 	Individual *par=&indiv[newindiv[indNum].parent];
@@ -3464,7 +3503,9 @@ void Population::NextGeneration(){
 
 	//this loop is only for mutation and recom, so start from holdover
 	for(unsigned indnum = conf->holdover; indnum < conf->nindivs; indnum++ ){
+		CheckActualClaUsage(newindiv);
 		PerformMutation(indnum);
+		CheckActualClaUsage(newindiv);
 		}
 
 	UpdateTopologyList(newindiv);

@@ -11,6 +11,7 @@ noinst_HEADERS = \
 	bipartition.h \
 	clamanager.h \
 	condlike.h \
+	calculationmanager.h \
 	configoptions.h \
 	configreader.h \
 	datamatr.h \
@@ -54,6 +55,7 @@ Garli_SOURCES = \
 	$(CUDASRCS) \
 	adaptation.cpp \
 	bipartition.cpp \
+	calculationmanager.cpp \
 	condlike.cpp \
 	configoptions.cpp \
 	configreader.cpp \

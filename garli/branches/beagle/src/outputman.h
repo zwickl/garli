@@ -34,6 +34,7 @@ class OutputManager{
 	char message[BUFFER_LENGTH+1];
 	ostream *defaultOut;
 	ofstream logOut;
+	ofstream debugOut;
 	bool noOutput;
 	bool log;
 
@@ -63,6 +64,15 @@ class OutputManager{
 				logOut.clear();
 				}
 			logOut.open(logname);
+			}
+
+		void SetDebugFile(const char *debname){
+			if(debugOut.is_open()){
+				debugOut.close();
+				debugOut.clear();
+				}
+			bool ok = debugOut.good();
+			debugOut.open(debname);
 			}
 
 		ofstream *GetLogStream(){
@@ -209,7 +219,7 @@ class OutputManager{
 			va_end(vl);
 
 			if(len > -1 && len < BUFFER_LENGTH){
-				Print(*defaultOut);
+				DebugPrint(debugOut);
 				}
 			else{//default buffer is not long enough or there was an error
 				char *longmessage = NULL;
@@ -238,12 +248,12 @@ class OutputManager{
 					va_end(vl);
 #else
 					//otherwise negative means a formatting error
-					Print(*defaultOut, "(problem formatting some program output...)");
+					DebugPrint(*defaultOut, "(problem formatting some program output...)");
 					if(longmessage) delete []longmessage;
 					return;
 #endif
 					}
-				Print(*defaultOut, longmessage);
+				DebugPrint(debugOut, longmessage);
 				if(longmessage) delete []longmessage;
 				}
 #endif
@@ -258,7 +268,7 @@ class OutputManager{
 			va_end(vl);
 
 			if(len > -1 && len < BUFFER_LENGTH){
-				PrintNoCR(*defaultOut);
+				DebugPrintNoCR(debugOut);
 				}
 			else{//default buffer is not long enough or there was an error
 				char *longmessage = NULL;
@@ -286,12 +296,12 @@ class OutputManager{
 					va_end(vl);
 #else
 					//otherwise negative means a formatting error
-					Print(*defaultOut, "(problem formatting some program output...)");
+					DebugPrint(*defaultOut, "(problem formatting some program output...)");
 					if(longmessage) delete []longmessage;
 					return;
 #endif
 					}
-				PrintNoCR(*defaultOut, longmessage);
+				DebugPrintNoCR(debugOut, longmessage);
 				if(longmessage) delete []longmessage;
 				}
 #endif
@@ -323,9 +333,27 @@ class OutputManager{
 			if(log==true) logOut << message << endl;
 			}
 
+		void DebugPrint(ostream &out){
+			if(noOutput == false) 
+				*defaultOut << message << endl;
+			if(debugOut.is_open() && debugOut.good()) 
+				out << message << endl;
+			else if(log==true) 
+				logOut << message << endl;
+			}
+
 		void PrintNoCR(ostream &out){
 			if(noOutput == false) out << message;
 			if(log==true) logOut << message;
+			}
+
+		void DebugPrintNoCR(ostream &out){
+			if(noOutput == false) 
+				*defaultOut << message;
+			if(debugOut.is_open()) 
+				out << message;
+			else if(log==true) 
+				logOut << message;
 			}
 
 		void Print(ostream &out, const string &mess){
@@ -333,11 +361,28 @@ class OutputManager{
 			if(log==true) logOut << mess << endl;
 			}
 
+		void DebugPrint(ostream &out, const string &mess){
+			if(noOutput == false)
+				*defaultOut << mess << endl;
+			if(debugOut.is_open())
+				out << mess << endl;
+			else if(log==true) 
+				logOut << mess << endl;
+			}
+
 		void PrintNoCR(ostream &out, const string &mess){
 			if(noOutput == false) out << mess;
 			if(log==true) logOut << mess;
 			}
+
+		void DebugPrintNoCR(ostream &out, const string &mess){
+			if(noOutput == false) 
+				*defaultOut << mess;
+			if(debugOut.is_open())
+				out << mess;
+			else if(log==true) 
+				logOut << mess;
+			}
 	};
 	
 #endif
-

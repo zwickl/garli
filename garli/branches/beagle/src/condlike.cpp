@@ -94,10 +94,6 @@ else
 
 
 	CondLikeArray* ClaManager::AssignFreeCla(){
-		#ifdef CLA_DEBUG
-		ofstream deb("cladebug.log", ios::app);
-		#endif
-
 		if(claStack.empty() == true) RecycleClas();
 
 		CondLikeArray *arr=claStack[claStack.size()-1];
