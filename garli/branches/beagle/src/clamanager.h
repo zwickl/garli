@@ -48,6 +48,9 @@ class ClaManager{
 								  
 	vector<CondLikeArray *> claStack;
 	vector<int> holderStack;
+
+	//DEBUG
+	bool debug_clas;
 	
 	public:	
 	ClaManager(int nnod, int nClas, int nHolders, int nchar, int nrates) : numNodes(nnod), numClas(nClas), numHolders(nHolders), numRates(nrates){
@@ -63,6 +66,12 @@ class ClaManager{
 		holderStack.reserve(numHolders);
 		for(int i=numHolders-1;i>=0;i--)
 			holderStack.push_back(i);
+#ifdef CLA_DEBUG
+		debug_clas = true;
+#else
+		debug_clas = false;
+#endif
+
 		}
 
 	~ClaManager(){
@@ -79,6 +88,7 @@ class ClaManager{
 	int MaxUsedClas() {return maxUsed;}
 	int NumFreeClas() {return (int) claStack.size();}
 	int NumFreeHolders() {return (int) holderStack.size();}
+	int NumHolders() {return numHolders;}
 
 
 	int AssignClaHolder();
@@ -93,29 +103,40 @@ class ClaManager{
 	bool IsClaReserved(int index) {return holders[index].reserved;}
 	bool IsClaTempReserved(int index) {return holders[index].tempReserved;};
 	void ReclaimSingleCla(int index);
-	void CountClaTotals(int &clean, int &tempres, int &res);
+	void CountClaTotals(int &clean, int &tempres, int &res, int &assigned);
 	void RecycleClas();
 	int GetClaNumber(int index);
 	int CountClasInUse(int recLevel);
 	CondLikeArray *GetCla(int index);	
 	const CondLikeArrayHolder *GetHolder(int index);	
+	CondLikeArrayHolder *GetMutableHolder(int index);
 	bool IsDirty(int index);
 	int SetDirty(int index);
 	void IncrementCla(int index);
 	void DecrementCla(int index);
 	void CheckClaHolders();
 	void MakeAllHoldersDirty();
+	void GetHolderUsageCountTotals(vector<int> &);
+	void SetHolderDependencies(int index, int depIndex1, int pDepIndex1, int depIndex2, int pDepIndex2);
 	};
 	
 	inline int ClaManager::AssignClaHolder(){
+		CheckClaHolders();
 		assert(holderStack.size() > 0);
 		int index=holderStack[holderStack.size()-1];
+		assert(holders[index].numAssigned == 0);
 		IncrementCla(index);
 		holderStack.pop_back();
+		if(debug_clas)
+			outman.DebugMessage("assign\t%d\tsizes:\t%d\t%d", index, claStack.size(), holderStack.size());
 		return index;
 		}
 	
 	inline void ClaManager::FillHolder(int index, int dir){
+		CheckClaHolders();
+		if(debug_clas)
+			outman.DebugMessage("fill holder\t%d\tsizes:\t%d\t%d", index, claStack.size(), holderStack.size());
+		assert(holders[index].numAssigned > 0);
 		holders[index].theArray = AssignFreeCla();
 		holders[index].reclaimLevel=dir;
 		}
@@ -146,12 +167,13 @@ class ClaManager{
 		holders[index].theArray=NULL;				
 		}
 
-	inline void ClaManager::CountClaTotals(int &clean, int &tempres, int &res){
+	inline void ClaManager::CountClaTotals(int &clean, int &tempres, int &res, int &assigned){
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL) clean++;
 			if(holders[i].tempReserved ==true) tempres++;
 			if(holders[i].reserved==true) res++;
 			}		
+		assigned = this->numHolders - holderStack.size();
 		}
 	
 	inline int ClaManager::GetClaNumber(int index){
@@ -173,53 +195,99 @@ class ClaManager{
 		}
 
 	inline CondLikeArray *ClaManager::GetCla(int index){
-		assert(holders[index].theArray != NULL);
+		CheckClaHolders();
+		//assert(holders[index].theArray != NULL);
+		//DEBUG - HACK not sure if this is dangerous or not, or what should happen with the dir argument
+		assert(holders[index].numAssigned > 0);
+		if(holders[index].theArray == NULL){
+			FillHolder(index, 1);
+//			outman.DebugMessage("fill and get cla from holder\t%d", index);
+			}
+		else{
+			if(debug_clas)
+				outman.DebugMessage("get existing cla from holder\t%d\tsizes:\t%d\t%d", index, claStack.size(), holderStack.size());
+			}
 		return holders[index].theArray;
 		}
 	
 	inline const CondLikeArrayHolder *ClaManager::GetHolder(int index){
 		return &holders[index];
 		}
-	
+
+	inline CondLikeArrayHolder *ClaManager::GetMutableHolder(int index){
+		return &holders[index];
+		}
+
+	inline void ClaManager::SetHolderDependencies(int index, int depIndex1, int pDepIndex1, int depIndex2, int pDepIndex2){
+		holders[index].holderDep1 = depIndex1;
+		holders[index].transMatDep1 = pDepIndex1;
+		holders[index].holderDep2 = depIndex2;
+		holders[index].transMatDep2 = pDepIndex2;
+		}
+
 	inline bool ClaManager::IsDirty(int index){
 		//dirtyness is now synonymous with a null cla pointer in the holder
 		assert(index > -1);
+		assert(holders[index].numAssigned > 0);
 		return (holders[index].theArray == NULL);	
 		}
 
 	inline int ClaManager::SetDirty(int index){
+		if(debug_clas)
+			outman.DebugMessage("dirty\t%d\tassigned\t%d", index, holders[index].numAssigned);
+		CheckClaHolders();
 		//there are only two options here:
 		//1. Cla is being made dirty, and only node node points to it 
 		//	->null the holder's cla pointer and return the same index
 		//2. Cla is being made dirty, and multiple nodes point to it
 		//	->remove this node from the holder (decrement) and assign a new one	
 	
-		assert(index != -1);
+		assert(index > -1);
+		assert(holders[index].numAssigned > 0);
 
 		if(holders[index].numAssigned==1){
 			if(holders[index].theArray != NULL){
 				holders[index].SetReclaimLevel(0);
 				claStack.push_back(holders[index].theArray);
+				if(debug_clas)
+					outman.DebugMessage("reclaim cla from holder\t%d\tsizes:\t%d\t%d", index, claStack.size(), holderStack.size());
 				holders[index].theArray=NULL;
 				}
 			}
 		else{
 			DecrementCla(index);
 			index=holderStack[holderStack.size()-1];
-			holderStack.pop_back();
+			assert(holders[index].numAssigned == 0);
+			assert(holders[index].theArray == NULL);
 			IncrementCla(index);
+			holderStack.pop_back();
 			}
+		if(debug_clas)
+			outman.DebugMessage("reassigned\t%d\tsizes:\t%d\t%d", index, claStack.size(), holderStack.size());
+		assert(holders[index].numAssigned > 0);
 		return index;
 		}
 
 	inline void ClaManager::IncrementCla(int index){
+		//DEBUG
+		CheckClaHolders();
+		if(debug_clas)
+			outman.DebugMessage("incr\t%d\t%d\t->\t%d", index, holders[index].numAssigned, holders[index].numAssigned+1);
+		assert(index >= 0);
 		holders[index].numAssigned++;
 		}
 
 	inline void ClaManager::DecrementCla(int index){
-		assert(index != -1);
+
+		CheckClaHolders();
+		if(debug_clas)
+			outman.DebugMessage("decr\t%d\t%d\t->\t%d", index, holders[index].numAssigned, holders[index].numAssigned-1);
+		assert(index > -1);
 		if(holders[index].numAssigned==1){
+			assert(find(holderStack.begin(), holderStack.end(), index) == holderStack.end());
 			holderStack.push_back(index);
+			if(debug_clas)
+				outman.DebugMessage("reclaim holder\t%d\tsizes:\t%d\t%d", index, claStack.size(), holderStack.size());
 			if(holders[index].theArray != NULL){
 				assert(find(claStack.begin(), claStack.end(), holders[index].theArray) == claStack.end());
 				//assert(holders[index].theArray->NStates()==4);
@@ -228,6 +296,7 @@ class ClaManager{
 			holders[index].Reset();
 			}
 		else{
+			assert(holders[index].numAssigned != 0);
 			holders[index].numAssigned--; 
 			//this is important!
 			holders[index].tempReserved=false;
@@ -235,17 +304,34 @@ class ClaManager{
 		}
 
 	inline void ClaManager::CheckClaHolders(){
-		int used=0;
-		int reclaim2=0;
-		for(int i=0;i<numHolders;i++){
-			if(holders[i].theArray != NULL){
-				used++;
-				if(holders[i].GetReclaimLevel() == 2) reclaim2++;
+		if(debug_clas){
+			int used=0;
+			int reclaim2=0;
+			for(int i=0;i<numHolders;i++){
+				if(holders[i].theArray != NULL){
+					used++;
+					if(holders[i].GetReclaimLevel() == 2) reclaim2++;
+					}
+				}
+			assert(used == numClas - claStack.size());
+			for(int i=0;i<numHolders;i++){
+				if(find(holderStack.begin(),holderStack.end(), i) == holderStack.end()){
+					assert(holders[i].numAssigned > 0);
+					}
+				else{
+					assert(holders[i].numAssigned == 0);
+					assert(holders[i].theArray == NULL);
+					}
 				}
 			}
-		assert(used == numClas - claStack.size());
 		}
 	
+	inline void ClaManager::GetHolderUsageCountTotals(vector<int> &counts){
+		for(int h = 0;h < numHolders;h++){
+			counts.push_back(holders[h].numAssigned);
+			}
+		}
+
 	inline void ClaManager::MakeAllHoldersDirty(){
 		
 		for(int i=0;i<numHolders;i++){

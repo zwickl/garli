@@ -1292,6 +1292,15 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 	//nd1 and nd2 are the nodes on either side of the branch of interest
 	//nd1 will always be the "lower" one, and will always be internal, while
 	//nd2 can be internal or terminal
+
+#ifdef USE_BEAGLE
+	//DEBUG - this shouldn't need to happen so often, but is playing it safe
+	UpdateDependencies();
+	ScoreSet results = calcMan->CalculateDerivatives(nd2);
+	lnL = results.lnL;
+	return pair<FLOAT_TYPE, FLOAT_TYPE>(results.d1, results.d2);
+#endif
+
 	const CondLikeArray *claOne;
 	if(nd1->left == nd2)
 		claOne=GetClaUpLeft(nd1, true);

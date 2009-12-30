@@ -34,6 +34,7 @@ using namespace std;
 #include "model.h"
 #include "sequencedata.h"
 #include "reconnode.h"
+#include "calculationmanager.h"
 
 
 #undef BRENT
@@ -75,6 +76,8 @@ class Tree{
 		static FLOAT_TYPE max_brlen;
 		static FLOAT_TYPE exp_starting_brlen;
 		static ClaManager *claMan;
+		static PmatManager *pmatMan;
+		static CalculationManager *calcMan;
 		static const SequenceData *data;
 		static FLOAT_TYPE treeRejectionThreshold;
 		static vector<Constraint> constraints;
@@ -331,6 +334,20 @@ class Tree{
 		void MakeNodeDirty(TreeNode *nd);
 		void MakeAllNodesDirty();
 
+		//Parallel functions with CalculationManager
+		void NewSweepDirtynessOverTree(TreeNode *nd, TreeNode *from=NULL);
+		void NewRemoveTreeFromAllClas();
+		void UpdateDependencies();
+		void UpdatePmatDependencies();
+		void CheckClaIndeces() const;
+		void NewMakeAllNodesDirty();
+		void MakeAllTransMatsDirty();
+		void NewMakeNodeDirty(TreeNode *nd);
+		//TEMPORARY
+		void UpdateNodeClaManagers();
+		void UpdateNodeIndeces();
+		void NewCopyClaIndeces(const Tree *source, bool remove);
+		void NewAssignCLAsFromMaster();
 		//accessor funcs
 		bool IsGood() const {return root->IsGood();}
 		int getNumTipsTotal() const {return numTipsTotal;}
@@ -354,227 +371,10 @@ class Tree{
 		void GetInternalStateString(char *string, int nodeNum);
 		void RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out);	
 		void InferAllInternalStateProbs(const char *ofprefix);
-
-		static void SetTreeStatics(ClaManager *, const SequenceData *, const GeneralGamlConfig *);
+		void GetUsedHolderList(vector<int> &used);
+		
+		static void SetTreeStatics(ClaManager *, PmatManager *pmatManCalculationManager, CalculationManager *calcMan, const SequenceData *, const GeneralGamlConfig *);
 		};
 
 
-inline void Tree::CopyBranchLens(const Tree *s){
-	for(int i=1;i<numNodesTotal;i++)
-		allNodes[i]->dlen=s->allNodes[i]->dlen;
-	}
-
-inline void Tree::MakeAllNodesDirty(){
-	root->claIndexDown=claMan->SetDirty(root->claIndexDown);
-	root->claIndexUL=claMan->SetDirty(root->claIndexUL);
-	root->claIndexUR=claMan->SetDirty(root->claIndexUR);
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		allNodes[i]->claIndexDown=claMan->SetDirty(allNodes[i]->claIndexDown);
-		allNodes[i]->claIndexUL=claMan->SetDirty(allNodes[i]->claIndexUL);
-		allNodes[i]->claIndexUR=claMan->SetDirty(allNodes[i]->claIndexUR);
-		}
-	lnL=-ONE_POINT_ZERO;
-	}
-	
-inline int Tree::FindUnusedNode(int start){
-	for(int i=start;i<numNodesTotal;i++)
-		if(!(allNodes[i]->attached))
-			{allNodes[i]->left=allNodes[i]->right=NULL;
-			return i;
-			}
-	assert(0);
-	return -1;
-	}	
-
-inline void Tree::AssignCLAsFromMaster(){
-	//remember that the root's down cla is actually the one that goes up 
-	//the middle des
-	if(claMan == NULL)
-		return;
-	assert(allNodes[0]->claIndexDown==-1);
-	allNodes[0]->claIndexDown=claMan->AssignClaHolder();
-	allNodes[0]->claIndexUL=claMan->AssignClaHolder();
-	allNodes[0]->claIndexUR=claMan->AssignClaHolder();
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		assert(allNodes[i]->claIndexDown==-1);
-		allNodes[i]->claIndexDown=claMan->AssignClaHolder();
-		allNodes[i]->claIndexUL=claMan->AssignClaHolder();
-		allNodes[i]->claIndexUR=claMan->AssignClaHolder();
-		}
-	}
-	
-inline void Tree::CopyClaIndeces(const Tree *from, bool remove){
-	//the bool argument "remove" designates whether the tree currently has cla arrays
-	//assigned to it or not (if not, it must have come from the unused tree vector)
-
-	//do the clas down
-	if(remove) claMan->DecrementCla(allNodes[0]->claIndexDown);
-	allNodes[0]->claIndexDown=from->allNodes[0]->claIndexDown;
-	if(allNodes[0]->claIndexDown != -1) claMan->IncrementCla(allNodes[0]->claIndexDown);
-	
-#ifdef EQUIV_CALCS
-	if(from->dirtyEQ == false){
-		memcpy(allNodes[0]->tipData, from->allNodes[0]->tipData, data->NChar()*sizeof(char));
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++)
-			memcpy(allNodes[i]->tipData, from->allNodes[i]->tipData, data->NChar()*sizeof(char));
-		dirtyEQ = false;
-		}
-	else dirtyEQ = true;
 #endif
-
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(remove) claMan->DecrementCla(allNodes[i]->claIndexDown);
-		allNodes[i]->claIndexDown=from->allNodes[i]->claIndexDown;
-		if(allNodes[i]->claIndexDown != -1) claMan->IncrementCla(allNodes[i]->claIndexDown);
-		}
-		
-	//do the clas up left
-	if(remove) claMan->DecrementCla(allNodes[0]->claIndexUL);
-	allNodes[0]->claIndexUL=from->allNodes[0]->claIndexUL;
-	if(allNodes[0]->claIndexUL != -1) claMan->IncrementCla(allNodes[0]->claIndexUL);
-	
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(remove) claMan->DecrementCla(allNodes[i]->claIndexUL);
-		allNodes[i]->claIndexUL=from->allNodes[i]->claIndexUL;
-		if(allNodes[i]->claIndexUL != -1) claMan->IncrementCla(allNodes[i]->claIndexUL);
-		}
-	
-	//do the clas up right
-	if(remove) claMan->DecrementCla(allNodes[0]->claIndexUR);
-	allNodes[0]->claIndexUR=from->allNodes[0]->claIndexUR;
-	if(allNodes[0]->claIndexUR != -1) claMan->IncrementCla(allNodes[0]->claIndexUR);
-		
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(remove) claMan->DecrementCla(allNodes[i]->claIndexUR);
-		allNodes[i]->claIndexUR=from->allNodes[i]->claIndexUR;
-		if(allNodes[i]->claIndexUR != -1) claMan->IncrementCla(allNodes[i]->claIndexUR);
-		}
-	}
-
-inline void Tree::RemoveTreeFromAllClas(){
-	if(root->claIndexDown != -1){
-		claMan->DecrementCla(root->claIndexDown);
-		root->claIndexDown=-1;
-		}
-	if(root->claIndexUL != -1){
-		claMan->DecrementCla(root->claIndexUL);
-		root->claIndexUL=-1;
-		}
-	if(root->claIndexUR != -1){	
-		claMan->DecrementCla(root->claIndexUR);
-		root->claIndexUR=-1;
-		}
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(allNodes[i]->claIndexDown != -1){
-			claMan->DecrementCla(allNodes[i]->claIndexDown);
-			allNodes[i]->claIndexDown=-1;
-			}
-		if(allNodes[i]->claIndexUL != -1){
-			claMan->DecrementCla(allNodes[i]->claIndexUL);
-			allNodes[i]->claIndexUL=-1;
-			}
-		if(allNodes[i]->claIndexUR != -1){
-			claMan->DecrementCla(allNodes[i]->claIndexUR);
-			allNodes[i]->claIndexUR=-1;
-			}
-		}
-	}
-	
-inline void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len){
-	assert(!(len < min_brlen) && !(len > max_brlen));
-	nd->dlen=len;
-	SweepDirtynessOverTree(nd);
-	}
-
-inline CondLikeArray *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){
-	if(claMan->IsDirty(nd->claIndexDown)){
-		if(calc==true){
-			ConditionalLikelihoodRateHet(DOWN, nd);
-			}
-		else claMan->FillHolder(nd->claIndexDown, 1);
-		}
-	if(memLevel > 1) claMan->ReserveCla(nd->claIndexDown);
-	return claMan->GetCla(nd->claIndexDown);
-	}
-	
-inline CondLikeArray *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
-	if(claMan->IsDirty(nd->claIndexUL)){
-		if(calc==true){
-			ConditionalLikelihoodRateHet(UPLEFT, nd);
-			}
-		else claMan->FillHolder(nd->claIndexUL, 2);
-		}
-	if(memLevel > 0) claMan->ReserveCla(nd->claIndexUL);
-	return claMan->GetCla(nd->claIndexUL);
-	}
-	
-inline CondLikeArray *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/){
-	if(claMan->IsDirty(nd->claIndexUR)){
-		if(calc==true){
-			ConditionalLikelihoodRateHet(UPRIGHT, nd);
-			}
-		else claMan->FillHolder(nd->claIndexUR, 2);
-		}
-	if(memLevel > 0) claMan->ReserveCla(nd->claIndexUR);
-	return claMan->GetCla(nd->claIndexUR);
-	}
-
-inline void Tree::ProtectClas(){
-	if(memLevel != 3){
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-			claMan->ReserveCla(allNodes[i]->claIndexDown, false);
-			}
-		}
-	else{
-		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-			if(allNodes[i]->left->IsInternal() && allNodes[i]->right->IsInternal()) claMan->ReserveCla(allNodes[i]->claIndexDown, false);
-			}
-		}
-	}
-
-inline void Tree::UnprotectClas(){
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(allNodes[i]->claIndexDown > -1)
-			claMan->UnreserveCla(allNodes[i]->claIndexDown);
-		}
-	}
-
-inline int Tree::NodeToNodeDistance(int num1, int num2){
-	TreeNode *nd1=allNodes[num1];
-	TreeNode *nd2=allNodes[num2];
-	int dist=0;
-	
-	int height1=NodesToRoot(nd1);
-	int height2=NodesToRoot(nd2);
-	
-	while(height1 > height2){
-		nd1=nd1->anc;
-		dist++;
-		height1--;
-		}
-	while(height2 > height1){
-		nd2=nd2->anc;
-		dist++;
-		height2--;
-		}
-	
-	while(nd1 != nd2){
-		nd1=nd1->anc;
-		nd2=nd2->anc;
-		dist += 2;
-		}	
-	
-	return dist;
-	}
-
-inline int Tree::NodesToRoot(TreeNode *nd){
-	int i=0;
-	while(nd->anc){
-		nd=nd->anc;
-		i++;
-		}
-	return i;
-	}
-
-#endif
-

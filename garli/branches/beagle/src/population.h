@@ -296,6 +296,8 @@ private:
 public:
 	GeneralGamlConfig *conf;
 	ClaManager *claMan;
+	PmatManager *pmatMan;
+	CalculationManager *calcMan;
 	Adaptation *adap;
 	Individual* indiv;
 
@@ -460,6 +462,7 @@ private:
 		void VariableStartingTreeOptimization(bool reducing);
 		void OptimizeSiteRates();
 		void OptimizeInputAndWriteSitelikelihoods();
+		void CheckActualClaUsage(const Individual *);
 
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );

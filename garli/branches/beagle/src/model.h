@@ -62,6 +62,12 @@ extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, co
 	#define MAX_REL_RATE (SUM_TO - (189.0 * MIN_REL_RATE))
 #endif
 
+struct ModelEigenSolution{
+	MODEL_FLOAT *eigenVecs;
+	MODEL_FLOAT *eigenVals;
+	MODEL_FLOAT *invEigenVecs;
+	};
+
 	enum{//the types
 		STATEFREQS = 1,
 		RELATIVERATES = 2,
@@ -877,11 +883,12 @@ class Model{
 
 	private:
 	void AllocateEigenVariables();
-	void CalcEigenStuff();
 
 	public:
+	void CalcEigenStuff();
 	void CalcPmat(MODEL_FLOAT blen, MODEL_FLOAT *metaPmat, bool flip =false);
 	void CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLOAT_TYPE *&mat2);
+	void CalcPmatsInProvidedMatrices(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE ***mat1, FLOAT_TYPE ***mat2);
 	void CalcPmatNState(FLOAT_TYPE blen, MODEL_FLOAT *metaPmat);
 	void CalcDerivatives(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
 	void OutputPmats(ofstream &deb);
@@ -942,6 +949,29 @@ class Model{
 	int Nst() const {return nst;}
 	const int *GetArbitraryRateMatrixIndeces() const {return arbitraryMatrixIndeces;}
 	const GeneticCode *GetGeneticCode(){return code;}
+	const FLOAT_TYPE *GetEigenVectors() const {
+		return **eigvecs;
+		}
+	const FLOAT_TYPE *GetEigenValues() const{
+		return *eigvals;
+		}
+	const FLOAT_TYPE *GetInverseEigenVectors() const{
+		return **inveigvecs;
+		}
+	const FLOAT_TYPE *GetBlenMultiplier() const{
+		//need to figure out if there could be multiple multipliers with M3 type models
+		assert(this->NRateCats() == 1);
+		return blen_multiplier;
+		}
+
+	void GetEigenSolution(ModelEigenSolution &sol){
+		if(eigenDirty)
+			CalcEigenStuff();
+		
+		sol.eigenVecs = **eigvecs;
+		sol.eigenVals = *eigvals;
+		sol.invEigenVecs = **inveigvecs;
+		}
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);

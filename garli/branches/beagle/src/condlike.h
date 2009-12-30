@@ -49,6 +49,7 @@
 using namespace std;
 
 #include "defs.h"
+class Model;
 
 //******************************************************************************
 //  CondLikeArray
@@ -78,6 +79,12 @@ class CondLikeArrayHolder{
 	bool tempReserved;
 	bool reserved;
 	CondLikeArray *theArray;
+	int holderDep1;
+	int holderDep2;
+	int transMatDep1;	
+	int transMatDep2;
+	int depLevel;
+
 	CondLikeArrayHolder() : theArray(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){}
 	~CondLikeArrayHolder() {};
 	int GetReclaimLevel() {return reclaimLevel;}
@@ -85,4 +92,3 @@ class CondLikeArrayHolder{
 	void Reset(){reclaimLevel=0;numAssigned=0,tempReserved=false;reserved=false;theArray=NULL;}
 	};
 #endif
-

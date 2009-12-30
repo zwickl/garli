@@ -276,7 +276,6 @@ int DataMatrix::PatternType( int k , unsigned int *stateCounts) const{
 		nStates = max(2, nStates);
 		}
 
-	//DEBUG
 /*	ofstream deb;
 	if(k==0) deb.open("pat.log");
 	else deb.open("pat.log", ios::app);

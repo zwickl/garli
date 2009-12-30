@@ -190,6 +190,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 	else if( r < adap->modelMutateProb + adap->topoMutateProb){
 		mutation_type |= mod->PerformModelMutation();
 		treeStruct->MakeAllNodesDirty();
+		treeStruct->MakeAllTransMatsDirty();
 		dirty = true;
 		}
 
