@@ -36,6 +36,7 @@ class OutputManager{
 	ofstream logOut;
 	ofstream debugOut;
 	bool noOutput;
+	bool debugToStdOut;
 	bool log;
 
 	public:
@@ -43,6 +44,7 @@ class OutputManager{
 			noOutput=false;
 			log=false;
 			defaultOut=&cout;
+			debugToStdOut = false;
 			}
 			
 		~OutputManager(){
@@ -66,13 +68,14 @@ class OutputManager{
 			logOut.open(logname);
 			}
 
-		void SetDebugFile(const char *debname){
+		void SetDebugFile(const char *debname, bool debStdOut = true){
 			if(debugOut.is_open()){
 				debugOut.close();
 				debugOut.clear();
 				}
 			bool ok = debugOut.good();
 			debugOut.open(debname);
+			debugToStdOut = debStdOut;
 			}
 
 		ofstream *GetLogStream(){
@@ -334,7 +337,7 @@ class OutputManager{
 			}
 
 		void DebugPrint(ostream &out){
-			if(noOutput == false) 
+			if(debugToStdOut) 
 				*defaultOut << message << endl;
 			if(debugOut.is_open() && debugOut.good()) 
 				out << message << endl;
@@ -348,7 +351,7 @@ class OutputManager{
 			}
 
 		void DebugPrintNoCR(ostream &out){
-			if(noOutput == false) 
+			if(debugToStdOut) 
 				*defaultOut << message;
 			if(debugOut.is_open()) 
 				out << message;
@@ -362,7 +365,7 @@ class OutputManager{
 			}
 
 		void DebugPrint(ostream &out, const string &mess){
-			if(noOutput == false)
+			if(debugToStdOut)
 				*defaultOut << mess << endl;
 			if(debugOut.is_open())
 				out << mess << endl;
@@ -376,7 +379,7 @@ class OutputManager{
 			}
 
 		void DebugPrintNoCR(ostream &out, const string &mess){
-			if(noOutput == false) 
+			if(debugToStdOut) 
 				*defaultOut << mess;
 			if(debugOut.is_open())
 				out << mess;
