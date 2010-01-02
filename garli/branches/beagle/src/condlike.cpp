@@ -48,7 +48,9 @@ CondLikeArray::~CondLikeArray(){
 #endif
 		arr=NULL;
 		 }
-	if(underflow_mult!=NULL) delete []underflow_mult;
+	if(underflow_mult!=NULL) 
+		delete []underflow_mult;
+	underflow_mult = NULL;
 }
 
 void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
@@ -135,4 +137,3 @@ else
 			}
 		assert(numReclaimed > 0);
 		}
-

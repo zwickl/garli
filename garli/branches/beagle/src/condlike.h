@@ -86,7 +86,10 @@ class CondLikeArrayHolder{
 	int depLevel;
 
 	CondLikeArrayHolder() : theArray(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){}
-	~CondLikeArrayHolder() {};
+	//the arrays are actually allocated and deleted by the claManager, not the holders
+	~CondLikeArrayHolder() {
+		theArray = NULL;
+		};
 	int GetReclaimLevel() {return reclaimLevel;}
 	void SetReclaimLevel(int lvl) {reclaimLevel = lvl;}
 	void Reset(){reclaimLevel=0;numAssigned=0,tempReserved=false;reserved=false;theArray=NULL;}
