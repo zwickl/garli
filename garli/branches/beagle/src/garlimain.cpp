@@ -375,6 +375,12 @@ int main( int argc, char* argv[] )	{
 
 #endif
 
+#ifdef DEBUG_MESSAGES
+			string str = conf.ofprefix;
+			str += ".deb.log";
+			outman.SetDebugFile(str.c_str(), false);
+#endif
+
 #ifdef SUBROUTINE_GARLI //MPI versions
 			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)");
