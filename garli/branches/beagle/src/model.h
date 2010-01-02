@@ -1641,9 +1641,14 @@ class Model{
 #endif
 		}
 
-	const FLOAT_TYPE *GetRateProbs() {
-		//this is silly, but use the rateProbs as a holder to return the omegaProbs, which are in a vector of double pointers
+	void GetStateFreqs(FLOAT_TYPE *outFreqs) const{
+		for(int i = 0;i < nstates;i++)
+			outFreqs[i] = *stateFreqs[i];
+		}
+
+	const FLOAT_TYPE *GetRateProbs(){
 		if(modSpec.IsNonsynonymousRateHet())
+			//this is silly, but use the rateProbs as a holder to return the omegaProbs, which are in a vector of double pointers
 			for(int i=0;i<NRateCats();i++)
 				rateProbs[i] = *omegaProbs[i];
 
@@ -1657,6 +1662,17 @@ class Model{
 #endif		
 		return rateProbs;
 		}
+	void GetRateProbs(FLOAT_TYPE *outProbs)const {
+		if(modSpec.IsNonsynonymousRateHet())
+			//this is silly, but use the rateProbs as a holder to return the omegaProbs, which are in a vector of double pointers
+			for(int i=0;i<NRateCats();i++)
+				outProbs[i] = *omegaProbs[i];
+		else{
+			for(int i=0;i<NRateCats();i++)
+				outProbs[i] = rateProbs[i];
+			}
+		}
+
 	};
 	
 	class ModelSet{//this is a set of models that are applied to a _single_ set of sites
