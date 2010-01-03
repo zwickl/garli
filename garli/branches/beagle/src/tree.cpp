@@ -3654,7 +3654,6 @@ int Tree::Score(int rootNodeNum /*=0*/){
 			CheckClaIndeces();
 			//DEBUG - this shouldn't need to happen so often, but is playing it safe
 			UpdateDependencies();
-			calcMan->mod = mod;
 			lnL = calcMan->CalculateLikelihood(rootNode);
 			CheckClaIndeces();
 #else
@@ -3837,6 +3836,8 @@ void Tree::SweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 #ifdef NEW_MANAGEMENT
 	this->CheckClaIndeces();
 	NewSweepDirtynessOverTree(nd, from);
+	UpdateNodeIndeces();
+	UpdateDependencies();
 	return;
 #endif
 
@@ -3948,9 +3949,6 @@ void Tree::NewSweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 				NewSweepDirtynessOverTree(nd->left->next, nd);
 			}
 		}
-	//DEBUG
-	UpdateNodeIndeces();
-	UpdateDependencies();
 	}
 
 void Tree::TraceDirtynessToNode(TreeNode *nd, int tonode){
@@ -7938,7 +7936,7 @@ void Tree::MakeAllTransMatsDirty(){
 
 //DEBUG - TEMP
 void Tree::CheckClaIndeces() const{
-#ifdef REMOVE_NEW_MANAGEMENT
+#ifdef NEW_MANAGEMENT
 	assert(root->claIndexDown == root->myMan.downHolderIndex);
 	assert(root->claIndexUL == root->myMan.ULHolderIndex);
 	assert(root->claIndexUR == root->myMan.URHolderIndex);
@@ -8047,23 +8045,48 @@ void Tree::UpdateDependencies(){
 #ifdef NEW_MANAGEMENT
 	TreeNode *nd = root;
 
+	assert(nd->myMan.IsAllocated());
 	//DEBUG
 	CheckClaIndeces();
 
 	UpdatePmatDependencies();
 
+#ifdef DEBUG_DEPS
+	outman.DebugMessage("0\tUL\t%d\t%d\t%d\t%d",
+		(nd->left->next->IsTerminal() ? -nd->left->next->nodeNum : nd->left->next->nodeNum), 
+		(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->nodeNum),
+		(nd->left->next->IsTerminal() ? -nd->left->next->nodeNum : nd->left->next->myMan.downHolderIndex), 
+		(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex)
+		);
+#endif
 	nd->myMan.SetDependenciesUL(
 		(nd->left->next->IsTerminal() ? -nd->left->next->nodeNum : nd->left->next->myMan.downHolderIndex), 
 		(nd->left->next->myMan.transMatIndex), 
 		(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex),
 		(nd->right->myMan.transMatIndex));
 
+#ifdef DEBUG_DEPS
+	outman.DebugMessage("\tUR\t%d\t%d\t%d\t%d",
+		(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->nodeNum), 
+		(nd->left->next->IsTerminal() ? -nd->left->next->nodeNum : nd->left->next->nodeNum),
+		(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
+		(nd->left->next->IsTerminal() ? -nd->left->next->nodeNum : nd->left->next->myMan.downHolderIndex)
+		);
+#endif
 	nd->myMan.SetDependenciesUR(
 		(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
 		(nd->left->myMan.transMatIndex), 
 		(nd->left->next->IsTerminal() ? -nd->left->next->nodeNum : nd->left->next->myMan.downHolderIndex),
 		(nd->left->next->myMan.transMatIndex));
 
+#ifdef DEBUG_DEPS
+	outman.DebugMessage("\tD\t%d\t%d\t%d\t%d",
+		(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->nodeNum), 
+		(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->nodeNum),
+		(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
+		(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex)
+		);
+#endif
 	nd->myMan.SetDependenciesDown(
 		(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
 		(nd->left->myMan.transMatIndex),
@@ -8073,9 +8096,18 @@ void Tree::UpdateDependencies(){
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		nd = allNodes[i];
 
+		assert(nd->myMan.IsAllocated());
 		//this branch might not be attached yet
 		if(nd->anc){
 			if(nd->anc->left == nd){
+#ifdef DEBUG_DEPS
+				outman.DebugMessage("%d\tUL\t%d\t%d\t%d\t%d", nd->nodeNum,
+					(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->nodeNum),
+					(nd->anc->nodeNum),
+					(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex), 
+					(nd->anc->myMan.ULHolderIndex)
+					);
+#endif
 				nd->myMan.SetDependenciesUL(
 					(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex), 
 					(nd->right->myMan.transMatIndex),
@@ -8084,14 +8116,30 @@ void Tree::UpdateDependencies(){
 				}
 			
 			else if(nd->anc->right == nd){
+#ifdef DEBUG_DEPS
+				outman.DebugMessage("%d\tUL\t%d\t%d\t%d\t%d", nd->nodeNum,
+					(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->nodeNum), 
+					(nd->anc->nodeNum),
+					(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex), 
+					(nd->anc->myMan.URHolderIndex)
+					);
+#endif
 				nd->myMan.SetDependenciesUL(
-				(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex), 
-				(nd->right->myMan.transMatIndex),
-				(nd->anc->myMan.URHolderIndex),
-				(nd->myMan.transMatIndex));
-				}
+					(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex), 
+					(nd->right->myMan.transMatIndex),
+					(nd->anc->myMan.URHolderIndex),
+					(nd->myMan.transMatIndex));
+					}
 
 			else{
+#ifdef DEBUG_DEPS
+				outman.DebugMessage("%d\tUL\t%d\t%d\t%d\t%d", nd->nodeNum,
+					(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->nodeNum), 
+					(nd->anc->nodeNum),
+					(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex), 
+					(nd->anc->myMan.downHolderIndex)
+					);
+#endif
 				nd->myMan.SetDependenciesUL(
 					(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex), 
 					(nd->right->myMan.transMatIndex),	
@@ -8100,29 +8148,60 @@ void Tree::UpdateDependencies(){
 				}
 
 			if(nd->anc->left == nd){
+#ifdef DEBUG_DEPS
+				outman.DebugMessage("\tUR\t%d\t%d\t%d\t%d",
+					(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->nodeNum), 
+					(nd->anc->nodeNum),
+					(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
+					(nd->anc->myMan.ULHolderIndex)
+					);
+#endif
 				nd->myMan.SetDependenciesUR(
-				(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
-				(nd->left->myMan.transMatIndex), 
-				(nd->anc->myMan.ULHolderIndex), 
-				(nd->myMan.transMatIndex));
-				}
+					(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
+					(nd->left->myMan.transMatIndex), 
+					(nd->anc->myMan.ULHolderIndex), 
+					(nd->myMan.transMatIndex));
+					}
 
 			else if(nd->anc->right == nd){
+#ifdef DEBUG_DEPS
+				outman.DebugMessage("\tUR\t%d\t%d\t%d\t%d",
+					(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->nodeNum), 
+					(nd->anc->nodeNum),
+					(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex),
+					(nd->anc->myMan.URHolderIndex)
+					);
+#endif
 				nd->myMan.SetDependenciesUR(
-				(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
-				(nd->left->myMan.transMatIndex), 
-				(nd->anc->myMan.URHolderIndex),
-				(nd->myMan.transMatIndex));
-				}
+					(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
+					(nd->left->myMan.transMatIndex), 
+					(nd->anc->myMan.URHolderIndex),
+					(nd->myMan.transMatIndex));
+					}
 
 			else{
+#ifdef DEBUG_DEPS
+				outman.DebugMessage("\tUR\t%d\t%d\t%d\t%d",
+					(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->nodeNum), 
+					(nd->anc->nodeNum),
+					(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
+					(nd->anc->myMan.downHolderIndex)
+					);
+#endif
 				nd->myMan.SetDependenciesUR(
 					(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
 					(nd->left->myMan.transMatIndex), 
 					(nd->anc->myMan.downHolderIndex),
 					(nd->myMan.transMatIndex));
 				}
-
+#ifdef DEBUG_DEPS
+			outman.DebugMessage("\tD\t%d\t%d\t%d\t%d",
+				(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->nodeNum), 
+				(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->nodeNum),
+				(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
+				(nd->right->IsTerminal() ? -nd->right->nodeNum : nd->right->myMan.downHolderIndex)
+				);
+#endif
 			nd->myMan.SetDependenciesDown(
 				(nd->left->IsTerminal() ? -nd->left->nodeNum : nd->left->myMan.downHolderIndex), 
 				(nd->left->myMan.transMatIndex), 
@@ -8242,7 +8321,7 @@ void Tree::RemoveTreeFromAllClas(){
 		}
 	//DEBUG
 	UpdateNodeClaManagers();
-	UpdateDependencies();
+	//UpdateDependencies();
 	}
 	
 void Tree::NewRemoveTreeFromAllClas(){
@@ -8255,7 +8334,6 @@ void Tree::NewRemoveTreeFromAllClas(){
 
 	//DEBUG
 	UpdateNodeIndeces();
-	UpdateDependencies();
 	}
 
 void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len){
@@ -8386,4 +8464,3 @@ void Tree::GetUsedHolderList(vector<int> &used){
 #endif
 		}
 	}
-
