@@ -1358,6 +1358,13 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 		ProfIntDeriv.Stop();
 		}
 
+#ifdef USE_BEAGLE
+	//DEBUG
+	assert(FloatingPointEquals(lnL, results.lnL, 0.01));
+	assert(FloatingPointEquals(d1, results.d1, 0.01));
+	assert(FloatingPointEquals(d2, results.d2, 0.01));
+#endif
+
 	return pair<FLOAT_TYPE, FLOAT_TYPE>(d1, d2);
 }
 

@@ -3503,9 +3503,9 @@ void Population::NextGeneration(){
 
 	//this loop is only for mutation and recom, so start from holdover
 	for(unsigned indnum = conf->holdover; indnum < conf->nindivs; indnum++ ){
-		CheckActualClaUsage(newindiv);
+//		CheckActualClaUsage(newindiv);
 		PerformMutation(indnum);
-		CheckActualClaUsage(newindiv);
+//		CheckActualClaUsage(newindiv);
 		}
 
 	UpdateTopologyList(newindiv);
