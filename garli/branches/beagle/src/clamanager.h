@@ -133,6 +133,7 @@ class ClaManager{
 		}
 	
 	inline void ClaManager::FillHolder(int index, int dir){
+		assert(index > -1);
 		CheckClaHolders();
 		if(debug_clas)
 			outman.DebugMessage("fill holder\t%d\tsizes:\t%d\t%d", index, claStack.size(), holderStack.size());
@@ -161,6 +162,7 @@ class ClaManager{
 	inline void ClaManager::ReclaimSingleCla(int index){
 		//this simply removes the cla from a holder.  It is equivalent to just
 		//dirtying it if only a single tree shares the holder
+		assert(index > -1);
 		if(holders[index].theArray==NULL) return;
 		claStack.push_back(holders[index].theArray);
 		holders[index].SetReclaimLevel(0);
@@ -195,6 +197,7 @@ class ClaManager{
 		}
 
 	inline CondLikeArray *ClaManager::GetCla(int index){
+		assert(index > -1);
 		CheckClaHolders();
 		//assert(holders[index].theArray != NULL);
 		//DEBUG - HACK not sure if this is dangerous or not, or what should happen with the dir argument
@@ -211,14 +214,17 @@ class ClaManager{
 		}
 	
 	inline const CondLikeArrayHolder *ClaManager::GetHolder(int index){
+		assert(index > -1);
 		return &holders[index];
 		}
 
 	inline CondLikeArrayHolder *ClaManager::GetMutableHolder(int index){
+		assert(index > -1);
 		return &holders[index];
 		}
 
 	inline void ClaManager::SetHolderDependencies(int index, int depIndex1, int pDepIndex1, int depIndex2, int pDepIndex2){
+		assert(index > -1);
 		holders[index].holderDep1 = depIndex1;
 		holders[index].transMatDep1 = pDepIndex1;
 		holders[index].holderDep2 = depIndex2;
@@ -273,7 +279,7 @@ class ClaManager{
 		CheckClaHolders();
 		if(debug_clas)
 			outman.DebugMessage("incr\t%d\t%d\t->\t%d", index, holders[index].numAssigned, holders[index].numAssigned+1);
-		assert(index >= 0);
+		assert(index > -1);
 		holders[index].numAssigned++;
 		}
 

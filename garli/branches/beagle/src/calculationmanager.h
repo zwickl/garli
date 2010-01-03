@@ -37,13 +37,7 @@ struct ScoreSet{
 	MODEL_FLOAT d1;
 	MODEL_FLOAT d2;
 	};
-/*
-struct ModelEigenSolution{
-	MODEL_FLOAT *eigenVecs;
-	MODEL_FLOAT *eigenVals;
-	MODEL_FLOAT *invEigenVecs;
-	};
-*/
+
 /*this is a generic matrix for use as a pmat or derivative matrix
 multiple matrices for rates or whatever appear one after another*/
 class TransMat{
@@ -60,6 +54,7 @@ public:
 		}
 	~TransMat(){
 		Delete3DArray<MODEL_FLOAT>(theMat);
+		theMat = NULL;
 		}
 	};
 
@@ -134,6 +129,10 @@ class TransMatHolder{
 	const FLOAT_TYPE *GetCategoryRates()const{
 		return myMod->GetRateMults();
 		}
+
+	const Model *GetConstModel() const{
+		return myMod;
+		}
 	};
 
 class PmatManager{
@@ -174,6 +173,8 @@ public:
 		}
 
 	~PmatManager(){
+		transMatSetStack.clear();
+		holderStack.clear();
 		if(allMatSets != NULL){
 			for(int i = 0;i < nMats;i++){
 				delete allMatSets[i];
@@ -181,6 +182,14 @@ public:
 			delete []allMatSets;
 			}
 		delete []holders;
+		}
+
+	const int GetNumStates() const{
+		return nStates;
+		}
+
+	const int GetNumRates() const{
+		return nRates;
 		}
 
 	TransMatSet *GetTransMatSet(int index){
@@ -221,6 +230,10 @@ public:
 
 	TransMatHolder *GetMutableHolder(int index){
 		return &holders[index];
+		}
+
+	const Model *GetCorrespondingModel(int index)const{
+		return holders[index].GetConstModel();
 		}
 
 	//this will be called by a node (branch) and will return a previously unused holder index
@@ -532,6 +545,10 @@ class BlockingOperationsSet{
 public:
 	list<ClaOperation> claOps;
 	list<TransMatOperation> pmatOps;
+	~BlockingOperationsSet(){
+		claOps.clear();
+		pmatOps.clear();
+		}
 	};
 
 /*
@@ -564,7 +581,7 @@ class CalculationManager{
 	
 public:
 	//DEBUG - this is a temporary hack
-	Model *mod;
+	//Model *mod;
 
 	CalculationManager(){
 		beagle = false; 
@@ -610,39 +627,31 @@ public:
 
 	//calculate and return either the lnL alone, or the lnl, D1 and D2
 	ScoreSet PerformScoringOperation(const ScoringOperation *theOp);
+	
+	//this is just for debugging
+	void OutputOperationsSummary() const;
 
 	//these are just duplicates of the functions originally in Tree.  They are not used with beagle
-	void CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const TransMat *Lpr, const TransMat *Rpr);
-	void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata, const TransMat *Lpr, const TransMat *Rpr);
-	void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *data2, const TransMat *pr1, const TransMat *pr2, const unsigned *ambigMap);
-	FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const TransMat *prmat, const char *Ldata);
-	FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const TransMat *prmat);
+	void CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const TransMat *Lpr, const TransMat *Rpr, const Model *mod);
+	void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata, const TransMat *Lpr, const TransMat *Rpr, const Model *mod);
+	void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *data2, const TransMat *pr1, const TransMat *pr2, const Model *mod, const unsigned *ambigMap);
+	FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const TransMat *prmat, const char *Ldata, const Model *mod);
+	FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const TransMat *prmat, const Model *mod);
 	
-	FLOAT_TYPE SumSiteValues(const FLOAT_TYPE *arr){
-//		ofstream deb("siteli.log");
-		FLOAT_TYPE lnL = 0.0;
-		for(int i = 0;i < data->NChar();i++){
-			assert(arr[i] == arr[i]);
-			lnL += arr[i] * data->Count(i);
-			//DEBUG
-//			deb << i << "\t" << arr[i] << endl;
-			}
-		return lnL;
-		}
-
-	ScoreSet SumDerivatives(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2){
-		//ofstream deb("siteli.log");
+	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2){
 		FLOAT_TYPE lnL = 0.0, D1 = 0.0, D2 = 0.0;
 		for(int i = 0;i < data->NChar();i++){
 			assert(sitelnL[i] == sitelnL[i]);
-			assert(siteD1[i] == siteD1[i]);
-			assert(siteD2[i] == siteD2[i]);
-
 			lnL += sitelnL[i] * data->Count(i);
-			D1 += siteD1[i] * data->Count(i);
-			D2 += siteD2[i] * data->Count(i);
-			//DEBUG
-			//deb << i << "\t" << arr[i] << endl;
+			
+			if(siteD1 != NULL){
+				assert(siteD1[i] == siteD1[i]);
+				D1 += siteD1[i] * data->Count(i);
+				}
+			if(siteD2 != NULL){
+				assert(siteD2[i] == siteD2[i]);
+				D2 += siteD2[i] * data->Count(i);
+				}
 			}
 		ScoreSet res = {lnL, D1, D2};
 		return res;
@@ -654,10 +663,10 @@ public:
 	void InitializeBeagle(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
 	
 	//interpret beagle error codes, output a message and bail if termOnBeagleError == true
-	void CheckBeagleReturnValue(int err, char *funcName);
+	void CheckBeagleReturnValue(int err, const char *funcName) const;
 
 	//simple report
-	void OutputInstanceDetails(BeagleInstanceDetails *det);
+	void OutputInstanceDetails(const BeagleInstanceDetails *det) const;
 
 	/*beagle treats cla indeces 0 -> NTax - 1 as the tips, then above that the other internals.  My internal cla indexing
 	starts at zero, and the negatives are just (-taxnum) NOT starting at zero.  So, convert like this: 
