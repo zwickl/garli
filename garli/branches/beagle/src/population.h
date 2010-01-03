@@ -400,7 +400,7 @@ private:
 		Population() : error(0), conf(NULL), usedNCL(false), startingTreeInNCL(false), startingModelInNCL(false),
 			bestFitness(-(FLT_MAX)), bestIndiv(0), currentSearchRep(1), 
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
-			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
+			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), pmatMan(NULL), calcMan(NULL), 
 			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
 			topologies(NULL), userTermination(false), timeTermination(false), genTermination(false), currentBootstrapRep(0),
 			finishedRep(false), lastBootstrapSeed(0), data(NULL), rawData(NULL), swapTermThreshold(0)
