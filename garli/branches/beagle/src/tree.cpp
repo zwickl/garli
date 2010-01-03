@@ -3063,7 +3063,7 @@ void Tree::MimicTopo(TreeNode *nd, bool firstNode, bool sameModel){
 	//allows replicating nodeNums from a certain subtree up, but not in the rest of the tree
 	//The cla info will only be copied if the models are identical for the individuals (sameModel==true)
 	//otherwise the replicated nodes will be marked as dirty
-	//TODO need to fix this for new memory management
+	//TODO need to fix this for new memory management, but I think hasn't been in use anyway
 	assert(0);
 	TreeNode *mnd;
 	mnd=allNodes[nd->nodeNum];
@@ -4060,7 +4060,11 @@ void Tree::RotateNodesAtRoot(TreeNode *newroot){
 //	root->claIndexDown=claMan->SetDirty(root->claIndexDown);
 //	tempnode->claIndexDown=claMan->SetDirty(tempnode->claIndexDown);
 	//DEBUG
-	this->UpdateNodeClaManagers();
+	//cla holders might not even be assigned yet, so don't do these in that case
+	if(newroot->myMan.IsAllocated()){
+		UpdateNodeClaManagers();
+		UpdateDependencies();
+		}
 	}
 
 //CAREFUL here!  This function assumes that this tree and ONLY this tree
@@ -4418,6 +4422,12 @@ void Tree::RerootHere(int newroot){
 	//REMEMBER that the mutation_type of the individual this is called for needs to be
 	// "|= rerooted" so that the topo numbers are updated properly
 
+	//TODO this has to be updated for the new management (actually I think that nothing needs to be done, but playing safe)
+	//DEBUG - just dirty everything and don't worry about adjusting it
+#ifdef NEW_MANAGEMENT
+	MakeAllNodesDirty();
+#endif
+
 	TreeNode *nroot=allNodes[newroot];
 
 	TreeNode *prevnode=nroot;
@@ -4517,13 +4527,22 @@ void Tree::RerootHere(int newroot){
 
 	root->CheckTreeFormation();
 	bipartCond = DIRTY;
+
+#ifdef NEW_MANAGEMENT
+	UpdateDependencies();
+#endif
 //	MakeAllNodesDirty();
 //	Score();
 	}
 
 void Tree::SwapNodeDataForReroot(TreeNode *nroot){
-	//TODO this has to be updated for the new management
-	assert(0);
+	
+	//TODO this has to be updated for the new management.  This is a hack for now
+	//DEBUG - just dirty everything and don't worry about adjusting it
+#ifdef NEW_MANAGEMENT
+	MakeAllNodesDirty();
+#endif
+
 	TreeNode tempold;
 	tempold.left=root->left;
 	tempold.right=root->right;
@@ -4534,9 +4553,11 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	else tempold.anc=root->anc;
 	tempold.dlen=root->dlen;
 
+#ifndef NEW_MANAGEMENT
 	tempold.claIndexDown=root->claIndexDown;
 	tempold.claIndexUL=root->claIndexUL;
 	tempold.claIndexUR=root->claIndexUR;
+#endif
 
 	TreeNode tempnew;
 	tempnew.left=nroot->left;
@@ -4545,9 +4566,11 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	tempnew.prev=nroot->prev;
 	tempnew.anc=nroot->anc;
 	tempnew.dlen=nroot->dlen;
+#ifndef NEW_MANAGEMENT
 	tempnew.claIndexDown=nroot->claIndexDown;
 	tempnew.claIndexUL=nroot->claIndexUL;
 	tempnew.claIndexUR=nroot->claIndexUR;
+#endif
 
 	root->left=tempnew.left;
 	root->left->anc=root;
@@ -4557,9 +4580,11 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	root->prev=root->next=NULL;
 	root->anc=NULL;
 	root->dlen=-1;
+#ifndef NEW_MANAGEMENT
 	root->claIndexDown=tempnew.claIndexDown;
 	root->claIndexUL=tempnew.claIndexUL;
 	root->claIndexUR=tempnew.claIndexUR;
+#endif
 
 	MakeNodeDirty(root);
 
@@ -4572,9 +4597,11 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 	if(nroot->prev) nroot->prev->next=nroot;
 	nroot->right->anc=nroot;
 	nroot->anc=tempold.anc;
+#ifndef NEW_MANAGEMENT
 	nroot->claIndexDown=tempold.claIndexDown;
 	nroot->claIndexUL=tempold.claIndexUL;
 	nroot->claIndexUR=tempold.claIndexUR;
+#endif
 
 	MakeNodeDirty(nroot);
 
@@ -4597,6 +4624,9 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 //		nroot->prev->next=nroot;
 		}
 	nroot->dlen=tempold.dlen;
+#ifdef NEW_MANAGEMENT
+	UpdateDependencies();
+#endif
 	}
 
 

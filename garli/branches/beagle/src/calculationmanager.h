@@ -340,10 +340,14 @@ public:
 		}
 
 	void SetHolders(int d, int UL, int UR, int p){
+		//this might be called to copy changes that were made to cla assignments NOT through the
+		//NodeClaManager. So these can already be set to some other valid value
+/*
 		assert(downHolderIndex < 0);
 		assert(ULHolderIndex < 0);
 		assert(URHolderIndex < 0);
 		assert(transMatIndex < 0);
+*/
 		downHolderIndex = d;
 		ULHolderIndex = UL;	
 		URHolderIndex = UR;
