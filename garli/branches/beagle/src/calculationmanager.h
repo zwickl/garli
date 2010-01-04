@@ -126,8 +126,18 @@ class TransMatHolder{
 		myMod->GetEigenSolution(sol);
 		}
 
-	const FLOAT_TYPE *GetCategoryRates()const{
-		return myMod->GetRateMults();
+//this includes pinv, which my scheme doesn't treat as a rate class per se
+	void GetCategoryRatesForBeagle(vector<FLOAT_TYPE> &r)const{
+		myMod->GetRateMultsForBeagle(r);
+		}
+//this includes pinv
+	void GetCategoryWeightsForBeagle(vector<FLOAT_TYPE> &p) const {
+		myMod->GetRateProbsForBeagle(p);
+		}
+
+	//need to include pinv, which is a separate rate as far as beagle is concerned, but not for Gar
+	int NumRateCatsForBeagle(){
+		return myMod->NumRateCatsForBeagle();
 		}
 
 	const Model *GetConstModel() const{
@@ -692,6 +702,14 @@ public:
 		}
 	int D2MatIndexForBeagle(int ind){
 		return (ind * 3) + 2;
+		}
+
+	//For scale arrays my indexing scheme and Beagle's happen to be the same
+	void AccumulateRescalers(int destIndex, int childIndex1, int childIndex2);
+
+	void Finalize(){
+		if(beagleInst > 0)
+			beagleFinalizeInstance(beagleInst);
 		}
 
 	//for testing/debugging

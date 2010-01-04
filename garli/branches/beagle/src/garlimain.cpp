@@ -567,6 +567,8 @@ int main( int argc, char* argv[] )	{
 					outman.UserMessage("\n-Press enter to close program.-");
 					char d=getchar();
 					}
+				if(pop.calcMan != NULL)
+					pop.calcMan->Finalize();
 				return 1;
 				}
 			catch(int error){
@@ -579,6 +581,8 @@ int main( int argc, char* argv[] )	{
 			char d=getchar();
 			}
 		outman.CloseLogFile();
+		if(pop.calcMan != NULL)
+			pop.calcMan->Finalize();
 		}
 
 #if defined(MONITORING_ALLOCATION) && !defined(NDEBUG)
