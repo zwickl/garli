@@ -142,12 +142,15 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	int compactCount = tipCount;
 	int eigCount = nClas;
 	int matrixCount = nClas * 3;//for the pmats, d1mats and d2mats
-	//DEBUG - no scaling yet
-	int scalerCount = 0;
+	//DEBUG - trying scaling
+	//try one scaler per cla, as in normal garli.  These are doubles rather than ints though, so larger.
+	//scaler for a given cla will share same index, and will be cumulative, as mine are now
+	//add one for a destinationScaleWrite which will always be the last and will be used in all calls for scratch
+	int scalerCount = nClas + 1;
 	int resourceList[1] = {NULL};
 	int resourceListCount = 0;
 
-	//this returns either the instance number of a beagle error, which is somewhat annoying
+	//this returns either the instance number or a beagle error, which is somewhat annoying
    	beagleInst = beagleCreateInstance(tipCount, 
 		partialsCount, 
 		compactCount, 
@@ -438,71 +441,14 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		}
 	else{
 #ifdef USE_BEAGLE
-		//first set up the pmats
-		//DEBUG
-		bool passPmats= false;
-/*
-		if(passPmats){
-			outman.DebugMessage("SETTING FIRST PMAT");
-			CheckBeagleReturnValue(
-				beagleSetTransitionMatrix(
-					beagleInst, 
-					PmatIndexForBeagle(theOp->transMatIndex1), 
-					**pmatMan->GetPmat(theOp->transMatIndex1)->theMat),
-				"beagleSetTransitionMatrix");
-				
-			outman.DebugMessage("SETTING SEC PMAT");
-			CheckBeagleReturnValue(
-				beagleSetTransitionMatrix(
-				beagleInst, 
-				PmatIndexForBeagle(theOp->transMatIndex2), 
-				**pmatMan->GetPmat(theOp->transMatIndex2)->theMat),
-				"beagleSetTransitionMatrix");
-			}
-		else{
-			outman.DebugMessage("SETTING EIGEN");
-			//DEBUG
-			int eigenIndex = 1;
-			
-			CheckBeagleReturnValue(
-				beagleSetEigenDecomposition(
-					beagleInst,
-					eigenIndex,
-					mod->GetEigenVectors(),
-					mod->GetInverseEigenVectors(),
-					mod->GetEigenValues()),
-				"beagleSetEigenDecomposition");
 
-			FLOAT_TYPE categRates[1] = {1.0};
-
-			outman.DebugMessage("SETTING CATEGORY RATES");
-			CheckBeagleReturnValue(
-				beagleSetCategoryRates(beagleInst,
-					categRates),
-				"beagleSetCategoryRates");
-
-			int pmatInd[2] = {PmatIndexForBeagle(theOp->transMatIndex1), PmatIndexForBeagle(theOp->transMatIndex2)};
-			//need to include the blen multiplier here!
-			double edgeLens[2] = {pmatMan->GetHolder(theOp->transMatIndex1)->edgeLen * mod->GetBlenMultiplier()[0], pmatMan->GetHolder(theOp->transMatIndex2)->edgeLen * mod->GetBlenMultiplier()[0]};
-			int count = 2;
-
-			outman.DebugMessageNoCR("UPDATING TRANS MATS ");
-			outman.DebugMessage("%d and %d, eigen %d, blens %f and %f", pmatInd[0], pmatInd[1], eigenIndex, edgeLens[0], edgeLens[1]);
-			CheckBeagleReturnValue(
-				beagleUpdateTransitionMatrices(
-					beagleInst,
-					eigenIndex,
-                    pmatInd,
-                    NULL,
-					NULL,
-					edgeLens,
-                    count),
-				"beagleUpdateTransitionMatrices");
-			}
-*/		
 		//need to figure out what to do with these scale things
 		int destinationScaleWrite, destinationScaleRead;
 		destinationScaleWrite = destinationScaleRead = BEAGLE_OP_NONE;
+		//destinationScaleWrite = BEAGLE_OP_NONE;
+		//not sure if this is right - will always use a single scale array for destWrite (essentially
+		//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
+		//destinationScaleWrite = claMan->NumClas();
 			
 		int operationTuple[7] = {PartialIndexForBeagle(theOp->destCLAIndex),
                                 destinationScaleWrite,
@@ -520,7 +466,12 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		int instanceCount = 1;
 		int cumulativeScaleIndex = BEAGLE_OP_NONE;
 		int operationCount = 1;
-		
+
+		//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
+		//and my negative (tip) corresponds to a NULL in beagle
+//		int cumulativeScaleIndex = theOp->destCLAIndex;
+//		AccumulateRescalers(cumulativeScaleIndex, theOp->childCLAIndex1, theOp->childCLAIndex2);
+
 		CheckBeagleReturnValue(
 			beagleUpdatePartials(&beagleInst,
 				instanceCount, 
@@ -533,6 +484,32 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
 		claMan->FillHolder(theOp->destCLAIndex, 0);
 #endif
+		}
+	}
+
+//For scale arrays my indexing scheme and Beagle's happen to be the same
+void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int childIndex2){
+	//further accumulate the cumulative rescalings from the two children
+	
+	//clear out the destination scaler first
+	CheckBeagleReturnValue(
+		beagleResetScaleFactors(beagleInst,
+			destIndex), 
+		"beagleResetScaleFactors");
+
+	vector<int> childScalers;
+	if( ! (childIndex1 < 0))
+		childScalers.push_back(childIndex1);
+	if( ! (childIndex2 < 0))
+		childScalers.push_back(childIndex2);
+
+	if(childScalers.size() > 0){
+		CheckBeagleReturnValue(
+			beagleAccumulateScaleFactors(beagleInst,
+				&(childScalers[0]),
+				childScalers.size(),
+				destIndex),
+			"beagleAccumulateScaleFactors");
 		}
 	}
 
@@ -562,12 +539,13 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 			sol.eigenVals),
 		"beagleSetEigenDecomposition");
 
-	const FLOAT_TYPE *categRates = pmatMan->GetHolder(theOp->destTransMatIndex)->GetCategoryRates();
+	vector<FLOAT_TYPE> categRates;
+	pmatMan->GetHolder(theOp->destTransMatIndex)->GetCategoryRatesForBeagle(categRates);
 
 //	outman.DebugMessage("SETTING CATEGORY RATES");
 	CheckBeagleReturnValue(
 		beagleSetCategoryRates(beagleInst,
-			categRates),
+			&(categRates[0])),
 		"beagleSetCategoryRates");
 
 	//int pmatInd[2] = {PmatIndexForBeagle(theOp->transMatIndex1), PmatIndexForBeagle(theOp->transMatIndex2)};
@@ -607,58 +585,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 
 	else{
 #ifdef USE_BEAGLE
-/*
-		//DEBUG
-		//the pmats should already have been calculated
-		bool passPmats= false;
 
-		if(passPmats){
-			outman.DebugMessage("SETTING PMAT FOR SCORING");
-			CheckBeagleReturnValue(
-				beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle(theOp->transMatIndex1), **pmatMan->GetPmat(theOp->transMatIndex1)->theMat),
-				"beagleSetTransitionMatrix");
-			}
-		else{
-			outman.DebugMessage("SETTING EIGEN");
-			//DEBUG
-			int eigenIndex = 1;
-			
-			CheckBeagleReturnValue(
-				beagleSetEigenDecomposition(
-					beagleInst,
-					eigenIndex,
-					mod->GetEigenVectors(),
-					mod->GetInverseEigenVectors(),
-					mod->GetEigenValues()),
-				"beagleSetEigenDecomposition");
-
-			FLOAT_TYPE categRates[1] = {1.0};
-
-			outman.DebugMessage("SETTING CATEGORY RATES");
-			CheckBeagleReturnValue(
-				beagleSetCategoryRates(beagleInst,
-					categRates),
-				"beagleSetCategoryRates");
-
-			int pmatInd[2] = {PmatIndexForBeagle(theOp->transMatIndex1)};
-
-			double edgeLens[2] = {pmatMan->GetHolder(theOp->transMatIndex1)->edgeLen * mod->GetBlenMultiplier()[0]};
-			int count = 1;
-
-			outman.DebugMessageNoCR("UPDATING TRANS MAT FOR SCORING, %d (%d)", PmatIndexForBeagle(theOp->transMatIndex1), theOp->transMatIndex1);
-			outman.DebugMessage(" eigen %d, blen %f", eigenIndex, edgeLens[0]);
-			CheckBeagleReturnValue(
-				beagleUpdateTransitionMatrices(
-					beagleInst,
-					eigenIndex,
-                    pmatInd,
-                    NULL,
-					NULL,
-					edgeLens,
-                    count),
-				"beagleUpdateTransitionMatrices");
-			}
-*/
 		int buffer1[1] = {PartialIndexForBeagle(theOp->childClaIndex1)};
 		int buffer2[1] = {PartialIndexForBeagle(theOp->childClaIndex2)};
 		int numInput = 2;
@@ -673,8 +600,8 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		pmatMan->GetCorrespondingModel(theOp->transMatIndex1)->GetStateFreqs(&(freqs[0]));
 
 		//category weights (or probs)
-		vector<FLOAT_TYPE> inWeights(pmatMan->GetNumRates());
-		pmatMan->GetCorrespondingModel(theOp->transMatIndex1)->GetRateProbs(&(inWeights[0]));
+		vector<FLOAT_TYPE> inWeights;
+		pmatMan->GetHolder(theOp->transMatIndex1)->GetCategoryWeightsForBeagle(inWeights);
 
 		int pmatIndeces[1] = {PmatIndexForBeagle(theOp->transMatIndex1)};
 		int	d1MatIndeces[1] = {D1MatIndexForBeagle(theOp->transMatIndex1)};
@@ -686,7 +613,13 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 
 		int NA[1] = {BEAGLE_OP_NONE};
 		int count = 1;
- 
+
+		//accumulate rescaling factors of the two clas that are being combined (one might be a tip)
+		//For scale arrays my indexing scheme and Beagle's happen to be the same, and my negative (tip) corresponds to a NULL in beagle
+		//use this scratch index to hold the final accumulated scalers 
+//		int cumulativeScaleIndex = claMan->NumClas();
+//		AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
+
 		CheckBeagleReturnValue(
 			beagleCalculateEdgeLogLikelihoods(beagleInst,
 				buffer2,
@@ -696,7 +629,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 				(theOp->derivatives ? d2MatIndeces : NULL),
 				&(inWeights[0]),
 				&(freqs[0]),
-				NA,
+				NA /*&cumulativeScaleIndex*/,
 				count,
 				&siteLikesOut[0],
 				(theOp->derivatives ? &siteD1Out[0] : NULL),
