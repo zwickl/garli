@@ -671,6 +671,13 @@ public:
 		return res;
 		}
 
+	void Finalize(){
+#ifdef USE_BEAGLE
+		if(beagleInst > 0)
+			beagleFinalizeInstance(beagleInst);
+#endif
+		}
+
 #ifdef USE_BEAGLE
 	//BEAGLE SPECIFIC FUNCS
 
@@ -706,11 +713,6 @@ public:
 
 	//For scale arrays my indexing scheme and Beagle's happen to be the same
 	void AccumulateRescalers(int destIndex, int childIndex1, int childIndex2);
-
-	void Finalize(){
-		if(beagleInst > 0)
-			beagleFinalizeInstance(beagleInst);
-		}
 
 	//for testing/debugging
 	void SendClaToBeagle(int num){

@@ -487,6 +487,7 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		}
 	}
 
+#ifdef USE_BEAGLE
 //For scale arrays my indexing scheme and Beagle's happen to be the same
 void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int childIndex2){
 	//further accumulate the cumulative rescalings from the two children
@@ -512,6 +513,7 @@ void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int
 			"beagleAccumulateScaleFactors");
 		}
 	}
+#endif
 
 //need to change this to allow multiple simultaneous ops
 void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp){
