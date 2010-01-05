@@ -682,7 +682,9 @@ public:
 	//BEAGLE SPECIFIC FUNCS
 
 	void InitializeBeagle(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
-	
+
+	void SendTipDataToBeagle();
+
 	//interpret beagle error codes, output a message and bail if termOnBeagleError == true
 	void CheckBeagleReturnValue(int err, const char *funcName) const;
 

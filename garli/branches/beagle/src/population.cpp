@@ -584,7 +584,7 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 
 #ifdef USE_BEAGLE
 	//invariable class needs to be treated as extra rate for beagle
-	calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, modSpec.nstates, sites, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)));
+	calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, data->NStates(), sites, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)));
 #endif
 
 	NodeClaManager::SetClaManager(claMan);

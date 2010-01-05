@@ -878,6 +878,7 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock){
 			SetTaxonLabel(i, NxsString::GetEscaped(tlabel).c_str());
 			
 			int j = 0;
+			bool foundAmbig = false;
 			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 				if(charblock->IsActiveChar(origIndex)){	
 					unsigned char datum = '\0';
@@ -885,6 +886,8 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock){
 					else if(charblock->IsMissingState(origTaxIndex, origIndex) == true) datum = 15;
 					else{
 						int nstates = charblock->GetNumStates(origTaxIndex, origIndex);
+						if(nstates > 1)
+							foundAmbig = true;
 						for(int s=0;s<nstates;s++){
 							datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, origIndex, s));
 							}
@@ -892,6 +895,8 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock){
 					SetMatrix( i, j++, datum );
 					}
 				}
+			if(foundAmbig)
+				taxaWithPartialAmbig.push_back(i);
 			i++;
 			}
 		}
@@ -936,6 +941,7 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 	// read in the data, including taxon names
 	int i=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+		bool foundAmbig = false;
 		if(charblock->IsActiveTaxon(origTaxIndex)){
 			//Now storing names as escaped Nexus values - this means:
 			//if they have underscores - store with underscores
@@ -951,12 +957,16 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
 				else{
 					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+					if(nstates > 1)
+						foundAmbig = true;
 					for(int s=0;s<nstates;s++){
 						datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
 						}
 					}
 				SetMatrix( i, j++, datum );
 				}
+			if(foundAmbig)
+				taxaWithPartialAmbig.push_back(i);
 			i++;
 			}
 		}

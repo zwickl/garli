@@ -130,16 +130,24 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 #endif
     long req_flag = 0;
 
-	assert(nstates == 4);
-
 	outman.DebugMessage("BEAGLE RESOURCES:");
 	OutputBeagleResources();
 
 	outman.DebugMessage("CREATING INSTANCE");
+//without ambiguity
+/*	
 	int tipCount = nTips;
 	int partialsCount = nClas;
-	//I think that all compacts are tips, but not all tips must be compact. They always are in this case though.
+	//I think that all compacts are tips, but not all tips must be compact. They always are in the nonambig case though.
 	int compactCount = tipCount;
+*/
+	//to allow ambiguity we need to create partials for the tips with ambiguity, and normal tip states for the others
+	int tipCount = nTips;
+	int ambigTips = data->NumTaxaWithPartialAmbig();
+	int normalTips = nTips - ambigTips;
+	int partialsCount = nClas + ambigTips;
+	int compactCount = normalTips;
+
 	int eigCount = nClas;
 	int matrixCount = nClas * 3;//for the pmats, d1mats and d2mats
 	//DEBUG - trying scaling
@@ -177,24 +185,54 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 
 	OutputInstanceDetails(&det);
 
-	//this should be elsewhere, allows no ambiguity and assumes nuc models
-	outman.DebugMessage("SENDING DATA");
-	vector<int> dat;
-    char convert[16]={-1, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4};
+	SendTipDataToBeagle();
+	}
 
+void CalculationManager::SendTipDataToBeagle(){
+	outman.DebugMessage("SENDING DATA");
+    char convert[16]={-1, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4};
+	
+	int nstates = data->NStates();
 	for(int t = 0;t < data->NTax();t++){
-		outman.DebugMessage("tax %d", t);
-		const unsigned char *bitData = data->GetRow(t);
-		for(int c = 0;c < data->NChar();c++){
-			dat.push_back(convert[bitData[c]]);
+		bool partialAmbig = data->TaxonHasPartialAmbig(t);
+		outman.DebugMessageNoCR("tax %d ", t);
+
+		const unsigned char *dataString = data->GetRow(t);
+		if(partialAmbig){
+			//ambiguity if currently for nuc only (all versions, not just beagle)
+			assert(nstates == 4);
+			outman.DebugMessageNoCR("(some ambiguity)");
+			vector<double> tipPartial;
+			for(int c = 0;c < data->NChar();c++){
+				for(int s = 0;s < nstates;s++){
+					((dataString[c] & (1 << s)) ? tipPartial.push_back(1.0) : tipPartial.push_back(0.0));
+					}
+				}
+			CheckBeagleReturnValue(
+				beagleSetTipPartials(beagleInst, t, &(tipPartial[0])),
+				"beagleSetTipStates");
 			}
-		CheckBeagleReturnValue(
-			beagleSetTipStates(beagleInst, t, &dat[0]),
-			"beagleSetTipStates");
-		dat.clear();
+		else{
+			outman.DebugMessageNoCR("(no ambiguity)");
+			vector<int> dat;
+			
+			for(int c = 0;c < data->NChar();c++){
+				if(nstates == 4){
+					//nucleotide data needs to be converted from the bitwise format to 0, 1, 2, 3, 4
+					dat.push_back(convert[dataString[c]]);
+					}
+				else{
+					//for non-nuc the data is already in the correct indexing scheme, but must be converted from
+					//chars to ints
+					dat.push_back(dataString[c]);
+					}
+				}
+			CheckBeagleReturnValue(
+				beagleSetTipStates(beagleInst, t, &(dat[0])),
+				"beagleSetTipStates");
+			}
 		}
 	outman.DebugMessage("DATA SENT");
-
 	}
 #endif
 

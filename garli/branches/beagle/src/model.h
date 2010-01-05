@@ -941,25 +941,29 @@ class Model{
 	int NRateCats() const {return modSpec.numRateCats;}
 	FLOAT_TYPE *GetRateMults() {return rateMults;}
 	void GetRateMultsForBeagle(vector<FLOAT_TYPE> &r) const {
-		assert(!modSpec.IsCodon());
 		//the only real trick here is that pinv will be include as a separate category of rate zero
 		if(NoPinvInModel() == false){
 			r.push_back(0.0);
 			}
+		//codon NS rate variation will be taken care of here, and all of the rateMults will be 1.0
 		for(int rate = 0;rate < NRateCats();rate++){
 			r.push_back(rateMults[rate]);
 			}
 		}
 	void GetRateProbsForBeagle(vector<FLOAT_TYPE> &p) const {
-		assert(!modSpec.IsCodon());
 		//the only real trick here is that pinv will be include as a separate category of rate zero
 		if(NoPinvInModel() == false){
 			p.push_back(*propInvar);
 			}
+		
 		for(int rate = 0;rate < NRateCats();rate++){
-			p.push_back(rateProbs[rate]);
+			if(modSpec.IsCodon())
+				p.push_back(*omegaProbs[rate]);
+			else
+				p.push_back(rateProbs[rate]);
 			}
 		}
+
 	//this just includes pinv as a separate rate class, which it is for beagle but not gar
 	int NumRateCatsForBeagle() const{
 		return (this->NRateCats() + (NoPinvInModel() ? 0 : 1));

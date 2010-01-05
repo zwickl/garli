@@ -74,6 +74,7 @@ protected:
 	int 	*constStates;//the state (or states) that a constant site contains
 	int		currentBootstrapSeed;
 	unsigned char fullyAmbigChar;
+	vector<int> taxaWithPartialAmbig;
 	
 	protected:
 		int*	numStates;
@@ -152,6 +153,7 @@ protected:
 		int NTax() const { return nTax; }
 		void SetNTax(int ntax) { nTax = ntax; }
 
+		int NStates() const {return maxNumStates;}
 		virtual int NChar() const { return nChar; }
 		int TotalNChar() const { return totalNChar; }
 		int GapsIncludedNChar() const { return gapsIncludedNChar; }
@@ -190,6 +192,12 @@ protected:
 		void CopyNamesFromOtherMatrix(const DataMatrix *dat){
 			assert(taxonLabel);
 			for(int t=0;t<nTax;t++) SetTaxonLabel(t, dat->TaxonLabel(t));
+			}
+		int NumTaxaWithPartialAmbig() const{
+			return taxaWithPartialAmbig.size();
+			}
+		bool TaxonHasPartialAmbig(int tax) const{
+			return (find(taxaWithPartialAmbig.begin(),taxaWithPartialAmbig.end(),tax) != taxaWithPartialAmbig.end());
 			}
 
 		void BeginNexusTreesBlock(ofstream &treeout) const;
