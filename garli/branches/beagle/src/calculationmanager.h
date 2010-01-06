@@ -593,6 +593,7 @@ class CalculationManager{
 	bool beagle;
 	int beagleInst;
 	bool termOnBeagleError;
+	bool rescale;
 	
 public:
 	//DEBUG - this is a temporary hack
@@ -602,6 +603,7 @@ public:
 		beagle = false; 
 		beagleInst = -1; 
 		termOnBeagleError = true;
+		rescale = false;
 		}
 
 	static void SetClaManager(ClaManager *cMan) {
