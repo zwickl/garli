@@ -128,7 +128,10 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 #else
 	long pref_flag = BEAGLE_FLAG_CPU;
 #endif
-    long req_flag = 0;
+	long req_flag = 0;
+    
+	//rescale = true;
+	//long req_flag = BEAGLE_FLAG_LSCALER;
 
 	outman.UserMessage("BEAGLE INITIALIZING ...");
 	OutputBeagleResources();
@@ -154,7 +157,7 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	//try one scaler per cla, as in normal garli.  These are doubles rather than ints though, so larger.
 	//scaler for a given cla will share same index, and will be cumulative, as mine are now
 	//add one for a destinationScaleWrite which will always be the last and will be used in all calls for scratch
-	int scalerCount = nClas + 1;
+	int scalerCount = (rescale ? nClas + 1 : 0);
 	int resourceList[1] = {NULL};
 	int resourceListCount = 0;
 
@@ -493,14 +496,11 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 	else{
 #ifdef USE_BEAGLE
 
-		//need to figure out what to do with these scale things
-		int destinationScaleWrite, destinationScaleRead;
-		destinationScaleWrite = destinationScaleRead = BEAGLE_OP_NONE;
-		//destinationScaleWrite = BEAGLE_OP_NONE;
 		//not sure if this is right - will always use a single scale array for destWrite (essentially
 		//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
-		//destinationScaleWrite = claMan->NumClas();
-			
+		int destinationScaleWrite = (rescale ? claMan->NumClas() : BEAGLE_OP_NONE);
+		int	destinationScaleRead = BEAGLE_OP_NONE;
+
 		int operationTuple[7] = {PartialIndexForBeagle(theOp->destCLAIndex),
                                 destinationScaleWrite,
                                 destinationScaleRead,
@@ -515,13 +515,15 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		outman.DebugMessage("\tP\t%d (%d)\t%d (%d)", PmatIndexForBeagle(theOp->transMatIndex1), theOp->transMatIndex1, PmatIndexForBeagle(theOp->transMatIndex2), theOp->transMatIndex2);
 		
 		int instanceCount = 1;
-		int cumulativeScaleIndex = BEAGLE_OP_NONE;
 		int operationCount = 1;
 
 		//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
 		//and my negative (tip) corresponds to a NULL in beagle
-//		int cumulativeScaleIndex = theOp->destCLAIndex;
-//		AccumulateRescalers(cumulativeScaleIndex, theOp->childCLAIndex1, theOp->childCLAIndex2);
+		int cumulativeScaleIndex = BEAGLE_OP_NONE;
+		if(rescale){
+			cumulativeScaleIndex = theOp->destCLAIndex;
+			AccumulateRescalers(cumulativeScaleIndex, theOp->childCLAIndex1, theOp->childCLAIndex2);
+			}
 
 		CheckBeagleReturnValue(
 			beagleUpdatePartials(&beagleInst,
@@ -664,14 +666,16 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", buffer2[0], theOp->childClaIndex2, buffer1[0], theOp->childClaIndex1);
 		outman.DebugMessage("\tP\t%d (%d)", pmatIndeces[0], theOp->transMatIndex1);
 
-		int NA[1] = {BEAGLE_OP_NONE};
 		int count = 1;
 
 		//accumulate rescaling factors of the two clas that are being combined (one might be a tip)
 		//For scale arrays my indexing scheme and Beagle's happen to be the same, and my negative (tip) corresponds to a NULL in beagle
 		//use this scratch index to hold the final accumulated scalers 
-//		int cumulativeScaleIndex = claMan->NumClas();
-//		AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
+		int cumulativeScaleIndex = BEAGLE_OP_NONE;
+		if(rescale){
+			cumulativeScaleIndex = claMan->NumClas();
+			AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
+			}
 
 		CheckBeagleReturnValue(
 			beagleCalculateEdgeLogLikelihoods(beagleInst,
@@ -682,7 +686,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 				(theOp->derivatives ? d2MatIndeces : NULL),
 				&(inWeights[0]),
 				&(freqs[0]),
-				NA /*&cumulativeScaleIndex*/,
+				&cumulativeScaleIndex,
 				count,
 				&siteLikesOut[0],
 				(theOp->derivatives ? &siteD1Out[0] : NULL),
