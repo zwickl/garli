@@ -395,8 +395,8 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("->Single precision floating point version<-\n");
 #endif
 
-#ifdef CUDA_GPU
-			outman.UserMessage("->CUDA GPU version<-\n");
+#ifdef USE_BEAGLE
+			outman.UserMessage("->Using BEAGLE library<-\n");
 #endif
 
 			//outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");

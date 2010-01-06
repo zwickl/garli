@@ -374,6 +374,12 @@ void Population::ErrorMsg( char* msgstr, int len )
 void Population::CheckForIncompatibleConfigEntries(){
 	//DEBUG - fill this in better
 
+	//don't have sitelike output worked out yet in beagle mode
+#ifdef USE_BEAGLE
+	if(conf->outputSitelikelihoods)
+		throw ErrorException("sorry, site-likelihood output is not yet implemented for the BEAGLE version.\nSet outputsitelikelihoods = 0.");
+#endif
+
 	//if no model mutations will be performed, parameters cannot be estimated.
 	if(conf->modWeight == ZERO_POINT_ZERO){
 		if(modSpec.fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
@@ -577,7 +583,8 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	//new calc manager stuff
 	calcMan = new CalculationManager();
 	CalculationManager::SetClaManager(claMan);
-	pmatMan = new PmatManager(numClas, numClas,  modSpec.numRateCats, modSpec.nstates);
+	//both the tips and internal branches need pmats, hence the x2
+	pmatMan = new PmatManager(numClas * 2, numClas * 2,  modSpec.numRateCats, modSpec.nstates);
 	CalculationManager::SetPmatManager(pmatMan);
 
 	CalculationManager::SetData(data);

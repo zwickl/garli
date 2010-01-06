@@ -259,7 +259,8 @@ public:
 	TransMatSet* AssignFreeTransMatSet(){
 		//DEBUG need to figure out how this will work with beagle, or if recycling is even necessary with transmats
 		//if(claStack.empty() == true) RecycleClas();
-
+		
+		assert(! transMatSetStack.empty());
 		TransMatSet *mat=transMatSetStack[transMatSetStack.size()-1];
 
 		assert(mat != NULL);
