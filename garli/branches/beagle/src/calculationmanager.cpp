@@ -130,10 +130,10 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 #endif
     long req_flag = 0;
 
-	outman.DebugMessage("BEAGLE RESOURCES:");
+	outman.UserMessage("BEAGLE INITIALIZING ...");
 	OutputBeagleResources();
 
-	outman.DebugMessage("CREATING INSTANCE");
+	outman.UserMessage("CREATING BEAGLE INSTANCE ...");
 //without ambiguity
 /*	
 	int tipCount = nTips;
@@ -149,7 +149,7 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	int compactCount = normalTips;
 
 	int eigCount = nClas;
-	int matrixCount = nClas * 3;//for the pmats, d1mats and d2mats
+	int matrixCount = (nClas * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
 	//DEBUG - trying scaling
 	//try one scaler per cla, as in normal garli.  These are doubles rather than ints though, so larger.
 	//scaler for a given cla will share same index, and will be cumulative, as mine are now
@@ -183,9 +183,20 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 		beagleInitializeInstance(beagleInst, &det),
 		"beagleInitializeInstance");
 
+	outman.DebugMessage("BEAGLE ALLOCATIONS:");
+	outman.DebugMessage("\tstates: %d char: %d rates: %d", nstates, nchar, nrates);
+	outman.DebugMessage("\ttips: %d", tipCount);
+	outman.DebugMessage("\tcompact tips arrays (no partial ambiguity): %d", compactCount);
+	outman.DebugMessage("\tpartial tips arrays (some partial ambiguity): %d", ambigTips);
+	outman.DebugMessage("\ttotal partial arrays: %d", partialsCount);
+	outman.DebugMessage("\teigen solutions: %d", eigCount);
+	outman.DebugMessage("\ttransition matrices (pmats and derivs): %d", matrixCount);
+	outman.DebugMessage("\trescaling arrays %d", scalerCount);
+
 	OutputInstanceDetails(&det);
 
 	SendTipDataToBeagle();
+	outman.UserMessage("#######################################################");
 	}
 
 void CalculationManager::SendTipDataToBeagle(){
@@ -201,7 +212,7 @@ void CalculationManager::SendTipDataToBeagle(){
 		if(partialAmbig){
 			//ambiguity if currently for nuc only (all versions, not just beagle)
 			assert(nstates == 4);
-			outman.DebugMessageNoCR("(some ambiguity)");
+			outman.DebugMessage("(some ambiguity)");
 			vector<double> tipPartial;
 			for(int c = 0;c < data->NChar();c++){
 				for(int s = 0;s < nstates;s++){
@@ -213,12 +224,14 @@ void CalculationManager::SendTipDataToBeagle(){
 				"beagleSetTipStates");
 			}
 		else{
-			outman.DebugMessageNoCR("(no ambiguity)");
+			outman.DebugMessage("(no ambiguity)");
 			vector<int> dat;
 			
 			for(int c = 0;c < data->NChar();c++){
 				if(nstates == 4){
 					//nucleotide data needs to be converted from the bitwise format to 0, 1, 2, 3, 4
+					assert(dataString[c] < 16);
+					assert(convert[dataString[c]] < 5);
 					dat.push_back(convert[dataString[c]]);
 					}
 				else{
