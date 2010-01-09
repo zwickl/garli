@@ -38,7 +38,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	useBeagle = false;
 	singlePrecBeagle = false;
 	gpuBeagle = false;
-	rescaleBeagle = true;
+	rescaleBeagle = false;
 
 	//output related
 	ofprefix = "ofprefix";

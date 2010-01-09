@@ -586,20 +586,24 @@ class CalculationManager{
 	static const SequenceData *data;
 	list<BlockingOperationsSet> operationSetQueue;
 	list<ScoringOperation> scoreOps;
-	bool beagle;
-	int beagleInst;
-	bool termOnBeagleError;
-	bool rescale;
 	
 public:
-	//DEBUG - this is a temporary hack
-	//Model *mod;
+	bool useBeagle;
+	bool termOnBeagleError;
+	bool rescaleBeagle;
+	bool singlePrecBeagle;
+	bool gpuBeagle;
+	int beagleInst;
+	double scoreTol;
 
 	CalculationManager(){
-		beagle = false; 
+		useBeagle = false; 
+		gpuBeagle = false;
 		beagleInst = -1; 
 		termOnBeagleError = true;
-		rescale = false;
+		singlePrecBeagle = false;
+		rescaleBeagle = false;
+		scoreTol = DBL_EPSILON;
 		}
 
 	static void SetClaManager(ClaManager *cMan) {
@@ -677,7 +681,26 @@ public:
 #endif
 		}
 
+	double ScoreTolerance() const {
+		return scoreTol;
+		}
+
 #ifdef USE_BEAGLE
+	void SetBeagleDetails(bool gpu, bool singlePrec, bool rescale){
+		useBeagle = true;
+		if(gpu){//assuming that all GPU is SP for now
+			gpuBeagle = true;
+			singlePrecBeagle = true;
+			scoreTol = FLT_EPSILON;
+			}
+		if(singlePrec){
+			singlePrecBeagle = true;
+			scoreTol = FLT_EPSILON;
+			}
+		if(rescale)
+			rescaleBeagle = true;
+		}
+	
 	//BEAGLE SPECIFIC FUNCS
 
 	void InitializeBeagle(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);

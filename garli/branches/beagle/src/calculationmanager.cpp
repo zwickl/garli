@@ -123,16 +123,16 @@ void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) c
 	}
 
 void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, int nstates, int nchar, int nrates){
-//#define BEAGLE_GPU
-#ifdef BEAGLE_GPU
-	long pref_flag = BEAGLE_FLAG_GPU;
-#else
-	long pref_flag = BEAGLE_FLAG_CPU;
-#endif
+	assert(useBeagle);
+
 	long req_flag = 0;
-    
-//	rescale = true;
-//	long req_flag = BEAGLE_FLAG_LSCALER;
+	//the fact that GPU implies SP is taken care of elsewhere
+	long pref_flag = (gpuBeagle ? BEAGLE_FLAG_GPU : BEAGLE_FLAG_CPU);
+	if(singlePrecBeagle)
+		pref_flag |= BEAGLE_FLAG_SINGLE;
+	//must accumulate log rescalers for my implementation
+	if(rescaleBeagle)
+		req_flag |= BEAGLE_FLAG_LSCALER;
 
 	outman.UserMessage("BEAGLE INITIALIZING ...");
 	OutputBeagleResources();
@@ -158,7 +158,7 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	//try one scaler per cla, as in normal garli.  These are doubles rather than ints though, so larger.
 	//scaler for a given cla will share same index, and will be cumulative, as mine are now
 	//add one for a destinationScaleWrite which will always be the last and will be used in all calls for scratch
-	int scalerCount = (rescale ? nClas + 1 : 0);
+	int scalerCount = (rescaleBeagle ? nClas + 1 : 0);
 	int resourceList[1] = {NULL};
 	int resourceListCount = 0;
 
@@ -441,11 +441,11 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 
 #ifdef USE_BEAGLE
 	//DEBUG
-	beagle = true;
+	useBeagle = true;
 #endif
 //	outman.DebugMessage("**ENTERING PERFORM CLA");	
 
-	if(! beagle){
+	if(! useBeagle){
 		int term1 = 0;
 		int term2 = 0;
 		if(theOp->childCLAIndex1 < 0)
@@ -499,7 +499,7 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 
 		//not sure if this is right - will always use a single scale array for destWrite (essentially
 		//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
-		int destinationScaleWrite = (rescale ? claMan->NumClas() : BEAGLE_OP_NONE);
+		int destinationScaleWrite = (rescaleBeagle ? claMan->NumClas() : BEAGLE_OP_NONE);
 		int	destinationScaleRead = BEAGLE_OP_NONE;
 
 		int operationTuple[7] = {PartialIndexForBeagle(theOp->destCLAIndex),
@@ -521,7 +521,7 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
 		//and my negative (tip) corresponds to a NULL in beagle
 		int cumulativeScaleIndex = BEAGLE_OP_NONE;
-		if(rescale){
+		if(rescaleBeagle){
 			cumulativeScaleIndex = theOp->destCLAIndex;
 			AccumulateRescalers(cumulativeScaleIndex, theOp->childCLAIndex1, theOp->childCLAIndex2);
 			}
@@ -632,7 +632,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 	ScoreSet results = {0.0, 0.0, 0.0};
 	//outman.DebugMessage("*ENTERING PERFORM SCORING");
 
-	if(!beagle){
+	if(!useBeagle){
 		results.lnL = GetScorePartialInternalRateHet(claMan->GetCla(theOp->childClaIndex1), 
 			claMan->GetCla(theOp->childClaIndex2), 
 			pmatMan->GetPmat(theOp->transMatIndex1),
@@ -673,7 +673,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		//For scale arrays my indexing scheme and Beagle's happen to be the same, and my negative (tip) corresponds to a NULL in beagle
 		//use this scratch index to hold the final accumulated scalers 
 		int cumulativeScaleIndex = BEAGLE_OP_NONE;
-		if(rescale){
+		if(rescaleBeagle){
 			cumulativeScaleIndex = claMan->NumClas();
 			AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
 			}
