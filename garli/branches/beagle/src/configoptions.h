@@ -27,6 +27,12 @@ using std::string;
 
 class GeneralGamlConfig{
 	public:
+	//beagle
+	bool useBeagle;
+	bool singlePrecBeagle;
+	bool gpuBeagle;
+	bool rescaleBeagle;
+
 	//these options will be the same regardless of whether a population is master or remote
 
 	//output related

@@ -18,10 +18,6 @@
 #ifndef CALCULATION_MANAGER
 #define CALCULATION_MANAGER
 
-#ifdef BEAGLE_VS_DEF 
-#define USE_BEAGLE
-#endif
-
 #ifdef USE_BEAGLE
 #include "beagle.h"
 #endif

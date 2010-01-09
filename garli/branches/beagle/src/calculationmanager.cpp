@@ -39,48 +39,48 @@ void OutputBeagleResources(){
 // print resource list
     BeagleResourceList* rList;
     rList = beagleGetResourceList();
-    fprintf(stdout, "Available resources:\n");
+    outman.UserMessageNoCR("Available resources:\n");
     for (int i = 0; i < rList->length; i++) {
-        fprintf(stdout, "\tResource %i:\n\t\tName : %s\n", i, rList->list[i].name);
-        fprintf(stdout, "\t\tDesc : %s\n", rList->list[i].description);
-        fprintf(stdout, "\t\tFlags:");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_DOUBLE) fprintf(stdout, " DOUBLE");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_SINGLE) fprintf(stdout, " SINGLE");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_ASYNCH) fprintf(stdout, " ASYNCH");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_SYNCH)  fprintf(stdout, " SYNCH");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_COMPLEX)fprintf(stdout, " COMPLEX");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_LSCALER)fprintf(stdout, " LSCALER");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_CPU)    fprintf(stdout, " CPU");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_GPU)    fprintf(stdout, " GPU");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_FPGA)   fprintf(stdout, " FPGA");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_SSE)    fprintf(stdout, " SSE");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_CELL)   fprintf(stdout, " CELL");
-        fprintf(stdout, "\n");
+        outman.UserMessageNoCR("\tResource %i:\n\t\tName : %s\n", i, rList->list[i].name);
+        outman.UserMessageNoCR("\t\tDesc : %s\n", rList->list[i].description);
+        outman.UserMessageNoCR("\t\tFlags:");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_DOUBLE) outman.UserMessageNoCR(" DOUBLE");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_SINGLE) outman.UserMessageNoCR(" SINGLE");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_ASYNCH) outman.UserMessageNoCR(" ASYNCH");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_SYNCH)  outman.UserMessageNoCR(" SYNCH");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_COMPLEX)outman.UserMessageNoCR(" COMPLEX");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_LSCALER)outman.UserMessageNoCR(" LSCALER");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_CPU)    outman.UserMessageNoCR(" CPU");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_GPU)    outman.UserMessageNoCR(" GPU");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_FPGA)   outman.UserMessageNoCR(" FPGA");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_SSE)    outman.UserMessageNoCR(" SSE");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_CELL)   outman.UserMessageNoCR(" CELL");
+        outman.UserMessageNoCR("\n");
     }
-    fprintf(stdout, "\n");
+    outman.UserMessageNoCR("\n");
 //end TINYTEST
 	}
 
 void CalculationManager::OutputInstanceDetails(const BeagleInstanceDetails *det) const{
-    fprintf(stdout, "Instance details:\n");
-	fprintf(stdout, "\t\tnumber: %d\n", det->resourceNumber);
-	fprintf(stdout, "\t\tresource name: %s\n", det->resourceName);
-	fprintf(stdout, "\t\timplementation name: %s\n", det->implName);
-	fprintf(stdout, "\t\tFlags: ");
+    outman.UserMessageNoCR("Instance details:\n");
+	outman.UserMessageNoCR("\t\tnumber: %d\n", det->resourceNumber);
+	outman.UserMessageNoCR("\t\tresource name: %s\n", det->resourceName);
+	outman.UserMessageNoCR("\t\timplementation name: %s\n", det->implName);
+	outman.UserMessageNoCR("\t\tFlags: ");
 
-    if (det->flags & BEAGLE_FLAG_DOUBLE) fprintf(stdout, " DOUBLE");
-    if (det->flags & BEAGLE_FLAG_SINGLE) fprintf(stdout, " SINGLE");
-    if (det->flags & BEAGLE_FLAG_ASYNCH) fprintf(stdout, " ASYNCH");
-    if (det->flags & BEAGLE_FLAG_SYNCH)  fprintf(stdout, " SYNCH");
-    if (det->flags & BEAGLE_FLAG_COMPLEX)fprintf(stdout, " COMPLEX");
-    if (det->flags & BEAGLE_FLAG_LSCALER)fprintf(stdout, " LSCALER");
-    if (det->flags & BEAGLE_FLAG_CPU)    fprintf(stdout, " CPU");
-    if (det->flags & BEAGLE_FLAG_GPU)    fprintf(stdout, " GPU");
-    if (det->flags & BEAGLE_FLAG_FPGA)   fprintf(stdout, " FPGA");
-    if (det->flags & BEAGLE_FLAG_SSE)    fprintf(stdout, " SSE");
-    if (det->flags & BEAGLE_FLAG_CELL)   fprintf(stdout, " CELL");
+    if (det->flags & BEAGLE_FLAG_DOUBLE) outman.UserMessageNoCR(" DOUBLE");
+    if (det->flags & BEAGLE_FLAG_SINGLE) outman.UserMessageNoCR(" SINGLE");
+    if (det->flags & BEAGLE_FLAG_ASYNCH) outman.UserMessageNoCR(" ASYNCH");
+    if (det->flags & BEAGLE_FLAG_SYNCH)  outman.UserMessageNoCR(" SYNCH");
+    if (det->flags & BEAGLE_FLAG_COMPLEX)outman.UserMessageNoCR(" COMPLEX");
+    if (det->flags & BEAGLE_FLAG_LSCALER)outman.UserMessageNoCR(" LSCALER");
+    if (det->flags & BEAGLE_FLAG_CPU)    outman.UserMessageNoCR(" CPU");
+    if (det->flags & BEAGLE_FLAG_GPU)    outman.UserMessageNoCR(" GPU");
+    if (det->flags & BEAGLE_FLAG_FPGA)   outman.UserMessageNoCR(" FPGA");
+    if (det->flags & BEAGLE_FLAG_SSE)    outman.UserMessageNoCR(" SSE");
+    if (det->flags & BEAGLE_FLAG_CELL)   outman.UserMessageNoCR(" CELL");
 
-	fprintf(stdout, "\n");
+	outman.UserMessageNoCR("\n");
 	}
 
 void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) const{
@@ -123,6 +123,7 @@ void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) c
 	}
 
 void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, int nstates, int nchar, int nrates){
+//#define BEAGLE_GPU
 #ifdef BEAGLE_GPU
 	long pref_flag = BEAGLE_FLAG_GPU;
 #else
@@ -130,8 +131,8 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 #endif
 	long req_flag = 0;
     
-	//rescale = true;
-	//long req_flag = BEAGLE_FLAG_LSCALER;
+//	rescale = true;
+//	long req_flag = BEAGLE_FLAG_LSCALER;
 
 	outman.UserMessage("BEAGLE INITIALIZING ...");
 	OutputBeagleResources();
