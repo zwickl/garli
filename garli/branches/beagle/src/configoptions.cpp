@@ -34,6 +34,12 @@ using namespace std;
 GeneralGamlConfig::GeneralGamlConfig(){
 	//Default values for everything
 
+	//beagle
+	useBeagle = false;
+	singlePrecBeagle = false;
+	gpuBeagle = false;
+	rescaleBeagle = true;
+
 	//output related
 	ofprefix = "ofprefix";
 	logevery = 10;
@@ -144,6 +150,12 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	int found=cr.GetPositiveNonZeroDoubleOption("megsclamemory", megsClaMemory, true);
 	found += cr.GetPositiveNonZeroDoubleOption("availablememory", availableMemory, true);
 	if(found == -2) throw ErrorException("Either \"megsclamemory\" or \"availablememory\" must be specified in conf!");
+	
+	//beagle
+	cr.GetBoolOption("usebeagle", useBeagle, true);
+	cr.GetBoolOption("singleprecbeagle", singlePrecBeagle, true);
+	cr.GetBoolOption("gpubeagle", gpuBeagle, true);
+	cr.GetBoolOption("rescalebeagle", rescaleBeagle, true);
 	
 	errors += cr.GetStringOption("datafname", datafname);
 	errors += cr.GetStringOption("ofprefix", ofprefix);
