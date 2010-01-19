@@ -775,7 +775,7 @@ void Model::CalcEigenStuff(){
 		//DEBUG - rescaling the eigenvals by blen_multiplier here _should_ give same result as using it later
 		//in transition matrix calculating function.  This will be easier for passing to beagle prescaled as well
 		for(int ev = 0;ev < nstates;ev++)
-			eigvals[m][ev] *= blen_multiplier[m];
+			eigvals[m][ev] *= (NoPinvInModel() ? blen_multiplier[m] : blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar));
 		blen_multiplier[m] = 1.0;
 
 		//For codon models using this precalculation actually makes things things slower in CalcPmat (cache thrashing,
@@ -1086,12 +1086,17 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 		for(int k=0; k<nstates; k++){
 			MODEL_FLOAT scaledEigVal;
 			if(modSpec.IsNonsynonymousRateHet() == false){
-				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
+				//The blen multiplier should be taken care of in CalcEigenStuff, including the effect of pinv
+				//Then blen_multiplier should have been set to 1.0.  This was added for beagle, where prescaling
+				//everything made more sense.
+				scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+
+/*				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
 					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
 				else
 					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
-				}
+*/				}
 			else{
 				scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
 				}
