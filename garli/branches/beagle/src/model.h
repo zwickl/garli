@@ -1382,6 +1382,10 @@ class Model{
 		for(int i=0;i<NRateCats();i++){
 			rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
 			}
+		//this would NOT seem to be necessary since the eigen solution itself doesn't change when pinv does
+		//however, since the blen_multiplier depends on pinv with my methodology and since that is all
+		//taken care of in CalcEigenStuff it must be called whenever pinv changes
+		eigenDirty = true;
 		}
 
 	void SetAlpha(int which, FLOAT_TYPE val){
@@ -1512,6 +1516,10 @@ class Model{
 		for(int i=0;i<NRateCats();i++){
 			rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
 			}
+		//this would NOT seem to be necessary since the eigen solution itself doesn't change when pinv does
+		//however, since the blen_multiplier depends on pinv with my methodology and since that is all
+		//taken care of in CalcEigenStuff it must be called whenever pinv changes
+		eigenDirty = true;
 		}
 	void SetMaxPinv(FLOAT_TYPE p){
 		Model::maxPropInvar=p;
