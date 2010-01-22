@@ -3176,6 +3176,10 @@ int Model::PerformModelMutation(){
 		if(modSpec.IsFlexRateHet() == false) AdjustRateProportions();
 		else NormalizeRates();
 		retType=Individual::pinv;
+		//this would NOT seem to be necessary since the eigen solution itself doesn't change when pinv does
+		//however, since the blen_multiplier depends on pinv with my methodology and since that is all
+		//taken care of in CalcEigenStuff it must be called whenever pinv changes
+		eigenDirty = true;
 		}
 	else if(mut->Type() == ALPHASHAPE){
 		DiscreteGamma(rateMults, rateProbs, *alpha);
