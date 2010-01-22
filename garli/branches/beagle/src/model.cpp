@@ -706,8 +706,9 @@ void Model::CalcSynonymousBranchlengthProportions(vector<FLOAT_TYPE> &results){
 		totSumS += sumS[w];
 		totSumNS += sumNS[w];
 		}
+	//DEBUG - this assert will no longer work after resetting blen_mult in CalcEigen
 	//verify that this all makes sense given the already calc'ed blen mults 
-	assert(FloatingPointEquals(blen_multiplier[0], (ONE_POINT_ZERO / (totSumS + totSumNS)), 1e-3));	
+	//assert(FloatingPointEquals(blen_multiplier[0], (ONE_POINT_ZERO / (totSumS + totSumNS)), 1e-3));	
 	//outman.UserMessage("w = %f S = %f NS = %f, propS = %f", *omegas[0], totSumS, totSumNS, (totSumS / (totSumS + totSumNS)));
 	results.push_back(totSumS / (totSumS + totSumNS));
 	}
@@ -1186,12 +1187,17 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 		for(int k=0; k<nstates; k++){
 			MODEL_FLOAT scaledEigVal;
 			if(modSpec.IsNonsynonymousRateHet() == false){
-				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
+				//The blen multiplier should be taken care of in CalcEigenStuff, including the effect of pinv
+				//Then blen_multiplier should have been set to 1.0.  This was added for beagle, where prescaling
+				//everything made more sense.
+				scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+
+/*				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
 					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
 				else
 					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
-				}
+*/				}
 			else{
 				scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
 				}
