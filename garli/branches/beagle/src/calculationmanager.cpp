@@ -696,8 +696,8 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 
 		results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
 		assert(results.lnL < 0.0 && results.lnL > -10.0e10);
-		assert(results.d1 < 10.0e10 && results.d1 > -10.0e10);
-		assert(results.d2 < 10.0e20 && results.d2 > -10.0e20);
+		assert(results.d1 < 10.0e15 && results.d1 > -10.0e15);
+		assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
 		//DEBUG
 		outman.DebugMessage("res: L %f D1 %f D2 %f", results.lnL, results.d1, results.d2);
 #endif

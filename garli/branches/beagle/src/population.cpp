@@ -593,6 +593,13 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	//invariable class needs to be treated as extra rate for beagle
 	calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle);
 	calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, data->NStates(), sites, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)));
+	//this probably isn't a great idea, but assigning back to the conf if beagle ended up being SP allows things
+	//to operate properly whether it was an explictly specified SP or just de facto (i.e., GPU).  That will allow
+	//SetTreeStatics to properly set the larger min brlen
+	if(calcMan->IsSinglePrecision()){
+		conf->singlePrecBeagle = true;
+		conf->minBrlen = 1.0e-6;
+		}
 #endif
 
 	NodeClaManager::SetClaManager(claMan);
