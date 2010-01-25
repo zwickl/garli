@@ -466,7 +466,7 @@ public:
 		return claMan->GetCla(ULHolderIndex);
 		}
 
-	inline TransMatSet *GetTransMatSet(){
+	inline TransMatSet *GetTransMatSet() const {
 		return pmatMan->GetTransMatSet(transMatIndex);
 		}
 
@@ -644,6 +644,11 @@ public:
 
 	//calculate and return either the lnL alone, or the lnl, D1 and D2
 	ScoreSet PerformScoringOperation(const ScoringOperation *theOp);
+
+	//This reports back whether Beagle ended up using single precision.  It may be because it was specifically specified,
+	//or just implied by other settings such as GPU.  Should be called AFTER SetBeagleDetails and InitializeBeagle, at which
+	//point the details of the instance are definitely known
+	bool IsSinglePrecision() {return singlePrecBeagle;}
 	
 	//this is just for debugging
 	void OutputOperationsSummary() const;
@@ -659,14 +664,52 @@ public:
 		FLOAT_TYPE lnL = 0.0, D1 = 0.0, D2 = 0.0;
 		for(int i = 0;i < data->NChar();i++){
 			assert(sitelnL[i] == sitelnL[i]);
-			lnL += sitelnL[i] * data->Count(i);
+			assert(sitelnL[i] <= 1e-6);
+
+			if(sitelnL[i] > 0.0){
+				outman.DebugMessage("BEAGLE-GARLI WARNING - site lnL > 0 : %e", sitelnL[i]);
+				}
+
+			assert(sitelnL[i] > -1e6);
+
+			if(sitelnL[i] < -1e6){
+				outman.DebugMessage("BEAGLE-GARLI WARNING - very small site lnL : %e", sitelnL[i]);
+				}
+	
+			double actuallnL = sitelnL[i];
+			if(actuallnL > 0.0)
+				actuallnL = 0.0;
+			if(actuallnL < -FLT_MAX)
+				actuallnL = -FLT_MAX;			
+
+			lnL += actuallnL * data->Count(i);
 			
 			if(siteD1 != NULL){
 				assert(siteD1[i] == siteD1[i]);
+//				assert(siteD1[i] > -1e15);
+//				assert(siteD1[i] < 1e15);
+
+				if(siteD1[i] > 1e15){
+					outman.DebugMessage("BEAGLE-GARLI WARNING - very large site D1 : %e", siteD1[i]);
+					}
+				if(siteD1[i] < -1e15){
+					outman.DebugMessage("BEAGLE-GARLI WARNING - very small site D1 : %e", siteD1[i]);
+					}
+				
 				D1 += siteD1[i] * data->Count(i);
 				}
 			if(siteD2 != NULL){
 				assert(siteD2[i] == siteD2[i]);
+//				assert(siteD2[i] > -1e15);
+//				assert(siteD2[i] < 1e15);
+				
+				if(siteD2[i] > 1e15){
+					outman.DebugMessage("BEAGLE-GARLI WARNING - very large site D1 : %e", siteD2[i]);
+					}
+				if(siteD2[i] < -1e15){
+					outman.DebugMessage("BEAGLE-GARLI WARNING - very small site D1 : %e", siteD2[i]);
+					}
+
 				D2 += siteD2[i] * data->Count(i);
 				}
 			}

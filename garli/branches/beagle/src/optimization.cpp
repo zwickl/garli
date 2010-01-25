@@ -804,7 +804,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 				else outman.DebugMessage("LOW:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 */
 #ifdef OPT_BOUNDED_LOG
-				log << "\t" << bestKnownVal << "\treturn2" << (restored ? "_best" : "") << endl; log.close();
+				log << "\t" << bestKnownVal << "\treturn2" << (stayed ? "" : "_best") << endl; log.close();
 #endif
 				return lnL-initialScore;
 				}
@@ -837,7 +837,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 //				if(restored) outman.DebugMessage("HIGH:took bestKnown: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 //				else outman.DebugMessage("HIGH:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 #ifdef OPT_BOUNDED_LOG
-				log << "\t" << bestKnownVal << "\treturn3" << (restored ? "_best" : "") << endl; log.close();
+				log << "\t" << bestKnownVal << "\treturn3" << (stayed ? "" : "_best") << endl; log.close();
 #endif
 				return lnL-initialScore;
 				}
@@ -873,7 +873,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 				outman.DebugMessage("IMPROVE:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 */
 #ifdef OPT_BOUNDED_LOG
-			log << "\t" << bestKnownVal << "\treturn4" << (restored ? "_best" : "") << endl; log.close();			
+			log << "\t" << bestKnownVal << "\treturn4" << (stayed ? "" : "_best") << endl; log.close();			
 #endif
 			return lnL-initialScore;
 			}
@@ -899,7 +899,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 			//this means the point we moved to isn't > closeToBound from both bounds
 			bool stayed = !CheckScoreAndRestore(which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
 #ifdef OPT_BOUNDED_LOG
-				log << "\t" << bestKnownVal << "\treturn5" << (restored ? "_best" : "") << endl; log.close();
+			log << "\t" << bestKnownVal << "\treturn5" << (stayed ? "" : "_best") << endl; log.close();
 #endif
 			return lnL-initialScore;
 			}
@@ -1564,7 +1564,7 @@ if(nd->nodeNum == 8){
 
 #ifdef OPT_DEBUG
 //	ofstream log("optimization.log", ios::app);
-//	log.precision(10);
+	log.precision(10);
 
 	opt << nd->nodeNum << "\t" << nd->dlen << "\t" << lnL <<endl;
 
