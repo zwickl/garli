@@ -44,17 +44,17 @@ void OutputBeagleResources(){
         outman.UserMessageNoCR("\tResource %i:\n\t\tName : %s\n", i, rList->list[i].name);
         outman.UserMessageNoCR("\t\tDesc : %s\n", rList->list[i].description);
         outman.UserMessageNoCR("\t\tFlags:");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_DOUBLE) outman.UserMessageNoCR(" DOUBLE");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_SINGLE) outman.UserMessageNoCR(" SINGLE");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_ASYNCH) outman.UserMessageNoCR(" ASYNCH");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_SYNCH)  outman.UserMessageNoCR(" SYNCH");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_COMPLEX)outman.UserMessageNoCR(" COMPLEX");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_LSCALER)outman.UserMessageNoCR(" LSCALER");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_CPU)    outman.UserMessageNoCR(" CPU");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_GPU)    outman.UserMessageNoCR(" GPU");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_FPGA)   outman.UserMessageNoCR(" FPGA");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_SSE)    outman.UserMessageNoCR(" SSE");
-        if (rList->list[i].supportFlags & BEAGLE_FLAG_CELL)   outman.UserMessageNoCR(" CELL");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_PRECISION_DOUBLE) outman.UserMessageNoCR(" DOUBLE");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_PRECISION_SINGLE) outman.UserMessageNoCR(" SINGLE");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_COMPUTATION_SYNCH) outman.UserMessageNoCR(" ASYNCH");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_COMPUTATION_ASYNCH)  outman.UserMessageNoCR(" SYNCH");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_EIGEN_COMPLEX)outman.UserMessageNoCR(" COMPLEX");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_SCALERS_LOG)outman.UserMessageNoCR(" LSCALER");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_PROCESSOR_CPU)    outman.UserMessageNoCR(" CPU");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_PROCESSOR_GPU)    outman.UserMessageNoCR(" GPU");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_PROCESSOR_FPGA)   outman.UserMessageNoCR(" FPGA");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_VECTOR_SSE)    outman.UserMessageNoCR(" SSE");
+        if (rList->list[i].supportFlags & BEAGLE_FLAG_PROCESSOR_CELL)   outman.UserMessageNoCR(" CELL");
         outman.UserMessageNoCR("\n");
     }
     outman.UserMessageNoCR("\n");
@@ -68,17 +68,17 @@ void CalculationManager::OutputInstanceDetails(const BeagleInstanceDetails *det)
 	outman.UserMessageNoCR("\t\timplementation name: %s\n", det->implName);
 	outman.UserMessageNoCR("\t\tFlags: ");
 
-    if (det->flags & BEAGLE_FLAG_DOUBLE) outman.UserMessageNoCR(" DOUBLE");
-    if (det->flags & BEAGLE_FLAG_SINGLE) outman.UserMessageNoCR(" SINGLE");
-    if (det->flags & BEAGLE_FLAG_ASYNCH) outman.UserMessageNoCR(" ASYNCH");
-    if (det->flags & BEAGLE_FLAG_SYNCH)  outman.UserMessageNoCR(" SYNCH");
-    if (det->flags & BEAGLE_FLAG_COMPLEX)outman.UserMessageNoCR(" COMPLEX");
-    if (det->flags & BEAGLE_FLAG_LSCALER)outman.UserMessageNoCR(" LSCALER");
-    if (det->flags & BEAGLE_FLAG_CPU)    outman.UserMessageNoCR(" CPU");
-    if (det->flags & BEAGLE_FLAG_GPU)    outman.UserMessageNoCR(" GPU");
-    if (det->flags & BEAGLE_FLAG_FPGA)   outman.UserMessageNoCR(" FPGA");
-    if (det->flags & BEAGLE_FLAG_SSE)    outman.UserMessageNoCR(" SSE");
-    if (det->flags & BEAGLE_FLAG_CELL)   outman.UserMessageNoCR(" CELL");
+    if (det->flags & BEAGLE_FLAG_PRECISION_DOUBLE) outman.UserMessageNoCR(" DOUBLE");
+    if (det->flags & BEAGLE_FLAG_PRECISION_SINGLE) outman.UserMessageNoCR(" SINGLE");
+    if (det->flags & BEAGLE_FLAG_COMPUTATION_ASYNCH) outman.UserMessageNoCR(" ASYNCH");
+    if (det->flags & BEAGLE_FLAG_COMPUTATION_SYNCH)  outman.UserMessageNoCR(" SYNCH");
+    if (det->flags & BEAGLE_FLAG_EIGEN_COMPLEX)outman.UserMessageNoCR(" COMPLEX");
+    if (det->flags & BEAGLE_FLAG_SCALERS_LOG)outman.UserMessageNoCR(" LSCALER");
+    if (det->flags & BEAGLE_FLAG_PROCESSOR_CPU)    outman.UserMessageNoCR(" CPU");
+    if (det->flags & BEAGLE_FLAG_PROCESSOR_GPU)    outman.UserMessageNoCR(" GPU");
+    if (det->flags & BEAGLE_FLAG_PROCESSOR_FPGA)   outman.UserMessageNoCR(" FPGA");
+    if (det->flags & BEAGLE_FLAG_VECTOR_SSE)    outman.UserMessageNoCR(" SSE");
+    if (det->flags & BEAGLE_FLAG_PROCESSOR_CELL)   outman.UserMessageNoCR(" CELL");
 
 	outman.UserMessageNoCR("\n");
 	}
@@ -127,12 +127,12 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 
 	long req_flag = 0;
 	//the fact that GPU implies SP is taken care of elsewhere
-	long pref_flag = (gpuBeagle ? BEAGLE_FLAG_GPU : BEAGLE_FLAG_CPU);
+	long pref_flag = (gpuBeagle ? BEAGLE_FLAG_PROCESSOR_GPU : BEAGLE_FLAG_PROCESSOR_CPU);
 	if(singlePrecBeagle)
-		pref_flag |= BEAGLE_FLAG_SINGLE;
+		pref_flag |= BEAGLE_FLAG_PRECISION_SINGLE;
 	//must accumulate log rescalers for my implementation
 	if(rescaleBeagle)
-		req_flag |= BEAGLE_FLAG_LSCALER;
+		req_flag |= BEAGLE_FLAG_SCALERS_LOG;
 
 	outman.UserMessage("BEAGLE INITIALIZING ...");
 	OutputBeagleResources();
@@ -162,6 +162,8 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	int resourceList[1] = {NULL};
 	int resourceListCount = 0;
 
+	BeagleInstanceDetails det;
+
 	//this returns either the instance number or a beagle error, which is somewhat annoying
    	beagleInst = beagleCreateInstance(tipCount, 
 		partialsCount, 
@@ -175,17 +177,14 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 		resourceList, 
 		resourceListCount, 
 		pref_flag, 
-		req_flag);
+		req_flag,
+		&det);
 
 	CheckBeagleReturnValue(
 		beagleInst, 
 		"beagleCreateInstance");
 
 	outman.DebugMessage("INITING");
-    BeagleInstanceDetails det;
-    CheckBeagleReturnValue(
-		beagleInitializeInstance(beagleInst, &det),
-		"beagleInitializeInstance");
 
 	outman.DebugMessage("BEAGLE ALLOCATIONS:");
 	outman.DebugMessage("\tstates: %d char: %d rates: %d", nstates, nchar, nrates);
@@ -339,7 +338,7 @@ void CalculationManager::OutputOperationsSummary() const{
 		for(list<ClaOperation>::const_iterator cit = (*it).claOps.begin();cit != (*it).claOps.end();cit++)
 			numClas++;
 		}
-	outman.DebugMessage("REQUIRED OPS : %d op sets, %d pmats, %d clas", numSets, numPmats, numClas);
+	outman.DebugMessage("REQ OPS : %d op sets, %d pmats, %d clas", numSets, numPmats, numClas);
 	}
 
 ScoreSet CalculationManager::CalculateDerivatives(const TreeNode *effectiveRoot){
@@ -510,7 +509,7 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
  								PartialIndexForBeagle(theOp->childCLAIndex2),
 								PmatIndexForBeagle(theOp->transMatIndex2)};
 
-		outman.DebugMessageNoCR("PARTIALS\t");
+		outman.DebugMessageNoCR("PARTS\t");
 		outman.DebugMessageNoCR("\tD\t%d (%d)", PartialIndexForBeagle(theOp->destCLAIndex), theOp->destCLAIndex);
 		outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", PartialIndexForBeagle(theOp->childCLAIndex1), theOp->childCLAIndex1, PartialIndexForBeagle(theOp->childCLAIndex2), theOp->childCLAIndex2);
 		outman.DebugMessage("\tP\t%d (%d)\t%d (%d)", PmatIndexForBeagle(theOp->transMatIndex1), theOp->transMatIndex1, PmatIndexForBeagle(theOp->transMatIndex2), theOp->transMatIndex2);
@@ -527,8 +526,8 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 			}
 
 		CheckBeagleReturnValue(
-			beagleUpdatePartials(&beagleInst,
-				instanceCount, 
+			beagleUpdatePartials(
+				beagleInst,
 				operationTuple,
 				operationCount,
 				cumulativeScaleIndex),
@@ -654,16 +653,30 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		//state freqs
 		vector<FLOAT_TYPE> freqs(pmatMan->GetNumStates());
 		pmatMan->GetCorrespondingModel(theOp->transMatIndex1)->GetStateFreqs(&(freqs[0]));
+		int freqIndex = 0;
+		CheckBeagleReturnValue(
+			beagleSetStateFrequencies(
+				beagleInst,
+				freqIndex,
+				&(freqs[0])),
+			"beagleSetStateFrequencies");
 
 		//category weights (or probs)
 		vector<FLOAT_TYPE> inWeights;
 		pmatMan->GetHolder(theOp->transMatIndex1)->GetCategoryWeightsForBeagle(inWeights);
+		int weightIndex = 0;
+		CheckBeagleReturnValue(
+			beagleSetCategoryWeights(
+				beagleInst,
+				weightIndex,
+				&(inWeights[0])),
+			"beagleSetCategoryWeights");
 
 		int pmatIndeces[1] = {PmatIndexForBeagle(theOp->transMatIndex1)};
 		int	d1MatIndeces[1] = {D1MatIndexForBeagle(theOp->transMatIndex1)};
 		int	d2MatIndeces[1] = {D2MatIndexForBeagle(theOp->transMatIndex1)};
 
-		outman.DebugMessageNoCR("Score:\t");
+		outman.DebugMessageNoCR("Scr:\t");
 		outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", buffer2[0], theOp->childClaIndex2, buffer1[0], theOp->childClaIndex1);
 		outman.DebugMessage("\tP\t%d (%d)", pmatIndeces[0], theOp->transMatIndex1);
 
@@ -679,14 +692,19 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 			}
 
 		CheckBeagleReturnValue(
-			beagleCalculateEdgeLogLikelihoods(beagleInst,
+			beagleCalculateEdgeLogLikelihoods(
+				beagleInst,
 				buffer2,
 				buffer1,
 				pmatIndeces,
 				(theOp->derivatives ? d1MatIndeces : NULL),
 				(theOp->derivatives ? d2MatIndeces : NULL),
+				&weightIndex,
+				&freqIndex,
+				/*
 				&(inWeights[0]),
 				&(freqs[0]),
+				*/
 				&cumulativeScaleIndex,
 				count,
 				&siteLikesOut[0],
@@ -699,7 +717,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		assert(results.d1 < 10.0e15 && results.d1 > -10.0e15);
 		assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
 		//DEBUG
-		outman.DebugMessage("res: L %f D1 %f D2 %f", results.lnL, results.d1, results.d2);
+		outman.DebugMessage("L %f D1 %f D2 %f", results.lnL, results.d1, results.d2);
 #endif
 		}
 	return results;
