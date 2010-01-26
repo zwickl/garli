@@ -208,6 +208,13 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	OutputInstanceDetails(&det);
 
 	SendTipDataToBeagle();
+
+	vector<double> counts;
+	for(int pat = 0;pat < data->NChar();pat++)
+		counts.push_back((double) data->Count(pat));
+
+	beagleSetPatternWeights(beagleInst, &(counts[0]));
+
 	outman.UserMessage("#######################################################");
 	}
 
@@ -721,7 +728,15 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 				(theOp->derivatives ? &siteD2Out[0] : NULL)),
 			"beagleCalculateEdgeLogLikelihoods");
 
-		results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
+		bool beagleReturnsSums = true;
+
+		if(beagleReturnsSums){
+			results.lnL = siteLikesOut[0];
+			results.d1 = siteD1Out[0];
+			results.d2 = siteD2Out[0];
+			}
+		else
+			results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
 		assert(results.lnL < 0.0 && results.lnL > -10.0e10);
 		assert(results.d1 < 10.0e15 && results.d1 > -10.0e15);
 		assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
