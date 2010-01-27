@@ -42,14 +42,14 @@ noinst_HEADERS = \
 	cudaman.h \
 	cudakernel.cu
 
-if CUDASOURCE
-.cu.o:
-	$(NVCC) -o $@ -c $< $(NVCCFLAGS)
+#if CUDASOURCE
+#.cu.o:
+#	$(NVCC) -o $@ -c $< $(NVCCFLAGS)
 
-CUDASRCS = \
-	cudainterface.cu \
-	cudaman.cpp 
-endif
+#CUDASRCS = \
+#	cudainterface.cu \
+#	cudaman.cpp 
+#endif
 
 Garli_SOURCES = \
 	$(CUDASRCS) \

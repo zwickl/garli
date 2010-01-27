@@ -90,6 +90,7 @@ void CalculationManager::OutputInstanceDetails(const BeagleInstanceDetails *det)
 	}
 
 void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) const{
+
 	string mess;
 	if(err == BEAGLE_SUCCESS || err >= 0)
 		return;
@@ -134,6 +135,7 @@ void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) c
 void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, int nstates, int nchar, int nrates){
 	assert(useBeagle);
 
+	termOnBeagleError = false;
 	long req_flag = 0;
 	//the fact that GPU implies SP is taken care of elsewhere
 	long pref_flag = (gpuBeagle ? BEAGLE_FLAG_PROCESSOR_GPU : BEAGLE_FLAG_PROCESSOR_CPU);
@@ -628,6 +630,9 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 	double edgeLens[1] = {pmatMan->GetHolder(theOp->destTransMatIndex)->edgeLen};
 	int count = 1;
 
+	//DEBUG
+	//outman.UserMessage("edgelen = %e", edgeLens[0]);
+
 	//outman.DebugMessageNoCR("UPDATING TRANS MAT ");
 	//outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
 	CheckBeagleReturnValue(
@@ -640,6 +645,24 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 			edgeLens,
             count),
 		"beagleUpdateTransitionMatrices");
+#endif
+
+#undef OUTPUT_PMATS
+
+#ifdef OUTPUT_PMATS
+	int nstates = data->NStates();
+	int nrates = pmatMan->GetCorrespondingModel(theOp->destTransMatIndex)->NRateCats() + (pmatMan->GetCorrespondingModel(theOp->destTransMatIndex)->NoPinvInModel() ? 0 : 1);
+	vector<double> outMat(nstates * nstates * nrates);
+	beagleGetTransitionMatrix(beagleInst, *pmatInd, &(outMat[0]));
+	vector<double>::iterator it = outMat.begin();
+	for(int i = 0;i < nstates;i++){
+		for(int j=0;j < nstates;j++){
+			outman.UserMessageNoCR("%.6f\t", *it++);
+			}
+		outman.UserMessage("");
+		}
+		
+
 #endif
 	}
 
@@ -731,6 +754,12 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		bool beagleReturnsSums = true;
 
 		if(beagleReturnsSums){
+/*			beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
+			if(theOp->derivatives)
+				beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
+			results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
+*/
+
 			results.lnL = siteLikesOut[0];
 			results.d1 = siteD1Out[0];
 			results.d2 = siteD2Out[0];
