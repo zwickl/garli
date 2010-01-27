@@ -735,6 +735,7 @@ public:
 			gpuBeagle = true;
 			singlePrecBeagle = true;
 			scoreTol = FLT_EPSILON;
+			rescaleBeagle = true;
 			}
 		if(singlePrec){
 			singlePrecBeagle = true;
