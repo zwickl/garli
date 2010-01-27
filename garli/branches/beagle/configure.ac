@@ -128,6 +128,17 @@ if test "$enable_oldmpi" = yes; then
            ])
 fi
 
+# using hmsbeagle library 
+AC_ARG_ENABLE(beagle,
+        AC_HELP_STRING([--enable-beagle],[use hmsbeagle calculation library (EXPERIMENTAL)]), , [enable_beagle=no])
+if test "$enable_beagle" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling version using hmsbeagle calculation library
+           ])
+fi
+
+#DLA - cuda gpu version (still being tested)
+
 # single precision version (still being tested)
 AC_ARG_ENABLE(single-prec,
         AC_HELP_STRING([--enable-single-prec],[use single precision floating point variables (EXPERIMENTAL)]), , [enable_single_prec=no])
@@ -230,6 +241,29 @@ if test  "$enable_single_prec" = yes; then
 	fi
 fi
 
+#beagle library support - this is a crappy temporary hack
+AC_ARG_WITH(
+	[beagle],
+	AC_HELP_STRING(
+		[--with-beagle=DIR],
+		[Specify the root directory for the hmsbeagle library installation. This is required to compile the beagle version with the --enable-beagle flag.]
+		),
+	[
+	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
+		BEAGLE_INSTALL_PATH="$withval"
+	fi
+	])
+		
+if test  "$enable_beagle" = yes; then
+   BEAGLE_LDFLAGS="-L$BEAGLE_INSTALL_PATH/lib"
+   BEAGLE_LIB="-lhmsbeagle"
+   BEAGLE_INCLUDES="-I$BEAGLE_INSTALL_PATH/include/libhmsbeagle-1.0/libhmsbeagle/ -I$BEAGLE_INSTALL_PATH/include/libhmsbeagle-1.0/"
+   LDFLAGS="$LDFLAGS $BEAGLE_LDFLAGS"
+   LIBS="$LIBS $BEAGLE_LIB"
+   CXXFLAGS="$CXXFLAGS $BEAGLE_INCLUDES -DNEW_MANAGEMENT -DUSE_BEAGLE"
+fi
+
+
 ##########################################################
 # DLA cuda gpu                                           #
 #                                                        #
@@ -263,15 +297,18 @@ AC_ARG_WITH(
 
 if test  "$enable_cuda_gpu" = yes; then
 	NVCCFLAGS="$NVCCFLAGS --ptxas-options=-v -DUNIX --compiler-options -fno-strict-aliasing"
-	CUDA_CFLAGS="$CUDA_CFLAGS -DCUDA_GPU"
-	CUDA_CFLAGS="$CUDA_CFLAGS -I$CUDA_INSTALL_PATH/include -I$CUDA_SDK_INSTALL_PATH/common/inc"
+#DJZ - just using the cuda flag to correctly set includes and libs, don't actually tell GARLI that
+#this is a CUDA_GPU build, which used to make something else
+#	CUDA_CFLAGS="$CUDA_CFLAGS -DCUDA_GPU"
+	CUDA_CFLAGS="$CUDA_CFLAGS"
+	CUDA_CFLAGS="$CUDA_CFLAGS -I$CUDA_INSTALL_PATH/include -I$CUDA_SDK_INSTALL_PATH/C/common/inc"
 	if test  "$enable_cuda_memory" = yes; then
 		CUDA_CFLAGS="$CUDA_CFLAGS -DCUDA_MEMORY_PINNED"
 	fi
 	if test  "$enable_single_prec" = yes; then
 		NVCCFLAGS="$NVCCFLAGS -DSINGLE_PRECISION_FLOATS"
 	fi
-   CUDA_LDFLAGS="-L$CUDA_INSTALL_PATH/lib -L$CUDA_SDK_INSTALL_PATH/lib"
+   CUDA_LDFLAGS="-L$CUDA_INSTALL_PATH/lib64 -L$CUDA_INSTALL_PATH/lib -L$CUDA_SDK_INSTALL_PATH/C/lib/"
    CUDA_LIBS="-lcuda -lcudart -lcutil"
    LDFLAGS="$LDFLAGS $CUDA_LDFLAGS"
    LIBS="$LIBS $CUDA_LIBS"
