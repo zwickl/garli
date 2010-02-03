@@ -918,6 +918,7 @@ class Model{
 	FLOAT_TYPE StateFreq(int p) const{ return *stateFreqs[p];}
 	FLOAT_TYPE TRatio() const;
 	FLOAT_TYPE Rates(int r) const { return *relNucRates[r];}
+	int NumRelRates() const {return relNucRates.size();}
 	int NRateCats() const {return nRateCats;}
 	FLOAT_TYPE *GetRateMults() {return rateMults;}
 	FLOAT_TYPE Alpha() const {return *alpha;}
@@ -926,6 +927,8 @@ class Model{
 	FLOAT_TYPE MaxPinv() const{return maxPropInvar;}
 	int NStates() const {return nstates;}
 	int NumMutatableParams() const {return (int) paramsToMutate.size();}
+	int Nst() const {return nst;}
+	const int *GetArbitraryRateMatrixIndeces() const {return arbitraryMatrixIndeces;}
 	bool IsNucleotide() {return modSpec->IsNucleotide();}
 	bool IsNState() {return modSpec->IsNState();}
 	bool IsNStateV() {return modSpec->IsNStateV();}
@@ -1026,6 +1029,96 @@ class Model{
 	//These are the set parameter functions used in the generic OptimizeBoundedParameter function
 	//They need to have a standardized form, despite the fact that the "which" argument is unneccesary
 	//for some of them
+	void SetEquilibriumFreq(int which, FLOAT_TYPE val){
+
+		assert(which < this->nstates);
+#ifdef OLD_EQ_RESCALE
+		FLOAT_TYPE rescale = (FLOAT_TYPE)((1.0 - val)/(1.0 - *stateFreqs[which]));
+		for(int b=0;b<nstates;b++)
+			if(b!=which) *stateFreqs[b] *= rescale;
+		*stateFreqs[which] = val;
+
+#else
+
+		*stateFreqs[which] = val;
+		NormalizeSumConstrainedValues(&stateFreqs[0], nstates, 1.0, 1e-4, which);
+#endif
+		eigenDirty = true;
+		}
+
+	void SetRelativeNucRate(int which, FLOAT_TYPE val){
+		//this has the potential to do GT (fixed at 1.0) although that won't work with
+		//OptBounded currently
+		//DEBUG - Allow estimated AA matrices
+		//assert(which < 6);
+		//note that for arbitrary rate matrices mutation
+		//of a rate other than GT might actually alter GT, so we need to actually check
+		//whether it is 1.0 or not
+		*relNucRates[which] = val;
+		int refRate = NumRelRates() - 1;
+		if(FloatingPointEquals(*relNucRates[refRate], ONE_POINT_ZERO, 1.0e-12) == false){
+			FLOAT_TYPE scaler = ONE_POINT_ZERO / *relNucRates[refRate];
+			for(int i=0;i<NumRelRates();i++){
+				if(relNucRates[i] != relNucRates[refRate]){//this is checking whether the rate params are aliased to one another
+					*relNucRates[i] *= scaler;
+					}
+				}
+			*relNucRates[refRate] *= scaler;
+			}
+		eigenDirty = true;
+		}
+
+	void NormalizeSumConstrainedValues(FLOAT_TYPE **vals, int numVals, FLOAT_TYPE targetSum, FLOAT_TYPE minVal, int toNotChange){
+		bool someMin = false;
+		
+		//CheckStatefreqBounds();
+		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+		//note that sum here is the sum of everything besides toNotChange
+		for(int i=0;i<numVals;i++){
+			if(i != toNotChange){
+				sum += *vals[i];
+				if(*vals[i] < minVal)
+					someMin = true;
+				}
+			}
+		//so if there is any toNotChange this will be true
+		if(someMin || !(FloatingPointEquals(sum, targetSum, minVal * 0.01))){
+			do{
+				FLOAT_TYPE unfixedTarget = targetSum - (toNotChange < 0 ? ZERO_POINT_ZERO : *vals[toNotChange]) - minSum;
+				FLOAT_TYPE rescale = unfixedTarget / sum;
+				someMin = false;
+				sum = ZERO_POINT_ZERO;
+				for(int i=0;i<numVals;i++){
+					if(i != toNotChange){
+						if(*vals[i] > ZERO_POINT_ZERO){
+							*vals[i] *= rescale;
+							if(*vals[i] < minVal){
+								*vals[i] = -1.0;
+								minSum += minVal;
+								someMin = true;
+								}
+							else
+								sum += *vals[i];
+							}
+						}
+					}
+				}while(someMin);
+			}
+
+		for(int i=0;i<numVals;i++)
+			if(*vals[i] < ZERO_POINT_ZERO)
+				*vals[i]= minVal;
+
+#ifndef NDEBUG
+		//CheckStatefreqBounds();
+		sum = ZERO_POINT_ZERO;
+		for(int i=0;i<numVals;i++){
+			sum += *vals[i];
+			}
+		assert(FloatingPointEquals(sum, targetSum, minVal * 0.1));
+#endif
+		}
 
 	void SetPinv(int which, FLOAT_TYPE val){
 		assert(which == 0);

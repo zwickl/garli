@@ -29,7 +29,14 @@ Profiler ProfTermDeriv("TermDeriv     ");
 Profiler ProfModDeriv ("ModDeriv      ");
 Profiler ProfNewton   ("Newton-Raphson");
 extern Profiler ProfEQVectors;
-				   
+
+#if !defined(STEP_TOL)
+	#ifdef SINGLE_PRECISION_FLOATS
+		#define STEP_TOL 1.0e-6
+	#else
+		#define STEP_TOL 1.0e-8
+	#endif
+#endif
 
 extern FLOAT_TYPE globalBest;
 
@@ -307,6 +314,488 @@ FLOAT_TYPE Tree::OptimizeAlpha(FLOAT_TYPE optPrecision){
 	return -1;
 	}
 */
+
+//The newer, more convoluted OptBounded from the trunk
+FLOAT_TYPE Tree::SetAndEvaluateParameter(int modnum, int which, FLOAT_TYPE val, FLOAT_TYPE &bestKnownScore, FLOAT_TYPE &bestKnownVal, void (Model::*SetParam)(int, FLOAT_TYPE)){
+	Model *mod = modPart->GetModel(modnum);	
+	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, val);
+	MakeAllNodesDirty();
+	Score();
+	if(lnL > bestKnownScore){
+		bestKnownVal = val;
+		bestKnownScore = lnL;
+		}
+	return lnL;
+	}
+
+//This checks whether bestVal is significantly better than the otherScore, and if so takes it.  Otherwise otherVal is taken,
+//which could represent the current value that the optimizer is at, or the initial value.
+//This is ONLY called when we are about to return from OptBounded and want to know whether we should take:
+//-A step to a bracket (best) that evals slightly higher than the initial (other and current) point (first optimization pass)
+//	In this case we want the best to be significantly better than the initial=current=other.  tolerance should be > 0
+//-Revert to the best known value if we took a step and ended up worsening the score.
+//	In this case we want to take best if it is at all better than the current. tolerance == 0
+bool Tree::CheckScoreAndRestore(int modnum, int which, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE otherScore, FLOAT_TYPE otherVal, FLOAT_TYPE bestScore, FLOAT_TYPE bestVal, FLOAT_TYPE tolerance){
+	Model *mod = modPart->GetModel(modnum);	
+	bool restored = false;
+	if(otherScore + tolerance < bestScore){
+//		outman.DebugMessage("Rest %.12f", otherScore - bestScore);
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, bestVal);
+		otherScore = bestScore;
+		restored = true;
+		}
+	else{
+		if(otherScore < bestScore)
+			outman.DebugMessage("Stay %.12f (would have gone)", otherScore - bestScore);
+/*		else 
+			outman.DebugMessage("Stay %.12f", otherScore - bestScore);
+*/
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, otherVal);
+		}
+	MakeAllNodesDirty();
+	lnL = otherScore;
+	return restored;
+	}
+
+void Tree::TraceLikelihoodForParameter(int modnum, int which, FLOAT_TYPE init, FLOAT_TYPE min, FLOAT_TYPE max, FLOAT_TYPE interval, void (Model::*SetParam)(int, FLOAT_TYPE), bool append){
+	Model *mod = modPart->GetModel(modnum);	
+
+	ofstream curves;
+	if(append)
+		curves.open("lcurve.log", ios::app);
+	else
+		curves.open("lcurve.log");
+
+	curves.precision(12);
+	curves << "\n";
+	FLOAT_TYPE dummy = -1;
+	FLOAT_TYPE dummy2 = -1;
+	for(double c = min; c <= max ; c += interval){
+		FLOAT_TYPE v = SetAndEvaluateParameter(modnum, which, c, dummy, dummy2, SetParam);
+		curves << c << "\t" << v << "\n";
+		}
+	curves.close();
+
+	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, init);
+	MakeAllNodesDirty();
+	Score();
+	}
+
+FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, FLOAT_TYPE initialVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE targetScoreDigits /* DP = 9, SP = 5 */){
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1.0e-6)) 
+		Score();
+
+#ifdef SINGLE_PRECISION_FLOATS
+	FLOAT_TYPE baseIncr = min(max(0.001*optPrecision, 1.0e-5f), initialVal * 0.01);
+#else
+	FLOAT_TYPE baseIncr = min(max(0.001*optPrecision, 1.0e-6), initialVal * 0.01);
+#endif
+
+	//this first bit of checking and bumping used to use epsilon rather than the default baseIncr
+	assert(initialVal > lowBound - baseIncr && initialVal < highBound + baseIncr);
+	FLOAT_TYPE curVal = initialVal;
+	FLOAT_TYPE initialScore, curScore;
+	initialScore = curScore = lnL;
+	FLOAT_TYPE bestKnownScore = initialScore;
+	FLOAT_TYPE bestKnownVal = initialVal;
+
+#ifdef NEW_BUMPING
+	FLOAT_TYPE requiredWindow = (baseIncr * 1.0001) * 2.0;
+	FLOAT_TYPE actualWindow = highBound - lowBound;
+	if(actualWindow < requiredWindow){
+	//if the bounds are so tight that we can't be > baseIncr * 1.0001 from both, exit
+		outman.DebugMessage("NEWER: OptimizeBoundedParameter: bounds fully constrain parameter %.6f <- %.6f -> %.6f, desired amount = %.6f", lowBound, curVal, highBound, requiredWindow);
+		//SetAndEvaluateParameter(which, initialVal, bestKnownScore, bestKnownVal, SetParam);
+		return 0.0;
+		}
+
+	//the new version
+	FLOAT_TYPE boundBumped = -1.0;
+	//if possible, bump enough that we could have two legal increases in incr below to allow sufficient lnL diffs
+	FLOAT_TYPE bumpAmt = baseIncr * 25.0001;
+	//if(initialVal - lowBound < bumpAmt){
+	if(lowBound + bumpAmt > initialVal){
+		//were closer than we'd like to be to the low bound
+		//but, if we bump what we would like we might go past the other bound, in that case decrease bump
+		if(lowBound + bumpAmt > highBound - bumpAmt){
+			bumpAmt = actualWindow / 2.0; 
+			outman.DebugMessage("halved: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, baseIncr * 25.0001, bumpAmt); 
+			}
+		boundBumped = fabs(curVal - (lowBound + bumpAmt));
+		curVal = lowBound + bumpAmt;
+		curScore = SetAndEvaluateParameter(which, curVal, bestKnownScore, bestKnownVal, SetParam);
+		}
+	else if(highBound - bumpAmt < initialVal){
+		if(highBound - bumpAmt < lowBound + bumpAmt){
+			bumpAmt = actualWindow / 2.0; 
+			outman.DebugMessage("halved: base = %.6f, ideal = %.6f, actual = %.6f", baseIncr, baseIncr * 25.0001, bumpAmt);
+			}
+		curVal = highBound - bumpAmt;
+		boundBumped = initialVal - curVal;
+		curScore = SetAndEvaluateParameter(which, curVal, bestKnownScore, bestKnownVal, SetParam);
+		}
+#else
+	//the older version
+	FLOAT_TYPE boundBumped = -1.0;
+	//if possible, bump enough that we could have one legal increase in incr below to allow sufficient lnL diffs
+	FLOAT_TYPE bumpAmt = baseIncr * 5.0001;
+	if(initialVal - lowBound < bumpAmt){
+		if(lowBound + bumpAmt > highBound)
+			bumpAmt = baseIncr * 1.0001;
+//		outman.DebugMessage("NEW: OptimizeBoundedParameter: value bumped off low bound %.6f -> %.6f", initialVal, lowBound + bumpAmt);
+		boundBumped = fabs(curVal - (lowBound + bumpAmt));
+		curVal = lowBound + bumpAmt;
+		if(curVal > highBound){
+			outman.DebugMessage("Bumped past other (high) bound!");
+			curVal = initialVal;
+			}
+		curScore = SetAndEvaluateParameter(modnum, which, curVal, bestKnownScore, bestKnownVal, SetParam);
+		}
+	else if(highBound - initialVal < bumpAmt){
+//		outman.DebugMessage("NEW: OptimizeBoundedParameter: value bumped off high bound %.6f -> %.6f", initialVal, highBound - bumpAmt);s
+		if(highBound - bumpAmt < lowBound)
+			bumpAmt = baseIncr * 1.0001;
+		boundBumped = fabs(curVal - (highBound - bumpAmt));
+		curVal = highBound - bumpAmt;
+		if(curVal < lowBound){
+			outman.DebugMessage("Bumped past other (low) bound!");
+			curVal = initialVal;
+			}
+		curScore = SetAndEvaluateParameter(modnum, which, curVal, bestKnownScore, bestKnownVal, SetParam);
+		}
+	//if the bounds are so tight that we can't be > baseIncr from both, exit
+	//If we were close to one bound we should have already been bumped off of it.  If we're still close to a bound then the bump must have pushed
+	//us too near the opposite bound.  give up in that case
+	if(curVal - lowBound < baseIncr || highBound - curVal < baseIncr){
+		outman.DebugMessage("NEW: OptimizeBoundedParameter: bounds fully constrain parameter %.6f <- %.6f -> %.6f, desired amount = %.6f", lowBound, curVal, highBound, bumpAmt * 2);
+		SetAndEvaluateParameter(modnum, which, initialVal, bestKnownScore, bestKnownVal, SetParam);
+		return 0.0;
+		}
+#endif
+
+	FLOAT_TYPE lowerEval, higherEval;
+	FLOAT_TYPE lowerEvalScore, higherEvalScore;
+	FLOAT_TYPE lastChange=(FLOAT_TYPE)9999.9;
+	FLOAT_TYPE upperBracket = highBound;   //the smallest value we know of with a negative d1, or the minimum allowed value
+	FLOAT_TYPE lowerBracket = lowBound;   //the largest value we know of with a positive d1 , or the maximum allowed value
+	FLOAT_TYPE incr, diffDigits = 100.0;
+	int lowBoundOvershoot = 0;
+	int upperBoundOvershoot = 0;
+	int positiveD2Num = 0;
+	int pass = 0, incrIncreases = 0;
+
+#ifdef OPT_BOUNDED_LOG
+	ofstream log("optbounded.log", ios::app);
+	log.precision(8);
+#endif
+
+#ifdef OPT_BOUNDED_TRACE
+	ofstream curves("lcurve.log", ios::app);
+	curves.precision(12);
+	curves << "\n";
+	for(double c = max(curVal - 2 * 1.0e-6, lowBound); c <= min(curVal + 2 * 1.0e-6, highBound) ; c += 1.0e-6){
+		FLOAT_TYPE v = SetAndEvaluateParameter(which, c, SetParam);
+		curves << c << "\t" << v << "\n";
+		}
+	curves.close();
+
+	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
+	MakeAllNodesDirty();
+	Score();
+#endif
+
+	FLOAT_TYPE incrLimit;
+	bool limited = false;
+	//we'll always know what the current score is at the top of this loop
+	while(1){
+		//baseIncr will be a sort of ideal increment, but it may be limited because of closeness
+		//to a min or max bracket
+		incrLimit = min(curVal - lowerBracket, upperBracket - curVal);
+		incr = baseIncr;
+		if(incr > incrLimit){
+			incr = incrLimit / 1.0001;
+			limited = true;
+			//outman.DebugMessage("OptimizeBoundedParameter: incr limited by bound.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f lbound=%.6f hbound=%.6f incr=%.10f baseIncr=%.6f", pass, initialScore, lnL, initialVal, curVal, lowerBracket, upperBracket, incr, baseIncr);
+			if(baseIncr/incrLimit > 100.0)
+				outman.DebugMessage("OptimizeBoundedParameter: incr very limited by bound. Ratio is %.6f", baseIncr/incrLimit);
+			}
+		//evaluate a point just above the current value
+		higherEval = curVal+incr;
+		higherEvalScore = SetAndEvaluateParameter(modnum, which, higherEval, bestKnownScore, bestKnownVal, SetParam);
+
+#ifdef ADAPTIVE_BOUNDED_OPT
+		bool cont = false;
+		//There are a few things that could happen here
+		//1. The incr has already be limited by closeness to a bound above - move on
+		//2. Test lnL diffs.  
+		//	2a. The difference in lnLs values is sufficiently large for accurate derivatives - move on
+		//	2b. The difference in lnLs is not sufficient - increase incr
+		//		2b1. The increased incr is still within any bounds - go bck to 2
+		//		2b2. The increased incr is greater than allowed by one bound.  Limit it and break.
+		while(pass == 0 && !cont && !limited){
+			//we want differences in likelihood of greater than targetScoreDigits orders of magnitude
+			//less than the total likelihoods. The determination of this amount will be taken care
+			//of by the caller, and will vary by DP or SP (currently mostly 9 and 5) or the parameter
+			//begin optimized (lower for codon)
+			FLOAT_TYPE diff = fabs(curScore - higherEvalScore);
+			if(diff != ZERO_POINT_ZERO)//otherwise diffDigits has been initialized to 100 above to force incr increase
+				diffDigits = log10(-curScore / diff);
+			if(diffDigits > targetScoreDigits){
+				incrIncreases++;
+				baseIncr *= 5.0;
+				//if the increased increment would be greater than what we are allowed by our bound
+				//we'll have to use the limited incr.  We'll try the increased baseIncr on the next pass.
+				if(baseIncr > incrLimit){
+					incr = incrLimit / 1.0001;
+					cont = true;
+					outman.DebugMessage("OptimizeBoundedParameter: adaptive increase in incr limited by bound (%s).\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f incr=%.10f baseIncr=%.6f", (boundBumped > ZERO_POINT_ZERO ? "boundBumped" : "no boundBump"), pass, initialScore, curScore, initialVal, curVal, incr, baseIncr);
+					}
+				else 
+					incr = baseIncr;
+				//apply the new increment and check score difference again
+				higherEval = curVal+incr;
+				higherEvalScore = SetAndEvaluateParameter(which, higherEval, bestKnownScore, bestKnownVal, SetParam);
+				}
+			else cont = true;
+			} 
+#endif
+		//we'll never move to a point closer than this (except maybe on exit)
+		//this ensures that we'll be able to have the low evaluation point just inside the bound
+		//without limiting incr
+		FLOAT_TYPE veryCloseToBound = baseIncr * 1.0001;
+		//we'll exit if closer than this, and will take the point with the best known score, which
+		//could be much closer yet
+		FLOAT_TYPE closeToBound = baseIncr * 1.0002;
+
+		//evaluate a point just below the current value
+		lowerEval = curVal-incr;
+		lowerEvalScore = SetAndEvaluateParameter(modnum, which, lowerEval, bestKnownScore, bestKnownVal, SetParam);
+
+		FLOAT_TYPE d11=(higherEvalScore-curScore)/incr;
+		FLOAT_TYPE d12=(lowerEvalScore-curScore)/-incr;
+		FLOAT_TYPE d1=(d11+d12)*ZERO_POINT_FIVE;
+		FLOAT_TYPE d2=(d11-d12)/incr;
+		FLOAT_TYPE est=-d1/d2;
+		FLOAT_TYPE proposed = curVal + est;
+
+#ifdef OPT_BOUNDED_LOG
+		log << pass << "\t" << incr << "\t" << incrIncreases << "\t" << diffDigits << "\t";
+		log << lowBound << "\t" << lowerBracket << "\t" << lowerEval << "\t" << curVal << "\t" << higherEval << "\t" << upperBracket << "\t" << highBound << "\t";
+		log << lowerEvalScore << "\t" << curScore << "\t" << higherEvalScore << "\t";
+		log << d1 << "\t" << d2 << "\t" << est << "\t" << proposed << "\t";
+#endif
+
+		//if the two derivative estimates are equal d2 is zero or undefined and bad things happen.  This is a bit of a hack, but works since it kicks in the pos d2 machinery 
+		if(d11 - d12 == 0){ 
+			d2 = 42.0;
+//			outman.DebugMessage("***equal d1's: %.4f", d11);
+			}
+
+		if(d1 == ZERO_POINT_ZERO){
+			outman.DebugMessage("****d1 is zero! d11=%.4f d12=%.4f", d11, d12);
+			}
+
+		//if the evaluation points straddle the optimum (or minimum), leave now
+		//in cases where the likelihood is unstable we can apparently straddle but end up with a worse likelihood
+		//than what we had initially.  In that case there isn't a lot we can do.  Restore the initial value and exit.
+		//occasionally d1 can also end up 0, so behave the same then.
+		if((d11 * d12 < ZERO_POINT_ZERO) || (d1 == ZERO_POINT_ZERO)){
+			if(d11 > 0.0){
+				outman.DebugMessage("MINIMUM! %.6f %.6f %.6f", lowerEvalScore, curScore, higherEvalScore);
+				//TraceLikelihoodForParameter(which, curVal, curVal-(baseIncr * 5), curVal+(baseIncr * 5), 1e-5, SetParam, false);
+				}
+			//on the first pass here the curVal will be the best val, so this won't do anything
+			//on later passes it should also be the best, unless there are weird stability issues
+			bool restored = CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, ZERO_POINT_ZERO);
+//			if(restored) outman.DebugMessage("took best: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
+//			else outman.DebugMessage("took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
+#ifdef OPT_BOUNDED_LOG
+			log << "\t" << bestKnownVal << "\treturn1" << (restored ? "_best" : "") << endl; log.close();
+#endif
+			return lnL-initialScore;
+			}
+
+#ifdef OPT_BOUNDED_LOG
+		if(boundBumped > ZERO_POINT_ZERO)
+			log << "BB-";
+		if(d2 < ZERO_POINT_ZERO)
+			log << "NR-";
+#endif
+
+		//second derivative is positive, so can't use NR.  Bump the value arbitrarily.
+		//if this overshoots a bound it will be dealt with below
+		if(d2 > ZERO_POINT_ZERO){
+			positiveD2Num++;
+			FLOAT_TYPE amtToBump;
+			if(d1 > ZERO_POINT_ZERO){
+				if((positiveD2Num + 1) % 3 == 0){
+					amtToBump = ((upperBracket + curVal) * ZERO_POINT_FIVE) - curVal;
+#ifdef OPT_BOUNDED_LOG
+					log << "B1/2";
+#endif
+					}
+				else{
+					//proposed=curVal*(FLOAT_TYPE)(ONE_POINT_ZERO+0.02*positiveD2Num);
+					amtToBump = max(closeToBound, (curVal * (FLOAT_TYPE)(0.02*positiveD2Num)));
+#ifdef OPT_BOUNDED_LOG
+					log << "B2P";
+#endif
+					}
+				proposed = curVal + amtToBump;
+				}
+			else {//cycle through a number of arbitrary value changes here
+				if(positiveD2Num % 3 == 0 || (pass == 0 && boundBumped > ZERO_POINT_ZERO)){
+					amtToBump = (curVal - (lowerBracket + veryCloseToBound));
+#ifdef OPT_BOUNDED_LOG
+					log << "BtoB";
+#endif
+					}
+				else if((positiveD2Num + 2) % 3 == 0){
+					amtToBump = (curVal * (FLOAT_TYPE)(0.02*positiveD2Num));
+#ifdef OPT_BOUNDED_LOG
+					log << "B2P";
+#endif
+					}
+				else if((positiveD2Num + 1) % 3 == 0){
+					amtToBump = curVal - ((curVal + lowerBracket) * ZERO_POINT_FIVE);
+#ifdef OPT_BOUNDED_LOG
+					log << "B1/2";
+#endif
+					}
+
+				//SHOULD THIS BE ctb or vctb?
+				amtToBump = max(veryCloseToBound, amtToBump);
+				proposed = curVal - amtToBump;
+				}
+			}
+
+		//we're proposing below the bound
+		if(d1 < ZERO_POINT_ZERO && proposed < lowerBracket + veryCloseToBound){
+			//if we're already very close to that bound, exit
+			//if(prevVal - lowerBracket - epsilon < epsilon * ZERO_POINT_FIVE){
+			if(curVal - (lowerBracket + closeToBound) <= ZERO_POINT_ZERO){
+				bool stayed = !CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
+/*
+				if(restored) outman.DebugMessage("LOW:took bestKnown: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
+				else outman.DebugMessage("LOW:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
+*/
+#ifdef OPT_BOUNDED_LOG
+				log << "\t" << bestKnownVal << "\treturn2" << (restored ? "_best" : "") << endl; log.close();
+#endif
+				return lnL-initialScore;
+				}
+			lowBoundOvershoot++;
+			//The previous behavior for low/high bracket overshooting caused rare problems because it automatically
+			//tried a value just inside the bracket if it was more than the first overshoot.  If the derivs at both
+			//the low and high brackets propose a value past the other, this can ping-pong back and forth making only
+			//very tiny moves inward, and crap out once 1000 reps have been completed.  Now just try near the bound once
+			if(lowBoundOvershoot == 2 || (lowBoundOvershoot == 1 && boundBumped > ZERO_POINT_ZERO)){
+				//this used to jump to 1/2 * baseIncr from bound
+				proposed = lowerBracket + veryCloseToBound;
+#ifdef OPT_BOUNDED_LOG
+				log << "LtoB";
+#endif
+				}
+			else{//jump halfway to bound, unless that is too close
+				FLOAT_TYPE delta = curVal - (curVal + lowerBracket) * ZERO_POINT_FIVE;
+				delta = max(veryCloseToBound, delta);
+				proposed = curVal - delta;
+#ifdef OPT_BOUNDED_LOG
+				log << "L1/2";
+#endif
+				}
+			}
+		//we're proposing above the bound
+		else if(d1 > ZERO_POINT_ZERO && proposed > upperBracket - veryCloseToBound){
+			//if we're already very close to that bound, exit
+			if(upperBracket - closeToBound - curVal <= ZERO_POINT_ZERO){
+				bool stayed = !CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
+//				if(restored) outman.DebugMessage("HIGH:took bestKnown: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
+//				else outman.DebugMessage("HIGH:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
+#ifdef OPT_BOUNDED_LOG
+				log << "\t" << bestKnownVal << "\treturn3" << (restored ? "_best" : "") << endl; log.close();
+#endif
+				return lnL-initialScore;
+				}
+			upperBoundOvershoot++;
+			if(upperBoundOvershoot == 2 || (upperBoundOvershoot == 1 && boundBumped > ZERO_POINT_ZERO)){
+				proposed = upperBracket - veryCloseToBound;
+#ifdef OPT_BOUNDED_LOG
+				log << "LtoB";
+#endif
+				}
+			else{
+				FLOAT_TYPE delta = (curVal + upperBracket) * ZERO_POINT_FIVE - curVal;
+				delta = max(veryCloseToBound, delta);
+				proposed = curVal + delta;
+#ifdef OPT_BOUNDED_LOG
+				log << "L1/2";
+#endif
+				}
+			}
+
+		FLOAT_TYPE estImprove;
+		if(d2 < ZERO_POINT_ZERO) 
+			estImprove = d1*(proposed - curVal) + (d2 * (proposed - curVal) * (proposed - curVal)) * ZERO_POINT_FIVE;
+		else estImprove = 9999.9;
+
+		//The expected amount of improvement from an NR move is low
+		//require that we didn't significantly worsen the likelihood overall or on the last pass
+		if(estImprove < optPrecision && curScore >= initialScore - 1.0e-6 && lastChange > -1.0e-6){
+			bool stayed = !CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
+/*			if(bestKnownScore > curScore)
+				outman.DebugMessage("IMPROVE:took best: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
+			else
+				outman.DebugMessage("IMPROVE:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
+*/
+#ifdef OPT_BOUNDED_LOG
+			log << "\t" << bestKnownVal << "\treturn4" << (restored ? "_best" : "") << endl; log.close();			
+#endif
+			return lnL-initialScore;
+			}
+
+		//don't allow infinite looping if something goes wrong
+		if(pass > 1000){
+			//bool restored = CheckScoreAndRestore(which, SetParam, curScore, curVal, initialScore, initialVal);
+			bool worsened = !CheckScoreAndRestore(modnum, which, SetParam, initialScore, initialVal, bestKnownScore, bestKnownVal, ZERO_POINT_ZERO);
+			if(worsened){
+				outman.UserMessage("OptimizeBoundedParameter: 1000 passes, but score worsened.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr, baseIncr);
+				outman.UserMessage("****Please report this message to garli.support@gmail.com****");
+				}
+			else{
+				outman.UserMessage("OptimizeBoundedParameter: 1000 passes without termination.\n\tpass=%d initlnL=%.6f curlnL=%.6f initVal=%.6f curVal=%.6f d11=%.6f d12=%.6f incr=%.10f baseIncr=%.10f", pass, initialScore, curScore, initialVal, curVal, d11, d12, incr, baseIncr);
+				outman.UserMessage("****Please report this message to garli.support@gmail.com****");
+				}
+			return lnL-initialScore;
+			}
+
+		assert(proposed >= lowerBracket && proposed <= upperBracket);
+
+		if((lowerBracket + closeToBound > proposed) && (upperBracket - closeToBound < proposed)){
+			//this means the point we moved to isn't > closeToBound from both bounds
+			bool stayed = !CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
+#ifdef OPT_BOUNDED_LOG
+				log << "\t" << bestKnownVal << "\treturn5" << (restored ? "_best" : "") << endl; log.close();
+#endif
+			return lnL-initialScore;
+			}
+
+		//update the brackets and take the move
+		if(d1 <= ZERO_POINT_ZERO && curVal < upperBracket)
+			upperBracket = curVal;
+		else if(d1 > ZERO_POINT_ZERO && curVal > lowerBracket)
+			lowerBracket = curVal;
+#ifdef OPT_BOUNDED_LOG
+		log << "\t" << estImprove << "\t" << proposed << endl;
+#endif
+		FLOAT_TYPE proposedScore = SetAndEvaluateParameter(modnum, which, proposed, bestKnownScore, bestKnownVal, SetParam);
+		lastChange = proposedScore - curScore;
+		curScore = proposedScore;
+		curVal = proposed;
+		pass++;
+		}
+	return -1;
+	}
 
 FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, int modnum, void (Model::*SetParam)(int, FLOAT_TYPE)){
 

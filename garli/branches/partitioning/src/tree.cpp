@@ -6138,6 +6138,88 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 */	return omegaImprove;
 	}
 
+FLOAT_TYPE Tree::OptimizeEquilibriumFreqs(FLOAT_TYPE prec, int modnum){
+	FLOAT_TYPE freqImprove=ZERO_POINT_ZERO;
+	int i=0;
+
+	Model *mod = modPart->GetModel(modnum);
+
+	//limiting change in any one pass much more
+	double maxChangeProportion = 1.2;
+
+	for(i=0;i < mod->NStates();i++){
+		double curVal = mod->StateFreq(i);
+		freqImprove += OptimizeBoundedParameter(modnum, prec, curVal, i, 
+			min(max((mod->NStates() > 4 ? 0.0001 : 0.01), curVal / maxChangeProportion), curVal),
+			max(min(0.96, curVal * maxChangeProportion), curVal),
+			&Model::SetEquilibriumFreq);
+		}
+	return freqImprove;
+	}
+
+FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum){
+	FLOAT_TYPE rateImprove=ZERO_POINT_ZERO;
+	FLOAT_TYPE minVal = 1.0e-5;
+	int i=0;
+
+	const ModelSpecification *modSpec = modSpecSet.GetModSpec(modnum);
+	Model *mod = modPart->GetModel(modnum);
+
+	//codon models can be a little unstable, so make the difference in scores that we're looking for in OptBounded a bit larger.  9 is the default value.
+	//it really shouldn't matter in almost all cases.
+	FLOAT_TYPE scoreDiffTarget;
+#ifdef SINGLE_PRECISION_FLOATS
+	if(modSpec->IsCodon())
+		scoreDiffTarget = 4.0;
+	else
+		scoreDiffTarget = 5.0;
+#else
+	if(modSpec->IsCodon())
+		scoreDiffTarget = 7.0;
+	else
+		scoreDiffTarget = 9.0;
+#endif
+
+	//limiting change in any one pass
+	double maxChangeProportion = 5.0;	
+	
+	//assert(mod->Nst() > 1);
+	if(mod->Nst() == 2){
+		//this was wrong - it should be Rates(1) i.e., K that is being optimized here
+		double curVal = mod->Rates(1);
+		rateImprove += OptimizeBoundedParameter(modnum, prec, curVal, 1, 
+				max(min(1.0e-3, curVal), curVal / maxChangeProportion),
+				min(max(999.0, curVal), curVal * maxChangeProportion),
+				&Model::SetRelativeNucRate, scoreDiffTarget);
+/*				
+		rateImprove += OptimizeBoundedParameter(prec, mod->Rates(0), 0, 
+				max(0.05, mod->Rates(0) / maxChangeProportion),
+				min(999.0, mod->Rates(0) * maxChangeProportion),
+				&Model::SetRelativeNucRate);
+*/
+		}
+	else if(modSpec->IsAminoAcid()==false){
+/*		char temp[100];
+		int oprec = 4;
+		sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));
+		outman.UserMessage("%s", temp);
+*/		for(i=0;i < 5;i++){
+			bool skip = false;
+			if(modSpec->IsArbitraryRateMatrix()){
+				if(mod->GetArbitraryRateMatrixIndeces()[i] == mod->GetArbitraryRateMatrixIndeces()[5]) skip = true;
+				}
+			if(!skip){
+				double curVal = mod->Rates(i);
+				rateImprove += OptimizeBoundedParameter(modnum, prec, curVal, i, 
+					max(min(1.0e-3, curVal), curVal / maxChangeProportion),
+					min(max(999.0, curVal), curVal * maxChangeProportion),
+					&Model::SetRelativeNucRate, scoreDiffTarget);
+				}
+			}
+		}
+	return rateImprove;
+	}
+
 FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec, int modnum){
 	FLOAT_TYPE flexImprove=ZERO_POINT_ZERO;
 	FLOAT_TYPE minVal = 1.0e-5;

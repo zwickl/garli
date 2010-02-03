@@ -534,6 +534,7 @@ private:
 		void AssignNewTopology(Individual *ind, int indNum);
 		void FindLostClas();
 		void FinalOptimization();
+		void BetterFinalOptimization();
 		void ResetMemLevel(int numNodesPerIndiv, int numClas);
 		void SetNewBestIndiv(int indivIndex);
 		void LogNewBestFromRemote(FLOAT_TYPE, int);
