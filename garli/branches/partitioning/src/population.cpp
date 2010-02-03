@@ -1687,7 +1687,12 @@ void Population::Run(){
 	boinc_fraction_done(0.99);
 #endif
 
+#ifdef MORE_DETERM_OPT
+	//the version adapted from trunk 1.0 final opt
+	BetterFinalOptimization();
+#else
 	FinalOptimization();
+#endif
 
 	gen = UINT_MAX;
 	OutputLog();
@@ -1748,6 +1753,298 @@ void Population::UpdateFractionDone(){
 #endif
 	}
 
+//this is a final opt adapted from final opt of trunk version 1.0
+void Population::BetterFinalOptimization(){
+	outman.setf(ios::fixed);
+	outman.precision(5);
+	outman.UserMessage("Current score = %.4f", BestFitness());
+
+#ifdef INCLUDE_PERTURBATION
+	if(pertMan->ratcheted) TurnOffRatchet();
+
+	if(allTimeBest != NULL){
+		if(BestFitness() < allTimeBest->Fitness()){
+			RestoreAllTimeBest();
+			}
+		}
+#endif
+
+	//This was a little dangerous since any subsequent scoring of any of the trees would cause problems
+	//probably not that important anyway.
+/*	for(unsigned i=0;i<total_size;i++){
+		if(i != bestIndiv) indiv[i].treeStruct->RemoveTreeFromAllClas();
+		}
+*/
+	outman.UserMessage("Performing final optimizations...");
+#ifdef MAC_FRONTEND
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+	[[MFEInterfaceClient sharedClient] didBeginBranchOptimization];
+	[pool release];
+#endif
+	int pass=1;
+	FLOAT_TYPE incr;
+
+	double freqOptImprove, nucRateOptImprove, pinvOptImprove, alphaOptImprove, omegaOptImprove, flexOptImprove, subRateOpt;
+	double paramOpt, blenOptImprove;
+	paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = subRateOpt = ZERO_POINT_ZERO;
+
+	FLOAT_TYPE precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
+	FLOAT_TYPE paramPrecThisPass = max(adap->branchOptPrecision*0.1, 0.01);
+	bool optAnyModel = FloatingPointEquals(conf->modWeight, ZERO_POINT_ZERO, 1e-8) == false;
+	bool goingToExit;
+
+	Individual *optInd = &indiv[bestIndiv];
+	Tree *optTree = optInd->treeStruct;
+
+	do{
+		//during each pass we'll keep track of a few things
+		//  incr = total improvement this pass. this controls termination of opt
+		//  summed improvement for each param/blens since last output.  If not outputting
+		//    every pass it won't be zeroed and so will accumulate.  The output string
+		//    will be constructed each pass, but only output sometimes
+		precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
+		paramPrecThisPass = max(precThisPass, 1e-5);
+
+		string outString;
+		char temp[50];
+		FLOAT_TYPE passStart=optInd->Fitness();
+
+		//back up the current branch lengths in case something goes wrong in the blen optimization
+		vector<FLOAT_TYPE> blens;
+		optTree->StoreBranchlengths(blens);
+
+		//remember that what is returned from OptAllBranches isn't the true increase in score, just an estimate
+		incr=optTree->OptimizeAllBranches(precThisPass);
+		optInd->CalcFitness(0);
+
+		FLOAT_TYPE trueImprove= optInd->Fitness() - passStart;
+
+		//In very rare cases the score can come out very slightly worse (or apparently worse due to numerical instability issues) after
+		//optimizing all of the branches.  In general this is taken care of at a lower level, but if it percolates up to here we'll ignore
+		//the last set of changes and pretend they never happened.
+		if(trueImprove < ZERO_POINT_ZERO){
+			outman.DebugMessage("OptimizeAllBranches worsened score by %f.  Restoring previous branch lengths...", trueImprove);
+			optTree->RestoreBranchlengths(blens);
+			trueImprove = ZERO_POINT_ZERO;
+			optInd->SetDirty();
+			optInd->CalcFitness(0);
+			}
+
+		blenOptImprove += trueImprove;
+		incr = trueImprove;
+
+		sprintf(temp, "(branch= %4.4f", blenOptImprove);
+		outString = temp;
+
+		optInd->CalcFitness(0);
+
+		for(int m = 0;m < indiv[bestIndiv].modPart.NumModels();m++){
+			Model *mod = indiv[bestIndiv].modPart.GetModel(m);
+			const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
+
+			bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates;
+			optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = false;
+
+			if(modSpec->IsCodon())
+				optOmega = true;
+			else if(modSpec->numRateCats > 1 && !modSpec->IsCodon()){
+				if(modSpec->IsFlexRateHet())
+					optFlex = true;
+				else if(modSpec->fixAlpha == false)
+					optAlpha = true;
+				}
+			if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
+				optPinv = true;
+
+			if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
+				optFreqs = true;
+			if((modSpec->fixRelativeRates == false && modSpec->Nst() > 1 && modSpec->IsAminoAcid() == false))
+				optRelRates = true;
+
+			//this is taken from the improved version in the trunk, and is a bit redundant in this context.  
+			//the output strings will be generated every time that any of the params are optimized, and will
+			//then be updated the next time the same parameter type is optimized in a different model.  The
+			//last model to optimize a given param will make the correct string that will eventually get output
+			if(optOmega) {
+				paramOpt = optTree->OptimizeOmegaParameters(paramPrecThisPass, m);
+				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+					paramOpt = ZERO_POINT_ZERO;
+				omegaOptImprove += paramOpt;
+				sprintf(temp, "  omega= %4.4f", paramOpt);
+				outString += temp;
+				incr += paramOpt;
+				}
+			if(optAlpha){
+				paramOpt = optTree->OptimizeBoundedParameter(m, paramPrecThisPass, mod->Alpha(), 0, min(0.05, mod->Alpha()), max(999.9, mod->Alpha()), &Model::SetAlpha);
+				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+					paramOpt = ZERO_POINT_ZERO;
+				alphaOptImprove += paramOpt;
+				sprintf(temp, "  alpha= %4.4f", paramOpt);
+				outString += temp;
+				incr += paramOpt;
+				}
+			if(optFlex){
+				//Flex opt is tough, give it more passes if they are helping
+				FLOAT_TYPE p = 0.0;
+				paramOpt = 0.0;
+				int innerPass = 0;
+				do{
+					p = optTree->OptimizeFlexRates(paramPrecThisPass, m);
+					paramOpt += p;
+					}while(p > trueImprove && innerPass++ < 5);
+				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+					paramOpt = ZERO_POINT_ZERO;
+				flexOptImprove += paramOpt;
+				sprintf(temp, "  flex rates= %4.4f", paramOpt);
+				outString += temp;
+				incr += paramOpt;
+				}
+			if(optPinv){
+				paramOpt = optTree->OptimizeBoundedParameter(m, paramPrecThisPass, mod->PropInvar(), 0, min(1.0e-8,mod->PropInvar()), mod->maxPropInvar, &Model::SetPinv);
+				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+					paramOpt = ZERO_POINT_ZERO;
+				pinvOptImprove += paramOpt;
+				sprintf(temp, "  pinv= %4.4f", paramOpt);
+				outString += temp;
+				incr += paramOpt;
+				}
+			if(optFreqs){
+				paramOpt = optTree->OptimizeEquilibriumFreqs(paramPrecThisPass, m);
+				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+					paramOpt = ZERO_POINT_ZERO;
+				freqOptImprove += paramOpt;
+				sprintf(temp, "  eq freqs= %4.4f", paramOpt);
+				outString += temp;
+				incr += paramOpt;
+				}
+			if(optRelRates){
+				paramOpt = optTree->OptimizeRelativeNucRates(paramPrecThisPass, m);
+				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+					paramOpt = ZERO_POINT_ZERO;
+				nucRateOptImprove += paramOpt;
+				sprintf(temp, "  rel rates= %4.4f", paramOpt);
+				outString += temp;
+				incr += paramOpt;
+				}
+			
+			optInd->CalcFitness(0);
+			}
+		
+		if(modSpecSet.InferSubsetRates()){
+			paramOpt = indiv[bestIndiv].treeStruct->OptimizeSubsetRates(max(adap->branchOptPrecision*0.1, 0.001));
+			if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+				paramOpt = ZERO_POINT_ZERO;
+			subRateOpt += paramOpt;
+			sprintf(temp, "  subset rates= %4.4f", paramOpt);
+			outString += temp;
+			paramOpt += subRateOpt;
+			}
+		optInd->CalcFitness(0);
+		
+		outString += ")";
+		goingToExit = !(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass + 1 < 10);
+
+//		if(pass < 20 || (pass % 10 == 0) || goingToExit){
+//			if(pass > 20 && (goingToExit || (pass % 10 == 0)))
+//				outman.UserMessage(" optimization up to ...");
+			outman.UserMessage("pass %-2d: %.4f   %s", pass, optInd->Fitness(), outString.c_str());
+			paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = subRateOpt = ZERO_POINT_ZERO;
+//			}
+		pass++;
+		}while(!goingToExit);
+#ifdef PUSH_TO_MIN_BLEN
+	double init = indiv[bestIndiv].treeStruct->lnL;
+	int num = indiv[bestIndiv].treeStruct->PushBranchlengthsToMin();
+	indiv[bestIndiv].treeStruct->Score();
+	double aft = indiv[bestIndiv].treeStruct->lnL;
+	double imp=indiv[bestIndiv].treeStruct->OptimizeAllBranches(precThisPass);
+	indiv[bestIndiv].treeStruct->Score();
+	double fin = indiv[bestIndiv].treeStruct->lnL;
+	outman.UserMessage("Looking for minimum length branches...");
+	indiv[bestIndiv].CalcFitness(0);
+	//outman.DebugMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
+#endif
+
+	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
+	unsigned totalSecs = stopwatch.SplitTime();
+	unsigned secs = totalSecs % 60;
+	totalSecs -= secs;
+	unsigned min = (totalSecs % 3600)/60;
+	totalSecs -= min * 60;
+	unsigned hours = totalSecs / 3600;
+	if(conf->searchReps == currentSearchRep && (conf->bootstrapReps == 0 || conf->bootstrapReps == currentBootstrapRep ))
+		outman.UserMessage("Time used = %d hours, %d minutes and %d seconds", hours, min, secs);
+	else
+		outman.UserMessage("Time used so far = %d hours, %d minutes and %d seconds", hours, min, secs);
+
+	log << "Score after final optimization: " << indiv[bestIndiv].Fitness() << endl;
+	//not sure how this would be done partitioned
+/*
+	if(modSpec.IsCodon()){
+		vector<FLOAT_TYPE> sProps;
+		indiv[bestIndiv].treeStruct->mod->CalcSynonymousBranchlengthProportions(sProps);
+		outman.UserMessage("Proportion of branchlengths that are Synonymous: %.5f", sProps[sProps.size()-1]); 
+		}
+*/
+#ifdef MAC_FRONTEND
+	pool = [[NSAutoreleasePool alloc] init];
+	[[MFEInterfaceClient sharedClient] reportFinalScore:BestFitness()];
+	[pool release];
+#endif
+
+	outman.unsetf(ios::fixed);
+
+	if(conf->outputTreelog && treeLog.is_open())
+		AppendTreeToTreeLog(-1);
+
+#ifdef ENABLE_CUSTOM_PROFILER
+	char fname[100];
+	sprintf(fname, "%s.profileresults.log", conf->ofprefix.c_str());
+	ofstream prof(fname);
+	prof << "dataset: " << conf->datafname << "\t" << "start: " << conf->streefname << endl;
+	prof << "seed: " << conf->randseed << "\t" << "refine: " << (conf->refineStart == true) << endl;
+	prof << "start prec: " << conf->startOptPrec << "\t" << "final prec: " << adap->branchOptPrecision << endl;
+
+#ifdef SINGLE_PRECISION_FLOATS
+	prof << "Single precision\n";
+#else
+	prof << "Double precision\n";
+#endif
+	unsigned s = stopwatch.SplitTime();
+	prof << "Total Runtime: " << s << "\tnumgen: " << gen << "\tFinalScore: " << indiv[bestIndiv].Fitness() << "\n";
+	outman.SetOutputStream(prof);
+	indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
+
+	prof << "Function\t\tcalls\ttime\tTperC\t%runtime" << endl;
+	ProfIntInt.Report(prof, s);
+	ProfIntTerm.Report(prof, s);
+	ProfTermTerm.Report(prof, s);
+	ProfRescale.Report(prof, s);
+	ProfScoreInt.Report(prof, s);
+	ProfScoreTerm.Report(prof, s);
+	ProfIntDeriv.Report(prof, s);
+	ProfTermDeriv.Report(prof, s);
+	ProfCalcPmat.Report(prof, s);
+	ProfCalcEigen.Report(prof, s);
+	ProfModDeriv.Report(prof, s);
+	ProfNewton.Report(prof, s);
+	ProfEQVectors.Report(prof, s);
+	prof.close();
+	outman.SetOutputStream(cout);
+#endif
+	/*	cout << "intterm calls " << inttermcalls << " time " << inttermtime/(double)(ticspersec.QuadPart) << endl;
+	cout << "termterm calls " << termtermcalls << " time " << termtermtime/(double)(ticspersec.QuadPart) << endl;
+	cout << "rescale calls " << rescalecalls << " time " << rescaletime/(double)(ticspersec.QuadPart) << " numrescales " << numactualrescales << endl;
+	cout << "totalopt calls " << totaloptcalls << " time " << totalopttime/(double)(ticspersec.QuadPart) << endl;
+	cout << "calcderiv calls " << calcderivcalls << " time " << calcderivtime/(double)(ticspersec.QuadPart) << endl;
+	cout << "derivgetclas calls " << derivgetclascalls << " time " << derivgetclastime/(double)(ticspersec.QuadPart) << endl;
+	cout << "derivint calls " << derivintcalls << " time " << derivinttime/(double)(ticspersec.QuadPart) << endl;
+	cout << "derivterm calls " << derivtermcalls << " time " << derivtermtime/(double)(ticspersec.QuadPart) << endl;
+	cout << "modderiv calls " << modderivcalls << " time " << modderivtime/(double)(ticspersec.QuadPart) << endl;
+	cout << "pmat calls " << pmatcalls << " time " << pmattime/(double)(ticspersec.QuadPart) << endl;
+*/	}
+
+//this is the original partitioned final opt
 void Population::FinalOptimization(){
 	outman.setf(ios::fixed);
 	outman.precision(5);
@@ -1767,7 +2064,7 @@ void Population::FinalOptimization(){
 		if(i != bestIndiv) indiv[i].treeStruct->RemoveTreeFromAllClas();
 		}
 	
-	outman.UserMessage("Performing final branch optimization...");
+	outman.UserMessage("Performing final optimization...");
 #ifdef MAC_FRONTEND
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	[[MFEInterfaceClient sharedClient] didBeginBranchOptimization];

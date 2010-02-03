@@ -255,16 +255,40 @@ class Tree{
 		FLOAT_TYPE OptimizeAlpha(FLOAT_TYPE, int modnum);
 		FLOAT_TYPE OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum);
 		FLOAT_TYPE OptimizeFlexRates(FLOAT_TYPE prec, int modnum);
+		FLOAT_TYPE OptimizeEquilibriumFreqs(FLOAT_TYPE prec, int modnum);
+		FLOAT_TYPE OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum);
 		FLOAT_TYPE OptimizeSubsetRates(FLOAT_TYPE prec);
+//the new versions from the trunk
+#ifdef SINGLE_PRECISION_FLOATS
+		FLOAT_TYPE OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, FLOAT_TYPE initialVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE targetScoreDigits = 5.0f);
+#else
+		FLOAT_TYPE OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, FLOAT_TYPE initialVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE targetScoreDigits = 9.0);
+#endif
 		FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, int modnum, void (Model::*SetParam)(int, FLOAT_TYPE));
 		template<class T> FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, T *obj, void (T::*SetParam)(int, FLOAT_TYPE));
 		template<class T> void TraceParameterLikelihood(ofstream &out, int which, FLOAT_TYPE prevVal, FLOAT_TYPE startVal, FLOAT_TYPE endVal, FLOAT_TYPE incr, T *obj, void (T::*SetParam)(int, FLOAT_TYPE));
+
+		void TraceLikelihoodForParameter(int modnum, int which, FLOAT_TYPE init, FLOAT_TYPE min, FLOAT_TYPE max, FLOAT_TYPE interval, void (Model::*SetParam)(int, FLOAT_TYPE), bool append);
+		//FLOAT_TYPE OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE));
+		FLOAT_TYPE SetAndEvaluateParameter(int modnum, int which, FLOAT_TYPE val, FLOAT_TYPE &bestKnownScore, FLOAT_TYPE &bestKnownVal, void (Model::*SetParam)(int, FLOAT_TYPE));
+		bool CheckScoreAndRestore(int modnum, int which, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE otherScore, FLOAT_TYPE otherVal, FLOAT_TYPE bestScore, FLOAT_TYPE bestVal, FLOAT_TYPE tolerance);
 
 		FLOAT_TYPE OptimizeTreeScale(FLOAT_TYPE);
 		FLOAT_TYPE OptimizePinv();
 		void SetNodesUnoptimized();
 		void RescaleRateHet(CondLikeArray *destCLA, int dataIndex);
 		void RescaleRateHetNState(CondLikeArray *destCLA, int dataIndex);
+
+		void StoreBranchlengths(vector<FLOAT_TYPE> &blens){
+			for(int n=1;n<numNodesTotal;n++)
+				blens.push_back(allNodes[n]->dlen);
+			assert(blens.size() == numNodesTotal - 1);
+			}
+		void RestoreBranchlengths(vector<FLOAT_TYPE> &blens){
+			for(int n=1;n<numNodesTotal;n++)
+				SetBranchLength(allNodes[n], blens[n-1]);
+			MakeAllNodesDirty();
+			}
 
 		pair<FLOAT_TYPE, FLOAT_TYPE> OptimizeSingleSiteTreeScale(FLOAT_TYPE optPrecision);
 

@@ -652,7 +652,9 @@ void Individual::GetStartingTreeFromNCL(NxsTreesBlock *treesblock, int rank, int
 	}
 
 void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
-	bool optAlpha = false, optPinv = false, optOmega = false, optFlex = false, optSubsetRates = false;
+	bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates, optSubsetRates;
+	optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = optSubsetRates = false;
+
 	if(optModel){
 		for(int modnum = 0;modnum < modPart.NumModels();modnum++){
 			Model *mod = modPart.GetModel(modnum);
@@ -661,6 +663,14 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			if(modSpec->IsFlexRateHet()) optFlex = true;
 			if(modSpec->includeInvariantSites && modSpec->fixInvariantSites == false) optPinv = true;
 			if(modSpec->IsCodon()) optOmega = true;
+
+#ifdef MORE_DETERM_OPT
+			if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
+				optFreqs = true;
+			if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1))
+				optRelRates = true;
+#endif
+
 			}
 		if(modSpecSet.InferSubsetRates() && modSpecSet.NumSpecs() > 1)
 			optSubsetRates = true;
@@ -669,6 +679,10 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	outman.UserMessageNoCR("optimizing: starting branch lengths");
 	if(optAlpha) outman.UserMessageNoCR(", alpha shape");
 	if(optPinv) outman.UserMessageNoCR(", prop. invar");
+#ifdef MORE_DETERM_OPT
+	if(optRelRates) outman.UserMessageNoCR(", rel rates");
+	if(optFreqs) outman.UserMessageNoCR(", eq freqs");
+#endif
 	if(optOmega) outman.UserMessageNoCR(", dN/dS (aka omega) parameters");
 	if(optSubsetRates) outman.UserMessageNoCR(", subset rates");
 	outman.UserMessage("...");
@@ -676,7 +690,8 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	CalcFitness(0);
 
 	for(int i=1;improve > branchPrec;i++){
-		FLOAT_TYPE alphaOptImprove=0.0, pinvOptImprove = 0.0, omegaOptImprove = 0.0, flexOptImprove = 0.0, optImprove=0.0, scaleOptImprove=0.0, subsetRateImprove=0.0;
+		FLOAT_TYPE alphaOptImprove=0.0, pinvOptImprove = 0.0, omegaOptImprove = 0.0, flexOptImprove = 0.0, optImprove=0.0, scaleOptImprove=0.0, subsetRateImprove=0.0, rateOptImprove=0.0;
+		FLOAT_TYPE freqOptImprove=0.0;
 		
 		CalcFitness(0);
 		FLOAT_TYPE passStart=Fitness();
@@ -718,6 +733,13 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 					}
 				if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
 					pinvOptImprove += treeStruct->OptimizeBoundedParameter(branchPrec, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, modnum, &Model::SetPinv);
+
+#ifdef MORE_DETERM_OPT
+				if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
+					freqOptImprove += treeStruct->OptimizeEquilibriumFreqs(branchPrec, modnum);
+				if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1))
+					rateOptImprove += treeStruct->OptimizeRelativeNucRates(branchPrec, modnum);
+#endif
 				}
 			if(optSubsetRates){
 				subsetRateImprove += treeStruct->OptimizeSubsetRates(branchPrec);
@@ -728,6 +750,12 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		outman.UserMessageNoCR("pass%2d:+%9.3f (branch=%7.2f scale=%6.2f", i, improve, trueImprove, scaleOptImprove);
 		if(optOmega) outman.UserMessageNoCR(" omega=%6.2f", omegaOptImprove);
 		if(optAlpha) outman.UserMessageNoCR(" alpha=%6.2f", alphaOptImprove);
+
+#ifdef MORE_DETERM_OPT
+		if(optFreqs) outman.UserMessageNoCR(" freqs=%6.2f", freqOptImprove);
+		if(optRelRates) outman.UserMessageNoCR(" rel rates=%6.2f", rateOptImprove);
+#endif
+
 		if(optFlex) outman.UserMessageNoCR(" flex=%6.2f", flexOptImprove);
 		if(optPinv) outman.UserMessageNoCR(" pinv=%6.2f", pinvOptImprove);
 		if(optSubsetRates) outman.UserMessageNoCR(" subset rates=%6.2f", subsetRateImprove);
