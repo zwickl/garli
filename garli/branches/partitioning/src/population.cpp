@@ -2176,7 +2176,13 @@ void Population::FinalOptimization(){
 int Population::EvaluateStoredTrees(bool report){
 	double bestL=-FLT_MAX;
 	int bestRep;
-	if(report) outman.UserMessage("\nCompleted %d replicate runs (of %d).\nResults:", storedTrees.size(), conf->searchReps);
+	if(report){
+		outman.UserMessage("\n#######################################################\n\nCompleted %d replicate search(es) (of %d).", storedTrees.size(), conf->searchReps);
+		if(conf->searchReps > 1 && (storedTrees.size() > 1))
+			outman.UserMessage("\nNOTE: Unless the following output indicates that search replicates found the\n\tsame topology, you should assume that they found different topologies.");
+		outman.UserMessage("Results:");
+		}
+
 	for(unsigned r=0;r<storedTrees.size();r++){
 		storedTrees[r]->treeStruct->CalcBipartitions(true);	
 		if(storedTrees[r]->Fitness() > bestL){
@@ -2186,12 +2192,6 @@ int Population::EvaluateStoredTrees(bool report){
 		}
 
 	if(report){
-		if(conf->collapseBranches){
-			outman.UserMessage("\nNOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");
-			outman.UserMessage("     If any were collapsed, the following tests for whether the topologies from each search");
-			outman.UserMessage("     replicate were identical may not be accurate.  Check the screen output above to see");
-			outman.UserMessage("     if branches were actually collapsed, and if necessary compare the trees in another program.");
-			}
 		for(unsigned r=0;r<storedTrees.size();r++){
 			unsigned r2;
 			for(r2=0;r2<r;r2++){
