@@ -1399,7 +1399,7 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 
 	bool recodeSkippedIndeces = true;
 	map<int, int> nclStateIndexToGarliState;
-	vector<map<int, int>> stateMaps;
+	vector< map<int, int> > stateMaps;
 	//recode characters that skip states (assuming numerical order of states) to not skip any.  i.e., recode a
 	//char with states 0 1 5 7 to 0 1 2 3
 	if(recodeSkippedIndeces){
