@@ -995,7 +995,8 @@ void Population::ValidateInput(int rep){
 	if(conf->modWeight == ZERO_POINT_ZERO)
 		if(modSpec.IsCodon() && modSpec.gotOmegasFromFile == false) throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
 
-	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0)){
+	//the treestruct could be null if there was a start file that contained no tree
+	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0) && (indiv[0].treeStruct != NULL)){
 		bool foundPolytomies = indiv[0].treeStruct->ArbitrarilyBifurcate();
 		if(foundPolytomies) outman.UserMessage("WARNING: Polytomies found in start tree.  These were arbitrarily resolved.");
 		indiv[0].treeStruct->root->CheckTreeFormation();
