@@ -1362,7 +1362,8 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 		}
 	if(consts.size() > 0 && type == ONLY_VARIABLE){
 		string c = NxsSetReader::GetSetAsNexusString(consts);
-		throw ErrorException("Character number(s) %s is/are constant and are not allowed when using the Mkv\n\tmodel (as opposed to Mk), because it specifically assumes that all characters\n\tare variable.  Exclude the characters or change to datatype = standard.", c.c_str());
+		throw ErrorException("Constant characters are not allowed when using the Mkv\n\tmodel (as opposed to Mk), because it assumes that all\n\tcharacters are variable.  Change to datatype = standard\n\tor exclude them by adding this to your nexus datafile:\nbegin assumptions;\nexset * const = %s;\nend;", c.c_str());
+
 		}
 
 //DEBUG
@@ -1396,8 +1397,28 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 	else
 		NewMatrix( numActiveTaxa, realCharSet->size());
 
+	bool recodeSkippedIndeces = true;
+	map<int, int> nclStateIndexToGarliState;
+	vector<map<int, int>> stateMaps;
+	//recode characters that skip states (assuming numerical order of states) to not skip any.  i.e., recode a
+	//char with states 0 1 5 7 to 0 1 2 3
+	if(recodeSkippedIndeces){
+		if(type == ONLY_VARIABLE)		
+			stateMaps.push_back(nclStateIndexToGarliState);
+
+		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){
+			set<int> stateSet = charblock->GetNamedStateSetOfColumn(*cit);
+			int myIndex = 0;
+			for(set<int>::iterator sit = stateSet.begin();sit != stateSet.end();sit++){
+				nclStateIndexToGarliState.insert(pair<int, int>(*sit, myIndex++));
+				}
+			stateMaps.push_back(nclStateIndexToGarliState);
+			nclStateIndexToGarliState.clear();
+			}
+		}
+
 	// read in the data, including taxon names
-	int i=0;
+	int effectiveTax=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
 			//internally, blanks in taxon names will be stored as underscores
@@ -1405,25 +1426,31 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
 			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
 			tlabel.BlanksToUnderscores();
-			SetTaxonLabel( i, tlabel.c_str());
+			SetTaxonLabel( effectiveTax, tlabel.c_str());
 			
-			int j = 0;
+			int effectiveChar = 0;
 			//add the dummy constant character
 			if(type == ONLY_VARIABLE)
-				SetMatrix( i, j++, 0 );
+				SetMatrix( effectiveTax, effectiveChar++, 0 );
 
 			bool firstAmbig = true;
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				unsigned char datum = '\0';
-				int poo = *cit;
 				if(charblock->IsGapState(origTaxIndex, *cit) == true){
 					//if gapmode=newstate is on (default is gapmode=missing) then need handle the gap properly
 					//changes in NCL should now have it correctly reporting the number of states with gaps {in, ex}cluded
-					if(charblock->GetGapModeSetting() == CharactersBlock::GAP_MODE_NEWSTATE)
-						datum = maxNumStates - 1;
-					else
+					if(charblock->GetGapModeSetting() == CharactersBlock::GAP_MODE_NEWSTATE){
+						if(recodeSkippedIndeces){
+							datum = stateMaps[effectiveChar][NXS_GAP_STATE_CODE];
+							}
+						else{
+							datum = maxNumStates - 1;
+							}
+						}
+					else{
 						datum = maxNumStates;
+						}
 					}
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true){
 					datum = maxNumStates;
@@ -1433,8 +1460,13 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 					//assert(nstates == 1);
 					//need to deal with the possibility of multiple states represented in matrix
 					//just convert to full ambiguity
-					if(nstates == 1)
-						datum = charblock->GetStateIndex(origTaxIndex, *cit, 0);
+					if(nstates == 1){
+						int nclIndex = charblock->GetStateIndex(origTaxIndex, *cit, 0);
+						if(recodeSkippedIndeces)
+							datum = stateMaps[effectiveChar][nclIndex];
+						else 
+							datum = nclIndex;
+						}
 					else{
 						if(firstAmbig){
 							outman.UserMessageNoCR("Partially ambiguous characters of taxon %s converted to full ambiguity:\n\t", TaxonLabel(origTaxIndex));
@@ -1444,10 +1476,10 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 						datum = maxNumStates;
 						}
 					}
-				SetMatrix( i, j++, datum );
+				SetMatrix( effectiveTax, effectiveChar++, datum );
 				}
 			if(firstAmbig == false) outman.UserMessage("");
-			i++;
+			effectiveTax++;
 			}
 		}
 	//verify that every allowed state was observed for each character
@@ -1462,7 +1494,11 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 					break;
 					}
 				}
-			assert(found);
+			if(!found){
+				outman.UserMessage("\nWARNING - some state in a %d-state character appeared only as part\n\tof an ambiguity code, e.g., a column with states 0, 1 and (12).", maxNumStates);
+				outman.UserMessage("\tThe ambiguity code will be treated as missing data,\n\tbut the character will still be considered to have %d states.\n", maxNumStates);
+				}
+			//assert(found);
 			}
 		}
 #endif
