@@ -19,7 +19,7 @@
 
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION 0.96
-#define MINOR_VERSION "r601"
+#define MINOR_VERSION "r730"
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
