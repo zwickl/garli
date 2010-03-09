@@ -1577,9 +1577,12 @@ void Population::Run(){
 				if(adap->numPrecReductions < 0) return;
 				reduced=adap->ReducePrecision();
 				}
-			if(reduced){
-				lastPrecisionReduction=gen;
-				outman.UserMessage("Optimization precision reduced ");
+			//optimize params if we just reduced prec or if we are at the min prec and we've run for a while since the last reduction
+			if(reduced || ((gen - lastPrecisionReduction >= (adap->intervalLength * 50)) && (gen % (adap->intervalLength * 50) == 0) && (FloatingPointEquals(adap->branchOptPrecision, conf->minOptPrec, 1.0e-8)))){
+				if(reduced){
+					lastPrecisionReduction=gen;
+					outman.UserMessage("Optimization precision reduced ");
+					}
 				//Added in this optimization of rate het params at prec reduction,
 				//mainly to help with optimization in partitioned models
 				FLOAT_TYPE improve = 0.0;
