@@ -1583,24 +1583,41 @@ void Population::Run(){
 				//Added in this optimization of rate het params at prec reduction,
 				//mainly to help with optimization in partitioned models
 				FLOAT_TYPE improve = 0.0;
+				Tree *bestTree = indiv[bestIndiv].treeStruct;
 				for(int modnum = 0;modnum < indiv[bestIndiv].modPart.NumModels();modnum++){
 					Model *mod = indiv[bestIndiv].modPart.GetModel(modnum);
 					const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
 					if(modSpec->IsCodon())//optimize omega even if there is only 1
-						improve += indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision, modnum);
+						improve += bestTree->OptimizeOmegaParameters(adap->branchOptPrecision, modnum);
 					else if(mod->NRateCats() > 1){
 						if(modSpec->IsFlexRateHet()){//Flex rates
-							improve += indiv[bestIndiv].treeStruct->OptimizeFlexRates(adap->branchOptPrecision, modnum);
+							improve += bestTree->OptimizeFlexRates(adap->branchOptPrecision, modnum);
 							}
 						else if(modSpec->fixAlpha == false){//normal gamma
-							improve += indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(adap->branchOptPrecision, mod->Alpha(), 0, min(mod->Alpha(), 0.05), 999.9, modnum, &Model::SetAlpha);
+							improve += bestTree->OptimizeBoundedParameter(adap->branchOptPrecision, mod->Alpha(), 0, min(mod->Alpha(), 0.05), 999.9, modnum, &Model::SetAlpha);
 							}
 						}
 					if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
-						improve += indiv[bestIndiv].treeStruct->OptimizeBoundedParameter(adap->branchOptPrecision, mod->PropInvar(), 0, min(mod->PropInvar(), 1.0e-8), mod->maxPropInvar, modnum, &Model::SetPinv);
+						improve += bestTree->OptimizeBoundedParameter(adap->branchOptPrecision, mod->PropInvar(), 0, min(mod->PropInvar(), 1.0e-8), mod->maxPropInvar, modnum, &Model::SetPinv);
+#ifdef MORE_DETERM_OPT
+					if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false){
+						FLOAT_TYPE paramOpt = bestTree->OptimizeEquilibriumFreqs(adap->branchOptPrecision, modnum);
+						if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+							paramOpt = ZERO_POINT_ZERO;
+						improve += paramOpt;
+						outman.DebugMessage("eq freq opt = %.4f", paramOpt);
+						}
+					if(modSpec->fixRelativeRates == false && modSpec->Nst() > 1 && modSpec->IsAminoAcid() == false){
+						FLOAT_TYPE paramOpt = bestTree->OptimizeRelativeNucRates(adap->branchOptPrecision, modnum);
+						if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+							paramOpt = ZERO_POINT_ZERO;
+						improve += paramOpt;
+						outman.DebugMessage("rel rates opt = %.4f", paramOpt);
+						}
+#endif
 					}
 				if(modSpecSet.InferSubsetRates()){
-					improve += indiv[bestIndiv].treeStruct->OptimizeSubsetRates(adap->branchOptPrecision);
+					improve += bestTree->OptimizeSubsetRates(adap->branchOptPrecision);
 					}
 				outman.UserMessage("   Optimizing parameters...    improved %8.3f lnL", improve);
 				/////
@@ -1608,7 +1625,7 @@ void Population::Run(){
 				FLOAT_TYPE before=bestFitness;
 				//under some conditions (very steep lopsided likelihood curve for branch lengths)
 				//the blen opt can actually make the score worse
-				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
+				bestTree->OptimizeAllBranches(adap->branchOptPrecision);
 				indiv[bestIndiv].SetDirty();
 				CalcAverageFitness();
 				outman.UserMessage("   Optimizing branchlengths... improved %8.3f lnL", bestFitness - before - improve);
