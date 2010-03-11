@@ -1,7 +1,7 @@
 AM_CPPFLAGS = @CPPFLAGS@
 AM_LDFLAGS  = @LDFLAGS@
  
-bin_PROGRAMS = Garli@VERSION@
+bin_PROGRAMS = Garli
 
 EXTRA_DIST = mpitrick.cpp \
 	threadfunc.cpp
@@ -39,7 +39,7 @@ noinst_HEADERS = \
 	treenode.h \
 	utility.h 
 
-Garli@VERSION@_SOURCES = \
+Garli_SOURCES = \
 	adaptation.cpp \
 	bipartition.cpp \
 	condlike.cpp \
@@ -65,4 +65,10 @@ Garli@VERSION@_SOURCES = \
 	mpitrick.cpp
 
 
-Garli@VERSION@_LDADD =  $(LDADD) @GARLI_LIBS@
+Garli_LDADD =  $(LDADD) @GARLI_LIBS@
+
+install-exec-hook:
+	cd $(DESTDIR)$(bindir) && \
+	  mv -f Garli$(EXEEXT) Garli-Part-$(VERSION)$(EXEEXT) && \
+	  $(LN_S) Garli-Part-$(VERSION)$(EXEEXT) Garli$(EXEEXT)
+

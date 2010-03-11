@@ -1,3 +1,10 @@
+#################
+FOR PARTITIONED VERSION EXAMPLES SEE THE partition_Mk_Examples directory.
+For documentation of the partitioned version see:
+http://www.nescent.org/wg_garli/Partition_testing_version
+
+The following may also be helpful if you aren't familar with general GARLI usage.
+#################
 GARLI version 0.96 examples - May 2008
 
 SAMPLE DATASETS:
