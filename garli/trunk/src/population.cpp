@@ -7001,7 +7001,7 @@ void Population::OptimizeSiteRates(){
 	vector<float_pair> allRates;
 
 	for(int i=0;i<data->NChar();i++){
-		if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].mod->StateFreq((data->GetConstStates())[i]));
+		if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].mod->StateFreqBitDataFormat((data->GetConstStates())[i]));
 		else{
 			indiv[0].treeStruct->MakeAllNodesDirty();
 			Tree::siteToScore = i;
