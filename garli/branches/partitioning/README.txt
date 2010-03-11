@@ -1,3 +1,15 @@
+
+###########
+##NOTE#####
+This is the mk model and partitioned model version of GARLI, GARLI-PART 0.97
+The readme below is for a slightly older non-partitioned version, but most 
+of it should apply to the partitioned version as well.
+
+For documentation on this version see:
+ http://www.nescent.org/wg_garli/Partition_testing_version
+
+You'll also find example files in the partition_Mk_Examples directory
+##########
 // GARLI Version 0.96b8 (May 2008)
 // Copyright 2005-2008 Derrick J. Zwickl
 // email: zwickl@nescent.org
