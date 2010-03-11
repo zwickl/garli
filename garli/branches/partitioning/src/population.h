@@ -541,5 +541,6 @@ private:
 		void CheckRemoteReplaceThresh();
 		void TurnOffRatchet();
 		unsigned Gen()const {return gen;}
+		void ValidateInput(int rep);
 	};
 #endif

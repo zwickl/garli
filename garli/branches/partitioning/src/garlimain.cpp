@@ -84,13 +84,15 @@ void UsageMessage(char *execName){
 #ifndef SUBROUTINE_GARLI	
 	outman.UserMessage("Usage: %s [OPTION] [config filename]", execName);
 	outman.UserMessage("Options:");
-	outman.UserMessage("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
-	if(interactive) outman.UserMessage("        (interactive is the default for the version you are running)");
-	outman.UserMessage("  -b, --batch		batch mode (do not expect user input)");
+	outman.UserMessage                 ("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
+	if(interactive) outman.UserMessage ("        (interactive is the default for the version you are running)");
+	outman.UserMessage                 ("  -b, --batch		batch mode (do not expect user input)");
 	if(!interactive) outman.UserMessage("        (batch is the default for the version you are running)");
-	outman.UserMessage("  -v, --version		print version information and exit");
-	outman.UserMessage("  -h, --help		print this help and exit");
-	outman.UserMessage("  -t			run internal tests (requires dataset and config file)");
+	outman.UserMessage                 ("  -v, --version		print version information and exit");
+	outman.UserMessage                 ("  -h, --help		print this help and exit");
+	outman.UserMessage                 ("  -t			run internal tests (requires dataset and config file)");
+	outman.UserMessage                 ("  -V			validate: load config file and data, validate config file, data, starting trees"); 
+	outman.UserMessage                 ("				and constraint files, print required memory and selected model, then exit");
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"");
 #else
 	outman.UserMessage("Usage: The syntax for launching MPI jobs varies between systems");
@@ -155,6 +157,7 @@ int main( int argc, char* argv[] )	{
 #endif
 
 	bool runTests = false;
+	bool validateMode = false;
     if (argc > 1) {
     	int curarg=1;
         while(curarg<argc){
@@ -176,7 +179,7 @@ int main( int argc, char* argv[] )	{
 						[pool release];
 #endif				
 					else if(argv[curarg][1]=='t') runTests = true;
-					else if(!_stricmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
+					else if(!strcmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
 						outman.UserMessage("%s Version %.2f.%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION);
 #ifdef SUBROUTINE_GARLI
 						outman.UserMessage("MPI run distributing version");
@@ -196,6 +199,10 @@ int main( int argc, char* argv[] )	{
 						UsageMessage(argv[0]);
 						exit(0);
 						}
+					else if(!strcmp(argv[curarg], "-V"))
+						//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
+						//which is essentially a stripped down version of pop::SeedPopWithStartingTree
+						validateMode = true;
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						UsageMessage(argv[0]);
@@ -642,8 +649,15 @@ int main( int argc, char* argv[] )	{
 				outman.UserMessage("******Successfully completed tests.******");
 				return 0;
 				}
-			
-			if(conf.runmode != 0){
+
+			if(validateMode){
+				//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
+				//which is essentially a stripped down version of pop::SeedPopWithStartingTree
+				pop.ValidateInput(1);
+				outman.UserMessage("VALIDATION COMPLETE. Check output above for information and possible errors.");
+				}
+
+			else if(conf.runmode != 0){
 				if(conf.runmode == 1)
 					pop.ApplyNSwaps(10);
 				else if(conf.runmode == 7)
