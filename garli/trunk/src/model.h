@@ -928,6 +928,18 @@ class Model{
 	
 	//Accessor functions
 	FLOAT_TYPE StateFreq(int p) const{ return *stateFreqs[p];}
+	FLOAT_TYPE StateFreqBitDataFormat(int p) const{
+		assert(! (p & (p-1)));
+		int index = 0;
+		switch(p){
+			case 1 : index = 0;break;
+			case 2 : index = 1;break;
+			case 4 : index = 2;break;
+			case 8 : index = 3;break;
+			default: assert(0);
+			}
+		return *stateFreqs[index];
+		}
 	FLOAT_TYPE TRatio() const;
 	FLOAT_TYPE Rates(int r) const { return *relNucRates[r];}
 	int NumRelRates() const {return relNucRates.size();}
