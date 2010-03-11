@@ -2,7 +2,7 @@
 # This file was written by hand (by mth using PAUP's configure.ac and http://autotoolset.sourceforge.net/tutorial.html as guides).
 
 AC_PREREQ(2.59)
-AC_INIT([Garli], [0.96b8], [zwickl@nescent.org])
+AC_INIT([Garli], [0.97], [zwickl@nescent.org])
 
 AC_CONFIG_SRCDIR([src/garlimain.cpp])
 AC_CONFIG_HEADER([config.h])
@@ -25,6 +25,7 @@ AC_CONFIG_MACRO_DIR(config)
 AM_INIT_AUTOMAKE([1.9 foreign dist-tarZ tar-ustar filename-length-max=299])
 
 # Checks for programs.
+AC_PROG_LN_S
 AC_PROG_CC
 AC_PROG_CPP
 INP_CXXFLAGS="$CXXFLAGS"
