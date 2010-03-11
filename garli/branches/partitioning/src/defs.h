@@ -46,6 +46,8 @@
 #endif
 */
 
+#define MORE_DETERM_OPT
+
 #define USE_COUNTS_IN_BOOT
 
 #undef OPT_DEBUG
