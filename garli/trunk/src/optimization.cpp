@@ -1999,8 +1999,10 @@ if(nd->nodeNum == 8){
 				outman.DebugMessage("100 passes in NR!");
 				//now going to allow escape after 100 passes in all SP runs, and in DP codon runs.  This should only happen due to numerical problems, and these
 				//are situations where numerical problems are known to occur.
+				//When blen MLE is very large I've found cases where there are true multiple blen optima for a single blen trace.  So, allowing an
+				//exemption in that case.
 #ifndef SINGLE_PRECISION_FLOATS				
-				if(modSpec.IsCodon() == false)
+				if(modSpec.IsCodon() == false && (nd->dlen < 1.0 && v_onEntry < 1.0))
 					throw(ErrorException("Problem with branchlength optimization.  Please report this error to garli.support@gmail.com.\nDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum));
 				else 
 					outman.UserMessage("Notice: possible problem with branchlength optimization.\nIf you see this message frequently, please report it to garli.support@gmail.com.\nIf you only see it ignore it.\n\tDetails: nd=%d init=%f cur=%f prev=%d d1=%f d2=%f neg=%d", nd->nodeNum, v_onEntry, v_prev, nd->dlen, d1, d2, negProposalNum);

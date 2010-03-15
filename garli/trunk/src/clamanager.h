@@ -93,7 +93,7 @@ class ClaManager{
 	bool IsClaReserved(int index) {return holders[index].reserved;}
 	bool IsClaTempReserved(int index) {return holders[index].tempReserved;};
 	void ReclaimSingleCla(int index);
-	void CountClaTotals(int &clean, int &tempres, int &res);
+	void CountClaTotals(int &clean, int &tempres, int &res, int &assigned);
 	void RecycleClas();
 	int GetClaNumber(int index);
 	int CountClasInUse(int recLevel);
@@ -146,12 +146,13 @@ class ClaManager{
 		holders[index].theArray=NULL;				
 		}
 
-	inline void ClaManager::CountClaTotals(int &clean, int &tempres, int &res){
+	inline void ClaManager::CountClaTotals(int &clean, int &tempres, int &res, int &assigned){
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL) clean++;
 			if(holders[i].tempReserved ==true) tempres++;
 			if(holders[i].reserved==true) res++;
 			}		
+		assigned = this->numHolders - holderStack.size();
 		}
 	
 	inline int ClaManager::GetClaNumber(int index){

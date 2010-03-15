@@ -79,6 +79,7 @@ protected:
 		int*	numStates;
 		int		dmFlags;
 		int     maxNumStates;
+		bool	useDefaultWeightsets;
 
 	protected:
 		char	info[80];
@@ -109,14 +110,14 @@ protected:
 			, number(0), taxonLabel(0), numStates(0) 
 			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
-			fullyAmbigChar(15)
+			fullyAmbigChar(15), useDefaultWeightsets(false)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
 			: nTax(ntax), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
 			, number(0), taxonLabel(0), numStates(0)
 			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
-			fullyAmbigChar(15)
+			fullyAmbigChar(15), useDefaultWeightsets(false)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
 		virtual ~DataMatrix();
 
@@ -166,16 +167,24 @@ protected:
 			//{ return ( number && (j < totalNChar) ? number[j] : 0 ); }
 			{ return ( number && (j < gapsIncludedNChar) ? number[j] : 0 ); }
 
-		virtual int Count(int j) const
-			{ return ( count && (j < nChar) ? count[j] : 0 ); }
-		virtual const int *GetCounts() const {return count;}
-		const int *GetConstStates() const {return constStates;}
-		void SetCount(int j, int c)
-			{ if( count && (j < nChar) ) count[j] = c; }
-
-		void SetNumStates(int j, int c)
-			{ if( numStates && (j < nChar) ) numStates[j] = c; }
-
+		virtual int Count(int j) const{ 
+			return ( count && (j < nChar) ? count[j] : 0 ); 
+			}
+		virtual int CountByOrigIndex(int j) const{ 
+			return ( count && (j < nChar) ? count[number[j]] : 0 ); 
+			}
+		virtual const int *GetCounts() const {
+			return count;
+			}
+		const int *GetConstStates() const {
+			return constStates;
+			}
+		void SetCount(int j, int c){
+			if( count && (j < nChar) ) count[j] = c; 
+			}
+		void SetNumStates(int j, int c){ 
+			if( numStates && (j < nChar) ) numStates[j] = c;
+			}
 		const char* TaxonLabel(int i) const{
 			return ( taxonLabel && (i < nTax) ? taxonLabel[i] : 0 );
 			}
@@ -288,7 +297,8 @@ protected:
       void Reweight(FLOAT_TYPE prob);
       long BootstrapReweight(int seed, FLOAT_TYPE resampleProportion);
 	  void CountMissingCharsByColumn(vector<int> &vec);
-      
+	  void MakeWeightSetString(NxsCharactersBlock &charblock, string &wtstring, string name);
+      void MakeWeightSetString(std::string &wtstring, string name);
 #endif
 };
 

@@ -1203,7 +1203,7 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 	// |_______________________________________|
 	//
 
-	strcat( newpath, ".comp" );
+	//strcat( newpath, ".comp" );
 	outman.UserMessage("Opening file \"%s\" for saving...", newpath);
 
 	ofstream outf( newpath );
@@ -1216,7 +1216,12 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 		nchar_total++;
 	}
 */
-	outf << nTax << "  " << nChar << endl;
+
+	outf << "#NEXUS\nbegin data;\ndimensions ntax=" <<nTax << " nchar=" << nChar << ";\n";
+	outf << "format datatype=dna missing=? gap=-;\n";
+	outf << "matrix" << endl;
+
+	//outf << nTax << "  " << nChar << endl;
 	for( i = 0; i < nTax; i++ ) {
 		outf << TaxonLabel(i) << "  ";
 		for( j = 0; j < nChar; j++ ) {
@@ -1226,6 +1231,15 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 		}
 		outf << endl;
 	}
+
+	outf << ";" << endl;
+	outf << "end;";
+	outf << "begin assumptions;\n";
+	string str;
+	this->MakeWeightSetString(str, "packed");
+	outf << str.c_str() << "\n;end;\n";
+	outf.close();
+	return 1;
 
 	// save a line containing the counts for each character
 	for( j = 0; j < nChar; j++ ) {
@@ -1751,4 +1765,70 @@ void DataMatrix::CountMissingCharsByColumn(vector<int> &vec){
 			}
 		vec.push_back(missing);
 		}
+	}
+
+void DataMatrix::MakeWeightSetString(NxsCharactersBlock &charblock, std::string &wtstring, string name){
+	NxsTransformationManager &transformer = charblock.GetNxsTransformationManagerRef();
+	//this is a list of IntWeightToIndexSet objects
+	NxsTransformationManager::ListOfIntWeights intWeights;
+	
+	NxsUnsignedSet dummy;
+	//the charset was empty, implying that all characters in this block will go into a single matrix
+	for(int i = 0;i < charblock.GetNumChar();i++)
+		dummy.insert(i);
+
+	for(int countNum = 0;dummy.size() > 0;countNum++){
+		//this is a pair<int, std::set<unsigned> >
+		NxsTransformationManager::IntWeightToIndexSet weightToIndex;
+		weightToIndex.first = countNum;
+		for(NxsUnsignedSet::iterator it = dummy.begin();it != dummy.end();){
+			int thisCount = Count(*it);
+			if(thisCount == countNum){
+				weightToIndex.second.insert(*it);
+				int err = *it++;
+				dummy.erase(err);
+				}
+			else it++;
+			}
+		if(weightToIndex.second.size() > 0)
+			intWeights.push_back(weightToIndex);
+		}
+	
+	transformer.AddIntWeightSet("bootstrapped", intWeights, true);
+	ostringstream out;
+	transformer.WriteWtSet(out);
+	wtstring = out.str();
+	}
+
+void DataMatrix::MakeWeightSetString(std::string &wtstring, string name){
+	NxsTransformationManager transformer;// = charblock.GetNxsTransformationManagerRef();
+	//this is a list of IntWeightToIndexSet objects
+	NxsTransformationManager::ListOfIntWeights intWeights;
+	
+	NxsUnsignedSet dummy;
+	//the charset was empty, implying that all characters in this block will go into a single matrix
+	for(int i = 0;i < nChar;i++)
+		dummy.insert(i);
+
+	for(int countNum = 0;dummy.size() > 0;countNum++){
+		//this is a pair<int, std::set<unsigned> >
+		NxsTransformationManager::IntWeightToIndexSet weightToIndex;
+		weightToIndex.first = countNum;
+		for(NxsUnsignedSet::iterator it = dummy.begin();it != dummy.end();){
+			int thisCount = Count(*it);
+			if(thisCount == countNum){
+				weightToIndex.second.insert(*it);
+				int err = *it++;
+				dummy.erase(err);
+				}
+			else it++;
+			}
+		if(weightToIndex.second.size() > 0)
+			intWeights.push_back(weightToIndex);
+		}
+	
+	transformer.AddIntWeightSet(name.c_str(), intWeights, true);
+	ostringstream out;
+	transformer.WriteWtSet(out);
+	wtstring = out.str();
 	}
