@@ -299,6 +299,17 @@ class Tree{
 			MakeAllNodesDirty();
 			}
 
+		void VerifyScore(double tol){
+			if(!FloatingPointEquals(-1.0, lnL, 1e-8)){
+				double bef = lnL;
+				MakeAllNodesDirty();
+				Score();
+				outman.UserMessage("Verify score: %.6f -> %.6f = %.6f", bef, lnL, bef - lnL);
+				assert(FloatingPointEquals(bef, lnL, tol));
+				}
+			return;
+			}
+
 		pair<FLOAT_TYPE, FLOAT_TYPE> OptimizeSingleSiteTreeScale(FLOAT_TYPE optPrecision);
 
 		//functions for dealing with conditional likelihood arrays

@@ -933,6 +933,20 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 
 	NewMatrix( numActiveTaxa, numActiveChar );
 
+	//get weightsets if any were specified - not turning this on by default
+	if(useDefaultWeightsets){
+		const NxsTransformationManager &transformer = charblock->GetNxsTransformationManagerRef();
+		string wset = transformer.GetDefaultWeightSetName();
+		vector<int> charWeights;
+		if(wset.length() > 0){
+			if(transformer.IsDoubleWeightSet(wset))
+				throw ErrorException("WeightSet \"%s\" contains non-integer weights", wset.c_str()); 
+			charWeights = transformer.GetIntWeights(wset);
+			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++)
+				SetCount(*cit, charWeights[*cit]);
+			}
+		}
+
 	// read in the data, including taxon names
 	int i=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
@@ -1061,6 +1075,20 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 		}
 
 	NewMatrix( numActiveTaxa, numActiveChar );
+
+	//get weightsets if any were specified - not turning this on by default
+	if(useDefaultWeightsets){
+		const NxsTransformationManager &transformer = charblock->GetNxsTransformationManagerRef();
+		string wset = transformer.GetDefaultWeightSetName();
+		vector<int> charWeights;
+		if(wset.length() > 0){
+			if(transformer.IsDoubleWeightSet(wset))
+				throw ErrorException("WeightSet \"%s\" contains non-integer weights", wset.c_str()); 
+			charWeights = transformer.GetIntWeights(wset);
+			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++)
+				SetCount(*cit, charWeights[*cit]);
+			}
+		}
 
 	// read in the data, including taxon names
 	int i=0;
