@@ -1126,21 +1126,32 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	//Here we'll error out if something was fixed but didn't appear
 	if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
 		//if no streefname file was specified, the param values should be in a garli block with the dataset
-		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-		else if(modSpec.IsCodon() && modSpec.fixOmega && !modSpec.gotOmegasFromFile) throw(ErrorException("rate het model set to nonsynonymousfixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) 
+			throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) 
+			throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) 
+			throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) 
+			throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+		else if(modSpec.IsCodon() && modSpec.fixOmega && !modSpec.gotOmegasFromFile) 
+			throw(ErrorException("rate het model set to nonsynonymousfixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 		}
 	else{
-		if(modSpec.IsNucleotide() && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-		else if(modSpec.IsCodon() && modSpec.fixOmega && !modSpec.gotOmegasFromFile) throw ErrorException("rate het model set to nonsynonymousfixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		if((modSpec.IsNucleotide() || modSpec.IsAminoAcid()) && modSpec.IsUserSpecifiedStateFrequencies() && !modSpec.gotStateFreqsFromFile) 
+			throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.fixAlpha && !modSpec.gotAlphaFromFile) 
+			throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.fixInvariantSites && !modSpec.gotPinvFromFile) 
+			throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.IsUserSpecifiedRateMatrix() && !modSpec.gotRmatFromFile) 
+			throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+		else if(modSpec.IsCodon() && modSpec.fixOmega && !modSpec.gotOmegasFromFile) 
+			throw ErrorException("rate het model set to nonsynonymousfixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 		}
 	if(conf->modWeight == ZERO_POINT_ZERO)
-		if(modSpec.IsCodon() && modSpec.gotOmegasFromFile == false) throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
+		if(modSpec.IsCodon() && modSpec.gotOmegasFromFile == false) 
+			throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
 
 	assert(indiv[0].treeStruct != NULL);
 	bool foundPolytomies = indiv[0].treeStruct->ArbitrarilyBifurcate();
