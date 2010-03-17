@@ -12,6 +12,8 @@ Zakon 11 taxon Na+ channel gene fish dataset:
 -This dataset is from Zakon, Lu, Zwickl and Hillis. 2006. Sodium channel genes and the evolution of diversity in communication signals of electric fishes: Convergent molecular evolution. Proc. Natl. Acad. Sci. USA. 103(10):3675-80.
 -This is a protein coding gene, aligned in proper reading frame
 -This single dataset file can be analyzed using nucleotide, amino acid and codon models with the garli.conf.nuc.test, garli.conf.AA.test and garli.conf.codon.test configuration files, respectively.
+-There is an example of how to use a custom AA model (the "LG" model in this case) with this dataset in configuration file garli.conf.AA.LGmodel and model file LGmodel.mod.
+
 
 Configuration files:
 -The program will look for a configuration file named garli.conf in the current working directory, unless a different filename is passed to it from the command line
