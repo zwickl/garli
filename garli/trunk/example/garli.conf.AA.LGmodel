@@ -1,9 +1,9 @@
 [general]
 datafname = zakonEtAl2006.11tax.nex
 constraintfile = none
-streefname = stepwise
+streefname = LGmodel.mod
 attachmentspertaxon = 50
-ofprefix = AA.jonesFIG
+ofprefix = AA.LGmodel
 randseed = -1
 availablememory = 512
 logevery = 10
@@ -12,7 +12,7 @@ refinestart = 1
 outputeachbettertopology = 0
 outputcurrentbesttopology = 0
 enforcetermconditions = 1
-genthreshfortopoterm = 2000
+genthreshfortopoterm = 20000
 scorethreshforterm = 0.05
 significanttopochange = 0.01
 outputphyliptree = 0
@@ -24,8 +24,8 @@ collapsebranches = 1
 searchreps = 2
 
 datatype = codon-aminoacid
-ratematrix = jones
-statefrequencies = empirical
+ratematrix = fixed
+statefrequencies = fixed
 ratehetmodel = gamma
 numratecats = 4
 invariantsites = estimate
@@ -40,7 +40,7 @@ stoptime = 5000000
 
 startoptprec = 0.5
 minoptprec = 0.01
-numberofprecreductions = 1
+numberofprecreductions = 10
 treerejectionthreshold = 50.0
 topoweight = 1.0
 modweight = 0.05
