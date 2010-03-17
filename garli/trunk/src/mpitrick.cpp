@@ -69,7 +69,7 @@ int main(int argc,char **argv){
   MPI_Comm comm,mycomm; 
   int nproc, rank;
   comm = MPI_COMM_WORLD;
-  MPI_Comm_size(comm,&nproc); 
+  MPI_Comm_size(comm,&nproc);
   MPI_Comm_rank(comm,&rank);
 
   timespec wait;
@@ -108,6 +108,7 @@ int main(int argc,char **argv){
 		else numJobsTotal = atoi(&argv[1][0]);
 		}
 #endif
+  	outman.UserMessage("#####%d total executions of the config file were requested######", numJobsTotal);
 	}
   else{//wait a moment for proc 0 to output to the messages file, then attach to the stream
 	wait.tv_sec = 1;
@@ -116,8 +117,20 @@ int main(int argc,char **argv){
 	outman.SetLogFileForAppend("mpi_messages.log");
 	}
  
+ 
+ //These barriers really shouldn't be necessary, but adding them seemed to resolve a weird issue that Jelesko
+ //was having where processes with rank >= 8 were hanging in the Bcast until some of the first 8 were completely 
+ //finished and returned from the job loop
+  //outman.UserMessage("#####Process %d approaching barrier 1 at %s######", rank, MyFormattedTime().c_str());
+  MPI_Barrier(comm);
+  //outman.UserMessage("#####Process %d passed barrier 1 at %s######", rank, MyFormattedTime().c_str());
+ 
 //send all of the processors the number of jobs total
   MPI_Bcast(&numJobsTotal, 1, MPI_INT, 0, comm);
+
+//  outman.UserMessage("#####Process %d passed broadcast, approaching barrier 2 at %s######", rank, MyFormattedTime().c_str());
+  MPI_Barrier(comm);
+//  outman.UserMessage("#####Process %d passed barrier 2 at %s######", rank, MyFormattedTime().c_str());
 
 //DEBUG
   //if startjob lockfiles exist at this point that must mean that a previous run bailed.  Remove them.

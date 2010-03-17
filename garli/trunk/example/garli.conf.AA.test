@@ -1,7 +1,7 @@
 [general]
 datafname = zakonEtAl2006.11tax.nex
 constraintfile = none
-streefname = stepwise
+streefname = LGmodel.mod
 attachmentspertaxon = 50
 ofprefix = AA.jonesFIG
 randseed = -1
@@ -24,7 +24,7 @@ collapsebranches = 1
 searchreps = 2
 
 datatype = codon-aminoacid
-ratematrix = jones
+ratematrix = fixed
 statefrequencies = empirical
 ratehetmodel = gamma
 numratecats = 4
