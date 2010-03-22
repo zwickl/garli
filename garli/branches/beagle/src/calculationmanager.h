@@ -118,7 +118,7 @@ class TransMatHolder{
 		return &theMatSet->d2mat;
 		}
 
-	void GetEigenSolution(ModelEigenSolution &sol){
+	void GetEigenSolution(ModelEigenSolution &sol) const{
 		myMod->GetEigenSolution(sol);
 		}
 
@@ -293,10 +293,10 @@ public:
 
 	int SetDirty(int index){
 		//there are only two options here:
-		//1. Cla is being made dirty, and only node node points to it 
-		//	->null the holder's cla pointer and return the same index
-		//2. Cla is being made dirty, and multiple nodes point to it
-		//	->remove this node from the holder (decrement) and assign a new one	
+		//1. transmatSet is being made dirty, and only node node points to it 
+		//	->null the holder's transmatSet pointer and return the same index
+		//2. transmatSet is being made dirty, and multiple nodes point to it
+		//	->remove this transmatSet from the holder (decrement) and assign a new one	
 	
 		assert(index != -1);
 
@@ -516,6 +516,7 @@ public:
 
 class ClaOperation{
 	friend class CalculationManager;
+	friend class NodeOperation;
 public:
 	int destCLAIndex;
 	int childCLAIndex1;
@@ -524,32 +525,91 @@ public:
 	int transMatIndex2;
 	int depLevel;
 public:
+	ClaOperation(): destCLAIndex(-1), childCLAIndex1(-1), childCLAIndex2(-1), transMatIndex1(-1), transMatIndex2(-1), depLevel(-1){};	
 	ClaOperation(int d, int cla1, int cla2, int pmat1, int pmat2, int dLevel): destCLAIndex(d), childCLAIndex1(cla1), childCLAIndex2(cla2), transMatIndex1(pmat1), transMatIndex2(pmat2), depLevel(dLevel){};	
+	ClaOperation(const ClaOperation &from){
+		destCLAIndex = from.destCLAIndex;
+		childCLAIndex1 = from.childCLAIndex1;
+		childCLAIndex2 = from.childCLAIndex2;
+		transMatIndex1 = from.transMatIndex1;
+		transMatIndex2 = from.transMatIndex2;
+		depLevel = from.depLevel;
+		}
 	};
 
 class TransMatOperation{
 	friend class CalculationManager;
+	friend class NodeOperation;
+	friend class BranchOperation;
 
 	int destTransMatIndex;
 	FLOAT_TYPE edgeLength;
 	int modelIndex; // ~eigen solution
 	bool calcDerivs;
-
+public:
+	TransMatOperation() : destTransMatIndex(-1), modelIndex(-1), edgeLength(-1.0), calcDerivs(false){};
 	TransMatOperation(int ind, int modInd, FLOAT_TYPE len, bool d) : destTransMatIndex(ind), modelIndex(modInd), edgeLength(len), calcDerivs(d){};
+	TransMatOperation(const TransMatOperation &from){
+		destTransMatIndex = from.destTransMatIndex;
+		edgeLength = from.edgeLength;
+		modelIndex = from.modelIndex;
+		calcDerivs = from.calcDerivs;
+		}
+	};
+
+class NodeOperation{
+	friend class CalculationManager;
+	ClaOperation claOp;
+	TransMatOperation transOp1;
+	TransMatOperation transOp2;
+public:
+	NodeOperation();
+	NodeOperation(const NodeOperation &from){
+		claOp = from.claOp;
+		transOp1 = from.transOp1;
+		transOp2 = from.transOp2;
+		}
+	NodeOperation(const ClaOperation &c, const TransMatOperation &t1, const TransMatOperation &t2){
+		claOp = c;
+		transOp1 = t1;
+		transOp2 = t2;
+		}
+	bool operator <(const NodeOperation &rhs){
+		return claOp.depLevel < rhs.claOp.depLevel;
+		}
 	};
 
 class ScoringOperation{
 	friend class CalculationManager;
+	friend class BranchOperation;
 
 	//my functions don't write the final cla, but Beagle allows for specifying one
 	int destClaIndex;
 	int childClaIndex1;
 	int childClaIndex2;
-	int transMatIndex1;
+	int transMatIndex;
 	bool derivatives;
-	
-	ScoringOperation() : destClaIndex(-1), childClaIndex1(-1), childClaIndex2(-1), transMatIndex1(-1), derivatives(false){};
-	ScoringOperation(int dest, int child1, int child2, int pmat, bool d) : destClaIndex(dest), childClaIndex1(child1), childClaIndex2(child2), transMatIndex1(pmat), derivatives(d){};
+public:
+	ScoringOperation() : destClaIndex(-1), childClaIndex1(-1), childClaIndex2(-1), transMatIndex(-1), derivatives(false){};
+	ScoringOperation(int dest, int child1, int child2, int pmat, bool d) : destClaIndex(dest), childClaIndex1(child1), childClaIndex2(child2), transMatIndex(pmat), derivatives(d){};
+	ScoringOperation(const ScoringOperation &from){
+		destClaIndex = from.destClaIndex;
+		childClaIndex1 = from.childClaIndex1;
+		childClaIndex2 = from.childClaIndex2;
+		transMatIndex = from.transMatIndex;
+		derivatives = from.derivatives;		
+		}
+	};
+
+class BranchOperation{
+	friend class CalculationManager;
+	ScoringOperation scrOp;
+	TransMatOperation transOp;
+public:
+	BranchOperation(const BranchOperation &from){
+		scrOp = from.scrOp;
+		transOp = from.transOp;
+		}
 	};
 
 class BlockingOperationsSet{
@@ -562,6 +622,27 @@ public:
 		}
 	};
 
+class NewBlockingOperationsSet{
+public:
+	list<NodeOperation> nodeOps;
+	list<BranchOperation> brOps;
+	~NewBlockingOperationsSet(){
+		nodeOps.clear();
+		brOps.clear();
+		}
+	};
+/*
+bool MyOpLessThan(const BlockingOperationsSet &lhs, const BlockingOperationsSet &rhs){
+//	int d1 = lhs.claOps.size() == 0 ? -1 : lhs.claOps.begin()->depLevel;
+//	int d2 = rhs.claOps.size() == 0 ? -1 : rhs.claOps.begin()->depLevel;
+	if(lhs.claOps.size() == 0)
+		return false;
+	else if(rhs.claOps.size() == 0)
+		return true;
+	return 
+		(lhs.claOps.begin()->depLevel < rhs.claOps.begin()->depLevel);
+	}
+*/
 /*
 This does all of the actual calculations and operations once they have been figured out at the Tree level.  It only understands about indeces
 of CLA holders and pmat holders, and constructs the sets of operations to be calculated.
@@ -587,6 +668,8 @@ class CalculationManager{
 	list<BlockingOperationsSet> operationSetQueue;
 	list<ScoringOperation> scoreOps;
 	
+	list<NewBlockingOperationsSet> newOperationSetQueue;
+
 public:
 	bool useBeagle;
 	bool termOnBeagleError;
@@ -634,13 +717,17 @@ public:
 	determine all of the pmats that must be calculated (TransMatOps) and the clas that must be combined (ClaOpts) to get 
 	the initially passed holder number.  Note that at this point any notion of a tree or directionality is out of the 
 	picture, only dependencies remain*/
-	int AccumulateOpsOnPath(int holderInd);
+	int AccumulateOpsOnPath(int holderInd, list<NodeOperation> &nodeOps);
 
 	//always combine two clas and one pmat
 	void PerformClaOperation(const ClaOperation *theOp);
+	//calculate a whole set of cla operations at once
+	void PerformClaOperationBatch(const list<ClaOperation> &theOps);
 
 	//calculate a pmat, or a pmat, d1mat and d2mat
 	void PerformTransMatOperation(const TransMatOperation *theOp);
+	//calculate a whole set of transmat operations at once
+	void PerformTransMatOperationBatch(const list<TransMatOperation> &theOps);
 
 	//calculate and return either the lnL alone, or the lnl, D1 and D2
 	ScoreSet PerformScoringOperation(const ScoringOperation *theOp);
@@ -791,6 +878,8 @@ public:
 				claMan->GetCla(num)->arr), 
 			"beagleSetPartials");
 		}
+
+	void UpdateAllConditionals();
 #endif 
 	};
 #endif
