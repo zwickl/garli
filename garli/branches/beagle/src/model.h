@@ -62,7 +62,11 @@ extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, co
 	#define MAX_REL_RATE (SUM_TO - (189.0 * MIN_REL_RATE))
 #endif
 
+//The set of eigen variables that need to be sent to beagle.  Note the the arrays are just ALIASES
+//to the proper arrays in the corresponding Model object.
 struct ModelEigenSolution{
+	//if the model changed (same as eigenDirty), which means that it won't have to be sent to beagle again
+	bool changed;
 	MODEL_FLOAT *eigenVecs;
 	MODEL_FLOAT *eigenVals;
 	MODEL_FLOAT *invEigenVecs;
@@ -823,6 +827,9 @@ class Model{
 	vector<FLOAT_TYPE*> omegaProbs;
 
 	bool eigenDirty;
+	//ratesChanged and rateProbsChanged were added for beagle, so that we know when the rate mults need to be resent or not
+	bool ratesChanged;
+	bool rateProbsChanged;
 	FLOAT_TYPE *blen_multiplier;
 	
 	FLOAT_TYPE rateMults[20];
@@ -870,6 +877,7 @@ class Model{
 		//global modspec has been setup
 		assert(modSpec.isSetup);
 		CreateModelFromSpecification(0);
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	void CalcMutationProbsFromWeights();
@@ -940,7 +948,11 @@ class Model{
 	int NumRelRates() const {return relNucRates.size();}
 	int NRateCats() const {return modSpec.numRateCats;}
 	FLOAT_TYPE *GetRateMults() {return rateMults;}
-	void GetRateMultsForBeagle(vector<FLOAT_TYPE> &r) const {
+	void GetRateMultsForBeagle(vector<FLOAT_TYPE> &r) {
+		//if ratesChanged isn't true, than the rate mults haven't changed since last time they were
+		//sent to beagle.  The calling function will be told this by having an empty vector of rates
+		if(!ratesChanged)
+			return;
 		//the only real trick here is that pinv will be include as a separate category of rate zero
 		if(NoPinvInModel() == false){
 			r.push_back(0.0);
@@ -949,8 +961,13 @@ class Model{
 		for(int rate = 0;rate < NRateCats();rate++){
 			r.push_back(rateMults[rate]);
 			}
+		ratesChanged = false;
 		}
-	void GetRateProbsForBeagle(vector<FLOAT_TYPE> &p) const {
+	void GetRateProbsForBeagle(vector<FLOAT_TYPE> &p) {
+		//if ratesChanged isn't true, than the rate mults haven't changed since last time they were
+		//sent to beagle.  The calling function will be told this by having an empty vector of rates
+		if(!rateProbsChanged)
+			return;
 		//the only real trick here is that pinv will be include as a separate category of rate zero
 		if(NoPinvInModel() == false){
 			p.push_back(*propInvar);
@@ -962,6 +979,7 @@ class Model{
 			else
 				p.push_back(rateProbs[rate]);
 			}
+		rateProbsChanged = false;
 		}
 
 	//this just includes pinv as a separate rate class, which it is for beagle but not gar
@@ -993,9 +1011,12 @@ class Model{
 		}
 
 	void GetEigenSolution(ModelEigenSolution &sol){
-		if(eigenDirty)
+		if(eigenDirty){
 			CalcEigenStuff();
-		
+			sol.changed = true;
+			}
+		else
+			sol.changed = false;
 		sol.eigenVecs = **eigvecs;
 		sol.eigenVals = *eigvals;
 		sol.invEigenVecs = **inveigvecs;
@@ -1121,6 +1142,7 @@ class Model{
 		//make the proportions exactly 1
 		for(int r=0;r<NRateCats();r++)
 			rateProbs[r] /= tot;
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	FLOAT_TYPE FlexRate(int which){
@@ -1386,6 +1408,7 @@ class Model{
 		//however, since the blen_multiplier depends on pinv with my methodology and since that is all
 		//taken care of in CalcEigenStuff it must be called whenever pinv changes
 		eigenDirty = true;
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	void SetAlpha(int which, FLOAT_TYPE val){
@@ -1395,6 +1418,7 @@ class Model{
 		//This is odd, but we need to call normalize rates here if we are just using a gamma distrib to get starting rates for 
 		//flex.  Flex expects that the rates will be normalized including pinv elsewhere
 		if(modSpec.IsFlexRateHet()) NormalizeRates();
+		ratesChanged = true;
 		}
 
 	//these are the bounds on a particular rate that keep it from crossing a neighboring rate when rescaling happens
@@ -1424,6 +1448,7 @@ class Model{
 		rateMults[which] = val;
 		NormalizeRates(which, which);
 		eigenDirty = true;
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	void SetFlexProb(int which, FLOAT_TYPE val){
@@ -1433,12 +1458,14 @@ class Model{
 		//the corresponding rate changing when rescaling
 		NormalizeRates(which, -1);
 		eigenDirty = true;
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	void SetOmega(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
 		*omegas[which] = val;
 		eigenDirty = true;
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	void SetOmegaProb(int which, FLOAT_TYPE val){
@@ -1466,6 +1493,7 @@ class Model{
 		assert(FloatingPointEquals(newTot, ONE_POINT_ZERO, 1.0e-5));
 #endif
 */
+		ratesChanged = rateProbsChanged = true;
 		eigenDirty = true;
 		}
 
@@ -1482,6 +1510,7 @@ class Model{
 			}
 		if(FloatingPointEquals(tot, ONE_POINT_ZERO, 1.0e-3) == false) throw ErrorException("omega category proportions add up to %f, not 1.0.", tot);
 		eigenDirty = true;
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	FLOAT_TYPE Omega(int which) const{
@@ -1506,6 +1535,7 @@ class Model{
 		//This is odd, but we need to call normalize rates here if we are just using a gamma distrib to get starting rates for 
 		//flex.  Flex expects that the rates will be normalized including pinv elsewhere
 		if(modSpec.IsFlexRateHet()) NormalizeRates();
+		ratesChanged = true;
 		}
 
 	void SetPinv(FLOAT_TYPE p, bool checkValidity){
@@ -1520,6 +1550,7 @@ class Model{
 		//however, since the blen_multiplier depends on pinv with my methodology and since that is all
 		//taken care of in CalcEigenStuff it must be called whenever pinv changes
 		eigenDirty = true;
+		ratesChanged = rateProbsChanged = true;
 		}
 	void SetMaxPinv(FLOAT_TYPE p){
 		Model::maxPropInvar=p;
@@ -1569,6 +1600,7 @@ class Model{
 				}while(!done);
 			}
 		else assert(0);
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	void AdjustRateProportions(){
@@ -1583,6 +1615,7 @@ class Model{
 		sum += *propInvar;
 		assert(FloatingPointEquals(sum, ONE_POINT_ZERO, 1.0e-5));
 #endif
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	void NormalizeRates(int probToRemainConstant = -1, int rateToRemainConstant = -1){
@@ -1675,6 +1708,7 @@ class Model{
 		assert(FloatingPointEquals(sum, 1.0, 1.0e-5));
 
 #endif
+		ratesChanged = rateProbsChanged = true;
 		}
 
 	void GetStateFreqs(FLOAT_TYPE *outFreqs) const{

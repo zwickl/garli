@@ -1335,6 +1335,8 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 			}
 		}
 	eigenDirty = true;
+	ratesChanged = true;
+	rateProbsChanged = true;
 	}
 
 void Model::MutateRates(){
@@ -1448,6 +1450,9 @@ void Model::CopyModel(const Model *from){
 		}
 	else 
 		eigenDirty=true;
+
+	ratesChanged = from->ratesChanged;
+	rateProbsChanged = from->rateProbsChanged;
 	}	
 
 void Model::CopyEigenVariables(const Model *from){
@@ -3180,10 +3185,12 @@ int Model::PerformModelMutation(){
 		//however, since the blen_multiplier depends on pinv with my methodology and since that is all
 		//taken care of in CalcEigenStuff it must be called whenever pinv changes
 		eigenDirty = true;
+		rateProbsChanged = ratesChanged = true;
 		}
 	else if(mut->Type() == ALPHASHAPE){
 		DiscreteGamma(rateMults, rateProbs, *alpha);
 		retType=Individual::alpha;
+		ratesChanged = true;
 		}
 	else if(mut->Type() == RATEPROPS || mut->Type() == RATEMULTS){
 		//flex rates and omega muts come through here
@@ -3201,6 +3208,7 @@ int Model::PerformModelMutation(){
 			//eigen stuff needs to be recalced for changes to nonsynonymous rates
 			eigenDirty = true;
 			}
+		ratesChanged = rateProbsChanged = true;
 		retType=Individual::alpha;
 		}
 	return retType;
