@@ -2191,7 +2191,7 @@ void Population::FinalOptimization(){
 	else
 		outman.UserMessage("Time used so far = %d hours, %d minutes and %d seconds", hours, min, secs);
 
-	log << "Score after final optimization: " << indiv[bestIndiv].Fitness() << endl;
+	scoreLog << "Score after final optimization: " << indiv[bestIndiv].Fitness() << endl;
 	if(modSpec.IsCodon()){
 		vector<FLOAT_TYPE> sProps;
 		indiv[bestIndiv].treeStruct->mod->CalcSynonymousBranchlengthProportions(sProps);
@@ -4323,12 +4323,12 @@ int Population::GetSpecifiedModels(FLOAT_TYPE** model_string, int n, int* indiv_
 void Population::OutputLog()	{
 	//log << gen << "\t" << bestFitness << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
 	if(gen < UINT_MAX) {
-		log << gen << "\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision;
+		scoreLog << gen << "\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision;
 
 		if(conf->reportRunProgress)
-			log << "\t" << 0.01 * (int) ceil(rep_fraction_done * 100) << "\t" << 0.01 * (int) ceil(tot_fraction_done * 100);
+			scoreLog << "\t" << 0.01 * (int) ceil(rep_fraction_done * 100) << "\t" << 0.01 * (int) ceil(tot_fraction_done * 100);
 
-		log << endl;
+		scoreLog << endl;
 #ifdef MAC_FRONTEND
 		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 		NSDictionary *progressDict = [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithInt:gen], @"generation", [NSNumber numberWithDouble:BestFitness()], @"likelihood", [NSNumber numberWithInt:stopwatch.SplitTime()], @"time", [NSNumber numberWithDouble:adap->branchOptPrecision], @"precision", [NSNumber numberWithInt:lastTopoImprove], @"lastImprovement", nil];
@@ -4338,7 +4338,7 @@ void Population::OutputLog()	{
 	}
 	else{
 		CalcAverageFitness();
-		log << "Final\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
+		scoreLog << "Final\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
 		}
 	}
 
@@ -6153,28 +6153,28 @@ void Population::InitializeOutputStreams(){
 
 	//initialize the log file
 	if(log_output != DONT_OUTPUT){
-		if(log.is_open() == false){
+		if(scoreLog.is_open() == false){
 			char suffix[100];
 			sprintf(suffix, "log0%d.log", rank);
 			DetermineFilename(log_output, temp_buf, suffix);
 
 			if(log_output & APPEND)
-				log.open(temp_buf, ios::app);
+				scoreLog.open(temp_buf, ios::app);
 			else
-				log.open(temp_buf);
-			log.precision(10);
+				scoreLog.open(temp_buf);
+			scoreLog.precision(10);
 			}
-		OutputRepNums(log);
+		OutputRepNums(scoreLog);
 		if(conf->restart == false)
-			log << "random seed = " << rnd.init_seed() << "\n";
+			scoreLog << "random seed = " << rnd.init_seed() << "\n";
 		else{
 			if(finishedRep ==false)
-				log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
+				scoreLog << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
 			else
-				log << "Restarting from checkpoint...\n";
+				scoreLog << "Restarting from checkpoint...\n";
 			}
 
-		log << "gen\tbest_like\ttime\toptPrecision\n";
+		scoreLog << "gen\tbest_like\ttime\toptPrecision\n";
 		}
 
 	//initialize the treelog
@@ -6388,7 +6388,7 @@ void Population::FinalizeOutputStreams(int type){
 
 	if(prematureTermination == true && type == 0){
 		if(log_output & WARN_PREMATURE)
-			log << TerminationWarningMessage().c_str() << endl;
+			scoreLog << TerminationWarningMessage().c_str() << endl;
 		if(treelog_output & WARN_PREMATURE)
 			if(treeLog.is_open()) 
 				treeLog << TerminationWarningMessage().c_str() << endl;
@@ -6417,13 +6417,13 @@ void Population::FinalizeOutputStreams(int type){
 		}
 
 	//if(((conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps) && (currentSearchRep == conf->searchReps)) || userTermination == true){
-	if(log.is_open()){
-		if(prematureTermination && (log_output & FINALIZE_PREMATURE)) log.close();
+	if(scoreLog.is_open()){
+		if(prematureTermination && (log_output & FINALIZE_PREMATURE)) scoreLog.close();
 		else if((!prematureTermination) && (
 			   (repTerm && (log_output & FINALIZE_REP_TERM))
 			|| (repsetTerm && (log_output & FINALIZE_REPSET_TERM))
 			|| (fullTerm && (log_output & FINALIZE_FULL_TERM)))
-			) log.close();
+			) scoreLog.close();
 		}
 
 	if(fate.is_open()){
@@ -7030,7 +7030,7 @@ void Population::OptimizeSiteRates(){
 	vector<float_pair> allRates;
 
 	for(int i=0;i<data->NChar();i++){
-		if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].mod->StateFreqBitDataFormat((data->GetConstStates())[i]));
+		if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, log(indiv[0].mod->StateFreqBitDataFormat((data->GetConstStates())[i])));
 		else{
 			indiv[0].treeStruct->MakeAllNodesDirty();
 			Tree::siteToScore = i;

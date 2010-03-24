@@ -312,7 +312,7 @@ private:
 		
 	//DJZ adding these streams directly to the class so that they can be opened once and left open
 	ofstream fate;
-	ofstream log;
+	ofstream scoreLog;
 	ofstream treeLog;
 	ofstream probLog;
 	ofstream bootLog;
