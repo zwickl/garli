@@ -95,7 +95,7 @@
 #undef INPUT_RECOMBINATION
 #define NUM_INPUT 12
 
-#undef ALLOW_SINGLE_SITE
+//#undef ALLOW_SINGLE_SITE
 
 #undef EQUIV_CALCS
 
