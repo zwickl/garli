@@ -417,7 +417,7 @@ const NxsCharactersBlock *GarliReader::CheckBlocksAndGetCorrectCharblock(const M
 			if(correctIndex > -1) throw ErrorException("More than one block containing nucleotide data was found.");
 			else correctIndex = c;
 			}
-		else if(charblock->GetDataType() == NxsCharactersBlock::protein && (modSpec.IsAminoAcid())){
+		else if(charblock->GetDataType() == NxsCharactersBlock::protein && (modSpec.IsAminoAcid() && ! modSpec.IsCodonAminoAcid())){
 			if(correctIndex > -1) throw ErrorException("More than one block containing amino acid (protein) data was found.");
 			else correctIndex = c;
 			}
