@@ -2621,7 +2621,7 @@ void Population::PerformSearch(){
 
 		int best=0;
 		if((currentSearchRep == conf->searchReps) || prematureTermination){
-			if(storedTrees.size() > 1){
+			if(storedTrees.size() > 0){
 				best=EvaluateStoredTrees(true);
 				//recombine final trees
 	/*			if(total_size > 2){

@@ -19,7 +19,7 @@
 
 #define PROGRAM_NAME "GARLI-PART"
 #define MAJOR_VERSION 0.97
-#define MINOR_VERSION "r737"
+#define MINOR_VERSION "r749"
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
@@ -128,7 +128,9 @@ int SubGarliMain(int rank)
 	//clear out whatever is in the reader already - it might be full if a single
 	//process has called SubGarliMain multiple times
 	GarliReader &reader = GarliReader::GetInstance();
-	reader.ResetReader();
+	reader.ClearContent();
+	claSpecs.clear();
+	dataSubInfo.clear();
 #else
 int main( int argc, char* argv[] )	{
 #endif
@@ -229,11 +231,7 @@ int main( int argc, char* argv[] )	{
 		try{
 			MasterGamlConfig conf;
 			bool confOK;
-			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			confOK = ((conf.Read(conf_name.c_str()) < 0) == false);
-			if(confOK == false) throw ErrorException("Error in config file...aborting");
-
-			string datafile = conf.datafname;
 
 #ifdef SUBROUTINE_GARLI
 			//override the ofprefix here, tacking .runXX onto it 
@@ -257,6 +255,8 @@ int main( int argc, char* argv[] )	{
 			rnd.set_seed(randomSeed);
 			
 			char temp_buf[100];
+
+			string datafile = conf.datafname;
 
 #ifdef BOINC
 			//deal with stdout and stderr, although I don't think that anything is being
@@ -359,7 +359,13 @@ int main( int argc, char* argv[] )	{
 #ifdef SINGLE_PRECISION_FLOATS
 			outman.UserMessage("Single precision floating point version\n");
 #endif
+			outman.UserMessage("Reading config file %s", conf_name.c_str());
+			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
+#ifdef SUBROUTINE_GARLI
+			if(conf.randseed != -1)
+				throw ErrorException("You cannot specify a random number seed with the MPI version.  This would cause all of the\n\tindependent MPI processes to give exactly identical results.  Set randomseed to -1");
+#endif
 			//This is pretty hacky.  Create one modSpec now because it is needed
 			//to read the data (to identify the expected type of sequence for phylip and
 			//fasta files), then add more later if there are multiple char blocks or CharPartitions
