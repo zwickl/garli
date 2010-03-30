@@ -126,10 +126,40 @@ public:
 
 	void Mutator(FLOAT_TYPE mutationShape){
 		int freqToChange=int(rnd.uniform()*numElements);
-		FLOAT_TYPE newFreq=*vals[freqToChange] * rnd.gamma( mutationShape );
+		FLOAT_TYPE newFreq;
+		FLOAT_TYPE rescaleBy;
+		bool ok;
+		do{
+			ok = true;
+			newFreq =*vals[freqToChange] * rnd.gamma( mutationShape );
+			rescaleBy = (FLOAT_TYPE)((1.0-newFreq)/(1.0-*vals[freqToChange]));
+			if(newFreq  > maxv)
+				ok = false;
+			else if(newFreq < minv)
+				ok = false;
+			//all of this checking should almost never be necessary, but if the rescaling after
+			//changing one rate would push one of the others over a boundary, just draw another
+			//multiplier
+			else{
+				for(int b=0;b<numElements;b++){
+					assert( *vals[b] >= 1e-4);
+					if(b!=freqToChange){
+						if(*vals[b] * rescaleBy > maxv)
+							ok = false;
+						if(*vals[b] * rescaleBy < minv)
+							ok = false;
+						}
+					}
+				}
+			}while(! ok);
+
 		for(int b=0;b<numElements;b++)
-			if(b!=freqToChange) *vals[b] *= (FLOAT_TYPE)((1.0-newFreq)/(1.0-*vals[freqToChange]));
+			if(b!=freqToChange) 
+				*vals[b] *= rescaleBy;
+
 		*vals[freqToChange]=newFreq;
+		for(int i=0;i<numElements;i++)
+			assert(*vals[i] >= minv && *vals[i] <= maxv);
 		}
 	};
 
@@ -163,7 +193,7 @@ public:
 #ifdef SINGLE_PRECISION_FLOATS
 				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-6));
 #else
-				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-12));
+				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-8));
 #endif
 
 				}
@@ -217,15 +247,18 @@ public:
 	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
+		if(*vals[rateToChange]<minv) *vals[rateToChange]=minv;
 		if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;
 		}
 	};
 
 class AlphaShape:public BaseParameter{
 public:
-	AlphaShape(FLOAT_TYPE **dv, int modnum):BaseParameter("Alpha shape", dv, ALPHASHAPE, 1, (FLOAT_TYPE)1e-5, (FLOAT_TYPE)999.9, modnum){};
+	AlphaShape(FLOAT_TYPE **dv, int modnum):BaseParameter("Alpha shape", dv, ALPHASHAPE, 1, (FLOAT_TYPE)0.05, (FLOAT_TYPE)999.9, modnum){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
+		if(*vals[0]<minv) *vals[0]=minv;
+		if(*vals[0]>maxv) *vals[0]=maxv;
 		}
 	};
 
