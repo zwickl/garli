@@ -793,6 +793,7 @@ public:
 		for(int i = 0;i < modSpecs.size();i++)
 			delete modSpecs[i];
 		modSpecs.clear();
+		inferSubsetRates = true;
 		}
 	void AddModSpec(const ConfigModelSettings &conf){
 		ModelSpecification * mod = new ModelSpecification;

@@ -19,7 +19,7 @@
 
 #define PROGRAM_NAME "GARLI-PART"
 #define MAJOR_VERSION 0.97
-#define MINOR_VERSION "r749"
+#define MINOR_VERSION "r750"
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
@@ -129,6 +129,8 @@ int SubGarliMain(int rank)
 	//process has called SubGarliMain multiple times
 	GarliReader &reader = GarliReader::GetInstance();
 	reader.ClearContent();
+	//ditto for these other globals
+	modSpecSet.Delete();	
 	claSpecs.clear();
 	dataSubInfo.clear();
 #else
