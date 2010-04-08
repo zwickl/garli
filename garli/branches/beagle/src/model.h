@@ -951,8 +951,11 @@ class Model{
 	void GetRateMultsForBeagle(vector<FLOAT_TYPE> &r) {
 		//if ratesChanged isn't true, than the rate mults haven't changed since last time they were
 		//sent to beagle.  The calling function will be told this by having an empty vector of rates
-		if(!ratesChanged)
-			return;
+
+		//oops, no the rates need to be sent to beagle whenever they change in beagles mind, not 
+		//a given model's.  The last send could have been a diff indiv with diff values
+//		if(!ratesChanged)
+//			return;
 		//the only real trick here is that pinv will be include as a separate category of rate zero
 		if(NoPinvInModel() == false){
 			r.push_back(0.0);
@@ -964,10 +967,13 @@ class Model{
 		ratesChanged = false;
 		}
 	void GetRateProbsForBeagle(vector<FLOAT_TYPE> &p) {
-		//if ratesChanged isn't true, than the rate mults haven't changed since last time they were
+		//if ratesChanged isn't true, then the rate mults haven't changed since last time they were
 		//sent to beagle.  The calling function will be told this by having an empty vector of rates
-		if(!rateProbsChanged)
-			return;
+
+		//oops, no the rates need to be sent to beagle whenever they change in beagles mind, not 
+		//a given model's.  The last send could have been a diff indiv with diff values
+//		if(!rateProbsChanged)
+//			return;
 		//the only real trick here is that pinv will be include as a separate category of rate zero
 		if(NoPinvInModel() == false){
 			p.push_back(*propInvar);
@@ -1013,10 +1019,13 @@ class Model{
 	void GetEigenSolution(ModelEigenSolution &sol){
 		if(eigenDirty){
 			CalcEigenStuff();
-			sol.changed = true;
-			}
-		else
-			sol.changed = false;
+
+		//had this wrong previously, and was only setting sol.changed if eigenDirty
+		//that isn't right though, single eigenDirty refers to this model, and sol.changed
+		//refers to the entirety of beagle.  It only matters if it is changed since the
+		//last time it was sent to beagle, which might have been a different indiv.  For
+		//now just always set sol.changed
+		sol.changed = true;
 		sol.eigenVecs = **eigvecs;
 		sol.eigenVals = *eigvals;
 		sol.invEigenVecs = **inveigvecs;
