@@ -3654,7 +3654,7 @@ int Tree::Score(int rootNodeNum /*=0*/){
 			CheckClaIndeces();
 			//DEBUG - this shouldn't need to happen so often, but is playing it safe
 			UpdateDependencies();
-			lnL = calcMan->CalculateLikelihood(rootNode);
+			lnL = calcMan->CalculateLikelihoodAndDerivatives(rootNode, false).lnL;
 			CheckClaIndeces();
 #else
 			ConditionalLikelihoodRateHet( ROOT, rootNode);

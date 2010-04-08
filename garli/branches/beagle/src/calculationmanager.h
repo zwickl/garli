@@ -668,7 +668,7 @@ class CalculationManager{
 	list<BlockingOperationsSet> operationSetQueue;
 	list<ScoringOperation> scoreOps;
 	
-	list<NewBlockingOperationsSet> newOperationSetQueue;
+//	list<NewBlockingOperationsSet> newOperationSetQueue;
 
 public:
 	bool useBeagle;
@@ -704,10 +704,12 @@ public:
 	//THE FOLLOWING DO NOT DEPEND ON BEAGLE BEING AVAILABLE
 
 	//pass the effective root node (any non-tip), it will figure out which clas to combine
-	FLOAT_TYPE CalculateLikelihood(const TreeNode *effectiveRoot);
+//	FLOAT_TYPE CalculateLikelihood(const TreeNode *effectiveRoot);
 
 	//pass the node on the upper end of the branch.  may be terminal
-	ScoreSet CalculateDerivatives(const TreeNode *topOfBranch);
+//	ScoreSet CalculateDerivatives(const TreeNode *topOfBranch);
+
+	ScoreSet CalculateLikelihoodAndDerivatives(const TreeNode *topOfBranch, bool calcDerivs);
 	
 	/*called by both CalculateLikelihood and CalculateDerivatives. interprets the focal node 
 	depending on whether derivatives are requested*/

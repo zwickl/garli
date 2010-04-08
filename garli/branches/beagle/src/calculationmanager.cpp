@@ -148,6 +148,12 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	outman.UserMessage("BEAGLE INITIALIZING ...");
 	OutputBeagleResources();
 
+ 	string str;
+ 	InterpretBeagleResourceFlags(pref_flag, str);
+ 	outman.DebugMessage("Preferring %s", str.c_str());
+ 	InterpretBeagleResourceFlags(req_flag, str);
+ 	outman.DebugMessage("Requiring %s", str.c_str());
+
 	outman.UserMessage("CREATING BEAGLE INSTANCE ...");
 //without ambiguity
 /*	
@@ -175,6 +181,16 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 
 	BeagleInstanceDetails det;
 
+	outman.DebugMessage("BEAGLE ALLOCATIONS:");
+	outman.DebugMessage("\tstates: %d char: %d rates: %d", nstates, nchar, nrates);
+	outman.DebugMessage("\ttips: %d", tipCount);
+	outman.DebugMessage("\tcompact tips arrays (no partial ambiguity): %d (%.1f KB)", compactCount, compactCount * nchar * 4 / 1024.0);
+	outman.DebugMessage("\tpartial tips arrays (some partial ambiguity): %d (%.1f KB)", ambigTips, ambigTips * nstates * nchar * 4 / 1024.0);
+	outman.DebugMessage("\ttotal partial arrays: %d (%.1f KB)", partialsCount, partialsCount * nstates * nchar * nrates * 4 / 1024.0);
+	outman.DebugMessage("\teigen solutions: %d (%.1f KB (?))", eigCount, eigCount * nstates * 2 * 4 / 1024.0);
+	outman.DebugMessage("\ttransition matrices (pmats and derivs): %d (%.1f KB)", matrixCount, matrixCount * nstates * nstates * nrates * 4 / 1024.0);
+	outman.DebugMessage("\trescaling arrays %d (%.1f)", scalerCount, scalerCount * nchar * 4 / 1024.0);
+
 	//this returns either the instance number or a beagle error, which is somewhat annoying
    	beagleInst = beagleCreateInstance(tipCount, 
 		partialsCount, 
@@ -194,18 +210,6 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	CheckBeagleReturnValue(
 		beagleInst, 
 		"beagleCreateInstance");
-
-	outman.DebugMessage("INITING");
-
-	outman.DebugMessage("BEAGLE ALLOCATIONS:");
-	outman.DebugMessage("\tstates: %d char: %d rates: %d", nstates, nchar, nrates);
-	outman.DebugMessage("\ttips: %d", tipCount);
-	outman.DebugMessage("\tcompact tips arrays (no partial ambiguity): %d", compactCount);
-	outman.DebugMessage("\tpartial tips arrays (some partial ambiguity): %d", ambigTips);
-	outman.DebugMessage("\ttotal partial arrays: %d", partialsCount);
-	outman.DebugMessage("\teigen solutions: %d", eigCount);
-	outman.DebugMessage("\ttransition matrices (pmats and derivs): %d", matrixCount);
-	outman.DebugMessage("\trescaling arrays %d", scalerCount);
 
 	OutputInstanceDetails(&det);
 
@@ -270,7 +274,7 @@ void CalculationManager::SendTipDataToBeagle(){
 	}
 #endif
 
-/*This is called by CalculateLikelihood and CalculateDerivatives and amasses all of the transmat, cla and scoring
+/*This is called by CalculateLikelihoodAndDerivatives and amasses all of the transmat, cla and scoring
 operations necessary to get whatever is asked for.  When deriviatives is false, effectiveRoot will be treated as 
 just that, the node at which all clas are pulled to.  It must be internal.  Which clas are combined is determined by this function.
 In the derivative case it assumes that the effective root is the node a the top of the branch, i.e. the one that
@@ -380,25 +384,43 @@ void CalculationManager::DetermineRequiredOperations(const TreeNode *effectiveRo
 	}
 
 void CalculationManager::OutputOperationsSummary() const{
+	bool outputFullSummary = false;
 	int numPmats = 0, numClas = 0, numSets = 0;
 	for(list<BlockingOperationsSet>::const_iterator it = operationSetQueue.begin();it != operationSetQueue.end();it++){
 		numSets++;
 		for(list<TransMatOperation>::const_iterator pit = (*it).pmatOps.begin();pit != (*it).pmatOps.end();pit++)
 			numPmats++;
-		for(list<ClaOperation>::const_iterator cit = (*it).claOps.begin();cit != (*it).claOps.end();cit++)
+		for(list<ClaOperation>::const_iterator cit = (*it).claOps.begin();cit != (*it).claOps.end();cit++){
 			numClas++;
+			if(outputFullSummary){
+				outman.DebugMessage("D\t%d\tC\t%d\t%f\t%d\t%f", (*cit).destCLAIndex, (*cit).childCLAIndex1, pmatMan->GetHolder((*cit).transMatIndex1)->GetEdgelen(), (*cit).childCLAIndex2, pmatMan->GetHolder((*cit).transMatIndex2)->GetEdgelen());
+				}
+			}
 		}
-	outman.DebugMessage("REQ OPS : %d op sets, %d pmats, %d clas", numSets, numPmats, numClas);
+	outman.DebugMessage("REQ OPS:\t%d opSets\t%d pmats\t%d clas", numSets, numPmats, numClas);
 	}
 
-ScoreSet CalculationManager::CalculateDerivatives(const TreeNode *effectiveRoot){
+ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *effectiveRoot, bool calcDerivs){
 	outman.DebugMessage("#########################\nENTERING CALC DERIVATIVES, ROOT = %d", effectiveRoot->nodeNum);
 
-	DetermineRequiredOperations(effectiveRoot, true);
+	//this collects all of the necessary computation details and stores them in 
+	//the operationSetQueue and scorOps list
+	DetermineRequiredOperations(effectiveRoot, calcDerivs);	
+	//list<BlockingOperationsSet> operationSetQueue;
+		//list claOps
+			//dest and child clas, transmat ind, deplevel
+		//list pmatOps
+			//destTransMat, edgelen, model index, calcDerivs
+    
+	//list<ScoringOperation> scoreOps;
+		//dest and children, transmatInd, calcDerivs
 
+	//do all of the ops in the operationsSetQueue (i.e., all transmat ops and updatePartials, 
+	//INCLUDING the transmat needed for the scoring operation)
 	UpdateAllConditionals();
 
-	//This assumes that there is only one score op in scoreOps
+	//Now do the score op, which will return a ScoreSet that has at least the lnL, and 
+	//D1 and D2 if requested.  This assumes that there is only one score op in scoreOps
 	assert(scoreOps.size() == 1);
 	ScoreSet values;
 	for(list<ScoringOperation>::iterator sit = scoreOps.begin() ; sit != scoreOps.end() ; sit++)
@@ -408,13 +430,13 @@ ScoreSet CalculationManager::CalculateDerivatives(const TreeNode *effectiveRoot)
 	scoreOps.clear();
 	return values;
 	}	
-
+/*
 FLOAT_TYPE CalculationManager::CalculateLikelihood(const TreeNode *effectiveRoot){
 	outman.DebugMessage("#########################\nENTERING CALC LIKELIHOOD, ROOT = %d", effectiveRoot->nodeNum);
 
 	DetermineRequiredOperations(effectiveRoot, false);
 
-	OutputOperationsSummary();
+//	OutputOperationsSummary();
 
 	UpdateAllConditionals();
 
@@ -429,7 +451,7 @@ FLOAT_TYPE CalculationManager::CalculateLikelihood(const TreeNode *effectiveRoot
 	scoreOps.clear();
 	return values.lnL;
 	}	
-
+*/
 //this just performs all of the transmat and cla ops that were queued
 //will generally be followed by a call to PerformScoring to get lnL or derivs
 void CalculationManager::UpdateAllConditionals(){	
@@ -452,8 +474,10 @@ void CalculationManager::UpdateAllConditionals(){
 	//Any transmats that need derivs will still be included in a blockingOpSet, so will get done here.  Otherwise
 	//no transmat calls will be done here because the ops were pulled out above to be done in one big batch
 	for(list<BlockingOperationsSet>::const_iterator it = operationSetQueue.begin();it != operationSetQueue.end();it++){
-		for(list<TransMatOperation>::const_iterator pit = (*it).pmatOps.begin();pit != (*it).pmatOps.end();pit++)
-			PerformTransMatOperation(&(*pit));
+//		for(list<TransMatOperation>::const_iterator pit = (*it).pmatOps.begin();pit != (*it).pmatOps.end();pit++)
+//			PerformTransMatOperation(&(*pit));
+		if((*it).pmatOps.size() > 0)
+			PerformTransMatOperationBatch((*it).pmatOps);
 		if((*it).claOps.size() > 0)
 			PerformClaOperationBatch((*it).claOps);
 		}
@@ -497,14 +521,14 @@ int CalculationManager::AccumulateOpsOnPath(int holderInd, list<NodeOperation> &
 	
 	holder->depLevel = max(depLevel1, depLevel2) + 1;
 
-	BlockingOperationsSet opSet;
+/*	BlockingOperationsSet opSet;
 	opSet.claOps.push_back(ClaOperation(holderInd, holder->holderDep1, holder->holderDep2, holder->transMatDep1, holder->transMatDep2, holder->depLevel));
 	//DEBUG - second arg here is model index.  Not sure how that will be dealt with
 	opSet.pmatOps.push_back(TransMatOperation(holder->transMatDep1, 0, pmatMan->GetMutableHolder(holder->transMatDep1)->GetEdgelen(), false));
 	opSet.pmatOps.push_back(TransMatOperation(holder->transMatDep2, 0, pmatMan->GetMutableHolder(holder->transMatDep2)->GetEdgelen(), false));
 
 	operationSetQueue.push_back(opSet);
-
+*/
 	nodeOps.push_back(NodeOperation(ClaOperation(holderInd, holder->holderDep1, holder->holderDep2, holder->transMatDep1, holder->transMatDep2, holder->depLevel),
 						TransMatOperation(holder->transMatDep1, 0, pmatMan->GetMutableHolder(holder->transMatDep1)->GetEdgelen(), false),
 						TransMatOperation(holder->transMatDep2, 0, pmatMan->GetMutableHolder(holder->transMatDep2)->GetEdgelen(), false)));
@@ -573,6 +597,10 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 	else{
 #ifdef USE_BEAGLE
 
+		//this is deprecated in favor of batched calls
+#ifdef BATCHED_CALLS
+	assert(0);
+#endif	
 		//not sure if this is right - will always use a single scale array for destWrite (essentially
 		//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
 		int destinationScaleWrite = (rescaleBeagle ? claMan->NumClas() : BEAGLE_OP_NONE);
@@ -618,76 +646,79 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 	}
 
 void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theOps){
-		//not sure if this is right - will always use a single scale array for destWrite (essentially
-		//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
-		int destinationScaleWrite = (rescaleBeagle ? claMan->NumClas() : BEAGLE_OP_NONE);
-		//need to work out batch rescaling yet
-		assert(!rescaleBeagle);
-		int	destinationScaleRead = BEAGLE_OP_NONE;
-/*
-		int operationTuple[7] = {PartialIndexForBeagle(theOp->destCLAIndex),
-                                destinationScaleWrite,
-                                destinationScaleRead,
-								PartialIndexForBeagle(theOp->childCLAIndex1),
- 								PmatIndexForBeagle(theOp->transMatIndex1),
- 								PartialIndexForBeagle(theOp->childCLAIndex2),
-								PmatIndexForBeagle(theOp->transMatIndex2)};
-*/
-		vector<int> tupleList;
-		for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-			tupleList.push_back(PartialIndexForBeagle((*it).destCLAIndex));
-            tupleList.push_back(destinationScaleWrite);
-            tupleList.push_back(destinationScaleRead);
-			tupleList.push_back(PartialIndexForBeagle((*it).childCLAIndex1));
- 			tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex1));
- 			tupleList.push_back(PartialIndexForBeagle((*it).childCLAIndex2));
-			tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex2));
-			}
-/*
-		outman.DebugMessageNoCR("PARTS\t");
-		outman.DebugMessageNoCR("\tD\t%d (%d)", PartialIndexForBeagle(theOp->destCLAIndex), theOp->destCLAIndex);
-		outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", PartialIndexForBeagle(theOp->childCLAIndex1), theOp->childCLAIndex1, PartialIndexForBeagle(theOp->childCLAIndex2), theOp->childCLAIndex2);
-		outman.DebugMessage("\tP\t%d (%d)\t%d (%d)", PmatIndexForBeagle(theOp->transMatIndex1), theOp->transMatIndex1, PmatIndexForBeagle(theOp->transMatIndex2), theOp->transMatIndex2);
-		
-		int instanceCount = 1;
-		int operationCount = 1;
-*/
-		int instanceCount = 1;
-		int operationCount = theOps.size();
+	//not sure if this is right - will always use a single scale array for destWrite (essentially
+	//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
+	//int destinationScaleWrite = (rescaleBeagle ? claMan->NumClas() : BEAGLE_OP_NONE);
 
-		//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
-		//and my negative (tip) corresponds to a NULL in beagle
-		int cumulativeScaleIndex = BEAGLE_OP_NONE;
+	//scale read is if you are telling it to use precomputed scaling factors
+	int	destinationScaleRead = BEAGLE_OP_NONE;
+
+	vector<int> tupleList;
+	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
+		tupleList.push_back(PartialIndexForBeagle((*it).destCLAIndex));
+		//if rescaling, for each partial op pass in an array to store the amount of rescaling
+		//at this node, in my case stored as logs
+		if(rescaleBeagle)
+			tupleList.push_back((*it).destCLAIndex);
+		else 
+			tupleList.push_back(BEAGLE_OP_NONE);
+        tupleList.push_back(destinationScaleRead);
+		tupleList.push_back(PartialIndexForBeagle((*it).childCLAIndex1));
+		tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex1));
+		tupleList.push_back(PartialIndexForBeagle((*it).childCLAIndex2));
+		tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex2));
+		}
+
+	int instanceCount = 1;
+	int operationCount = theOps.size();
+
+	//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
+	//and my negative (tip) corresponds to a NULL in beagle
+	int cumulativeScaleIndex = BEAGLE_OP_NONE;
+
 /*		if(rescaleBeagle){
-			cumulativeScaleIndex = theOp->destCLAIndex;
-			AccumulateRescalers(cumulativeScaleIndex, theOp->childCLAIndex1, theOp->childCLAIndex2);
-			}
+		cumulativeScaleIndex = theOp->destCLAIndex;
+		AccumulateRescalers(cumulativeScaleIndex, theOp->childCLAIndex1, theOp->childCLAIndex2);
+		}
 */
-		CheckBeagleReturnValue(
-			beagleUpdatePartials(
-				beagleInst,
-				&tupleList[0],
-				operationCount,
-				cumulativeScaleIndex),
-			"beagleUpdatePartials");
+	CheckBeagleReturnValue(
+		beagleUpdatePartials(
+			beagleInst,
+			&tupleList[0],
+			operationCount,
+			cumulativeScaleIndex),
+		"beagleUpdatePartials");
 
-		//to indicate that the partial is now clean, fill the holder that represents it, despite the fact that the memory there is never being used
-		//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
+	//this is a bit sneaky. each partial now has a rescaling array associated with it, holding
+	//the amount done at that node alone.  Take the rescaling amounts from the two children,
+	//and add then to the rescaling already done at this node.  In the next dependency level pass
+	//the dest here will become the child there.
+	if(rescaleBeagle){
 		for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-			claMan->FillHolder((*it).destCLAIndex, 0);
+			AccumulateRescalers((*it).destCLAIndex, (*it).childCLAIndex1, (*it).childCLAIndex2);
 			}
+		}
+
+	//to indicate that the partial is now clean, fill the holder that represents it, despite the fact that the memory there is never being used
+	//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
+	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
+		claMan->FillHolder((*it).destCLAIndex, 0);
+		}
 	}
 
 #ifdef USE_BEAGLE
 //For scale arrays my indexing scheme and Beagle's happen to be the same
+//further accumulate the cumulative rescalings from the two children.  In the batched case
+//the dest array will already have the rescaling done at this node included, so don't reset it
 void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int childIndex2){
-	//further accumulate the cumulative rescalings from the two children
-	
+
+#ifndef BATCHED_CALLS
 	//clear out the destination scaler first
 	CheckBeagleReturnValue(
 		beagleResetScaleFactors(beagleInst,
 			destIndex), 
 		"beagleResetScaleFactors");
+#endif
 
 	vector<int> childScalers;
 	if( ! (childIndex1 < 0))
@@ -706,13 +737,17 @@ void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int
 	}
 #endif
 
-//need to change this to allow multiple simultaneous ops
+//deprecated in favor of PerformTransMatOperationBatch
 void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp){
 #ifndef USE_BEAGLE
 	//mod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
 	//this is a bit ridiculous, but these funcs won't really be getting used except with beagle
 	pmatMan->GetMutableHolder(theOp->destTransMatIndex)->myMod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
 #else 
+
+#ifdef BATCHED_CALLS
+	assert(0);
+#endif
 
 //	outman.DebugMessage("**ENTERING PERFORM PMAT");
 //	outman.DebugMessage("SETTING EIGEN");
@@ -722,8 +757,6 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 	//this call will calculate the eigen solution first if necessary
 	ModelEigenSolution sol;
 	pmatMan->GetHolder(theOp->destTransMatIndex)->GetEigenSolution(sol);
-	//not sure why I had this as mutable
-	//pmatMan->GetMutableHolder(theOp->destTransMatIndex)->GetEigenSolution(sol);
 
 	if(sol.changed){
 		CheckBeagleReturnValue(
@@ -755,10 +788,7 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 	//don't need to include the blen multiplier here, since it has already been used to scale the eigen values (not quite same as scaling blen)
 	double edgeLens[1] = {pmatMan->GetHolder(theOp->destTransMatIndex)->edgeLen};
 	int count = 1;
-
-	//DEBUG
-	//outman.UserMessage("edgelen = %e", edgeLens[0]);
-
+	
 	//outman.DebugMessageNoCR("UPDATING TRANS MAT ");
 	//outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
 	CheckBeagleReturnValue(
@@ -800,17 +830,15 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	pmatMan->GetMutableHolder(theOp->destTransMatIndex)->myMod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
 #else 
 	//for now assuming that all transmat ops in a set have same eigen solution and rate multipliers
-
-//	outman.DebugMessage("**ENTERING PERFORM PMAT");
-//	outman.DebugMessage("SETTING EIGEN");
-	//DEBUG - currently just using a single eigen index and sending it every time
+	
+	//currently just using a single eigen index and sending it every time
 	int eigenIndex = 0;
 	
 	//this call will calculate the eigen solution first if necessary
+	//currently it will always be resent (sol.changed will always be true) because
+	//it is non-trivial to figure out when it has changed since it was last sent to beagle
 	ModelEigenSolution sol;
 	pmatMan->GetHolder(theOps.begin()->destTransMatIndex)->GetEigenSolution(sol);
-	//not sure why I had this as mutable
-	//pmatMan->GetMutableHolder(theOp->destTransMatIndex)->GetEigenSolution(sol);
 
 	if(sol.changed){
 		CheckBeagleReturnValue(
@@ -826,14 +854,13 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	vector<FLOAT_TYPE> categRates;
 	pmatMan->GetHolder(theOps.begin()->destTransMatIndex)->GetCategoryRatesForBeagle(categRates);
 
-//	outman.DebugMessage("SETTING CATEGORY RATES");
+	//as above, always resent currently
 	if(categRates.size() > 0){
 		CheckBeagleReturnValue(
 			beagleSetCategoryRates(beagleInst,
 				&(categRates[0])),
 			"beagleSetCategoryRates");
 		}
-
 
 	vector<int> pmatInd;
 	vector<int> d1MatInd;
@@ -847,14 +874,8 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 		edgeLens.push_back(pmatMan->GetHolder((*it).destTransMatIndex)->edgeLen);
 		}
 
-	//don't need to include the blen multiplier here, since it has already been used to scale the eigen values (not quite same as scaling blen)
-//	double edgeLens[1] = {pmatMan->GetHolder(theOp->destTransMatIndex)->edgeLen};
-	//int count = 1;
 	int count = pmatInd.size();
 	bool calcDerivs = theOps.begin()->calcDerivs;
-
-	//DEBUG
-	//outman.UserMessage("edgelen = %e", edgeLens[0]);
 
 	//outman.DebugMessageNoCR("UPDATING TRANS MAT ");
 	//outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
@@ -875,29 +896,31 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	
 	int nrates = pmatMan->GetCorrespondingModel(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
 
-	if(calcDerivs){
+//	if(calcDerivs){
 
 	vector<double> outMat(nstates * nstates * nrates);
 	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){				
 		outMat.clear();
 		for(int p=0;p<nstates*nstates*nrates;p++) outMat.push_back(p);
-		//beagleGetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
-		beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
+		beagleGetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
+		//beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
 		vector<double>::iterator it = outMat.begin();
-		outman.UserMessage("%d", (*pit).destTransMatIndex);
+		outman.DebugMessage("%d", (*pit).destTransMatIndex);
 		for(int r = 0;r < nrates;r++){
 			for(int i = 0;i < nstates;i++){
 				for(int j=0;j < nstates;j++){
-					outman.UserMessageNoCR("%.6f\t", *it++);
+					outman.DebugMessageNoCR("%.6f\t", *it++);
 					}
-				outman.UserMessage("");
+				outman.DebugMessage("");
 				}
 			}
 		}
-		}
+//		}
 #endif
 	}
 
+//this does the last operation, beagleCalculateEdgeLogLikelihoods, and expects that the 
+//required partials have been calculated as well as the transmats necessary for this operation
 ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *theOp){
 	ScoreSet results = {0.0, 0.0, 0.0};
 	//outman.DebugMessage("*ENTERING PERFORM SCORING");
@@ -917,11 +940,12 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		int numInput = 2;
 
 		//arrays to hold site lnLs and derivs returned from Beagle
+		//note that later beagle versions don't return the array anymore, just the sum
 		vector<double> siteLikesOut(data->NChar());
 		vector<double> siteD1Out(data->NChar());
 		vector<double> siteD2Out(data->NChar());
 
-		//state freqs
+		//state freqs - these are always being sent and stored in the same slot
 		vector<FLOAT_TYPE> freqs(pmatMan->GetNumStates());
 		pmatMan->GetCorrespondingModel(theOp->transMatIndex)->GetStateFreqs(&(freqs[0]));
 		int freqIndex = 0;
@@ -932,7 +956,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 				&(freqs[0])),
 			"beagleSetStateFrequencies");
 
-		//category weights (or probs)
+		//category weights (or probs) - these are also always being sent.  annoying to figure out when they need to be updated
 		vector<FLOAT_TYPE> inWeights;
 		pmatMan->GetHolder(theOp->transMatIndex)->GetCategoryWeightsForBeagle(inWeights);
 		int weightIndex = 0;
@@ -961,6 +985,9 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		int cumulativeScaleIndex = BEAGLE_OP_NONE;
 		if(rescaleBeagle){
 			cumulativeScaleIndex = claMan->NumClas();
+			beagleResetScaleFactors(beagleInst, cumulativeScaleIndex);
+			//add all of the rescaling up to the two involved children.  This will be passed to
+			//calcEdgeLike, which will give the final scores
 			AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
 			}
 
@@ -974,10 +1001,6 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 				(theOp->derivatives ? d2MatIndeces : NULL),
 				&weightIndex,
 				&freqIndex,
-				/*
-				&(inWeights[0]),
-				&(freqs[0]),
-				*/
 				&cumulativeScaleIndex,
 				count,
 				&siteLikesOut[0],
@@ -988,23 +1011,29 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		bool beagleReturnsSums = true;
 
 		if(beagleReturnsSums){
-/*			beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
-			if(theOp->derivatives)
-				beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
-			results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
-*/
-
 			results.lnL = siteLikesOut[0];
 			results.d1 = siteD1Out[0];
 			results.d2 = siteD2Out[0];
-			}
+/*			
+			ScoreSet mySummation = {0.0, 0.0, 0.0};
+			beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
+			if(theOp->derivatives)
+				beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
+			mySummation = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
+
+			assert(FloatingPointEquals(results.lnL, mySummation.lnL, 1e-4));
+			if(theOp->derivatives){
+				assert(FloatingPointEquals(results.d1, mySummation.d1, 1e-4));
+				assert(FloatingPointEquals(results.d2, mySummation.d2, 1e-4));
+				}
+*/			}
 		else
 			results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
 		assert(results.lnL < 0.0 && results.lnL > -10.0e10);
 		assert(results.d1 < 10.0e15 && results.d1 > -10.0e15);
 		assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
 		//DEBUG
-		outman.DebugMessage("L %f D1 %f D2 %f", results.lnL, results.d1, results.d2);
+		outman.DebugMessage("L\t%f\tD1\t%f\tD2\t%f", results.lnL, results.d1, results.d2);
 #endif
 		}
 	return results;
