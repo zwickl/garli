@@ -1017,7 +1017,7 @@ class Model{
 		}
 
 	void GetEigenSolution(ModelEigenSolution &sol){
-		if(eigenDirty){
+		if(eigenDirty)
 			CalcEigenStuff();
 
 		//had this wrong previously, and was only setting sol.changed if eigenDirty
