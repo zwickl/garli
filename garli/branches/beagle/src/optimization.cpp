@@ -132,8 +132,7 @@ int Tree::PushBranchlengthsToMin(){
 	}
 
 FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) Score();
-	Score();
+	ScoreIfNecessary();
 	FLOAT_TYPE start=lnL;
 	FLOAT_TYPE prev=lnL;
 	FLOAT_TYPE cur;
@@ -242,8 +241,7 @@ FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
 	}
 
 FLOAT_TYPE Tree::OptimizeReferenceRelativeRate(FLOAT_TYPE optPrecision){
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) Score();
-	Score();
+	ScoreIfNecessary();
 	FLOAT_TYPE start=lnL;
 	FLOAT_TYPE prev=lnL;
 	FLOAT_TYPE cur;
@@ -365,7 +363,7 @@ FLOAT_TYPE Tree::OptimizeAlpha(FLOAT_TYPE optPrecision){
 	Score();
 #endif
 
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) Score();
+	ScoreIfNecessary();
 	FLOAT_TYPE start, prev, cur;
 	prev = start = cur = lnL;
 	FLOAT_TYPE prevVal=mod->Alpha();
@@ -506,8 +504,7 @@ void Tree::TraceLikelihoodForParameter(int which, FLOAT_TYPE init, FLOAT_TYPE mi
 	}
 
 FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE initialVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE targetScoreDigits /* DP = 9, SP = 5 */){
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) 
-		Score();
+	ScoreIfNecessary();
 
 #ifdef SINGLE_PRECISION_FLOATS
 	FLOAT_TYPE baseIncr = min(max(0.001*optPrecision, 1.0e-5f), initialVal * 0.01);
@@ -1009,12 +1006,25 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 	//was the point.
 	ProfNewton.Start();
 	improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, true);
+
+	//DEBUG
+/*	if(numNodesAdded == numNodesTotal){
+		double altLike;
+		double origLike = lnL;
+		MakeAllNodesDirty();
+		int node = rnd.random_int(numNodesAdded - numTipsAdded - 1) + numTipsTotal + 1;
+		altLike = calcMan->CalculateLikelihoodAndDerivatives(allNodes[node], false).lnL;
+		assert(FloatingPointEquals(altLike, origLike, max((-altLike * expectedPrecision), 0.01)));
+//		outman.UserMessage("Score %.5f %.5f %.4e", origLike, altLike, origLike - altLike);
+		}
+*/
 	ProfNewton.Stop();
 #endif
 
 #ifdef OPT_DEBUG
 	optsum << nd->dlen << "\t" << improve << endl;
 
+	//DEBUG
 /*	ofstream opttrees;
 	if(num == 1) opttrees.open("everyTree.tre");
 	else opttrees.open("everyTree.tre", ios::app);
@@ -1564,7 +1574,7 @@ if(nd->nodeNum == 8){
 
 #ifdef OPT_DEBUG
 //	ofstream log("optimization.log", ios::app);
-	log.precision(10);
+	opt.precision(10);
 
 	opt << nd->nodeNum << "\t" << nd->dlen << "\t" << lnL <<endl;
 
@@ -1765,7 +1775,7 @@ if(nd->nodeNum == 8){
 			//as the iterations go on.  If possible we'd still like to see very close scores, but if we're having
 			//trouble getting close after many iterations we don't want to terminate the program.  If something is
 			//horribly wrong with the scores this will still cause termination.
-			if(estScoreDelta < precision1 && (iter == 0 || lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, GARLI_FP_EPS * 10.0)) >= initialL)){
+			if(estScoreDelta < precision1 && (iter == 0 || lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, lnL * expectedPrecision)) >= initialL)){
 #endif
 														#ifdef OPT_DEBUG
 														opt << "delta < prec, return\n";
@@ -1892,7 +1902,7 @@ if(nd->nodeNum == 8){
 							opt << "would have bailed\t" <<  scoreDeltaToMin << "\t" << (lnL - initialL);
 						#endif
 						}
-					if(scoreDeltaToMin < precision1 &&  lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, max(calcMan->scoreTol, GARLI_FP_EPS) * 10.0)) >= initialL){
+					if(scoreDeltaToMin < precision1 &&  lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, -lnL * expectedPrecision)) >= initialL){
 #else
 					if(scoreDeltaToMin < precision1){
 #endif
@@ -1936,7 +1946,7 @@ if(nd->nodeNum == 8){
 							opt << "would have bailed\t" <<  scoreDeltaToMax << "\t" << (lnL - initialL);
 						#endif
 						}	
-					if(scoreDeltaToMax < precision1 &&  lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, max(calcMan->scoreTol, GARLI_FP_EPS) * 10.0)) >= initialL){
+					if(scoreDeltaToMax < precision1 &&  lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, -lnL * expectedPrecision)) >= initialL){
 #else
 					if(scoreDeltaToMax < precision1){
 #endif

@@ -677,7 +677,6 @@ public:
 	bool singlePrecBeagle;
 	bool gpuBeagle;
 	int beagleInst;
-	double scoreTol;
 
 	CalculationManager(){
 		useBeagle = false; 
@@ -686,7 +685,6 @@ public:
 		termOnBeagleError = true;
 		singlePrecBeagle = false;
 		rescaleBeagle = false;
-		scoreTol = DBL_EPSILON;
 		}
 
 	static void SetClaManager(ClaManager *cMan) {
@@ -813,22 +811,16 @@ public:
 #endif
 		}
 
-	double ScoreTolerance() const {
-		return scoreTol;
-		}
-
 #ifdef USE_BEAGLE
 	void SetBeagleDetails(bool gpu, bool singlePrec, bool rescale){
 		useBeagle = true;
 		if(gpu){//assuming that all GPU is SP for now
 			gpuBeagle = true;
 			singlePrecBeagle = true;
-			scoreTol = FLT_EPSILON;
 			rescaleBeagle = true;
 			}
 		if(singlePrec){
 			singlePrecBeagle = true;
-			scoreTol = FLT_EPSILON;
 			}
 		if(rescale)
 			rescaleBeagle = true;

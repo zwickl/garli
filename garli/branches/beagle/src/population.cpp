@@ -1195,7 +1195,10 @@ void Population::SeedPopulationWithStartingTree(int rep){
 #ifdef SINGLE_PRECISION_FLOATS
 	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
 #else
-	Tree::expectedPrecision = pow(10.0, - (double) ((int) DBL_DIG - ceil(log10(-indiv[0].Fitness()))));
+	if(calcMan->useBeagle && calcMan->singlePrecBeagle)
+		Tree::expectedPrecision = FLT_EPSILON * 10.0;
+	else
+		Tree::expectedPrecision = DBL_EPSILON * 10.0;
 #endif
 //	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
 

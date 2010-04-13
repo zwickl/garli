@@ -3655,6 +3655,17 @@ int Tree::Score(int rootNodeNum /*=0*/){
 			//DEBUG - this shouldn't need to happen so often, but is playing it safe
 			UpdateDependencies();
 			lnL = calcMan->CalculateLikelihoodAndDerivatives(rootNode, false).lnL;
+			//DEBUG
+/*			if(numNodesAdded == numNodesTotal){
+				double altLike;
+				double origLike = lnL;
+				MakeAllNodesDirty();
+				int node = rnd.random_int(numNodesTotal - numTipsTotal - 1) + numTipsTotal + 1;
+				altLike = calcMan->CalculateLikelihoodAndDerivatives(allNodes[node], false).lnL;
+				assert(FloatingPointEquals(altLike, origLike, max((altLike * expectedPrecision), 0.01)));
+//				outman.UserMessage("Score %.5f %.5f %.4e", origLike, altLike, origLike - altLike);
+				}
+*/
 			CheckClaIndeces();
 #else
 			ConditionalLikelihoodRateHet( ROOT, rootNode);
