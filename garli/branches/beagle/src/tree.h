@@ -222,6 +222,10 @@ class Tree{
 		FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat);
 		FLOAT_TYPE GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat);
 		int Score(int rootNodeNum =0);
+		void ScoreIfNecessary(){
+			if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) 
+				Score();
+			}
 	
 		//functions to optimize blens and params
 		pair<FLOAT_TYPE, FLOAT_TYPE> CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2);
