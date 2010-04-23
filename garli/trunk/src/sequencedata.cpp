@@ -443,10 +443,10 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 				}
 
 			char prot;
-			//note that a return code of 20 from the codon lookup indicates a stop codon, but a protein code of 20 generally means total ambiguity
+			//note that a return code of 20 (or 21 for the two serine model) from the codon lookup indicates a stop codon, but a protein code of 20 generally means total ambiguity
 			if(thisCodonNum != 64){
 				prot = code->CodonLookup(thisCodonNum);
-				if(prot == 20){
+				if(prot == maxNumStates){
 					string c;
 					char b[4]={'A','C','G','T'};
 					c += b[pos1];
@@ -455,7 +455,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 					throw ErrorException("stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
 					}
 				}
-			else prot = 20;
+			else prot = maxNumStates;
 
 			matrix[tax][cod] = prot;
 			}
@@ -1013,8 +1013,8 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock){
 			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 				if(charblock->IsActiveChar(origIndex)){	
 					unsigned char datum = '\0';
-					if(charblock->IsGapState(origTaxIndex, origIndex) == true) datum = 20;
-					else if(charblock->IsMissingState(origTaxIndex, origIndex) == true) datum = 20;
+					if(charblock->IsGapState(origTaxIndex, origIndex) == true) datum = maxNumStates;
+					else if(charblock->IsMissingState(origTaxIndex, origIndex) == true) datum = maxNumStates;
 					else{
 						int nstates = charblock->GetNumStates(origTaxIndex, origIndex);
 						//assert(nstates == 1);
@@ -1106,8 +1106,8 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				unsigned char datum = '\0';
-				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 20;
-				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 20;
+				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = maxNumStates;
+				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = maxNumStates;
 				else{
 					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
 					//assert(nstates == 1);

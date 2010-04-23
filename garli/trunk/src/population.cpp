@@ -1726,6 +1726,18 @@ void Population::Run(){
 					}
 				}
 
+			if((reduced && FloatingPointEquals(adap->branchOptPrecision, conf->minOptPrec, 1.0e-8))
+				|| (modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix()) && (gen - lastPrecisionReduction >= (adap->intervalLength * 50)) && (gen % (adap->intervalLength * 50) == 0) && (FloatingPointEquals(adap->branchOptPrecision, conf->minOptPrec, 1.0e-8)))
+				{
+				FLOAT_TYPE before = bestFitness;
+				indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(adap->branchOptPrecision);
+				indiv[bestIndiv].SetDirty();	
+				CalcAverageFitness();
+				if(bestFitness - before > ZERO_POINT_ZERO)
+					outman.UserMessage("\t\t\toptimizing AA rate matrix:%.4f -> %.4f", before, bestFitness);
+				assert(bestFitness - before > 1.0e-4);
+				}
+
 			UpdateFractionDone(2);
 
 			//automatic termination conditions
@@ -2036,7 +2048,7 @@ void Population::FinalOptimization(){
 		//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
 		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
 			optFreqs = true;
-		if((modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false) || modSpec.IsEstimateAAMatrix())
+		if((modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false) || modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix())
 			optRelRates = true;
 #endif
 		}
@@ -2324,7 +2336,7 @@ int Population::EvaluateStoredTrees(bool report){
 				storedTrees[i]->mod->FillModelOrHeaderStringForTable(s, true);
 				outman.UserMessage("rep%2d: %s", i+1, s.c_str());
 
-				if(modSpec.IsEstimateAAMatrix() && conf->bootstrapReps == 0){
+				if((modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix()) && conf->bootstrapReps == 0){
 					string n = conf->ofprefix.c_str();
 					n += ".AArmatrix.dat";
 					ofstream mat;
