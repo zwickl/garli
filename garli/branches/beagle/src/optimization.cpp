@@ -512,6 +512,9 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 	FLOAT_TYPE baseIncr = min(max(0.001*optPrecision, 1.0e-6), initialVal * 0.01);
 #endif
 
+	//DEBUG
+	targetScoreDigits = - log10(expectedPrecision);
+
 	//this first bit of checking and bumping used to use epsilon rather than the default baseIncr
 	assert(initialVal > lowBound - baseIncr && initialVal < highBound + baseIncr);
 	FLOAT_TYPE curVal = initialVal;
@@ -1008,14 +1011,15 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 	improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, true);
 
 	//DEBUG
-/*	if(numNodesAdded == numNodesTotal){
+/*
+	if(numNodesAdded == numNodesTotal){
 		double altLike;
 		double origLike = lnL;
 		MakeAllNodesDirty();
 		int node = rnd.random_int(numNodesAdded - numTipsAdded - 1) + numTipsTotal + 1;
 		altLike = calcMan->CalculateLikelihoodAndDerivatives(allNodes[node], false).lnL;
 		assert(FloatingPointEquals(altLike, origLike, max((-altLike * expectedPrecision), 0.01)));
-//		outman.UserMessage("Score %.5f %.5f %.4e", origLike, altLike, origLike - altLike);
+		outman.UserMessage("Deriv %.5f %.5f %.4e", origLike, altLike, origLike - altLike);
 		}
 */
 	ProfNewton.Stop();
@@ -1946,7 +1950,7 @@ if(nd->nodeNum == 8){
 							opt << "would have bailed\t" <<  scoreDeltaToMax << "\t" << (lnL - initialL);
 						#endif
 						}	
-					if(scoreDeltaToMax < precision1 &&  lnL + ((iter < 10 ? 1 : iter) * max(1.0e-7, -lnL * expectedPrecision)) >= initialL){
+					if(scoreDeltaToMax < precision1 &&  lnL + ((iter < 10 ? 1 : iter) * max(1.0e-6, -lnL * expectedPrecision)) >= initialL){
 #else
 					if(scoreDeltaToMax < precision1){
 #endif

@@ -895,12 +895,13 @@ class Model{
 	public:
 	void CalcEigenStuff();
 	void CalcPmat(MODEL_FLOAT blen, MODEL_FLOAT *metaPmat, bool flip =false);
-	void CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLOAT_TYPE *&mat2);
-	void CalcPmatsInProvidedMatrices(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE ***mat1, FLOAT_TYPE ***mat2);
+	void CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, MODEL_FLOAT *&mat1, MODEL_FLOAT *&mat2);
+	void CalcPmatsInProvidedMatrices(FLOAT_TYPE blen1, FLOAT_TYPE blen2, MODEL_FLOAT ***mat1, MODEL_FLOAT ***mat2);
 	void CalcPmatNState(FLOAT_TYPE blen, MODEL_FLOAT *metaPmat);
-	void CalcDerivatives(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
+	void CalcDerivatives(MODEL_FLOAT, MODEL_FLOAT ***, MODEL_FLOAT ***, MODEL_FLOAT ***);
+	void FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLOAT ***one, MODEL_FLOAT ***two);
 	void OutputPmats(ofstream &deb);
-	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pr);
+	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pr);
 	void UpdateQMat();
 	void UpdateQMatCodon();
 	void CalcSynonymousBranchlengthProportions(vector<FLOAT_TYPE> &results);
@@ -1362,6 +1363,7 @@ class Model{
 		FLOAT_TYPE sum = ZERO_POINT_ZERO;
 		//note that sum here is the sum of everything besides toNotChange
 		for(int i=0;i<numVals;i++){
+			assert(*vals[i] < (targetSum - (minVal * (numVals - 1))));
 			if(i != toNotChange){
 				sum += *vals[i];
 				if(*vals[i] < minVal)

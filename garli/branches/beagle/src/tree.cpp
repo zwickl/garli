@@ -349,6 +349,8 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 		if(*s == '(' || isdigit(*s) || cont==true){
 			//here we're about to add a node of some sort
 			this->numBranchesAdded++;
+			if(current >= numNodesTotal)
+				throw ErrorException("Problem reading tree description.  Extra taxa?");
 			if(*(s+1)=='('){//add an internal node
 				temp=temp->AddDes(allNodes[current++]);
 				numNodesAdded++;
@@ -3655,18 +3657,24 @@ int Tree::Score(int rootNodeNum /*=0*/){
 			//DEBUG - this shouldn't need to happen so often, but is playing it safe
 			UpdateDependencies();
 			lnL = calcMan->CalculateLikelihoodAndDerivatives(rootNode, false).lnL;
-			//DEBUG
-/*			if(numNodesAdded == numNodesTotal){
-				double altLike;
-				double origLike = lnL;
-				MakeAllNodesDirty();
-				int node = rnd.random_int(numNodesTotal - numTipsTotal - 1) + numTipsTotal + 1;
-				altLike = calcMan->CalculateLikelihoodAndDerivatives(allNodes[node], false).lnL;
-				assert(FloatingPointEquals(altLike, origLike, max((altLike * expectedPrecision), 0.01)));
-//				outman.UserMessage("Score %.5f %.5f %.4e", origLike, altLike, origLike - altLike);
-				}
-*/
 			CheckClaIndeces();
+
+#ifdef TEST_ACCURACY
+			if(numNodesAdded == numNodesTotal){
+				vector<double> likeScores;
+				vector<double> likeDerivScores;
+
+				for(int i = numTipsTotal + 1; i < numNodesTotal;i++){
+					MakeAllNodesDirty();
+					likeScores.push_back(calcMan->CalculateLikelihoodAndDerivatives(allNodes[i], false).lnL);
+					MakeAllNodesDirty();
+					likeDerivScores.push_back(calcMan->CalculateLikelihoodAndDerivatives(allNodes[i], true).lnL);
+					}
+				std::sort(likeScores.begin(), likeScores.end());
+				std::sort(likeDerivScores.begin(), likeDerivScores.end());
+				outman.DebugMessage("bestL\t%.5f\tworstL\t%.5f\trng\t%.5f\tbestD\t%.5f\tworstD\t%.5f\trng\t%.5f\texp\t%.5f", likeScores[0], likeScores[likeScores.size()-1], likeScores[0] - likeScores[likeScores.size()-1], likeDerivScores[0], likeDerivScores[likeDerivScores.size()-1], likeDerivScores[0] - likeDerivScores[likeDerivScores.size()-1], expectedPrecision * likeScores[0]);
+				}
+#endif
 #else
 			ConditionalLikelihoodRateHet( ROOT, rootNode);
 #endif
@@ -4008,21 +4016,21 @@ void Tree::EliminateNode(int nn){
 	allNodes=newNodes;
 	}
 
-//CAREFUL!  This is called from CheckBalance and assumes that this tree
-//does not share CLAs with any other.
+//4/28/10 - Removing any attempt to adjust claIndeces here.  Just too buggy, and 
+//since this is almost never used in a case in which the retained indeces will help,
+//it is pointless.  It does not assume that any cla indeces in this tree are not shared
+//with other trees, contrary to the previous version.
 void Tree::RotateNodesAtRoot(TreeNode *newroot){
 	//DZ 11-3-02 This can be used to rebalance the tree
 	//I'm assuming that this will be called with one of the des of the root;
 	assert(newroot->anc==root);
 	assert(newroot->IsInternal());
+	if(newroot->myMan.IsAllocated())
+		MakeAllNodesDirty();
 	//detach the newroot from root, making it bifurcating
 	if(newroot==root->left){
 		root->left=newroot->next;
 		root->left->prev=NULL;
-		//DEBUG
-		int temp = root->claIndexDown;
-		root->claIndexDown = root->claIndexUL;
-		root->claIndexUL = temp;
 		}
 	else if(newroot==root->left->next){
 		root->left->next=root->right;
@@ -4031,10 +4039,6 @@ void Tree::RotateNodesAtRoot(TreeNode *newroot){
 	else{
 		root->right=root->left->next;
 		root->right->next=NULL;
-		//DEBUG
-		int temp = root->claIndexDown;
-		root->claIndexDown = root->claIndexUR;
-		root->claIndexUR = temp;
 		}
 	//now make the root the middle des of newroot and correct the dlens
 	root->anc=newroot;
@@ -4131,7 +4135,7 @@ void Tree::CheckBalance(){
 			RotateNodesAtRoot(root->right);
 			lastRot=3;
 			}
-
+		
 		lb=mb=rb=ls=ms=rs=llb=lrb=mlb=mrb=rlb=rrb=lls=lrs=mls=mrs=rls=rrs=0;
 
 		if(root->left->IsInternal()){

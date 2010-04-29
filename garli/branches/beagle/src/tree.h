@@ -34,7 +34,7 @@ using namespace std;
 #include "model.h"
 #include "sequencedata.h"
 #include "reconnode.h"
-#include "calculationmanager.h"
+//#include "calculationmanager.h"
 
 
 #undef BRENT

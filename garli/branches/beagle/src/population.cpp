@@ -103,6 +103,8 @@ FLOAT_TYPE globalBest;
 
 bool output_tree=false;
 
+#define DEBUG_SCORES
+
 int CheckRestartNumber(const string str);
 int debug_mpi(const char* fmt, ...);
 int QuitNow();
@@ -1198,9 +1200,9 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	if(calcMan->useBeagle && calcMan->singlePrecBeagle)
 		Tree::expectedPrecision = FLT_EPSILON * 10.0;
 	else
-		Tree::expectedPrecision = DBL_EPSILON * 10.0;
+		Tree::expectedPrecision = max(DBL_EPSILON * 10.0, 1e-12);
 #endif
-//	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
+	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	if(indiv[0].mod->NumMutatableParams() == 0) {
@@ -3627,7 +3629,8 @@ if(rank > 0) return;
 		paupf << "#nexus\n\n";
 		paupf << "begin paup;\n";
 		paupf << "set warnreset=no incr=auto;\n";
-		paupf << "execute " << conf->ofprefix.c_str() << ".nex;\n";
+		//paupf << "execute " << conf->ofprefix.c_str() << ".nex;\n";
+		paupf << "execute " << "dat.ln;\n";
 #ifndef NNI_SPECTRUM
 		paupf << "gett file=toscore.tre storebr;" << endl;
 #else
