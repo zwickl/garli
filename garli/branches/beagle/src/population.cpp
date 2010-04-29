@@ -103,7 +103,7 @@ FLOAT_TYPE globalBest;
 
 bool output_tree=false;
 
-#define DEBUG_SCORES
+#undef DEBUG_SCORES
 
 int CheckRestartNumber(const string str);
 int debug_mpi(const char* fmt, ...);
