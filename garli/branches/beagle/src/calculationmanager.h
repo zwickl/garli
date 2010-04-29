@@ -37,10 +37,11 @@ struct ScoreSet{
 /*this is a generic matrix for use as a pmat or derivative matrix
 multiple matrices for rates or whatever appear one after another*/
 class TransMat{
+	friend class TransMatSet;
 	int nRates;
 	int nStates;
-public:
 	MODEL_FLOAT ***theMat;
+public:
 
 	TransMat(): theMat(NULL), nRates(-1), nStates(-1){}
 	void Allocate(int numStates, int numRates){
@@ -49,21 +50,39 @@ public:
 		theMat = New3DArray<MODEL_FLOAT>(nRates, nStates, nStates);
 		}
 	~TransMat(){
-		Delete3DArray<MODEL_FLOAT>(theMat);
+		if(theMat)
+			Delete3DArray<MODEL_FLOAT>(theMat);
 		theMat = NULL;
+		}
+	MODEL_FLOAT ***GetMatrix(){
+		return theMat;
 		}
 	};
 
-/*package of pmat/d1mat/d2mat that will be assigned to a branch together*/
+/*package of pmat/d1mat/d2mat that will be assigned to a TransMatHolder (representing a branch)*/
 class TransMatSet{
-public:
+	friend class TransMatHolder;
+
 	TransMat pmat;
 	TransMat d1mat;
 	TransMat d2mat;
+public:
 	void Allocate(int numStates, int numRates){
 		pmat.Allocate(numStates, numRates);
 		d1mat.Allocate(numStates, numRates);
 		d2mat.Allocate(numStates, numRates);
+		}
+	MODEL_FLOAT ***GetPmatArray(){
+		assert(pmat.theMat);
+		return pmat.theMat;
+		}
+	MODEL_FLOAT ***GetD1Array(){
+		assert(d1mat.theMat);
+		return d1mat.theMat;
+		}
+	MODEL_FLOAT ***GetD2Array(){
+		assert(d2mat.theMat);
+		return d2mat.theMat;
 		}
 	};
 
@@ -71,8 +90,8 @@ public:
 keep a pointer to it.  When dirty it will be NULL*/
 class TransMatHolder{
 	friend class PmatManager;
-	friend class NodeClaManager;
-	friend class CalculationManager;
+	//friend class NodeClaManager;
+	//friend class CalculationManager;
 
 	//reference count
 	int numAssigned;
@@ -91,49 +110,20 @@ class TransMatHolder{
 		}
 	void Reset(){numAssigned = 0; theMatSet = NULL; myMod = NULL;}
 	
-	void SetModel(Model *mod){
-		myMod = mod;
-		}
-
-	void SetEdgelen(FLOAT_TYPE e){
-		edgeLen = e;
-		}
-
-	const FLOAT_TYPE GetEdgelen() const{
-		return edgeLen;
-		}
-
-	TransMat *GetPmat(){
+	MODEL_FLOAT ***GetPmatArray(){
 		assert(theMatSet);
-		return &theMatSet->pmat;
+		assert(theMatSet->GetPmatArray()[0] && theMatSet->GetPmatArray()[0][0]);
+		return theMatSet->GetPmatArray();
 		}
 
-	TransMat *GetD1Mat(){
+	MODEL_FLOAT ***GetD1Array(){
 		assert(theMatSet);
-		return &theMatSet->d1mat;
+		return theMatSet->GetD1Array();
 		}
 
-	TransMat *GetD2Mat(){
+	MODEL_FLOAT ***GetD2Array(){
 		assert(theMatSet);
-		return &theMatSet->d2mat;
-		}
-
-	void GetEigenSolution(ModelEigenSolution &sol) const{
-		myMod->GetEigenSolution(sol);
-		}
-
-//this includes pinv, which my scheme doesn't treat as a rate class per se
-	void GetCategoryRatesForBeagle(vector<FLOAT_TYPE> &r)const{
-		myMod->GetRateMultsForBeagle(r);
-		}
-//this includes pinv
-	void GetCategoryWeightsForBeagle(vector<FLOAT_TYPE> &p) const {
-		myMod->GetRateProbsForBeagle(p);
-		}
-
-	//need to include pinv, which is a separate rate as far as beagle is concerned, but not for Gar
-	int NumRateCatsForBeagle(){
-		return myMod->NumRateCatsForBeagle();
+		return theMatSet->GetD2Array();;
 		}
 
 	const Model *GetConstModel() const{
@@ -159,7 +149,7 @@ class PmatManager{
 	//pointers to the matrix sets
 	vector<TransMatSet*> transMatSetStack;
 	
-	//indeces of the holders
+	//indeces of free holders
 	vector<int> holderStack;
 public:
 	PmatManager(int numMats, int numHolders, int numRates, int numStates) : nMats(numMats), nHolders(numHolders), nRates(numRates), nStates(numStates){
@@ -190,56 +180,97 @@ public:
 		delete []holders;
 		}
 
-	const int GetNumStates() const{
-		return nStates;
-		}
-
-	const int GetNumRates() const{
-		return nRates;
-		}
+	const int GetNumStates() const { return nStates; }
+	const int GetNumRates() const { return nRates; }
+	bool TransMatIsAssigned(int index) const { return holders[index].theMatSet != NULL; }
 
 	TransMatSet *GetTransMatSet(int index){
 		if(holders[index].theMatSet == NULL)
-			FillHolder(index);
+			FillTransMatHolder(index);
 		assert(holders[index].theMatSet != NULL);
 		return holders[index].theMatSet;
 		}
 
-	TransMat *GetPmat(int index){
-		assert(holders[index].numAssigned > 0);
-		if(holders[index].theMatSet == NULL)
-			FillHolder(index);
-		return holders[index].GetPmat();
+	void SetModel(int index, Model *mod){
+		holders[index].myMod = mod;
 		}
 
-	TransMat *GetD1Mat(int index){
-		assert(holders[index].numAssigned > 0);
-		if(holders[index].theMatSet == NULL)
-			FillHolder(index);
-		return holders[index].GetD1Mat();
+	void SetEdgelen(int index, FLOAT_TYPE e){
+		holders[index].edgeLen = e;
 		}
 
-	TransMat *GetD2Mat(int index){
-		assert(holders[index].numAssigned > 0);
-		if(holders[index].theMatSet == NULL)
-			FillHolder(index);
-		return holders[index].GetD2Mat();
+	const FLOAT_TYPE GetEdgelen(int index) const{
+		return holders[index].edgeLen;
 		}
 
-	void FillHolder(int index){
+	void GetEigenSolution(int index, ModelEigenSolution &sol) const{
+		assert(holders[index].myMod);
+		holders[index].myMod->GetEigenSolution(sol);
+		}
+
+//this includes pinv, which my scheme doesn't treat as a rate class per se
+	void GetCategoryRatesForBeagle(int index, vector<FLOAT_TYPE> &r)const{
+		holders[index].myMod->GetRateMultsForBeagle(r);
+		}
+
+//this includes pinv
+	void GetCategoryWeightsForBeagle(int index, vector<FLOAT_TYPE> &p) const {
+		holders[index].myMod->GetRateProbsForBeagle(p);
+		}
+
+	//need to include pinv, which is a separate rate as far as beagle is concerned, but not for Gar
+	int NumRateCatsForBeagle(int index) const { 
+		return holders[index].myMod->NumRateCatsForBeagle();
+		}
+
+	MODEL_FLOAT ***GetPmatArray(int index){
+		assert(holders[index].numAssigned > 0);
+		if(holders[index].theMatSet == NULL){
+			FillTransMatHolder(index);
+			//outman.DebugMessage("get, fill %d", index);
+			}
+		else{
+			//outman.DebugMessage("get, %d already filled", index);
+			}
+		return holders[index].GetPmatArray();
+		}
+ 
+	MODEL_FLOAT ***GetD1MatArray(int index){
+		assert(holders[index].numAssigned > 0);
+		if(holders[index].theMatSet == NULL)
+			FillTransMatHolder(index);
+		return holders[index].GetD1Array();
+		}
+
+	MODEL_FLOAT ***GetD2MatArray(int index){
+		assert(holders[index].numAssigned > 0);
+		if(holders[index].theMatSet == NULL)
+			FillTransMatHolder(index);
+		return holders[index].GetD2Array();
+		}
+
+	void FillTransMatHolder(int index){
+		//outman.DebugMessage("assign %d", index);
+		assert(holders[index].theMatSet == NULL);
 		holders[index].theMatSet = AssignFreeTransMatSet();
 		}
 
-	const TransMatHolder *GetHolder(int index) const{
+	const TransMatHolder *GetTransMatHolder(int index) const{
+		//outman.DebugMessage("get %d", index);
 		return &holders[index];
 		}
 
-	TransMatHolder *GetMutableHolder(int index){
+	TransMatHolder *GetMutableTransMatHolder(int index){
+		//outman.DebugMessage("get mut %d", index);
 		return &holders[index];
 		}
 
-	const Model *GetCorrespondingModel(int index)const{
+	const Model *GetModelForTransMatHolder(int index)const{
 		return holders[index].GetConstModel();
+		}
+
+	Model *GetMutableModelForTransMatHolder(int index)const{
+		return holders[index].myMod;
 		}
 
 	//this will be called by a node (branch) and will return a previously unused holder index
@@ -253,58 +284,68 @@ public:
 		}
 
 	TransMatSet* AssignFreeTransMatSet(){
+		//TODO
 		//DEBUG need to figure out how this will work with beagle, or if recycling is even necessary with transmats
 		//if(claStack.empty() == true) RecycleClas();
-		
+
 		assert(! transMatSetStack.empty());
 		TransMatSet *mat=transMatSetStack[transMatSetStack.size()-1];
-
-		assert(mat != NULL);
 		transMatSetStack.pop_back();
 		if(nMats - (int)transMatSetStack.size() > maxUsed) 
 			maxUsed = nMats - (int)transMatSetStack.size();
-
 		return mat;
 		}
 
 	void IncrementTransMatHolder(int index){
+		//outman.DebugMessage("inc %d to %d", index, holders[index].numAssigned + 1);
 		holders[index].numAssigned++;
 		}
 
 	void DecrementTransMatHolder(int index){
+		TransMatHolder *thisHold = &holders[index];
+
 		assert(index != -1);
-		if(holders[index].numAssigned == 1){
+		assert(thisHold->numAssigned != 0);
+		//outman.DebugMessage("dec %d to %d", index, holders[index].numAssigned - 1);
+		if(thisHold->numAssigned == 1){
 			//if the count has fallen to zero, reclaim the holder
+			//outman.DebugMessage("reclaim1 %d", index);
 			holderStack.push_back(index);
 			if(holders[index].theMatSet != NULL){
 				//if there is a valid matrix set in the holder, reclaim it too
+				//outman.DebugMessage("reclaim1 set from %d", index);
 				assert(find(transMatSetStack.begin(), transMatSetStack.end(), holders[index].theMatSet) == transMatSetStack.end());
-				transMatSetStack.push_back(holders[index].theMatSet);
+				transMatSetStack.push_back(thisHold->theMatSet);
 				}
-			holders[index].Reset();
+			thisHold->Reset();
 			}
 		else{
-			holders[index].numAssigned--; 
+			thisHold->numAssigned--; 
+			//TODO
 			//DEBUG - what happens with this and beagle
 			//this is important!
 //			holders[index].tempReserved=false;
 			}
 		}
 
-	int SetDirty(int index){
+	int SetTransMatDirty(int index){
 		//there are only two options here:
 		//1. transmatSet is being made dirty, and only node node points to it 
 		//	->null the holder's transmatSet pointer and return the same index
 		//2. transmatSet is being made dirty, and multiple nodes point to it
 		//	->remove this transmatSet from the holder (decrement) and assign a new one	
-	
 		assert(index != -1);
 
-		if(holders[index].numAssigned==1){
-			if(holders[index].theMatSet != NULL){
+		TransMatHolder *thisHold = &holders[index];
+		//outman.DebugMessage("dirty %d", index);
+		if(thisHold->numAssigned==1){
+			if(thisHold->theMatSet != NULL){
+				//TODO
 				//holders[index].SetReclaimLevel(0);
-				transMatSetStack.push_back(holders[index].theMatSet);
-				holders[index].theMatSet=NULL;
+				//outman.DebugMessage("reclaim2 %d", index);
+				
+				transMatSetStack.push_back(thisHold->theMatSet);
+				thisHold->theMatSet=NULL;
 				}
 			}
 		else{
@@ -398,7 +439,7 @@ public:
 
 	void SetTransMatDirty(){
 		if(transMatIndex >= 0)
-			transMatIndex = pmatMan->SetDirty(transMatIndex);
+			transMatIndex = pmatMan->SetTransMatDirty(transMatIndex);
 		}
 
 	void SetDependenciesUL(int depIndex1, int pDepIndex1, int depIndex2, int pDepIndex2){
@@ -414,8 +455,10 @@ public:
 		}
 
 	void SetTransMat(Model *m, FLOAT_TYPE e){
-		pmatMan->GetMutableHolder(transMatIndex)->SetModel(m);
-		pmatMan->GetMutableHolder(transMatIndex)->SetEdgelen(e);
+		//outman.DebugMessage("up pdeps %d", transMatIndex);
+
+		pmatMan->SetModel(transMatIndex, m);
+		pmatMan->SetEdgelen(transMatIndex, e);
 		}
 
 	inline CondLikeArray *GetClaDown(){
@@ -728,6 +771,8 @@ public:
 	void PerformTransMatOperation(const TransMatOperation *theOp);
 	//calculate a whole set of transmat operations at once
 	void PerformTransMatOperationBatch(const list<TransMatOperation> &theOps);
+	//call back to the underlying models to calculate the pmats, then send them to beagle
+	void SendTransMatsToBeagle(const list<TransMatOperation> &theOps);
 
 	//calculate and return either the lnL alone, or the lnl, D1 and D2
 	ScoreSet PerformScoringOperation(const ScoringOperation *theOp);
@@ -741,11 +786,11 @@ public:
 	void OutputOperationsSummary() const;
 
 	//these are just duplicates of the functions originally in Tree.  They are not used with beagle
-	void CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const TransMat *Lpr, const TransMat *Rpr, const Model *mod);
-	void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata, const TransMat *Lpr, const TransMat *Rpr, const Model *mod);
-	void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *data2, const TransMat *pr1, const TransMat *pr2, const Model *mod, const unsigned *ambigMap);
-	FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const TransMat *prmat, const char *Ldata, const Model *mod);
-	FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const TransMat *prmat, const Model *mod);
+	void CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA,  MODEL_FLOAT ***Lpr,  MODEL_FLOAT ***Rpr, const Model *mod);
+	void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata,  MODEL_FLOAT ***Lpr,  MODEL_FLOAT ***Rpr, const Model *mod);
+	void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *data2,  MODEL_FLOAT ***pr1,  MODEL_FLOAT ***pr2, const Model *mod, const unsigned *ambigMap);
+	FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,  MODEL_FLOAT ***prmat, const char *Ldata, const Model *mod);
+	FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA,  MODEL_FLOAT ***prmat, const Model *mod);
 	
 	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2){
 		FLOAT_TYPE lnL = 0.0, D1 = 0.0, D2 = 0.0;
@@ -873,7 +918,23 @@ public:
 			"beagleSetPartials");
 		}
 
+	void OutputBeagleSiteLikelihoods(vector<double> &siteLikesOut){
+		const int *count = data->GetCounts();
+		int num = 0;
+		
+		ofstream likes("beagleSLs.log", ios::app);
+		//for(vector<double>::iterator it = siteLikesOut.begin();it != siteLikesOut.end();it++)
+		for(int c = 0;c < data->NChar();c++)
+			for(int co = 0;co < count[c];co++)
+				likes << c << "\t" << co << "\t" << siteLikesOut[c] << "\n";
+		likes.precision(11);
+		likes << SumSiteValues(&(siteLikesOut[0]), NULL, NULL).lnL << "\n";
+		likes.close();
+		}
+
 	void UpdateAllConditionals();
+
+	void OutputBeagleTransMat(int index);
 #endif 
 	};
 #endif

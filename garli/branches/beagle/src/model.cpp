@@ -1071,7 +1071,7 @@ void Model::OutputPmats(ofstream &deb){
 
 	}
 
-void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&one, FLOAT_TYPE ***&two){
+void Model::CalcDerivatives(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLOAT ***one, MODEL_FLOAT ***two){
 /*	double before = *omegas[0];
 	if(dlen < 0.011 && dlen > 0.009)
 		SetOmega(0, 1.0);
@@ -1168,10 +1168,90 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 #endif
 	}
 
+//this version will assume that the arrays passed in are allocated and to be filled with the matrices
+//these might be the actual matrices that are part of the model, or if beagle they might be from elsewhere
+//regardless, the model will use its own data members to calculate and hold the eigen solution 
+void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLOAT ***one, MODEL_FLOAT ***two){
+
+	if(eigenDirty==true)
+		CalcEigenStuff();
+
+	for(int rate=0;rate<NRateCats();rate++){
+		const unsigned rateOffset = nstates*rate; 
+		for(int k=0; k<nstates; k++){
+			MODEL_FLOAT scaledEigVal;
+			if(modSpec.IsNonsynonymousRateHet() == false){
+				//The blen multiplier should be taken care of in CalcEigenStuff, including the effect of pinv
+				//Then blen_multiplier should have been set to 1.0.  This was added for beagle, where prescaling
+				//everything made more sense.
+				scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+
+/*				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
+					//in the rate normalization, and doesn't need to be figured in here
+					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+				else
+					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+*/				}
+			else{
+				scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				}
+			EigValexp[k+rateOffset] = exp(scaledEigVal * dlen);
+			EigValderiv[k+rateOffset] = scaledEigVal*EigValexp[k+rateOffset];
+			EigValderiv2[k+rateOffset] = scaledEigVal*EigValderiv[k+rateOffset];
+			}
+		}
+
+	if(NStates() > 59){//using precalced eigvecs X inveigvecs (c_ijk) is less efficient for codon models, and I
+					//don't want a conditional in the inner loop
+		for(int rate=0;rate<NRateCats();rate++){
+			int model=0;
+			if(modSpec.IsNonsynonymousRateHet())
+				model = rate;
+			const unsigned rateOffset = nstates*rate;
+			for (int i = 0; i < nstates; i++){
+				for (int j = 0; j < nstates; j++){
+					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d1p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d2p = ZERO_POINT_ZERO;
+					for (int k = 0; k < nstates; k++){ 
+						const MODEL_FLOAT x = eigvecs[model][i][k]*inveigvecs[model][k][j];
+						sum_p   += x*EigValexp[k+rateOffset];
+						sum_d1p += x*EigValderiv[k+rateOffset];
+						sum_d2p += x*EigValderiv2[k+rateOffset];
+						}
+					pr[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					one[rate][i][j] = sum_d1p;
+					two[rate][i][j] = sum_d2p;
+					}
+				}
+			}
+		}
+	else{ // aminoacids or nucleotides
+		for(int rate=0;rate<NRateCats();rate++){
+			const unsigned rateOffset = nstates*rate;
+			for (int i = 0; i < nstates; i++){
+				for (int j = 0; j < nstates; j++){
+					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d1p=ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d2p = ZERO_POINT_ZERO;
+					for (int k = 0; k < nstates; k++){ 
+						MODEL_FLOAT x = c_ijk[0][i*nstates*nstates + j*nstates +k];
+						sum_p   += x*EigValexp[k+rateOffset];
+						sum_d1p += x*EigValderiv[k+rateOffset];
+						sum_d2p += x*EigValderiv2[k+rateOffset];
+						}
+					pr[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					one[rate][i][j] = sum_d1p;
+					two[rate][i][j] = sum_d2p;
+					}
+				}
+			}
+		}
+	}
 
 bool DoubleAbsLessThan(double &first, double &sec){return fabs(first) <= fabs(sec);}
 
-void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
+void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 /*	double before = *omegas[0];
 	if(dlen < 0.011 && dlen > 0.009)
 		SetOmega(0, 1.0);

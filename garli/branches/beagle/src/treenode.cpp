@@ -578,7 +578,7 @@ void TreeNode::OutputNodeConnections(){
 			nd = nd->next;
 			}
 		cout << dlen; 
-		cout << "\t" << this->myMan.downHolderIndex << "\t" << this->myMan.ULHolderIndex << "\t" << this->myMan.URHolderIndex << "\t" << endl;
+		cout << "\t" << myMan.downHolderIndex << "\t" << myMan.ULHolderIndex << "\t" << myMan.URHolderIndex << "\t" << myMan.transMatIndex << endl;
 		nd = left;
 		while(nd){
 			if(nd->IsInternal())

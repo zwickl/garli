@@ -376,7 +376,7 @@ void CalculationManager::DetermineRequiredOperations(const TreeNode *effectiveRo
 	//the matrix for the branch between end1 and end2 for the final operation 
 	//there is no cla opt in this final operation, the calculation will instead 
 	//be stored in the scoreOps list
-	TransMatOperation final(finalPmat, 0, pmatMan->GetMutableHolder(finalPmat)->GetEdgelen(), derivatives);
+	TransMatOperation final(finalPmat, 0, pmatMan->GetEdgelen(finalPmat), derivatives);
 	BlockingOperationsSet fin;
 	fin.pmatOps.push_back(final);
 	operationSetQueue.push_back(fin);
@@ -393,7 +393,16 @@ void CalculationManager::OutputOperationsSummary() const{
 		for(list<ClaOperation>::const_iterator cit = (*it).claOps.begin();cit != (*it).claOps.end();cit++){
 			numClas++;
 			if(outputFullSummary){
-				outman.DebugMessage("D\t%d\tC\t%d\t%f\t%d\t%f", (*cit).destCLAIndex, (*cit).childCLAIndex1, pmatMan->GetHolder((*cit).transMatIndex1)->GetEdgelen(), (*cit).childCLAIndex2, pmatMan->GetHolder((*cit).transMatIndex2)->GetEdgelen());
+				outman.DebugMessage("D\t%d\tC\t%d\t%f\t%d\t%f M1 %d %d M2 %d %d", 
+					(*cit).destCLAIndex, 
+					(*cit).childCLAIndex1, 
+					pmatMan->GetEdgelen((*cit).transMatIndex1), 
+					(*cit).childCLAIndex2, 
+					pmatMan->GetEdgelen((*cit).transMatIndex2), 
+					(*cit).transMatIndex1,
+					pmatMan->GetModelForTransMatHolder((*cit).transMatIndex1), 
+					(*cit).transMatIndex2,
+					pmatMan->GetModelForTransMatHolder((*cit).transMatIndex2));
 				}
 			}
 		}
@@ -401,7 +410,7 @@ void CalculationManager::OutputOperationsSummary() const{
 	}
 
 ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *effectiveRoot, bool calcDerivs){
-	outman.DebugMessage("#########################\nENTERING CALC DERIVATIVES, ROOT = %d", effectiveRoot->nodeNum);
+	outman.DebugMessage("##\nENTER CALC L&D, ROOT = %d", effectiveRoot->nodeNum);
 
 	//this collects all of the necessary computation details and stores them in 
 	//the operationSetQueue and scorOps list
@@ -468,6 +477,9 @@ void CalculationManager::UpdateAllConditionals(){
 		if(! (*it).pmatOps.begin()->calcDerivs)
 			tops.splice(tops.end(), (*it).pmatOps);
 		}
+
+#define SEND_TRANSMATS
+
 	if(tops.size() > 0)
 		PerformTransMatOperationBatch(tops);
 
@@ -530,8 +542,8 @@ int CalculationManager::AccumulateOpsOnPath(int holderInd, list<NodeOperation> &
 	operationSetQueue.push_back(opSet);
 */
 	nodeOps.push_back(NodeOperation(ClaOperation(holderInd, holder->holderDep1, holder->holderDep2, holder->transMatDep1, holder->transMatDep2, holder->depLevel),
-						TransMatOperation(holder->transMatDep1, 0, pmatMan->GetMutableHolder(holder->transMatDep1)->GetEdgelen(), false),
-						TransMatOperation(holder->transMatDep2, 0, pmatMan->GetMutableHolder(holder->transMatDep2)->GetEdgelen(), false)));
+						TransMatOperation(holder->transMatDep1, 0, pmatMan->GetEdgelen(holder->transMatDep1), false),
+						TransMatOperation(holder->transMatDep2, 0, pmatMan->GetEdgelen(holder->transMatDep2), false)));
 
 
 	return holder->depLevel;
@@ -560,27 +572,27 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 				//DEBUG - should probably figure some way not to do these static cassts
 				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term1-1),
 				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term2-1),
-				pmatMan->GetPmat(theOp->transMatIndex1),
-				pmatMan->GetPmat(theOp->transMatIndex2), 
-				pmatMan->GetCorrespondingModel(theOp->transMatIndex1));
+				pmatMan->GetPmatArray(theOp->transMatIndex1),
+				pmatMan->GetPmatArray(theOp->transMatIndex2), 
+				pmatMan->GetModelForTransMatHolder(theOp->transMatIndex1));
 			}
 		else if( ! (term1 || term2)){
 			CalcFullClaInternalInternal(
 				claMan->GetCla(theOp->destCLAIndex),
 				claMan->GetCla(theOp->childCLAIndex1),
 				claMan->GetCla(theOp->childCLAIndex2),
-				pmatMan->GetPmat(theOp->transMatIndex1),
-				pmatMan->GetPmat(theOp->transMatIndex2),
-				pmatMan->GetCorrespondingModel(theOp->transMatIndex1));
+				pmatMan->GetPmatArray(theOp->transMatIndex1),
+				pmatMan->GetPmatArray(theOp->transMatIndex2),
+				pmatMan->GetModelForTransMatHolder(theOp->transMatIndex1));
 			}
 		else if( term1 ){
 			this->CalcFullCLAInternalTerminal(
 				claMan->GetCla(theOp->destCLAIndex),
 				claMan->GetCla(theOp->childCLAIndex2),
 				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term1-1),
-				pmatMan->GetPmat(theOp->transMatIndex2),
-				pmatMan->GetPmat(theOp->transMatIndex1),
-				pmatMan->GetCorrespondingModel(theOp->transMatIndex1), 
+				pmatMan->GetPmatArray(theOp->transMatIndex2),
+				pmatMan->GetPmatArray(theOp->transMatIndex1),
+				pmatMan->GetModelForTransMatHolder(theOp->transMatIndex1), 
 				NULL);
 			}
 		else{
@@ -588,9 +600,9 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 				claMan->GetCla(theOp->destCLAIndex),
 				claMan->GetCla(theOp->childCLAIndex1),
 				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term2-1),
-				pmatMan->GetPmat(theOp->transMatIndex1),
-				pmatMan->GetPmat(theOp->transMatIndex2),
-				pmatMan->GetCorrespondingModel(theOp->transMatIndex1),
+				pmatMan->GetPmatArray(theOp->transMatIndex1),
+				pmatMan->GetPmatArray(theOp->transMatIndex2),
+				pmatMan->GetModelForTransMatHolder(theOp->transMatIndex1),
 				NULL);
 			}
 		}
@@ -689,10 +701,25 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 			cumulativeScaleIndex),
 		"beagleUpdatePartials");
 
+	//DEBUG
+/*	//nstates x nrates x nsites = 4 x 1 x 845 = 3380
+	double outPartials[3380];
+	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
+		beagleGetPartials(beagleInst, PartialIndexForBeagle((*it).destCLAIndex), BEAGLE_OP_NONE, outPartials);
+		for(int site = 0;site < 845;site++){
+			outman.DebugMessageNoCR("%d\t", site);
+			for(int state = 0;state < 4;state++)
+				outman.DebugMessageNoCR("%.8f\t", outPartials[site * 4 + state]);
+			outman.DebugMessage("");
+			}
+		}
+*/
+
 	//this is a bit sneaky. each partial now has a rescaling array associated with it, holding
 	//the amount done at that node alone.  Take the rescaling amounts from the two children,
 	//and add then to the rescaling already done at this node.  In the next dependency level pass
 	//the dest here will become the child there.
+
 	if(rescaleBeagle){
 		for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
 			AccumulateRescalers((*it).destCLAIndex, (*it).childCLAIndex1, (*it).childCLAIndex2);
@@ -756,7 +783,7 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 	
 	//this call will calculate the eigen solution first if necessary
 	ModelEigenSolution sol;
-	pmatMan->GetHolder(theOp->destTransMatIndex)->GetEigenSolution(sol);
+	pmatMan->GetEigenSolution(theOp->destTransMatIndex, sol);
 
 	if(sol.changed){
 		CheckBeagleReturnValue(
@@ -770,7 +797,7 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 		}
 
 	vector<double> categRates;
-	pmatMan->GetHolder(theOp->destTransMatIndex)->GetCategoryRatesForBeagle(categRates);
+	pmatMan->GetCategoryRatesForBeagle(theOp->destTransMatIndex, categRates);
 
 //	outman.DebugMessage("SETTING CATEGORY RATES");
 	if(categRates.size() > 0){
@@ -786,7 +813,7 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 	int d2MatInd[1] = {D2MatIndexForBeagle(theOp->destTransMatIndex)};
 
 	//don't need to include the blen multiplier here, since it has already been used to scale the eigen values (not quite same as scaling blen)
-	double edgeLens[1] = {pmatMan->GetHolder(theOp->destTransMatIndex)->edgeLen};
+	double edgeLens[1] = {pmatMan->GetEdgelen(theOp->destTransMatIndex)};
 	int count = 1;
 	
 	//outman.DebugMessageNoCR("UPDATING TRANS MAT ");
@@ -829,6 +856,12 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	//this is a bit ridiculous, but these funcs won't really be getting used except with beagle
 	pmatMan->GetMutableHolder(theOp->destTransMatIndex)->myMod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
 #else 
+
+#ifdef SEND_TRANSMATS
+	SendTransMatsToBeagle(theOps);
+	return;
+#endif
+
 	//for now assuming that all transmat ops in a set have same eigen solution and rate multipliers
 	
 	//currently just using a single eigen index and sending it every time
@@ -838,7 +871,7 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	//currently it will always be resent (sol.changed will always be true) because
 	//it is non-trivial to figure out when it has changed since it was last sent to beagle
 	ModelEigenSolution sol;
-	pmatMan->GetHolder(theOps.begin()->destTransMatIndex)->GetEigenSolution(sol);
+	pmatMan->GetEigenSolution(theOps.begin()->destTransMatIndex, sol);
 
 	if(sol.changed){
 		CheckBeagleReturnValue(
@@ -852,9 +885,9 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 		}
 
 	vector<FLOAT_TYPE> categRates;
-	pmatMan->GetHolder(theOps.begin()->destTransMatIndex)->GetCategoryRatesForBeagle(categRates);
+	pmatMan->GetCategoryRatesForBeagle(theOps.begin()->destTransMatIndex, categRates);
 
-	//as above, always resent currently
+	//as above, always resend currently
 	if(categRates.size() > 0){
 		CheckBeagleReturnValue(
 			beagleSetCategoryRates(beagleInst,
@@ -868,10 +901,13 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	vector<double> edgeLens;
 
 	for(list<TransMatOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
+		//DEBUG
+		//outman.DebugMessage("transmat %d mod %d modadr %d edge %.4f", (*it).destTransMatIndex, (*it).modelIndex, pmatMan->GetCorrespondingModel((*it).destTransMatIndex), (*it).edgeLength);
+		//pmatMan->GetCorrespondingModel(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
 		pmatInd.push_back(PmatIndexForBeagle((*it).destTransMatIndex));
 		d1MatInd.push_back(D1MatIndexForBeagle((*it).destTransMatIndex));
 		d2MatInd.push_back(D2MatIndexForBeagle((*it).destTransMatIndex));
-		edgeLens.push_back(pmatMan->GetHolder((*it).destTransMatIndex)->edgeLen);
+		edgeLens.push_back(pmatMan->GetEdgelen((*it).destTransMatIndex));
 		}
 
 	int count = pmatInd.size();
@@ -891,17 +927,37 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 		"beagleUpdateTransitionMatrices");
 #endif
 
+#undef	OUTPUT_PMATS
+
 #ifdef OUTPUT_PMATS
+
 	int nstates = data->NStates();
 	
 	int nrates = pmatMan->GetCorrespondingModel(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
 
 //	if(calcDerivs){
 
+	/*wrong	*/
+	//double inmat[16] = {0.9070614,	0.02927732,	0.02870608,	0.0349794, 0.03213807,	0.90418679,	0.02868981,	0.03497981, 0.03213807,	0.02926432,	0.90361226, 0.03497981, 0.03213831,	0.02927236,	0.02868767,	0.90990174};
+	//double inmat[16] = {0.9070613980, 0.0292773210, 0.0287060775, 0.0349793993, 0.0321380682, 0.9041867852, 0.0286898147, 0.0349798091, 0.0321380682, 0.0292643178, 0.9036122561, 0.0349798091, 0.0321383066, 0.0292723589, 0.0286876746, 0.9099017382}; 
+	//wrong, normalized rows sum to zero
+	//double inmat[16] = {0.9070394515, 0.0292766126, 0.0287053830, 0.0349785530, 0.0321382457, 0.9041917789, 0.0286899731, 0.0349800023, 0.0321382465, 0.0292644802, 0.9036172701, 0.0349800032, 0.0321383041, 0.0292723566, 0.0286876724, 0.9099016670};
+	//wrong, rescaled such that column totals are same, three lower elements in each column match
+	//double inmat[16] = {0.9070613980, 0.0292713326, 0.0286945223, 0.0349796725, 0.0321381477, 0.9041867852, 0.0286945223, 0.0349796725, 0.0321381477, 0.0292713326, 0.9036122561, 0.0349796725, 0.0321381477, 0.0292713326, 0.0286945223, 0.9099017382};
+	/*right*/
+	//double inmat[16] = {0.9070611, 0.0292719, 0.02868779, 0.03497917, 0.03213868, 0.90419436, 0.02868777, 0.03497917, 0.03213868, 0.0292719, 0.90361023, 0.03497917, 0.03213868, 0.02927192, 0.02868777, 0.90990162};
+	//double inmat[16] = {0.9070611396, 0.0292718949, 0.0286877828, 0.0349791827, 0.0321386719, 0.9041943625, 0.0286877828, 0.0349791827, 0.0321386719, 0.0292718949, 0.9036102504, 0.0349791827, 0.0321386719, 0.0292718949, 0.0286877828, 0.9099016503};
+	//pmat from DP beagle
+	double inmat[16] = {0.907060771,  0.02927234,  0.028687678,  0.034979238,  0.032138303,  0.904194759,  0.028687707,  0.034979216,  0.032138303,  0.029272277,  0.903610189,  0.034979216,  0.032138297,  0.029272304,  0.028687689,  0.909901709};
+
 	vector<double> outMat(nstates * nstates * nrates);
 	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){				
+//		outman.UserMessage("MANUALLY SETTING PMATS");
+//		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), inmat);
+
 		outMat.clear();
-		for(int p=0;p<nstates*nstates*nrates;p++) outMat.push_back(p);
+		for(int p=0;p<nstates*nstates*nrates;p++) 
+			outMat.push_back(p);
 		beagleGetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
 		//beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
 		vector<double>::iterator it = outMat.begin();
@@ -909,7 +965,7 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 		for(int r = 0;r < nrates;r++){
 			for(int i = 0;i < nstates;i++){
 				for(int j=0;j < nstates;j++){
-					outman.DebugMessageNoCR("%.6f\t", *it++);
+					outman.DebugMessageNoCR("%.10f\t", *it++);
 					}
 				outman.DebugMessage("");
 				}
@@ -917,6 +973,111 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 		}
 //		}
 #endif
+	}
+
+void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &theOps){
+/*	
+	//OLD
+	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){
+		double theBlen = (*pit).edgeLength;
+		int theIndex = (*pit).destTransMatIndex;
+		//DEBUG
+		//assert(pmatMan->GetPmatArray(theIndex)[0] && pmatMan->GetPmatArray(theIndex)[0][0] && pmatMan->GetPmatArray(theIndex)[0][0][0]);
+		if(pit->calcDerivs)
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->FillDerivativeMatrices(pit->edgeLength, pmatMan->GetPmatArray(theIndex), pmatMan->GetD1MatArray(theIndex), pmatMan->GetD2MatArray(theIndex));
+		else
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->AltCalcPmat(pit->edgeLength, pmatMan->GetPmatArray(theIndex));
+		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle(theIndex), **pmatMan->GetPmatArray(theIndex));
+		if(pit->calcDerivs){
+			beagleSetTransitionMatrix(beagleInst, D1MatIndexForBeagle(theIndex), **pmatMan->GetD1MatArray(theIndex));
+			beagleSetTransitionMatrix(beagleInst, D2MatIndexForBeagle(theIndex), **pmatMan->GetD2MatArray(theIndex));
+			}
+		}
+*/
+	//NEW
+	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){
+		double theBlen = (*pit).edgeLength;
+		int theIndex = (*pit).destTransMatIndex;
+		FLOAT_TYPE ***thePMat = pmatMan->GetPmatArray(theIndex);
+		FLOAT_TYPE ***theD1Mat = NULL;
+		FLOAT_TYPE ***theD2Mat = NULL;
+		if(pit->calcDerivs){
+			theD1Mat = pmatMan->GetD1MatArray(theIndex);
+			theD2Mat = pmatMan->GetD2MatArray(theIndex);
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->FillDerivativeMatrices(theBlen, thePMat, theD1Mat, theD2Mat);
+			}
+		else{
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->AltCalcPmat(theBlen, thePMat);
+			}
+		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle(theIndex), **thePMat);
+		if(pit->calcDerivs){
+			beagleSetTransitionMatrix(beagleInst, D1MatIndexForBeagle(theIndex), **theD1Mat);
+			beagleSetTransitionMatrix(beagleInst, D2MatIndexForBeagle(theIndex), **theD2Mat);
+			}
+		}
+#ifdef OUTPUT_PMATS
+
+	int nstates = data->NStates();
+	
+	int nrates = pmatMan->NumRateCatsForBeagle(theOps.begin()->destTransMatIndex);
+
+//	if(calcDerivs){
+
+	/*wrong	*/
+//	double inmat[16] = {0.9070614,	0.02927732,	0.02870608,	0.0349794, 0.03213807,	0.90418679,	0.02868981,	0.03497981, 0.03213807,	0.02926432,	0.90361226, 0.03497981, 0.03213831,	0.02927236,	0.02868767,	0.90990174};
+	/*right*/
+	//double inmat[16] = {0.9070611, 0.0292719, 0.02868779, 0.03497917, 0.03213868, 0.90419436, 0.02868777, 0.03497917, 0.03213868, 0.0292719, 0.90361023, 0.03497917, 0.03213868, 0.02927192, 0.02868777, 0.90990162};
+
+	vector<double> outMat(nstates * nstates * nrates);
+	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){				
+/*
+		outman.UserMessage("MANUALLY SETTING PMAT");
+		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), inmat);
+*/
+		OutputBeagleTransMat(PmatIndexForBeagle((*pit).destTransMatIndex));
+		if((*pit).calcDerivs){
+			OutputBeagleTransMat(D1MatIndexForBeagle((*pit).destTransMatIndex));
+			OutputBeagleTransMat(D2MatIndexForBeagle((*pit).destTransMatIndex));
+			}
+		}
+
+		/*
+		outMat.clear();
+		for(int p=0;p<nstates*nstates*nrates;p++) 
+			outMat.push_back(p);
+		beagleGetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
+		//beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
+		vector<double>::iterator it = outMat.begin();
+		outman.DebugMessage("%d", (*pit).destTransMatIndex);
+		for(int r = 0;r < nrates;r++){
+			for(int i = 0;i < nstates;i++){
+				for(int j=0;j < nstates;j++){
+					outman.DebugMessageNoCR("%.8f\t", *it++);
+					}
+				outman.DebugMessage("");
+				}
+			}
+		*/
+//		}
+#endif
+	}
+
+void CalculationManager::OutputBeagleTransMat(int beagleIndex){
+	int nstates = data->NStates();
+	int nrates = pmatMan->NumRateCatsForBeagle(beagleIndex);
+	vector<double> outMat(nstates * nstates * nrates);
+
+	beagleGetTransitionMatrix(beagleInst, beagleIndex, &(outMat[0]));
+	vector<double>::iterator it = outMat.begin();
+	outman.DebugMessage("%d", beagleIndex);
+	for(int r = 0;r < nrates;r++){
+		for(int i = 0;i < nstates;i++){
+			for(int j=0;j < nstates;j++){
+				outman.DebugMessageNoCR("%.8f\t", *it++);
+				}
+			outman.DebugMessage("");
+			}
+		}
 	}
 
 //this does the last operation, beagleCalculateEdgeLogLikelihoods, and expects that the 
@@ -928,8 +1089,8 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 	if(!useBeagle){
 		results.lnL = GetScorePartialInternalRateHet(claMan->GetCla(theOp->childClaIndex1), 
 			claMan->GetCla(theOp->childClaIndex2), 
-			pmatMan->GetPmat(theOp->transMatIndex),
-			pmatMan->GetCorrespondingModel(theOp->transMatIndex));
+			pmatMan->GetPmatArray(theOp->transMatIndex),
+			pmatMan->GetModelForTransMatHolder(theOp->transMatIndex));
 		}
 
 	else{
@@ -947,7 +1108,14 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 
 		//state freqs - these are always being sent and stored in the same slot
 		vector<FLOAT_TYPE> freqs(pmatMan->GetNumStates());
-		pmatMan->GetCorrespondingModel(theOp->transMatIndex)->GetStateFreqs(&(freqs[0]));
+		pmatMan->GetModelForTransMatHolder(theOp->transMatIndex)->GetStateFreqs(&(freqs[0]));
+
+//DEBUG
+/*		outman.UserMessageNoCR("mod for states %d ", (int) pmatMan->GetCorrespondingModel(theOp->transMatIndex));
+		for(int s = 0;s < pmatMan->GetNumStates();s++)
+			outman.UserMessageNoCR("%.16f ", freqs[s]);
+		outman.UserMessage("");
+*/
 		int freqIndex = 0;
 		CheckBeagleReturnValue(
 			beagleSetStateFrequencies(
@@ -958,7 +1126,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 
 		//category weights (or probs) - these are also always being sent.  annoying to figure out when they need to be updated
 		vector<FLOAT_TYPE> inWeights;
-		pmatMan->GetHolder(theOp->transMatIndex)->GetCategoryWeightsForBeagle(inWeights);
+		pmatMan->GetCategoryWeightsForBeagle(theOp->transMatIndex, inWeights);
 		int weightIndex = 0;
 		if(inWeights.size() > 0){
 			CheckBeagleReturnValue(
@@ -1014,19 +1182,24 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 			results.lnL = siteLikesOut[0];
 			results.d1 = siteD1Out[0];
 			results.d2 = siteD2Out[0];
-/*			
+//DEBUG			
+/*
 			ScoreSet mySummation = {0.0, 0.0, 0.0};
 			beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
+			OutputBeagleSiteLikelihoods(siteLikesOut);
 			if(theOp->derivatives)
 				beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
 			mySummation = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
-
-			assert(FloatingPointEquals(results.lnL, mySummation.lnL, 1e-4));
+//			outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
+			assert(FloatingPointEquals(results.lnL, mySummation.lnL, 1e-2));
 			if(theOp->derivatives){
-				assert(FloatingPointEquals(results.d1, mySummation.d1, 1e-4));
-				assert(FloatingPointEquals(results.d2, mySummation.d2, 1e-4));
+//				outman.UserMessage(" D1 mine = %.4f beag = %.4f", mySummation.d1, results.d1);
+//				outman.UserMessage(" D2 mine = %.4f beag = %.4f", mySummation.d2, results.d2);
+				assert(FloatingPointEquals(results.d1, mySummation.d1, 1.0));
+				//assert(FloatingPointEquals(results.d2, mySummation.d2, 10.0));
 				}
-*/			}
+*/
+		}
 		else
 			results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
 		assert(results.lnL < 0.0 && results.lnL > -10.0e10);
@@ -1034,16 +1207,17 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
 		//DEBUG
 		outman.DebugMessage("L\t%f\tD1\t%f\tD2\t%f", results.lnL, results.d1, results.d2);
+//		outman.UserMessage("L\t%f\tD1\t%f\tD2\t%f", results.lnL, results.d1, results.d2);
 #endif
 		}
 	return results;
 	}
 
 //these are my old functions, not used when in beagle mode
-void CalculationManager::CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const TransMat *Lpmat, const TransMat *Rpmat, const Model *mod){
+void CalculationManager::CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, MODEL_FLOAT ***Lpmat,  MODEL_FLOAT ***Rpmat, const Model *mod){
 
-	FLOAT_TYPE *Lpr = **Lpmat->theMat;
-	FLOAT_TYPE *Rpr = **Rpmat->theMat;
+	FLOAT_TYPE *Lpr = **Lpmat;
+	FLOAT_TYPE *Rpr = **Rpmat;
 
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
@@ -1226,12 +1400,12 @@ void CalculationManager::CalcFullClaInternalInternal(CondLikeArray *destCLA, con
 	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
 	}
 
-void CalculationManager::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata, const TransMat *Lpmat, const TransMat* Rpmat, const Model *mod){
+void CalculationManager::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata, MODEL_FLOAT ***Lpmat, MODEL_FLOAT ***Rpmat, const Model *mod){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 
-	FLOAT_TYPE *Lpr = **Lpmat->theMat;
-	FLOAT_TYPE *Rpr = **Rpmat->theMat;
+	FLOAT_TYPE *Lpr = **Lpmat;
+	FLOAT_TYPE *Rpr = **Rpmat;
 
 	FLOAT_TYPE *dest=destCLA->arr;
 
@@ -1397,12 +1571,12 @@ void CalculationManager::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, con
 	destCLA->rescaleRank=2;
 	}
 
-void CalculationManager::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *dat2, const TransMat *Lpmat, const TransMat *Rpmat, const Model *mod, const unsigned *ambigMap){
+void CalculationManager::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *dat2, MODEL_FLOAT ***Lpmat, MODEL_FLOAT ***Rpmat, const Model *mod, const unsigned *ambigMap){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 
-	FLOAT_TYPE *pr1 = **Lpmat->theMat;
-	FLOAT_TYPE *pr2 = **Rpmat->theMat;
+	FLOAT_TYPE *pr1 = **Lpmat;
+	FLOAT_TYPE *pr2 = **Rpmat;
 
 	FLOAT_TYPE *des=destCLA->arr;
 	FLOAT_TYPE *dest=des;
@@ -1605,11 +1779,11 @@ void CalculationManager::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, con
 	}
 
 
-FLOAT_TYPE CalculationManager::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const TransMat *pmat, const Model *mod){
+FLOAT_TYPE CalculationManager::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, MODEL_FLOAT ***pmat, const Model *mod){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 
-	const FLOAT_TYPE *prmat = **pmat->theMat;
+	const FLOAT_TYPE *prmat = **pmat;
 
 	const FLOAT_TYPE *CL1=childCLA->arr;
 	const FLOAT_TYPE *partial=partialCLA->arr;
@@ -1711,10 +1885,10 @@ FLOAT_TYPE CalculationManager::GetScorePartialInternalRateHet(const CondLikeArra
 */
 	return totallnL;
 	}
-FLOAT_TYPE CalculationManager::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, const TransMat *pmat, const char *Ldata, const Model *mod){
+FLOAT_TYPE CalculationManager::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, MODEL_FLOAT ***pmat, const char *Ldata, const Model *mod){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
-	const FLOAT_TYPE *prmat = **pmat->theMat;
+	const FLOAT_TYPE *prmat = **pmat;
 	const FLOAT_TYPE *partial=partialCLA->arr;
 	const int *underflow_mult=partialCLA->underflow_mult;
 	const int nRateCats=mod->NRateCats();
