@@ -5007,11 +5007,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 					assert(0);
 					}
 				siteL *= rateProb[0];//multiply by (1-pinv)
-				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+				if(mod->NoPinvInModel() == false && ((siteToScore < 0 ? i : siteToScore ) <= lastConst)){
+					int actualSite = (siteToScore < 0 ? i : siteToScore );
 					if(underflow_mult[i] == 0)
-						siteL += prI*freqs[conStates[i]];
+						siteL += prI*freqs[conStates[actualSite]];
 					else
-						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult[i]);
+						siteL += prI*freqs[conStates[actualSite]]*exp((FLOAT_TYPE)underflow_mult[i]);
 					}
 				unscaledlnL = (log(siteL) - underflow_mult[i]);
 				assert(siteL > ZERO_POINT_ZERO);//this should be positive
@@ -5083,11 +5084,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 						}
 					}
 
-				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+				if(mod->NoPinvInModel() == false && ((siteToScore < 0 ? i : siteToScore ) <= lastConst)){
+					int actualSite = (siteToScore < 0 ? i : siteToScore );
 					if(underflow_mult[i] == 0)
-						siteL += prI*freqs[conStates[i]];
+						siteL += prI*freqs[conStates[actualSite]];
 					else
-						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult[i]);
+						siteL += prI*freqs[conStates[actualSite]]*exp((FLOAT_TYPE)underflow_mult[i]);
 					}
 
 				unscaledlnL = (log(siteL) - underflow_mult[i]);
@@ -5199,12 +5201,13 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 					}
 				partial+=4*nRateCats;
 				}
-			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+			if(mod->NoPinvInModel() == false && ((siteToScore < 0 ? i : siteToScore ) <= lastConst)){
+				int actualSite = (siteToScore < 0 ? i : siteToScore );
 				FLOAT_TYPE btot=0.0;
-				if(conBases[i]&1) btot+=freqs[0];
-				if(conBases[i]&2) btot+=freqs[1];
-				if(conBases[i]&4) btot+=freqs[2];
-				if(conBases[i]&8) btot+=freqs[3];
+				if(conBases[actualSite]&1) btot+=freqs[0];
+				if(conBases[actualSite]&2) btot+=freqs[1];
+				if(conBases[actualSite]&4) btot+=freqs[2];
+				if(conBases[actualSite]&8) btot+=freqs[3];
 				if(underflow_mult[i]==0)
 					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + prI*btot);
 				else
@@ -5302,12 +5305,13 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 				partial+=4;
 				CL1+=4;
 				}
-			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+			if(mod->NoPinvInModel() == false && ((siteToScore < 0 ? i : siteToScore ) <= lastConst)){
+				int actualSite = (siteToScore < 0 ? i : siteToScore );
 				FLOAT_TYPE btot=ZERO_POINT_ZERO;
-				if(conBases[i]&1) btot+=freqs[0];
-				if(conBases[i]&2) btot+=freqs[1];
-				if(conBases[i]&4) btot+=freqs[2];
-				if(conBases[i]&8) btot+=freqs[3];
+				if(conBases[actualSite]&1) btot+=freqs[0];
+				if(conBases[actualSite]&2) btot+=freqs[1];
+				if(conBases[actualSite]&4) btot+=freqs[2];
+				if(conBases[actualSite]&8) btot+=freqs[3];
 				if(underflow_mult1[i] + underflow_mult2[i] == 0)
 					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + prI*btot);
 				else
@@ -5409,11 +5413,12 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 					siteL += temp * partial[from] * freqs[from];
 					}
 				siteL *= rateProb[0]; //multiply by (1-pinv)
-				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+				if(mod->NoPinvInModel() == false && ((siteToScore < 0 ? i : siteToScore ) <= lastConst)){
+					int actualSite = (siteToScore < 0 ? i : siteToScore );
 					if(underflow_mult1[i] + underflow_mult2[i] == 0)
-						siteL += prI*freqs[conStates[i]];
+						siteL += prI*freqs[conStates[actualSite]];
 					else
-						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
+						siteL += prI*freqs[conStates[actualSite]]*exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
 					}
 				CL1 += nstates;
 				partial += nstates;
@@ -5480,12 +5485,12 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 					partial += nstates;
 					CL1 += nstates;
 					}
-
-				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+				if(mod->NoPinvInModel() == false && ((siteToScore < 0 ? i : siteToScore ) <= lastConst)){
+					int actualSite = (siteToScore < 0 ? i : siteToScore );
 					if(underflow_mult1[i] + underflow_mult2[i] == 0)
-						siteL += prI*freqs[conStates[i]];
+						siteL += prI*freqs[conStates[actualSite]];
 					else
-						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
+						siteL += prI*freqs[conStates[actualSite]]*exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
 					}
 				unscaledlnL = (log(siteL) - underflow_mult1[i] - underflow_mult2[i]);
 				assert(siteL > ZERO_POINT_ZERO);//this should be positive
@@ -7660,14 +7665,36 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 #ifdef DEBUG_SCALE_OPT
 	ofstream deb("scaleTrace.log");
 	deb.precision(20);
-	for(int s=0;s<50;s++){
-		FLOAT_TYPE scale=0.5 + s*.025;
+	ofstream trees("trees.log");
+	trees.precision(10);
+	ofstream scls("scales.log");
+	scls.precision(10);
+
+	trees << "#NEXUS\nbegin trees;" << endl;
+	trees.precision(5);
+	int sit = siteToScore;
+	siteToScore = -1;
+	ofprefix="poo";
+	for(int s=0;s<75;s++){
+		FLOAT_TYPE scale= 1.0e-8 * pow(1.5, s);
+		scls << s << "\t" << scale << endl; 
 		ScaleWholeTree(scale);
+		if(s == 0)
+			sitelikeLevel = 1;
+		else
+			sitelikeLevel = -1;
 		Score();
 		deb << scale << "\t" << lnL << endl;
+		string str;
+		root->MakeNewick(str, data, false, true, true);
+		trees << "tree t" << s << " = [scale = " << scale << " " << lnL / siteCount << "]" << str.c_str() << ";\n";
 		ScaleWholeTree(ONE_POINT_ZERO/scale);
 		}
+	siteToScore = sit;
 	deb.close();
+	trees << "end;" << endl;
+	trees.close();
+	scls.close();
 #endif
 
 	if(FloatingPointEquals(lnL, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
