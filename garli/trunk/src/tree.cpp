@@ -345,9 +345,9 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 		if(*s == '(' || isdigit(*s) || cont==true){
 			//here we're about to add a node of some sort
 			this->numBranchesAdded++;
-			if(current >= numNodesTotal)
-				throw ErrorException("Problem reading tree description.  Extra taxa?");
 			if(*(s+1)=='('){//add an internal node
+				if(current >= numNodesTotal)
+					throw ErrorException("Problem reading tree description.  Extra taxa?");
 				temp=temp->AddDes(allNodes[current++]);
 				numNodesAdded++;
 				s++;
