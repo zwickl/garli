@@ -1197,10 +1197,17 @@ void Population::SeedPopulationWithStartingTree(int rep){
 #ifdef SINGLE_PRECISION_FLOATS
 	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
 #else
+
+#ifdef SAME_PRECISION
+	//DEBUG
+	//use the same tolerance, even in the double prec case
+	Tree::expectedPrecision = FLT_EPSILON * 10.0;
+#else
 	if(calcMan->useBeagle && calcMan->singlePrecBeagle)
 		Tree::expectedPrecision = FLT_EPSILON * 10.0;
 	else
 		Tree::expectedPrecision = max(DBL_EPSILON * 10.0, 1e-12);
+#endif
 #endif
 	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
 
