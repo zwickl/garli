@@ -33,6 +33,14 @@ PmatManager *NodeClaManager::pmatMan = NULL;
 
 const char *AdvanceDataPointer(const char *arr, int num);
 
+
+#ifdef FULL_BEAGLE_DEBUG
+	#define	OUTPUT_PMATS
+	#define OUTPUT_BEAGLE_SITELIKES
+	#define OUTPUT_PARTIALS
+	#define OUTPUT_OTHER_BEAGLE
+#endif
+
 #ifdef USE_BEAGLE
 
 void InterpretBeagleResourceFlags(long flags, string &list){
@@ -155,13 +163,7 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
  	outman.DebugMessage("Requiring %s", str.c_str());
 
 	outman.UserMessage("CREATING BEAGLE INSTANCE ...");
-//without ambiguity
-/*	
-	int tipCount = nTips;
-	int partialsCount = nClas;
-	//I think that all compacts are tips, but not all tips must be compact. They always are in the nonambig case though.
-	int compactCount = tipCount;
-*/
+
 	//to allow ambiguity we need to create partials for the tips with ambiguity, and normal tip states for the others
 	int tipCount = nTips;
 	int ambigTips = data->NumTaxaWithPartialAmbig();
@@ -218,7 +220,23 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	vector<double> counts;
 	for(int pat = 0;pat < data->NChar();pat++)
 		counts.push_back((double) data->Count(pat));
-
+#ifdef OUTPUT_OTHER_BEAGLE
+	outman.DebugMessageNoCR("counts ");
+	for(vector<double>::iterator it = counts.begin();it != counts.end();it++){
+		outman.DebugMessageNoCR("%d ", (int) *it);
+		}
+	outman.DebugMessage("");
+#endif
+#ifdef OUTPUT_BEAGLE_SITELIKES
+	string name = ofprefix + ".Bsitelikes.log";
+	ofstream file(name.c_str());	
+	file.close();
+#endif
+#ifdef OUTPUT_BEAGLE_PARTIALS
+	string name2 = ofprefix + ".partials.log";
+	ofstream part(name2.c_str());	
+	part.close();
+#endif
 	beagleSetPatternWeights(beagleInst, &(counts[0]));
 
 	outman.UserMessage("#######################################################");
@@ -410,7 +428,10 @@ void CalculationManager::OutputOperationsSummary() const{
 	}
 
 ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *effectiveRoot, bool calcDerivs){
-	outman.DebugMessage("##\nENTER CALC L&D, ROOT = %d", effectiveRoot->nodeNum);
+	if(calcDerivs)
+		outman.DebugMessage("#\nCALC D ROOT=%d", effectiveRoot->nodeNum);
+	else
+		outman.DebugMessage("#\nCALC L ROOT=%d", effectiveRoot->nodeNum);
 
 	//this collects all of the necessary computation details and stores them in 
 	//the operationSetQueue and scorOps list
@@ -439,28 +460,7 @@ ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *e
 	scoreOps.clear();
 	return values;
 	}	
-/*
-FLOAT_TYPE CalculationManager::CalculateLikelihood(const TreeNode *effectiveRoot){
-	outman.DebugMessage("#########################\nENTERING CALC LIKELIHOOD, ROOT = %d", effectiveRoot->nodeNum);
 
-	DetermineRequiredOperations(effectiveRoot, false);
-
-//	OutputOperationsSummary();
-
-	UpdateAllConditionals();
-
-	//This assumes that there is only one score op in scoreOps
-	assert(scoreOps.size() == 1);
-	//only the lnL field of the values struct will be filled here
-	ScoreSet values;
-	for(list<ScoringOperation>::iterator sit = scoreOps.begin() ; sit != scoreOps.end() ; sit++)
-		values = PerformScoringOperation(&(*sit));
-
-	operationSetQueue.clear();
-	scoreOps.clear();
-	return values.lnL;
-	}	
-*/
 //this just performs all of the transmat and cla ops that were queued
 //will generally be followed by a call to PerformScoring to get lnL or derivs
 void CalculationManager::UpdateAllConditionals(){	
@@ -688,11 +688,6 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 	//and my negative (tip) corresponds to a NULL in beagle
 	int cumulativeScaleIndex = BEAGLE_OP_NONE;
 
-/*		if(rescaleBeagle){
-		cumulativeScaleIndex = theOp->destCLAIndex;
-		AccumulateRescalers(cumulativeScaleIndex, theOp->childCLAIndex1, theOp->childCLAIndex2);
-		}
-*/
 	CheckBeagleReturnValue(
 		beagleUpdatePartials(
 			beagleInst,
@@ -701,19 +696,26 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 			cumulativeScaleIndex),
 		"beagleUpdatePartials");
 
-	//DEBUG
-/*	//nstates x nrates x nsites = 4 x 1 x 845 = 3380
-	double outPartials[3380];
+#ifdef OUTPUT_PARTIALS
+	string name2 = ofprefix + ".partials.log";
+	ofstream part(name2.c_str());
+	part.precision(5);
+
+	int nstates = 4;
+	vector<double> outPartials( nstates * data->NChar() * pmatMan->GetNumRates());
 	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-		beagleGetPartials(beagleInst, PartialIndexForBeagle((*it).destCLAIndex), BEAGLE_OP_NONE, outPartials);
-		for(int site = 0;site < 845;site++){
-			outman.DebugMessageNoCR("%d\t", site);
-			for(int state = 0;state < 4;state++)
-				outman.DebugMessageNoCR("%.8f\t", outPartials[site * 4 + state]);
-			outman.DebugMessage("");
+		beagleGetPartials(beagleInst, PartialIndexForBeagle((*it).destCLAIndex), BEAGLE_OP_NONE, &outPartials[0]);
+		for(int site = 0;site < data->NChar();site++){
+			part << site << "\t";
+			for(int rate = 0;rate < pmatMan->GetNumRates();rate++){
+				for(int state = 0;state < 4;state++)
+					part << outPartials[site * 4 + state] << "\t";
+				}
+			part << "\n";
 			}
 		}
-*/
+	part.close();
+#endif
 
 	//this is a bit sneaky. each partial now has a rescaling array associated with it, holding
 	//the amount done at that node alone.  Take the rescaling amounts from the two children,
@@ -832,7 +834,7 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 
 #ifdef OUTPUT_PMATS
 if(theOp->calcDerivs){
-	int nrates = pmatMan->GetCorrespondingModel(theOp->destTransMatIndex)->NumRateCatsForBeagle();
+	int nrates = pmatMan->GetModelForTransMatHolder(theOp->destTransMatIndex)->NumRateCatsForBeagle();
 	int nstates = data->NStates();
 	vector<double> outMat(nstates * nstates * nrates);
 	beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle(theOp->destTransMatIndex), &(outMat[0]));
@@ -846,7 +848,6 @@ if(theOp->calcDerivs){
 			}
 		}
 	}		
-
 #endif
 	}
 
@@ -927,13 +928,12 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 		"beagleUpdateTransitionMatrices");
 #endif
 
-#undef	OUTPUT_PMATS
 
 #ifdef OUTPUT_PMATS
 
 	int nstates = data->NStates();
 	
-	int nrates = pmatMan->GetCorrespondingModel(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
+	int nrates = pmatMan->GetModelForTransMatHolder(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
 
 //	if(calcDerivs){
 
@@ -976,25 +976,14 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	}
 
 void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &theOps){
-/*	
-	//OLD
-	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){
-		double theBlen = (*pit).edgeLength;
-		int theIndex = (*pit).destTransMatIndex;
-		//DEBUG
-		//assert(pmatMan->GetPmatArray(theIndex)[0] && pmatMan->GetPmatArray(theIndex)[0][0] && pmatMan->GetPmatArray(theIndex)[0][0][0]);
-		if(pit->calcDerivs)
-			pmatMan->GetMutableModelForTransMatHolder(theIndex)->FillDerivativeMatrices(pit->edgeLength, pmatMan->GetPmatArray(theIndex), pmatMan->GetD1MatArray(theIndex), pmatMan->GetD2MatArray(theIndex));
-		else
-			pmatMan->GetMutableModelForTransMatHolder(theIndex)->AltCalcPmat(pit->edgeLength, pmatMan->GetPmatArray(theIndex));
-		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle(theIndex), **pmatMan->GetPmatArray(theIndex));
-		if(pit->calcDerivs){
-			beagleSetTransitionMatrix(beagleInst, D1MatIndexForBeagle(theIndex), **pmatMan->GetD1MatArray(theIndex));
-			beagleSetTransitionMatrix(beagleInst, D2MatIndexForBeagle(theIndex), **pmatMan->GetD2MatArray(theIndex));
-			}
-		}
-*/
-	//NEW
+#if ! (defined(BATCHED_CALLS) && defined(SEND_TRANSMATS))
+	assert(0);
+#endif
+
+#ifdef OUTPUT_PMATS
+	ofstream *deb = outman.GetDebugStream();
+#endif
+
 	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){
 		double theBlen = (*pit).edgeLength;
 		int theIndex = (*pit).destTransMatIndex;
@@ -1009,57 +998,42 @@ void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &th
 		else{
 			pmatMan->GetMutableModelForTransMatHolder(theIndex)->AltCalcPmat(theBlen, thePMat);
 			}
+
+#ifdef OUTPUT_PMATS
+		//output pmats to be sent
+		*deb << "send p " << theIndex << "\n";
+		pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, thePMat);
+#endif
 		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle(theIndex), **thePMat);
+
+#ifdef OUTPUT_PMATS
+		if(!gpuBeagle){
+			*deb << "ret p GI=" << theIndex << " BI=" << PmatIndexForBeagle(theIndex)<< "\n";
+			OutputBeagleTransMat(PmatIndexForBeagle(theIndex));
+			}
+#endif
 		if(pit->calcDerivs){
+#ifdef OUTPUT_PMATS
+			*deb << "send D1 " << theIndex << "\n";
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, theD1Mat);
+			*deb << "send D2 " << theIndex << "\n";
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, theD2Mat);
+#endif
 			beagleSetTransitionMatrix(beagleInst, D1MatIndexForBeagle(theIndex), **theD1Mat);
 			beagleSetTransitionMatrix(beagleInst, D2MatIndexForBeagle(theIndex), **theD2Mat);
-			}
-		}
+
 #ifdef OUTPUT_PMATS
-
-	int nstates = data->NStates();
-	
-	int nrates = pmatMan->NumRateCatsForBeagle(theOps.begin()->destTransMatIndex);
-
-//	if(calcDerivs){
-
-	/*wrong	*/
-//	double inmat[16] = {0.9070614,	0.02927732,	0.02870608,	0.0349794, 0.03213807,	0.90418679,	0.02868981,	0.03497981, 0.03213807,	0.02926432,	0.90361226, 0.03497981, 0.03213831,	0.02927236,	0.02868767,	0.90990174};
-	/*right*/
-	//double inmat[16] = {0.9070611, 0.0292719, 0.02868779, 0.03497917, 0.03213868, 0.90419436, 0.02868777, 0.03497917, 0.03213868, 0.0292719, 0.90361023, 0.03497917, 0.03213868, 0.02927192, 0.02868777, 0.90990162};
-
-	vector<double> outMat(nstates * nstates * nrates);
-	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){				
-/*
-		outman.UserMessage("MANUALLY SETTING PMAT");
-		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), inmat);
-*/
-		OutputBeagleTransMat(PmatIndexForBeagle((*pit).destTransMatIndex));
-		if((*pit).calcDerivs){
-			OutputBeagleTransMat(D1MatIndexForBeagle((*pit).destTransMatIndex));
-			OutputBeagleTransMat(D2MatIndexForBeagle((*pit).destTransMatIndex));
+			if(!gpuBeagle){
+				if((*pit).calcDerivs){
+					*deb << "ret D1 GI=" << theIndex << " BI=" << D1MatIndexForBeagle(theIndex) << "\n";
+					OutputBeagleTransMat(D1MatIndexForBeagle(theIndex));
+					*deb << "ret D2 GI=" << theIndex << " BI=" << D2MatIndexForBeagle(theIndex) << "\n";
+					OutputBeagleTransMat(D2MatIndexForBeagle(theIndex));
+					}
+				}
+#endif
 			}
 		}
-
-		/*
-		outMat.clear();
-		for(int p=0;p<nstates*nstates*nrates;p++) 
-			outMat.push_back(p);
-		beagleGetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
-		//beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
-		vector<double>::iterator it = outMat.begin();
-		outman.DebugMessage("%d", (*pit).destTransMatIndex);
-		for(int r = 0;r < nrates;r++){
-			for(int i = 0;i < nstates;i++){
-				for(int j=0;j < nstates;j++){
-					outman.DebugMessageNoCR("%.8f\t", *it++);
-					}
-				outman.DebugMessage("");
-				}
-			}
-		*/
-//		}
-#endif
 	}
 
 void CalculationManager::OutputBeagleTransMat(int beagleIndex){
@@ -1069,11 +1043,11 @@ void CalculationManager::OutputBeagleTransMat(int beagleIndex){
 
 	beagleGetTransitionMatrix(beagleInst, beagleIndex, &(outMat[0]));
 	vector<double>::iterator it = outMat.begin();
-	outman.DebugMessage("%d", beagleIndex);
 	for(int r = 0;r < nrates;r++){
+		outman.DebugMessage("r%d", r);
 		for(int i = 0;i < nstates;i++){
 			for(int j=0;j < nstates;j++){
-				outman.DebugMessageNoCR("%.8f\t", *it++);
+				outman.DebugMessageNoCR("%.6f\t", *it++);
 				}
 			outman.DebugMessage("");
 			}
@@ -1095,27 +1069,16 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 
 	else{
 #ifdef USE_BEAGLE
-
-		int buffer1[1] = {PartialIndexForBeagle(theOp->childClaIndex1)};
-		int buffer2[1] = {PartialIndexForBeagle(theOp->childClaIndex2)};
-		int numInput = 2;
-
-		//arrays to hold site lnLs and derivs returned from Beagle
-		//note that later beagle versions don't return the array anymore, just the sum
-		vector<double> siteLikesOut(data->NChar());
-		vector<double> siteD1Out(data->NChar());
-		vector<double> siteD2Out(data->NChar());
-
 		//state freqs - these are always being sent and stored in the same slot
 		vector<FLOAT_TYPE> freqs(pmatMan->GetNumStates());
 		pmatMan->GetModelForTransMatHolder(theOp->transMatIndex)->GetStateFreqs(&(freqs[0]));
 
-//DEBUG
-/*		outman.UserMessageNoCR("mod for states %d ", (int) pmatMan->GetCorrespondingModel(theOp->transMatIndex));
-		for(int s = 0;s < pmatMan->GetNumStates();s++)
-			outman.UserMessageNoCR("%.16f ", freqs[s]);
-		outman.UserMessage("");
-*/
+#ifdef OUTPUT_OTHER_BEAGLE
+		outman.DebugMessageNoCR("freqs sent\t");
+		for(int i = 0; i < 4;i++)
+			outman.DebugMessageNoCR("%.6f\t", freqs[i]);
+		outman.DebugMessage("");
+#endif
 		int freqIndex = 0;
 		CheckBeagleReturnValue(
 			beagleSetStateFrequencies(
@@ -1127,6 +1090,14 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		//category weights (or probs) - these are also always being sent.  annoying to figure out when they need to be updated
 		vector<FLOAT_TYPE> inWeights;
 		pmatMan->GetCategoryWeightsForBeagle(theOp->transMatIndex, inWeights);
+#ifdef OUTPUT_OTHER_BEAGLE
+		if(inWeights.size() > 1){
+			outman.DebugMessageNoCR("rate props sent\t");
+			for(int i = 0; i < inWeights.size();i++)
+				outman.DebugMessageNoCR("%.6f\t", inWeights[i]);
+			outman.DebugMessage("");
+			}
+#endif
 		int weightIndex = 0;
 		if(inWeights.size() > 0){
 			CheckBeagleReturnValue(
@@ -1136,6 +1107,17 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 					&(inWeights[0])),
 				"beagleSetCategoryWeights");
 			}
+
+		//the two children to be included
+		int buffer1[1] = {PartialIndexForBeagle(theOp->childClaIndex1)};
+		int buffer2[1] = {PartialIndexForBeagle(theOp->childClaIndex2)};
+		int numInput = 2;
+
+		//arrays to hold site lnLs and derivs returned from Beagle
+		//note that later beagle versions don't return the array anymore, just the sum
+		vector<double> siteLikesOut(data->NChar());
+		vector<double> siteD1Out(data->NChar());
+		vector<double> siteD2Out(data->NChar());
 
 		int pmatIndeces[1] = {PmatIndexForBeagle(theOp->transMatIndex)};
 		int	d1MatIndeces[1] = {D1MatIndexForBeagle(theOp->transMatIndex)};
@@ -1182,24 +1164,16 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 			results.lnL = siteLikesOut[0];
 			results.d1 = siteD1Out[0];
 			results.d2 = siteD2Out[0];
-//DEBUG			
-/*
-			ScoreSet mySummation = {0.0, 0.0, 0.0};
-			beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
-			OutputBeagleSiteLikelihoods(siteLikesOut);
-			if(theOp->derivatives)
-				beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
-			mySummation = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
-//			outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
-			assert(FloatingPointEquals(results.lnL, mySummation.lnL, 1e-2));
-			if(theOp->derivatives){
-//				outman.UserMessage(" D1 mine = %.4f beag = %.4f", mySummation.d1, results.d1);
-//				outman.UserMessage(" D2 mine = %.4f beag = %.4f", mySummation.d2, results.d2);
-				assert(FloatingPointEquals(results.d1, mySummation.d1, 1.0));
-				//assert(FloatingPointEquals(results.d2, mySummation.d2, 10.0));
-				}
-*/
-		}
+
+#ifdef OUTPUT_BEAGLE_SITELIKES
+			string name = ofprefix + ".Bsitelikes.log";
+			ofstream file(name.c_str(), ios::app);	
+			OutputBeagleSiteValues(file, theOp->derivatives);
+			file.close();
+			//mySummation = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
+			//outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
+#endif
+			}
 		else
 			results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
 		assert(results.lnL < 0.0 && results.lnL > -10.0e10);
@@ -1207,7 +1181,6 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
 		//DEBUG
 		outman.DebugMessage("L\t%f\tD1\t%f\tD2\t%f", results.lnL, results.d1, results.d2);
-//		outman.UserMessage("L\t%f\tD1\t%f\tD2\t%f", results.lnL, results.d1, results.d2);
 #endif
 		}
 	return results;

@@ -1071,6 +1071,23 @@ void Model::OutputPmats(ofstream &deb){
 
 	}
 
+
+void Model::OutputPmat(ofstream &deb, MODEL_FLOAT ***mat){
+	for(int r=0;r<NRateCats();r++){
+		if(NRateCats() > 1)
+			deb << "r" << r << "\n";
+		for(int f=0;f<nstates;f++){
+			for(int t=0;t<nstates;t++){
+				deb << mat[r][f][t] << "\t";
+				}
+			deb << "\n";
+			}
+	//	deb << "\n";
+		}
+	//deb << "\n";
+	}
+
+
 void Model::CalcDerivatives(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLOAT ***one, MODEL_FLOAT ***two){
 /*	double before = *omegas[0];
 	if(dlen < 0.011 && dlen > 0.009)

@@ -3666,13 +3666,20 @@ int Tree::Score(int rootNodeNum /*=0*/){
 
 				for(int i = numTipsTotal + 1; i < numNodesTotal;i++){
 					MakeAllNodesDirty();
+					if(i == numTipsTotal + 1)
+						sitelikeLevel = 1;
+					else 
+						sitelikeLevel = -1;
 					likeScores.push_back(calcMan->CalculateLikelihoodAndDerivatives(allNodes[i], false).lnL);
 					MakeAllNodesDirty();
+					sitelikeLevel = -1;
 					likeDerivScores.push_back(calcMan->CalculateLikelihoodAndDerivatives(allNodes[i], true).lnL);
 					}
 				std::sort(likeScores.begin(), likeScores.end());
 				std::sort(likeDerivScores.begin(), likeDerivScores.end());
 				outman.DebugMessage("bestL\t%.5f\tworstL\t%.5f\trng\t%.5f\tbestD\t%.5f\tworstD\t%.5f\trng\t%.5f\texp\t%.5f", likeScores[0], likeScores[likeScores.size()-1], likeScores[0] - likeScores[likeScores.size()-1], likeDerivScores[0], likeDerivScores[likeDerivScores.size()-1], likeDerivScores[0] - likeDerivScores[likeDerivScores.size()-1], expectedPrecision * likeScores[0]);
+				outman.UserMessage("bestL\t%.5f\tworstL\t%.5f\trng\t%.5f\tbestD\t%.5f\tworstD\t%.5f\trng\t%.5f\texp\t%.5f", likeScores[0], likeScores[likeScores.size()-1], likeScores[0] - likeScores[likeScores.size()-1], likeDerivScores[0], likeDerivScores[likeDerivScores.size()-1], likeDerivScores[0] - likeDerivScores[likeDerivScores.size()-1], expectedPrecision * likeScores[0]);
+				throw ErrorException("exiting after score accuracy check");
 				}
 #endif
 #else

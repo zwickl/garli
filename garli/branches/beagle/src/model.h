@@ -901,6 +901,7 @@ class Model{
 	void CalcDerivatives(MODEL_FLOAT, MODEL_FLOAT ***, MODEL_FLOAT ***, MODEL_FLOAT ***);
 	void FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLOAT ***one, MODEL_FLOAT ***two);
 	void OutputPmats(ofstream &deb);
+	void OutputPmat(ofstream &deb, MODEL_FLOAT ***mat);
 	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pr);
 	void UpdateQMat();
 	void UpdateQMatCodon();

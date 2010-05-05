@@ -720,6 +720,7 @@ public:
 	bool singlePrecBeagle;
 	bool gpuBeagle;
 	int beagleInst;
+	string ofprefix;
 
 	CalculationManager(){
 		useBeagle = false; 
@@ -742,6 +743,10 @@ public:
 		CalculationManager::data = dat;
 		}
 	
+	void SetOfprefix(string &prefix){
+		ofprefix = prefix;
+		}
+
 	//THE FOLLOWING DO NOT DEPEND ON BEAGLE BEING AVAILABLE
 
 	//pass the effective root node (any non-tip), it will figure out which clas to combine
@@ -857,7 +862,7 @@ public:
 		}
 
 #ifdef USE_BEAGLE
-	void SetBeagleDetails(bool gpu, bool singlePrec, bool rescale){
+	void SetBeagleDetails(bool gpu, bool singlePrec, bool rescale, string &prefix){
 		useBeagle = true;
 		if(gpu){//assuming that all GPU is SP for now
 			gpuBeagle = true;
@@ -869,6 +874,7 @@ public:
 			}
 		if(rescale)
 			rescaleBeagle = true;
+		this->ofprefix = prefix;
 		}
 	
 	//BEAGLE SPECIFIC FUNCS
@@ -918,11 +924,10 @@ public:
 			"beagleSetPartials");
 		}
 
-	void OutputBeagleSiteLikelihoods(vector<double> &siteLikesOut){
+	void OutputBeagleSiteLikelihoods(ofstream &likes, vector<double> &siteLikesOut){
 		const int *count = data->GetCounts();
 		int num = 0;
 		
-		ofstream likes("beagleSLs.log", ios::app);
 		//for(vector<double>::iterator it = siteLikesOut.begin();it != siteLikesOut.end();it++)
 		for(int c = 0;c < data->NChar();c++)
 			for(int co = 0;co < count[c];co++)
@@ -930,6 +935,28 @@ public:
 		likes.precision(11);
 		likes << SumSiteValues(&(siteLikesOut[0]), NULL, NULL).lnL << "\n";
 		likes.close();
+		}
+
+	void OutputBeagleSiteValues(ofstream &out, bool derivs){
+		//there is only one set of sitelikes stored by an instance, the most recent ones		
+		vector<double> siteLikesOut(data->NChar());
+		vector<double> siteD1Out(data->NChar());
+		vector<double> siteD2Out(data->NChar());
+
+		const int *counts = data->GetCounts();
+
+		beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
+		if(derivs)
+			beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
+
+		for(int s = 0;s < data->GapsIncludedNChar();s++){
+			int packed = data->Number(s);
+			out << s << "\t" << packed << "\t" << counts[packed] << "\t" << siteLikesOut[packed];
+			if(derivs){
+				out << "\t" << siteD1Out[packed] << "\t" << siteD2Out[packed];
+				}
+			out << "\n";
+			}
 		}
 
 	void UpdateAllConditionals();
