@@ -88,6 +88,10 @@ class OutputManager{
 			else return defaultOut;
 			}
 
+		ofstream *GetDebugStream(){
+			return &debugOut;
+			}
+
 		void SetLogFileForAppend(const char *logname){
 			log=true;
 			if(logOut.is_open()){
