@@ -511,9 +511,8 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE in
 #else
 	FLOAT_TYPE baseIncr = min(max(0.001*optPrecision, 1.0e-6), initialVal * 0.01);
 #endif
-
 	//DEBUG
-	targetScoreDigits = - log10(expectedPrecision);
+	targetScoreDigits = min(targetScoreDigits, -log10(expectedPrecision));
 
 	//this first bit of checking and bumping used to use epsilon rather than the default baseIncr
 	assert(initialVal > lowBound - baseIncr && initialVal < highBound + baseIncr);
