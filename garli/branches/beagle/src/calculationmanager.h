@@ -949,12 +949,21 @@ public:
 		if(derivs)
 			beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
 
+		//ScoreSet mySummation = SumSiteValues(&siteLikesOut[0], (derivs ? &siteD1Out[0] : NULL), (derivs ? &siteD2Out[0] : NULL));
+		//out << "mine\t" << mySummation.lnL << "\t" << mySummation.d1 << "\t" << mySummation.d2 << "\n";
+		//outman.DebugMessage("myL\t%f\tD1\t%f\tD2\t%f", mySummation.lnL, mySummation.d1, mySummation.d2);
+		//outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
+
 		for(int s = 0;s < data->GapsIncludedNChar();s++){
 			int packed = data->Number(s);
-			out << s << "\t" << packed << "\t" << counts[packed] << "\t" << siteLikesOut[packed];
-			if(derivs){
-				out << "\t" << siteD1Out[packed] << "\t" << siteD2Out[packed];
+			if(packed >= 0){
+				out << s << "\t" << packed << "\t" << counts[packed] << "\t" << siteLikesOut[packed];
+				if(derivs){
+					out << "\t" << siteD1Out[packed] << "\t" << siteD2Out[packed];
+					}
 				}
+			else 
+				out << s << "\t" << packed << "\t" << counts[packed] << "\tNA";
 			out << "\n";
 			}
 		}
