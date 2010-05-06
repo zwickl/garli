@@ -1198,6 +1198,8 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
 #else
 
+#define SAME_PRECISION
+
 #ifdef SAME_PRECISION
 	//DEBUG
 	//use the same tolerance, even in the double prec case
