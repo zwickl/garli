@@ -600,7 +600,9 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	//SetTreeStatics to properly set the larger min brlen
 	if(calcMan->IsSinglePrecision()){
 		conf->singlePrecBeagle = true;
-		conf->minBrlen = 1.0e-6;
+		//DEBUG - this used to be more limited, but I don't think that its necessary
+		//since the matrix calcs will be done by me in DP anyway 
+		//conf->minBrlen = 1.0e-6;
 		}
 #endif
 

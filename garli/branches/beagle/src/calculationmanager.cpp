@@ -1168,6 +1168,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 #ifdef OUTPUT_BEAGLE_SITELIKES
 			string name = ofprefix + ".Bsitelikes.log";
 			ofstream file(name.c_str(), ios::app);	
+			file.precision(10);
 			OutputBeagleSiteValues(file, theOp->derivatives);
 			file.close();
 			//mySummation = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));

@@ -1422,15 +1422,16 @@ FLOAT_TYPE Tree::BranchLike(TreeNode *optNode){
 void Tree::SampleBlenCurve(TreeNode *nd, ofstream &out){
 
 	FLOAT_TYPE initialLen=nd->dlen;
-	Score();
+//	Score();
 
-	out << nd->dlen << "\t" << lnL << "\n";
+//	out << nd->dlen << "\t" << lnL << "\n";
 
-	SetBranchLength(nd, (FLOAT_TYPE)1e-4);
-	for(int i=0;i<15;i++){
-		Score();
-		out << nd->dlen << "\t" << lnL << "\n";
-		SetBranchLength(nd, nd->dlen * (FLOAT_TYPE)2.0);
+	double empD1, empD2;
+	for(double len = 0.01;len < min(initialLen * 1000.0, 0.08);len += 0.0001){
+		SetBranchLength(nd, len);
+		pair<double, double> derivs = CalcDerivativesRateHet(nd->anc, nd);
+		CalcEmpiricalDerivatives(nd, empD1, empD2);
+		out << len << "\t" << lnL << "\t" << derivs.first << "\t" << derivs.second << "\t" << empD1 << "\t" << empD2 << "\n";
 		}
 	SetBranchLength(nd, initialLen);
 	}
@@ -1440,54 +1441,52 @@ void Tree::CalcEmpiricalDerivatives(TreeNode *nd, FLOAT_TYPE &D1, FLOAT_TYPE &D2
 
 	FLOAT_TYPE incr;
 	FLOAT_TYPE blen_used = start_blen;
-
+/*
 	if(blen_used > 1e-6)
-		incr= blen_used * 0.001;
+		incr= blen_used * 0.01;
 	else if(blen_used > min_brlen + 1.0e-8) incr = blen_used * 0.01;
 	else{
 		incr =1.0e-8;
 		blen_used = max(start_blen, min_brlen + incr);
 		SetBranchLength(nd, blen_used);
 		}
+*/
+	if(blen_used < min_brlen * 3.0)
+		blen_used = min_brlen * 3.0;
+	incr = (blen_used * 0.0001 > min_brlen ? blen_used * 0.0001 : min_brlen * 2.0); 
 
 	MakeAllNodesDirty();
 	Score();
 	FLOAT_TYPE start=lnL;
 
-/*	ofstream deb;
-	deb.open("clas.log");
-	OutputNthClaAcrossTree(deb, root, 274);
-	deb.close();
-*/
-	SetBranchLength(nd, blen_used + incr);
-//	MakeAllNodesDirty();
-	Score();
+	outman.UserMessageNoCR("initIncr %.3e ", incr);
+	do{
+		SetBranchLength(nd, blen_used + incr);
+	//	MakeAllNodesDirty();
+		Score();
+		if(fabs(start - lnL) < -expectedPrecision * lnL){
+			incr *= 2.0;
+			if(blen_used - incr < 2.0 * min_brlen){
+				incr = min_brlen;
+				break;
+				}
+			}
+		else 
+			break;
+		}while(1);
 
-/*	deb.open("clas.log");
-	OutputNthClaAcrossTree(deb, root, 274);
-	deb.close();
-*/
+
 	FLOAT_TYPE empD11= (lnL - start)/incr;
 
-//	SetBranchLength(nd, prevDLen);
-//	Score();
-
 	SetBranchLength(nd, blen_used - incr);
-//	MakeAllNodesDirty();
 	Score();
 
-/*
-	deb.open("clas.log");
-	OutputNthClaAcrossTree(deb, root, 274);
-	deb.close();
-*/
 	FLOAT_TYPE empD12 = (lnL - start)/-incr;
 
 	D1=(empD11+empD12)*.5;
 	D2=(empD11-empD12)/incr;
 
 	SetBranchLength(nd, start_blen);
-//	MakeAllNodesDirty();
 	lnL = start;
 	}
 
@@ -1638,17 +1637,6 @@ if(nd->nodeNum == 8){
 		d1=derivs.first;
 		d2=derivs.second;
 
-#ifdef OPT_DEBUG
-		FLOAT_TYPE empD1, empD2;
-//		if(nd->nodeNum == 67 && nd->anc->nodeNum==96){// && nd->anc->nodeNum==12 && nd->next != NULL && nd->next->nodeNum==10){
-//			SetBranchLength(nd, 0.01);
-//			CalcEmpiricalDerivatives(nd, empD1, empD2);
-//			opt << empD1 << "\t" << empD2 << "\t" << nd->dlen + (-empD1/empD2) << "\t";
-//			d1 = empD1;
-//			d2 = empD2;
-//			}
-#endif
-
 		estDeltaNR=-d1/d2;
 		//estimated change in score by a Taylor series
 		estScoreDelta = d1*estDeltaNR + (d2 * estDeltaNR * estDeltaNR * ZERO_POINT_FIVE);
@@ -1659,6 +1647,21 @@ if(nd->nodeNum == 8){
 														#ifdef OPT_DEBUG
 														opt << nd->dlen << "\t" << lnL << "\t" << d1 << "\t" << d2 << "\t" << estScoreDelta << "\t";
 														#endif
+#if defined(CALC_EMPIRICAL_DERIVS) || defined(USE_EMPIRICAL_DERIVS)
+                FLOAT_TYPE empD1, empD2;
+                CalcEmpiricalDerivatives(nd, empD1, empD2);
+				if(empD1/d1 < 0.0){
+					outman.UserMessage("diff D1 signs!");
+					}
+#ifdef OPT_DEBUG
+                opt << empD1 << "\t" << empD1/d1 << "\t" << empD2 << "\t" << empD2/d2 << "\t" << nd->dlen + (-empD1/empD2) << "\t";
+#endif
+#ifdef USE_EMPIRICAL_DERIVS
+                d1 = empD1;
+                d2 = empD2;
+#endif
+#endif
+										
 		FLOAT_TYPE abs_d1 = fabs(d1);
 		if (d2 >= ZERO_POINT_ZERO){//curvature is wrong for NR use
 			//this does NOT only happen when the peak is at the min, as I used to think
