@@ -1182,6 +1182,10 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
 		//DEBUG
 		outman.DebugMessage("L\t%f\tD1\t%f\tD2\t%f", results.lnL, results.d1, results.d2);
+#ifdef TERMINATE_AFTER_SCORE
+		throw ErrorException("TERMINATING AFTER ONE SCORE");
+#endif
+
 #endif
 		}
 	return results;

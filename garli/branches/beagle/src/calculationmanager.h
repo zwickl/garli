@@ -867,7 +867,8 @@ public:
 		if(gpu){//assuming that all GPU is SP for now
 			gpuBeagle = true;
 			singlePrecBeagle = true;
-			rescaleBeagle = true;
+			//DEBUG - should eventually force rescaling with gpu, but don't for debugging purposes
+			//rescaleBeagle = true;
 			}
 		if(singlePrec){
 			singlePrecBeagle = true;
