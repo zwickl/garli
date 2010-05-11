@@ -1004,7 +1004,7 @@ void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &th
 		*deb << "send p " << theIndex << "\n";
 		pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, thePMat);
 #endif
-		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle(theIndex), **thePMat);
+		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle(theIndex), **thePMat, 1.0);
 
 #ifdef OUTPUT_PMATS
 		if(!gpuBeagle){
@@ -1019,8 +1019,8 @@ void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &th
 			*deb << "send D2 " << theIndex << "\n";
 			pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, theD2Mat);
 #endif
-			beagleSetTransitionMatrix(beagleInst, D1MatIndexForBeagle(theIndex), **theD1Mat);
-			beagleSetTransitionMatrix(beagleInst, D2MatIndexForBeagle(theIndex), **theD2Mat);
+			beagleSetTransitionMatrix(beagleInst, D1MatIndexForBeagle(theIndex), **theD1Mat, 0.0);
+			beagleSetTransitionMatrix(beagleInst, D2MatIndexForBeagle(theIndex), **theD2Mat, 0.0);
 
 #ifdef OUTPUT_PMATS
 			if(!gpuBeagle){
