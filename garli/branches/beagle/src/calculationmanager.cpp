@@ -249,13 +249,13 @@ void CalculationManager::SendTipDataToBeagle(){
 	int nstates = data->NStates();
 	for(int t = 0;t < data->NTax();t++){
 		bool partialAmbig = data->TaxonHasPartialAmbig(t);
-		outman.DebugMessageNoCR("tax %d ", t);
+		outman.DebugMessageNoCR("t %d ", t);
 
 		const unsigned char *dataString = data->GetRow(t);
 		if(partialAmbig){
 			//ambiguity if currently for nuc only (all versions, not just beagle)
 			assert(nstates == 4);
-			outman.DebugMessage("(some ambiguity)");
+			outman.DebugMessage("(some ambig)");
 			vector<double> tipPartial;
 			for(int c = 0;c < data->NChar();c++){
 				for(int s = 0;s < nstates;s++){
@@ -267,7 +267,7 @@ void CalculationManager::SendTipDataToBeagle(){
 				"beagleSetTipStates");
 			}
 		else{
-			outman.DebugMessage("(no ambiguity)");
+			outman.DebugMessage("(no ambig)");
 			vector<int> dat;
 			
 			for(int c = 0;c < data->NChar();c++){
@@ -424,14 +424,14 @@ void CalculationManager::OutputOperationsSummary() const{
 				}
 			}
 		}
-	outman.DebugMessage("REQ OPS:\t%d opSets\t%d pmats\t%d clas", numSets, numPmats, numClas);
+	outman.DebugMessage("%d sets\t%d mats\t%d clas", numSets, numPmats, numClas);
 	}
 
 ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *effectiveRoot, bool calcDerivs){
 	if(calcDerivs)
-		outman.DebugMessage("#\nCALC D ROOT=%d", effectiveRoot->nodeNum);
+		outman.DebugMessage("#\nCALC D RT=%d", effectiveRoot->nodeNum);
 	else
-		outman.DebugMessage("#\nCALC L ROOT=%d", effectiveRoot->nodeNum);
+		outman.DebugMessage("#\nCALC L RT=%d", effectiveRoot->nodeNum);
 
 	//this collects all of the necessary computation details and stores them in 
 	//the operationSetQueue and scorOps list
@@ -778,8 +778,9 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 	assert(0);
 #endif
 
-//	outman.DebugMessage("**ENTERING PERFORM PMAT");
-//	outman.DebugMessage("SETTING EIGEN");
+#ifdef OUTPUT_OTHER_BEAGLE
+	outman.DebugMessage("SETTING EIGEN");
+#endif
 	//DEBUG - currently just using a single eigen index and sending it every time
 	int eigenIndex = 0;
 	
@@ -801,7 +802,9 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 	vector<double> categRates;
 	pmatMan->GetCategoryRatesForBeagle(theOp->destTransMatIndex, categRates);
 
-//	outman.DebugMessage("SETTING CATEGORY RATES");
+#ifdef OUTPUT_OTHER_BEAGLE
+	outman.DebugMessage("SETTING CATEGORY RATES");
+#endif
 	if(categRates.size() > 0){
 		CheckBeagleReturnValue(
 			beagleSetCategoryRates(beagleInst,
@@ -818,8 +821,11 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 	double edgeLens[1] = {pmatMan->GetEdgelen(theOp->destTransMatIndex)};
 	int count = 1;
 	
-	//outman.DebugMessageNoCR("UPDATING TRANS MAT ");
-	//outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
+#ifdef OUTPUT_OTHER_BEAGLE
+	outman.DebugMessageNoCR("UPDATING MAT ");
+	outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
+#endif
+
 	CheckBeagleReturnValue(
 		beagleUpdateTransitionMatrices(
 			beagleInst,
@@ -914,8 +920,10 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	int count = pmatInd.size();
 	bool calcDerivs = theOps.begin()->calcDerivs;
 
-	//outman.DebugMessageNoCR("UPDATING TRANS MAT ");
-	//outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
+#ifdef OUTPUT_OTHER_BEAGLE
+	outman.DebugMessageNoCR("UPDATING TRANS MAT ");
+	outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
+#endif
 	CheckBeagleReturnValue(
 		beagleUpdateTransitionMatrices(
 			beagleInst,
@@ -1058,7 +1066,9 @@ void CalculationManager::OutputBeagleTransMat(int beagleIndex){
 //required partials have been calculated as well as the transmats necessary for this operation
 ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *theOp){
 	ScoreSet results = {0.0, 0.0, 0.0};
-	//outman.DebugMessage("*ENTERING PERFORM SCORING");
+#ifdef OUTPUT_OTHER_BEAGLE
+	outman.DebugMessage("ENTER PERF SCR");
+#endif
 
 	if(!useBeagle){
 		results.lnL = GetScorePartialInternalRateHet(claMan->GetCla(theOp->childClaIndex1), 
@@ -1123,9 +1133,11 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		int	d1MatIndeces[1] = {D1MatIndexForBeagle(theOp->transMatIndex)};
 		int	d2MatIndeces[1] = {D2MatIndexForBeagle(theOp->transMatIndex)};
 
+#ifdef OUTPUT_OTHER_BEAGLE
 		outman.DebugMessageNoCR("Scr:\t");
 		outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", buffer2[0], theOp->childClaIndex2, buffer1[0], theOp->childClaIndex1);
 		outman.DebugMessage("\tP\t%d (%d)", pmatIndeces[0], theOp->transMatIndex);
+#endif
 
 		int count = 1;
 
@@ -1180,8 +1192,9 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		assert(results.lnL < 0.0 && results.lnL > -10.0e10);
 		assert(results.d1 < 10.0e15 && results.d1 > -10.0e15);
 		assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
-		//DEBUG
+#ifdef OUTPUT_OTHER_BEAGLE
 		outman.DebugMessage("L\t%f\tD1\t%f\tD2\t%f", results.lnL, results.d1, results.d2);
+#endif
 #ifdef TERMINATE_AFTER_SCORE
 		throw ErrorException("TERMINATING AFTER ONE SCORE");
 #endif
