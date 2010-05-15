@@ -1193,10 +1193,10 @@ void Population::SeedPopulationWithStartingTree(int rep){
 
 	indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->mod=indiv[0].mod;
-	indiv[0].CalcFitness(0);
 
 	//check the current likelihood now to know how accurate we can expect them to be later
 #ifdef SINGLE_PRECISION_FLOATS
+	assert(0);
 	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
 #else
 
@@ -1213,7 +1213,9 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		Tree::expectedPrecision = max(DBL_EPSILON * 10.0, 1e-12);
 #endif
 #endif
-	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
+	
+	indiv[0].CalcFitness(0);
+	outman.UserMessage("approx likelihood precision = +/- %.4e", Tree::expectedPrecision * -indiv[0].Fitness());
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	if(indiv[0].mod->NumMutatableParams() == 0) {

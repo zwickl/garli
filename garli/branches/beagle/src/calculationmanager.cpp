@@ -921,8 +921,8 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	bool calcDerivs = theOps.begin()->calcDerivs;
 
 #ifdef OUTPUT_OTHER_BEAGLE
-	outman.DebugMessageNoCR("UPDATING TRANS MAT ");
-	outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
+	outman.DebugMessageNoCR("UPDATING TRANS MATS ");
+//	outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
 #endif
 	CheckBeagleReturnValue(
 		beagleUpdateTransitionMatrices(
