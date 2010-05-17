@@ -1725,9 +1725,18 @@ void Population::Run(){
 					outman.UserMessage("\t\t\toptimizing flex rates:%.4f -> %.4f", before, bestFitness);
 					}
 				}
-
-			if((reduced && FloatingPointEquals(adap->branchOptPrecision, conf->minOptPrec, 1.0e-8))
-				|| (modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix()) && (gen - lastPrecisionReduction >= (adap->intervalLength * 50)) && (gen % (adap->intervalLength * 50) == 0) && (FloatingPointEquals(adap->branchOptPrecision, conf->minOptPrec, 1.0e-8)))
+			//if this is an estimated AA rate matrix
+			//and 
+			//	we just reached min prec
+			//	or
+			//	it has been a while since doing so 
+			//		and this is a nice round # gen
+			//		and we're at min prec
+			if((modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix()) 
+				&& ( reduced && FloatingPointEquals(adap->branchOptPrecision, conf->minOptPrec, 1.0e-8)
+				|| ( (gen - lastPrecisionReduction >= (adap->intervalLength * 50) 
+					&& (gen % (adap->intervalLength * 50) == 0))
+					&& FloatingPointEquals(adap->branchOptPrecision, conf->minOptPrec, 1.0e-8))))
 				{
 				FLOAT_TYPE before = bestFitness;
 				indiv[bestIndiv].treeStruct->OptimizeRelativeNucRates(adap->branchOptPrecision);
