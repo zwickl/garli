@@ -1201,15 +1201,18 @@ void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLO
 
 	vector<double> realMults;
 	int realNumRates = NRateCats();
+	for(int rate=0;rate<NRateCats();rate++)
+		realMults.push_back(rateMults[rate]);
+	//put the pinv class after the others will make this easier on the GARLI side
 #ifndef FAKE_PINV_MATS
 	if(NoPinvInModel() == false){
 		realNumRates += 1;
 		realMults.push_back(0.0);
+		for(int rate=0;rate<NRateCats();rate++)
+			realMults[rate] /= (1.0-*propInvar);
 		}
 #endif
-	for(int rate=0;rate<NRateCats();rate++)
-		realMults.push_back(rateMults[rate]);
-	
+
 	//DEBUG
 	//for(int rate=0;rate<NRateCats();rate++){
 	for(int rate=0;rate<realNumRates;rate++){
@@ -1302,7 +1305,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 	if(dlen < 0.011 && dlen > 0.009)
 		SetOmega(0, before);
 */
-	vector<double> realMults;
+/*	vector<double> realMults;
 	int realNumRates = this->NumRateCatsForBeagle();
 
 	for(int rate=0;rate<NRateCats();rate++)
@@ -1311,6 +1314,21 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 	//pinv class with rate zero comes AFTER the others
 	if(NoPinvInModel() == false)
 		realMults.push_back(0.0);
+*/
+	//from FillDerivs
+	vector<double> realMults;
+	int realNumRates = NRateCats();
+	for(int rate=0;rate<NRateCats();rate++)
+		realMults.push_back(rateMults[rate]);
+	//put the pinv class after the others will make this easier on the GARLI side
+#ifndef FAKE_PINV_MATS
+	if(NoPinvInModel() == false){
+		realNumRates += 1;
+		realMults.push_back(0.0);
+		for(int rate=0;rate<NRateCats();rate++)
+			realMults[rate] /= (1.0-*propInvar);
+		}
+#endif
 
 	for(int rate=0;rate<realNumRates;rate++){
 	//for(int rate=0;rate<NRateCats();rate++){
