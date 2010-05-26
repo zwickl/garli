@@ -130,28 +130,31 @@ Model::~Model(){
 
 void Model::AllocateEigenVariables(){
 #ifndef ALIGN_MODEL
+	//need extra for beagle if pinv.  should remove this allocation in non-beagle mode, but shouldn't cause problems
+	int realNumRates = NumRateCatsForBeagle();
+
 	//a bunch of allocation here for all of the qmatrix->eigenvector->pmatrix related variables
 	eigvalsimag=new MODEL_FLOAT[nstates];
 	iwork=new int[nstates];
 	work=new MODEL_FLOAT[nstates];
 	col=new MODEL_FLOAT[nstates];
 	indx=new int[nstates];
-	EigValexp=new MODEL_FLOAT[nstates*NRateCats()];
-	EigValderiv=new MODEL_FLOAT[nstates*NRateCats()];
-	EigValderiv2=new MODEL_FLOAT[nstates*NRateCats()];
+	EigValexp=new MODEL_FLOAT[nstates*realNumRates];
+	EigValderiv=new MODEL_FLOAT[nstates*realNumRates];
+	EigValderiv2=new MODEL_FLOAT[nstates*realNumRates];
 
 	//create the matrix for the eigenvectors
-	eigvecs=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
+	eigvecs=New3DArray<MODEL_FLOAT>(realNumRates, nstates, nstates);
 
 	//create a temporary matrix to hold the eigenvectors that will be destroyed during the invertization
 	teigvecs=New2DArray<MODEL_FLOAT>(nstates,nstates);
 
 	//create the matrix for the inverse eigenvectors
-	inveigvecs=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);	
+	inveigvecs=New3DArray<MODEL_FLOAT>(realNumRates, nstates, nstates);	
 
 	//allocate the pmats
-	pmat1=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
-	pmat2=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
+	pmat1=New3DArray<MODEL_FLOAT>(realNumRates, nstates, nstates);
+	pmat2=New3DArray<MODEL_FLOAT>(realNumRates, nstates, nstates);
 	
 #ifdef SINGLE_PRECISION_FLOATS
 	//allocate single precision versions of the matrices
@@ -1193,7 +1196,25 @@ void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLO
 	if(eigenDirty==true)
 		CalcEigenStuff();
 
-	for(int rate=0;rate<NRateCats();rate++){
+	//this gets tricky, because to do +I and pass pmats/dmats we need to create mats for the 0 rate class,
+	//which Garli does not usually do.
+
+	vector<double> realMults;
+	int realNumRates = NRateCats();
+#ifndef FAKE_PINV_MATS
+	if(NoPinvInModel() == false){
+		realNumRates += 1;
+		realMults.push_back(0.0);
+		}
+#endif
+	for(int rate=0;rate<NRateCats();rate++)
+		realMults.push_back(rateMults[rate]);
+	
+	//DEBUG
+	//for(int rate=0;rate<NRateCats();rate++){
+	for(int rate=0;rate<realNumRates;rate++){
+		//DEBUG
+		assert(rate < realMults.size());
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
 			MODEL_FLOAT scaledEigVal;
@@ -1201,7 +1222,8 @@ void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLO
 				//The blen multiplier should be taken care of in CalcEigenStuff, including the effect of pinv
 				//Then blen_multiplier should have been set to 1.0.  This was added for beagle, where prescaling
 				//everything made more sense.
-				scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+				//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+				scaledEigVal = eigvals[0][k]*realMults[rate]*blen_multiplier[0];	
 
 /*				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
@@ -1210,6 +1232,7 @@ void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLO
 					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
 */				}
 			else{
+				assert(NoPinvInModel());
 				scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
 				}
 			EigValexp[k+rateOffset] = exp(scaledEigVal * dlen);
@@ -1220,7 +1243,7 @@ void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLO
 
 	if(NStates() > 59){//using precalced eigvecs X inveigvecs (c_ijk) is less efficient for codon models, and I
 					//don't want a conditional in the inner loop
-		for(int rate=0;rate<NRateCats();rate++){
+		for(int rate=0;rate<realNumRates;rate++){
 			int model=0;
 			if(modSpec.IsNonsynonymousRateHet())
 				model = rate;
@@ -1244,7 +1267,7 @@ void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLO
 			}
 		}
 	else{ // aminoacids or nucleotides
-		for(int rate=0;rate<NRateCats();rate++){
+		for(int rate=0;rate<realNumRates;rate++){
 			const unsigned rateOffset = nstates*rate;
 			for (int i = 0; i < nstates; i++){
 				for (int j = 0; j < nstates; j++){
@@ -1279,7 +1302,18 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 	if(dlen < 0.011 && dlen > 0.009)
 		SetOmega(0, before);
 */
-	for(int rate=0;rate<NRateCats();rate++){
+	vector<double> realMults;
+	int realNumRates = this->NumRateCatsForBeagle();
+
+	for(int rate=0;rate<NRateCats();rate++)
+		realMults.push_back(rateMults[rate]/(ONE_POINT_ZERO-*propInvar));
+
+	//pinv class with rate zero comes AFTER the others
+	if(NoPinvInModel() == false)
+		realMults.push_back(0.0);
+
+	for(int rate=0;rate<realNumRates;rate++){
+	//for(int rate=0;rate<NRateCats();rate++){
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
 			MODEL_FLOAT scaledEigVal;
@@ -1287,7 +1321,8 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 				//The blen multiplier should be taken care of in CalcEigenStuff, including the effect of pinv
 				//Then blen_multiplier should have been set to 1.0.  This was added for beagle, where prescaling
 				//everything made more sense.
-				scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+				scaledEigVal = eigvals[0][k]*realMults[rate]*blen_multiplier[0];	
+				//scaledEigVal = eigvals[0][k]*realMults[rate]*blen_multiplier[0];	
 
 /*				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
@@ -1303,7 +1338,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 		}
 
 	if(NStates() == 20){
-		for(int rate=0;rate<NRateCats();rate++){
+		for(int rate=0;rate<realNumRates;rate++){
 			int model=0;
 			const unsigned rateOffset = 20*rate;
 			for (int i = 0; i < 20; i++){
@@ -1319,7 +1354,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 			}
 		}
 	else if(NStates()>59){
-		for(int rate=0;rate<NRateCats();rate++){
+		for(int rate=0;rate<realNumRates;rate++){
 			int model=0;
 			if(modSpec.IsNonsynonymousRateHet())
 				model = rate;
@@ -1365,7 +1400,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 			}
 		}
 	else{
-		for(int rate=0;rate<NRateCats();rate++){
+		for(int rate=0;rate<realNumRates;rate++){
 			int model=0;
 			const unsigned rateOffset = 4*rate;
 			for (int i = 0; i < 4; i++){

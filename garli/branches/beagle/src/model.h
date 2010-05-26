@@ -958,13 +958,16 @@ class Model{
 		//a given model's.  The last send could have been a diff indiv with diff values
 //		if(!ratesChanged)
 //			return;
-		//the only real trick here is that pinv will be include as a separate category of rate zero
-		if(NoPinvInModel() == false){
-			r.push_back(0.0);
-			}
+
 		//codon NS rate variation will be taken care of here, and all of the rateMults will be 1.0
 		for(int rate = 0;rate < NRateCats();rate++){
-			r.push_back(rateMults[rate]);
+			r.push_back(rateMults[rate] / (ONE_POINT_ZERO - *propInvar));
+			}
+
+		//the only real trick here is that pinv will be include as a separate category of rate zero
+		//making it AFTER the others, so having it won't screw up indexing in non-beagle mode
+		if(NoPinvInModel() == false){
+			r.push_back(0.0);
 			}
 		ratesChanged = false;
 		}
@@ -976,16 +979,18 @@ class Model{
 		//a given model's.  The last send could have been a diff indiv with diff values
 //		if(!rateProbsChanged)
 //			return;
-		//the only real trick here is that pinv will be include as a separate category of rate zero
-		if(NoPinvInModel() == false){
-			p.push_back(*propInvar);
-			}
 		
 		for(int rate = 0;rate < NRateCats();rate++){
 			if(modSpec.IsCodon())
 				p.push_back(*omegaProbs[rate]);
 			else
 				p.push_back(rateProbs[rate]);
+			}
+
+		//the only real trick here is that pinv will be include as a separate category of rate zero
+		//making it AFTER the others, so having it won't screw up indexing in non-beagle mode
+		if(NoPinvInModel() == false){
+			p.push_back(*propInvar);
 			}
 		rateProbsChanged = false;
 		}
