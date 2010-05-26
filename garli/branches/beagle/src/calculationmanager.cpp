@@ -33,6 +33,10 @@ PmatManager *NodeClaManager::pmatMan = NULL;
 
 const char *AdvanceDataPointer(const char *arr, int num);
 
+//#undef FULL_BEAGLE_DEBUG
+//#undef OUTPUT_OTHER_BEAGLE
+//#undef OUTPUT_PARTIALS
+//#undef OUTPUT_BEAGLE_SITELIKES
 
 #ifdef FULL_BEAGLE_DEBUG
 	#define	OUTPUT_PMATS
@@ -172,11 +176,15 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	int compactCount = normalTips;
 
 	int eigCount = nClas;
-	int matrixCount = (nClas * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
+	//this is a gross overestimate of how many matrices are needed, but haven't worked out recycling quite yet for mats
+	int matrixCount = (nHolders * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
+	//int matrixCount = (nClas * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
 	//DEBUG - trying scaling
 	//try one scaler per cla, as in normal garli.  These are doubles rather than ints though, so larger.
 	//scaler for a given cla will share same index, and will be cumulative, as mine are now
 	//add one for a destinationScaleWrite which will always be the last and will be used in all calls for scratch
+	//Note that although there is a 1to1 correspondence between the cla and scaler indeces, this is NOT true for what is
+	//passed to beagle, so beagle partial index = my partial index + #tips, beagle scaler = my scaler
 	int scalerCount = (rescaleBeagle ? nClas + 1 : 0);
 	int resourceList[1] = {NULL};
 	int resourceListCount = 0;
@@ -304,7 +312,7 @@ void CalculationManager::DetermineRequiredOperations(const TreeNode *effectiveRo
 	int dest, end1, end2, finalPmat;
 	dest = end1 = end2 = finalPmat = -1;
 	if(! derivatives){
-		//here we are calculating the lnL only, and don't case which branch it is integrated on.  pick an internal one
+		//here we are calculating the lnL only, and don't care which branch it is integrated on.  pick an internal one
 		if(effectiveRoot->left->IsInternal()){
 			end1 = effectiveRoot->myMan.ULHolderIndex;
 			end2 = effectiveRoot->left->myMan.downHolderIndex;
@@ -374,7 +382,7 @@ void CalculationManager::DetermineRequiredOperations(const TreeNode *effectiveRo
 	list<NodeOperation>::iterator end = nodeOps.begin();
 	while(end != nodeOps.end()){
 		int num = 0;
-		while(end != nodeOps.end() && end->claOp.depLevel == lvl){
+		while(end != nodeOps.end() && end->claOp.opDepLevel == lvl){
 			end++;
 			num++;
 			}
@@ -384,6 +392,7 @@ void CalculationManager::DetermineRequiredOperations(const TreeNode *effectiveRo
 			thisSet.pmatOps.push_back((*nit).transOp1);
 			thisSet.pmatOps.push_back((*nit).transOp2);
 			}
+		thisSet.opSetDepLevel = lvl;
 		operationSetQueue.push_back(thisSet);
 		start = end;
 		lvl++;
@@ -402,7 +411,10 @@ void CalculationManager::DetermineRequiredOperations(const TreeNode *effectiveRo
 	}
 
 void CalculationManager::OutputOperationsSummary() const{
+	//DEBUG
+	//bool outputFullSummary = true;
 	bool outputFullSummary = false;
+
 	int numPmats = 0, numClas = 0, numSets = 0;
 	for(list<BlockingOperationsSet>::const_iterator it = operationSetQueue.begin();it != operationSetQueue.end();it++){
 		numSets++;
@@ -411,16 +423,19 @@ void CalculationManager::OutputOperationsSummary() const{
 		for(list<ClaOperation>::const_iterator cit = (*it).claOps.begin();cit != (*it).claOps.end();cit++){
 			numClas++;
 			if(outputFullSummary){
-				outman.DebugMessage("D\t%d\tC\t%d\t%f\t%d\t%f M1 %d %d M2 %d %d", 
-					(*cit).destCLAIndex, 
-					(*cit).childCLAIndex1, 
+				//DEBUG
+				int D=(*cit).destClaIndex;
+				int C1=(*cit).childClaIndex1;
+				int C2=(*cit).childClaIndex2;
+				outman.DebugMessage("D\t%d\t%d\tC\t%d\t%f\t%d\t%f M1 %d M2 %d", 
+					(*cit).destClaIndex, 
+					(*cit).opDepLevel, 
+					(*cit).childClaIndex1, 
 					pmatMan->GetEdgelen((*cit).transMatIndex1), 
-					(*cit).childCLAIndex2, 
+					(*cit).childClaIndex2, 
 					pmatMan->GetEdgelen((*cit).transMatIndex2), 
 					(*cit).transMatIndex1,
-					pmatMan->GetModelForTransMatHolder((*cit).transMatIndex1), 
-					(*cit).transMatIndex2,
-					pmatMan->GetModelForTransMatHolder((*cit).transMatIndex2));
+					(*cit).transMatIndex2);
 				}
 			}
 		}
@@ -435,7 +450,9 @@ ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *e
 
 	//this collects all of the necessary computation details and stores them in 
 	//the operationSetQueue and scorOps list
+	//NOTE that any clas that are indentified as clean dependencies will be reserved here
 	DetermineRequiredOperations(effectiveRoot, calcDerivs);	
+
 	//list<BlockingOperationsSet> operationSetQueue;
 		//list claOps
 			//dest and child clas, transmat ind, deplevel
@@ -455,6 +472,8 @@ ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *e
 	ScoreSet values;
 	for(list<ScoringOperation>::iterator sit = scoreOps.begin() ; sit != scoreOps.end() ; sit++)
 		values = PerformScoringOperation(&(*sit));
+
+	ResetDepLevelsAndReservations();
 
 	operationSetQueue.clear();
 	scoreOps.clear();
@@ -483,16 +502,37 @@ void CalculationManager::UpdateAllConditionals(){
 	if(tops.size() > 0)
 		PerformTransMatOperationBatch(tops);
 
+	claMan->SetCurReclaimLevel(0);
+	list<BlockingOperationsSet>::const_iterator toFree = operationSetQueue.begin();
 	//Any transmats that need derivs will still be included in a blockingOpSet, so will get done here.  Otherwise
 	//no transmat calls will be done here because the ops were pulled out above to be done in one big batch
 	for(list<BlockingOperationsSet>::const_iterator it = operationSetQueue.begin();it != operationSetQueue.end();it++){
-//		for(list<TransMatOperation>::const_iterator pit = (*it).pmatOps.begin();pit != (*it).pmatOps.end();pit++)
-//			PerformTransMatOperation(&(*pit));
 		if((*it).pmatOps.size() > 0)
 			PerformTransMatOperationBatch((*it).pmatOps);
-		if((*it).claOps.size() > 0)
+		if((*it).claOps.size() > 0){
+			//this will reserve the DESTINATION clas. The child cla dependencies should already have
+			//been reserved if they are clas
+			ReserveNeededClas((*it).claOps);
 			PerformClaOperationBatch((*it).claOps);
+
+			int depLevel = (*it).opSetDepLevel;
+			int freeableDepLevel = depLevel - 1;
+			if(freeableDepLevel > 0){
+				//once we've got a few levels of clas done, unreserve the ones that are no longer direct dependencies
+				//and tell the cla man that clas of that dep level are ok to be recycled.  They will retain their
+				//dep levels for now
+				assert( ! ((*toFree).opSetDepLevel < freeableDepLevel));
+				claMan->SetCurReclaimLevel(freeableDepLevel);
+
+				if((*toFree).opSetDepLevel == freeableDepLevel){
+					UnreserveUnneededClas((*toFree).claOps);
+					toFree++;
+					}
+				}
+			}
 		}
+
+	claMan->SetCurReclaimLevel(-1);
 #else
 	//do the actual operations.  right now it is doing 2 pmat ops followed by the cla op that requires then and looping
 	//since there are enough pmats it would make more sense to put them into a single block to be done together
@@ -505,31 +545,100 @@ void CalculationManager::UpdateAllConditionals(){
 #endif
 	}
 
+void CalculationManager::ReserveNeededClas(const list<ClaOperation> &theOps){
+	for(list<ClaOperation>::const_iterator op = theOps.begin(); op != theOps.end() ; op++) 
+		claMan->ClaimClaFillIfNecessary((*op).destClaIndex, (*op).opDepLevel);
+	}
+
+void CalculationManager::UnreserveUnneededClas(const list<ClaOperation> &theOps){
+	for(list<ClaOperation>::const_iterator op = theOps.begin(); op != theOps.end() ; op++){
+		//I now think that this should ONLY be unreserving the deps, not the current dest
+		//claMan->RemoveTempReservation((*op).destClaIndex);
+
+		//unreseving the deps may be very redundant since they would be unreserved when they
+		//are the destClaIndex in the next step.  However, the tip-most dependenices 
+		//which might be clean clas cause reservations as well
+		if((*op).childClaIndex1 > -1)
+			claMan->RemoveTempReservation((*op).childClaIndex1);
+		if((*op).childClaIndex2 > -1) 
+			claMan->RemoveTempReservation((*op).childClaIndex2);
+		}
+	}
+
+//this version resets a single opset
+void CalculationManager::ResetDepLevels(const list<ClaOperation> &theOps){
+	for(list<ClaOperation>::const_iterator op = theOps.begin(); op != theOps.end() ; op++){
+		claMan->SetDepLevel((*op).destClaIndex, -1);
+		//unreseving the deps may be very redundant since they would be unreserved when they
+		//are the destClaIndex in the next step.  However, the tip-most dependenices 
+		//which might be clean clas cause reservations as well
+		if((*op).childClaIndex1 > -1)
+			claMan->SetDepLevel((*op).childClaIndex1, -1);
+		if((*op).childClaIndex2 > -1) 
+			claMan->SetDepLevel((*op).childClaIndex2, -1);
+		}
+	}
+
+//this version resets all ops in the queue
+void CalculationManager::ResetDepLevelsAndReservations(){
+	for(list<BlockingOperationsSet>::const_iterator set = operationSetQueue.begin(); set != operationSetQueue.end();set++){
+		for(list<ClaOperation>::const_iterator op = (*set).claOps.begin(); op != (*set).claOps.end() ; op++){
+			claMan->SetDepLevel((*op).destClaIndex, -1);
+			claMan->RemoveTempReservation((*op).destClaIndex);
+			if((*op).childClaIndex1 > -1){
+				claMan->SetDepLevel((*op).childClaIndex1, -1);
+				claMan->RemoveTempReservation((*op).childClaIndex1);
+				}
+			if((*op).childClaIndex2 > -1){
+				claMan->SetDepLevel((*op).childClaIndex2, -1);
+				claMan->RemoveTempReservation((*op).childClaIndex2);
+				}
+			}
+		}
+	for(list<ScoringOperation>::const_iterator sop = scoreOps.begin();sop != scoreOps.end();sop++){
+		if((*sop).childClaIndex1 > -1){
+			claMan->SetDepLevel((*sop).childClaIndex1, -1);
+			claMan->RemoveTempReservation((*sop).childClaIndex1);
+			}
+		if((*sop).childClaIndex2 > -1){
+			claMan->SetDepLevel((*sop).childClaIndex2, -1);
+			claMan->RemoveTempReservation((*sop).childClaIndex2);
+			}
+		}
+	}
+
+//this will recursively move over the tree from the root node, spreading until tips or clean clas
+//are hit.  If the endpoints are clas, they will be reserved now
 int CalculationManager::AccumulateOpsOnPath(int holderInd, list<NodeOperation> &nodeOps){
 	//it is ok to call this with a tip, because that tip could be a terminal branch that is having derivs
 	//calculated.  accumulate nothing in that case
 	if(holderInd < 0)
 		return 0;
 	CondLikeArrayHolder *holder = claMan->GetMutableHolder(holderInd);
-	if(!claMan->IsDirty(holderInd)){
+	if(!claMan->IsHolderDirty(holderInd)){
 		holder->depLevel = 0;
+		//this cla is now an initial dependency, so be sure that it doesn't get yoniked
+		//claMan->ReserveCla(holderInd, true);
+		claMan->ClaimClaFillIfNecessary(holderInd, 0);
 		return 0;
 		}
 
 	int depLevel1, depLevel2;
 	depLevel1 = depLevel2 = 0;
 	if(holder->holderDep1 >= 0){
-		if(claMan->IsDirty(holder->holderDep1))
+		depLevel1 = AccumulateOpsOnPath(holder->holderDep1, nodeOps);
+/*		if(claMan->IsHolderDirty(holder->holderDep1))
 			depLevel1 = AccumulateOpsOnPath(holder->holderDep1, nodeOps);
 		else
 			claMan->GetMutableHolder(holder->holderDep1)->depLevel = 0;
-		}
+*/		}
 	if(holder->holderDep2 >= 0){
-		if(claMan->IsDirty(holder->holderDep2))
+		depLevel2 = AccumulateOpsOnPath(holder->holderDep2, nodeOps);
+/*		if(claMan->IsHolderDirty(holder->holderDep2))
 			depLevel2 = AccumulateOpsOnPath(holder->holderDep2, nodeOps);
 		else
 			claMan->GetMutableHolder(holder->holderDep2)->depLevel = 0;
-		}
+*/		}
 	
 	holder->depLevel = max(depLevel1, depLevel2) + 1;
 
@@ -560,15 +669,15 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 	if(! useBeagle){
 		int term1 = 0;
 		int term2 = 0;
-		if(theOp->childCLAIndex1 < 0)
-			term1 = -theOp->childCLAIndex1;
+		if(theOp->childClaIndex1 < 0)
+			term1 = -theOp->childClaIndex1;
 	
-		if(theOp->childCLAIndex2 < 0)
-			term2 = -theOp->childCLAIndex2;
+		if(theOp->childClaIndex2 < 0)
+			term2 = -theOp->childClaIndex2;
 
 		if( term1 && term2 ){
 			CalcFullCLATerminalTerminal(
-				claMan->GetCla(theOp->destCLAIndex),
+				claMan->GetClaFillIfNecessary(theOp->destClaIndex),
 				//DEBUG - should probably figure some way not to do these static cassts
 				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term1-1),
 				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term2-1),
@@ -578,17 +687,17 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 			}
 		else if( ! (term1 || term2)){
 			CalcFullClaInternalInternal(
-				claMan->GetCla(theOp->destCLAIndex),
-				claMan->GetCla(theOp->childCLAIndex1),
-				claMan->GetCla(theOp->childCLAIndex2),
+				claMan->GetClaFillIfNecessary(theOp->destClaIndex),
+				claMan->GetClaFillIfNecessary(theOp->childClaIndex1),
+				claMan->GetClaFillIfNecessary(theOp->childClaIndex2),
 				pmatMan->GetPmatArray(theOp->transMatIndex1),
 				pmatMan->GetPmatArray(theOp->transMatIndex2),
 				pmatMan->GetModelForTransMatHolder(theOp->transMatIndex1));
 			}
 		else if( term1 ){
 			this->CalcFullCLAInternalTerminal(
-				claMan->GetCla(theOp->destCLAIndex),
-				claMan->GetCla(theOp->childCLAIndex2),
+				claMan->GetClaFillIfNecessary(theOp->destClaIndex),
+				claMan->GetClaFillIfNecessary(theOp->childClaIndex2),
 				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term1-1),
 				pmatMan->GetPmatArray(theOp->transMatIndex2),
 				pmatMan->GetPmatArray(theOp->transMatIndex1),
@@ -597,8 +706,8 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 			}
 		else{
 			this->CalcFullCLAInternalTerminal(
-				claMan->GetCla(theOp->destCLAIndex),
-				claMan->GetCla(theOp->childCLAIndex1),
+				claMan->GetClaFillIfNecessary(theOp->destClaIndex),
+				claMan->GetClaFillIfNecessary(theOp->childClaIndex1),
 				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term2-1),
 				pmatMan->GetPmatArray(theOp->transMatIndex1),
 				pmatMan->GetPmatArray(theOp->transMatIndex2),
@@ -618,17 +727,17 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		int destinationScaleWrite = (rescaleBeagle ? claMan->NumClas() : BEAGLE_OP_NONE);
 		int	destinationScaleRead = BEAGLE_OP_NONE;
 
-		int operationTuple[7] = {PartialIndexForBeagle(theOp->destCLAIndex),
+		int operationTuple[7] = {PartialIndexForBeagle(theOp->destClaIndex),
                                 destinationScaleWrite,
                                 destinationScaleRead,
-								PartialIndexForBeagle(theOp->childCLAIndex1),
+								PartialIndexForBeagle(theOp->childClaIndex1),
  								PmatIndexForBeagle(theOp->transMatIndex1),
- 								PartialIndexForBeagle(theOp->childCLAIndex2),
+ 								PartialIndexForBeagle(theOp->childClaIndex2),
 								PmatIndexForBeagle(theOp->transMatIndex2)};
 
 		outman.DebugMessageNoCR("PARTS\t");
-		outman.DebugMessageNoCR("\tD\t%d (%d)", PartialIndexForBeagle(theOp->destCLAIndex), theOp->destCLAIndex);
-		outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", PartialIndexForBeagle(theOp->childCLAIndex1), theOp->childCLAIndex1, PartialIndexForBeagle(theOp->childCLAIndex2), theOp->childCLAIndex2);
+		outman.DebugMessageNoCR("\tD\t%d (%d)", PartialIndexForBeagle(theOp->destClaIndex), theOp->destClaIndex);
+		outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", PartialIndexForBeagle(theOp->childClaIndex1), theOp->childClaIndex1, PartialIndexForBeagle(theOp->childClaIndex2), theOp->childClaIndex2);
 		outman.DebugMessage("\tP\t%d (%d)\t%d (%d)", PmatIndexForBeagle(theOp->transMatIndex1), theOp->transMatIndex1, PmatIndexForBeagle(theOp->transMatIndex2), theOp->transMatIndex2);
 		
 		int instanceCount = 1;
@@ -638,8 +747,8 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		//and my negative (tip) corresponds to a NULL in beagle
 		int cumulativeScaleIndex = BEAGLE_OP_NONE;
 		if(rescaleBeagle){
-			cumulativeScaleIndex = theOp->destCLAIndex;
-			AccumulateRescalers(cumulativeScaleIndex, theOp->childCLAIndex1, theOp->childCLAIndex2);
+			cumulativeScaleIndex = theOp->destClaIndex;
+			AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
 			}
 
 		CheckBeagleReturnValue(
@@ -652,7 +761,7 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 
 		//to indicate that the partial is now clean, fill the holder that represents it, despite the fact that the memory there is never being used
 		//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
-		claMan->FillHolder(theOp->destCLAIndex, 0);
+		claMan->FillHolder(theOp->destClaIndex, 0);
 #endif
 		}
 	}
@@ -667,17 +776,22 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 
 	vector<int> tupleList;
 	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-		tupleList.push_back(PartialIndexForBeagle((*it).destCLAIndex));
+		//This is happening a level higher now
+		//this will fill the destination holder with a cla index if necessary
+		//claMan->ClaimClaFillIfNecessary((*it).destClaIndex, (*it).depLevel);
+
+
+		tupleList.push_back(PartialIndexForBeagle((*it).destClaIndex));
 		//if rescaling, for each partial op pass in an array to store the amount of rescaling
 		//at this node, in my case stored as logs
 		if(rescaleBeagle)
-			tupleList.push_back((*it).destCLAIndex);
+			tupleList.push_back(ScalerIndexForBeagle((*it).destClaIndex));
 		else 
 			tupleList.push_back(BEAGLE_OP_NONE);
         tupleList.push_back(destinationScaleRead);
-		tupleList.push_back(PartialIndexForBeagle((*it).childCLAIndex1));
+		tupleList.push_back(PartialIndexForBeagle((*it).childClaIndex1));
 		tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex1));
-		tupleList.push_back(PartialIndexForBeagle((*it).childCLAIndex2));
+		tupleList.push_back(PartialIndexForBeagle((*it).childClaIndex2));
 		tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex2));
 		}
 
@@ -704,7 +818,8 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 	int nstates = 4;
 	vector<double> outPartials( nstates * data->NChar() * pmatMan->GetNumRates());
 	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-		beagleGetPartials(beagleInst, PartialIndexForBeagle((*it).destCLAIndex), BEAGLE_OP_NONE, &outPartials[0]);
+		//could pass a scaler index here to have the values unscaled, I think
+		beagleGetPartials(beagleInst, PartialIndexForBeagle((*it).destClaIndex), BEAGLE_OP_NONE, &outPartials[0]);
 		for(int site = 0;site < data->NChar();site++){
 			part << site << "\t";
 			for(int rate = 0;rate < pmatMan->GetNumRates();rate++){
@@ -724,15 +839,19 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 
 	if(rescaleBeagle){
 		for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-			AccumulateRescalers((*it).destCLAIndex, (*it).childCLAIndex1, (*it).childCLAIndex2);
+			AccumulateRescalers(
+				(*it).destClaIndex, 
+				(*it).childClaIndex1, 
+				(*it).childClaIndex2);
 			}
 		}
-
+/*
 	//to indicate that the partial is now clean, fill the holder that represents it, despite the fact that the memory there is never being used
 	//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
 	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-		claMan->FillHolder((*it).destCLAIndex, 0);
+		claMan->FillHolder((*it).destClaIndex, 0);
 		}
+*/
 	}
 
 #ifdef USE_BEAGLE
@@ -741,26 +860,30 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 //the dest array will already have the rescaling done at this node included, so don't reset it
 void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int childIndex2){
 
+#ifdef OUTPUT_OTHER_BEAGLE
+	//DEBUG
+	//outman.DebugMessage("accum %d + %d = %d", childIndex1, childIndex2, destIndex);
+#endif
 #ifndef BATCHED_CALLS
 	//clear out the destination scaler first
 	CheckBeagleReturnValue(
 		beagleResetScaleFactors(beagleInst,
-			destIndex), 
+			ScalerIndexForBeagle(destIndex)), 
 		"beagleResetScaleFactors");
 #endif
 
 	vector<int> childScalers;
 	if( ! (childIndex1 < 0))
-		childScalers.push_back(childIndex1);
+		childScalers.push_back(ScalerIndexForBeagle(childIndex1));
 	if( ! (childIndex2 < 0))
-		childScalers.push_back(childIndex2);
+		childScalers.push_back(ScalerIndexForBeagle(childIndex2));
 
 	if(childScalers.size() > 0){
 		CheckBeagleReturnValue(
 			beagleAccumulateScaleFactors(beagleInst,
 				&(childScalers[0]),
 				childScalers.size(),
-				destIndex),
+				ScalerIndexForBeagle(destIndex)),
 			"beagleAccumulateScaleFactors");
 		}
 	}
@@ -921,7 +1044,7 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	bool calcDerivs = theOps.begin()->calcDerivs;
 
 #ifdef OUTPUT_OTHER_BEAGLE
-	outman.DebugMessageNoCR("UPDATING TRANS MATS ");
+	outman.DebugMessageNoCR("UPDATING TRANS MAT ");
 //	outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
 #endif
 	CheckBeagleReturnValue(
@@ -1067,12 +1190,12 @@ void CalculationManager::OutputBeagleTransMat(int beagleIndex){
 ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *theOp){
 	ScoreSet results = {0.0, 0.0, 0.0};
 #ifdef OUTPUT_OTHER_BEAGLE
-	outman.DebugMessage("ENTER PERF SCR");
+//	outman.DebugMessage("ENTER PERF SCR");
 #endif
 
 	if(!useBeagle){
-		results.lnL = GetScorePartialInternalRateHet(claMan->GetCla(theOp->childClaIndex1), 
-			claMan->GetCla(theOp->childClaIndex2), 
+		results.lnL = GetScorePartialInternalRateHet(claMan->GetClaFillIfNecessary(theOp->childClaIndex1), 
+			claMan->GetClaFillIfNecessary(theOp->childClaIndex2), 
 			pmatMan->GetPmatArray(theOp->transMatIndex),
 			pmatMan->GetModelForTransMatHolder(theOp->transMatIndex));
 		}
@@ -1084,10 +1207,11 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		pmatMan->GetModelForTransMatHolder(theOp->transMatIndex)->GetStateFreqs(&(freqs[0]));
 
 #ifdef OUTPUT_OTHER_BEAGLE
-		outman.DebugMessageNoCR("freqs sent\t");
+/*		outman.DebugMessageNoCR("freqs sent\t");
 		for(int i = 0; i < 4;i++)
 			outman.DebugMessageNoCR("%.6f\t", freqs[i]);
 		outman.DebugMessage("");
+		*/
 #endif
 		int freqIndex = 0;
 		CheckBeagleReturnValue(
@@ -1118,7 +1242,8 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 				"beagleSetCategoryWeights");
 			}
 
-		//the two children to be included
+		//the two children to be included- they should have been calculated and reserved
+		//earlier in UpdateClas
 		int buffer1[1] = {PartialIndexForBeagle(theOp->childClaIndex1)};
 		int buffer2[1] = {PartialIndexForBeagle(theOp->childClaIndex2)};
 		int numInput = 2;
@@ -1144,13 +1269,13 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		//accumulate rescaling factors of the two clas that are being combined (one might be a tip)
 		//For scale arrays my indexing scheme and Beagle's happen to be the same, and my negative (tip) corresponds to a NULL in beagle
 		//use this scratch index to hold the final accumulated scalers 
-		int cumulativeScaleIndex = BEAGLE_OP_NONE;
+		int cumulativeBeagleScaleIndex = BEAGLE_OP_NONE;
 		if(rescaleBeagle){
-			cumulativeScaleIndex = claMan->NumClas();
-			beagleResetScaleFactors(beagleInst, cumulativeScaleIndex);
+			cumulativeBeagleScaleIndex = ScalerIndexForBeagle(GARLI_FINAL_SCALER_INDEX);
+			beagleResetScaleFactors(beagleInst, cumulativeBeagleScaleIndex);
 			//add all of the rescaling up to the two involved children.  This will be passed to
 			//calcEdgeLike, which will give the final scores
-			AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
+			AccumulateRescalers(GARLI_FINAL_SCALER_INDEX, theOp->childClaIndex1, theOp->childClaIndex2);
 			}
 
 		CheckBeagleReturnValue(
@@ -1163,7 +1288,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 				(theOp->derivatives ? d2MatIndeces : NULL),
 				&weightIndex,
 				&freqIndex,
-				&cumulativeScaleIndex,
+				&cumulativeBeagleScaleIndex,
 				count,
 				&siteLikesOut[0],
 				(theOp->derivatives ? &siteD1Out[0] : NULL),

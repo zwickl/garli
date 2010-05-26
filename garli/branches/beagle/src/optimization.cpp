@@ -1259,7 +1259,7 @@ FLOAT_TYPE Tree::RecursivelyOptimizeBranches(TreeNode *nd, FLOAT_TYPE optPrecisi
 	if(nd->next!=NULL && dontGoNext==false){
 		if(nd->next->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranches(nd->next, optPrecision, subtreeNode, radius, false, 0, ignoreDelta);
 		}
-	if(memLevel > 1) RemoveTempClaReservations();
+	if(memLevel > 1 && !calcMan->useBeagle) RemoveTempClaReservations();
 	return scoreIncrease;
 	}
 
@@ -1297,7 +1297,9 @@ FLOAT_TYPE Tree::RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledF
 			else if(nd->next->next->alreadyOptimized == false) scoreIncrease += RecursivelyOptimizeBranches(nd->next->next, optPrecision, subtreeNode, radius-1, true, 0);
 			}
 		}
-	if(memLevel > 1) RemoveTempClaReservations();
+	//DEBUG - was this the whole problem?
+	//if(memLevel > 1) RemoveTempClaReservations();
+	if(memLevel > 1 && !calcMan->useBeagle) RemoveTempClaReservations();
 	return scoreIncrease;
 	}
 
@@ -1387,18 +1389,18 @@ FLOAT_TYPE Tree::BranchLike(TreeNode *optNode){
 	do{
 		try{
 			if(optNode->anc->left==optNode){
-				optNode->anc->claIndexDown = claMan->SetDirty(optNode->anc->claIndexDown);
-				optNode->anc->claIndexUR = claMan->SetDirty(optNode->anc->claIndexUR);
+				optNode->anc->claIndexDown = claMan->SetHolderDirty(optNode->anc->claIndexDown);
+				optNode->anc->claIndexUR = claMan->SetHolderDirty(optNode->anc->claIndexUR);
 				GetClaUpLeft(optNode->anc);
 				}
 			else if(optNode->anc->right==optNode){
-				optNode->anc->claIndexDown = claMan->SetDirty(optNode->anc->claIndexDown);
-				optNode->anc->claIndexUL = claMan->SetDirty(optNode->anc->claIndexUL);
+				optNode->anc->claIndexDown = claMan->SetHolderDirty(optNode->anc->claIndexDown);
+				optNode->anc->claIndexUL = claMan->SetHolderDirty(optNode->anc->claIndexUL);
 				GetClaUpRight(optNode->anc);
 				}
 			else {
-				optNode->anc->claIndexUL = claMan->SetDirty(optNode->anc->claIndexUL);
-				optNode->anc->claIndexUR = claMan->SetDirty(optNode->anc->claIndexUR);
+				optNode->anc->claIndexUL = claMan->SetHolderDirty(optNode->anc->claIndexUL);
+				optNode->anc->claIndexUR = claMan->SetHolderDirty(optNode->anc->claIndexUR);
 				GetClaDown(optNode->anc);
 				}
 

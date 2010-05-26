@@ -140,8 +140,8 @@ inline void TreeNode::CopyOneClaIndex(const TreeNode *from, ClaManager *claMan, 
 		}
 	else assert(0);
 	
-	claMan->DecrementCla(*indexT);
-	claMan->IncrementCla(*indexF);
+	claMan->DecrementHolder(*indexT);
+	claMan->IncrementHolder(*indexF);
 	*indexT=*indexF;
 	}
 
