@@ -240,6 +240,18 @@ void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationM
 			}
 		outman.UserMessage("\n#######################################################");
 		}
+//set the expected precision
+#define SAME_PRECISION
+
+#if defined(SAME_PRECISION) && defined(USE_BEAGLE){
+	//use the same tolerance, even in the double prec case
+	Tree::expectedPrecision = FLT_EPSILON * 10.0;
+#else
+	if(calcMan->useBeagle && calcMan->singlePrecBeagle)
+		Tree::expectedPrecision = FLT_EPSILON * 10.0;
+	else
+		Tree::expectedPrecision = max(DBL_EPSILON * 10.0, 1e-12);
+#endif
 	}
 
 //this assumes that a tree string has been passed in with *s pointing to the first char of a blen

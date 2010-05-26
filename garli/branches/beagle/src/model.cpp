@@ -28,6 +28,7 @@ using namespace std;
 #include "rng.h"
 
 #undef ALIGN_MODEL
+#define FAKE_PINV_MATS
 
 Profiler ProfCalcPmat("CalcPmat      ");
 Profiler ProfCalcEigen("CalcEigen     ");
@@ -1204,7 +1205,7 @@ void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLO
 	for(int rate=0;rate<NRateCats();rate++)
 		realMults.push_back(rateMults[rate]);
 	//put the pinv class after the others will make this easier on the GARLI side
-#ifndef FAKE_PINV_MATS
+#ifdef FAKE_PINV_MATS
 	if(NoPinvInModel() == false){
 		realNumRates += 1;
 		realMults.push_back(0.0);
@@ -1321,7 +1322,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 	for(int rate=0;rate<NRateCats();rate++)
 		realMults.push_back(rateMults[rate]);
 	//put the pinv class after the others will make this easier on the GARLI side
-#ifndef FAKE_PINV_MATS
+#ifdef FAKE_PINV_MATS
 	if(NoPinvInModel() == false){
 		realNumRates += 1;
 		realMults.push_back(0.0);

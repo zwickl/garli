@@ -817,8 +817,9 @@ void Population::RunTests(){
 	//this only really tests for major scoring problems in the optimization functions
 	scr = ind0->treeStruct->lnL;
 	ind0->treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-	assert(ind0->treeStruct->lnL >= scr - 1e-8);
-	assert(ind0->treeStruct->lnL * 2 < scr);
+	assert(FloatingPointEquals(ind0->treeStruct->lnL , scr, -scr * ind0->treeStruct->expectedPrecision));
+	//assert(ind0->treeStruct->lnL >= scr - 1e-8);
+	//assert(ind0->treeStruct->lnL * 2 < scr);
 
 #ifdef SINGLE_PRECISION_FLOATS
 	int sigFigs = ceil(log10(-ind0->treeStruct->lnL));
@@ -838,9 +839,9 @@ void Population::RunTests(){
 		assert(FloatingPointEquals(ind0->Fitness(), scr, eps));
 		}
 	#else
-	if(FloatingPointEquals(ind0->Fitness(), scr, 0.001) == false){
+	if(FloatingPointEquals(ind0->Fitness(), scr, -scr * ind0->treeStruct->expectedPrecision) == false){
 		outman.UserMessage("Failed rescaling test: freq %d=%f, freq 2=%f", r, scr, ind0->Fitness());
-		assert(FloatingPointEquals(ind0->Fitness(), scr, 0.001));
+		assert(FloatingPointEquals(ind0->Fitness(), scr, -scr * ind0->treeStruct->expectedPrecision));
 		}
 	#endif
 
@@ -1206,6 +1207,8 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
 #else
 
+	//this stuff no longer depends on the likelihood value, so moving to earlier, in Setup
+/*
 #define SAME_PRECISION
 
 #ifdef SAME_PRECISION
@@ -1218,10 +1221,11 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	else
 		Tree::expectedPrecision = max(DBL_EPSILON * 10.0, 1e-12);
 #endif
+*/
 #endif
 	
 	indiv[0].CalcFitness(0);
-	outman.UserMessage("approx likelihood precision = +/- %.4e", Tree::expectedPrecision * -indiv[0].Fitness());
+	outman.UserMessage("approx likelihood precision = +/- %.2e lnL", Tree::expectedPrecision * -indiv[0].Fitness());
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	if(indiv[0].mod->NumMutatableParams() == 0) {
