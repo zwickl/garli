@@ -992,6 +992,12 @@ class Model{
 		if(NoPinvInModel() == false){
 			p.push_back(*propInvar);
 			}
+#ifndef NDEBUG
+		FLOAT_TYPE sum = 0.0;
+		for(vector<FLOAT_TYPE>::iterator it = p.begin(); it != p.end();it++)
+			sum += *it;
+		assert(FloatingPointEquals(sum, 1.0, 1e-6));
+#endif
 		rateProbsChanged = false;
 		}
 
