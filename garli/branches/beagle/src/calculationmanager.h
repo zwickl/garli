@@ -28,11 +28,15 @@
 #include "model.h"
 class TreeNode;
 
+#include "managedresource.h"
+
 struct ScoreSet{
 	MODEL_FLOAT lnL;
 	MODEL_FLOAT d1;
 	MODEL_FLOAT d2;
 	};
+
+#define GARLI_FINAL_SCALER_INDEX -9999999
 
 /*this is a generic matrix for use as a pmat or derivative matrix
 multiple matrices for rates or whatever appear one after another*/
@@ -66,8 +70,10 @@ class TransMatSet{
 	TransMat pmat;
 	TransMat d1mat;
 	TransMat d2mat;
+	int index;
 public:
-	void Allocate(int numStates, int numRates){
+	void Allocate(int i, int numStates, int numRates){
+		index = i;
 		pmat.Allocate(numStates, numRates);
 		d1mat.Allocate(numStates, numRates);
 		d2mat.Allocate(numStates, numRates);
@@ -84,6 +90,7 @@ public:
 		assert(d2mat.theMat);
 		return d2mat.theMat;
 		}
+	int Index(){return index;}
 	};
 
 /*analogous to a ClaHolder.  When a valid transmat set exists theMatSet will
@@ -158,7 +165,7 @@ public:
 		
 		for(int i = nMats - 1;i >= 0;i--){
 			allMatSets[i] = new TransMatSet;
-			allMatSets[i]->Allocate(nStates, nRates);
+			allMatSets[i]->Allocate(i, nStates, nRates);
 			transMatSetStack.push_back(allMatSets[i]);
 			}
 
@@ -169,8 +176,8 @@ public:
 		}
 
 	~PmatManager(){
-		transMatSetStack.clear();
-		holderStack.clear();
+		//transMatSetStack.clear();
+		//holderStack.clear();
 		if(allMatSets != NULL){
 			for(int i = 0;i < nMats;i++){
 				delete allMatSets[i];
@@ -286,7 +293,8 @@ public:
 	TransMatSet* AssignFreeTransMatSet(){
 		//TODO
 		//DEBUG need to figure out how this will work with beagle, or if recycling is even necessary with transmats
-		//if(claStack.empty() == true) RecycleClas();
+//		if(transMatSetStack.empty() == true) 
+//			RecycleTransMatSets();
 
 		assert(! transMatSetStack.empty());
 		TransMatSet *mat=transMatSetStack[transMatSetStack.size()-1];
@@ -323,7 +331,7 @@ public:
 			thisHold->numAssigned--; 
 			//TODO
 			//DEBUG - what happens with this and beagle
-			//this is important!
+			//this is important! (this was the old message that was here)
 //			holders[index].tempReserved=false;
 			}
 		}
@@ -357,10 +365,32 @@ public:
 			}
 		return index;
 		}
+
+	//This returns the pmat number of the cla that this holder points to 
+	//FOR BEAGLE PURPOSES.  It sees three matrices for each mat set here, so
+	//multiply accordingly
+	int GetPmatIndexForBeagle(int index) const{
+		assert(index > -1 && index < nHolders);
+		assert(holders[index].theMatSet != NULL);
+		return holders[index].theMatSet->Index() * 3;
+		}
+	
+	int GetD1MatIndexForBeagle(int index) const{
+		assert(index > -1 && index < nHolders);
+		assert(holders[index].theMatSet != NULL);
+		return holders[index].theMatSet->Index() * 3 + 1;
+		}
+
+	int GetD2MatIndexForBeagle(int index) const{
+		assert(index > -1 && index < nHolders);
+		assert(holders[index].theMatSet != NULL);
+		return holders[index].theMatSet->Index() * 3 + 2;
+		}
 	};
 
 class NodeClaManager{
 	static ClaManager *claMan;
+	static ClaManager2 *claMan2;
 	static PmatManager *pmatMan;
 
 public:
@@ -376,6 +406,10 @@ public:
 
 	static void SetClaManager(ClaManager *cMan) {
 		NodeClaManager::claMan = cMan;
+		}
+
+	static void SetClaManager2(ClaManager2 *cMan) {
+		NodeClaManager::claMan2 = cMan;
 		}
 
 	static void SetPmatManager(PmatManager *pMan) {
@@ -412,28 +446,28 @@ public:
 		assert(ULHolderIndex < 0);
 		assert(URHolderIndex < 0);
 		assert(transMatIndex < 0);
-		downHolderIndex = claMan->AssignClaHolder();
-		ULHolderIndex = claMan->AssignClaHolder();
-		URHolderIndex = claMan->AssignClaHolder();
+		downHolderIndex = claMan->AssignFreeClaHolder();
+		ULHolderIndex = claMan->AssignFreeClaHolder();
+		URHolderIndex = claMan->AssignFreeClaHolder();
 		transMatIndex = pmatMan->AssignTransMatHolder();
 		}
 
 	void SetDirtyUpRight(){
-		URHolderIndex = claMan->SetDirty(URHolderIndex);
+		URHolderIndex = claMan->SetHolderDirty(URHolderIndex);
 		}
 
 	void SetDirtyUpLeft(){
-		ULHolderIndex = claMan->SetDirty(ULHolderIndex);
+		ULHolderIndex = claMan->SetHolderDirty(ULHolderIndex);
 		}
 
 	void SetDirtyDown(){
-		downHolderIndex = claMan->SetDirty(downHolderIndex);
+		downHolderIndex = claMan->SetHolderDirty(downHolderIndex);
 		}
 
 	void SetDirtyAll(){
-		URHolderIndex = claMan->SetDirty(URHolderIndex);
-		ULHolderIndex = claMan->SetDirty(ULHolderIndex);
-		downHolderIndex = claMan->SetDirty(downHolderIndex);
+		URHolderIndex = claMan->SetHolderDirty(URHolderIndex);
+		ULHolderIndex = claMan->SetHolderDirty(ULHolderIndex);
+		downHolderIndex = claMan->SetHolderDirty(downHolderIndex);
 		SetTransMatDirty();
 		}
 
@@ -463,7 +497,7 @@ public:
 
 	inline CondLikeArray *GetClaDown(){
 		bool calc = true;
-		if(claMan->IsDirty(downHolderIndex)){
+		if(claMan->IsHolderDirty(downHolderIndex)){
 			if(calc==true){
 				assert(0);
 				//DEBUG - may have to nix this auto calc behavior when dirty with the new management system
@@ -474,12 +508,12 @@ public:
 			}
 
 	//	if(memLevel > 1) claMan->ReserveCla(downClaIndex);
-		return claMan->GetCla(downHolderIndex);
+		return claMan->GetClaFillIfNecessary(downHolderIndex);
 		}
 
 	inline CondLikeArray *GetClaUpLeft(){
 		bool calc = true;
-		if(claMan->IsDirty(ULHolderIndex)){
+		if(claMan->IsHolderDirty(ULHolderIndex)){
 			if(calc==true){
 				//DEBUG
 				assert(0);
@@ -491,12 +525,12 @@ public:
 
 	//	if(memLevel > 0) claMan->ReserveCla(nd->claIndexUL);
 
-		return claMan->GetCla(ULHolderIndex);
+		return claMan->GetClaFillIfNecessary(ULHolderIndex);
 		}
 
 	inline CondLikeArray *GetClaUpRight(){
 		bool calc = true;
-		if(claMan->IsDirty(URHolderIndex)){
+		if(claMan->IsHolderDirty(URHolderIndex)){
 			if(calc==true){
 				//DEBUG
 				assert(0);
@@ -506,20 +540,18 @@ public:
 			else claMan->FillHolder(ULHolderIndex, 2);
 			}
 	//	if(memLevel > 0) claMan->ReserveCla(nd->claIndexUR);
-		return claMan->GetCla(ULHolderIndex);
+		return claMan->GetClaFillIfNecessary(ULHolderIndex);
 		}
 
 	inline TransMatSet *GetTransMatSet() const {
 		return pmatMan->GetTransMatSet(transMatIndex);
 		}
 
-	void CopyHolderIndeces(const NodeClaManager *from, bool remove){
+	void CopyHolderIndecesInternal(const NodeClaManager *from, bool remove){
 		if(remove){
 			StripHolders();
 			}
-		else{
-			int poo=2;
-			}
+
 		downHolderIndex = from->downHolderIndex;
 		ULHolderIndex = from->ULHolderIndex;
 		URHolderIndex = from->URHolderIndex;
@@ -529,19 +561,28 @@ public:
 			assert(claMan->GetNumAssigned(downHolderIndex) > 0);
 			assert(claMan->GetNumAssigned(ULHolderIndex) > 0);
 			assert(claMan->GetNumAssigned(URHolderIndex) > 0);
-			claMan->IncrementCla(downHolderIndex);
-			claMan->IncrementCla(ULHolderIndex);
-			claMan->IncrementCla(URHolderIndex);
+			claMan->IncrementHolder(downHolderIndex);
+			claMan->IncrementHolder(ULHolderIndex);
+			claMan->IncrementHolder(URHolderIndex);
 			}
+		if(transMatIndex >= 0)
+			pmatMan->IncrementTransMatHolder(transMatIndex);
+		}
+
+	void CopyHolderIndecesTerminal(const NodeClaManager *from, bool remove){
+		if(remove){
+			StripHolders();
+			}
+		transMatIndex = from->transMatIndex;
 		if(transMatIndex >= 0)
 			pmatMan->IncrementTransMatHolder(transMatIndex);
 		}
 
 	void StripHolders(){
 		if(downHolderIndex >= 0){
-			claMan->DecrementCla(downHolderIndex);
-			claMan->DecrementCla(ULHolderIndex);
-			claMan->DecrementCla(URHolderIndex);
+			claMan->DecrementHolder(downHolderIndex);
+			claMan->DecrementHolder(ULHolderIndex);
+			claMan->DecrementHolder(URHolderIndex);
 
 			downHolderIndex = -1;
 			ULHolderIndex = -1;
@@ -559,30 +600,30 @@ public:
 
 class ClaOperation{
 	friend class CalculationManager;
-	friend class NodeOperation;
+	//friend class NodeOperation;
 public:
-	int destCLAIndex;
-	int childCLAIndex1;
-	int childCLAIndex2;
+	int destClaIndex;
+	int childClaIndex1;
+	int childClaIndex2;
 	int transMatIndex1;
 	int transMatIndex2;
-	int depLevel;
+	int opDepLevel;
 public:
-	ClaOperation(): destCLAIndex(-1), childCLAIndex1(-1), childCLAIndex2(-1), transMatIndex1(-1), transMatIndex2(-1), depLevel(-1){};	
-	ClaOperation(int d, int cla1, int cla2, int pmat1, int pmat2, int dLevel): destCLAIndex(d), childCLAIndex1(cla1), childCLAIndex2(cla2), transMatIndex1(pmat1), transMatIndex2(pmat2), depLevel(dLevel){};	
+	ClaOperation(): destClaIndex(-1), childClaIndex1(-1), childClaIndex2(-1), transMatIndex1(-1), transMatIndex2(-1), opDepLevel(-1){};	
+	ClaOperation(int d, int cla1, int cla2, int pmat1, int pmat2, int dLevel): destClaIndex(d), childClaIndex1(cla1), childClaIndex2(cla2), transMatIndex1(pmat1), transMatIndex2(pmat2), opDepLevel(dLevel){};	
 	ClaOperation(const ClaOperation &from){
-		destCLAIndex = from.destCLAIndex;
-		childCLAIndex1 = from.childCLAIndex1;
-		childCLAIndex2 = from.childCLAIndex2;
+		destClaIndex = from.destClaIndex;
+		childClaIndex1 = from.childClaIndex1;
+		childClaIndex2 = from.childClaIndex2;
 		transMatIndex1 = from.transMatIndex1;
 		transMatIndex2 = from.transMatIndex2;
-		depLevel = from.depLevel;
+		opDepLevel = from.opDepLevel;
 		}
 	};
 
 class TransMatOperation{
 	friend class CalculationManager;
-	friend class NodeOperation;
+	//friend class NodeOperation;
 	friend class BranchOperation;
 
 	int destTransMatIndex;
@@ -618,7 +659,7 @@ public:
 		transOp2 = t2;
 		}
 	bool operator <(const NodeOperation &rhs){
-		return claOp.depLevel < rhs.claOp.depLevel;
+		return claOp.opDepLevel < rhs.claOp.opDepLevel;
 		}
 	};
 
@@ -657,14 +698,15 @@ public:
 
 class BlockingOperationsSet{
 public:
+	int opSetDepLevel;
 	list<ClaOperation> claOps;
 	list<TransMatOperation> pmatOps;
 	~BlockingOperationsSet(){
-		claOps.clear();
-		pmatOps.clear();
+		//claOps.clear();
+		//pmatOps.clear();
 		}
 	};
-
+/*
 class NewBlockingOperationsSet{
 public:
 	list<NodeOperation> nodeOps;
@@ -674,6 +716,7 @@ public:
 		brOps.clear();
 		}
 	};
+*/
 /*
 bool MyOpLessThan(const BlockingOperationsSet &lhs, const BlockingOperationsSet &rhs){
 //	int d1 = lhs.claOps.size() == 0 ? -1 : lhs.claOps.begin()->depLevel;
@@ -797,7 +840,7 @@ public:
 	FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,  MODEL_FLOAT ***prmat, const char *Ldata, const Model *mod);
 	FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA,  MODEL_FLOAT ***prmat, const Model *mod);
 	
-	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2){
+	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const{
 		FLOAT_TYPE lnL = 0.0, D1 = 0.0, D2 = 0.0;
 		for(int i = 0;i < data->NChar();i++){
 			assert(sitelnL[i] == sitelnL[i]);
@@ -890,26 +933,92 @@ public:
 	//simple report
 	void OutputInstanceDetails(const BeagleInstanceDetails *det) const;
 
+	//These functions can be altered to get indeces from different schemes without actually altering the
+	//functions that talk to beagle
+
 	/*beagle treats cla indeces 0 -> NTax - 1 as the tips, then above that the other internals.  My internal cla indexing
 	starts at zero, and the negatives are just (-taxnum) NOT starting at zero.  So, convert like this: 
 			T4 T3 T2 T1 int1 int2 int3
 		me	-4 -3 -2 -1  0    1     2
 		Be	 3  2  1  0  4    5     6	*/
-	int PartialIndexForBeagle(int ind){
-		return (ind < 0 ? ((-ind) - 1) : ind + data->NTax());
-		}
+	
+	/*This gets extremely confusing when using holders as pointers to cla objects, which is necessary for recycling
+		H: HolderIndex - These represent particular holders in the allHolders array.   They are the index held by the nodes, 
+			and used for dependencies, ranging from 0 - #holders. This is the index that the claMan will always be passed.
+			If clean (or reserved and about to be filled) the theMat member will point to a cla object, otherwise NULL
 
+		HD: Holder index for dependencies.  The tips are negative -(tip#), non-negative are same as H
+		
+		C: ClaIndex - Each cla object has its own fixed number, from 0 to #clas, with each corresponding to one partial 
+			buffer allocated in beagle.  When passed to beagle the numbers must be altered (incremented by , since it uses the first 
+			0 -> Ntax-1 partial indeces to represent the tips, which may actually be represented by a partial or not.
+
+		CD: ClaIndex for dependencies - For internal nodes, these are the ClaIndecies, with the same mapping
+			for tips, these are the -(tip#)
+
+		S: ScalerIndex - These correspond exactly to the C. No object actually exists, they are just allocated in equal
+			number as the C, and are dirtied/cleaned at the same time.  Indexing scheme is NOT SAME AS C, is identical in G and B,
+			both beginning indexing from 0, up to #clas.  No corresponding object is really indexed in my normal G scheme, 
+			but are again tied one to one with the clas
+
+						range				cla_mapping				beagle_mapping			beagle_range				
+		H		0 -> (as many as needed)	arbitrary					NA						NA
+		HD		-(#tips) -> #C				neg maps to tip				NA						NA
+
+		C		0 -> #C							NA					  C+#tips			#tips -> #tips + #partial buffers
+		CD		-(#tips) -> #C			  1to1 excp tips		D<0 ? -C + 1 : C+#tips		0 -> #partials + #tips
+		
+		S		0 -> #C						1to1 with C				1to1 with C			0 -> #partials (?)
+		SD		-(#tips) -> #C				1to1 excp tips			D<0 ? NULL : C
+		*/
+
+	//passed in a holder dependency index
+	//return beagle partial index (might actually represent tip)
+	int PartialIndexForBeagle(int ind) const{
+#ifdef PASS_HOLDER_INDECES
+		return (ind < 0 ? ((-ind) - 1) : ind + data->NTax());
+#else
+		return (ind < 0 ? ((-ind) - 1) : claMan->GetClaIndexForBeagle(ind) + data->NTax());
+#endif
+		}
+	/*beagle rescaling indeces are in the same order as mine, and they match my partial indeces*/
+	int ScalerIndexForBeagle(int ind) const{
+#ifdef PASS_HOLDER_INDECES		
+		return ind;
+#else
+		//this is the code used for the cumulative rescaling index which is reused again and again
+		//there aren't actually that many clas, so don't pass this in G functions
+		if(ind == GARLI_FINAL_SCALER_INDEX)
+			return claMan->NumClas();
+		else if(ind < 0)
+			return ind;
+		else
+			return claMan->GetClaIndexForBeagle(ind);
+#endif
+		}
 	/*beagle doesn't know anything about pmat vs deriv mats in terms of storage.  So, I keep track of TransMatSets, which contain one of each
 	these will be transformed into beagle indeces such that the pmat, d1 and d2 mats use three consecutive beagle mat indeces
 	thus, for my TransMatSet 0, the beagle pmat index is 0, d1 index is 1, d2 is 2.  TransMatSet 1 is 3, 4, 5, etc. */
-	int PmatIndexForBeagle(int ind){
+	int PmatIndexForBeagle(int ind) const{
+#ifdef PASS_PMAT_HOLDER_INDECES
 		return (ind * 3);
+#else
+		return pmatMan->GetPmatIndexForBeagle(ind);
+#endif
 		}
-	int D1MatIndexForBeagle(int ind){
+	int D1MatIndexForBeagle(int ind) const{
+#ifdef PASS_PMAT_HOLDER_INDECES
 		return (ind * 3) + 1;
+#else
+		return pmatMan->GetD1MatIndexForBeagle(ind);
+#endif
 		}
-	int D2MatIndexForBeagle(int ind){
+	int D2MatIndexForBeagle(int ind) const{
+#ifdef PASS_PMAT_HOLDER_INDECES
 		return (ind * 3) + 2;
+#else
+		return pmatMan->GetD2MatIndexForBeagle(ind);
+#endif
 		}
 
 	//For scale arrays my indexing scheme and Beagle's happen to be the same
@@ -921,11 +1030,11 @@ public:
 			beagleSetPartials(
 				beagleInst,
 				PartialIndexForBeagle(num),
-				claMan->GetCla(num)->arr), 
+				claMan->GetClaFillIfNecessary(num)->arr), 
 			"beagleSetPartials");
 		}
 
-	void OutputBeagleSiteLikelihoods(ofstream &likes, vector<double> &siteLikesOut){
+	void OutputBeagleSiteLikelihoods(ofstream &likes, vector<double> &siteLikesOut) const{
 		const int *count = data->GetCounts();
 		int num = 0;
 		
@@ -938,7 +1047,7 @@ public:
 		likes.close();
 		}
 
-	void OutputBeagleSiteValues(ofstream &out, bool derivs){
+	void OutputBeagleSiteValues(ofstream &out, bool derivs) const{
 		//there is only one set of sitelikes stored by an instance, the most recent ones		
 		vector<double> siteLikesOut(data->NChar());
 		vector<double> siteD1Out(data->NChar());
@@ -970,6 +1079,10 @@ public:
 		}
 
 	void UpdateAllConditionals();
+	void ReserveNeededClas(const list<ClaOperation> &theOps);
+	void UnreserveUnneededClas(const list<ClaOperation> &theOps);
+	void ResetDepLevels(const list<ClaOperation> &theOps);
+	void ResetDepLevelsAndReservations();
 
 	void OutputBeagleTransMat(int index);
 #endif 

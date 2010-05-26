@@ -215,7 +215,7 @@ void Individual::CalcFitness(int subtreeNode){
 		fitness = treeStruct->lnL;
 		}
 
-	if(memLevel > 0)
+	if(memLevel > 0 && !treeStruct->calcMan->useBeagle)
 		treeStruct->RemoveTempClaReservations();
 	}
 
@@ -269,8 +269,9 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 	Individual scratchI;
 	scratchI.treeStruct=new Tree();
 	Tree *scratchT = scratchI.treeStruct;
-	scratchT->AssignCLAsFromMaster();
-	scratchI.CopySecByRearrangingNodesOfFirst(scratchT, this, true);
+	//scratchT->AssignCLAsFromMaster();
+	//scratchI.CopySecByRearrangingNodesOfFirst(scratchT, this, true);
+	scratchI.CopySecByRearrangingNodesOfFirst(scratchT, this, false);
 
 	int n = nTax;
 	Set taxset(n);

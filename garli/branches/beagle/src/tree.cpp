@@ -674,9 +674,9 @@ void Tree::MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned ){
 		rootDesc.push_back(root->left);
 		}
 	if(clasAssigned){
-		removedNode->claIndexDown=claMan->SetDirty(removedNode->claIndexDown);
-		removedNode->claIndexUL=claMan->SetDirty(removedNode->claIndexUL);
-		removedNode->claIndexUR=claMan->SetDirty(removedNode->claIndexUR);
+		removedNode->claIndexDown=claMan->SetHolderDirty(removedNode->claIndexDown);
+		removedNode->claIndexUL=claMan->SetHolderDirty(removedNode->claIndexUL);
+		removedNode->claIndexUR=claMan->SetHolderDirty(removedNode->claIndexUR);
 		}
 	t1 = removedNode->left;
 	while(t1){
@@ -3119,19 +3119,19 @@ void Tree::CopyClaIndecesInSubtree(const TreeNode *from, bool remove){
 	assert(from->anc);
 
 	//do the clas down
-	if(remove) claMan->DecrementCla(allNodes[from->nodeNum]->claIndexDown);
+	if(remove) claMan->DecrementHolder(allNodes[from->nodeNum]->claIndexDown);
 	allNodes[from->nodeNum]->claIndexDown=from->claIndexDown;
-	if(allNodes[from->nodeNum]->claIndexDown > -1) claMan->IncrementCla(allNodes[from->nodeNum]->claIndexDown);
+	if(allNodes[from->nodeNum]->claIndexDown > -1) claMan->IncrementHolder(allNodes[from->nodeNum]->claIndexDown);
 
 	//do the clas up left
-	if(remove) claMan->DecrementCla(allNodes[from->nodeNum]->claIndexUL);
+	if(remove) claMan->DecrementHolder(allNodes[from->nodeNum]->claIndexUL);
 	allNodes[from->nodeNum]->claIndexUL=from->claIndexUL;
-	if(allNodes[from->nodeNum]->claIndexUL > -1) claMan->IncrementCla(allNodes[from->nodeNum]->claIndexUL);
+	if(allNodes[from->nodeNum]->claIndexUL > -1) claMan->IncrementHolder(allNodes[from->nodeNum]->claIndexUL);
 
 	//do the clas up right
-	if(remove) claMan->DecrementCla(allNodes[from->nodeNum]->claIndexUR);
+	if(remove) claMan->DecrementHolder(allNodes[from->nodeNum]->claIndexUR);
 	allNodes[from->nodeNum]->claIndexUR=from->claIndexUR;
-	if(allNodes[from->nodeNum]->claIndexUR > -1) claMan->IncrementCla(allNodes[from->nodeNum]->claIndexUR);
+	if(allNodes[from->nodeNum]->claIndexUR > -1) claMan->IncrementHolder(allNodes[from->nodeNum]->claIndexUR);
 
 	if(from->left->IsInternal()) CopyClaIndecesInSubtree(from->left, remove);
 	if(from->right->IsInternal()) CopyClaIndecesInSubtree(from->right, remove);
@@ -3533,7 +3533,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool returnU
 		TreeNode *child;
 		CondLikeArray *childCLA=NULL;
 
-		if(claMan->IsDirty(nd->claIndexUL) == false){
+		if(claMan->IsHolderDirty(nd->claIndexUL) == false){
 			partialCLA=GetClaUpLeft(nd, false);
 			child=nd->left;
 			if(child->IsInternal()){
@@ -3541,7 +3541,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool returnU
 				}
 			blen1 = child->dlen;
 			}
-		else if(claMan->IsDirty(nd->claIndexUR) == false){
+		else if(claMan->IsHolderDirty(nd->claIndexUR) == false){
 			partialCLA=GetClaUpRight(nd, false);
 			child=nd->right;
 			if(child->IsInternal()){
@@ -3551,7 +3551,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool returnU
 			}
 		else{//both of the UP clas must be dirty.  We'll use the down one as the
 			//partial, and calc it now if necessary
-			if(claMan->IsDirty(nd->claIndexDown) == true)
+			if(claMan->IsHolderDirty(nd->claIndexDown) == true)
 				partialCLA=GetClaDown(nd, true);
 			else partialCLA=GetClaDown(nd, false);
 			if(nd->anc!=NULL){
@@ -3604,15 +3604,15 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool returnU
 		else{
 			//this is only for inferring internal states
 			//careful!  The cla will have to be returned manually by the caller
-			int wholeTreeIndex=claMan->AssignClaHolder();
+			int wholeTreeIndex=claMan->AssignFreeClaHolder();
 			claMan->FillHolder(wholeTreeIndex, ROOT);
 			claMan->ReserveCla(wholeTreeIndex);
 			//note that the NState functions are used here for both nuc and other datatypes
 			if(childCLA!=NULL){//if child is internal
-				GetStatewiseUnscaledPosteriorsPartialInternalNState(claMan->GetCla(wholeTreeIndex), partialCLA, childCLA, &Lprmat[0]);
+				GetStatewiseUnscaledPosteriorsPartialInternalNState(claMan->GetClaFillIfNecessary(wholeTreeIndex), partialCLA, childCLA, &Lprmat[0]);
 				}
 			else{
-				GetStatewiseUnscaledPosteriorsPartialTerminalNState(claMan->GetCla(wholeTreeIndex), partialCLA, &Lprmat[0], child->tipData);
+				GetStatewiseUnscaledPosteriorsPartialTerminalNState(claMan->GetClaFillIfNecessary(wholeTreeIndex), partialCLA, &Lprmat[0], child->tipData);
 				}
 
 			return wholeTreeIndex;
@@ -3876,8 +3876,8 @@ void Tree::SweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 	if(from==NULL){
 		//if this is the branch where the dirtyness starts
 		if(nd->IsInternal()){
-			nd->claIndexUL=claMan->SetDirty(nd->claIndexUL);
-			nd->claIndexUR=claMan->SetDirty(nd->claIndexUR);
+			nd->claIndexUL=claMan->SetHolderDirty(nd->claIndexUL);
+			nd->claIndexUR=claMan->SetHolderDirty(nd->claIndexUR);
 			if(nd->left->IsInternal()) SweepDirtynessOverTree(nd->left, nd);
 			if(nd->right->IsInternal()) SweepDirtynessOverTree(nd->right, nd);
 			}
@@ -3887,21 +3887,21 @@ void Tree::SweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 	//if the change was below, invalidating clas above, also if the change
 	//was on the path connecting to the central des of the root
 		if(from==nd->anc || (nd->IsRoot() && from==nd->left->next)){
-			nd->claIndexUL=claMan->SetDirty(nd->claIndexUL);
-			nd->claIndexUR=claMan->SetDirty(nd->claIndexUR);
+			nd->claIndexUL=claMan->SetHolderDirty(nd->claIndexUL);
+			nd->claIndexUR=claMan->SetHolderDirty(nd->claIndexUR);
 			if(nd->left->IsInternal()) SweepDirtynessOverTree(nd->left, nd);
 			if(nd->right->IsInternal()) SweepDirtynessOverTree(nd->right, nd);
 			}
 		else if(from==nd->left){
-			nd->claIndexUR=claMan->SetDirty(nd->claIndexUR);
-			nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
+			nd->claIndexUR=claMan->SetHolderDirty(nd->claIndexUR);
+			nd->claIndexDown=claMan->SetHolderDirty(nd->claIndexDown);
 			if(nd->right->IsInternal()) SweepDirtynessOverTree(nd->right, nd);
 			if(nd->anc!=NULL) SweepDirtynessOverTree(nd->anc, nd);
 			else if(nd->left->next->IsInternal()) SweepDirtynessOverTree(nd->left->next, nd);
 			}
 		else if(from==nd->right){
-			nd->claIndexUL=claMan->SetDirty(nd->claIndexUL);
-			nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
+			nd->claIndexUL=claMan->SetHolderDirty(nd->claIndexUL);
+			nd->claIndexDown=claMan->SetHolderDirty(nd->claIndexDown);
 			if(nd->left->IsInternal()) SweepDirtynessOverTree(nd->left, nd);
 			if(nd->anc!=NULL) SweepDirtynessOverTree(nd->anc, nd);
 			else if(nd->left->next->IsInternal()) SweepDirtynessOverTree(nd->left->next, nd);
@@ -3914,9 +3914,12 @@ void Tree::SweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 
 void Tree::NewSweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 	//this will never be called initially with nd = root
+	if(claMan->debug_clas)
+		outman.DebugMessage("Sweep dirty nd %d from %d", nd->nodeNum, (from == NULL ? -1 :from->nodeNum));
 	assert(! (nd->IsRoot() && from == NULL));
 
 	//DEBUG - this shouldn't be here long term
+	//TODO
 	nd->myMan.SetTransMatDirty();
 
 	lnL=-1;
@@ -3933,12 +3936,16 @@ void Tree::NewSweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 		if(nd->IsInternal()){
 			nd->myMan.SetDirtyUpLeft();
 			nd->myMan.SetDirtyUpRight();
-			//nd->claIndexUL=claMan->SetDirty(nd->claIndexUL);
-			//nd->claIndexUR=claMan->SetDirty(nd->claIndexUR);
-			if(nd->left->IsInternal()) 
+			if(nd->left->IsInternal())
 				NewSweepDirtynessOverTree(nd->left, nd);
-			if(nd->right->IsInternal()) 
+			else//TODO this shouldn't be left here
+				nd->left->myMan.SetTransMatDirty();
+				
+			if(nd->right->IsInternal())
 				NewSweepDirtynessOverTree(nd->right, nd);
+			else//TODO this shouldn't be left here
+				nd->right->myMan.SetTransMatDirty();
+				
 			}
 		if(nd->anc!=NULL) 
 			NewSweepDirtynessOverTree(nd->anc, nd);
@@ -3951,37 +3958,54 @@ void Tree::NewSweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 			nd->myMan.SetDirtyUpRight();
 			if(nd->left->IsInternal()) 
 				NewSweepDirtynessOverTree(nd->left, nd);
+			else//TODO this shouldn't be left here
+				nd->left->myMan.SetTransMatDirty();
 			if(nd->right->IsInternal()) 
 				NewSweepDirtynessOverTree(nd->right, nd);
+			else//TODO this shouldn't be left here
+				nd->right->myMan.SetTransMatDirty();
 			}
 		else if(from==nd->left){
 			nd->myMan.SetDirtyUpRight();
 			nd->myMan.SetDirtyDown();
 			if(nd->right->IsInternal()) 
 				NewSweepDirtynessOverTree(nd->right, nd);
+			else//TODO this shouldn't be left here
+				nd->right->myMan.SetTransMatDirty();
 			if(nd->anc!=NULL) 
 				NewSweepDirtynessOverTree(nd->anc, nd);
-			else if(nd->left->next->IsInternal()) 
-				NewSweepDirtynessOverTree(nd->left->next, nd);
+			else{ 
+				if(nd->left->next->IsInternal()) 
+					NewSweepDirtynessOverTree(nd->left->next, nd);
+				else//TODO this shouldn't be left here
+					nd->left->next->myMan.SetTransMatDirty();
+				}
 			}
 		else if(from==nd->right){
 			nd->myMan.SetDirtyUpLeft();
 			nd->myMan.SetDirtyDown();
 			if(nd->left->IsInternal()) 
 				NewSweepDirtynessOverTree(nd->left, nd);
+			else//TODO this shouldn't be left here
+				nd->left->myMan.SetTransMatDirty();
+
 			if(nd->anc!=NULL) 
 				NewSweepDirtynessOverTree(nd->anc, nd);
-			else if(nd->left->next->IsInternal()) 
-				NewSweepDirtynessOverTree(nd->left->next, nd);
+			else{
+				if(nd->left->next->IsInternal())
+					NewSweepDirtynessOverTree(nd->left->next, nd);
+				else//TODO this shouldn't be left here
+					nd->left->next->myMan.SetTransMatDirty();
+				}
 			}
 		}
 	}
 
 void Tree::TraceDirtynessToNode(TreeNode *nd, int tonode){
-	if(nd->nodeNum==0 || nd->nodeNum>numTipsTotal) nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
+	if(nd->nodeNum==0 || nd->nodeNum>numTipsTotal) nd->claIndexDown=claMan->SetHolderDirty(nd->claIndexDown);
 	while(nd->nodeNum!=tonode){
 		nd=nd->anc;
-		if(nd->nodeNum==0 || nd->nodeNum>numTipsTotal) nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
+		if(nd->nodeNum==0 || nd->nodeNum>numTipsTotal) nd->claIndexDown=claMan->SetHolderDirty(nd->claIndexDown);
 		}
 	}
 
@@ -4658,13 +4682,13 @@ void Tree::MakeNodeDirty(TreeNode *nd){
 	return;
 #endif
 	if(nd->claIndexDown > -1){
-		nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
+		nd->claIndexDown=claMan->SetHolderDirty(nd->claIndexDown);
 		}
 	if(nd->claIndexUL > -1){
-		nd->claIndexUL=claMan->SetDirty(nd->claIndexUL);
+		nd->claIndexUL=claMan->SetHolderDirty(nd->claIndexUL);
 		}
 	if(nd->claIndexUR > -1){
-		nd->claIndexUR=claMan->SetDirty(nd->claIndexUR);
+		nd->claIndexUR=claMan->SetHolderDirty(nd->claIndexUR);
 		}
 	UpdateNodeClaManagers();
 	}
@@ -4690,15 +4714,16 @@ void Tree::RemoveTempClaReservations(){
 	}
 
 void Tree::ReclaimUniqueClas(){
+	//DEBUG - isn't this effectively MakeAllNodesDirty
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		if(claMan->GetNumAssigned(allNodes[i]->claIndexDown) == 1){
-			claMan->ReclaimSingleCla(allNodes[i]->claIndexDown);
+			claMan->EmptyHolder(allNodes[i]->claIndexDown);
 			}
 		if(claMan->GetNumAssigned(allNodes[i]->claIndexUL) == 1){
-			claMan->ReclaimSingleCla(allNodes[i]->claIndexUL);
+			claMan->EmptyHolder(allNodes[i]->claIndexUL);
 			}
 		if(claMan->GetNumAssigned(allNodes[i]->claIndexUR) == 1){
-			claMan->ReclaimSingleCla(allNodes[i]->claIndexUR);
+			claMan->EmptyHolder(allNodes[i]->claIndexUR);
 			}
 		}
 	}
@@ -4789,25 +4814,25 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site){
 	//this version outputs the indeces even for dirty clas
 	if(nd->IsInternal()){
 		deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
-		if(claMan->IsDirty(nd->claIndexDown) == false){
-			for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexDown)->arr[index+i] << "\t";
-			deb << claMan->GetCla(nd->claIndexDown)->underflow_mult[site];
+		if(claMan->IsHolderDirty(nd->claIndexDown) == false){
+			for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetClaFillIfNecessary(nd->claIndexDown)->arr[index+i] << "\t";
+			deb << claMan->GetClaFillIfNecessary(nd->claIndexDown)->underflow_mult[site];
 			}
 		deb << "\n";
 		}
 	if(nd->IsInternal()){
 		deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
-		if(claMan->IsDirty(nd->claIndexUL) == false){
-			for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexUL)->arr[index+i] << "\t";
-			deb << claMan->GetCla(nd->claIndexUL)->underflow_mult[site];
+		if(claMan->IsHolderDirty(nd->claIndexUL) == false){
+			for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetClaFillIfNecessary(nd->claIndexUL)->arr[index+i] << "\t";
+			deb << claMan->GetClaFillIfNecessary(nd->claIndexUL)->underflow_mult[site];
 			}
 		deb <<"\n";
 		}
 	if(nd->IsInternal()){
 		deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
-		if(claMan->IsDirty(nd->claIndexUR) == false){
-			for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexUR)->arr[index+i] << "\t";
-			deb << claMan->GetCla(nd->claIndexUR)->underflow_mult[site];
+		if(claMan->IsHolderDirty(nd->claIndexUR) == false){
+			for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetClaFillIfNecessary(nd->claIndexUR)->arr[index+i] << "\t";
+			deb << claMan->GetClaFillIfNecessary(nd->claIndexUR)->underflow_mult[site];
 			}
 		deb <<"\n";
 		}
@@ -4840,33 +4865,33 @@ void Tree::CountNumReservedClas(int &clean, int &tempRes, int&res){
 	tempRes=0;
 	res=0;
 
-	if(claMan->IsDirty(allNodes[0]->claIndexDown)==false){
+	if(claMan->IsHolderDirty(allNodes[0]->claIndexDown)==false){
 		clean++;
 		res += (claMan->IsClaReserved(allNodes[0]->claIndexDown));
 		tempRes += (claMan->IsClaTempReserved(allNodes[0]->claIndexDown));
 		}
-	if(claMan->IsDirty(allNodes[0]->claIndexUL)==false){
+	if(claMan->IsHolderDirty(allNodes[0]->claIndexUL)==false){
 		clean++;
 		res += (claMan->IsClaReserved(allNodes[0]->claIndexUL));
 		tempRes += (claMan->IsClaTempReserved(allNodes[0]->claIndexUL));
 		}
-	if(claMan->IsDirty(allNodes[0]->claIndexUR)==false){
+	if(claMan->IsHolderDirty(allNodes[0]->claIndexUR)==false){
 		clean++;
 		res += (claMan->IsClaReserved(allNodes[0]->claIndexUR));
 		tempRes += (claMan->IsClaTempReserved(allNodes[0]->claIndexUR));
 		}
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(claMan->IsDirty(allNodes[i]->claIndexDown)==false){
+		if(claMan->IsHolderDirty(allNodes[i]->claIndexDown)==false){
 			clean++;
 			res += (claMan->IsClaReserved(allNodes[i]->claIndexDown));
 			tempRes += (claMan->IsClaTempReserved(allNodes[i]->claIndexDown));
 			}
-		if(claMan->IsDirty(allNodes[i]->claIndexUL)==false){
+		if(claMan->IsHolderDirty(allNodes[i]->claIndexUL)==false){
 			clean++;
 			res += (claMan->IsClaReserved(allNodes[i]->claIndexUL));
 			tempRes += (claMan->IsClaTempReserved(allNodes[i]->claIndexUL));
 			}
-		if(claMan->IsDirty(allNodes[i]->claIndexUR)==false){
+		if(claMan->IsHolderDirty(allNodes[i]->claIndexUR)==false){
 			clean++;
 			res += (claMan->IsClaReserved(allNodes[i]->claIndexUR));
 			tempRes += (claMan->IsClaTempReserved(allNodes[i]->claIndexUR));
@@ -4892,9 +4917,9 @@ void Tree::SetupClasForSubtreeMode(int subtreeNode){
 void Tree::DirtyNodesOutsideOfSubtree(TreeNode *nd, int subtreeNode){
 
 	if(nd != root){
-		claMan->ReclaimSingleCla(nd->claIndexDown);
-		claMan->ReclaimSingleCla(nd->claIndexUL);
-		claMan->ReclaimSingleCla(nd->claIndexUR);
+		claMan->SetHolderDirty(nd->claIndexDown);
+		claMan->SetHolderDirty(nd->claIndexUL);
+		claMan->SetHolderDirty(nd->claIndexUR);
 		}
 
 	if(nd->left->IsInternal() && nd->left->nodeNum != subtreeNode && nd->left->nodeNum != allNodes[subtreeNode]->anc->nodeNum){
@@ -4910,7 +4935,7 @@ void Tree::DirtyNodesOutsideOfSubtree(TreeNode *nd, int subtreeNode){
 
 void Tree::OutputValidClaIndeces(){
 	ofstream cla("claind.log");
-	if(claMan->IsDirty(allNodes[0]->claIndexDown)==false){
+	if(claMan->IsHolderDirty(allNodes[0]->claIndexDown)==false){
 		cla << "0\t" << allNodes[0]->claIndexDown << "\t" << claMan->GetNumAssigned(allNodes[0]->claIndexDown) << "\t" << claMan->GetReclaimLevel(allNodes[0]->claIndexDown) << "\t" << claMan->IsClaReserved(allNodes[0]->claIndexDown) <<"\n";
 		}
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
@@ -4945,7 +4970,7 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 		//note that this clas then only uses the first nstates x nchar portion, instead of the usual nstates x nchar x nrates
 		int wholeTreeIndex = ConditionalLikelihoodRateHet(ROOT, nd, true);
 		vector<InternalState> stateProbs;
-		InferStatesFromCla(stateProbs, claMan->GetCla(wholeTreeIndex)->arr, data->NChar(), mod->NStates());
+		InferStatesFromCla(stateProbs, claMan->GetClaFillIfNecessary(wholeTreeIndex)->arr, data->NChar(), mod->NStates());
 
 		//output newick strings with both names and numbers indicating which node this corresponds to
 		string subtreeString;
@@ -4977,7 +5002,7 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 		
 		//return the cla that we used temporarily
 		claMan->ClearTempReservation(wholeTreeIndex);
-		claMan->DecrementCla(wholeTreeIndex);
+		claMan->DecrementHolder(wholeTreeIndex);
 		delete states;
 		}
 	}
@@ -5007,14 +5032,14 @@ void Tree::ClaReport(ofstream &cla){
 FLOAT_TYPE Tree::CountClasInUse(){
 	FLOAT_TYPE inUse=0.0;
 
-	if(claMan->IsDirty(root->claIndexDown) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(root->claIndexDown);
-	if(claMan->IsDirty(root->claIndexUL) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(root->claIndexUL);
-	if(claMan->IsDirty(root->claIndexUR) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(root->claIndexUR);
+	if(claMan->IsHolderDirty(root->claIndexDown) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(root->claIndexDown);
+	if(claMan->IsHolderDirty(root->claIndexUL) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(root->claIndexUL);
+	if(claMan->IsHolderDirty(root->claIndexUR) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(root->claIndexUR);
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		TreeNode *n=allNodes[i];
-		if(claMan->IsDirty(n->claIndexDown) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(n->claIndexDown);
-		if(claMan->IsDirty(n->claIndexUL) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(n->claIndexUL);
-		if(claMan->IsDirty(n->claIndexUR) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(n->claIndexUR);
+		if(claMan->IsHolderDirty(n->claIndexDown) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(n->claIndexDown);
+		if(claMan->IsHolderDirty(n->claIndexUL) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(n->claIndexUL);
+		if(claMan->IsHolderDirty(n->claIndexUR) == false) inUse += ONE_POINT_ZERO/claMan->GetNumAssigned(n->claIndexUR);
 		}
 	return inUse;
 	}
@@ -7954,13 +7979,13 @@ void Tree::MakeAllNodesDirty(){
 	return;
 #endif
 
-	root->claIndexDown=claMan->SetDirty(root->claIndexDown);
-	root->claIndexUL=claMan->SetDirty(root->claIndexUL);
-	root->claIndexUR=claMan->SetDirty(root->claIndexUR);
+	root->claIndexDown=claMan->SetHolderDirty(root->claIndexDown);
+	root->claIndexUL=claMan->SetHolderDirty(root->claIndexUL);
+	root->claIndexUR=claMan->SetHolderDirty(root->claIndexUR);
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		allNodes[i]->claIndexDown=claMan->SetDirty(allNodes[i]->claIndexDown);
-		allNodes[i]->claIndexUL=claMan->SetDirty(allNodes[i]->claIndexUL);
-		allNodes[i]->claIndexUR=claMan->SetDirty(allNodes[i]->claIndexUR);
+		allNodes[i]->claIndexDown=claMan->SetHolderDirty(allNodes[i]->claIndexDown);
+		allNodes[i]->claIndexUL=claMan->SetHolderDirty(allNodes[i]->claIndexUL);
+		allNodes[i]->claIndexUR=claMan->SetHolderDirty(allNodes[i]->claIndexUR);
 		}
 	lnL=-ONE_POINT_ZERO;
 
@@ -7970,7 +7995,17 @@ void Tree::MakeAllNodesDirty(){
 	}
 
 void Tree::NewMakeAllNodesDirty(){
+
+	if(claMan->debug_clas)
+		outman.DebugMessage("Make all dirty");
+
 	root->myMan.SetDirtyAll();
+
+	//need to reclaim these from the tips
+	for(int i=1;i<numTipsTotal+1;i++){
+		allNodes[i]->myMan.SetTransMatDirty();
+		}	
+
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		allNodes[i]->myMan.SetDirtyAll();
 		}	
@@ -8022,14 +8057,14 @@ void Tree::AssignCLAsFromMaster(){
 	if(claMan == NULL)
 		return;
 	assert(allNodes[0]->claIndexDown==-1);
-	allNodes[0]->claIndexDown=claMan->AssignClaHolder();
-	allNodes[0]->claIndexUL=claMan->AssignClaHolder();
-	allNodes[0]->claIndexUR=claMan->AssignClaHolder();
+	allNodes[0]->claIndexDown=claMan->AssignFreeClaHolder();
+	allNodes[0]->claIndexUL=claMan->AssignFreeClaHolder();
+	allNodes[0]->claIndexUR=claMan->AssignFreeClaHolder();
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		assert(allNodes[i]->claIndexDown==-1);
-		allNodes[i]->claIndexDown=claMan->AssignClaHolder();
-		allNodes[i]->claIndexUL=claMan->AssignClaHolder();
-		allNodes[i]->claIndexUR=claMan->AssignClaHolder();
+		allNodes[i]->claIndexDown=claMan->AssignFreeClaHolder();
+		allNodes[i]->claIndexUL=claMan->AssignFreeClaHolder();
+		allNodes[i]->claIndexUR=claMan->AssignFreeClaHolder();
 		}
 	//DEBUG
 	UpdateNodeClaManagers();
@@ -8044,6 +8079,9 @@ void Tree::NewAssignCLAsFromMaster(){
 	if(pmatMan == NULL)
 		return;
 	
+	if(claMan->debug_clas)
+		outman.DebugMessage("Assign master");
+
 	//root gets transmats, but won't use them
 	root->myMan.ObtainClaAndTransMatHolders();
 	
@@ -8060,6 +8098,7 @@ void Tree::NewAssignCLAsFromMaster(){
 
 //I don't think that this will be used for anything but debugging.  Note that each manager is assigned its own transMatIndex back
 void Tree::UpdateNodeClaManagers(){
+//DEBUG
 #ifdef NEW_MANAGEMENT
 	allNodes[0]->myMan.SetHolders(allNodes[0]->claIndexDown, allNodes[0]->claIndexUL, allNodes[0]->claIndexUR, allNodes[0]->myMan.transMatIndex);
 	for(int i=1;i<numTipsTotal + 1;i++)
@@ -8147,6 +8186,8 @@ void Tree::UpdateDependencies(){
 
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		nd = allNodes[i];
+		if(nd->myMan.ULHolderIndex >506 || nd->myMan.URHolderIndex >506 || nd->myMan.downHolderIndex >506)
+			int poo=2;
 
 		assert(nd->myMan.IsAllocated());
 		//this branch might not be attached yet
@@ -8278,9 +8319,9 @@ void Tree::CopyClaIndeces(const Tree *from, bool remove){
 #endif
 
 	//do the clas down
-	if(remove) claMan->DecrementCla(allNodes[0]->claIndexDown);
+	if(remove) claMan->DecrementHolder(allNodes[0]->claIndexDown);
 	allNodes[0]->claIndexDown=from->allNodes[0]->claIndexDown;
-	if(allNodes[0]->claIndexDown > -1) claMan->IncrementCla(allNodes[0]->claIndexDown);
+	if(allNodes[0]->claIndexDown > -1) claMan->IncrementHolder(allNodes[0]->claIndexDown);
 	
 #ifdef EQUIV_CALCS
 	if(from->dirtyEQ == false){
@@ -8293,31 +8334,31 @@ void Tree::CopyClaIndeces(const Tree *from, bool remove){
 #endif
 
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(remove) claMan->DecrementCla(allNodes[i]->claIndexDown);
+		if(remove) claMan->DecrementHolder(allNodes[i]->claIndexDown);
 		allNodes[i]->claIndexDown=from->allNodes[i]->claIndexDown;
-		if(allNodes[i]->claIndexDown > -1) claMan->IncrementCla(allNodes[i]->claIndexDown);
+		if(allNodes[i]->claIndexDown > -1) claMan->IncrementHolder(allNodes[i]->claIndexDown);
 		}
 		
 	//do the clas up left
-	if(remove) claMan->DecrementCla(allNodes[0]->claIndexUL);
+	if(remove) claMan->DecrementHolder(allNodes[0]->claIndexUL);
 	allNodes[0]->claIndexUL=from->allNodes[0]->claIndexUL;
-	if(allNodes[0]->claIndexUL > -1) claMan->IncrementCla(allNodes[0]->claIndexUL);
+	if(allNodes[0]->claIndexUL > -1) claMan->IncrementHolder(allNodes[0]->claIndexUL);
 	
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(remove) claMan->DecrementCla(allNodes[i]->claIndexUL);
+		if(remove) claMan->DecrementHolder(allNodes[i]->claIndexUL);
 		allNodes[i]->claIndexUL=from->allNodes[i]->claIndexUL;
-		if(allNodes[i]->claIndexUL > -1) claMan->IncrementCla(allNodes[i]->claIndexUL);
+		if(allNodes[i]->claIndexUL > -1) claMan->IncrementHolder(allNodes[i]->claIndexUL);
 		}
 	
 	//do the clas up right
-	if(remove) claMan->DecrementCla(allNodes[0]->claIndexUR);
+	if(remove) claMan->DecrementHolder(allNodes[0]->claIndexUR);
 	allNodes[0]->claIndexUR=from->allNodes[0]->claIndexUR;
-	if(allNodes[0]->claIndexUR > -1) claMan->IncrementCla(allNodes[0]->claIndexUR);
+	if(allNodes[0]->claIndexUR > -1) claMan->IncrementHolder(allNodes[0]->claIndexUR);
 		
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(remove) claMan->DecrementCla(allNodes[i]->claIndexUR);
+		if(remove) claMan->DecrementHolder(allNodes[i]->claIndexUR);
 		allNodes[i]->claIndexUR=from->allNodes[i]->claIndexUR;
-		if(allNodes[i]->claIndexUR > -1) claMan->IncrementCla(allNodes[i]->claIndexUR);
+		if(allNodes[i]->claIndexUR > -1) claMan->IncrementHolder(allNodes[i]->claIndexUR);
 		}
 
 	//DEBUG
@@ -8327,10 +8368,17 @@ void Tree::CopyClaIndeces(const Tree *from, bool remove){
 void Tree::NewCopyClaIndeces(const Tree *from, bool remove){
 	//the bool argument "remove" designates whether the tree currently has cla arrays
 	//assigned to it or not (if not, it must have come from the unused tree vector)
+	
+	if(claMan->debug_clas)
+		outman.DebugMessage("Copy clas");
 
-	//copy indeces for all nodes, even though terminals will only have a valid pmat index	
-	for(int i = 0;i < numNodesTotal;i++){
-		allNodes[i]->myMan.CopyHolderIndeces(&from->allNodes[i]->myMan, remove);
+	allNodes[0]->myMan.CopyHolderIndecesInternal(&from->allNodes[0]->myMan, remove);
+	for(int i = 1;i <= numTipsTotal;i++){
+		allNodes[i]->myMan.CopyHolderIndecesTerminal(&from->allNodes[i]->myMan, remove);
+		}	
+
+	for(int i = numTipsTotal + 1;i < numNodesTotal;i++){
+		allNodes[i]->myMan.CopyHolderIndecesInternal(&from->allNodes[i]->myMan, remove);
 		}
 
 	//DEBUG
@@ -8346,28 +8394,28 @@ void Tree::RemoveTreeFromAllClas(){
 
 	CheckClaIndeces();
 	if(root->claIndexDown > -1){
-		claMan->DecrementCla(root->claIndexDown);
+		claMan->DecrementHolder(root->claIndexDown);
 		root->claIndexDown=-1;
 		}
 	if(root->claIndexUL > -1){
-		claMan->DecrementCla(root->claIndexUL);
+		claMan->DecrementHolder(root->claIndexUL);
 		root->claIndexUL=-1;
 		}
 	if(root->claIndexUR > -1){	
-		claMan->DecrementCla(root->claIndexUR);
+		claMan->DecrementHolder(root->claIndexUR);
 		root->claIndexUR=-1;
 		}
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		if(allNodes[i]->claIndexDown > -1){
-			claMan->DecrementCla(allNodes[i]->claIndexDown);
+			claMan->DecrementHolder(allNodes[i]->claIndexDown);
 			allNodes[i]->claIndexDown=-1;
 			}
 		if(allNodes[i]->claIndexUL > -1){
-			claMan->DecrementCla(allNodes[i]->claIndexUL);
+			claMan->DecrementHolder(allNodes[i]->claIndexUL);
 			allNodes[i]->claIndexUL=-1;
 			}
 		if(allNodes[i]->claIndexUR > -1){
-			claMan->DecrementCla(allNodes[i]->claIndexUR);
+			claMan->DecrementHolder(allNodes[i]->claIndexUR);
 			allNodes[i]->claIndexUR=-1;
 			}
 		}
@@ -8378,6 +8426,9 @@ void Tree::RemoveTreeFromAllClas(){
 	
 void Tree::NewRemoveTreeFromAllClas(){
 	CheckClaIndeces();
+
+	if(claMan->debug_clas)
+		outman.DebugMessage("Remove tree from all");
 
 	//oops, this needs to be done for all nodes, even terminals, since they have pmats assigned
 	for(int i=0;i<numNodesTotal;i++){
@@ -8396,7 +8447,7 @@ void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len){
 	}
 
 CondLikeArray *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){
-	if(claMan->IsDirty(nd->claIndexDown)){
+	if(claMan->IsHolderDirty(nd->claIndexDown)){
 		if(calc==true){
 			//DEBUG
 #ifdef NEW_MANAGEMENT
@@ -8407,11 +8458,11 @@ CondLikeArray *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){
 		else claMan->FillHolder(nd->claIndexDown, 1);
 		}
 	if(memLevel > 1) claMan->ReserveCla(nd->claIndexDown);
-	return claMan->GetCla(nd->claIndexDown);
+	return claMan->GetClaFillIfNecessary(nd->claIndexDown);
 	}
 	
 CondLikeArray *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
-	if(claMan->IsDirty(nd->claIndexUL)){
+	if(claMan->IsHolderDirty(nd->claIndexUL)){
 		if(calc==true){
 			//DEBUG
 #ifdef NEW_MANAGEMENT
@@ -8422,11 +8473,11 @@ CondLikeArray *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
 		else claMan->FillHolder(nd->claIndexUL, 2);
 		}
 	if(memLevel > 0) claMan->ReserveCla(nd->claIndexUL);
-	return claMan->GetCla(nd->claIndexUL);
+	return claMan->GetClaFillIfNecessary(nd->claIndexUL);
 	}
 	
 CondLikeArray *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/){
-	if(claMan->IsDirty(nd->claIndexUR)){
+	if(claMan->IsHolderDirty(nd->claIndexUR)){
 		if(calc==true){
 			//DEBUG
 #ifdef NEW_MANAGEMENT
@@ -8437,7 +8488,7 @@ CondLikeArray *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/){
 		else claMan->FillHolder(nd->claIndexUR, 2);
 		}
 	if(memLevel > 0) claMan->ReserveCla(nd->claIndexUR);
-	return claMan->GetCla(nd->claIndexUR);
+	return claMan->GetClaFillIfNecessary(nd->claIndexUR);
 	}
 
 void Tree::ProtectClas(){
@@ -8448,7 +8499,8 @@ void Tree::ProtectClas(){
 		}
 	else{
 		for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-			if(allNodes[i]->left->IsInternal() && allNodes[i]->right->IsInternal()) claMan->ReserveCla(allNodes[i]->claIndexDown, false);
+			if(allNodes[i]->left->IsInternal() && allNodes[i]->right->IsInternal()) 
+				claMan->ReserveCla(allNodes[i]->claIndexDown, false);
 			}
 		}
 	}
@@ -8456,7 +8508,7 @@ void Tree::ProtectClas(){
 void Tree::UnprotectClas(){
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		if(allNodes[i]->claIndexDown > -1)
-			claMan->UnreserveCla(allNodes[i]->claIndexDown);
+			claMan->RemoveNormalReservation(allNodes[i]->claIndexDown);
 		}
 	}
 

@@ -59,17 +59,19 @@ class CondLikeArray
 	friend class CondLikeArrayIterator;
 
 	unsigned nsites, nrates, nstates;
+	int index;
 	public:
 		FLOAT_TYPE* arr;
 		int* underflow_mult;
 		unsigned rescaleRank;
 		CondLikeArray()
-			: nsites(0), nrates(0), nstates(0), arr(0), underflow_mult(0), rescaleRank(1){}
+			: nsites(0), nrates(0), nstates(0), arr(0), underflow_mult(0), rescaleRank(1), index(-1){}
 		~CondLikeArray();
 		int NStates() {return nstates;}
 		int NSites() {return nsites;}
+		int Index() {return index;}
 
-		void Allocate( int nk, int ns, int nr = 1 );
+		void Allocate( int ind, int nk, int ns, int nr = 1 );
 	};
 
 class CondLikeArrayHolder{
@@ -85,13 +87,23 @@ class CondLikeArrayHolder{
 	int transMatDep2;
 	int depLevel;
 
-	CondLikeArrayHolder() : theArray(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){}
+	CondLikeArrayHolder() : depLevel(-1), theArray(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){
+		holderDep1 = holderDep2 = transMatDep1 = transMatDep2 = -1;
+		}
 	//the arrays are actually allocated and deleted by the claManager, not the holders
 	~CondLikeArrayHolder() {
 		theArray = NULL;
 		};
 	int GetReclaimLevel() {return reclaimLevel;}
 	void SetReclaimLevel(int lvl) {reclaimLevel = lvl;}
-	void Reset(){reclaimLevel=0;numAssigned=0,tempReserved=false;reserved=false;theArray=NULL;}
+	void Reset(){
+		depLevel = -1;
+		theArray=NULL;
+		numAssigned = 0;
+		reclaimLevel = 0;
+		tempReserved=false;
+		reserved=false;
+		holderDep1 = holderDep2 = transMatDep1 = transMatDep2 = -1;
+		}
 	};
 #endif

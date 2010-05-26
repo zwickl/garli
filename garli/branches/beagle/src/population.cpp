@@ -576,8 +576,10 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 	//if we do tons of recombination
 	idealClas *= 2;
-	if(!validateMode)
-		claMan=new ClaManager(data->NTax()-2, numClas, idealClas, sites, modSpec.numRateCats);
+	if(!validateMode){
+		claMan = new ClaManager(data->NTax()-2, numClas, idealClas, sites, modSpec.numRateCats);
+//		claMan2 = new ClaManager2(data->NTax()-2, numClas, idealClas, sites, modSpec.numRateCats, modSpec.nstates);
+		}
 
 	//setup the bipartition statics
 	Bipartition::SetBipartitionStatics(data->NTax());
@@ -586,7 +588,11 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	calcMan = new CalculationManager();
 	CalculationManager::SetClaManager(claMan);
 	//both the tips and internal branches need pmats, hence the x2
-	pmatMan = new PmatManager(numClas * 2, numClas * 2,  modSpec.numRateCats, modSpec.nstates);
+	int idealPmats = total_size * (2 * (data->NTax() - 1));
+	idealPmats *= 2;
+	//for now using as many pmats as pmat holders
+	//pmatMan = new PmatManager(numClas * 2, idealPmats, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)), modSpec.nstates);
+	pmatMan = new PmatManager(idealPmats, idealPmats, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)), modSpec.nstates);
 	CalculationManager::SetPmatManager(pmatMan);
 
 	CalculationManager::SetData(data);
@@ -3452,7 +3458,9 @@ void Population::PerformMutation(int indNum){
 
 			       		//reclaim clas if the created tree has essentially no chance of reproducing
 			       		if(((ind->Fitness() - BestFitness()) < (-11.5/conf->selectionIntensity))){
-			       			ind->treeStruct->ReclaimUniqueClas();
+							//effects of these were the same
+			       			ind->treeStruct->MakeAllNodesDirty();
+							//ind->treeStruct->ReclaimUniqueClas();
 			       			}
 						}
 					else{
@@ -6410,6 +6418,8 @@ void Population::InitializeOutputStreams(){
 	}
 */
 
+//this was the old version of this, which didn't make much sense in the non-parallel context
+/*
 void Population::SetNewBestIndiv(int indivIndex){
 	//this should be called when a new best individual is set outside of
 	//CalcAverageFitness.  Particularly important for parallel.
@@ -6420,6 +6430,16 @@ void Population::SetNewBestIndiv(int indivIndex){
 			indiv[i].treeStruct->UnprotectClas();
 			}
 		}
+	indiv[bestIndiv].treeStruct->ProtectClas();
+	}
+*/
+
+//this makes more sense with beagle changes
+void Population::SetNewBestIndiv(int newIndex){
+	if(newIndex != bestIndiv)
+		indiv[bestIndiv].treeStruct->UnprotectClas();
+	bestIndiv = newIndex;
+	globalBest = bestFitness = prevBestFitness = BestFitness();
 	indiv[bestIndiv].treeStruct->ProtectClas();
 	}
 
@@ -6569,19 +6589,19 @@ void Population::FindLostClas(){
 
 	for(unsigned i=0;i<total_size;i++){
 		Tree *t=indiv[i].treeStruct;
-		if(! (claMan->IsDirty(t->allNodes[0]->claIndexDown)))
-			arr.push_back(claMan->GetCla(t->allNodes[0]->claIndexDown));
-		if(! (claMan->IsDirty(t->allNodes[0]->claIndexUL)))
-			arr.push_back(claMan->GetCla(t->allNodes[0]->claIndexUL));
-		if(! (claMan->IsDirty(t->allNodes[0]->claIndexUR)))
-			arr.push_back(claMan->GetCla(t->allNodes[0]->claIndexUR));
+		if(! (claMan->IsHolderDirty(t->allNodes[0]->claIndexDown)))
+			arr.push_back(claMan->GetClaFillIfNecessary(t->allNodes[0]->claIndexDown));
+		if(! (claMan->IsHolderDirty(t->allNodes[0]->claIndexUL)))
+			arr.push_back(claMan->GetClaFillIfNecessary(t->allNodes[0]->claIndexUL));
+		if(! (claMan->IsHolderDirty(t->allNodes[0]->claIndexUR)))
+			arr.push_back(claMan->GetClaFillIfNecessary(t->allNodes[0]->claIndexUR));
 		for(int n=t->getNumTipsTotal()+1;n<t->getNumNodesTotal();n++){
-			if(! (claMan->IsDirty(t->allNodes[n]->claIndexDown)))
-				arr.push_back(claMan->GetCla(t->allNodes[n]->claIndexDown));
-			if(! (claMan->IsDirty(t->allNodes[n]->claIndexUL)))
-				arr.push_back(claMan->GetCla(t->allNodes[n]->claIndexUL));
-			if(! (claMan->IsDirty(t->allNodes[n]->claIndexUR)))
-				arr.push_back(claMan->GetCla(t->allNodes[n]->claIndexUR));
+			if(! (claMan->IsHolderDirty(t->allNodes[n]->claIndexDown)))
+				arr.push_back(claMan->GetClaFillIfNecessary(t->allNodes[n]->claIndexDown));
+			if(! (claMan->IsHolderDirty(t->allNodes[n]->claIndexUL)))
+				arr.push_back(claMan->GetClaFillIfNecessary(t->allNodes[n]->claIndexUL));
+			if(! (claMan->IsHolderDirty(t->allNodes[n]->claIndexUR)))
+				arr.push_back(claMan->GetClaFillIfNecessary(t->allNodes[n]->claIndexUR));
 			}
 		}
 	sort(arr.begin(), arr.end());
