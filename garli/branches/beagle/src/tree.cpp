@@ -243,7 +243,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationM
 //set the expected precision
 #define SAME_PRECISION
 
-#if defined(SAME_PRECISION) && defined(USE_BEAGLE){
+#if defined(SAME_PRECISION) && defined(USE_BEAGLE)
 	//use the same tolerance, even in the double prec case
 	Tree::expectedPrecision = FLT_EPSILON * 10.0;
 #else
