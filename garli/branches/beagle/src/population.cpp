@@ -1225,7 +1225,11 @@ void Population::SeedPopulationWithStartingTree(int rep){
 #endif
 	
 	indiv[0].CalcFitness(0);
-	outman.UserMessage("approx likelihood precision = +/- %.2e lnL", Tree::expectedPrecision * -indiv[0].Fitness());
+	FLOAT_TYPE lnLerror = Tree::expectedPrecision * -indiv[0].Fitness();
+	if(lnLerror > 0.001)
+		outman.UserMessage("approx likelihood precision = +/- %.3f lnL", Tree::expectedPrecision * -indiv[0].Fitness());
+	else
+		outman.UserMessage("approx likelihood precision = +/- %.2e lnL", Tree::expectedPrecision * -indiv[0].Fitness());
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	if(indiv[0].mod->NumMutatableParams() == 0) {
