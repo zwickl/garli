@@ -947,7 +947,7 @@ class Model{
 	FLOAT_TYPE StateFreq(int p) const{ return *stateFreqs[p];}
 	FLOAT_TYPE TRatio() const;
 	FLOAT_TYPE Rates(int r) const { return *relNucRates[r];}
-	int NumRelRates() const {return relNucRates.size();}
+	int NumRelRates() const {return (int) relNucRates.size();}
 	int NRateCats() const {return modSpec.numRateCats;}
 	FLOAT_TYPE *GetRateMults() {return rateMults;}
 	void GetRateMultsForBeagle(vector<FLOAT_TYPE> &r) {
@@ -1112,7 +1112,10 @@ class Model{
 			for(int i=0;i<relNucRates.size();i++)
 				*relNucRates[i]=r[i];
 			}
-		eigenDirty=true;
+		//The qmat must be updated because it will calculate
+		//a new blen_multiplier, which now MUST be factored into the eigenVals in CalcEigenStuff
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		}
 	void SetPis(FLOAT_TYPE *b, bool checkValidity, bool renormalize){
 		//7/12/07 we'll now assume that all freqs have been passed in, rather than calcing the last
@@ -1140,7 +1143,10 @@ class Model{
 				*stateFreqs[i] /= freqTot;
 				}
 			}
-		eigenDirty=true;
+		//The qmat must be updated because it will calculate
+		//a new blen_multiplier, which now MUST be factored into the eigenVals in CalcEigenStuff
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		}
 
 	void SetFlexRates(FLOAT_TYPE *rates, FLOAT_TYPE *probs){
@@ -1165,6 +1171,10 @@ class Model{
 		for(int r=0;r<NRateCats();r++)
 			rateProbs[r] /= tot;
 		ratesChanged = rateProbsChanged = true;
+		//The qmat must be updated because it will calculate
+		//a new blen_multiplier, which now MUST be factored into the eigenVals in CalcEigenStuff
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		}
 
 	FLOAT_TYPE FlexRate(int which){
@@ -1201,7 +1211,8 @@ class Model{
 		*stateFreqs[which] = val;
 		NormalizeSumConstrainedValues(&stateFreqs[0], nstates, 1.0, 1e-4, which);
 #endif
-		eigenDirty = true;
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		}
 
 	void SetRelativeNucRate(int which, FLOAT_TYPE val){
@@ -1223,13 +1234,16 @@ class Model{
 				}
 			*relNucRates[refRate] *= scaler;
 			}
-		eigenDirty = true;
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		}
 	//
 	void SetReferenceRelativeNucRate(int which, FLOAT_TYPE val){
 		FLOAT_TYPE newVal = val / currentRefRateScale;
 		SetRelativeNucRate(NumRelRates() - 1, newVal);
 		currentRefRateScale = val;
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		}
 	void ResetCurrentRefRateScale(){
 		currentRefRateScale = 1.0;
@@ -1284,7 +1298,8 @@ class Model{
 		assert(FloatingPointEquals(sum, SUM_TO, 1e-8));
 #endif
 */
-		eigenDirty = true;
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		}
 
 	void NormalizeSumConstrainedRelativeRates(bool enforceBounds, int toNotChange){
@@ -1427,10 +1442,10 @@ class Model{
 		for(int i=0;i<NRateCats();i++){
 			rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
 			}
-		//this would NOT seem to be necessary since the eigen solution itself doesn't change when pinv does
-		//however, since the blen_multiplier depends on pinv with my methodology and since that is all
-		//taken care of in CalcEigenStuff it must be called whenever pinv changes
-		eigenDirty = true;
+		//The qmat must be updated because it will calculate
+		//a new blen_multiplier, which now MUST be factored into the eigenVals in CalcEigenStuff
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		ratesChanged = rateProbsChanged = true;
 		}
 
@@ -1487,7 +1502,8 @@ class Model{
 	void SetOmega(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
 		*omegas[which] = val;
-		eigenDirty = true;
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		ratesChanged = rateProbsChanged = true;
 		}
 
@@ -1498,6 +1514,10 @@ class Model{
 		*omegaProbs[which] = val;
 
 		NormalizeSumConstrainedValues(&omegaProbs[0], NRateCats(), ONE_POINT_ZERO, 1.0e-5, which);
+		//The qmat must be updated because it will calculate
+		//a new blen_multiplier, which now MUST be factored into the eigenVals in CalcEigenStuff
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 /*
 		FLOAT_TYPE newTot = 1.0 - *omegaProbs[which];
 		FLOAT_TYPE oldTot = 0.0;
@@ -1532,7 +1552,8 @@ class Model{
 			tot += *omegaProbs[r];
 			}
 		if(FloatingPointEquals(tot, ONE_POINT_ZERO, 1.0e-3) == false) throw ErrorException("omega category proportions add up to %f, not 1.0.", tot);
-		eigenDirty = true;
+		//eigenDirty is set by UpdateQmat
+		UpdateQMat();
 		ratesChanged = rateProbsChanged = true;
 		}
 
