@@ -802,7 +802,9 @@ void Population::RunTests(){
 		}
 
 	Individual *ind0 = &newindiv[0];
+	ind0->mod->SetDefaultModelParameters(data);
 	Individual *ind1 = &newindiv[1];
+	ind1->mod->SetDefaultModelParameters(data);
 
 	//ind0->MakeRandomTree(data->NTax());
 	ind0->MakeStepwiseTree(data->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
@@ -813,13 +815,13 @@ void Population::RunTests(){
 	ind0->treeStruct->MakeAllNodesDirty();
 	ind0->SetDirty();
 	ind0->CalcFitness(0);
+	assert(FloatingPointEquals(ind0->treeStruct->lnL , scr, -scr * ind0->treeStruct->expectedPrecision));
 
 	//this only really tests for major scoring problems in the optimization functions
 	scr = ind0->treeStruct->lnL;
 	ind0->treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-	assert(FloatingPointEquals(ind0->treeStruct->lnL , scr, -scr * ind0->treeStruct->expectedPrecision));
-	//assert(ind0->treeStruct->lnL >= scr - 1e-8);
-	//assert(ind0->treeStruct->lnL * 2 < scr);
+	assert(ind0->treeStruct->lnL >= scr - 1e-8);
+	assert(ind0->treeStruct->lnL * 2 < scr);
 
 #ifdef SINGLE_PRECISION_FLOATS
 	int sigFigs = ceil(log10(-ind0->treeStruct->lnL));
@@ -2534,6 +2536,9 @@ void Population::PerformSearch(){
 			if(currentSearchRep > conf->searchReps) throw ErrorException("rep number in checkpoint (%d) is larger than total rep specified in config (%d)", currentSearchRep, conf->searchReps);
 			outman.UserMessage("%s generation %d, seed %d, best lnL %.3f", s.c_str(), gen, rnd.init_seed(), indiv[bestIndiv].Fitness());
 			}
+		//this needs to be done to keep the clas of the best indiv from being yoinked
+	//	if(memLevel > 0)
+	//		indiv[bestIndiv].treeStruct->ProtectClas();
 
 #ifndef BOINC
 		//Start catching Ctrl-C's
@@ -3391,7 +3396,7 @@ void Population::FindTreeStructsForNextGeneration(){
 
 void Population::CheckActualClaUsage(const Individual *inds){
 	vector<int> bookCounts;
-	claMan->GetHolderUsageCountTotals(bookCounts);
+	//claMan->GetHolderUsageCountTotals(bookCounts);
 	vector<int> actualCounts(claMan->NumHolders(), 0);
 	ofstream deb("debug.log");
 	for(int i = 0;i < total_size;i++){
