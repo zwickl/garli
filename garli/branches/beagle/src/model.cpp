@@ -274,6 +274,8 @@ void Model::UpdateQMat(){
 
 	//calculate the branch length rescaling factor
 	blen_multiplier[0]=(ZERO_POINT_FIVE/((qmat[0][0][1]**stateFreqs[0])+(qmat[0][0][2]**stateFreqs[0])+(qmat[0][0][3]**stateFreqs[0])+(qmat[0][1][2]**stateFreqs[1])+(qmat[0][1][3]**stateFreqs[1])+(qmat[0][2][3]**stateFreqs[2])));
+	//in the post beagle scheme CalcEigen MUST be called after UpdateQmat so that the blen_multiplier is factored into the eigenVals and set back to 1.0
+	eigenDirty = true;
 	}
 
 void Model::FillQMatLookup(){
@@ -667,6 +669,8 @@ void Model::UpdateQMatCodon(){
 	blen_multiplier[0] = ONE_POINT_ZERO / blen_multiplier[0];
 	for(int i=1;i<NRateCats();i++)
 		blen_multiplier[i] = blen_multiplier[0];
+	//in the post beagle scheme CalcEigen MUST be called after UpdateQmat so that the blen_multiplier is factored into the eigenVals and set back to 1.0
+	eigenDirty = true;
 	}
 
 //This just duplicates what happens at the end of UpdateQmatCodon, where the total rate is summed
@@ -761,12 +765,18 @@ void Model::UpdateQMatAminoAcid(){
 		weightedDiagSum += sum * *stateFreqs[from];
 		}
 	blen_multiplier[0] = ONE_POINT_ZERO / weightedDiagSum;
+	//in the post beagle scheme CalcEigen MUST be called after UpdateQmat so that the blen_multiplier is factored into the eigenVals and set back to 1.0
+	eigenDirty = true;
 	}
 
 void Model::CalcEigenStuff(){
 	ProfCalcEigen.Start();
 	//if rate params or statefreqs have been altered, requiring the recalculation of the eigenvectors and c_ijk
 	//NOTE that the calculation of the blen_multiplier (rate matrix scaler) now occurs in UpdateQMat()
+	//BUT it is factored out again below in the post-beagle context
+	//ALSO note that an updated Qmat implies dirtyEigen, so UpdateQMat automatically sets eigenDirty if it
+	//is called from elsewhere.  It is called again here for saftey, just in case in case eigenDirty
+	//was set but the qmat wasn't updated
 	UpdateQMat();
 	
 	int effectiveModels = modSpec.IsNonsynonymousRateHet() ? NRateCats() : 1;
@@ -1197,6 +1207,8 @@ void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLO
 	if(eigenDirty==true)
 		CalcEigenStuff();
 
+	assert(FloatingPointEquals(blen_multiplier[0], 1.0, 1e-4));
+
 	//this gets tricky, because to do +I and pass pmats/dmats we need to create mats for the 0 rate class,
 	//which Garli does not usually do.
 
@@ -1302,6 +1314,8 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***pmat){
 */
 	if(eigenDirty==true)
 		CalcEigenStuff();
+
+	assert(FloatingPointEquals(blen_multiplier[0], 1.0, 1e-4));
 /*
 	if(dlen < 0.011 && dlen > 0.009)
 		SetOmega(0, before);
@@ -1485,7 +1499,7 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 			else AdjustRateProportions();
 			}
 		}
-	eigenDirty = true;
+	UpdateQMat();
 	ratesChanged = true;
 	rateProbsChanged = true;
 	}
@@ -3357,7 +3371,8 @@ int Model::PerformModelMutation(){
 			//function does a better job of enforcing minimum values
 			NormalizeSumConstrainedValues(&omegaProbs[0], NRateCats(), ONE_POINT_ZERO, 1.0e-5, -1);
 			//eigen stuff needs to be recalced for changes to nonsynonymous rates
-			eigenDirty = true;
+			//eigenDirty is set by UpdateQmat
+			UpdateQMat();
 			}
 		ratesChanged = rateProbsChanged = true;
 		retType=Individual::alpha;
