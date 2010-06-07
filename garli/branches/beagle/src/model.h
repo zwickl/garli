@@ -1508,6 +1508,7 @@ class Model{
 		}
 
 	void SetOmegaProb(int which, FLOAT_TYPE val){
+		assert(NRateCats() > 1);
 		assert(which < NRateCats());
 		assert(val >= 0.0);
 		assert(val == val);

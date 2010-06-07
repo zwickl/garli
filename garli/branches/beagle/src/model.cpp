@@ -3369,7 +3369,8 @@ int Model::PerformModelMutation(){
 		else if(modSpec.IsCodon()){
 			//this normalization could really be taken care of in the mutator, but this general purpose
 			//function does a better job of enforcing minimum values
-			NormalizeSumConstrainedValues(&omegaProbs[0], NRateCats(), ONE_POINT_ZERO, 1.0e-5, -1);
+			if(NRateCats() > 1)
+				NormalizeSumConstrainedValues(&omegaProbs[0], NRateCats(), ONE_POINT_ZERO, 1.0e-5, -1);
 			//eigen stuff needs to be recalced for changes to nonsynonymous rates
 			//eigenDirty is set by UpdateQmat
 			UpdateQMat();
