@@ -378,8 +378,8 @@ void Population::CheckForIncompatibleConfigEntries(){
 
 	//don't have sitelike output worked out yet in beagle mode
 #ifdef USE_BEAGLE
-	if(conf->outputSitelikelihoods)
-		throw ErrorException("sorry, site-likelihood output is not yet implemented for the BEAGLE version.\nSet outputsitelikelihoods = 0.");
+//	if(conf->outputSitelikelihoods)
+//		throw ErrorException("sorry, site-likelihood output is not yet implemented for the BEAGLE version.\nSet outputsitelikelihoods = 0.");
 #endif
 
 	//if no model mutations will be performed, parameters cannot be estimated.
@@ -510,7 +510,13 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	const int MB = 1024 * 1024;
 	int sites = data->NChar();
 
-	int claSizePerNode = (modSpec.nstates * modSpec.numRateCats * sites * sizeof(FLOAT_TYPE)) + (sites * sizeof(int));
+#ifdef USE_BEAGLE
+	int fpSize = ((conf->singlePrecBeagle || conf->gpuBeagle) ? 4 : 8);
+#else
+	int fpSize = sizeof(FLOAT_TYPE);
+#endif
+
+	int claSizePerNode = (modSpec.nstates * modSpec.numRateCats * sites * fpSize) + (sites * sizeof(int));
 	int numNodesPerIndiv = data->NTax()-2;
 	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
@@ -537,11 +543,11 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 	outman.precision(4);
 	outman.UserMessage("\nFor this dataset:");
 	outman.UserMessage(" Mem level		availablememory setting");
-	outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNode/(FLOAT_TYPE)MB)) * 1.25);
-	outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
-	outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
-	outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
-	outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 );
+	outman.UserMessage("  great			    >= %.1f MB", ceil(L0 * (claSizePerNode/(FLOAT_TYPE)MB)) * 1.25);
+	outman.UserMessage("  good			approx %.1f MB to %.1f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
+	outman.UserMessage("  low			approx %.1f MB to %.1f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
+	outman.UserMessage("  very low		approx %.1f MB to %.1f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
+	outman.UserMessage("the minimum required availablememory is %.1f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 );
 
 	outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
 
@@ -820,8 +826,8 @@ void Population::RunTests(){
 	//this only really tests for major scoring problems in the optimization functions
 	scr = ind0->treeStruct->lnL;
 	ind0->treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-	assert(ind0->treeStruct->lnL >= scr - 1e-8);
-	assert(ind0->treeStruct->lnL * 2 < scr);
+	assert(FloatingPointEquals(ind0->treeStruct->lnL , scr, -scr * ind0->treeStruct->expectedPrecision));
+	assert(ind0->treeStruct->lnL * 2.0 < scr);
 
 #ifdef SINGLE_PRECISION_FLOATS
 	int sigFigs = ceil(log10(-ind0->treeStruct->lnL));
@@ -3091,7 +3097,9 @@ FLOAT_TYPE Population::CalcAverageFitness(){
 		globalBest = bestFitness = indiv[bestIndiv].Fitness();
 		}
 
-	if(memLevel>0){
+	//DEBUG
+	//if(memLevel>0){
+	if(1){
 		//if we are at some level of memory restriction, mark the clas of the old best
 		//for reclamation, and protect those of the new best
 		SetNewBestIndiv(bestIndiv);
@@ -6431,8 +6439,9 @@ void Population::InitializeOutputStreams(){
 	}
 */
 
-//this was the old version of this, which didn't make much sense in the non-parallel context
-/*
+//I thought that I could change this for beagle purposes and only unprotect if the best
+//changes (and then only the old best) but cannot because clas that were reserved may
+//no longer be pointed to by the tree that they were reserved on
 void Population::SetNewBestIndiv(int indivIndex){
 	//this should be called when a new best individual is set outside of
 	//CalcAverageFitness.  Particularly important for parallel.
@@ -6445,16 +6454,7 @@ void Population::SetNewBestIndiv(int indivIndex){
 		}
 	indiv[bestIndiv].treeStruct->ProtectClas();
 	}
-*/
 
-//this makes more sense with beagle changes
-void Population::SetNewBestIndiv(int newIndex){
-	if(newIndex != bestIndiv)
-		indiv[bestIndiv].treeStruct->UnprotectClas();
-	bestIndiv = newIndex;
-	globalBest = bestFitness = prevBestFitness = BestFitness();
-	indiv[bestIndiv].treeStruct->ProtectClas();
-	}
 
 void Population::FinalizeOutputStreams(int type){
 	/*the types are:
