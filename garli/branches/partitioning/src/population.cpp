@@ -650,7 +650,7 @@ void Population::LoadNexusStartingConditions(){
 		else treesblock = reader.GetTreesBlock(tax, afterNumTreesBlocks - 1);
 #endif
 
-		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false)
+		if(( treesblock == NULL || treesblock->GetNumTrees() == 0) && reader.FoundModelString() == false)
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting model and/or tree", conf->streefname.c_str());
 		}
 	if(treesblock->GetNumTrees() > 0) startingTreeInNCL = true;
