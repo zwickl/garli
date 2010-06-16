@@ -193,8 +193,8 @@ protected:
 			assert(taxonLabel);
 			for(int t=0;t<nTax;t++) SetTaxonLabel(t, dat->TaxonLabel(t));
 			}
-		int NumTaxaWithPartialAmbig() const{
-			return taxaWithPartialAmbig.size();
+		unsigned NumTaxaWithPartialAmbig() const{
+			return (unsigned) taxaWithPartialAmbig.size();
 			}
 		bool TaxonHasPartialAmbig(int tax) const{
 			return (find(taxaWithPartialAmbig.begin(),taxaWithPartialAmbig.end(),tax) != taxaWithPartialAmbig.end());

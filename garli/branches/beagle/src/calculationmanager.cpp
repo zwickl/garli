@@ -35,6 +35,8 @@ const char *AdvanceDataPointer(const char *arr, int num);
 
 //#undef FULL_BEAGLE_DEBUG
 //#undef OUTPUT_OTHER_BEAGLE
+//#define OUTPUT_OTHER_BEAGLE
+//#define	OUTPUT_PMATS
 //#undef OUTPUT_PARTIALS
 //#undef OUTPUT_BEAGLE_SITELIKES
 
@@ -147,10 +149,12 @@ void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) c
 void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, int nstates, int nchar, int nrates){
 	assert(useBeagle);
 
-	termOnBeagleError = false;
+	//termOnBeagleError = false;
+	termOnBeagleError = true;
 	long req_flag = 0;
 	//the fact that GPU implies SP is taken care of elsewhere
 	long pref_flag = (gpuBeagle ? BEAGLE_FLAG_PROCESSOR_GPU : BEAGLE_FLAG_PROCESSOR_CPU);
+	//req_flag |= (gpuBeagle ? BEAGLE_FLAG_PROCESSOR_GPU : BEAGLE_FLAG_PROCESSOR_CPU);
 	if(singlePrecBeagle)
 		req_flag |= BEAGLE_FLAG_PRECISION_SINGLE;
 	//must accumulate log rescalers for my implementation
@@ -175,11 +179,16 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	int partialsCount = nClas + ambigTips;
 	int compactCount = normalTips;
 
+#ifndef DONT_SEND_TRANSMATS
+	//num freqs = numEigens in beagle, so need at least one
+	int eigCount = 1;
+#else
 	int eigCount = nClas;
+#endif
 	//this is a gross overestimate of how many matrices are needed, but haven't worked out recycling quite yet for mats
 	int matrixCount = (nHolders * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
 	//int matrixCount = (nClas * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
-	//DEBUG - trying scaling
+	
 	//try one scaler per cla, as in normal garli.  These are doubles rather than ints though, so larger.
 	//scaler for a given cla will share same index, and will be cumulative, as mine are now
 	//add one for a destinationScaleWrite which will always be the last and will be used in all calls for scratch
@@ -191,15 +200,23 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 
 	BeagleInstanceDetails det;
 
+	int fpSize = (singlePrecBeagle ? 4 : 8);
+
 	outman.DebugMessage("BEAGLE ALLOCATIONS:");
 	outman.DebugMessage("\tstates: %d char: %d rates: %d", nstates, nchar, nrates);
 	outman.DebugMessage("\ttips: %d", tipCount);
 	outman.DebugMessage("\tcompact tips arrays (no partial ambiguity): %d (%.1f KB)", compactCount, compactCount * nchar * 4 / 1024.0);
-	outman.DebugMessage("\tpartial tips arrays (some partial ambiguity): %d (%.1f KB)", ambigTips, ambigTips * nstates * nchar * 4 / 1024.0);
-	outman.DebugMessage("\ttotal partial arrays: %d (%.1f KB)", partialsCount, partialsCount * nstates * nchar * nrates * 4 / 1024.0);
-	outman.DebugMessage("\teigen solutions: %d (%.1f KB (?))", eigCount, eigCount * nstates * 2 * 4 / 1024.0);
-	outman.DebugMessage("\ttransition matrices (pmats and derivs): %d (%.1f KB)", matrixCount, matrixCount * nstates * nstates * nrates * 4 / 1024.0);
-	outman.DebugMessage("\trescaling arrays %d (%.1f)", scalerCount, scalerCount * nchar * 4 / 1024.0);
+	outman.DebugMessage("\tpartial tips arrays (some partial ambiguity): %d (%.1f KB)", ambigTips, ambigTips * nstates * nchar * fpSize / 1024.0);
+	outman.DebugMessage("\ttotal partial arrays: %d (%.1f KB)", partialsCount, partialsCount * nstates * nchar * nrates * fpSize / 1024.0);
+	outman.DebugMessage("\teigen solutions: %d (%.1f KB (?))", eigCount, eigCount * nstates * 2 * fpSize / 1024.0);
+	outman.DebugMessage("\ttransition matrices (pmats and derivs): %d (%.1f KB)", matrixCount, matrixCount * nstates * nstates * nrates * fpSize / 1024.0);
+	outman.DebugMessage("\trescaling arrays %d (%.1f KB)", scalerCount, scalerCount * nchar * fpSize / 1024.0);
+	
+	double totMem = (compactCount * nchar * 4 / 1024.0) + (ambigTips * nstates * nchar * fpSize / 1024.0) + (partialsCount * nstates * nchar * nrates * fpSize / 1024.0) +
+			(eigCount * nstates * 2 * fpSize / 1024.0) + (eigCount, eigCount * nstates * 2 * fpSize / 1024.0) + (matrixCount * nstates * nstates * nrates * fpSize / 1024.0) +
+			(scalerCount * nchar * fpSize / 1024.0);
+
+	outman.DebugMessage("Total beagle memory allocations approx %.1f MB)", totMem / 1024.0);
 
 	//this returns either the instance number or a beagle error, which is somewhat annoying
    	beagleInst = beagleCreateInstance(tipCount, 
@@ -300,6 +317,44 @@ void CalculationManager::SendTipDataToBeagle(){
 	}
 #endif
 
+ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *effectiveRoot, bool calcDerivs){
+	if(calcDerivs)
+		outman.DebugMessage("#\nCALC D RT=%d", effectiveRoot->nodeNum);
+	else
+		outman.DebugMessage("#\nCALC L RT=%d", effectiveRoot->nodeNum);
+
+	//this collects all of the necessary computation details and stores them in 
+	//the operationSetQueue and scorOps list
+	//NOTE that any clas that are indentified as clean dependencies will be temp reserved here
+	DetermineRequiredOperations(effectiveRoot, calcDerivs);	
+
+	//list<BlockingOperationsSet> operationSetQueue;
+		//list claOps
+			//dest and child clas, transmat ind, deplevel
+		//list pmatOps
+			//destTransMat, edgelen, model index, calcDerivs
+    
+	//list<ScoringOperation> scoreOps;
+		//dest and children, transmatInd, calcDerivs
+
+	//do all of the ops in the operationsSetQueue (i.e., all transmat ops and updatePartials, 
+	//INCLUDING the transmat needed for the scoring operation)
+	UpdateAllConditionals();
+
+	//Now do the score op, which will return a ScoreSet that has at least the lnL, and 
+	//D1 and D2 if requested.  This assumes that there is only one score op in scoreOps
+	assert(scoreOps.size() == 1);
+	ScoreSet values;
+	for(list<ScoringOperation>::iterator sit = scoreOps.begin() ; sit != scoreOps.end() ; sit++)
+		values = PerformScoringOperation(&(*sit));
+
+	ResetDepLevelsAndReservations();
+
+	operationSetQueue.clear();
+	scoreOps.clear();
+	return values;
+	}	
+
 /*This is called by CalculateLikelihoodAndDerivatives and amasses all of the transmat, cla and scoring
 operations necessary to get whatever is asked for.  When deriviatives is false, effectiveRoot will be treated as 
 just that, the node at which all clas are pulled to.  It must be internal.  Which clas are combined is determined by this function.
@@ -382,22 +437,25 @@ void CalculationManager::DetermineRequiredOperations(const TreeNode *effectiveRo
 	list<NodeOperation>::iterator end = nodeOps.begin();
 	while(end != nodeOps.end()){
 		int num = 0;
-		while(end != nodeOps.end() && end->claOp.opDepLevel == lvl){
-			end++;
-			num++;
+		assert(start->claOp.opDepLevel == lvl);
+		if(start->claOp.opDepLevel == lvl){
+			while(end != nodeOps.end() && end->claOp.opDepLevel == lvl){
+				end++;
+				num++;
+				}
+			//outman.UserMessage("level %d = %d nodes", lvl, num);
+			for(list<NodeOperation>::iterator nit = start;nit != end;nit++){
+				thisSet.claOps.push_back((*nit).claOp);
+				thisSet.pmatOps.push_back((*nit).transOp1);
+				thisSet.pmatOps.push_back((*nit).transOp2);
+				}
+			thisSet.opSetDepLevel = lvl;
+			operationSetQueue.push_back(thisSet);
+			start = end;
+			thisSet.claOps.clear();
+			thisSet.pmatOps.clear();
+			lvl++;
 			}
-		//outman.UserMessage("level %d = %d nodes", lvl, num);
-		for(list<NodeOperation>::iterator nit = start;nit != end;nit++){
-			thisSet.claOps.push_back((*nit).claOp);
-			thisSet.pmatOps.push_back((*nit).transOp1);
-			thisSet.pmatOps.push_back((*nit).transOp2);
-			}
-		thisSet.opSetDepLevel = lvl;
-		operationSetQueue.push_back(thisSet);
-		start = end;
-		lvl++;
-		thisSet.claOps.clear();
-		thisSet.pmatOps.clear();
 		}
 
 	//the matrix for the branch between end1 and end2 for the final operation 
@@ -409,6 +467,471 @@ void CalculationManager::DetermineRequiredOperations(const TreeNode *effectiveRo
 	operationSetQueue.push_back(fin);
 	scoreOps.push_back(ScoringOperation(-1, end1, end2, finalPmat, derivatives));
 	}
+
+//this will recursively move over the tree from the root node, spreading until tips or clean clas
+//are hit.  If the endpoints are clas, they will be reserved now
+int CalculationManager::AccumulateOpsOnPath(int holderInd, list<NodeOperation> &nodeOps){
+	//it is ok to call this with a tip, because that tip could be a terminal branch that is having derivs
+	//calculated.  accumulate nothing in that case
+	if(holderInd < 0)
+		return 0;
+
+	CondLikeArrayHolder *holder = claMan->GetMutableHolder(holderInd);
+	if(! holder->IsDirty()){
+		//this cla is clean, and now an initial dependency, so be sure that it doesn't get yoniked
+		claMan->ClaimClaFillIfNecessary(holderInd, 0);
+		return 0;
+		}
+
+	int depLevel1 = 0, depLevel2 = 0;
+	
+	if(holder->HolderDep1() >= 0){
+		depLevel1 = AccumulateOpsOnPath(holder->HolderDep1(), nodeOps);
+		}
+	if(holder->HolderDep2() >= 0){
+		depLevel2 = AccumulateOpsOnPath(holder->HolderDep2(), nodeOps);
+		}
+	
+	claMan->SetDepLevel(holderInd, max(depLevel1, depLevel2) + 1);
+
+/*
+	BlockingOperationsSet opSet;
+	//opSet.claOps.push_back(ClaOperation(holderInd, holder->HolderDep1(), holder->HolderDep2(), holder->TransMatDep1(), holder->TransMatDep2(), holder->DepLevel()));
+	opSet.claOps.push_back(ClaOperation(holderInd, holder));
+	//DEBUG - second arg here is model index.  Not sure how that will be dealt with
+	opSet.pmatOps.push_back(TransMatOperation(holder->TransMatDep1(), 0, pmatMan->GetEdgelen(holder->TransMatDep1()), false));
+	opSet.pmatOps.push_back(TransMatOperation(holder->TransMatDep2(), 0, pmatMan->GetEdgelen(holder->TransMatDep2()), false));
+
+	operationSetQueue.push_back(opSet);
+*/
+	nodeOps.push_back(NodeOperation(ClaOperation(holderInd, holder->HolderDep1(), holder->HolderDep2(), holder->TransMatDep1(), holder->TransMatDep2(), holder->DepLevel()),
+						TransMatOperation(holder->TransMatDep1(), 0, pmatMan->GetEdgelen(holder->TransMatDep1()), false),
+						TransMatOperation(holder->TransMatDep2(), 0, pmatMan->GetEdgelen(holder->TransMatDep2()), false)));
+
+	return holder->DepLevel();
+	}
+
+//this just performs all of the transmat and cla ops that were queued
+//will generally be followed by a call to PerformScoring to get lnL or derivs
+void CalculationManager::UpdateAllConditionals(){	
+	//DEBUG
+	OutputOperationsSummary();
+
+#define BATCHED_CALLS
+#ifdef BATCHED_CALLS
+/*
+	//this just yoinks the pmat ops from each BlockingOpSet into a new list
+	//note that PerformTransMatOperationBatch assumes that all the ops either
+	//need derivs or not.  So, avoid adding ops that need derivs here.
+	list<TransMatOperation> tops;
+	for(list<BlockingOperationsSet>::iterator it = operationSetQueue.begin();it != operationSetQueue.end();it++){
+		if(! (*it).pmatOps.begin()->calcDerivs)
+			tops.splice(tops.end(), (*it).pmatOps);
+		}
+
+	if(tops.size() > 0){
+#ifndef DONT_SEND_TRANSMATS
+		SendTransMatsToBeagle(tops);
+#else
+		PerformTransMatOperationBatch(tops);
+#endif
+		}
+
+	//Any transmats that need derivs will still be included in a blockingOpSet, so will get done here.  Otherwise
+	//no transmat calls will be done here because the ops were pulled out above to be done in one big batch
+*/
+	/*Calculation of all necessary partials will go like this:
+		0. Before getting here all cla ops will have their cla and pmat dependencies set, and
+		   the dependencies of the first destination clas will have been reserved if clean clas
+		1. (calc any transmats necessary - currently this will actually happen above)
+		2. Claim the first set of destination clas (this could in theory cause a call to Recycle, but 
+		   shouldn't be necessary unless something is wrong, I think)
+		3. Calc the first level
+		4. Unreserve deps of first level (which would be clas clean to begin with), don't add to freeable
+		5. Claim second (could call recyc, but wouldn't touch anything used in this entire scoring/deriv call)
+		6. Calc second 
+		7. Mark dependencies of second (i.e., the first level) as freeable and push to claman freeable queue
+		6. Claim third (could call recyc, AND would first reclaim the first level from claman freeable queue)
+		7. Calc third
+		6. Mark dependencies of third (i.e., the second level) as freeable and push to claman freeable queue
+		7. Claim fourth (could call recyc, AND would first reclaim the first and second level from claman freeable queue)
+		6. Calc fourth
+		8. Mark deps of fourth as freeable and push to claman freeable queue
+		etc...
+		9. Unreserve anything remaining, clear freeable queue and op queue
+
+	*/
+	claMan->SetCurReclaimableLevel(0);
+	list<BlockingOperationsSet>::iterator toFree = operationSetQueue.begin();
+
+	for(list<BlockingOperationsSet>::iterator it = operationSetQueue.begin();it != operationSetQueue.end();){
+		if((*it).pmatOps.size() > 0){
+#ifndef DONT_SEND_TRANSMATS
+			SendTransMatsToBeagle((*it).pmatOps);
+#else
+			PerformTransMatOperationBatch((*it).pmatOps);
+#endif
+			}
+		if((*it).claOps.size() > 0){
+			//this will reserve the DESTINATION clas. The child cla dependencies should already have
+			//been reserved if they are clas (not tips).  If they were clean in the first place they
+			//should have been reserved in AccumulateOps, otherwise when they were reserved when previous
+			//destinations
+			ReserveDestinationClas(*it);
+			PerformClaOperationBatch((*it).claOps);
+			
+			//No need to do all this unreservation if the number of clas is large enough to simultaneously hold
+			//all clas of the tree. We'll still unreserve them all at the end
+			//DEBUG
+			//if(memLevel > 0){
+			if(1){
+				//remove the temp reservations from the level 1 DEPENDENCIES (if they are clean clas and not tips)
+				//but DO NOT add them to the freeable queue (since they must have been clean in the first place)
+				if((*it).opSetDepLevel == 1){
+					UnreserveDependencyClas(*it);
+					claMan->SetCurReclaimableLevel((*it).opSetDepLevel - 1);
+					it = operationSetQueue.erase(it);
+					}
+				//when we've finished level 2 or greater, we can now tell the claMan that the dependencies are ripe for the taking
+				else if((*it).opSetDepLevel > 1){
+					QueueDependencyClasForFreeing(*it);
+					claMan->SetCurReclaimableLevel((*it).opSetDepLevel - 1);
+					it = operationSetQueue.erase(it);
+					}
+				}
+			else it++;
+			}
+		else 
+			it++;
+		}
+	//TODO - what should happen with reclaim level after all the calcs?  
+	//trying to allow freeing of first level dependencies in general
+	claMan->SetCurReclaimableLevel(1);
+#else
+	//do the actual operations.  right now it is doing 2 pmat ops followed by the cla op that requires then and looping
+	//since there are enough pmats it would make more sense to put them into a single block to be done together
+	for(list<BlockingOperationsSet>::const_iterator it = operationSetQueue.begin();it != operationSetQueue.end();it++){
+		for(list<TransMatOperation>::const_iterator pit = (*it).pmatOps.begin();pit != (*it).pmatOps.end();pit++)
+			PerformTransMatOperation(&(*pit));
+		for(list<ClaOperation>::const_iterator cit = (*it).claOps.begin();cit != (*it).claOps.end();cit++)
+			PerformClaOperation(&(*cit));
+		}
+#endif
+	}
+
+void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperation> &theOps){
+#ifndef USE_BEAGLE
+	//mod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
+	//this is a bit ridiculous, but these funcs won't really be getting used except with beagle
+	pmatMan->GetMutableHolder(theOp->destTransMatIndex)->myMod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
+#else 
+
+	//for now assuming that all transmat ops in a set have same eigen solution and rate multipliers
+	
+	//currently just using a single eigen index and sending it every time
+	int eigenIndex = 0;
+	
+	//this call will calculate the eigen solution first if necessary
+	//currently it will always be resent (sol.changed will always be true) because
+	//it is non-trivial to figure out when it has changed since it was last sent to beagle
+	ModelEigenSolution sol;
+	pmatMan->GetEigenSolution(theOps.begin()->destTransMatIndex, sol);
+
+	if(sol.changed){
+		CheckBeagleReturnValue(
+			beagleSetEigenDecomposition(
+				beagleInst,
+				eigenIndex,
+				sol.eigenVecs,
+				sol.invEigenVecs,
+				sol.eigenVals),
+			"beagleSetEigenDecomposition");
+		}
+
+	vector<FLOAT_TYPE> categRates;
+	pmatMan->GetCategoryRatesForBeagle(theOps.begin()->destTransMatIndex, categRates);
+
+	//as above, always resend currently
+	if(categRates.size() > 0){
+		CheckBeagleReturnValue(
+			beagleSetCategoryRates(beagleInst,
+				&(categRates[0])),
+			"beagleSetCategoryRates");
+		}
+
+	vector<int> pmatInd;
+	vector<int> d1MatInd;
+	vector<int> d2MatInd;
+	vector<double> edgeLens;
+
+	for(list<TransMatOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
+		//DEBUG
+		//outman.DebugMessage("transmat %d mod %d modadr %d edge %.4f", (*it).destTransMatIndex, (*it).modelIndex, pmatMan->GetCorrespondingModel((*it).destTransMatIndex), (*it).edgeLength);
+		//pmatMan->GetCorrespondingModel(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
+		pmatMan->ClaimTransmatsetFillIfNecessary((*it).destTransMatIndex);
+		pmatInd.push_back(PmatIndexForBeagle((*it).destTransMatIndex));
+		d1MatInd.push_back(D1MatIndexForBeagle((*it).destTransMatIndex));
+		d2MatInd.push_back(D2MatIndexForBeagle((*it).destTransMatIndex));
+		edgeLens.push_back(pmatMan->GetEdgelen((*it).destTransMatIndex));
+		}
+
+	int count = pmatInd.size();
+	bool calcDerivs = theOps.begin()->calcDerivs;
+
+#ifdef OUTPUT_OTHER_BEAGLE
+	outman.DebugMessageNoCR("UPDATING TRANS MAT ");
+//	outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
+#endif
+	CheckBeagleReturnValue(
+		beagleUpdateTransitionMatrices(
+			beagleInst,
+			eigenIndex,
+            &pmatInd[0],
+			(calcDerivs ? &d1MatInd[0] : NULL),
+			(calcDerivs ? &d2MatInd[0] : NULL),
+			&edgeLens[0],
+            count),
+		"beagleUpdateTransitionMatrices");
+#endif
+
+#ifdef OUTPUT_PMATS
+
+	int nstates = data->NStates();
+	
+	int nrates = pmatMan->GetModelForTransMatHolder(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
+
+//	if(calcDerivs){
+
+	/*wrong	*/
+	//double inmat[16] = {0.9070614,	0.02927732,	0.02870608,	0.0349794, 0.03213807,	0.90418679,	0.02868981,	0.03497981, 0.03213807,	0.02926432,	0.90361226, 0.03497981, 0.03213831,	0.02927236,	0.02868767,	0.90990174};
+	//double inmat[16] = {0.9070613980, 0.0292773210, 0.0287060775, 0.0349793993, 0.0321380682, 0.9041867852, 0.0286898147, 0.0349798091, 0.0321380682, 0.0292643178, 0.9036122561, 0.0349798091, 0.0321383066, 0.0292723589, 0.0286876746, 0.9099017382}; 
+	//wrong, normalized rows sum to zero
+	//double inmat[16] = {0.9070394515, 0.0292766126, 0.0287053830, 0.0349785530, 0.0321382457, 0.9041917789, 0.0286899731, 0.0349800023, 0.0321382465, 0.0292644802, 0.9036172701, 0.0349800032, 0.0321383041, 0.0292723566, 0.0286876724, 0.9099016670};
+	//wrong, rescaled such that column totals are same, three lower elements in each column match
+	//double inmat[16] = {0.9070613980, 0.0292713326, 0.0286945223, 0.0349796725, 0.0321381477, 0.9041867852, 0.0286945223, 0.0349796725, 0.0321381477, 0.0292713326, 0.9036122561, 0.0349796725, 0.0321381477, 0.0292713326, 0.0286945223, 0.9099017382};
+	/*right*/
+	//double inmat[16] = {0.9070611, 0.0292719, 0.02868779, 0.03497917, 0.03213868, 0.90419436, 0.02868777, 0.03497917, 0.03213868, 0.0292719, 0.90361023, 0.03497917, 0.03213868, 0.02927192, 0.02868777, 0.90990162};
+	//double inmat[16] = {0.9070611396, 0.0292718949, 0.0286877828, 0.0349791827, 0.0321386719, 0.9041943625, 0.0286877828, 0.0349791827, 0.0321386719, 0.0292718949, 0.9036102504, 0.0349791827, 0.0321386719, 0.0292718949, 0.0286877828, 0.9099016503};
+	//pmat from DP beagle
+	double inmat[16] = {0.907060771,  0.02927234,  0.028687678,  0.034979238,  0.032138303,  0.904194759,  0.028687707,  0.034979216,  0.032138303,  0.029272277,  0.903610189,  0.034979216,  0.032138297,  0.029272304,  0.028687689,  0.909901709};
+
+	vector<double> outMat(nstates * nstates * nrates);
+	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){				
+//		outman.UserMessage("MANUALLY SETTING PMATS");
+//		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), inmat);
+
+		outMat.clear();
+		for(int p=0;p<nstates*nstates*nrates;p++) 
+			outMat.push_back(p);
+		beagleGetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
+		//beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
+		vector<double>::iterator it = outMat.begin();
+		outman.DebugMessage("%d", (*pit).destTransMatIndex);
+		for(int r = 0;r < nrates;r++){
+			for(int i = 0;i < nstates;i++){
+				for(int j=0;j < nstates;j++){
+					outman.DebugMessageNoCR("%.10f\t", *it++);
+					}
+				outman.DebugMessage("");
+				}
+			}
+		}
+//		}
+#endif
+	}
+
+void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &theOps){
+#if ! (defined(BATCHED_CALLS) && ! defined(DONT_SEND_TRANSMATS))
+	assert(0);
+#endif
+
+#ifdef OUTPUT_PMATS
+	ofstream *deb = outman.GetDebugStream();
+#endif
+
+	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){
+
+#define NEW
+#ifdef NEW
+		int theIndex = (*pit).destTransMatIndex;
+		FLOAT_TYPE ***thePMat = NULL;
+		FLOAT_TYPE ***theD1Mat = NULL;
+		FLOAT_TYPE ***theD2Mat = NULL;
+		pmatMan->ObtainAppropriateTransmats(*pit, thePMat, theD1Mat, theD2Mat);
+#else
+		double theBlen = (*pit).edgeLength;
+		int theIndex = (*pit).destTransMatIndex;
+		FLOAT_TYPE ***thePMat = pmatMan->GetPmatArray(theIndex);
+		FLOAT_TYPE ***theD1Mat = NULL;
+		FLOAT_TYPE ***theD2Mat = NULL;
+		if(pit->calcDerivs){
+			theD1Mat = pmatMan->GetD1MatArray(theIndex);
+			theD2Mat = pmatMan->GetD2MatArray(theIndex);
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->FillDerivativeMatrices(theBlen, thePMat, theD1Mat, theD2Mat);
+			pmatMan->FillDerivativeMatrices(theIndex, thePMat, theD1Mat, theD2Mat);
+			}
+		else{
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->AltCalcPmat(theBlen, thePMat);
+			}
+#endif
+#ifdef OUTPUT_PMATS
+		//output pmats to be sent
+		*deb << "send p " << theIndex << "\n";
+		pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, thePMat);
+#endif
+		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle(theIndex), **thePMat, 1.0);
+
+#ifdef OUTPUT_PMATS
+		if(!gpuBeagle){
+			*deb << "ret p GI=" << theIndex << " BI=" << PmatIndexForBeagle(theIndex)<< "\n";
+			OutputBeagleTransMat(PmatIndexForBeagle(theIndex));
+			}
+#endif
+		if(pit->calcDerivs){
+#ifdef OUTPUT_PMATS
+			*deb << "send D1 " << theIndex << "\n";
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, theD1Mat);
+			*deb << "send D2 " << theIndex << "\n";
+			pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, theD2Mat);
+#endif
+			beagleSetTransitionMatrix(beagleInst, D1MatIndexForBeagle(theIndex), **theD1Mat, 0.0);
+			beagleSetTransitionMatrix(beagleInst, D2MatIndexForBeagle(theIndex), **theD2Mat, 0.0);
+
+#ifdef OUTPUT_PMATS
+			if(!gpuBeagle){
+				if((*pit).calcDerivs){
+					*deb << "ret D1 GI=" << theIndex << " BI=" << D1MatIndexForBeagle(theIndex) << "\n";
+					OutputBeagleTransMat(D1MatIndexForBeagle(theIndex));
+					*deb << "ret D2 GI=" << theIndex << " BI=" << D2MatIndexForBeagle(theIndex) << "\n";
+					OutputBeagleTransMat(D2MatIndexForBeagle(theIndex));
+					}
+				}
+#endif
+			}
+		}
+	}
+
+void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theOps){
+	//not sure if this is right - will always use a single scale array for destWrite (essentially
+	//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
+	//int destinationScaleWrite = (rescaleBeagle ? claMan->NumClas() : BEAGLE_OP_NONE);
+
+	//scale read is if you are telling it to use precomputed scaling factors
+	int	destinationScaleRead = BEAGLE_OP_NONE;
+
+	vector<int> tupleList;
+	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
+		//This is happening a level higher now
+		//this will fill the destination holder with a cla index if necessary
+		//claMan->ClaimClaFillIfNecessary((*it).destClaIndex, (*it).depLevel);
+
+
+		tupleList.push_back(PartialIndexForBeagle((*it).destClaIndex));
+		//if rescaling, for each partial op pass in an array to store the amount of rescaling
+		//at this node, in my case stored as logs
+		if(rescaleBeagle)
+			tupleList.push_back(ScalerIndexForBeagle((*it).destClaIndex));
+		else 
+			tupleList.push_back(BEAGLE_OP_NONE);
+        tupleList.push_back(destinationScaleRead);
+		tupleList.push_back(PartialIndexForBeagle((*it).childClaIndex1));
+		tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex1));
+		tupleList.push_back(PartialIndexForBeagle((*it).childClaIndex2));
+		tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex2));
+		}
+
+	int instanceCount = 1;
+	int operationCount = (int) theOps.size();
+
+	//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
+	//and my negative (tip) corresponds to a NULL in beagle
+	int cumulativeScaleIndex = BEAGLE_OP_NONE;
+
+	CheckBeagleReturnValue(
+		beagleUpdatePartials(
+			beagleInst,
+			&tupleList[0],
+			operationCount,
+			cumulativeScaleIndex),
+		"beagleUpdatePartials");
+
+#ifdef OUTPUT_PARTIALS
+	string name2 = ofprefix + ".partials.log";
+	ofstream part(name2.c_str());
+	part.precision(5);
+
+	vector<double> outPartials(data->NStates() * data->NChar() * pmatMan->GetNumRates());
+	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
+		//could pass a scaler index here to have the values unscaled, I think
+		beagleGetPartials(beagleInst, PartialIndexForBeagle((*it).destClaIndex), BEAGLE_OP_NONE, &outPartials[0]);
+		for(int site = 0;site < data->NChar();site++){
+			part << site << "\t";
+			for(int rate = 0;rate < pmatMan->GetNumRates();rate++){
+				for(int state = 0;state < 4;state++)
+					part << outPartials[site * 4 + state] << "\t";
+				}
+			part << "\n";
+			}
+		}
+	part.close();
+#endif
+
+	//this is a bit sneaky. each partial now has a rescaling array associated with it, holding
+	//the amount done at that node alone.  Take the rescaling amounts from the two children,
+	//and add then to the rescaling already done at this node.  In the next dependency level pass
+	//the dest here will become the child there.
+
+	if(rescaleBeagle){
+		for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
+			AccumulateRescalers(
+				(*it).destClaIndex, 
+				(*it).childClaIndex1, 
+				(*it).childClaIndex2);
+			}
+		}
+/*
+	//to indicate that the partial is now clean, fill the holder that represents it, despite the fact that the memory there is never being used
+	//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
+	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
+		claMan->FillHolder((*it).destClaIndex, 0);
+		}
+*/
+	}
+
+#ifdef USE_BEAGLE
+//For scale arrays my indexing scheme and Beagle's happen to be the same
+//further accumulate the cumulative rescalings from the two children.  In the batched case
+//the dest array will already have the rescaling done at this node included, so don't reset it
+void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int childIndex2){
+
+#ifdef OUTPUT_OTHER_BEAGLE
+	//DEBUG
+	//outman.DebugMessage("accum %d + %d = %d", childIndex1, childIndex2, destIndex);
+#endif
+#ifndef BATCHED_CALLS
+	//clear out the destination scaler first
+	CheckBeagleReturnValue(
+		beagleResetScaleFactors(beagleInst,
+			ScalerIndexForBeagle(destIndex)), 
+		"beagleResetScaleFactors");
+#endif
+
+	vector<int> childScalers;
+	if( ! (childIndex1 < 0))
+		childScalers.push_back(ScalerIndexForBeagle(childIndex1));
+	if( ! (childIndex2 < 0))
+		childScalers.push_back(ScalerIndexForBeagle(childIndex2));
+
+	if(childScalers.size() > 0){
+		CheckBeagleReturnValue(
+			beagleAccumulateScaleFactors(beagleInst,
+				&(childScalers[0]),
+				(int) childScalers.size(),
+				ScalerIndexForBeagle(destIndex)),
+			"beagleAccumulateScaleFactors");
+		}
+	}
+#endif
 
 void CalculationManager::OutputOperationsSummary() const{
 	//DEBUG
@@ -442,220 +965,94 @@ void CalculationManager::OutputOperationsSummary() const{
 	outman.DebugMessage("%d sets\t%d mats\t%d clas", numSets, numPmats, numClas);
 	}
 
-ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *effectiveRoot, bool calcDerivs){
-	if(calcDerivs)
-		outman.DebugMessage("#\nCALC D RT=%d", effectiveRoot->nodeNum);
-	else
-		outman.DebugMessage("#\nCALC L RT=%d", effectiveRoot->nodeNum);
-
-	//this collects all of the necessary computation details and stores them in 
-	//the operationSetQueue and scorOps list
-	//NOTE that any clas that are indentified as clean dependencies will be reserved here
-	DetermineRequiredOperations(effectiveRoot, calcDerivs);	
-
-	//list<BlockingOperationsSet> operationSetQueue;
-		//list claOps
-			//dest and child clas, transmat ind, deplevel
-		//list pmatOps
-			//destTransMat, edgelen, model index, calcDerivs
-    
-	//list<ScoringOperation> scoreOps;
-		//dest and children, transmatInd, calcDerivs
-
-	//do all of the ops in the operationsSetQueue (i.e., all transmat ops and updatePartials, 
-	//INCLUDING the transmat needed for the scoring operation)
-	UpdateAllConditionals();
-
-	//Now do the score op, which will return a ScoreSet that has at least the lnL, and 
-	//D1 and D2 if requested.  This assumes that there is only one score op in scoreOps
-	assert(scoreOps.size() == 1);
-	ScoreSet values;
-	for(list<ScoringOperation>::iterator sit = scoreOps.begin() ; sit != scoreOps.end() ; sit++)
-		values = PerformScoringOperation(&(*sit));
-
-	ResetDepLevelsAndReservations();
-
-	operationSetQueue.clear();
-	scoreOps.clear();
-	return values;
-	}	
-
-//this just performs all of the transmat and cla ops that were queued
-//will generally be followed by a call to PerformScoring to get lnL or derivs
-void CalculationManager::UpdateAllConditionals(){	
-	//DEBUG
-	OutputOperationsSummary();
-
-#define BATCHED_CALLS
-#ifdef BATCHED_CALLS
-	//this just yoinks the pmat ops from each BlockingOpSet into a new list
-	//note that PerformTransMatOperationBatch assumes that all the ops either
-	//need derivs or not.  So, avoid adding ops that need derivs here.
-	list<TransMatOperation> tops;
-	for(list<BlockingOperationsSet>::iterator it = operationSetQueue.begin();it != operationSetQueue.end();it++){
-		if(! (*it).pmatOps.begin()->calcDerivs)
-			tops.splice(tops.end(), (*it).pmatOps);
-		}
-
-#define SEND_TRANSMATS
-
-	if(tops.size() > 0)
-		PerformTransMatOperationBatch(tops);
-
-	claMan->SetCurReclaimLevel(0);
-	list<BlockingOperationsSet>::const_iterator toFree = operationSetQueue.begin();
-	//Any transmats that need derivs will still be included in a blockingOpSet, so will get done here.  Otherwise
-	//no transmat calls will be done here because the ops were pulled out above to be done in one big batch
-	for(list<BlockingOperationsSet>::const_iterator it = operationSetQueue.begin();it != operationSetQueue.end();it++){
-		if((*it).pmatOps.size() > 0)
-			PerformTransMatOperationBatch((*it).pmatOps);
-		if((*it).claOps.size() > 0){
-			//this will reserve the DESTINATION clas. The child cla dependencies should already have
-			//been reserved if they are clas
-			ReserveNeededClas((*it).claOps);
-			PerformClaOperationBatch((*it).claOps);
-
-			int depLevel = (*it).opSetDepLevel;
-			int freeableDepLevel = depLevel - 1;
-			if(freeableDepLevel > 0){
-				//once we've got a few levels of clas done, unreserve the ones that are no longer direct dependencies
-				//and tell the cla man that clas of that dep level are ok to be recycled.  They will retain their
-				//dep levels for now
-				assert( ! ((*toFree).opSetDepLevel < freeableDepLevel));
-				claMan->SetCurReclaimLevel(freeableDepLevel);
-
-				if((*toFree).opSetDepLevel == freeableDepLevel){
-					UnreserveUnneededClas((*toFree).claOps);
-					toFree++;
-					}
-				}
-			}
-		}
-
-	claMan->SetCurReclaimLevel(-1);
-#else
-	//do the actual operations.  right now it is doing 2 pmat ops followed by the cla op that requires then and looping
-	//since there are enough pmats it would make more sense to put them into a single block to be done together
-	for(list<BlockingOperationsSet>::const_iterator it = operationSetQueue.begin();it != operationSetQueue.end();it++){
-		for(list<TransMatOperation>::const_iterator pit = (*it).pmatOps.begin();pit != (*it).pmatOps.end();pit++)
-			PerformTransMatOperation(&(*pit));
-		for(list<ClaOperation>::const_iterator cit = (*it).claOps.begin();cit != (*it).claOps.end();cit++)
-			PerformClaOperation(&(*cit));
-		}
-#endif
-	}
-
-void CalculationManager::ReserveNeededClas(const list<ClaOperation> &theOps){
-	for(list<ClaOperation>::const_iterator op = theOps.begin(); op != theOps.end() ; op++) 
+void CalculationManager::ReserveDestinationClas(BlockingOperationsSet &set){
+	//outman.DebugMessage("reserving dests of level %d", set.opSetDepLevel);
+	for(list<ClaOperation>::const_iterator op = set.claOps.begin(); op != set.claOps.end() ; op++) 
 		claMan->ClaimClaFillIfNecessary((*op).destClaIndex, (*op).opDepLevel);
 	}
 
-void CalculationManager::UnreserveUnneededClas(const list<ClaOperation> &theOps){
-	for(list<ClaOperation>::const_iterator op = theOps.begin(); op != theOps.end() ; op++){
-		//I now think that this should ONLY be unreserving the deps, not the current dest
-		//claMan->RemoveTempReservation((*op).destClaIndex);
-
-		//unreseving the deps may be very redundant since they would be unreserved when they
-		//are the destClaIndex in the next step.  However, the tip-most dependenices 
-		//which might be clean clas cause reservations as well
+void CalculationManager::UnreserveDependencyClas(const BlockingOperationsSet &set){
+	//outman.DebugMessage("unreserving deps of level %d", set.opSetDepLevel);
+	for(list<ClaOperation>::const_iterator op = set.claOps.begin(); op != set.claOps.end() ; op++){
+		//This ONLY removes the temp reservations from the dependencies
+		//It does NOT add them to the freeableQueue
 		if((*op).childClaIndex1 > -1)
 			claMan->RemoveTempReservation((*op).childClaIndex1);
-		if((*op).childClaIndex2 > -1) 
+		if((*op).childClaIndex2 > -1)
 			claMan->RemoveTempReservation((*op).childClaIndex2);
 		}
 	}
 
+void CalculationManager::QueueDependencyClasForFreeing(const BlockingOperationsSet &set){
+	//outman.DebugMessage("queuing deps level %d for freeing", set.opSetDepLevel);
+	for(list<ClaOperation>::const_iterator op = set.claOps.begin(); op != set.claOps.end() ; op++){
+		//Adds DEPENDENCY clas to the freeable queue AND removes their temp reservations
+		claMan->AddToFreeableQueue((*op).childClaIndex1);
+		claMan->AddToFreeableQueue((*op).childClaIndex2);
+		}
+	}
+
+void CalculationManager::QueueDestinationClasForFreeing(const BlockingOperationsSet &set){
+	//outman.DebugMessage("queuing dests level %d for freeing", set.opSetDepLevel);
+	int dontFree = scoreOps.begin()->childClaIndex1;
+	int dontFree2 = scoreOps.begin()->childClaIndex2;
+	for(list<ClaOperation>::const_iterator op = set.claOps.begin(); op != set.claOps.end() ; op++){
+		int thisIndex = (*op).destClaIndex;
+		//Adds destination clas to the freeable queue AND removes their temp reservations
+		//this is annoying, but can't do with dests needed for final scoring.  They will
+		//eventually get freed in ResetDepLevelsAndRes
+		if(thisIndex != dontFree && thisIndex != dontFree2)
+			claMan->AddToFreeableQueue(thisIndex);
+		}
+	}
+
 //this version resets a single opset
-void CalculationManager::ResetDepLevels(const list<ClaOperation> &theOps){
-	for(list<ClaOperation>::const_iterator op = theOps.begin(); op != theOps.end() ; op++){
-		claMan->SetDepLevel((*op).destClaIndex, -1);
+void CalculationManager::ResetDepLevels(const BlockingOperationsSet &set){
+	assert(0); //trying not resetting deps
+	outman.DebugMessage("resetting deps of level %d", set.opSetDepLevel);
+	for(list<ClaOperation>::const_iterator op = set.claOps.begin(); op != set.claOps.end() ; op++){
+		claMan->SetDepLevel((*op).destClaIndex, 0);
 		//unreseving the deps may be very redundant since they would be unreserved when they
 		//are the destClaIndex in the next step.  However, the tip-most dependenices 
 		//which might be clean clas cause reservations as well
 		if((*op).childClaIndex1 > -1)
-			claMan->SetDepLevel((*op).childClaIndex1, -1);
+			claMan->SetDepLevel((*op).childClaIndex1, 0);
 		if((*op).childClaIndex2 > -1) 
-			claMan->SetDepLevel((*op).childClaIndex2, -1);
+			claMan->SetDepLevel((*op).childClaIndex2, 0);
 		}
 	}
 
-//this version resets all ops in the queue
+//this version resets all ops that remain in the queue
 void CalculationManager::ResetDepLevelsAndReservations(){
 	for(list<BlockingOperationsSet>::const_iterator set = operationSetQueue.begin(); set != operationSetQueue.end();set++){
+		if((*set).claOps.size() > 0)
+			outman.DebugMessage("resetting all - level %d", (*set).opSetDepLevel);
 		for(list<ClaOperation>::const_iterator op = (*set).claOps.begin(); op != (*set).claOps.end() ; op++){
-			claMan->SetDepLevel((*op).destClaIndex, -1);
+//			claMan->SetDepLevel((*op).destClaIndex, 0);
 			claMan->RemoveTempReservation((*op).destClaIndex);
 			if((*op).childClaIndex1 > -1){
-				claMan->SetDepLevel((*op).childClaIndex1, -1);
+//				claMan->SetDepLevel((*op).childClaIndex1, 0);
 				claMan->RemoveTempReservation((*op).childClaIndex1);
 				}
 			if((*op).childClaIndex2 > -1){
-				claMan->SetDepLevel((*op).childClaIndex2, -1);
+//				claMan->SetDepLevel((*op).childClaIndex2, 0);
 				claMan->RemoveTempReservation((*op).childClaIndex2);
 				}
 			}
 		}
 	for(list<ScoringOperation>::const_iterator sop = scoreOps.begin();sop != scoreOps.end();sop++){
 		if((*sop).childClaIndex1 > -1){
-			claMan->SetDepLevel((*sop).childClaIndex1, -1);
+//			claMan->SetDepLevel((*sop).childClaIndex1, 0);
 			claMan->RemoveTempReservation((*sop).childClaIndex1);
 			}
 		if((*sop).childClaIndex2 > -1){
-			claMan->SetDepLevel((*sop).childClaIndex2, -1);
+//			claMan->SetDepLevel((*sop).childClaIndex2, 0);
 			claMan->RemoveTempReservation((*sop).childClaIndex2);
 			}
 		}
-	}
-
-//this will recursively move over the tree from the root node, spreading until tips or clean clas
-//are hit.  If the endpoints are clas, they will be reserved now
-int CalculationManager::AccumulateOpsOnPath(int holderInd, list<NodeOperation> &nodeOps){
-	//it is ok to call this with a tip, because that tip could be a terminal branch that is having derivs
-	//calculated.  accumulate nothing in that case
-	if(holderInd < 0)
-		return 0;
-	CondLikeArrayHolder *holder = claMan->GetMutableHolder(holderInd);
-	if(!claMan->IsHolderDirty(holderInd)){
-		holder->depLevel = 0;
-		//this cla is now an initial dependency, so be sure that it doesn't get yoniked
-		//claMan->ReserveCla(holderInd, true);
-		claMan->ClaimClaFillIfNecessary(holderInd, 0);
-		return 0;
-		}
-
-	int depLevel1, depLevel2;
-	depLevel1 = depLevel2 = 0;
-	if(holder->holderDep1 >= 0){
-		depLevel1 = AccumulateOpsOnPath(holder->holderDep1, nodeOps);
-/*		if(claMan->IsHolderDirty(holder->holderDep1))
-			depLevel1 = AccumulateOpsOnPath(holder->holderDep1, nodeOps);
-		else
-			claMan->GetMutableHolder(holder->holderDep1)->depLevel = 0;
-*/		}
-	if(holder->holderDep2 >= 0){
-		depLevel2 = AccumulateOpsOnPath(holder->holderDep2, nodeOps);
-/*		if(claMan->IsHolderDirty(holder->holderDep2))
-			depLevel2 = AccumulateOpsOnPath(holder->holderDep2, nodeOps);
-		else
-			claMan->GetMutableHolder(holder->holderDep2)->depLevel = 0;
-*/		}
-	
-	holder->depLevel = max(depLevel1, depLevel2) + 1;
-
-/*	BlockingOperationsSet opSet;
-	opSet.claOps.push_back(ClaOperation(holderInd, holder->holderDep1, holder->holderDep2, holder->transMatDep1, holder->transMatDep2, holder->depLevel));
-	//DEBUG - second arg here is model index.  Not sure how that will be dealt with
-	opSet.pmatOps.push_back(TransMatOperation(holder->transMatDep1, 0, pmatMan->GetMutableHolder(holder->transMatDep1)->GetEdgelen(), false));
-	opSet.pmatOps.push_back(TransMatOperation(holder->transMatDep2, 0, pmatMan->GetMutableHolder(holder->transMatDep2)->GetEdgelen(), false));
-
-	operationSetQueue.push_back(opSet);
-*/
-	nodeOps.push_back(NodeOperation(ClaOperation(holderInd, holder->holderDep1, holder->holderDep2, holder->transMatDep1, holder->transMatDep2, holder->depLevel),
-						TransMatOperation(holder->transMatDep1, 0, pmatMan->GetEdgelen(holder->transMatDep1), false),
-						TransMatOperation(holder->transMatDep2, 0, pmatMan->GetEdgelen(holder->transMatDep2), false)));
-
-
-	return holder->depLevel;
+	claMan->ClearFreeableQueue();
+	if(claMan->debug_clas)
+		claMan->ReportClaTotals("reset all ", -1);
 	}
 
 void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
@@ -766,128 +1163,7 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		}
 	}
 
-void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theOps){
-	//not sure if this is right - will always use a single scale array for destWrite (essentially
-	//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
-	//int destinationScaleWrite = (rescaleBeagle ? claMan->NumClas() : BEAGLE_OP_NONE);
 
-	//scale read is if you are telling it to use precomputed scaling factors
-	int	destinationScaleRead = BEAGLE_OP_NONE;
-
-	vector<int> tupleList;
-	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-		//This is happening a level higher now
-		//this will fill the destination holder with a cla index if necessary
-		//claMan->ClaimClaFillIfNecessary((*it).destClaIndex, (*it).depLevel);
-
-
-		tupleList.push_back(PartialIndexForBeagle((*it).destClaIndex));
-		//if rescaling, for each partial op pass in an array to store the amount of rescaling
-		//at this node, in my case stored as logs
-		if(rescaleBeagle)
-			tupleList.push_back(ScalerIndexForBeagle((*it).destClaIndex));
-		else 
-			tupleList.push_back(BEAGLE_OP_NONE);
-        tupleList.push_back(destinationScaleRead);
-		tupleList.push_back(PartialIndexForBeagle((*it).childClaIndex1));
-		tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex1));
-		tupleList.push_back(PartialIndexForBeagle((*it).childClaIndex2));
-		tupleList.push_back(PmatIndexForBeagle((*it).transMatIndex2));
-		}
-
-	int instanceCount = 1;
-	int operationCount = theOps.size();
-
-	//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
-	//and my negative (tip) corresponds to a NULL in beagle
-	int cumulativeScaleIndex = BEAGLE_OP_NONE;
-
-	CheckBeagleReturnValue(
-		beagleUpdatePartials(
-			beagleInst,
-			&tupleList[0],
-			operationCount,
-			cumulativeScaleIndex),
-		"beagleUpdatePartials");
-
-#ifdef OUTPUT_PARTIALS
-	string name2 = ofprefix + ".partials.log";
-	ofstream part(name2.c_str());
-	part.precision(5);
-
-	int nstates = 4;
-	vector<double> outPartials( nstates * data->NChar() * pmatMan->GetNumRates());
-	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-		//could pass a scaler index here to have the values unscaled, I think
-		beagleGetPartials(beagleInst, PartialIndexForBeagle((*it).destClaIndex), BEAGLE_OP_NONE, &outPartials[0]);
-		for(int site = 0;site < data->NChar();site++){
-			part << site << "\t";
-			for(int rate = 0;rate < pmatMan->GetNumRates();rate++){
-				for(int state = 0;state < 4;state++)
-					part << outPartials[site * 4 + state] << "\t";
-				}
-			part << "\n";
-			}
-		}
-	part.close();
-#endif
-
-	//this is a bit sneaky. each partial now has a rescaling array associated with it, holding
-	//the amount done at that node alone.  Take the rescaling amounts from the two children,
-	//and add then to the rescaling already done at this node.  In the next dependency level pass
-	//the dest here will become the child there.
-
-	if(rescaleBeagle){
-		for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-			AccumulateRescalers(
-				(*it).destClaIndex, 
-				(*it).childClaIndex1, 
-				(*it).childClaIndex2);
-			}
-		}
-/*
-	//to indicate that the partial is now clean, fill the holder that represents it, despite the fact that the memory there is never being used
-	//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
-	for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-		claMan->FillHolder((*it).destClaIndex, 0);
-		}
-*/
-	}
-
-#ifdef USE_BEAGLE
-//For scale arrays my indexing scheme and Beagle's happen to be the same
-//further accumulate the cumulative rescalings from the two children.  In the batched case
-//the dest array will already have the rescaling done at this node included, so don't reset it
-void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int childIndex2){
-
-#ifdef OUTPUT_OTHER_BEAGLE
-	//DEBUG
-	//outman.DebugMessage("accum %d + %d = %d", childIndex1, childIndex2, destIndex);
-#endif
-#ifndef BATCHED_CALLS
-	//clear out the destination scaler first
-	CheckBeagleReturnValue(
-		beagleResetScaleFactors(beagleInst,
-			ScalerIndexForBeagle(destIndex)), 
-		"beagleResetScaleFactors");
-#endif
-
-	vector<int> childScalers;
-	if( ! (childIndex1 < 0))
-		childScalers.push_back(ScalerIndexForBeagle(childIndex1));
-	if( ! (childIndex2 < 0))
-		childScalers.push_back(ScalerIndexForBeagle(childIndex2));
-
-	if(childScalers.size() > 0){
-		CheckBeagleReturnValue(
-			beagleAccumulateScaleFactors(beagleInst,
-				&(childScalers[0]),
-				childScalers.size(),
-				ScalerIndexForBeagle(destIndex)),
-			"beagleAccumulateScaleFactors");
-		}
-	}
-#endif
 
 //deprecated in favor of PerformTransMatOperationBatch
 void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp){
@@ -979,194 +1255,6 @@ if(theOp->calcDerivs){
 	}		
 #endif
 	}
-
-void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperation> &theOps){
-#ifndef USE_BEAGLE
-	//mod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
-	//this is a bit ridiculous, but these funcs won't really be getting used except with beagle
-	pmatMan->GetMutableHolder(theOp->destTransMatIndex)->myMod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
-#else 
-
-#ifdef SEND_TRANSMATS
-	SendTransMatsToBeagle(theOps);
-	return;
-#endif
-
-	//for now assuming that all transmat ops in a set have same eigen solution and rate multipliers
-	
-	//currently just using a single eigen index and sending it every time
-	int eigenIndex = 0;
-	
-	//this call will calculate the eigen solution first if necessary
-	//currently it will always be resent (sol.changed will always be true) because
-	//it is non-trivial to figure out when it has changed since it was last sent to beagle
-	ModelEigenSolution sol;
-	pmatMan->GetEigenSolution(theOps.begin()->destTransMatIndex, sol);
-
-	if(sol.changed){
-		CheckBeagleReturnValue(
-			beagleSetEigenDecomposition(
-				beagleInst,
-				eigenIndex,
-				sol.eigenVecs,
-				sol.invEigenVecs,
-				sol.eigenVals),
-			"beagleSetEigenDecomposition");
-		}
-
-	vector<FLOAT_TYPE> categRates;
-	pmatMan->GetCategoryRatesForBeagle(theOps.begin()->destTransMatIndex, categRates);
-
-	//as above, always resend currently
-	if(categRates.size() > 0){
-		CheckBeagleReturnValue(
-			beagleSetCategoryRates(beagleInst,
-				&(categRates[0])),
-			"beagleSetCategoryRates");
-		}
-
-	vector<int> pmatInd;
-	vector<int> d1MatInd;
-	vector<int> d2MatInd;
-	vector<double> edgeLens;
-
-	for(list<TransMatOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
-		//DEBUG
-		//outman.DebugMessage("transmat %d mod %d modadr %d edge %.4f", (*it).destTransMatIndex, (*it).modelIndex, pmatMan->GetCorrespondingModel((*it).destTransMatIndex), (*it).edgeLength);
-		//pmatMan->GetCorrespondingModel(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
-		pmatInd.push_back(PmatIndexForBeagle((*it).destTransMatIndex));
-		d1MatInd.push_back(D1MatIndexForBeagle((*it).destTransMatIndex));
-		d2MatInd.push_back(D2MatIndexForBeagle((*it).destTransMatIndex));
-		edgeLens.push_back(pmatMan->GetEdgelen((*it).destTransMatIndex));
-		}
-
-	int count = pmatInd.size();
-	bool calcDerivs = theOps.begin()->calcDerivs;
-
-#ifdef OUTPUT_OTHER_BEAGLE
-	outman.DebugMessageNoCR("UPDATING TRANS MAT ");
-//	outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
-#endif
-	CheckBeagleReturnValue(
-		beagleUpdateTransitionMatrices(
-			beagleInst,
-			eigenIndex,
-            &pmatInd[0],
-			(calcDerivs ? &d1MatInd[0] : NULL),
-			(calcDerivs ? &d2MatInd[0] : NULL),
-			&edgeLens[0],
-            count),
-		"beagleUpdateTransitionMatrices");
-#endif
-
-
-#ifdef OUTPUT_PMATS
-
-	int nstates = data->NStates();
-	
-	int nrates = pmatMan->GetModelForTransMatHolder(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
-
-//	if(calcDerivs){
-
-	/*wrong	*/
-	//double inmat[16] = {0.9070614,	0.02927732,	0.02870608,	0.0349794, 0.03213807,	0.90418679,	0.02868981,	0.03497981, 0.03213807,	0.02926432,	0.90361226, 0.03497981, 0.03213831,	0.02927236,	0.02868767,	0.90990174};
-	//double inmat[16] = {0.9070613980, 0.0292773210, 0.0287060775, 0.0349793993, 0.0321380682, 0.9041867852, 0.0286898147, 0.0349798091, 0.0321380682, 0.0292643178, 0.9036122561, 0.0349798091, 0.0321383066, 0.0292723589, 0.0286876746, 0.9099017382}; 
-	//wrong, normalized rows sum to zero
-	//double inmat[16] = {0.9070394515, 0.0292766126, 0.0287053830, 0.0349785530, 0.0321382457, 0.9041917789, 0.0286899731, 0.0349800023, 0.0321382465, 0.0292644802, 0.9036172701, 0.0349800032, 0.0321383041, 0.0292723566, 0.0286876724, 0.9099016670};
-	//wrong, rescaled such that column totals are same, three lower elements in each column match
-	//double inmat[16] = {0.9070613980, 0.0292713326, 0.0286945223, 0.0349796725, 0.0321381477, 0.9041867852, 0.0286945223, 0.0349796725, 0.0321381477, 0.0292713326, 0.9036122561, 0.0349796725, 0.0321381477, 0.0292713326, 0.0286945223, 0.9099017382};
-	/*right*/
-	//double inmat[16] = {0.9070611, 0.0292719, 0.02868779, 0.03497917, 0.03213868, 0.90419436, 0.02868777, 0.03497917, 0.03213868, 0.0292719, 0.90361023, 0.03497917, 0.03213868, 0.02927192, 0.02868777, 0.90990162};
-	//double inmat[16] = {0.9070611396, 0.0292718949, 0.0286877828, 0.0349791827, 0.0321386719, 0.9041943625, 0.0286877828, 0.0349791827, 0.0321386719, 0.0292718949, 0.9036102504, 0.0349791827, 0.0321386719, 0.0292718949, 0.0286877828, 0.9099016503};
-	//pmat from DP beagle
-	double inmat[16] = {0.907060771,  0.02927234,  0.028687678,  0.034979238,  0.032138303,  0.904194759,  0.028687707,  0.034979216,  0.032138303,  0.029272277,  0.903610189,  0.034979216,  0.032138297,  0.029272304,  0.028687689,  0.909901709};
-
-	vector<double> outMat(nstates * nstates * nrates);
-	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){				
-//		outman.UserMessage("MANUALLY SETTING PMATS");
-//		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), inmat);
-
-		outMat.clear();
-		for(int p=0;p<nstates*nstates*nrates;p++) 
-			outMat.push_back(p);
-		beagleGetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
-		//beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
-		vector<double>::iterator it = outMat.begin();
-		outman.DebugMessage("%d", (*pit).destTransMatIndex);
-		for(int r = 0;r < nrates;r++){
-			for(int i = 0;i < nstates;i++){
-				for(int j=0;j < nstates;j++){
-					outman.DebugMessageNoCR("%.10f\t", *it++);
-					}
-				outman.DebugMessage("");
-				}
-			}
-		}
-//		}
-#endif
-	}
-
-void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &theOps){
-#if ! (defined(BATCHED_CALLS) && defined(SEND_TRANSMATS))
-	assert(0);
-#endif
-
-#ifdef OUTPUT_PMATS
-	ofstream *deb = outman.GetDebugStream();
-#endif
-
-	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){
-		double theBlen = (*pit).edgeLength;
-		int theIndex = (*pit).destTransMatIndex;
-		FLOAT_TYPE ***thePMat = pmatMan->GetPmatArray(theIndex);
-		FLOAT_TYPE ***theD1Mat = NULL;
-		FLOAT_TYPE ***theD2Mat = NULL;
-		if(pit->calcDerivs){
-			theD1Mat = pmatMan->GetD1MatArray(theIndex);
-			theD2Mat = pmatMan->GetD2MatArray(theIndex);
-			pmatMan->GetMutableModelForTransMatHolder(theIndex)->FillDerivativeMatrices(theBlen, thePMat, theD1Mat, theD2Mat);
-			}
-		else{
-			pmatMan->GetMutableModelForTransMatHolder(theIndex)->AltCalcPmat(theBlen, thePMat);
-			}
-
-#ifdef OUTPUT_PMATS
-		//output pmats to be sent
-		*deb << "send p " << theIndex << "\n";
-		pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, thePMat);
-#endif
-		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle(theIndex), **thePMat, 1.0);
-
-#ifdef OUTPUT_PMATS
-		if(!gpuBeagle){
-			*deb << "ret p GI=" << theIndex << " BI=" << PmatIndexForBeagle(theIndex)<< "\n";
-			OutputBeagleTransMat(PmatIndexForBeagle(theIndex));
-			}
-#endif
-		if(pit->calcDerivs){
-#ifdef OUTPUT_PMATS
-			*deb << "send D1 " << theIndex << "\n";
-			pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, theD1Mat);
-			*deb << "send D2 " << theIndex << "\n";
-			pmatMan->GetMutableModelForTransMatHolder(theIndex)->OutputPmat(*deb, theD2Mat);
-#endif
-			beagleSetTransitionMatrix(beagleInst, D1MatIndexForBeagle(theIndex), **theD1Mat, 0.0);
-			beagleSetTransitionMatrix(beagleInst, D2MatIndexForBeagle(theIndex), **theD2Mat, 0.0);
-
-#ifdef OUTPUT_PMATS
-			if(!gpuBeagle){
-				if((*pit).calcDerivs){
-					*deb << "ret D1 GI=" << theIndex << " BI=" << D1MatIndexForBeagle(theIndex) << "\n";
-					OutputBeagleTransMat(D1MatIndexForBeagle(theIndex));
-					*deb << "ret D2 GI=" << theIndex << " BI=" << D2MatIndexForBeagle(theIndex) << "\n";
-					OutputBeagleTransMat(D2MatIndexForBeagle(theIndex));
-					}
-				}
-#endif
-			}
-		}
-	}
-
 void CalculationManager::OutputBeagleTransMat(int beagleIndex){
 	int nstates = data->NStates();
 	int nrates = pmatMan->NumRateCatsForBeagle(beagleIndex);
@@ -1327,6 +1415,98 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 #endif
 		}
 	return results;
+	}
+
+ScoreSet CalculationManager::SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const{
+	FLOAT_TYPE lnL = 0.0, D1 = 0.0, D2 = 0.0;
+	for(int i = 0;i < data->NChar();i++){
+		assert(sitelnL[i] == sitelnL[i]);
+		assert(sitelnL[i] <= 1e-6);
+
+		if(sitelnL[i] > 0.0){
+			outman.DebugMessage("BEAGLE-GARLI WARNING - site lnL > 0 : %e", sitelnL[i]);
+			}
+
+		assert(sitelnL[i] > -1e6);
+
+		if(sitelnL[i] < -1e6){
+			outman.DebugMessage("BEAGLE-GARLI WARNING - very small site lnL : %e", sitelnL[i]);
+			}
+
+		double actuallnL = sitelnL[i];
+		if(actuallnL > 0.0)
+			actuallnL = 0.0;
+		if(actuallnL < -FLT_MAX)
+			actuallnL = -FLT_MAX;			
+
+		lnL += actuallnL * data->Count(i);
+		
+		if(siteD1 != NULL){
+			assert(siteD1[i] == siteD1[i]);
+//				assert(siteD1[i] > -1e15);
+//				assert(siteD1[i] < 1e15);
+
+			if(siteD1[i] > 1e15){
+				outman.DebugMessage("BEAGLE-GARLI WARNING - very large site D1 : %e", siteD1[i]);
+				}
+			if(siteD1[i] < -1e15){
+				outman.DebugMessage("BEAGLE-GARLI WARNING - very small site D1 : %e", siteD1[i]);
+				}
+			
+			D1 += siteD1[i] * data->Count(i);
+			}
+		if(siteD2 != NULL){
+			assert(siteD2[i] == siteD2[i]);
+//				assert(siteD2[i] > -1e15);
+//				assert(siteD2[i] < 1e15);
+			
+			if(siteD2[i] > 1e15){
+				outman.DebugMessage("BEAGLE-GARLI WARNING - very large site D1 : %e", siteD2[i]);
+				}
+			if(siteD2[i] < -1e15){
+				outman.DebugMessage("BEAGLE-GARLI WARNING - very small site D1 : %e", siteD2[i]);
+				}
+
+			D2 += siteD2[i] * data->Count(i);
+			}
+		}
+	ScoreSet res = {lnL, D1, D2};
+	return res;
+	}
+
+void CalculationManager::GetBeagleSiteLikelihoods(double *likes){
+	beagleGetSiteLogLikelihoods(beagleInst, likes);
+	}
+
+void CalculationManager::OutputBeagleSiteValues(ofstream &out, bool derivs) const{
+	//there is only one set of sitelikes stored by an instance, the most recent ones		
+	vector<double> siteLikesOut(data->NChar());
+	vector<double> siteD1Out(data->NChar());
+	vector<double> siteD2Out(data->NChar());
+
+	const int *counts = data->GetCounts();
+
+	beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
+	if(derivs)
+		beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
+
+	//ScoreSet mySummation = SumSiteValues(&siteLikesOut[0], (derivs ? &siteD1Out[0] : NULL), (derivs ? &siteD2Out[0] : NULL));
+	//out << "mine\t" << mySummation.lnL << "\t" << mySummation.d1 << "\t" << mySummation.d2 << "\n";
+	//outman.DebugMessage("myL\t%f\tD1\t%f\tD2\t%f", mySummation.lnL, mySummation.d1, mySummation.d2);
+	//outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
+
+	for(int s = 0;s < data->GapsIncludedNChar();s++){
+		int packed = data->Number(s);
+		if(packed >= 0){
+			out << s << "\t" << packed << "\t" << counts[packed] << "\t" << siteLikesOut[packed];
+			if(derivs){
+				out << "\t" << siteD1Out[packed] << "\t" << siteD2Out[packed];
+				}
+			}
+		else 
+			out << s << "\t" << packed << "\t" << counts[packed] << "\tNA";
+		out << "\n";
+		}
 	}
 
 //these are my old functions, not used when in beagle mode

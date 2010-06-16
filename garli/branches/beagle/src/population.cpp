@@ -891,7 +891,7 @@ void Population::RunTests(){
 			assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps));
 			}
 #else
-		assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, 0.001));
+		assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, -scr * ind0->treeStruct->expectedPrecision));
 #endif
 
 		//check full rescoring from arbitrary nodes in the trees
@@ -905,7 +905,7 @@ void Population::RunTests(){
 			assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps ));
 			}
 #else
-		assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, 0.001));
+		assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, -scr * ind0->treeStruct->expectedPrecision));
 #endif
 		}
 	}

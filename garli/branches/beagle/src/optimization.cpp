@@ -1048,6 +1048,7 @@ void Tree::SetNodesUnoptimized(){
 	}
 
 void Tree::OptimizeBranchesWithinRadius(TreeNode *nd, FLOAT_TYPE optPrecision, int subtreeNode, TreeNode *prune){
+	assert(noCalcs == false);
 	nodeOptVector.clear();
 	SetNodesUnoptimized();
 
@@ -1461,7 +1462,7 @@ void Tree::CalcEmpiricalDerivatives(TreeNode *nd, FLOAT_TYPE &D1, FLOAT_TYPE &D2
 	Score();
 	FLOAT_TYPE start=lnL;
 
-	outman.UserMessageNoCR("initIncr %.3e ", incr);
+	//outman.UserMessageNoCR("initIncr %.3e ", incr);
 	do{
 		SetBranchLength(nd, blen_used + incr);
 	//	MakeAllNodesDirty();
