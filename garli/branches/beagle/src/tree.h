@@ -65,6 +65,8 @@ class Tree{
 		TreeNode *root;
 		TreeNode **allNodes;
 		ReconList sprRang;
+		//sometimes we just want to make a tree and not score it or deal with dirtying etc, so use this flag
+		bool noCalcs;
 
 #ifdef EQUIV_CALCS
 		bool dirtyEQ;

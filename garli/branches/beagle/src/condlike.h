@@ -75,7 +75,8 @@ class CondLikeArray
 	};
 
 class CondLikeArrayHolder{
-	public:
+	friend class ClaManager;
+
 	short numAssigned;
 	short reclaimLevel;
 	bool tempReserved;
@@ -87,6 +88,8 @@ class CondLikeArrayHolder{
 	int transMatDep2;
 	int depLevel;
 
+public:
+
 	CondLikeArrayHolder() : depLevel(-1), theArray(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){
 		holderDep1 = holderDep2 = transMatDep1 = transMatDep2 = -1;
 		}
@@ -94,8 +97,17 @@ class CondLikeArrayHolder{
 	~CondLikeArrayHolder() {
 		theArray = NULL;
 		};
-	int GetReclaimLevel() {return reclaimLevel;}
+	int HolderDep1() const {return holderDep1;}
+	int HolderDep2() const {return holderDep2;}
+	int TransMatDep1() const {return transMatDep1;}
+	int TransMatDep2() const {return transMatDep2;}
+	bool IsDirty() const {return theArray == NULL;}
+	int DepLevel() const {return depLevel;}
+
+private:
 	void SetReclaimLevel(int lvl) {reclaimLevel = lvl;}
+	void SetDepLevel(int lvl) {depLevel = lvl;}
+
 	void Reset(){
 		depLevel = -1;
 		theArray=NULL;

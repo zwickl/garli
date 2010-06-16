@@ -30,13 +30,19 @@ class ErrorException{
 	
 	public:
 	char message[400];
+	//this is just a hack to allow using a thrown exception to bail from the program
+	//without actually returning non-zero, so as not to cause scripts to think that it failed
+	bool returnZero;
 	ErrorException(const char *fmt, ...){
 		va_list vl;
 		va_start(vl, fmt);
 		vsprintf(message, fmt, vl);
 		va_end(vl);
+		returnZero = false;
 		}
-
+	void SetReturnZero(){
+		returnZero = true;
+		}
 	void Print(ostream &out){
 		outman.UserMessage("ERROR!: %s\n\n", message);
 		//out << "ERROR!: " << message << endl << endl;

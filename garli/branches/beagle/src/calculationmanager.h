@@ -38,6 +38,94 @@ struct ScoreSet{
 
 #define GARLI_FINAL_SCALER_INDEX -9999999
 
+
+class ClaOperation{
+	friend class CalculationManager;
+public:
+	int destClaIndex;
+	int childClaIndex1;
+	int childClaIndex2;
+	int transMatIndex1;
+	int transMatIndex2;
+	int opDepLevel;
+public:
+	ClaOperation(): destClaIndex(-1), childClaIndex1(-1), childClaIndex2(-1), transMatIndex1(-1), transMatIndex2(-1), opDepLevel(-1){};	
+	ClaOperation(int d, int cla1, int cla2, int pmat1, int pmat2, int dLevel): destClaIndex(d), childClaIndex1(cla1), childClaIndex2(cla2), transMatIndex1(pmat1), transMatIndex2(pmat2), opDepLevel(dLevel){
+		int poo = 2;	
+		}
+	ClaOperation(int d, const CondLikeArrayHolder *h): destClaIndex(d), childClaIndex1(h->HolderDep1()), childClaIndex2(h->HolderDep2()), transMatIndex1(h->TransMatDep1()), transMatIndex2(h->TransMatDep2()), opDepLevel(h->DepLevel()){};	
+	};
+
+class TransMatOperation{
+	friend class CalculationManager;
+	//friend class NodeOperation;
+	friend class BranchOperation;
+
+public:
+	int destTransMatIndex;
+	FLOAT_TYPE edgeLength;
+	int modelIndex; // ~eigen solution
+	bool calcDerivs;
+
+	TransMatOperation() : destTransMatIndex(-1), modelIndex(-1), edgeLength(-1.0), calcDerivs(false){};
+	TransMatOperation(int ind, int modInd, FLOAT_TYPE len, bool d) : destTransMatIndex(ind), modelIndex(modInd), edgeLength(len), calcDerivs(d){};
+	};
+
+class NodeOperation{
+	friend class CalculationManager;
+	ClaOperation claOp;
+	TransMatOperation transOp1;
+	TransMatOperation transOp2;
+public:
+	NodeOperation();
+	NodeOperation(const NodeOperation &from){
+		claOp = from.claOp;
+		transOp1 = from.transOp1;
+		transOp2 = from.transOp2;
+		}
+	NodeOperation(const ClaOperation &c, const TransMatOperation &t1, const TransMatOperation &t2){
+		claOp = c;
+		transOp1 = t1;
+		transOp2 = t2;
+		}
+	bool operator <(const NodeOperation &rhs){
+		return claOp.opDepLevel < rhs.claOp.opDepLevel;
+		}
+	};
+
+class ScoringOperation{
+	friend class CalculationManager;
+	friend class BranchOperation;
+
+	//my functions don't write the final cla, but Beagle allows for specifying one
+	int destClaIndex;
+	int childClaIndex1;
+	int childClaIndex2;
+	int transMatIndex;
+	bool derivatives;
+public:
+	ScoringOperation() : destClaIndex(-1), childClaIndex1(-1), childClaIndex2(-1), transMatIndex(-1), derivatives(false){};
+	ScoringOperation(int dest, int child1, int child2, int pmat, bool d) : destClaIndex(dest), childClaIndex1(child1), childClaIndex2(child2), transMatIndex(pmat), derivatives(d){};
+	};
+
+class BranchOperation{
+	friend class CalculationManager;
+	ScoringOperation scrOp;
+	TransMatOperation transOp;
+public:
+	BranchOperation(const BranchOperation &from){
+		scrOp = from.scrOp;
+		transOp = from.transOp;
+		}
+	};
+
+class BlockingOperationsSet{
+public:
+	int opSetDepLevel;
+	list<ClaOperation> claOps;
+	list<TransMatOperation> pmatOps;
+	};
+
 /*this is a generic matrix for use as a pmat or derivative matrix
 multiple matrices for rates or whatever appear one after another*/
 class TransMat{
@@ -190,6 +278,7 @@ public:
 	const int GetNumStates() const { return nStates; }
 	const int GetNumRates() const { return nRates; }
 	bool TransMatIsAssigned(int index) const { return holders[index].theMatSet != NULL; }
+	bool IsHolderDirty(int index) const { return holders[index].theMatSet == NULL; }
 
 	TransMatSet *GetTransMatSet(int index){
 		if(holders[index].theMatSet == NULL)
@@ -262,6 +351,22 @@ public:
 		holders[index].theMatSet = AssignFreeTransMatSet();
 		}
 
+	//This is essentially the same as GetTransmat, but doesn't return anything and also sets the tempReserved flag
+	//FillHolder is only used if the holder is currently empty
+	void ClaimTransmatsetFillIfNecessary(int index){
+		//this is all that needs to happen here until transmat recycling is worked out
+		if(IsHolderDirty(index)){
+			FillTransMatHolder(index);
+			}
+/*		else{
+			//FillHolder will also set the dep level, but we need to set it even if FillHolder doesn't need to be called
+			SetDepLevel(index, depLevel);
+			}
+*/
+		//mark this holder as one not to be reclaimed, since it has been "claimed"
+		//TempReserveCla(index);
+		}
+
 	const TransMatHolder *GetTransMatHolder(int index) const{
 		//outman.DebugMessage("get %d", index);
 		return &holders[index];
@@ -278,6 +383,27 @@ public:
 
 	Model *GetMutableModelForTransMatHolder(int index)const{
 		return holders[index].myMod;
+		}
+
+	void FillDerivativeMatrices(int index, double ***thePMat, double ***theD1Mat, double ***theD2Mat){
+		TransMatHolder *hold = &holders[index];
+		thePMat = hold->GetPmatArray();
+		theD1Mat = hold->GetD1Array();
+		theD2Mat = hold->GetD2Array();
+		hold->myMod->FillDerivativeMatrices(hold->edgeLen, thePMat, theD1Mat, theD2Mat);
+		}
+
+	void ObtainAppropriateTransmats(const TransMatOperation &pit, double ***&thePMat, double ***&theD1Mat, double ***&theD2Mat){
+		TransMatHolder *hold = &holders[pit.destTransMatIndex];
+		thePMat = GetPmatArray(pit.destTransMatIndex);
+		if(pit.calcDerivs){
+			theD1Mat = GetD1MatArray(pit.destTransMatIndex);
+			theD2Mat = GetD2MatArray(pit.destTransMatIndex);
+			hold->myMod->FillDerivativeMatrices(hold->edgeLen, thePMat, theD1Mat, theD2Mat);
+			}
+		else{
+			hold->myMod->AltCalcPmat(hold->edgeLen, thePMat);
+			}
 		}
 
 	//this will be called by a node (branch) and will return a previously unused holder index
@@ -322,7 +448,7 @@ public:
 			if(holders[index].theMatSet != NULL){
 				//if there is a valid matrix set in the holder, reclaim it too
 				//outman.DebugMessage("reclaim1 set from %d", index);
-				assert(find(transMatSetStack.begin(), transMatSetStack.end(), holders[index].theMatSet) == transMatSetStack.end());
+	//			assert(find(transMatSetStack.begin(), transMatSetStack.end(), holders[index].theMatSet) == transMatSetStack.end());
 				transMatSetStack.push_back(thisHold->theMatSet);
 				}
 			thisHold->Reset();
@@ -332,7 +458,7 @@ public:
 			//TODO
 			//DEBUG - what happens with this and beagle
 			//this is important! (this was the old message that was here)
-//			holders[index].tempReserved=false;
+			//holders[index].tempReserved=false;
 			}
 		}
 
@@ -558,9 +684,9 @@ public:
 		transMatIndex = from->transMatIndex;
 
 		if(downHolderIndex >= 0){
-			assert(claMan->GetNumAssigned(downHolderIndex) > 0);
-			assert(claMan->GetNumAssigned(ULHolderIndex) > 0);
-			assert(claMan->GetNumAssigned(URHolderIndex) > 0);
+			assert(claMan->NumAssigned(downHolderIndex) > 0);
+			assert(claMan->NumAssigned(ULHolderIndex) > 0);
+			assert(claMan->NumAssigned(URHolderIndex) > 0);
 			claMan->IncrementHolder(downHolderIndex);
 			claMan->IncrementHolder(ULHolderIndex);
 			claMan->IncrementHolder(URHolderIndex);
@@ -598,114 +724,6 @@ public:
 		}
 	};
 
-class ClaOperation{
-	friend class CalculationManager;
-	//friend class NodeOperation;
-public:
-	int destClaIndex;
-	int childClaIndex1;
-	int childClaIndex2;
-	int transMatIndex1;
-	int transMatIndex2;
-	int opDepLevel;
-public:
-	ClaOperation(): destClaIndex(-1), childClaIndex1(-1), childClaIndex2(-1), transMatIndex1(-1), transMatIndex2(-1), opDepLevel(-1){};	
-	ClaOperation(int d, int cla1, int cla2, int pmat1, int pmat2, int dLevel): destClaIndex(d), childClaIndex1(cla1), childClaIndex2(cla2), transMatIndex1(pmat1), transMatIndex2(pmat2), opDepLevel(dLevel){};	
-	ClaOperation(const ClaOperation &from){
-		destClaIndex = from.destClaIndex;
-		childClaIndex1 = from.childClaIndex1;
-		childClaIndex2 = from.childClaIndex2;
-		transMatIndex1 = from.transMatIndex1;
-		transMatIndex2 = from.transMatIndex2;
-		opDepLevel = from.opDepLevel;
-		}
-	};
-
-class TransMatOperation{
-	friend class CalculationManager;
-	//friend class NodeOperation;
-	friend class BranchOperation;
-
-	int destTransMatIndex;
-	FLOAT_TYPE edgeLength;
-	int modelIndex; // ~eigen solution
-	bool calcDerivs;
-public:
-	TransMatOperation() : destTransMatIndex(-1), modelIndex(-1), edgeLength(-1.0), calcDerivs(false){};
-	TransMatOperation(int ind, int modInd, FLOAT_TYPE len, bool d) : destTransMatIndex(ind), modelIndex(modInd), edgeLength(len), calcDerivs(d){};
-	TransMatOperation(const TransMatOperation &from){
-		destTransMatIndex = from.destTransMatIndex;
-		edgeLength = from.edgeLength;
-		modelIndex = from.modelIndex;
-		calcDerivs = from.calcDerivs;
-		}
-	};
-
-class NodeOperation{
-	friend class CalculationManager;
-	ClaOperation claOp;
-	TransMatOperation transOp1;
-	TransMatOperation transOp2;
-public:
-	NodeOperation();
-	NodeOperation(const NodeOperation &from){
-		claOp = from.claOp;
-		transOp1 = from.transOp1;
-		transOp2 = from.transOp2;
-		}
-	NodeOperation(const ClaOperation &c, const TransMatOperation &t1, const TransMatOperation &t2){
-		claOp = c;
-		transOp1 = t1;
-		transOp2 = t2;
-		}
-	bool operator <(const NodeOperation &rhs){
-		return claOp.opDepLevel < rhs.claOp.opDepLevel;
-		}
-	};
-
-class ScoringOperation{
-	friend class CalculationManager;
-	friend class BranchOperation;
-
-	//my functions don't write the final cla, but Beagle allows for specifying one
-	int destClaIndex;
-	int childClaIndex1;
-	int childClaIndex2;
-	int transMatIndex;
-	bool derivatives;
-public:
-	ScoringOperation() : destClaIndex(-1), childClaIndex1(-1), childClaIndex2(-1), transMatIndex(-1), derivatives(false){};
-	ScoringOperation(int dest, int child1, int child2, int pmat, bool d) : destClaIndex(dest), childClaIndex1(child1), childClaIndex2(child2), transMatIndex(pmat), derivatives(d){};
-	ScoringOperation(const ScoringOperation &from){
-		destClaIndex = from.destClaIndex;
-		childClaIndex1 = from.childClaIndex1;
-		childClaIndex2 = from.childClaIndex2;
-		transMatIndex = from.transMatIndex;
-		derivatives = from.derivatives;		
-		}
-	};
-
-class BranchOperation{
-	friend class CalculationManager;
-	ScoringOperation scrOp;
-	TransMatOperation transOp;
-public:
-	BranchOperation(const BranchOperation &from){
-		scrOp = from.scrOp;
-		transOp = from.transOp;
-		}
-	};
-
-class BlockingOperationsSet{
-public:
-	int opSetDepLevel;
-	list<ClaOperation> claOps;
-	list<TransMatOperation> pmatOps;
-	~BlockingOperationsSet(){
-		//claOps.clear();
-		//pmatOps.clear();
-		}
-	};
 /*
 class NewBlockingOperationsSet{
 public:
@@ -752,6 +770,7 @@ class CalculationManager{
 	static PmatManager *pmatMan;
 	static const SequenceData *data;
 	list<BlockingOperationsSet> operationSetQueue;
+	list<BlockingOperationsSet> freeableOpSets;
 	list<ScoringOperation> scoreOps;
 	
 //	list<NewBlockingOperationsSet> newOperationSetQueue;
@@ -774,6 +793,31 @@ public:
 		rescaleBeagle = false;
 		}
 
+	void SetBeagleDetails(bool gpu, bool singlePrec, bool rescale, string &prefix){
+		useBeagle = true;
+		if(gpu){//assuming that all GPU is SP for now
+			gpuBeagle = true;
+			singlePrecBeagle = true;
+			//DEBUG - should eventually force rescaling with gpu, but don't for debugging purposes
+			//rescaleBeagle = true;
+			}
+		if(singlePrec){
+			singlePrecBeagle = true;
+			}
+		if(rescale)
+			rescaleBeagle = true;
+		this->ofprefix = prefix;
+		}
+
+	void InitializeBeagle(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
+
+	void Finalize(){
+#ifdef USE_BEAGLE
+		if(beagleInst > 0)
+			beagleFinalizeInstance(beagleInst);
+#endif
+		}
+
 	static void SetClaManager(ClaManager *cMan) {
 		CalculationManager::claMan = cMan;
 		}
@@ -790,34 +834,57 @@ public:
 		ofprefix = prefix;
 		}
 
-	//THE FOLLOWING DO NOT DEPEND ON BEAGLE BEING AVAILABLE
+	void GetBeagleSiteLikelihoods(double *likes);
 
-	//pass the effective root node (any non-tip), it will figure out which clas to combine
-//	FLOAT_TYPE CalculateLikelihood(const TreeNode *effectiveRoot);
+	//This reports back whether Beagle ended up using single precision.  It may be because it was specifically specified,
+	//or just implied by other settings such as GPU.  Should be called AFTER SetBeagleDetails and InitializeBeagle, at which
+	//point the details of the instance are definitely known
+	bool IsSinglePrecision() {return singlePrecBeagle;}
 
-	//pass the node on the upper end of the branch.  may be terminal
-//	ScoreSet CalculateDerivatives(const TreeNode *topOfBranch);
-
+	//Called by Tree
+	//For likelihood : pass the effective root node (any non-tip), it will figure out which clas to combine
+	//For derivs     : pass the node on the upper end of the branch.  may be terminal
 	ScoreSet CalculateLikelihoodAndDerivatives(const TreeNode *topOfBranch, bool calcDerivs);
 	
-	/*called by both CalculateLikelihood and CalculateDerivatives. interprets the focal node 
+private:
+	/*called by CalculateLikelihoodAndDerivatives. interprets the focal node 
 	depending on whether derivatives are requested*/
 	void DetermineRequiredOperations(const TreeNode *focalNode, bool derivatives);
 
 	/*called by DetermineRequiredOperations. using dependecies pre-set in the ClaHolders, tracks backwards recursively to 
-	determine all of the pmats that must be calculated (TransMatOps) and the clas that must be combined (ClaOpts) to get 
+	determine all of the pmats that must be calculated (TransMatOps) and the clas that must be combined (ClaOps) to get 
 	the initially passed holder number.  Note that at this point any notion of a tree or directionality is out of the 
 	picture, only dependencies remain*/
 	int AccumulateOpsOnPath(int holderInd, list<NodeOperation> &nodeOps);
 
-	//always combine two clas and one pmat
-	void PerformClaOperation(const ClaOperation *theOp);
-	//calculate a whole set of cla operations at once
+	/*called by CalculateLikelihoodAndDerivatives after needed cla ops are determined.  Gets calcs
+	up to the point where CalcScoringOpt is next*/
+	void UpdateAllConditionals();
+
+	/*Called from UpdateAllConditionals, claims the destination clas for the current dep level.  Those
+	clas then remain reserved as they are the deps of the next level, then they are unreserved either
+	just before the call to CalcLikeAndDerives returns or as the dep pass continue, if mem is limited*/
+	void ReserveDestinationClas(BlockingOperationsSet &set);
+
+	/*Mark clas as recycleable after they are no longer directly needed.  The dep levels remain the same, 
+	so lower dep level clas will still be reclaimed before higher ones*/
+	void UnreserveDependencyClas(const BlockingOperationsSet &set);
+
+	void QueueDependencyClasForFreeing(const BlockingOperationsSet &set);
+	void QueueDestinationClasForFreeing(const BlockingOperationsSet &set);
+
+	//resets single opSet. not used I think
+	void ResetDepLevels(const BlockingOperationsSet &set);
+
+	/*resets depLevels and any temp reservations for all ops in operationsSetQueue.  Done before returning from
+	CalcLikeAndDerivs*/
+	void ResetDepLevelsAndReservations();
+
+	//Calculate a whole set of cla operations at once - each combines two clas and two transmats into one dest cla
 	void PerformClaOperationBatch(const list<ClaOperation> &theOps);
 
-	//calculate a pmat, or a pmat, d1mat and d2mat
-	void PerformTransMatOperation(const TransMatOperation *theOp);
-	//calculate a whole set of transmat operations at once
+	//Calculate a whole set of transmat operations at once. May include derivative matrix calcs too.
+	//Acutal calculation of the matrices may happen in Garli and then be sent to beagle
 	void PerformTransMatOperationBatch(const list<TransMatOperation> &theOps);
 	//call back to the underlying models to calculate the pmats, then send them to beagle
 	void SendTransMatsToBeagle(const list<TransMatOperation> &theOps);
@@ -825,105 +892,21 @@ public:
 	//calculate and return either the lnL alone, or the lnl, D1 and D2
 	ScoreSet PerformScoringOperation(const ScoringOperation *theOp);
 
-	//This reports back whether Beagle ended up using single precision.  It may be because it was specifically specified,
-	//or just implied by other settings such as GPU.  Should be called AFTER SetBeagleDetails and InitializeBeagle, at which
-	//point the details of the instance are definitely known
-	bool IsSinglePrecision() {return singlePrecBeagle;}
+	//THESE SINGLE OP VERSIONS ARE DEPRECATED IN FAVOR OF BATCH OPS ABOVE
+	//always combine two clas and one pmat
+	void PerformClaOperation(const ClaOperation *theOp);
+	//calculate a pmat, or a pmat, d1mat and d2mat
+	void PerformTransMatOperation(const TransMatOperation *theOp);
 	
-	//this is just for debugging
-	void OutputOperationsSummary() const;
-
 	//these are just duplicates of the functions originally in Tree.  They are not used with beagle
 	void CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA,  MODEL_FLOAT ***Lpr,  MODEL_FLOAT ***Rpr, const Model *mod);
 	void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata,  MODEL_FLOAT ***Lpr,  MODEL_FLOAT ***Rpr, const Model *mod);
 	void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *data2,  MODEL_FLOAT ***pr1,  MODEL_FLOAT ***pr2, const Model *mod, const unsigned *ambigMap);
 	FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,  MODEL_FLOAT ***prmat, const char *Ldata, const Model *mod);
 	FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA,  MODEL_FLOAT ***prmat, const Model *mod);
-	
-	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const{
-		FLOAT_TYPE lnL = 0.0, D1 = 0.0, D2 = 0.0;
-		for(int i = 0;i < data->NChar();i++){
-			assert(sitelnL[i] == sitelnL[i]);
-			assert(sitelnL[i] <= 1e-6);
-
-			if(sitelnL[i] > 0.0){
-				outman.DebugMessage("BEAGLE-GARLI WARNING - site lnL > 0 : %e", sitelnL[i]);
-				}
-
-			assert(sitelnL[i] > -1e6);
-
-			if(sitelnL[i] < -1e6){
-				outman.DebugMessage("BEAGLE-GARLI WARNING - very small site lnL : %e", sitelnL[i]);
-				}
-	
-			double actuallnL = sitelnL[i];
-			if(actuallnL > 0.0)
-				actuallnL = 0.0;
-			if(actuallnL < -FLT_MAX)
-				actuallnL = -FLT_MAX;			
-
-			lnL += actuallnL * data->Count(i);
-			
-			if(siteD1 != NULL){
-				assert(siteD1[i] == siteD1[i]);
-//				assert(siteD1[i] > -1e15);
-//				assert(siteD1[i] < 1e15);
-
-				if(siteD1[i] > 1e15){
-					outman.DebugMessage("BEAGLE-GARLI WARNING - very large site D1 : %e", siteD1[i]);
-					}
-				if(siteD1[i] < -1e15){
-					outman.DebugMessage("BEAGLE-GARLI WARNING - very small site D1 : %e", siteD1[i]);
-					}
-				
-				D1 += siteD1[i] * data->Count(i);
-				}
-			if(siteD2 != NULL){
-				assert(siteD2[i] == siteD2[i]);
-//				assert(siteD2[i] > -1e15);
-//				assert(siteD2[i] < 1e15);
-				
-				if(siteD2[i] > 1e15){
-					outman.DebugMessage("BEAGLE-GARLI WARNING - very large site D1 : %e", siteD2[i]);
-					}
-				if(siteD2[i] < -1e15){
-					outman.DebugMessage("BEAGLE-GARLI WARNING - very small site D1 : %e", siteD2[i]);
-					}
-
-				D2 += siteD2[i] * data->Count(i);
-				}
-			}
-		ScoreSet res = {lnL, D1, D2};
-		return res;
-		}
-
-	void Finalize(){
-#ifdef USE_BEAGLE
-		if(beagleInst > 0)
-			beagleFinalizeInstance(beagleInst);
-#endif
-		}
 
 #ifdef USE_BEAGLE
-	void SetBeagleDetails(bool gpu, bool singlePrec, bool rescale, string &prefix){
-		useBeagle = true;
-		if(gpu){//assuming that all GPU is SP for now
-			gpuBeagle = true;
-			singlePrecBeagle = true;
-			//DEBUG - should eventually force rescaling with gpu, but don't for debugging purposes
-			//rescaleBeagle = true;
-			}
-		if(singlePrec){
-			singlePrecBeagle = true;
-			}
-		if(rescale)
-			rescaleBeagle = true;
-		this->ofprefix = prefix;
-		}
-	
 	//BEAGLE SPECIFIC FUNCS
-
-	void InitializeBeagle(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
 
 	void SendTipDataToBeagle();
 
@@ -1021,8 +1004,8 @@ public:
 #endif
 		}
 
-	//For scale arrays my indexing scheme and Beagle's happen to be the same
 	void AccumulateRescalers(int destIndex, int childIndex1, int childIndex2);
+	void OutputBeagleSiteValues(ofstream &out, bool derivs) const;
 
 	//for testing/debugging
 	void SendClaToBeagle(int num){
@@ -1034,57 +1017,11 @@ public:
 			"beagleSetPartials");
 		}
 
-	void OutputBeagleSiteLikelihoods(ofstream &likes, vector<double> &siteLikesOut) const{
-		const int *count = data->GetCounts();
-		int num = 0;
-		
-		//for(vector<double>::iterator it = siteLikesOut.begin();it != siteLikesOut.end();it++)
-		for(int c = 0;c < data->NChar();c++)
-			for(int co = 0;co < count[c];co++)
-				likes << c << "\t" << co << "\t" << siteLikesOut[c] << "\n";
-		likes.precision(11);
-		likes << SumSiteValues(&(siteLikesOut[0]), NULL, NULL).lnL << "\n";
-		likes.close();
-		}
-
-	void OutputBeagleSiteValues(ofstream &out, bool derivs) const{
-		//there is only one set of sitelikes stored by an instance, the most recent ones		
-		vector<double> siteLikesOut(data->NChar());
-		vector<double> siteD1Out(data->NChar());
-		vector<double> siteD2Out(data->NChar());
-
-		const int *counts = data->GetCounts();
-
-		beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
-		if(derivs)
-			beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
-
-		//ScoreSet mySummation = SumSiteValues(&siteLikesOut[0], (derivs ? &siteD1Out[0] : NULL), (derivs ? &siteD2Out[0] : NULL));
-		//out << "mine\t" << mySummation.lnL << "\t" << mySummation.d1 << "\t" << mySummation.d2 << "\n";
-		//outman.DebugMessage("myL\t%f\tD1\t%f\tD2\t%f", mySummation.lnL, mySummation.d1, mySummation.d2);
-		//outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
-
-		for(int s = 0;s < data->GapsIncludedNChar();s++){
-			int packed = data->Number(s);
-			if(packed >= 0){
-				out << s << "\t" << packed << "\t" << counts[packed] << "\t" << siteLikesOut[packed];
-				if(derivs){
-					out << "\t" << siteD1Out[packed] << "\t" << siteD2Out[packed];
-					}
-				}
-			else 
-				out << s << "\t" << packed << "\t" << counts[packed] << "\tNA";
-			out << "\n";
-			}
-		}
-
-	void UpdateAllConditionals();
-	void ReserveNeededClas(const list<ClaOperation> &theOps);
-	void UnreserveUnneededClas(const list<ClaOperation> &theOps);
-	void ResetDepLevels(const list<ClaOperation> &theOps);
-	void ResetDepLevelsAndReservations();
-
 	void OutputBeagleTransMat(int index);
+	//this is just for debugging
+	void OutputOperationsSummary() const;
+	//Sum site likes/derivs. Beagle now sums on its own, so no longer necessary except for debugging
+	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const;
 #endif 
 	};
 #endif

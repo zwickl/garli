@@ -21,6 +21,7 @@
 #include "condlike.h"
 #include "clamanager.h"
 #include "utility.h"
+#include "calculationmanager.h"
 
 #ifdef CUDA_GPU
 #include "cudaman.h"
@@ -95,6 +96,16 @@ else
 		}
 	}
 
+	const CondLikeArrayHolder *ClaManager::GetHolder(int index){
+		assert(index > -1 && index < numHolders);
+		return &holders[index];
+		}
+
+	CondLikeArrayHolder *ClaManager::GetMutableHolder(int index){
+		assert(index > -1 && index < numHolders);
+		return &holders[index];
+		}
+
 		//this will assign an unused holder index to a node that did not previously have one (no argument)
 	int ClaManager::AssignFreeClaHolder(){
 		int newIndex = _GetFreeH();
@@ -116,36 +127,39 @@ else
 		return newIndex;
 		}
 
-	void ClaManager::FillHolder(int index, int dir){
+	void ClaManager::FillHolder(int index, int depLevel){
 		assert(index > -1 && index < numHolders);
 		CheckClaHolders();
 		assert(holders[index].numAssigned > 0);
 
 		holders[index].theArray = _GetFreeC();
-		holders[index].SetReclaimLevel(dir);
+		holders[index].SetDepLevel(depLevel);
 		if(debug_clas){
 			char s[100];
-			sprintf(s, "filled\tdir\t%d\tind", dir);
+			sprintf(s, "filled\tdep\t%d\tind", depLevel);
 			ReportClaTotals(s, index);
 			}
 		}
 
 	//this simply removes the cla from a holder.  It is equivalent to just
-	//dirtying it if only a single tree shares the holder.  Nothing happens 
-	//to the holder itself, which remains valid and properly assigned
+	//dirtying it if only a single tree shares the holder.  The holder itself
+	//remains valid and properly assigned, but is: 
+	//-unreserved (this shouldn't be getting called with reserved holders anyway)
+	//
 	void ClaManager::EmptyHolder(int index){
 		assert(index > -1 && index < numHolders);
-
-		holders[index].reserved = holders[index].tempReserved = false;
-		if(holders[index].theArray==NULL){
+	
+		if(holders[index].IsDirty()){
 			if(debug_clas){
 				ReportClaTotals("alreadyEmpty\0", index);
 				}
 			return;
 			}
-		claStack.push_back(holders[index].theArray);
+
+		_ReclaimC(index);
+		holders[index].reserved = holders[index].tempReserved = false;
+
 		holders[index].SetReclaimLevel(0);
-		holders[index].theArray=NULL;
 		if(debug_clas){
 			ReportClaTotals("emptied\0", index);
 			}
@@ -160,12 +174,12 @@ else
 		//	->null the holder's cla pointer and return the same index
 		//2. Cla is being made dirty, and multiple nodes point to it
 		//	->remove this node from the holder (decrement) and assign a new one	
-		CheckClaHolders();
 		assert(index > -1 && index < numHolders);
 		assert(holders[index].numAssigned > 0);
+		CheckClaHolders();
 		
 		int newIndex = -1;
-		if(holders[index].numAssigned == 1){
+		if(NumAssigned(index) == 1){
 			//the same holder can be used in the new context
 			if(holders[index].theArray != NULL){
 				//but if it had been previously calculated, grab that cla
@@ -181,43 +195,38 @@ else
 		if(debug_clas){
 			char s[50];
 			sprintf(s, "emptied\t%d\treassigned", index);
-			ReportClaTotals(s, newIndex);
+			//DEBUG
+			//outman.DebugMessageNoCR("%s ", s);
+			//ReportClaTotals(s, newIndex);
 			}
 		return newIndex;
 		}
 
 	//this marks this holder as one that should not have its cla reclaimed during recycling
-	//SEE BELOW for distinction between normal and temp reservations
-	void ClaManager::ReserveCla(int index, bool temp/*=true*/){
-		assert(index > -1 && index < numHolders);
-		if(temp==true) holders[index].tempReserved=true;
-		else holders[index].reserved=true;
-		if(debug_clas){
-			if(temp)
-				ReportClaTotals("tempreserved", index);
-			else
-				ReportClaTotals("reserved", index);
-			}
-		}
-
-	//Tell the manager that it is ok to reclaim the cla in this holder, although it might
-	//avoid doing so based on the dep level
-	//TEMP RESERVATIONS are nodes that are necessary for ongoing operations - destination arrays
-	//and immediate dependencies
-	void ClaManager::RemoveTempReservation(int index){
-		assert(index > -1 && index < numHolders);
-		holders[index].tempReserved=false;
-		if(memLevel>1)
-			holders[index].SetReclaimLevel(1);
-		if(debug_clas){
-			ReportClaTotals("unTreserved", index);
-			}
-		}
-
-	//Tell the manager that it is ok to reclaim the cla in this holder, although it might
-	//avoid doing so based on the dep level
 	//NORMAL RESERVATIONS are nodes that are reserved at a higher level, for example because
 	//they belong to the bestIndiv
+	void ClaManager::ReserveCla(int index){
+		assert(index > -1 && index < numHolders);
+		holders[index].reserved = true;
+		if(debug_clas){
+			ReportClaTotals("reserved", index);
+			}
+		}
+
+	//this marks this holder as one that should not have its cla reclaimed during recycling
+	//TEMP RESERVATIONS are nodes that are necessary for ongoing operations - destination arrays
+	//and immediate dependencies
+	void ClaManager::TempReserveCla(int index){
+		assert(index > -1 && index < numHolders);
+		holders[index].tempReserved = true;
+		if(debug_clas){
+			ReportClaTotals("tempreserved", index);
+			}
+		}
+
+	//Tell the manager that it is ok to reclaim the cla in this holder, although it might
+	//avoid doing so based on the dep level
+	//SEE ABOVE for distinction between normal and temp reservations
 	void ClaManager::RemoveNormalReservation(int index){
 		assert(index > -1 && index < numHolders);
 		//holders[index].tempReserved=false;
@@ -227,6 +236,25 @@ else
 		if(debug_clas){
 			ReportClaTotals("unNreserved", index);
 			}
+		}
+
+	//Tell the manager that it is ok to reclaim the cla in this holder, although it might
+	//avoid doing so based on the dep level
+	//SEE ABOVE for distinction between normal and temp reservations
+	void ClaManager::RemoveTempReservation(int index){
+		assert(index > -1 && index < numHolders);
+		holders[index].tempReserved=false;
+		
+		if(memLevel>1)
+			holders[index].SetReclaimLevel(1);
+		if(debug_clas){
+			ReportClaTotals("unTreserved", index);
+			}
+		}
+
+	void ClaManager::MarkOperationAsFreeable(ClaOperation &op){
+		AddToFreeableQueue(op.childClaIndex1);
+		AddToFreeableQueue(op.childClaIndex2);
 		}
 
 	//this is essentially the same as ClaimClaFillIfNecessary, but it returns the assigned cla object
@@ -250,37 +278,43 @@ else
 		return holders[index].theArray;
 		}
 
-	//This is essentially the same as GetCla, but doesn't return anything and also sets the reserved flag
+	//This is essentially the same as GetCla, but doesn't return anything and also sets the tempReserved flag
 	//FillHolder is only used if the holder is currently empty
 	void ClaManager::ClaimClaFillIfNecessary(int index, int depLevel){
 		assert(index > -1 && index < numHolders);
-		if(debug_clas)
-			outman.DebugMessage("claim %d dep %d", index, depLevel);
-		CheckClaHolders();
 		assert(holders[index].numAssigned > 0);
-		//FillHolder will also set the dep level, but we need to set it even if FillHolder doesn't need to be called
-		holders[index].depLevel = depLevel;
-		if(holders[index].theArray == NULL){
+		if(debug_clas){
+			outman.DebugMessage("claim %d dep %d", index, depLevel);
+			CheckClaHolders();
+			}
+		
+		if(IsHolderDirty(index)){
 			FillHolder(index, depLevel);
 			if(debug_clas){
 				ReportClaTotals("claimed-fill", index);
 				}
 			}
 		else{
+			//FillHolder will also set the dep level, but we need to set it even if FillHolder doesn't need to be called
+			SetDepLevel(index, depLevel);
 			if(debug_clas){
 				ReportClaTotals("claimed-already-filled", index);
 				}
 			}
-		//mark this cla as one not to be reclaimed
-		ReserveCla(index, true);
+		//mark this cla as one not to be reclaimed, since it has been "claimed"
+		TempReserveCla(index);
 		}
 
 	//tell the manager that another tree (node) now points to this holder.  
 	void ClaManager::IncrementHolder(int index){
 		assert(index > -1 && index < numHolders);
 		holders[index].numAssigned++;
-		if(debug_clas)
-			outman.DebugMessage("incr\t%d\t->\t%d", index, holders[index].numAssigned);
+		if(debug_clas){
+			if(this->IsHolderReserved(index))
+				outman.DebugMessage("incr(res)\t%d\t->\t%d", index, holders[index].numAssigned);
+			else
+				outman.DebugMessage("incr(noRes)\t%d\t->\t%d", index, holders[index].numAssigned);
+			}
 		CheckClaHolders();
 		}
 
@@ -308,7 +342,10 @@ else
 			holders[index].numAssigned--; 
 			//DEBUG - Why was this important?  Should this be here for beagle?
 			//this is important!
-			//holders[index].tempReserved=false;
+			//Yes, I think that this should be done, since the holder should only be temp reseved if it
+			//was in current use, and if it is being decremented then it must no longer be.  Normal
+			//reserations will persist.
+			RemoveTempReservation(index);
 			}
 		}
 
@@ -316,7 +353,7 @@ else
 		int numReclaimed=0;
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL){
-				if(holders[i].GetReclaimLevel() == 2 && holders[i].tempReserved == false && holders[i].reserved == false){
+				if(holders[i].DepLevel() == 2 && holders[i].tempReserved == false && holders[i].reserved == false){
 					EmptyHolder(i);
 					numReclaimed++;
 					}
@@ -326,7 +363,7 @@ else
 		if(numReclaimed>10) return;
 		for(int i=0;i<numHolders;i++){
 			if(holders[i].theArray != NULL){
-				if((holders[i].GetReclaimLevel() == 1 && holders[i].tempReserved == false && holders[i].reserved == false)){
+				if((holders[i].DepLevel() == 1 && holders[i].tempReserved == false && holders[i].reserved == false)){
 					EmptyHolder(i);
 					numReclaimed++;
 					}
@@ -345,23 +382,156 @@ else
 		if(debug_clas){
 			ReportClaTotals("recycling", -1);
 			}
+
 		int numReclaimed=0;
+		int targetReclaim = min(numNodes / 2.0, 20.0);
+		for(list<int>::iterator it = freeableHolderQueue.begin(); it != freeableHolderQueue.end();){
+			//if(holders[*it].depLevel > curReclaimLevel || numReclaimed > numNodes / 2)
+			if(numReclaimed >= targetReclaim)
+				break;
+			assert(!IsHolderTempReserved(*it) && !IsHolderReserved(*it));
+			EmptyHolder(*it);
+			numReclaimed++;
+			it++;
+			freeableHolderQueue.pop_front();
+			}
+
+		if(numReclaimed >= targetReclaim){
+			ReportClaTotals("recycledFromQueueRet ", numReclaimed);
+			return;
+			}
+		else
+			ReportClaTotals("recycledFromQueueCont. ", numReclaimed);
+
+		vector<int> level2s;
 		for(int i=0;i<numHolders;i++){
-			if(holders[i].theArray != NULL){
-				if(holders[i].depLevel < curReclaimLevel && holders[i].tempReserved == false && holders[i].reserved == false){
+			if(!holders[i].IsDirty()){
+				//grab any level 0 or 1 deps
+				if((holders[i].depLevel < 3) && (IsHolderTempReserved(i) == false) && (IsHolderReserved(i) == false)){
+					if(holders[i].depLevel < 2){
+						EmptyHolder(i);
+						numReclaimed++;
+						if(numReclaimed >= targetReclaim){
+							return;
+							}
+						}
+					else 
+						level2s.push_back(i);
+					}
+				}
+			}
+
+		ReportClaTotals("recycled>numNodesLvl<2 ", numReclaimed);
+		if(numReclaimed >= targetReclaim){
+			return;
+			}
+
+		//return the second level deps
+		for(vector<int>::iterator it = level2s.begin(); it != level2s.end();it++){
+			EmptyHolder(*it);
+			numReclaimed++;
+			}
+
+		ReportClaTotals("recycled>numNodesLvl2 ", numReclaimed);
+		if(numReclaimed >= targetReclaim){
+			return;
+			}
+
+		for(int i=0;i<numHolders;i++){
+			if(!holders[i].IsDirty()){
+				//just grab anything not reserved
+				if((IsHolderTempReserved(i) == false) && (IsHolderReserved(i) == false)){
 					EmptyHolder(i);
 					numReclaimed++;
 					}
 				}
-			if(numReclaimed > numNodes){
-				ReportClaTotals("recycled>numNodes ", numReclaimed);
+			if(numReclaimed >= targetReclaim){
+				ReportClaTotals("recycled>numNodesAnyLevel ", numReclaimed);
 				return;
 				}
 			}
 		if(debug_clas){
 			ReportClaTotals("recycled ", numReclaimed);
-			}
-		if(debug_clas)
 			OutputClaReport();
+			}
 		assert(numReclaimed > 0);
+		}
+
+
+//DEBUGGING FUNCS
+
+	int ClaManager::GetClaNumber(int index) const{
+		//this is ugly, but should only be called for debugging
+		assert(index > -1 && index < numHolders);
+		if(holders[index].theArray == NULL) return -1;
+		for(int i=0;i<numClas;i++)
+			if(holders[index].theArray == allClas[i]) return i;
+		assert(0);
+		return -1;
+		}
+
+	int ClaManager::CountClasInUse(int recLevel) const{
+		int num=0;
+		for(int i=0;i<numHolders;i++){
+			if(! IsHolderDirty(i))
+				if(holders[i].DepLevel() == recLevel) 
+					num++;
+			}
+		return num;
+		}
+
+	void ClaManager::ReportClaTotals(const char *mess, int index) const{
+		if(debug_clas){
+			int clean, tempres, res, assigned;
+			clean = tempres = res = assigned = 0;
+			for(int i=0;i<numHolders;i++){
+				if(holders[i].theArray != NULL)
+					clean++;
+				if(IsHolderTempReserved(i)) 
+					tempres++;
+				if(IsHolderReserved(i))
+					res++;
+				}		
+			assigned = numHolders - holderStack.size();
+			outman.DebugMessage("%s\t%d\tstacks:\t%d\t%d\tclean\t%d\ttempres\t%d\tres\t%d\tassigned\t%d\tfreeable\t%d", mess, index, claStack.size(), holderStack.size(), clean, tempres, res, assigned, freeableHolderQueue.size());
+			//the numbers can be a little out of whack because this is called mid-operation, so
+			//this will only check for serious problems
+			assert(abs(clean + (int) claStack.size() - numClas) <= 2);
+			}
+		}
+
+	void ClaManager::CheckClaHolders() const{
+		//DEBUG
+		//if(debug_clas){
+		if(0){
+			int used=0;
+			int reclaim2=0;
+			for(int i=0;i<numHolders;i++){
+				if(holders[i].theArray != NULL){
+					used++;
+					if(holders[i].DepLevel() == 2) reclaim2++;
+					}
+				}
+			assert(used == numClas - claStack.size());
+			for(int i=0;i<numHolders;i++){
+				if(find(holderStack.begin(),holderStack.end(), i) == holderStack.end()){
+					assert(holders[i].numAssigned > 0);
+					}
+				else{
+					assert(holders[i].numAssigned == 0);
+					assert(holders[i].theArray == NULL);
+					}
+				}
+			}
+		}
+	
+	void ClaManager::OutputClaReport() const{
+		ofstream cla("clareport.log");
+		cla << "hIndex\tclaIndex\tnumAss\treclaimLvl\tdepLvl\tRes\tTres\n";
+		for(int i=0;i< numHolders;i++){
+			cla << i << "\t" << (holders[i].theArray == NULL ? -1 : holders[i].theArray->Index()) << "\t" << holders[i].numAssigned << "\t";
+			cla << holders[i].reclaimLevel << "\t" << holders[i].depLevel << "\t";
+			cla << (holders[i].reserved ? "1" : "0") << "\t" << (holders[i].tempReserved ? "1" : "0")<< "\n";
+			}
+		cla.close();
 		}

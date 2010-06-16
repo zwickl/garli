@@ -569,7 +569,8 @@ int main( int argc, char* argv[] )	{
 					}
 				if(pop.calcMan != NULL)
 					pop.calcMan->Finalize();
-				return 1;
+				//can throw a sort of dummy exception and set returnZero, causing bailing from the program but not a non-zero ret val
+				return (err.returnZero ? 0 : 1);
 				}
 			catch(int error){
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;

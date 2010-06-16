@@ -541,7 +541,7 @@ class GeneticCode{
 		return mapIndexToCodonDisplay[index];
 		}
 
-	int NumStates() const {return mapIndexToCodonDisplay.size();}
+	unsigned NumStates() const {return (unsigned) mapIndexToCodonDisplay.size();}
 	};
 
 class CodonData : public SequenceData {
