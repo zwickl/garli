@@ -32,6 +32,10 @@ class GeneralGamlConfig{
 	bool singlePrecBeagle;
 	bool gpuBeagle;
 	bool rescaleBeagle;
+	string requiredBeagleFlags;
+	string preferredBeagleFlags;
+	double singlePrecEps;
+	double doublePrecEps;
 
 	//these options will be the same regardless of whether a population is master or remote
 

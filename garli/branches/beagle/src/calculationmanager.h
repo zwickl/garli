@@ -775,24 +775,40 @@ class CalculationManager{
 	
 //	list<NewBlockingOperationsSet> newOperationSetQueue;
 
+	map<long, string> flagToName;
+	map<string, long> nameToFlag;
+	vector<long> invalidFlags;
+
+	string requiredBeagleFlags;
+	string preferredBeagleFlags;
+	string actualBeagleFlags;
+
+	long req_flags;
+	long pref_flags;
+	long actual_flags;
+
 public:
 	bool useBeagle;
 	bool termOnBeagleError;
-	bool rescaleBeagle;
-	bool singlePrecBeagle;
-	bool gpuBeagle;
+	//bool rescaleBeagle;
+//	bool singlePrecBeagle;
+//	bool gpuBeagle;
 	int beagleInst;
 	string ofprefix;
 
 	CalculationManager(){
 		useBeagle = false; 
-		gpuBeagle = false;
+//		gpuBeagle = false;
 		beagleInst = -1; 
 		termOnBeagleError = true;
-		singlePrecBeagle = false;
-		rescaleBeagle = false;
+		//singlePrecBeagle = false;
+		//rescaleBeagle = false;
+		FillBeagleOptionsMaps();
+		req_flags = pref_flags = actual_flags = 0;
 		}
 
+	void FillBeagleOptionsMaps();
+/*
 	void SetBeagleDetails(bool gpu, bool singlePrec, bool rescale, string &prefix){
 		useBeagle = true;
 		if(gpu){//assuming that all GPU is SP for now
@@ -808,6 +824,25 @@ public:
 			rescaleBeagle = true;
 		this->ofprefix = prefix;
 		}
+*/
+	void SetBeagleDetails(string prefFlags, string reqFlags, string &prefix){
+		useBeagle = true;
+		preferredBeagleFlags = prefFlags;
+		requiredBeagleFlags = reqFlags;
+		ofprefix = prefix;
+		}
+
+	long ParseBeagleFlagString(string flagsString) const;
+	void InterpretBeagleResourceFlags(long flags, string &list) const;
+	void OutputBeagleResources() const;
+
+	//for now assuming that rescaling will always be available - this will need to be
+	//called BEFORE initializing an instance because how the initialization is called depends on it
+	bool IsRescaling() {return (bool) ((pref_flags | req_flags) & BEAGLE_FLAG_SCALERS_LOG);}
+	//this will only know if it ended up being SP AFTER initialization
+	bool IsSinglePrecision() {return (bool) (actual_flags & BEAGLE_FLAG_PRECISION_SINGLE);}
+	//this is also only known AFTER initialization
+	bool IsGPU() {return (bool) (actual_flags & BEAGLE_FLAG_PROCESSOR_GPU);}
 
 	void InitializeBeagle(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
 
@@ -839,7 +874,7 @@ public:
 	//This reports back whether Beagle ended up using single precision.  It may be because it was specifically specified,
 	//or just implied by other settings such as GPU.  Should be called AFTER SetBeagleDetails and InitializeBeagle, at which
 	//point the details of the instance are definitely known
-	bool IsSinglePrecision() {return singlePrecBeagle;}
+	//bool IsSinglePrecision() {return singlePrecBeagle;}
 
 	//Called by Tree
 	//For likelihood : pass the effective root node (any non-tip), it will figure out which clas to combine
@@ -914,7 +949,7 @@ private:
 	void CheckBeagleReturnValue(int err, const char *funcName) const;
 
 	//simple report
-	void OutputInstanceDetails(const BeagleInstanceDetails *det) const;
+	void ParseInstanceDetails(const BeagleInstanceDetails *det);
 
 	//These functions can be altered to get indeces from different schemes without actually altering the
 	//functions that talk to beagle

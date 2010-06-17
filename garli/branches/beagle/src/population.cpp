@@ -605,17 +605,9 @@ void Population::Setup(GeneralGamlConfig *c, SequenceData *d, int nprocs, int r)
 
 #ifdef USE_BEAGLE
 	//invariable class needs to be treated as extra rate for beagle
-	calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
+	//calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
+	calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->ofprefix);
 	calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, data->NStates(), sites, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)));
-	//this probably isn't a great idea, but assigning back to the conf if beagle ended up being SP allows things
-	//to operate properly whether it was an explictly specified SP or just de facto (i.e., GPU).  That will allow
-	//SetTreeStatics to properly set the larger min brlen
-	if(calcMan->IsSinglePrecision()){
-		conf->singlePrecBeagle = true;
-		//DEBUG - this used to be more limited, but I don't think that its necessary
-		//since the matrix calcs will be done by me in DP anyway 
-		//conf->minBrlen = 1.0e-6;
-		}
 #endif
 
 	NodeClaManager::SetClaManager(claMan);
@@ -1209,28 +1201,8 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->mod=indiv[0].mod;
 
-	//check the current likelihood now to know how accurate we can expect them to be later
-#ifdef SINGLE_PRECISION_FLOATS
-	assert(0);
-	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
-#else
-
-	//this stuff no longer depends on the likelihood value, so moving to earlier, in Setup
-/*
-#define SAME_PRECISION
-
-#ifdef SAME_PRECISION
-	//DEBUG
-	//use the same tolerance, even in the double prec case
-	Tree::expectedPrecision = FLT_EPSILON * 10.0;
-#else
-	if(calcMan->useBeagle && calcMan->singlePrecBeagle)
-		Tree::expectedPrecision = FLT_EPSILON * 10.0;
-	else
-		Tree::expectedPrecision = max(DBL_EPSILON * 10.0, 1e-12);
-#endif
-*/
-#endif
+	//used to set the Tree::expectedPrecision here, but now moved to defaults in configoptions.
+	//value is such that lnL * expectedPrecision gives about the expected score error +/-
 	
 	indiv[0].CalcFitness(0);
 	FLOAT_TYPE lnLerror = Tree::expectedPrecision * -indiv[0].Fitness();
