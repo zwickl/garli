@@ -49,34 +49,8 @@ const char *AdvanceDataPointer(const char *arr, int num);
 
 #ifdef USE_BEAGLE
 
-void InterpretBeagleResourceFlags(long flags, string &list){
-    if (flags & BEAGLE_FLAG_PRECISION_DOUBLE)	list += " DOUBLE";
-    if (flags & BEAGLE_FLAG_PRECISION_SINGLE)	list += " SINGLE";
-    
-	if (flags & BEAGLE_FLAG_COMPUTATION_ASYNCH) list += " ASYNCH";
-    if (flags & BEAGLE_FLAG_COMPUTATION_SYNCH)  list += " SYNCH";
-    
-	if (flags & BEAGLE_FLAG_EIGEN_COMPLEX)		list += " COMPLEX";
-	if (flags & BEAGLE_FLAG_EIGEN_REAL)			list += " REAL";
-
-	if (flags & BEAGLE_FLAG_SCALING_MANUAL)		list += " MANUAL_SCALING";
-	if (flags & BEAGLE_FLAG_SCALING_AUTO)		list += " AUTO_SCALING";
-	if (flags & BEAGLE_FLAG_SCALING_ALWAYS)		list += " ALWAYS_SCALING";
-
-	if (flags & BEAGLE_FLAG_SCALERS_RAW)		list += " RAW_SCALERS";
-    if (flags & BEAGLE_FLAG_SCALERS_LOG)		list += " LOG_SCALERS";
-
-    if (flags & BEAGLE_FLAG_VECTOR_SSE)			list += " SSE";
-	if (flags & BEAGLE_FLAG_THREADING_OPENMP)	list += " OPENMP";
-	
-	if (flags & BEAGLE_FLAG_PROCESSOR_CPU)		list += " CPU";
-    if (flags & BEAGLE_FLAG_PROCESSOR_GPU)		list += " GPU";
-    if (flags & BEAGLE_FLAG_PROCESSOR_FPGA)		list += " FPGA";
-    if (flags & BEAGLE_FLAG_PROCESSOR_CELL)		list += " CELL";	
-	}
-
 // print possible beagle resources
-void OutputBeagleResources(){
+void CalculationManager::OutputBeagleResources() const{
     BeagleResourceList* rList;
     rList = beagleGetResourceList();
     outman.UserMessageNoCR("Available resources:\n");
@@ -87,20 +61,29 @@ void OutputBeagleResources(){
 		string flagList;
 		InterpretBeagleResourceFlags(rList->list[i].supportFlags, flagList);
 		outman.UserMessage("%s", flagList.c_str());
+		if((rList->list[i].supportFlags & req_flags) == req_flags)
+			outman.UserMessage("\t\t(Meets beagle instance requirements)");
+		else
+			outman.UserMessage("\t\t(Does not meet beagle instance requirements)");
+		if((rList->list[i].supportFlags & pref_flags) == pref_flags)
+			outman.UserMessage("\t\t(Meets beagle instance preferences)");
+		else
+			outman.UserMessage("\t\t(Does not meet beagle instance preferences)");
 		}
     outman.UserMessageNoCR("\n");
 	}
 
 //print actual beagle resources used by specific instance
-void CalculationManager::OutputInstanceDetails(const BeagleInstanceDetails *det) const{
+void CalculationManager::ParseInstanceDetails(const BeagleInstanceDetails *det){
     outman.UserMessageNoCR("Instance details:\n");
 	outman.UserMessageNoCR("\t\tnumber: %d\n", det->resourceNumber);
 	outman.UserMessageNoCR("\t\tresource name: %s\n", det->resourceName);
 	outman.UserMessageNoCR("\t\timplementation name: %s\n", det->implName);
 	outman.UserMessageNoCR("\t\tFlags: ");
-	string flagList;
-	InterpretBeagleResourceFlags(det->flags, flagList);
-	outman.UserMessage("%s", flagList.c_str());
+	
+	actual_flags = det->flags;
+	InterpretBeagleResourceFlags(actual_flags, actualBeagleFlags);
+	outman.UserMessage("%s", actualBeagleFlags.c_str());
 	}
 
 void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) const{
@@ -125,7 +108,7 @@ void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) c
 		mess = "Beagle out-of-range error in ";
 
 	else if(err == BEAGLE_ERROR_NO_RESOURCE)
-		mess = "Beagle no-resource error in ";
+		mess = "Beagle was unable to find a suitable resource in ";
 
 	else if(err == BEAGLE_ERROR_NO_IMPLEMENTATION)
 		mess = "Beagle no-implementation error in ";
@@ -146,12 +129,119 @@ void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) c
 	return;
 	}
 
+void CalculationManager::FillBeagleOptionsMaps(){
+	//define the mappings
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PROCESSOR_CPU, "CPU"));
+	nameToFlag.insert(pair<string, long>("CPU", BEAGLE_FLAG_PROCESSOR_CPU));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PROCESSOR_GPU, "GPU"));
+	nameToFlag.insert(pair<string, long>("GPU", BEAGLE_FLAG_PROCESSOR_GPU));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PRECISION_DOUBLE, "DOUBLE"));
+	nameToFlag.insert(pair<string, long>("DOUBLE", BEAGLE_FLAG_PRECISION_DOUBLE));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PRECISION_SINGLE, "SINGLE"));
+	nameToFlag.insert(pair<string, long>("SINGLE", BEAGLE_FLAG_PRECISION_SINGLE));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_SCALERS_LOG, "RESCALE"));
+	nameToFlag.insert(pair<string, long>("RESCALE", BEAGLE_FLAG_SCALERS_LOG));	
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_VECTOR_SSE, "SSE"));
+	nameToFlag.insert(pair<string, long>("SSE", BEAGLE_FLAG_VECTOR_SSE));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_THREADING_OPENMP, "OPENMP"));
+	nameToFlag.insert(pair<string, long>("OPENMP", BEAGLE_FLAG_THREADING_OPENMP));
+
+#ifdef OUTPUT_OTHER_BEAGLE
+	//we don't usually care about these flags
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_COMPUTATION_ASYNCH, "ASYNCH"));
+	nameToFlag.insert(pair<string, long>("ASYNCH", BEAGLE_FLAG_COMPUTATION_ASYNCH));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_COMPUTATION_SYNCH, "SYNCH"));
+	nameToFlag.insert(pair<string, long>("SYNCH", BEAGLE_FLAG_COMPUTATION_SYNCH));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_EIGEN_COMPLEX, "COMPLEX"));
+	nameToFlag.insert(pair<string, long>("COMPLEX", BEAGLE_FLAG_EIGEN_COMPLEX));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_EIGEN_REAL, "REAL"));
+	nameToFlag.insert(pair<string, long>("REAL", BEAGLE_FLAG_EIGEN_REAL));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_SCALING_MANUAL, "MANUAL_SCALING"));
+	nameToFlag.insert(pair<string, long>("MANUAL_SCALING", BEAGLE_FLAG_SCALING_MANUAL));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_SCALING_AUTO, "AUTO_SCALING"));
+	nameToFlag.insert(pair<string, long>("AUTO_SCALING", BEAGLE_FLAG_SCALING_AUTO));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_SCALING_ALWAYS, "ALWAYS_SCALING"));
+	nameToFlag.insert(pair<string, long>("ALWAYS_SCALING", BEAGLE_FLAG_SCALING_ALWAYS));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_SCALERS_RAW, "RAW_SCALERS"));
+	nameToFlag.insert(pair<string, long>("RAW_SCALERS", BEAGLE_FLAG_SCALERS_RAW));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PROCESSOR_FPGA, "FPGA"));
+	nameToFlag.insert(pair<string, long>("FPGA", BEAGLE_FLAG_PROCESSOR_FPGA));
+
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PROCESSOR_CELL, "CELL"));
+	nameToFlag.insert(pair<string, long>("CELL", BEAGLE_FLAG_PROCESSOR_CELL));
+#endif
+
+	invalidFlags.push_back(BEAGLE_FLAG_PRECISION_DOUBLE | BEAGLE_FLAG_PRECISION_SINGLE);
+	invalidFlags.push_back(BEAGLE_FLAG_PROCESSOR_CPU | BEAGLE_FLAG_PROCESSOR_GPU);
+	}
+
+long CalculationManager::ParseBeagleFlagString(string flagsString) const{
+	long ret = 0;
+
+	NxsString::to_upper(flagsString);
+	stringstream s(flagsString);
+
+	map<string, long>::const_iterator itToFlag;
+
+	string flag;
+	while(!s.eof()){
+		s >> flag;
+		itToFlag = nameToFlag.find(flag);
+		if(itToFlag == nameToFlag.end()){
+			outman.UserMessage("Ignoring unknown beagle option: %s", flag.c_str());
+			}
+		else 
+			ret |= (*itToFlag).second;
+		}
+	
+	for(vector<long>::const_iterator it = invalidFlags.begin(); it != invalidFlags.end(); it++){
+		if(((*it) & ret) == (*it)){
+			string str;
+			InterpretBeagleResourceFlags((*it), str);
+			throw 
+				ErrorException("INVALID BEAGLE FLAG COMBINATION\nThese flags cannot be specified together: %s", str.c_str());
+			}
+		}
+	return ret;
+	}
+
+void CalculationManager::InterpretBeagleResourceFlags(long flags, string &list) const{
+	map<long, string>::const_iterator itToName;
+	long bit = 1;
+
+	do{
+		if(bit & flags){
+			itToName = flagToName.find(bit);
+			if (itToName == flagToName.end()){
+#ifdef OUTPUT_OTHER_BEAGLE
+				outman.DebugMessage("Warning: unknown beagle flag number: %d", bit);
+#endif
+				}
+			else
+				list += (*itToName).second + " ";
+			}
+		bit = bit << 1;
+		}while(bit <= (1 << 18));
+	}
+
 void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, int nstates, int nchar, int nrates){
 	assert(useBeagle);
 
-	//termOnBeagleError = false;
-	termOnBeagleError = true;
-	long req_flag = 0;
+/*
 	//the fact that GPU implies SP is taken care of elsewhere
 	long pref_flag = (gpuBeagle ? BEAGLE_FLAG_PROCESSOR_GPU : BEAGLE_FLAG_PROCESSOR_CPU);
 	//req_flag |= (gpuBeagle ? BEAGLE_FLAG_PROCESSOR_GPU : BEAGLE_FLAG_PROCESSOR_CPU);
@@ -160,15 +250,23 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	//must accumulate log rescalers for my implementation
 	if(rescaleBeagle)
 		req_flag |= BEAGLE_FLAG_SCALERS_LOG;
+*/
+	termOnBeagleError = true;
+	req_flags = ParseBeagleFlagString(requiredBeagleFlags);
+	//dealing with rescaling depending on other assigned flags gets annoying, so just always demand it
+	req_flags = req_flags | BEAGLE_FLAG_SCALERS_LOG;
+	pref_flags = ParseBeagleFlagString(preferredBeagleFlags);
 
 	outman.UserMessage("BEAGLE INITIALIZING ...");
-	OutputBeagleResources();
 
  	string str;
- 	InterpretBeagleResourceFlags(pref_flag, str);
- 	outman.DebugMessage("Preferring %s", str.c_str());
- 	InterpretBeagleResourceFlags(req_flag, str);
- 	outman.DebugMessage("Requiring %s", str.c_str());
+ 	InterpretBeagleResourceFlags(pref_flags, str);
+	outman.UserMessage("\nPreferred beagle flags: %s", str.c_str());
+	str.clear();
+ 	InterpretBeagleResourceFlags(req_flags, str);
+	outman.UserMessage("Required beagle flags: %s\n", str.c_str());
+
+	OutputBeagleResources();
 
 	outman.UserMessage("CREATING BEAGLE INSTANCE ...");
 
@@ -194,13 +292,39 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	//add one for a destinationScaleWrite which will always be the last and will be used in all calls for scratch
 	//Note that although there is a 1to1 correspondence between the cla and scaler indeces, this is NOT true for what is
 	//passed to beagle, so beagle partial index = my partial index + #tips, beagle scaler = my scaler
-	int scalerCount = (rescaleBeagle ? nClas + 1 : 0);
+
+	//DEBUG - it is hard to tell whether we will later be forced in a SP instance, in which case we'd like to turn on rescaling
+	//so, just allocate enough scalers to do it whether we will or not
+	//int scalerCount = (IsRescaling() ? nClas + 1 : 0);
+	int scalerCount = nClas + 1;
 	int resourceList[1] = {NULL};
 	int resourceListCount = 0;
 
 	BeagleInstanceDetails det;
 
-	int fpSize = (singlePrecBeagle ? 4 : 8);
+	//this returns either the instance number or a beagle error, which is somewhat annoying
+   	beagleInst = beagleCreateInstance(tipCount, 
+		partialsCount, 
+		compactCount, 
+		nstates, 
+		nchar, 
+		eigCount, 
+		matrixCount, 
+		nrates, 
+		scalerCount, 
+		resourceList, 
+		resourceListCount, 
+		pref_flags, 
+		req_flags,
+		&det);
+
+	CheckBeagleReturnValue(
+		beagleInst, 
+		"beagleCreateInstance");
+
+	ParseInstanceDetails(&det);
+
+	int fpSize = (IsSinglePrecision() ? 4 : 8);
 
 	outman.DebugMessage("BEAGLE ALLOCATIONS:");
 	outman.DebugMessage("\tstates: %d char: %d rates: %d", nstates, nchar, nrates);
@@ -217,28 +341,6 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 			(scalerCount * nchar * fpSize / 1024.0);
 
 	outman.DebugMessage("Total beagle memory allocations approx %.1f MB)", totMem / 1024.0);
-
-	//this returns either the instance number or a beagle error, which is somewhat annoying
-   	beagleInst = beagleCreateInstance(tipCount, 
-		partialsCount, 
-		compactCount, 
-		nstates, 
-		nchar, 
-		eigCount, 
-		matrixCount, 
-		nrates, 
-		scalerCount, 
-		resourceList, 
-		resourceListCount, 
-		pref_flag, 
-		req_flag,
-		&det);
-
-	CheckBeagleReturnValue(
-		beagleInst, 
-		"beagleCreateInstance");
-
-	OutputInstanceDetails(&det);
 
 	SendTipDataToBeagle();
 
@@ -829,7 +931,7 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 		tupleList.push_back(PartialIndexForBeagle((*it).destClaIndex));
 		//if rescaling, for each partial op pass in an array to store the amount of rescaling
 		//at this node, in my case stored as logs
-		if(rescaleBeagle)
+		if(IsRescaling())
 			tupleList.push_back(ScalerIndexForBeagle((*it).destClaIndex));
 		else 
 			tupleList.push_back(BEAGLE_OP_NONE);
@@ -881,7 +983,7 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 	//and add then to the rescaling already done at this node.  In the next dependency level pass
 	//the dest here will become the child there.
 
-	if(rescaleBeagle){
+	if(IsRescaling()){
 		for(list<ClaOperation>::const_iterator it = theOps.begin();it != theOps.end();it++){
 			AccumulateRescalers(
 				(*it).destClaIndex, 
@@ -1121,7 +1223,7 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 #endif	
 		//not sure if this is right - will always use a single scale array for destWrite (essentially
 		//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
-		int destinationScaleWrite = (rescaleBeagle ? claMan->NumClas() : BEAGLE_OP_NONE);
+		int destinationScaleWrite = (IsRescaling() ? claMan->NumClas() : BEAGLE_OP_NONE);
 		int	destinationScaleRead = BEAGLE_OP_NONE;
 
 		int operationTuple[7] = {PartialIndexForBeagle(theOp->destClaIndex),
@@ -1143,7 +1245,7 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
 		//and my negative (tip) corresponds to a NULL in beagle
 		int cumulativeScaleIndex = BEAGLE_OP_NONE;
-		if(rescaleBeagle){
+		if(IsRescaling()){
 			cumulativeScaleIndex = theOp->destClaIndex;
 			AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
 			}
@@ -1358,7 +1460,7 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 		//For scale arrays my indexing scheme and Beagle's happen to be the same, and my negative (tip) corresponds to a NULL in beagle
 		//use this scratch index to hold the final accumulated scalers 
 		int cumulativeBeagleScaleIndex = BEAGLE_OP_NONE;
-		if(rescaleBeagle){
+		if(IsRescaling()){
 			cumulativeBeagleScaleIndex = ScalerIndexForBeagle(GARLI_FINAL_SCALER_INDEX);
 			beagleResetScaleFactors(beagleInst, cumulativeBeagleScaleIndex);
 			//add all of the rescaling up to the two involved children.  This will be passed to
