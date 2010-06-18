@@ -160,6 +160,10 @@ void UsageMessage(char *execName){
 	outman.UserMessage    ("  -t                run internal tests (requires dataset and config file)");
 	outman.UserMessage    ("  -V                validate: load config file and data, validate config file, data, starting trees"); 
 	outman.UserMessage    ("                    and constraint files, print required memory and selected model, then exit");
+	outman.UserMessage    ("  -f                pass flags to beagle to help it choose a specific resource. Options are");
+	outman.UserMessage    ("                    CPU GPU SINGLE DOUBLE SSE OPENMP.  They may not all work. Flags are interpreted");
+	outman.UserMessage    ("                    as beagle *preferences*, so can be ignored when not able to be met");
+	outman.UserMessage    ("  -F                same as -f, except interpret the flags as beagle *requirements*");
 #ifdef CUDA_GPU
 	outman.UserMessage    ("  --device d_number	use specified CUDA device");
 #endif
@@ -207,6 +211,7 @@ int main( int argc, char* argv[] )	{
 
 	string svnRev = GetSvnRev();
 	string svnDate = GetSvnDate();
+	string cmdLineBeagleFlags;
 
 #ifdef OLD_SUBROUTINE_GARLI
 	char name[12];
@@ -263,7 +268,19 @@ int main( int argc, char* argv[] )	{
 						UsageMessage(argv[0]);
 						exit(0);
 						}
-
+					else if(!strcmp(argv[curarg], "-f") || !strcmp(argv[curarg], "-F")){
+						//beagle flags are being passed in.  Assuming that nothing comes after them
+						//allowed CPU GPU SINGLE DOUBLE SSE OPENMP
+						//if a capital F was used, this will be interpreted as beagle requirements, otherwise prefs
+						if(!strcmp(argv[curarg], "-F"))
+							cmdLineBeagleFlags = "F ";
+						curarg++;
+						cmdLineBeagleFlags += argv[curarg++];
+						while(curarg < argc){
+							cmdLineBeagleFlags += " ";
+							cmdLineBeagleFlags += argv[curarg++];
+							}
+						}
 					else if(!strcmp(argv[curarg], "-V"))
 						//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
 						//which is essentially a stripped down version of pop::SeedPopWithStartingTree
@@ -295,6 +312,16 @@ int main( int argc, char* argv[] )	{
 			MasterGamlConfig conf;
 			bool confOK;
 			confOK = ((conf.Read(conf_name.c_str()) < 0) == false);
+			//override default beagle settings or any found in config in favor of command line
+			if(cmdLineBeagleFlags.length() > 0){
+				if(cmdLineBeagleFlags[0] == 'F'){
+					//
+					cmdLineBeagleFlags.erase(0, 1);
+					conf.requiredBeagleFlags = cmdLineBeagleFlags;
+					}
+				else
+					conf.preferredBeagleFlags = cmdLineBeagleFlags;
+				}
 
 #ifdef SUBROUTINE_GARLI
 			//override the ofprefix here, tacking .runXX onto it
