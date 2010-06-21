@@ -147,7 +147,7 @@ class Tree{
 		void SortAllNodesArray();
 		void EliminateNode(int nn);
 		int FindUnusedNode(int start);
-		inline void SetBranchLength(TreeNode *nd, FLOAT_TYPE len);
+		void SetBranchLength(TreeNode *nd, FLOAT_TYPE len);
 		bool IdenticalSubtreeTopology(const TreeNode *other);
 		bool IdenticalTopology(const TreeNode *other);
 		bool IdenticalTopologyAllowingRerooting(const TreeNode *other);
@@ -327,9 +327,9 @@ class Tree{
 		void MarkClasNearTipsToReclaim(int subtreeNode);
 		void ProtectClas();
 		void UnprotectClas();
-		inline CondLikeArray *GetClaDown(TreeNode *nd, bool calc=true);
-		inline CondLikeArray *GetClaUpLeft(TreeNode *nd, bool calc=true);
-		inline CondLikeArray *GetClaUpRight(TreeNode *nd, bool calc=true);
+		CondLikeArray *GetClaDown(TreeNode *nd, bool calc=true);
+		CondLikeArray *GetClaUpLeft(TreeNode *nd, bool calc=true);
+		CondLikeArray *GetClaUpRight(TreeNode *nd, bool calc=true);
 		void OutputValidClaIndeces();
 		void OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site);
 		void ClaReport(ofstream &cla);
