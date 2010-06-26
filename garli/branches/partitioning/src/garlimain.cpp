@@ -511,6 +511,8 @@ int main( int argc, char* argv[] )	{
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATE;
 				else if(modSpec->IsNStateV())
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATEV;
+				else if(modSpec->IsOrientedGap())
+					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORIENTEDGAP;
 
 				dataSubInfo[dataChunk].Report();
 				outman.UserMessage("");
@@ -524,6 +526,8 @@ int main( int argc, char* argv[] )	{
 				for(int impliedMatrix = 2;impliedMatrix < ((modSpec->IsNState() || modSpec->IsNStateV()) ? maxObservedStates + 1 : 3);impliedMatrix++){
 					if(modSpec->IsNState() || modSpec->IsNStateV())
 						data = new NStateData(impliedMatrix, modSpec->IsNStateV());
+					else if(modSpec->IsOrientedGap())
+						data = new OrientedGapData();
 					else if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
 						data = new AminoacidData();
 					else //all other data will be read into a DNA matrix and
@@ -567,6 +571,26 @@ int main( int argc, char* argv[] )	{
 								modSpec = modSpecSet.GetModSpec(modSpecSet.NumSpecs() - 1);
 								}
 							modSpec->SetNStates(impliedMatrix);
+							}
+						else if(modSpec->IsOrientedGap()){
+#ifdef OPEN_MP
+							throw ErrorException("Sorry, oriented-gap models cannot currently be used with the OpenMP version");
+#endif
+							if(modSpec->IsGammaRateHet() || modSpec->IsFlexRateHet())
+								throw ErrorException("Sorry, rate heterogeneity cannot be used with oriented-gap models yet.\n\tSet ratehetmodel = none.");
+							if(actuallyUsedImpliedMatrixIndex > 0){
+								//the specs are being added as we read and create subsets, so we can add them for the implied matrices
+								//as we go
+								claSpecs.push_back(ClaSpecifier(nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex));
+								//clone the current datasubset info, which applies to all of the implied matrices within this effective matrix
+								dataSubInfo.push_back(dataSubInfo[dataChunk]);
+								//also clone the modspec.  This isn't really necessary (or good) except that the number of states is stored by the modspecs
+								if(conf.linkModels)
+									modSpecSet.AddModSpec(conf.configModelSets[0]);
+								else
+									modSpecSet.AddModSpec(conf.configModelSets[dataChunk]);
+								modSpec = modSpecSet.GetModSpec(modSpecSet.NumSpecs() - 1);
+								}
 							}
 						else if(modSpec->IsCodon()){
 							rawPart.AddSubset(data);

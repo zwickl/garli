@@ -313,7 +313,8 @@ public:
 		AMINOACID = 3,
 		CODONAMINOACID = 4,
 		NSTATE = 5,
-		NSTATEV = 6
+		NSTATEV = 6,
+		ORIENTEDGAP = 7
 		}datatype;
 	
 	enum{
@@ -376,6 +377,7 @@ public:
 	bool IsCodonAminoAcid() const {return datatype == CODONAMINOACID;}
 	bool IsNState() const {return datatype == NSTATE;}
 	bool IsNStateV() const {return datatype == NSTATEV;}
+	bool IsOrientedGap() const {return datatype == ORIENTEDGAP;}
 
 	bool GotAnyParametersFromFile() const{
 		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile;
@@ -456,6 +458,15 @@ public:
 		rateMatrix = NST1;
 		stateFrequencies = EQUAL;
 		nstates = -1; //this will need to be reset later 
+		fixRelativeRates=true;
+		fixStateFreqs=true;
+		}
+
+	void SetOrientedGap(){
+		datatype = ORIENTEDGAP;
+		rateMatrix = NST1;
+		stateFrequencies = EQUAL;
+		nstates = 3;
 		fixRelativeRates=true;
 		fixStateFreqs=true;
 		}
@@ -735,6 +746,7 @@ public:
 		else if(_stricmp(str, "mk") == 0) SetNState();
 		else if(_stricmp(str, "standardvariable") == 0) SetNStateV();
 		else if(_stricmp(str, "mkv") == 0) SetNStateV();
+		else if(_stricmp(str, "orientedgap") == 0) SetOrientedGap();
 		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna, binary, nstate)", str));
 		}
 	void SetGeneticCode(const char *str){
@@ -909,6 +921,7 @@ class Model{
 	void CalcDerivatives(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
 	void OutputPmats(ofstream &deb);
 	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pr);
+	void CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat);
 	void UpdateQMat();
 	void UpdateQMatCodon();
 	void UpdateQMatAminoAcid();
@@ -963,9 +976,11 @@ class Model{
 	int NumMutatableParams() const {return (int) paramsToMutate.size();}
 	int Nst() const {return nst;}
 	const int *GetArbitraryRateMatrixIndeces() const {return arbitraryMatrixIndeces;}
-	bool IsNucleotide() {return modSpec->IsNucleotide();}
-	bool IsNState() {return modSpec->IsNState();}
-	bool IsNStateV() {return modSpec->IsNStateV();}
+	bool IsNucleotide() const {return modSpec->IsNucleotide();}
+	bool IsOrientedGap() const {return modSpec->IsOrientedGap();}
+	bool IsNState() const {return modSpec->IsNState();}
+	bool IsNStateV() const {return modSpec->IsNStateV();}
+	const ModelSpecification *GetModSpec() const {return modSpec;}
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
@@ -1206,6 +1221,15 @@ class Model{
 		for(int i=0;i<NRateCats();i++) newTot += *omegaProbs[i];
 		assert(FloatingPointEquals(newTot, ONE_POINT_ZERO, 1.0e-5));
 		eigenDirty = true;
+		}
+
+	//this is pretty hacktacular, but using this as a dummy setting function 
+	//so that it can be passed to OptBounded, which needs a function pointer
+	//with signiture void (Model::*SetParam)(int, FLOAT_TYPE), thus can't make
+	//the set function part of TreeNode or Tree
+	//This shouldn't even be called
+	void SetBranchlengthDummy(int which, FLOAT_TYPE val){
+		assert(0);
 		}
 
 	void SetOmegas(const FLOAT_TYPE *rates, const FLOAT_TYPE *probs){

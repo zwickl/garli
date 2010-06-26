@@ -82,6 +82,8 @@ class Tree{
 		static unsigned rescaleEvery;
 		static FLOAT_TYPE rescaleBelow;
 		static list<TreeNode *> nodeOptVector;
+		static int effectiveRootNode;
+		static bool useOptBoundedForBlen;
 		
 		static FLOAT_TYPE uniqueSwapPrecalc[500];
 		static FLOAT_TYPE distanceSwapPrecalc[1000];
@@ -213,6 +215,8 @@ class Tree{
 		FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, int modIndex, int dataIndex);
 		FLOAT_TYPE GetScorePartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, int modIndex, int dataIndex);
 		int Score(int rootNodeNum =0);
+
+		FLOAT_TYPE GetScorePartialTerminalOrientedGap(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, int modIndex, int dataIndex);
 	
 		//functions to optimize blens and params
 		pair<FLOAT_TYPE, FLOAT_TYPE> CalcDerivativesRateHet(TreeNode *nd1, TreeNode *nd2);
@@ -240,6 +244,9 @@ class Tree{
 		void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, int modIndex, int dataIndex);
 		void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex);
 		
+		void CalcFullCLATerminalTerminalOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex);
+		void CalcFullCLAInternalTerminalOrientedGap(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, int modIndex, int dataIndex);
+
 		void UpdateCLAs(CondLikeArraySet *destCLA, CondLikeArraySet *firstCLA, CondLikeArraySet *secCLA, TreeNode *firstChild, TreeNode *secChild, FLOAT_TYPE blen1, FLOAT_TYPE blen2);
 		void GetTotalScore(CondLikeArraySet *partialCLA, CondLikeArraySet *childCLA, TreeNode *child, FLOAT_TYPE blen1);
 
@@ -348,6 +355,7 @@ class Tree{
 		void InferAllInternalStateProbs(const char *ofprefix);
 
 		static void SetTreeStatics(ClaManager *, const DataPartition *, const GeneralGamlConfig *);
+		void SetEffectiveRootNode(int r) {effectiveRootNode = r;}
 		};
 
 

@@ -651,11 +651,12 @@ public:
 		AMINOACID = 1,
 		CODON = 2, 
 		NSTATE= 3,
-		NSTATEV = 4
+		NSTATEV = 4,
+		ORIENTEDGAP = 5
 		}readAs, usedAs;
 	int totalCharacters;
 	int uniqueCharacters;
-	string outputNames[5];//{"Nucleotide data", "Amino acid data", "Codon data"};
+	string outputNames[6];//{"Nucleotide data", "Amino acid data", "Codon data"};
 	DataSubsetInfo(int gssNum, int cbNum, string cbName, int psNum, string psName, type rAs, type uAs) :
 		garliSubsetNum(gssNum), charblockNum(cbNum), charblockName(cbName), partitionSubsetNum(psNum), partitionSubsetName(psName), readAs(rAs), usedAs(uAs){
 			outputNames[0]="Nucleotide data";
@@ -663,6 +664,7 @@ public:
 			outputNames[2]="Codon data";
 			outputNames[3]="Standard k-state data";
 			outputNames[4]="Standard k-state data, variable only";
+			outputNames[5]="Gap-coded data, oriented with respect to time";
 			}
 	void Report(){
 		outman.UserMessage("GARLI partition subset %d", garliSubsetNum+1);
@@ -738,10 +740,10 @@ class NStateData : public SequenceData{
 			}
 		void SetNumStates(int ns){maxNumStates = ns;}
 
-		unsigned char CharToDatum(char d);
+		virtual unsigned char CharToDatum(char d);
 		char DatumToChar( unsigned char d );
 		void CreateMatrixFromNCL(NxsCharactersBlock *);
-		void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
+		virtual void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
 			}
@@ -794,6 +796,25 @@ inline char NStateData::DatumToChar( unsigned char d ){
 */
 	return ch;
 	}
+
+class OrientedGapData : public NStateData{
+	public:
+		OrientedGapData() : NStateData(){
+			maxNumStates = 3;
+			}
+		OrientedGapData(int ns) : NStateData(){
+			assert(0);
+			}
+		OrientedGapData(int ns, bool isMkv) : NStateData(){
+			assert(0);
+			}
+		void SetNumStates(int ns){maxNumStates = ns;}
+
+		virtual void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
+		void CalcEmpiricalFreqs(){
+			//BINARY - this might actually make sense for gap encoding
+			}
+	};
 
 
 #endif

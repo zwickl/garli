@@ -96,6 +96,9 @@ FLOAT_TYPE Tree::rescalePrecalcThresh[30];
 FLOAT_TYPE Tree::rescalePrecalcMult[30];
 int Tree::rescalePrecalcIncr[30];
 
+int Tree::effectiveRootNode;
+bool Tree::useOptBoundedForBlen;
+
 Bipartition *Tree::outgroup = NULL;
 
 int Tree::siteToScore = -1;
@@ -167,6 +170,8 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 	Tree::min_brlen = conf->minBrlen;
 	Tree::max_brlen = conf->maxBrlen;
 	Tree::exp_starting_brlen = conf->startingBrlen;
+	Tree::effectiveRootNode = -1;
+	Tree::useOptBoundedForBlen = false;
 
 	//deal with the outgroup specification, if there is one
 	if(conf->outgroupString.length() > 0){
@@ -3530,6 +3535,9 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 			ProfScoreTerm.Start();
 			if(isNucleotide)
 				modlnL = GetScorePartialTerminalRateHet(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+			else if(mod->IsOrientedGap()){
+				modlnL = this->GetScorePartialTerminalOrientedGap(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+				}
 			else
 				modlnL = GetScorePartialTerminalNState(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 
@@ -3645,6 +3653,9 @@ int Tree::Score(int rootNodeNum /*=0*/){
 	do{
 		try{
 			scoreOK=true;
+			if(effectiveRootNode > 0 && rootNodeNum == 0) 
+				ConditionalLikelihoodRateHet( ROOT, allNodes[effectiveRootNode]);
+			else
 				ConditionalLikelihoodRateHet( ROOT, rootNode);
 			}
 #if defined(NDEBUG)
@@ -5147,6 +5158,86 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 			}
 		}
 
+	delete []freqs;
+	return totallnL;
+	}
+
+FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldat, int modIndex, int dataIndex){
+
+	//this function assumes that the pmat is arranged with the nstates^2 entries for the
+	//first rate, followed by nstates^2 for the second, etc.
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult=partialCLA->underflow_mult;
+
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
+
+	const int nstates = mod->NStates();
+	const int nRateCats = mod->NRateCats();
+	const int nchar = data->NChar();
+	const int *countit=data->GetCounts();
+	const char *Ldata = Ldat;
+
+	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+	const int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
+	const FLOAT_TYPE prI=mod->PropInvar();
+
+#ifdef UNIX
+	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE siteL, totallnL = ZERO_POINT_ZERO, unscaledlnL = ZERO_POINT_ZERO;
+	FLOAT_TYPE MkvScaler = ZERO_POINT_ZERO;
+
+	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
+	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
+
+	vector<FLOAT_TYPE> siteLikes;
+
+	for(int i=0;i<nchar;i++){
+#ifdef USE_COUNTS_IN_BOOT
+		if(countit[i] > 0){
+#else
+		if(1){
+#endif
+		siteL = 0.0;
+		for(int from=0;from<nstates;from++){
+			double tipContrib = 0.0;
+			if((*Ldat) == 0){
+				tipContrib = prmat[from*nstates];
+				tipContrib += prmat[2 + from*nstates];
+				}
+			else if((*Ldat) == nstates){
+				tipContrib = 1.0;
+				}
+			else{
+				tipContrib = prmat[1+from*nstates];
+				}
+			siteL += tipContrib * partial[from] * freqs[from];
+			}
+		partial += nstates;					
+
+		unscaledlnL = (log(siteL) - underflow_mult[i]);
+		assert(siteL > ZERO_POINT_ZERO);//this should be positive
+		assert(unscaledlnL < 1.0e-4);//this should be negative or zero
+		//rounding error in multiplying a site that is fully ambiguous across the tree
+		//(which might not have been removed from the data because we are only scoring a
+		//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
+		//> zero.  If that is the case, just ignore it
+
+		if(unscaledlnL < ZERO_POINT_ZERO)
+			totallnL += (countit[i] * unscaledlnL);
+			}
+		else{//nothing needs to be done if the count for this site is 0
+			}
+		Ldata++;
+		if(sitelikeLevel != 0)
+			siteLikes.push_back(unscaledlnL+MkvScaler);
+		}
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
+		}
 	delete []freqs;
 	return totallnL;
 	}
@@ -6893,6 +6984,84 @@ void Tree::CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT
 		destCLA->rescaleRank=2;
 	}
 
+void Tree::CalcFullCLATerminalTerminalOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
+
+	const int nRateCats = mod->NRateCats();
+	const int nstates = mod->NStates();
+	const int nchar = data->NChar();
+	const int *counts = data->GetCounts();
+
+#ifdef UNIX
+	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+#endif
+	if(siteToScore > 0){
+		Ldata += siteToScore;
+		Rdata += siteToScore;
+		}
+
+	for(int i=0;i<nchar;i++){
+#ifdef USE_COUNTS_IN_BOOT
+		if(counts[i]> 0){
+#else
+		if(1){
+#endif
+			for(int rate=0;rate<nRateCats;rate++){
+				for(int from=0;from<nstates;from++){
+					double left, right;
+					if((*Ldata) == 0){
+						left = Lpr[0 + from*nstates + rate*nstates*nstates];
+						left += Lpr[2 + from*nstates + rate*nstates*nstates];
+						}
+					else if((*Ldata) == nstates){
+						left = 1.0;
+						}
+					else{
+						left = Lpr[1 + from*nstates + rate*nstates*nstates];
+						}
+					if((*Rdata) == 0){
+						right =  Rpr[0 + from*nstates + rate*nstates*nstates];	
+						right += Rpr[2 + from*nstates + rate*nstates*nstates];	
+						}
+					if((*Rdata) == nstates){
+						right = 1.0;
+						}
+					else{
+						right = Rpr[1 + from*nstates + rate*nstates*nstates];	
+						}
+
+					dest[rate*nstates + from] = left * right;
+					}
+				}
+			Ldata++;
+			Rdata++;
+
+			dest += nRateCats*nstates;
+#ifdef ALLOW_SINGLE_SITE
+			if(siteToScore > -1) break;
+#endif
+			}
+		else{
+#ifdef OPEN_MP
+			//this is a little strange, but dest only needs to be advanced in the case of OMP
+			//because sections of the CLAs corresponding to sites with count=0 are skipped
+			//over in OMP instead of being eliminated
+			dest += nRateCats*nstates;
+#endif
+			Ldata++;
+			Rdata++;
+			}
+		}
+		for(int site=0;site<nchar;site++){
+			destCLA->underflow_mult[site]=0;
+			}
+		destCLA->rescaleRank=2;
+	}
 
 void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const unsigned *ambigMap, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
@@ -7145,6 +7314,81 @@ void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondL
 						d += pr1[rate*nstates*nstates + from*nstates + to] * CL1[to];
 						}
 					dest[from] = (*data2 < nstates ? d * pr2[rate*nstates*nstates + (*data2)+from*nstates] : d);
+					}
+				assert(dest[19] < 1e10);
+				dest += nstates;
+				CL1 += nstates;
+				}
+			data2++;
+#ifdef ALLOW_SINGLE_SITE
+			if(siteToScore > -1) break;
+#endif
+			}
+		else data2++;
+		}
+	
+	for(int i=0;i<nchar;i++)
+		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
+	
+	destCLA->rescaleRank=LCLA->rescaleRank+2;
+	} 
+
+void Tree::CalcFullCLAInternalTerminalOrientedGap(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, int modIndex, int dataIndex){
+	//this function assumes that the pmat is arranged with the 16 entries for the
+	//first rate, followed by 16 for the second, etc.
+	FLOAT_TYPE *des=destCLA->arr;
+	FLOAT_TYPE *dest=des;
+	const FLOAT_TYPE *CL=LCLA->arr;
+	const FLOAT_TYPE *CL1=CL;
+	const char *data2=dat2;
+
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
+
+	const int nchar = data->NChar();
+	const int nRateCats = mod->NRateCats();
+	const int nstates = mod->NStates();
+	const int *counts = data->GetCounts();
+
+#ifdef UNIX	
+	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);	
+#endif
+
+	if(siteToScore > 0) data2 += siteToScore;
+
+#ifdef OMP_INTTERMCLA_NSTATE
+	#pragma omp parallel for private(dest, CL1, data2)
+	for(int i=0;i<nchar;i++){
+		dest=&des[nRateCats*nstates*i];
+		CL1=&CL[nRateCats*nstates*i];
+		data2=&dat2[i];
+#else
+	for(int i=0;i<nchar;i++){
+#endif
+#ifdef USE_COUNTS_IN_BOOT
+		if(counts[i]> 0){
+#else
+		if(1){
+#endif
+			for(int rate=0;rate<nRateCats;rate++){
+				for(int from=0;from<nstates;from++){
+					FLOAT_TYPE d = ZERO_POINT_ZERO;
+					for(int to=0;to<nstates;to++){
+						d += pr1[rate*nstates*nstates + from*nstates + to] * CL1[to];
+						}
+					double tipContrib;
+					if((*data2) == 0){
+						tipContrib = pr2[rate*nstates*nstates + 0+from*nstates];
+						tipContrib += pr2[rate*nstates*nstates + 2+from*nstates];
+						}
+					else if((*data2) == nstates){
+						tipContrib = 1.0;
+						}
+					else{
+						tipContrib = pr2[rate*nstates*nstates + 1+from*nstates];
+						}
+					dest[from] = d * tipContrib;
 					}
 				assert(dest[19] < 1e10);
 				dest += nstates;

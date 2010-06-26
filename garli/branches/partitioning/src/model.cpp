@@ -714,7 +714,17 @@ void ChangeMatrixPrecision(int elements, double ***pmat, float ***fpmat){
 //is needed the other blen with be -1
 void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLOAT_TYPE *&mat2){
 	ProfCalcPmat.Start();
-//	if(NStates() > 4){
+	if(this->modSpec->IsOrientedGap()){
+		if(!(blen1 < ZERO_POINT_ZERO)){
+			CalcOrientedGapPmat(blen1, pmat1);
+			mat1 = **pmat1;
+			}
+		if(!(blen2 < ZERO_POINT_ZERO)){
+			CalcOrientedGapPmat(blen2, pmat2);
+			mat2 = **pmat2;
+			}
+		}
+	else{
 		if(!(blen1 < ZERO_POINT_ZERO)){
 			AltCalcPmat(blen1, pmat1);
 #ifdef SINGLE_PRECISION_FLOATS
@@ -733,7 +743,7 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 			mat2 = **pmat2;
 #endif
 			}
-//		}
+		}
 
 /*		for(int i=0;i<nstates;i++)
 		for(int j=0;j<nstates;j++)
@@ -742,6 +752,48 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 	ProfCalcPmat.Stop();
 	return;
 	
+	}
+
+void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
+
+	double rateI = 0.2;
+	double rateD = 0.1;
+	
+	int ns = 3;
+
+	//insertions 0 -> 1
+	mat[0][0][1] = 1.0 - exp(-rateI * blen);
+
+	//deletions 1 -> 2
+	mat[0][1][2] = 1.0 - exp(-rateD * blen);
+
+	//stay null 0 -> 0
+	mat[0][0][0] = 1.0 - mat[0][0][1];
+	
+	//stay inserted 1 -> 1
+	mat[0][1][1] = 1.0 - mat[0][1][2];
+
+	//stay deleted 2 -> 2
+	mat[0][2][2] = 1.0;
+
+	mat[0][0][2] = mat[0][1][0] = mat[0][2][0] =  mat[0][2][1] = ZERO_POINT_ZERO;
+
+/*
+	//insertions 0 -> 1
+	**mat[0 * ns + 1] = 1.0 - exp(-rateI * blen);
+
+	//deletions 1 -> 2
+	**mat[1 * ns + 2] = 1.0 - exp(-rateD * blen);
+
+	//stay null 0 -> 0
+	**mat[0 * ns + 0] = 1.0 - **mat[0 * ns + 1];
+	
+	//stay inserted 1 -> 1
+	**mat[1 * ns + 1] = 1.0 - **mat[1 * ns + 2];
+
+	//stay deleted 2 -> 2
+	**mat[2 * ns + 2] = 1.0;
+*/
 	}
 
 void Model::CalcPmat(MODEL_FLOAT blen, MODEL_FLOAT *metaPmat, bool flip /*=false*/){
@@ -1936,6 +1988,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		outman.UserMessage("  Number of states = 20 (amino acid data)");
 	else if(modSpec->IsNState() || modSpec->IsNStateV())
 		outman.UserMessage("  Number of states = %d (standard data)", nstates);
+	else if(modSpec->IsOrientedGap())
+		outman.UserMessage("  Number of states = 2 (gap encoding, # states = 3 with unobserved state)", nstates);
 	else
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
@@ -1972,6 +2026,9 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 	else if(modSpec->IsNStateV()){
 		outman.UserMessage("  Character change matrix:\n    One rate (symmetric one rate Mkv model)");
 		}
+	else if(modSpec->IsOrientedGap()){
+		outman.UserMessage("  Character change matrix:\n    irreversible matrix, insertion rate and deletion rate parameters");
+		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
 	if(modSpec->IsEqualStateFrequencies()){
@@ -1984,6 +2041,9 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 			outman.UserMessage("equal (0.05, fixed)");
 		else if(modSpec->IsNState() || modSpec->IsNStateV())
 			outman.UserMessage("equal (%.2f, fixed)", 1.0/nstates);
+		else if(modSpec->IsOrientedGap()){
+			outman.UserMessage("equal (for now) (uninserted = inserted = deleted)");
+			}
 		else 
 			outman.UserMessage("equal (0.25, fixed)");
 		}
@@ -2470,7 +2530,7 @@ void Model::CreateModelFromSpecification(int modnum){
 		//require the Eigen stuff	
 
 	if(modSpec->IsNucleotide()) UpdateQMat();
-	else if(modSpec->IsNState() || modSpec->IsNStateV()){
+	else if(modSpec->IsNState() || modSpec->IsNStateV() || modSpec->IsOrientedGap()){
 		//NSTATE - nothing needs to be done here right now
 		}
 	else if(modSpec->IsCodon()){
