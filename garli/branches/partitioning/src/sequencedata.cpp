@@ -21,6 +21,7 @@
 #include "sequencedata.h"
 #include "garlireader.h"
 #include "rng.h"
+#include <iterator>
 
 extern rng rnd;
 extern OutputManager outman;
@@ -1400,8 +1401,11 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 	bool recodeSkippedIndeces = true;
 	map<int, int> nclStateIndexToGarliState;
 	vector< map<int, int> > stateMaps;
-	//recode characters that skip states (assuming numerical order of states) to not skip any.  i.e., recode a
-	//char with states 0 1 5 7 to 0 1 2 3
+	//Recode characters that skip states (assuming numerical order of states) to not skip any.  i.e., recode a
+	//char with states 0 1 5 7 to 0 1 2 3 and assume that it has 4 states
+	//the 
+	//With assumptions block "options gapmode=newstate" things get even more confusing.  GetNamedStateSetOfColumn
+	//returns the gap as a code of -2, in which case the mapping would be -2 0 1 5 7 -> 0 1 2 3 4 5 
 	if(recodeSkippedIndeces){
 		if(type == ONLY_VARIABLE)		
 			stateMaps.push_back(nclStateIndexToGarliState);
@@ -1574,4 +1578,165 @@ long NStateData::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 	if(restartSeed > 0) rnd.set_seed(originalSeed);
 	delete []cumProbs;
 	return seedUsed;
+	}
+
+void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){
+	if(charblock->GetDataType() != NxsCharactersBlock::standard)
+		throw ErrorException("Tried to create n-state matrix from non-standard data.\n\t(Did you mean to use datatype = nstate?)");
+
+	//this creates a copy of the charset that we can screw with here without hosing the one that was passed in,
+	//which might be needed elsewhere
+	NxsUnsignedSet charset = origCharset;
+
+	int numOrigTaxa = charblock->GetNTax();
+	int numActiveTaxa = charblock->GetNumActiveTaxa();
+
+	if(charset.empty()){
+		//the charset was empty, implying that all characters in this block will go into a single matrix (actually, for nstate
+		//might be split anyway).  Create an effective charset that contains all of the characters, which will be filtered
+		//for exclusions and for the right number of max states
+		for(int i = 0;i < charblock->GetNumChar();i++)
+			charset.insert(i);
+		}
+
+	NxsUnsignedSet excluded = charblock->GetExcludedIndexSet();
+	NxsUnsignedSet *realCharSet = & charset;
+	NxsUnsignedSet charsetMinusExcluded;
+	if (!excluded.empty()) {
+		set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
+		realCharSet = &charsetMinusExcluded;
+	}	
+
+	int numOrigChar = charset.size();
+	int numActiveChar = realCharSet->size();
+
+	if(numActiveChar == 0){
+		throw ErrorException("Sorry, fully excluded characters blocks or partition subsets are not currently supported.");
+		}
+
+/*	//first count the number of characters with the number of observed states that was specified for
+	//this matrix, create a matrix with those dimensions  and grab them from the charblock and make a matrix.
+	//If not, just return and the function that called this should be able to check if any characters were actually read, and act accordingly
+	//remove_if(realCharSet->begin(), realCharSet->end(), charblock->GetObsNumStates);
+
+	NxsUnsignedSet consts;
+	for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();){
+		unsigned num = *cit;
+		cit++;
+		int ns = charblock->GetObsNumStates(num, false);
+		if(ns == 1)
+			consts.insert(num);
+		else if(ns == 0 && maxNumStates == 2)
+			outman.UserMessage("NOTE: entirely missing character #%d removed from matrix.", num+1);
+		if(ns != maxNumStates){
+			realCharSet->erase(num);
+			}
+		}
+	if(consts.size() > 0 && type == ONLY_VARIABLE){
+		string c = NxsSetReader::GetSetAsNexusString(consts);
+		throw ErrorException("Constant characters are not allowed when using the Mkv\n\tmodel (as opposed to Mk), because it assumes that all\n\tcharacters are variable.  Change to datatype = standard\n\tor exclude them by adding this to your nexus datafile:\nbegin assumptions;\nexset * const = %s;\nend;", c.c_str());
+
+		}
+*/
+//DEBUG
+	//further filter for no ambiguities - I'm not sure how to deal with them under Mkv
+/*
+	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+		if(charblock->IsActiveTaxon(origTaxIndex)){
+			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
+				for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();){	
+					unsigned num = *cit;
+					cit++;
+					if(charblock->IsGapState(origTaxIndex, num) == true || charblock->IsMissingState(origTaxIndex, num) == true){
+						realCharSet->erase(num);
+						outman.UserMessage("Note: Discarding character %d due to missing data", num);
+						}
+					else if(charblock->GetNumStates(origTaxIndex, num) > 1){
+						realCharSet->erase(num);
+						outman.UserMessage("Note: Discarding character %d due to ambiguous data", num);
+						}
+					}
+				}
+			}
+		}
+*/
+	if(realCharSet->size() == 0)
+		return;
+
+	//make room for a dummy constant character here
+	if(type == ONLY_VARIABLE)
+		NewMatrix( numActiveTaxa, realCharSet->size() + 1);
+	else
+		NewMatrix( numActiveTaxa, realCharSet->size());
+
+/*
+	bool recodeSkippedIndeces = true;
+	map<int, int> nclStateIndexToGarliState;
+	vector< map<int, int> > stateMaps;
+	//Recode characters that skip states (assuming numerical order of states) to not skip any.  i.e., recode a
+	//char with states 0 1 5 7 to 0 1 2 3 and assume that it has 4 states
+	//the 
+	//With assumptions block "options gapmode=newstate" things get even more confusing.  GetNamedStateSetOfColumn
+	//returns the gap as a code of -2, in which case the mapping would be -2 0 1 5 7 -> 0 1 2 3 4 5 
+	if(recodeSkippedIndeces){
+		if(type == ONLY_VARIABLE)		
+			stateMaps.push_back(nclStateIndexToGarliState);
+
+		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){
+			set<int> stateSet = charblock->GetNamedStateSetOfColumn(*cit);
+			int myIndex = 0;
+			for(set<int>::iterator sit = stateSet.begin();sit != stateSet.end();sit++){
+				nclStateIndexToGarliState.insert(pair<int, int>(*sit, myIndex++));
+				}
+			stateMaps.push_back(nclStateIndexToGarliState);
+			nclStateIndexToGarliState.clear();
+			}
+		}
+*/
+	// read in the data, including taxon names
+	int effectiveTax=0;
+	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+		if(charblock->IsActiveTaxon(origTaxIndex)){
+			//internally, blanks in taxon names will be stored as underscores
+			//FACTORY
+			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
+			tlabel.BlanksToUnderscores();
+			SetTaxonLabel( effectiveTax, tlabel.c_str());
+			
+			int effectiveChar = 0;
+			//add the dummy constant character
+			if(type == ONLY_VARIABLE)
+				SetMatrix( effectiveTax, effectiveChar++, 0 );
+
+			bool firstAmbig = true;
+//			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
+			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+				unsigned char datum = '\0';
+				if(charblock->IsGapState(origTaxIndex, *cit) == true)
+					datum = 0;
+				else if(charblock->IsMissingState(origTaxIndex, *cit) == true){
+					datum = maxNumStates;
+					}
+				else{
+					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+					if(nstates == 1){
+						int nclIndex = charblock->GetStateIndex(origTaxIndex, *cit, 0);
+						datum = nclIndex;
+						}
+					else{
+						if(firstAmbig){
+							outman.UserMessageNoCR("Partially ambiguous characters of taxon %s converted to full ambiguity:\n\t", TaxonLabel(origTaxIndex));
+							firstAmbig = false;
+							}
+						outman.UserMessageNoCR("%d ", *cit+1);
+						datum = maxNumStates;
+						}
+					}
+				SetMatrix( effectiveTax, effectiveChar++, datum );
+				}
+			if(firstAmbig == false) outman.UserMessage("");
+			effectiveTax++;
+			}
+		}
 	}
