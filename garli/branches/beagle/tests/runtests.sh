@@ -1,15 +1,20 @@
 #!/bin/bash
 
-if [ ! $# -eq 3 ];
+if [ $# -lt 3 ];
 then
-	echo Usage: pass exactly three arguments:
-	echo        '$0 <path to tests directory with data subdirectory> <path of GARLI binary> <path of NEXUSvalidator, part of NCL installation>'
+	echo Usage: pass three, or \(optionally\) more arguments:
+	echo        '$0 <path to tests directory with data subdirectory> <path of GARLI binary> <path of NEXUSvalidator, part of NCL installation> [optional: GARLI command-line arguments]'
 	exit 1
 fi
 
 TESTS_DIR=$1
 GARLI_BIN=$2
 NEXUS_VAL=$3
+if [ $# -gt 3 ];
+then
+	shift; shift; shift;
+	GARLI_ARGS=$@
+fi
 
 rm  -f *.log00.log *.screen.log *.best*.tre *.best*.tre.phy *.boot.tre *.boot.phy *treelog00.tre *treelog00.log *problog00.log *fate00.log .*lock* *swaplog* *.check out.* qout.* mpi_m* *SiteLikes.log *sitelikes.log *best.all.phy *best.phy *current.phy *internalstates.log
 
@@ -26,7 +31,7 @@ do
         base=${base/.conf/}
         echo "Running test $i"
 
-        $GARLI_BIN -t $i || exit 1
+        $GARLI_BIN -t $i $GARLI_ARGS || exit 1
 done
 
 echo "**************************"
@@ -38,7 +43,7 @@ do
 	base=${i/*\/}
 	base=${base/.conf/}
 
-	$GARLI_BIN $i || exit 1
+	$GARLI_BIN $i $GARLI_ARGS || exit 1
 #	score=`tail -1 ${i%.conf}.sitelikes.log | awk '{print $2}'`
 	score=`tail -1 scr.$base.sitelikes.log | awk '{print $2}'`
 	expect=`head -n$line data/expected.scr | tail -n1`
@@ -69,7 +74,7 @@ do
         base=${base/.conf/}
         echo "Running test $base"
 
-        $GARLI_BIN $i || exit 1
+        $GARLI_BIN $i $GARLI_ARGS || exit 1
 
         #NEXUSvalidator gives a warning every time it reads a tree file
         #without a taxa block.  So, shut it up initially and then if it
@@ -93,7 +98,7 @@ do
 	base=${base/.conf/}
 	echo "Running test $base"
 
-	$GARLI_BIN $i || exit 1
+	$GARLI_BIN $i $GARLI_ARGS || exit 1
 
 	#NEXUSvalidator gives a warning every time it reads a tree file
         #without a taxa block.  So, shut it up initially and then if it
@@ -118,9 +123,9 @@ do
 	base=${base/.conf/}
 	echo "Running test $i"
 	
-	$GARLI_BIN $i || exit 1
+	$GARLI_BIN $i $GARLI_ARGS || exit 1
 
-	$GARLI_BIN $TESTS_DIR/restart/$base.conf || exit 1
+	$GARLI_BIN $TESTS_DIR/restart/$base.conf $GARLI_ARGS || exit 1
 
 	#NEXUSvalidator gives a warning every time it reads a tree file
         #without a taxa block.  So, shut it up initially and then if it
