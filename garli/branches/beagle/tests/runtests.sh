@@ -10,10 +10,17 @@ fi
 TESTS_DIR=$1
 GARLI_BIN=$2
 NEXUS_VAL=$3
-if [ $# -gt 3 ];
+
+if [ $# -gt 3 ]
 then
 	shift; shift; shift;
 	GARLI_ARGS=$@
+fi
+
+#alter this to move on to the next test after failing one
+if [ 0 ]
+then
+	NO_EXIT_ON_ERR=1
 fi
 
 rm  -f *.log00.log *.screen.log *.best*.tre *.best*.tre.phy *.boot.tre *.boot.phy *treelog00.tre *treelog00.log *problog00.log *fate00.log .*lock* *swaplog* *.check out.* qout.* mpi_m* *SiteLikes.log *sitelikes.log *best.all.phy *best.phy *current.phy *internalstates.log
@@ -27,11 +34,15 @@ echo "**************************"
 
 for i in $TESTS_DIR/internal/*.conf
 do
-        base=${i/*\/}
-        base=${base/.conf/}
-        echo "Running test $i"
+    base=${i/*\/}
+    base=${base/.conf/}
+    echo "Running internal test $i"
+	echo "Running internal test $i" >&2
 
-        $GARLI_BIN -t $i $GARLI_ARGS || exit 1
+ 	$GARLI_BIN -t $i $GARLI_ARGS
+	if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
+		exit 1
+	fi
 done
 
 echo "**************************"
@@ -43,23 +54,40 @@ do
 	base=${i/*\/}
 	base=${base/.conf/}
 
-	$GARLI_BIN $i $GARLI_ARGS || exit 1
+	echo "Running scoring test $i"
+	echo "Running scoring test $i" >&2
+	$GARLI_BIN $i $GARLI_ARGS
+	if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
+		exit 1
+	fi
+
+	#figure out what precision we can expect
+	if [ ! `grep "likelihood precision" scr.$base.screen.log | wc -l` -eq 0 ]
+	then
+		allowed=`grep "likelihood precision" scr.$base.screen.log | awk '{$print 5}'`
+	else
+		allowed=0.01
+	fi
+
 #	score=`tail -1 ${i%.conf}.sitelikes.log | awk '{print $2}'`
 	score=`tail -1 scr.$base.sitelikes.log | awk '{print $2}'`
 	expect=`head -n$line data/expected.scr | tail -n1`
 	diff=`echo \($score\) - \($expect\) | bc`
 	echo ***********TEST**************
 	echo ***Score is $score
-	echo ***Excpected is $expect
+	echo ***Expected is $expect
 	echo ***SCORE DIFFERENCE IS $diff
-	OK=`echo "$diff < 0.01 && $diff > -0.01" | bc`
+	echo ***ALLOWED ERROR IS $allowed
+	OK=`echo "$diff < $allowed && $diff > -$allowed" | bc`
 
 	if (( $OK ))
 	then
 		echo "***Scoring OK for $i ***"
 	else
 		echo "***Scoring test failed for $i ***"
-		exit 1
+		if [[ ! -n "$NO_EXIT_ON_ERR" ]];then
+			exit 1
+		fi
 	fi
 	line=`expr $line + 1`
 done
@@ -72,20 +100,27 @@ for i in $TESTS_DIR/const/*.conf
 do
         base=${i/*\/}
         base=${base/.conf/}
-        echo "Running test $base"
+        echo "Running constraint test $base"
+		echo "Running constraint test $base" >&2
 
-        $GARLI_BIN $i $GARLI_ARGS || exit 1
+        $GARLI_BIN $i $GARLI_ARGS
+	if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
+		exit 1
+	fi
 
-        #NEXUSvalidator gives a warning every time it reads a tree file
-        #without a taxa block.  So, shut it up initially and then if it
-        #fails let it output whatever error
-        $NEXUS_VAL $base*.tre 2> /dev/null
-        if [ $? -eq 0 ]
-        then
-                echo TREEFILES ARE OK
-        else
-                $NEXUS_VAL $base*.tre || exit 1
-        fi
+    #NEXUSvalidator gives a warning every time it reads a tree file
+    #without a taxa block.  So, shut it up initially and then if it
+    #fails let it output whatever error
+    $NEXUS_VAL $base*.tre 2> /dev/null
+    if [ $? -eq 0 ]
+    then
+    	echo TREEFILES PASS
+    else
+    	$NEXUS_VAL $base*.tre
+		if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
+			exit 1
+		fi
+    fi
 done
 
 echo "**************************"
@@ -96,20 +131,27 @@ for i in $TESTS_DIR/output/*.conf
 do
 	base=${i/*\/}
 	base=${base/.conf/}
-	echo "Running test $base"
+	echo "Running output test $base"
+	echo "Running output test $base" >&2
 
-	$GARLI_BIN $i $GARLI_ARGS || exit 1
+	$GARLI_BIN $i $GARLI_ARGS
+	if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
+		exit 1
+	fi
 
 	#NEXUSvalidator gives a warning every time it reads a tree file
-        #without a taxa block.  So, shut it up initially and then if it
-        #fails let it output whatever error
-        $NEXUS_VAL $base*.tre 2> /dev/null
-        if [ $? -eq 0 ]
-        then
-                echo TREEFILES ARE OK
-        else
-                $NEXUS_VAL $base*.tre || exit 1
-        fi
+    #without a taxa block.  So, shut it up initially and then if it
+    #fails let it output whatever error
+    $NEXUS_VAL $base*.tre 2> /dev/null
+    if [ $? -eq 0 ]
+    then
+        echo "TREEFILES PASS"
+    else
+        $NEXUS_VAL $base*.tre
+		if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
+			exit 1
+		fi
+    fi
 done
 
 
@@ -121,21 +163,31 @@ for i in $TESTS_DIR/check/*.conf
 do
 	base=${i/*\/}
 	base=${base/.conf/}
-	echo "Running test $i"
+	echo "Running checkpoint test $i"
+	echo "Running checkpoint test $i" >&2
 	
-	$GARLI_BIN $i $GARLI_ARGS || exit 1
+	$GARLI_BIN $i $GARLI_ARGS
+	if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
+		exit 1
+	fi
 
-	$GARLI_BIN $TESTS_DIR/restart/$base.conf $GARLI_ARGS || exit 1
+	$GARLI_BIN $TESTS_DIR/restart/$base.conf $GARLI_ARGS
+	if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
+		exit 1
+	fi
 
 	#NEXUSvalidator gives a warning every time it reads a tree file
-        #without a taxa block.  So, shut it up initially and then if it
-        #fails let it output whatever error
-        $NEXUS_VAL ch.$base*.tre 2> /dev/null
-        if [ $? -eq 0 ]
-        then
-                echo "TREEFILES ARE OK"
-        else
-                $NEXUS_VAL ch.$base*.tre || exit 1
-        fi
+    #without a taxa block.  So, shut it up initially and then if it
+    #fails let it output whatever error
+    $NEXUS_VAL ch.$base*.tre 2> /dev/null
+    if [ $? -eq 0 ]
+    then
+            echo "TREEFILES PASS"
+    else
+        $NEXUS_VAL ch.$base*.tre
+		if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
+			exit 1
+		fi
+    fi
 done
 
