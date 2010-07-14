@@ -137,7 +137,16 @@ if test "$enable_beagle" = yes; then
            ])
 fi
 
-#DLA - cuda gpu version (still being tested)
+#DLA - using hmsbeagle library with cuda gpu
+AC_ARG_ENABLE(beagle-cuda,
+        AC_HELP_STRING([--enable-beagle-cuda],[enable CUDA GPU for hmsbeagle (requires --enable-beagle)]), , [enable_beagle_cuda=no])
+if test "$enable_beagle" = yes; then
+    if test "$enable_beagle_cuda" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling version using hmsbeagle library with CUDA GPU
+           ])
+    fi
+fi
 
 # single precision version (still being tested)
 AC_ARG_ENABLE(single-prec,
@@ -263,31 +272,42 @@ if test  "$enable_beagle" = yes; then
    CXXFLAGS="$CXXFLAGS $BEAGLE_INCLUDES -DNEW_MANAGEMENT -DUSE_BEAGLE"
 fi
 
-
-##########################################################
-# DLA cuda gpu                                           #
-#                                                        #
-
+####################################################################
+# DLA cuda toolkit (required for both beagle-cuda and original cuda version) 
 CUDA_INSTALL_PATH="/usr/local/cuda"
-CUDA_SDK_INSTALL_PATH="/Developer/CUDA"
 
 AC_ARG_WITH(
 	[cuda],
 	AC_HELP_STRING(
 		[--with-cuda=DIR],
-		[Specify the root directory for cuda toolkit. Omit this flag to build using the default location ("/usr/local/cuda").]
+		[Specify the root directory for CUDA toolkit. Omit this flag to build using the default location ("/usr/local/cuda"). Used with --enable-beagle-cuda and --enable-cuda-gpu flags.]
 		),
 	[
 	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
 		CUDA_INSTALL_PATH="$withval"
 	fi
 	])
-	
+
+####################################################################    
+# DLA beagle-cuda gpu
+if test  "$enable_beagle_cuda" = yes; then
+   BEAGLE_CUDA_CFLAGS="-I$CUDA_INSTALL_PATH/include"
+   BEAGLE_CUDA_LDFLAGS="-L$CUDA_INSTALL_PATH/lib64 -L$CUDA_INSTALL_PATH/lib"
+   BEAGLE_CUDA_LIBS="-lcuda"
+   LDFLAGS="$LDFLAGS $BEAGLE_CUDA_LDFLAGS"
+   LIBS="$LIBS $BEAGLE_CUDA_LIBS"
+   CXXFLAGS="$CXXFLAGS $BEAGLE_CUDA_CFLAGS"
+fi
+
+####################################################################
+# DLA original cuda gpu version
+CUDA_SDK_INSTALL_PATH="/Developer/CUDA"
+
 AC_ARG_WITH(
 	[cuda-sdk],
 	AC_HELP_STRING(
 		[--with-cuda-sdk=DIR],
-		[Specify the root directory for cuda sdk. Omit this flag to build using the default location ("/Developer/CUDA").]
+		[Specify the root directory for CUDA SDK. Omit this flag to build using the default location ("/Developer/CUDA"). Used with --enable-cuda-gpu flag.]
 		),
 	[
 	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
@@ -297,11 +317,7 @@ AC_ARG_WITH(
 
 if test  "$enable_cuda_gpu" = yes; then
 	NVCCFLAGS="$NVCCFLAGS --ptxas-options=-v -DUNIX --compiler-options -fno-strict-aliasing"
-#DJZ - just using the cuda flag to correctly set includes and libs, don't actually tell GARLI that
-#this is a CUDA_GPU build, which used to make something else
-#	CUDA_CFLAGS="$CUDA_CFLAGS -DCUDA_GPU"
-	CUDA_CFLAGS="$CUDA_CFLAGS"
-	CUDA_CFLAGS="$CUDA_CFLAGS -I$CUDA_INSTALL_PATH/include -I$CUDA_SDK_INSTALL_PATH/C/common/inc"
+	CUDA_CFLAGS="-DCUDA_GPU -I$CUDA_INSTALL_PATH/include -I$CUDA_SDK_INSTALL_PATH/C/common/inc"
 	if test  "$enable_cuda_memory" = yes; then
 		CUDA_CFLAGS="$CUDA_CFLAGS -DCUDA_MEMORY_PINNED"
 	fi
@@ -320,9 +336,8 @@ if test  "$enable_cuda_gpu" = yes; then
 fi
 
 AM_CONDITIONAL(CUDASOURCE, test "$enable_cuda_gpu" = yes)
-
-#                                                        #
-##########################################################
+                                                                   #
+####################################################################
 
 AC_LANG(C++)
 ACX_MPI
