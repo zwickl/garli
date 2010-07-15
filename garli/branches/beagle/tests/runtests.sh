@@ -17,11 +17,8 @@ then
 	GARLI_ARGS=$@
 fi
 
-#alter this to move on to the next test after failing one
-if [ 0 ]
-then
-	NO_EXIT_ON_ERR=1
-fi
+#set this to move on to the next test after failing one
+#NO_EXIT_ON_ERR=1
 
 rm  -f *.log00.log *.screen.log *.best*.tre *.best*.tre.phy *.boot.tre *.boot.phy *treelog00.tre *treelog00.log *problog00.log *fate00.log .*lock* *swaplog* *.check out.* qout.* mpi_m* *SiteLikes.log *sitelikes.log *best.all.phy *best.phy *current.phy *internalstates.log
 
@@ -64,7 +61,7 @@ do
 	#figure out what precision we can expect
 	if [ ! `grep "likelihood precision" scr.$base.screen.log | wc -l` -eq 0 ]
 	then
-		allowed=`grep "likelihood precision" scr.$base.screen.log | awk '{$print 5}'`
+		allowed=`grep "likelihood precision" scr.$base.screen.log | awk '{print $6}'`
 	else
 		allowed=0.01
 	fi

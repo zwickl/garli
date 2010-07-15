@@ -5,3 +5,5 @@ gpucheck:
 	$(srcdir)/runtests.sh $(srcdir) $(top_builddir)/src/Garli$(EXEEXT) @NCL_BIN_DIR@/NEXUSvalidator -F GPU
 snglcpucheck:
 	$(srcdir)/runtests.sh $(srcdir) $(top_builddir)/src/Garli$(EXEEXT) @NCL_BIN_DIR@/NEXUSvalidator -F CPU SINGLE
+ssecpucheck:
+	$(srcdir)/runtests.sh $(srcdir) $(top_builddir)/src/Garli$(EXEEXT) @NCL_BIN_DIR@/NEXUSvalidator -F CPU SSE
