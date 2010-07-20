@@ -42,8 +42,6 @@ do
 	fi
 done
 
-exit
-
 echo "**************************"
 echo "Running scoring tests ..."
 echo "**************************"
