@@ -1373,7 +1373,7 @@ void Model::CopyModel(const Model *from){
 			*omegaProbs[i]=*(from->omegaProbs[i]);
 		}
 
-	if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix() || (modSpec.IsAminoAcid() && modSpec.IsUserSpecifiedRateMatrix()))
+	if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix() || (modSpec.IsTwoSerineRateMatrix() && !modSpec.fixRelativeRates) || (modSpec.IsAminoAcid() && modSpec.IsUserSpecifiedRateMatrix()))
 		for(int i=0;i<relNucRates.size();i++)
 			*relNucRates[i]=*(from->relNucRates[i]);
 	
@@ -2294,7 +2294,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		else if(modSpec.IsMtRevAAMatrix()) outman.UserMessage("MtRev");
 		else if(modSpec.IsEstimateAAMatrix()) outman.UserMessage("Estimated (189 free parameters)");
 		else if(modSpec.IsUserSpecifiedRateMatrix()) outman.UserMessage(" values specified by user (fixed)");
-		else if(modSpec.IsTwoSerineRateMatrix()) outman.UserMessage("Experimental model with two serine types - Matrix estimated (209 free parameters)");
+		else if(modSpec.IsTwoSerineRateMatrix() && !modSpec.fixRelativeRates) outman.UserMessage("Experimental model with two serine types\n    Matrix estimated (209 free parameters)");
+		else if(modSpec.IsTwoSerineRateMatrix()) outman.UserMessage("Experimental model with two serine types\n    Matrix specified by user.");
 		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
@@ -2882,8 +2883,8 @@ void Model::CreateModelFromSpecification(int modnum){
 				relNucRates.push_back(a);
 			}
 		}
-	else{//estimating or fixing the aminoacid rate matrix
-		if(modSpec.fixRelativeRates == false || modSpec.IsUserSpecifiedRateMatrix()){
+	else{//estimating or fixing the aminoacid rate matrix - a two serine matrix is either estimated or fixed and user specified, so goes through here regardless
+		if(modSpec.fixRelativeRates == false || modSpec.IsUserSpecifiedRateMatrix() || modSpec.IsTwoSerineRateMatrix()){
 			int seed = rnd.seed();
 			int matrixRates = nstates * (nstates - 1) / 2;
 			//for(int i=0;i<190;i++){
