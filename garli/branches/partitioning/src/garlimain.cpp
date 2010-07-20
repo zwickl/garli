@@ -705,6 +705,9 @@ int main( int argc, char* argv[] )	{
 #endif
 					pop.OptimizeSiteRates();
 					}
+				else if(conf.runmode == 11){
+					pop.OptimizeInputAndWriteSitelikelihoods();
+					}
 				else if(conf.runmode > 20){
 					pop.GenerateTreesOnly(conf.runmode);
 					}

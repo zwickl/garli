@@ -142,10 +142,10 @@ int main(int argc,char **argv){
 		sprintf(startfile, ".s-lock%d", j);
 		sprintf(donefile, ".d-lock%d", j);
 		if(FileExists(donefile)){
-			outman.UserMessage("It appears that run %d was completed in a previous MPI invocation.\n\tRun %d will not be rerun unless the hidden file \"%s\" and any checkpoint files for this run (if present) are deleted from this directory.", j, j, donefile);
+			outman.UserMessage("It appears that run %d was completed in a previous MPI invocation.\n\tRun %d will not be re-run unless the hidden file \"%s\" and any checkpoint files for this run (if present) are deleted from this directory.", j, j, donefile);
 			}
 		else if(FileExists(startfile)){
-			outman.UserMessage("It appears that run %d was started but not completed in a previous MPI invocation.\n\tRun %d will be re-run.).", j, j);
+			outman.UserMessage("It appears that run %d was started but not completed in a previous MPI invocation.\n\tRun %d will be re-run.", j, j);
 			remove(startfile);
 			}
   		}

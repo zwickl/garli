@@ -2765,6 +2765,43 @@ void Population::PerformSearch(){
 	ClearStoredTrees();
 	}
 
+void Population::OptimizeInputAndWriteSitelikelihoods(){
+	//find out how many trees we have
+	GarliReader & reader = GarliReader::GetInstance();
+	const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
+	assert(treesblock != NULL);
+	int numTrees = treesblock->GetNumTrees();
+
+	string oname = conf->ofprefix + ".sitelikes.log";
+	ofstream ordered;
+	ordered.open(oname.c_str());
+	ordered << "Tree\t-lnL\tSite\t-lnL\n";
+	ordered.close();
+
+	adap->branchOptPrecision = 0.01;
+	bestIndiv = 0;
+	//loop over the trees
+	for(int t = 1;t <= numTrees;t++){
+		this->currentSearchRep = t;
+		outman.UserMessage("Optimizing tree %d ...", t);
+
+		SeedPopulationWithStartingTree(t);
+		bestIndiv = 0;
+		BetterFinalOptimization();
+
+		outman.UserMessage("Writing site likelihoods for tree %d ...", t);
+		indiv[0].treeStruct->sitelikeLevel = -1;
+		indiv[0].treeStruct->ofprefix = conf->ofprefix;
+		indiv[0].treeStruct->Score();
+		
+		ordered.open(oname.c_str(), ios::app);
+		ordered.precision(10);
+		ordered << t << "\t" << -indiv[0].treeStruct->lnL << "\n";
+		ordered.close();
+		Reset();
+		}
+	}
+
 void Population::VariableStartingTreeOptimization(bool reducing){
 	currentSearchRep = 1;
 	SeedPopulationWithStartingTree(currentSearchRep);
