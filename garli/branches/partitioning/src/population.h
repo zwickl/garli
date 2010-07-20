@@ -446,6 +446,7 @@ private:
 		void LoadNexusStartingConditions();
 		void VariableStartingTreeOptimization(bool reducing);
 		void OptimizeSiteRates();
+		void OptimizeInputAndWriteSitelikelihoods();
 
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );
