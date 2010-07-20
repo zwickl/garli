@@ -924,6 +924,7 @@ class Model{
 	void CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat);
 	void UpdateQMat();
 	void UpdateQMatCodon();
+	void CalcSynonymousBranchlengthProportions(vector<FLOAT_TYPE> &results);
 	void UpdateQMatAminoAcid();
 	void UpdateQMatNState();
 	void DiscreteGamma(FLOAT_TYPE *, FLOAT_TYPE *, FLOAT_TYPE);
@@ -1187,6 +1188,28 @@ class Model{
 		if(modSpec->IsFlexRateHet()) NormalizeRates();
 		}
 
+	//these are the bounds on a particular rate that keep it from crossing a neighboring rate when rescaling happens
+	FLOAT_TYPE EffectiveLowerFlexBound(int which){
+		assert(which != 0);
+		assert(which < NRateCats());
+		FLOAT_TYPE whichProd = rateMults[which] * rateProbs[which];
+		FLOAT_TYPE factor = rateMults[which - 1] / ((rateMults[which] * (1.0 - whichProd)) + (whichProd * rateMults[which - 1]));
+		FLOAT_TYPE thisVal = rateMults[which] * factor;
+		FLOAT_TYPE lowerVal = rateMults[which - 1] * (1.0 - factor * rateMults[which] * rateProbs[which]) / (1.0 - rateMults[which] * rateProbs[which]);
+		assert(FloatingPointEquals(thisVal, lowerVal, 1e-4));
+		return max(thisVal, lowerVal)  + FLT_EPSILON;
+		}
+
+	FLOAT_TYPE EffectiveUpperFlexBound(int which){
+		assert(which < NRateCats() - 1);
+		FLOAT_TYPE whichProd = rateMults[which] * rateProbs[which];
+		FLOAT_TYPE factor = rateMults[which + 1] / ((rateMults[which] * (1.0 - whichProd)) + (whichProd * rateMults[which + 1]));
+		FLOAT_TYPE thisVal = rateMults[which] * factor;
+		FLOAT_TYPE upperVal = rateMults[which + 1] * (1.0 - factor * rateMults[which] * rateProbs[which]) / (1.0 - rateMults[which] * rateProbs[which]);
+		assert(FloatingPointEquals(thisVal, upperVal, 1e-4));
+		return min(thisVal, upperVal) - FLT_EPSILON;
+		}
+
 	void SetFlexRate(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
 		rateMults[which] = val;
@@ -1209,17 +1232,29 @@ class Model{
 
 	void SetOmegaProb(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
+		assert(val >= 0.0);
+		assert(val == val);
 		*omegaProbs[which] = val;
 
+		NormalizeSumConstrainedValues(&omegaProbs[0], NRateCats(), ONE_POINT_ZERO, 1.0e-5, which);
+/*
 		FLOAT_TYPE newTot = 1.0 - *omegaProbs[which];
 		FLOAT_TYPE oldTot = 0.0;
 		for(int i=0;i<NRateCats();i++)
-			if(i != which) oldTot += *omegaProbs[i];
+			if(i != which) 
+				oldTot += *omegaProbs[i];
 		for(int i=0;i<NRateCats();i++)
-			if(i != which) *omegaProbs[i] *= newTot / oldTot;
+			if(i != which){
+				assert(*omegaProbs[i] * newTot / oldTot > 0.0);
+				*omegaProbs[i] *= newTot / oldTot;
+				}
+#ifndef NDEBUG
 		newTot = 0.0;
-		for(int i=0;i<NRateCats();i++) newTot += *omegaProbs[i];
+		for(int i=0;i<NRateCats();i++) 
+			newTot += *omegaProbs[i];
 		assert(FloatingPointEquals(newTot, ONE_POINT_ZERO, 1.0e-5));
+#endif
+*/
 		eigenDirty = true;
 		}
 
@@ -1249,11 +1284,15 @@ class Model{
 
 	FLOAT_TYPE Omega(int which) const{
 		assert(which < NRateCats());
+		assert(*omegas[which] >= 0.0);
+		assert(*omegas[which] == *omegas[which]);
 		return *omegas[which];
 		}
 
 	FLOAT_TYPE OmegaProb(int which) const{
 		assert(which < NRateCats());
+		assert(*omegaProbs[which] >= 0.0);
+		assert(*omegaProbs[which] == *omegaProbs[which]);
 		return *omegaProbs[which];
 		}
 
@@ -1285,38 +1324,51 @@ class Model{
 		}
 
 	void CheckAndCorrectRateOrdering(){
+		//if a rate gets bumped past two others we might need to pass over the rates twice
+		//this is certainly not the most efficient sorting algorithm, but it doesn't really matter
 		assert(NRateCats() > 1);
 		if(modSpec->IsNonsynonymousRateHet()){
-			for(int f=0;f<NRateCats()-1;f++){
-				if(*omegas[f] > *omegas[f+1]){
-					//outman.UserMessage("prevented: %f %f", *omegas[f], *omegas[f+1]); 
-					FLOAT_TYPE dum = *omegas[f+1];
-					*omegas[f+1] = *omegas[f];
-					*omegas[f] = dum;
-					dum = *omegaProbs[f+1];
-					*omegaProbs[f+1] = *omegaProbs[f];
-					*omegaProbs[f] = dum;
+			bool done;
+			do{
+				done = true;
+				for(int f=0;f<NRateCats()-1;f++){
+					if(*omegas[f] > *omegas[f+1]){
+						//outman.UserMessage("prevented: %f %f", *omegas[f], *omegas[f+1]); 
+						FLOAT_TYPE dum = *omegas[f+1];
+						*omegas[f+1] = *omegas[f];
+						*omegas[f] = dum;
+						dum = *omegaProbs[f+1];
+						*omegaProbs[f+1] = *omegaProbs[f];
+						*omegaProbs[f] = dum;
+						done = false;
+						}
 					}
-				}
+				}while(!done);
 			}
 		else if(modSpec->IsFlexRateHet()){
-			for(int f=0;f<NRateCats()-1;f++){
-				if(rateMults[f] > rateMults[f+1]){
-					FLOAT_TYPE dum = rateMults[f+1];
-					rateMults[f+1] = rateMults[f];
-					rateMults[f] = dum;
-					dum = rateProbs[f+1];
-					rateProbs[f+1] = rateProbs[f];
-					rateProbs[f] = dum;
+			bool done;
+			do{
+				done = true;
+				for(int f=0;f<NRateCats()-1;f++){
+					if(rateMults[f] > rateMults[f+1]){
+						FLOAT_TYPE dum = rateMults[f+1];
+						rateMults[f+1] = rateMults[f];
+						rateMults[f] = dum;
+						dum = rateProbs[f+1];
+						rateProbs[f+1] = rateProbs[f];
+						rateProbs[f] = dum;
+						done = false;
+						}
 					}
-				}
+				}while(!done);
 			}
 		else assert(0);
 		}
 
 	void AdjustRateProportions(){
 		//this will change the gamma class probs when pinv changes
-		for(int i=0;i<NRateCats();i++) rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
+		for(int i=0;i<NRateCats();i++) 
+			rateProbs[i]=(FLOAT_TYPE)(1.0-*propInvar)/NRateCats();
 #ifndef NDEBUG
 		FLOAT_TYPE sum=0.0;
 		for(int i=0;i<NRateCats();i++){
@@ -1327,11 +1379,20 @@ class Model{
 #endif
 		}
 
-	void NormalizeRates(int toRemainConstant = -1){
+	void NormalizeRates(int probToRemainConstant = -1, int rateToRemainConstant = -1){
 		//optionally, pass the number of one of the rate/prob pairs to hold constant
 
 		FLOAT_TYPE sum=0.0;
+		FLOAT_TYPE minVal = 1e-5;
 
+		//FLOAT_TYPE **aliasedRates = new FLOAT_TYPE*[NRateCats()];
+		vector<FLOAT_TYPE *> aliasedRates;
+		for(int i=0;i<NRateCats();i++){
+			aliasedRates.push_back(&rateProbs[i]);
+			}
+		NormalizeSumConstrainedValues(&aliasedRates[0], NRateCats(), ONE_POINT_ZERO, minVal, probToRemainConstant);
+
+/*
 		for(int i=0;i<NRateCats();i++){
 			if(i != toRemainConstant) sum += rateProbs[i];
 			}
@@ -1341,28 +1402,55 @@ class Model{
 			sum = sum / (FLOAT_TYPE)(1.0-*propInvar);
 			}
 
-		if(toRemainConstant > -1) sum /= (ONE_POINT_ZERO - rateProbs[toRemainConstant]);
+		if(toRemainConstant > -1) 
+			sum /= (ONE_POINT_ZERO - rateProbs[toRemainConstant]);
+
 		for(int i=0;i<NRateCats();i++)	{
 			if(i != toRemainConstant) rateProbs[i] /= sum;
 			}
+*/
 
-		sum=0.0;
-		
-		double toRemainConstantContrib;
-		if(toRemainConstant > -1){
-			toRemainConstantContrib = rateMults[toRemainConstant]*rateProbs[toRemainConstant];
-			//this means that it isn't possible to rescale and keep one of the rate/probs constant
-			if(toRemainConstantContrib > ONE_POINT_ZERO)
-				toRemainConstant = -1;
-			}
-			
-		for(int i=0;i<NRateCats();i++){
-			if(i != toRemainConstant) sum += rateMults[i]*rateProbs[i];
-			}
-		if(toRemainConstant > -1) sum /= (ONE_POINT_ZERO - (rateMults[toRemainConstant] * rateProbs[toRemainConstant]));
-		for(int i=0;i<NRateCats();i++){
-			if(i != toRemainConstant) rateMults[i] /= sum;
-			}
+		//3/17/09 - it is possible for mult rescaling to cause two rates to "cross" if one is being held constant.  If
+		//that happens, try again without holding it constant.  It isn't safe to call CheckAndCorrectRateOrdering()
+		//from here because that would change the numbering of the rates and would screw things up at a higher level
+		//if e.g. rate 2 is being optimized but it suddenly becomes rate 3.  NOTE THAT THIS IS ONLY USED FOR Flex rates
+		//although M3 codon models are very similar, the normalization there happens differently through the rmat rescaling
+		bool OK = true;
+		FLOAT_TYPE backup_mults[20];
+		for(int r=0;r<NRateCats();r++)
+			backup_mults[r] = rateMults[r];
+		do{
+			double rateToRemainConstantContrib;
+			sum=0.0;
+			if(rateToRemainConstant > -1){
+				rateToRemainConstantContrib = rateMults[rateToRemainConstant]*rateProbs[rateToRemainConstant];
+				//this means that it isn't possible to rescale and keep one of the rate/probs constant
+				if(rateToRemainConstantContrib > ONE_POINT_ZERO)
+					rateToRemainConstant = -1;
+				}
+				
+			for(int i=0;i<NRateCats();i++){
+				if(i != rateToRemainConstant) sum += rateMults[i]*rateProbs[i];
+				}
+			if(rateToRemainConstant > -1) sum /= (ONE_POINT_ZERO - (rateMults[rateToRemainConstant] * rateProbs[rateToRemainConstant]));
+			for(int i=0;i<NRateCats();i++){
+				if(i != rateToRemainConstant) rateMults[i] /= sum;
+				}
+			//check if the rates are ordered properly
+			int r = 1;
+			for(;r<NRateCats();r++)
+				if(rateMults[r-1] > rateMults[r]){
+					OK = false;
+					break;
+					}
+			if(r == NRateCats()) OK = true;
+			if(rateToRemainConstant == -1) assert(OK);
+			if(!OK){//restore the rates and try again
+				for(int r=0;r<NRateCats();r++)
+					rateMults[r] = backup_mults[r];
+				rateToRemainConstant = -1;
+				}
+			}while(!OK);
 
 #ifndef NDEBUG
 		sum=0.0;
