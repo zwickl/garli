@@ -717,8 +717,8 @@ public:
 			else if(_stricmp(str, "twoserine") == 0 || _stricmp(str, "twoserinefixed") == 0){
 				if(datatype != CODONAMINOACID)
 					throw(ErrorException("Sorry, codon input data (with the codon-aminoacid datatype) are currently required for the Two-Serine model"));
-				if(stateFrequencies != EMPIRICAL && stateFrequencies != ESTIMATE)
-					throw(ErrorException("Sorry, empirical or estimate must be used as the statefrequencies setting for the Two-Serine model"));
+				if(stateFrequencies != EMPIRICAL && stateFrequencies != ESTIMATE && stateFrequencies != USERSPECIFIED)
+					throw(ErrorException("Sorry, empirical, estimated or fixed must be used as the statefrequencies setting for the Two-Serine model"));
 				SetTwoSerineRateMatrix();
 				if(_stricmp(str, "twoserinefixed") == 0)
 					fixRelativeRates = true;
