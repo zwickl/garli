@@ -1732,7 +1732,7 @@ void Population::Run(){
 			//	it has been a while since doing so 
 			//		and this is a nice round # gen
 			//		and we're at min prec
-			if((modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix()) 
+			if((modSpec.IsEstimateAAMatrix() || (modSpec.IsTwoSerineRateMatrix() && !modSpec.fixRelativeRates)) 
 				&& ( reduced && FloatingPointEquals(adap->branchOptPrecision, conf->minOptPrec, 1.0e-8)
 				|| ( (gen - lastPrecisionReduction >= (adap->intervalLength * 50) 
 					&& (gen % (adap->intervalLength * 50) == 0))
