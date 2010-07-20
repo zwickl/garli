@@ -630,11 +630,56 @@ void Model::UpdateQMatCodon(){
 		blen_multiplier[i] = blen_multiplier[0];
 	}
 
+//This just duplicates what happens at the end of UpdateQmatCodon, where the total rate is summed
+//across the matrix to calc the blens scaler.  Here it sums the rates for S and NS cells separately
+//and returns a vector with (S rate sum) / ((S rate sum) + (NS rate sum)) for each w set and then
+//over all categories
+void Model::CalcSynonymousBranchlengthProportions(vector<FLOAT_TYPE> &results){
+	results.clear();
+	UpdateQMatCodon();
+
+//calc the S and NS blens separately
+	vector<double> sumS, sumNS;
+	sumS.resize(NRateCats());
+	sumNS.resize(NRateCats());	
+	double weightedSumS, weightedSumNS;
+	double tempSumS, tempSumNS;
+	for(int w=0;w<NRateCats();w++){
+		weightedSumS = weightedSumNS = 0.0;
+		for(int x=0;x<nstates;x++){
+			tempSumS = tempSumNS = 0.0;
+			for(int y=0;y<nstates;y++){
+				if(x!=y){
+					if(qmatLookup[x*nstates+y]&4)
+						tempSumNS += qmat[w][x][y];
+					else
+						tempSumS += qmat[w][x][y];
+					}
+				}
+			//qmat[w][x][x]=-sum;
+			weightedSumS += tempSumS * *stateFreqs[x];
+			weightedSumNS += tempSumNS * *stateFreqs[x];
+			}
+		sumS[w] = weightedSumS * *omegaProbs[w];
+		sumNS[w] = weightedSumNS * *omegaProbs[w];
+		results.push_back((sumS[w] / (sumS[w] + sumNS[w])));
+		}
+		
+	double totSumS = 0.0, totSumNS = 0.0;
+	for(int w=0;w<NRateCats();w++){
+		totSumS += sumS[w];
+		totSumNS += sumNS[w];
+		}
+	//verify that this all makes sense given the already calc'ed blen mults 
+	assert(FloatingPointEquals(blen_multiplier[0], (ONE_POINT_ZERO / (totSumS + totSumNS)), 1e-3));	
+	//outman.UserMessage("w = %f S = %f NS = %f, propS = %f", *omegas[0], totSumS, totSumNS, (totSumS / (totSumS + totSumNS)));
+	results.push_back(totSumS / (totSumS + totSumNS));
+	}
 
 void Model::UpdateQMatAminoAcid(){
 
-	for(int from=0;from<20;from++)
-		for(int to=0;to<20;to++)
+	for(int from=0;from<nstates;from++)
+		for(int to=0;to<nstates;to++)
 			qmat[0][from][to] = *stateFreqs[to];
 
 	if(modSpec->IsJonesAAMatrix()) MultiplyByJonesAAMatrix();
@@ -1105,15 +1150,15 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 			}
 		}
 
-	if(NStates() == 20){
+	if(NStates() == 20 || NStates() == 21){
 		for(int rate=0;rate<NRateCats();rate++){
 			int model=0;
-			const unsigned rateOffset = 20*rate;
-			for (int i = 0; i < 20; i++){
-				for (int j = 0; j < 20; j++){
+			const unsigned rateOffset = nstates*rate;
+			for (int i = 0; i < nstates; i++){
+				for (int j = 0; j < nstates; j++){
 					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
-					for (int k = 0; k < 20; k++){ 
-						const MODEL_FLOAT x = c_ijk[0][model*20*20*20 + i*20*20 + j*20 +k];
+					for (int k = 0; k < nstates; k++){ 
+						const MODEL_FLOAT x = c_ijk[0][model*nstates*nstates*nstates + i*nstates*nstates + j*nstates +k];
 						sum_p   += x*EigValexp[k+rateOffset];
 						}
 					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
@@ -1510,7 +1555,7 @@ FLOAT_TYPE IncompleteGamma (FLOAT_TYPE x, FLOAT_TYPE alpha, FLOAT_TYPE LnGamma_a
 	int 			i;
 #ifdef SINGLE_PRECISION_FLOATS
 	FLOAT_TYPE 		p = alpha, g = LnGamma_alpha,
-					accurate = 1e-8f, overflow = 1e30f,
+					accurate = FLT_EPSILON, overflow = 1e30f,
 					factor, gin = 0.0f, rn = 0.0f, a = 0.0f, b = 0.0f, an = 0.0f, 
 					dif = 0.0f, term = 0.0f, pn[6];
 #else
@@ -1770,6 +1815,7 @@ void Model::DiscreteGamma(FLOAT_TYPE *rates, FLOAT_TYPE *props, FLOAT_TYPE shape
 	}	
 	
 void Model::OutputPaupBlockForModel(ofstream &outf, const char *treefname) const{
+	assert(modSpec->IsNucleotide());
 	outf << "begin paup;\nclear;\ngett file=" << treefname << " storebr;\nlset userbr ";
 	if(nst == 2) outf << "nst=2 trat= " << TRatio();
 	else if(nst == 1) outf << "nst=1 ";
@@ -1844,7 +1890,13 @@ void Model::FillPaupBlockStringForModel(string &str, const char *treefname) cons
 	}
 
 void Model::OutputGarliFormattedModel(ostream &outf) const{
-	if(modSpec->IsCodon()){
+	//no reason to have different versions of the same thing, so just use the fill string function
+	string s;
+	this->FillGarliFormattedModelString(s);
+	outf << s.c_str();
+	return;
+/*
+	if(modSpec.IsCodon()){
 		outf << "o ";
 		for(int i=0;i<omegas.size();i++){
 			outf << *omegas[i] << " " << *omegaProbs[i] << " ";
@@ -1869,7 +1921,7 @@ void Model::OutputGarliFormattedModel(ostream &outf) const{
 		}
 	if(PropInvar()!=ZERO_POINT_ZERO) outf << " p " << PropInvar();
 	outf << " ";
-	}
+*/	}
 
 void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{	
 	s.clear();
@@ -2760,9 +2812,13 @@ int Model::PerformModelMutation(){
 
 		if(modSpec->IsFlexRateHet() == true)
 			NormalizeRates();
-		else if(modSpec->IsCodon())
+		else if(modSpec->IsCodon()){
+			//this normalization could really be taken care of in the mutator, but this general purpose
+			//function does a better job of enforcing minimum values
+			NormalizeSumConstrainedValues(&omegaProbs[0], NRateCats(), ONE_POINT_ZERO, 1.0e-5, -1);
 			//eigen stuff needs to be recalced for changes to nonsynonymous rates
 			eigenDirty = true;
+			}
 		retType=Individual::alpha;
 		}
 	return retType;
