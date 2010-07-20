@@ -6139,32 +6139,44 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 	Model *mod = modPart->GetModel(modnum);
 
 #undef DEBUG_OMEGA_OPT
+	//codon models can be a little unstable, so make the difference in scores that we're looking for in OptBounded a bit larger.  9 is the default value.
+	//it really shouldn't matter in almost all cases.
+	FLOAT_TYPE scoreDiffTarget;
+#ifdef SINGLE_PRECISION_FLOATS
+	scoreDiffTarget = 4.0;
+#else
+	scoreDiffTarget = 7.0;
+#endif
 
 	//limiting change in any one pass
-	double maxRateChangeProp = 0.5;
-	double maxProbChange = 0.10;
-	
-	//limiting here now too
-	if(mod->NRateCats() == 1) //allow a bit more change for a single omega
-		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), 0, 
-			max(minVal, mod->Omega(0)*0.333),
-			min(9999.9, mod->Omega(0)+mod->Omega(0)*0.333), modnum,
-			&Model::SetOmega);
+	double maxRateChangeProportion = 2.0; //this is the allowed proportion of change, i.e., x is bounded by x/maxRateChangeProportion and x * maxRateChangeProportion
+	double maxProbChange = 0.10; //this is the actual allowed magnitude of change, i.e, x - maxProbChange aned x + maxProbChange
+	double curVal;
+
+	//give the first rate more leeway in the down direction, since it may want to approach zero
+	if(mod->NRateCats() == 1){ 
+		curVal = mod->Omega(i);
+		omegaImprove += OptimizeBoundedParameter(prec, curVal, 0,
+			max(minVal, curVal / 5.0),
+			max(min(9999.9, curVal * maxRateChangeProportion), 0.01), modnum,
+			&Model::SetOmega, scoreDiffTarget);
+		}
 	else{
-		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, 
-			max(minVal, mod->Omega(i)*maxRateChangeProp),
-			min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), modnum,
-			&Model::SetOmega);
+		curVal = mod->Omega(i);
+		omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+			max(minVal, curVal / 5.0),
+			min(mod->Omega(i+1), max(curVal * maxRateChangeProportion, 0.01)), modnum,
+			&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 		for(int j=0;j<mod->NRateCats();j++)
 			outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
 #endif
-		
-		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
-			max(minVal, mod->OmegaProb(i)-maxProbChange),
-			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange), modnum,
-			&Model::SetOmegaProb);
+		curVal = mod->OmegaProb(i);
+		omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+			max(minVal, curVal-maxProbChange),
+			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  curVal+maxProbChange), modnum,
+			&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 		for(int j=0;j<mod->NRateCats();j++)
@@ -6172,40 +6184,42 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 #endif
 
 		for(i=1;i < mod->NRateCats()-1;i++){
-			omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, 
-				max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
-				min(mod->Omega(i+1), mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), modnum,
-				&Model::SetOmega);
+			curVal = mod->Omega(i);
+			omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+				max(mod->Omega(i-1), curVal / maxRateChangeProportion),
+				min(mod->Omega(i+1), max(curVal * maxRateChangeProportion, 0.01)), modnum,
+				&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 			for(int j=0;j<mod->NRateCats();j++)
 				outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
 #endif
-
-			omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
-				max(minVal, mod->OmegaProb(i)-maxProbChange),
-				min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange), modnum,
-				&Model::SetOmegaProb);
+			curVal = mod->OmegaProb(i);
+			omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+				max(minVal, curVal-maxProbChange),
+				min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  curVal+maxProbChange), modnum,
+				&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 			for(int j=0;j<mod->NRateCats();j++)
 				outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
 #endif
 			}
-		omegaImprove += OptimizeBoundedParameter(prec, mod->Omega(i), i, 
-			max(mod->Omega(i-1), mod->Omega(i)*maxRateChangeProp),
-			min(9999.9, mod->Omega(i)+mod->Omega(i)*maxRateChangeProp), modnum,
-			&Model::SetOmega);
+		curVal = mod->Omega(i);
+		omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+			max(mod->Omega(i-1), curVal / maxRateChangeProportion),
+			min(9999.9, curVal * maxRateChangeProportion), modnum,
+			&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 		for(int j=0;j<mod->NRateCats();j++)
 			outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
 #endif
-
-		omegaImprove += OptimizeBoundedParameter(prec, mod->OmegaProb(i), i,
-			max(minVal, mod->OmegaProb(i)-maxProbChange),
-			min(ONE_POINT_ZERO,  mod->OmegaProb(i)+maxProbChange), modnum,
-			&Model::SetOmegaProb);
+		curVal = mod->OmegaProb(i);
+		omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+			max(minVal, curVal-maxProbChange),
+			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  curVal+maxProbChange), modnum,
+			&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
 		for(int j=0;j<mod->NRateCats();j++)
@@ -6318,6 +6332,77 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum){
 					min(max(999.0, curVal), curVal * maxChangeProportion),
 					&Model::SetRelativeNucRate, scoreDiffTarget);
 				}
+			}
+		}
+	else{
+
+#ifdef DEBUG_MESSAGES
+/*
+		string s;
+		mod->FillModelOrHeaderStringForTable(s, true);
+		ofstream tab("valTable.log", ios::app);
+		tab << lnL << "\t" << s.c_str() << "\t" << endl;
+		tab.close();
+*/
+#endif
+	
+		list<int> reopt;
+#ifdef SUM_AA_REL_RATES
+		mod->NormalizeSumConstrainedRelativeRates(true, -1);
+		for(i=0;i < mod->NumRelRates();i++)
+			reopt.push_back(i);
+#else
+		for(i=0;i < mod->NumRelRates()-1;i++)
+			reopt.push_back(i);
+#endif
+		int pass = 0;
+		while(reopt.size() != 0 && pass < 5){
+			double beflnL = lnL;
+			list<int>::iterator it = reopt.begin();
+			int num = reopt.size();
+			while(it != reopt.end()){
+				double beflnL = lnL;
+				double befval = mod->Rates(*it);
+#ifdef SUM_AA_REL_RATES
+				FLOAT_TYPE minV = max(MIN_REL_RATE, befval / maxChangeProportion);
+				if(minV < SUM_TO * 1.0e-3/190.0){
+					minV = min(befval, MIN_REL_RATE);
+					}
+				FLOAT_TYPE maxV = min(MAX_REL_RATE, befval * maxChangeProportion);
+				if(maxV < SUM_TO * 1.0e-3/190.0)
+					maxV = SUM_TO * 1.0e-3/190.0;
+				rateImprove += OptimizeBoundedParameter(prec, befval, *it, 
+					minV, maxV,
+					&Model::SetSumConstrainedRelativeRate, scoreDiffTarget);
+#else
+				FLOAT_TYPE minV = max(min(1.0e-3, befval), befval / maxChangeProportion);
+				if(minV < 0.01)
+					minV = min(befval, 1.0e-3);
+				FLOAT_TYPE maxV = min(max(9999.0, befval), befval * maxChangeProportion);
+				if(maxV < 0.01)
+					maxV = 0.01;
+				rateImprove += OptimizeBoundedParameter(prec, befval, *it, 
+					minV, maxV, modnum,
+					&Model::SetRelativeNucRate, scoreDiffTarget);
+#endif
+				if(FloatingPointEquals(lnL, beflnL, 1e-8)){
+					list<int>::iterator del=it;
+					it++;
+					reopt.erase(del);
+					}
+				else it++;				
+				}
+			pass++;
+			outman.DebugMessage("reoptimized %d. improvement %.6f", num, lnL - beflnL);
+#ifdef DEBUG_MESSAGES
+			/*
+			string s;
+			mod->FillModelOrHeaderStringForTable(s, true);
+			ofstream tab("valTable.log", ios::app);
+			tab << lnL << "\t" << s.c_str() << endl;
+			tab.close();
+			*/
+#endif
 			}
 		}
 	return rateImprove;
