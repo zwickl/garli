@@ -6156,16 +6156,16 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 	//give the first rate more leeway in the down direction, since it may want to approach zero
 	if(mod->NRateCats() == 1){ 
 		curVal = mod->Omega(i);
-		omegaImprove += OptimizeBoundedParameter(prec, curVal, 0,
+		omegaImprove += OptimizeBoundedParameter(modnum, prec, curVal, 0,
 			max(minVal, curVal / 5.0),
-			max(min(9999.9, curVal * maxRateChangeProportion), 0.01), modnum,
+			max(min(9999.9, curVal * maxRateChangeProportion), 0.01),
 			&Model::SetOmega, scoreDiffTarget);
 		}
 	else{
 		curVal = mod->Omega(i);
-		omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+		omegaImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
 			max(minVal, curVal / 5.0),
-			min(mod->Omega(i+1), max(curVal * maxRateChangeProportion, 0.01)), modnum,
+			min(mod->Omega(i+1), max(curVal * maxRateChangeProportion, 0.01)), 
 			&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6173,9 +6173,9 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 			outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
 #endif
 		curVal = mod->OmegaProb(i);
-		omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+		omegaImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
 			max(minVal, curVal-maxProbChange),
-			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  curVal+maxProbChange), modnum,
+			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  curVal+maxProbChange), 
 			&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6185,9 +6185,9 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 
 		for(i=1;i < mod->NRateCats()-1;i++){
 			curVal = mod->Omega(i);
-			omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+			omegaImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
 				max(mod->Omega(i-1), curVal / maxRateChangeProportion),
-				min(mod->Omega(i+1), max(curVal * maxRateChangeProportion, 0.01)), modnum,
+				min(mod->Omega(i+1), max(curVal * maxRateChangeProportion, 0.01)), 
 				&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6195,9 +6195,9 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 				outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
 #endif
 			curVal = mod->OmegaProb(i);
-			omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+			omegaImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
 				max(minVal, curVal-maxProbChange),
-				min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  curVal+maxProbChange), modnum,
+				min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  curVal+maxProbChange),
 				&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6206,9 +6206,9 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 #endif
 			}
 		curVal = mod->Omega(i);
-		omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+		omegaImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
 			max(mod->Omega(i-1), curVal / maxRateChangeProportion),
-			min(9999.9, curVal * maxRateChangeProportion), modnum,
+			min(9999.9, curVal * maxRateChangeProportion),
 			&Model::SetOmega, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
@@ -6216,9 +6216,9 @@ FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){
 			outman.UserMessage("%f\t%f", mod->Omega(j), mod->OmegaProb(j));
 #endif
 		curVal = mod->OmegaProb(i);
-		omegaImprove += OptimizeBoundedParameter(prec, curVal, i,
+		omegaImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
 			max(minVal, curVal-maxProbChange),
-			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  curVal+maxProbChange), modnum,
+			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))),  curVal+maxProbChange),
 			&Model::SetOmegaProb, scoreDiffTarget);
 
 #ifdef DEBUG_OMEGA_OPT
