@@ -2326,7 +2326,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		
 	if(!modSpec.IsEqualStateFrequencies()){
 		if(modSpec.IsCodon())  outman.UserMessageNoCR("    (AAA, AAC, AAG, AAT, ACA, ... etc)\n    ");
-		else if(modSpec.IsAminoAcid()) outman.UserMessageNoCR("    (ACDEFGHIKLMNPQRSTVWY)\n    ");
+		else if(modSpec.IsAminoAcid() && !modSpec.IsTwoSerineRateMatrix()) outman.UserMessageNoCR("    (ACDEFGHIKLMNPQRSTVWY)\n    ");
+		else if(modSpec.IsAminoAcid() && modSpec.IsTwoSerineRateMatrix()) outman.UserMessageNoCR("    (ACDEFGHIKLMNPQRSTVWYZ) (Z=ACG and AGT Serines)\n    ");
 		else outman.UserMessageNoCR("    (ACGT) ");
 		for(int i=0;i<nstates;i++){
 			outman.UserMessageNoCR("%.4f ", StateFreq(i));
