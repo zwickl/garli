@@ -363,12 +363,12 @@ void Population::CheckForIncompatibleConfigEntries(){
 	//DEBUG - fill this in better
 
 	//PARTITION - disallow a number of things that aren't implemented/tested with partitioned models
+	if(conf->inferInternalStateProbs)
+		throw ErrorException("Sorry, internal state reconstruction is not yet implemented for the partitioned version of GARLI");
 	if(dataPart->NumSubsets() > 1){
 		if(conf->linkModels && modSpecSet.GetModSpec(0)->IsEmpiricalStateFrequencies())
 			throw ErrorException("Sorry, empirical state frequencies can't be used with partitioned models when models are linked");
-		if(conf->inferInternalStateProbs)
-			throw ErrorException("Sorry, internal state reconstruction is not yet implemented for partitioned models");
-		if(conf->checkpoint)
+		if(conf->checkpoint)//checkpointing is allowed and actually works if there is only one subset 
 			throw ErrorException("Sorry, checkpointing is not yet implemented for partitioned models");
 		if(conf->linkModels == false){
 			for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
@@ -391,8 +391,6 @@ void Population::CheckForIncompatibleConfigEntries(){
 			if(modSpec->includeInvariantSites == true && modSpec->fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
 			if(modSpec->Nst() > 1 && modSpec->fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
 			if(modSpec->numRateCats > 1 && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
-			if(conf->inferInternalStateProbs && (modSpec->IsNucleotide() == false))
-				throw ErrorException("Sorry, internal state reconstruction not yet implemented for non-nucleotide models.\nPAML does a good job of this with fixed trees, so you might try using your best GARLI tree there.");
 			}
 		}
 
@@ -2699,6 +2697,8 @@ void Population::PerformSearch(){
 			}
 
 		if(conf->inferInternalStateProbs == true){
+			//not implemented for partitioned version yet
+			assert(0);
 			if(prematureTermination == false && currentSearchRep == conf->searchReps){
 				if(storedTrees.size() > 0){//careful here, the trees in the storedTrees array don't have clas assigned
 					outman.UserMessage("Inferring internal state probabilities on best tree....");
