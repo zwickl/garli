@@ -2057,7 +2057,7 @@ void Population::FinalOptimization(){
 		//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
 		if(modSpec.IsCodon() && modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == true)
 			optFreqs = true;
-		if((modSpec.fixRelativeRates == false && modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false) || modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix())
+		if((modSpec.fixRelativeRates == false) && ((modSpec.Nst() > 1 && modSpec.IsAminoAcid() == false) || modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix()))
 			optRelRates = true;
 #endif
 		}
