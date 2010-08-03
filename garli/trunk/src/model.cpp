@@ -2113,6 +2113,9 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 	out << "begin garli;" << endl;
 	out << "[this specifies an amino acid rate matrix, with AA's ordered alphabetically by SINGLE LETTER CODE]" << endl;
 	out << "[it is the above diagonal portion of the matrix, in order across each row]" << endl;
+	if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false)
+		out << "[below the rate matrix is a line begining with \"e\" that specifies the estimated AA frequencies in GARLI format]" << endl;
+
 	out << "r ";
 	
 	FLOAT_TYPE scaleTo = 100.0 * ((nstates * nstates) - nstates)/2.0;
@@ -2121,6 +2124,11 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 		for(int to=from+1;to<nstates;to++){
 			sprintf(str, "%.5g", (el[from * nstates + to] * (scaleTo/tot)));
 			out << str << " ";
+			}
+		if(modSpec.fixStateFreqs == false && modSpec.IsEqualStateFrequencies() == false && modSpec.IsEmpiricalStateFrequencies() == false){
+			out << "\ne ";
+			for(int st = 0;st < nstates;st++)
+				out << StateFreq(st) << " ";
 			}
 		}
 	out << ";\nend;\n" << endl;
