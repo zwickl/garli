@@ -790,6 +790,7 @@ class CalculationManager{
 public:
 	bool useBeagle;
 	bool termOnBeagleError;
+	int beagleDeviceNum;
 	//bool rescaleBeagle;
 //	bool singlePrecBeagle;
 //	bool gpuBeagle;
@@ -825,15 +826,16 @@ public:
 		this->ofprefix = prefix;
 		}
 */
-	void SetBeagleDetails(string prefFlags, string reqFlags, string &prefix){
+	void SetBeagleDetails(string prefFlags, string reqFlags, int dnum, string &prefix){
 		useBeagle = true;
 		preferredBeagleFlags = prefFlags;
 		requiredBeagleFlags = reqFlags;
 		ofprefix = prefix;
+		beagleDeviceNum = dnum;
 		}
 
-	long ParseBeagleFlagString(string flagsString) const;
-	void InterpretBeagleResourceFlags(long flags, string &list) const;
+	long ParseBeagleFlagString(string flagsString, long flagMask = 0) const;
+	void InterpretBeagleResourceFlags(long flags, string &list, long flagMask = 0) const;
 	void OutputBeagleResources() const;
 
 	//for now assuming that rescaling will always be available - this will need to be
