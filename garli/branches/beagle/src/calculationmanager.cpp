@@ -189,7 +189,9 @@ void CalculationManager::FillBeagleOptionsMaps(){
 	invalidFlags.push_back(BEAGLE_FLAG_PROCESSOR_CPU | BEAGLE_FLAG_PROCESSOR_GPU);
 	}
 
-long CalculationManager::ParseBeagleFlagString(string flagsString) const{
+//flag mask allows for ignoring bits that have already be interpreted, for example req_flags trump pref_flags, and thus
+//redundant pref_flags don't need to be dealt with 
+long CalculationManager::ParseBeagleFlagString(string flagsString, long flagMask /*=0*/) const{
 	long ret = 0;
 
 	NxsString::to_upper(flagsString);
@@ -205,7 +207,7 @@ long CalculationManager::ParseBeagleFlagString(string flagsString) const{
 			outman.UserMessage("Ignoring unknown beagle option: %s", flag.c_str());
 			}
 		else 
-			ret |= (*itToFlag).second;
+			ret |= (*itToFlag).second & ~flagMask;
 		}
 	
 	for(vector<long>::const_iterator it = invalidFlags.begin(); it != invalidFlags.end(); it++){
@@ -219,12 +221,14 @@ long CalculationManager::ParseBeagleFlagString(string flagsString) const{
 	return ret;
 	}
 
-void CalculationManager::InterpretBeagleResourceFlags(long flags, string &list) const{
+//flag mask allows for ignoring bits that have already be interpreted, for example req_flags trump pref_flags, and thus
+//redundant pref_flags don't need to be dealt with  
+void CalculationManager::InterpretBeagleResourceFlags(long flags, string &list, long flagMask /*=0*/) const{
 	map<long, string>::const_iterator itToName;
 	long bit = 1;
 
 	do{
-		if(bit & flags){
+		if(bit & flags & ~flagMask){
 			itToName = flagToName.find(bit);
 			if (itToName == flagToName.end()){
 #ifdef OUTPUT_OTHER_BEAGLE
@@ -255,20 +259,25 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	req_flags = ParseBeagleFlagString(requiredBeagleFlags);
 	//dealing with rescaling depending on other assigned flags gets annoying, so just always demand it
 	req_flags = req_flags | BEAGLE_FLAG_SCALERS_LOG;
-	pref_flags = ParseBeagleFlagString(preferredBeagleFlags);
+	pref_flags = ParseBeagleFlagString(preferredBeagleFlags, req_flags);
 
 	outman.UserMessage("BEAGLE INITIALIZING ...");
 
  	string str;
- 	InterpretBeagleResourceFlags(pref_flags, str);
-	outman.UserMessage("\nPreferred beagle flags: %s", str.c_str());
-	str.clear();
  	InterpretBeagleResourceFlags(req_flags, str);
-	outman.UserMessage("Required beagle flags: %s\n", str.c_str());
+	outman.UserMessage("Required beagle flags: %s", str.c_str());
+	str.clear();
+	InterpretBeagleResourceFlags(pref_flags, str, req_flags);
+	outman.UserMessage("Preferred beagle flags: %s", str.c_str());
 
+	if(beagleDeviceNum > -1){
+		outman.UserMessage("Requested beagle device number: %d", beagleDeviceNum);
+		}
+
+	outman.UserMessage("");
 	OutputBeagleResources();
 
-	outman.UserMessage("CREATING BEAGLE INSTANCE ...");
+	outman.UserMessage("\nCREATING BEAGLE INSTANCE ...");
 
 	//to allow ambiguity we need to create partials for the tips with ambiguity, and normal tip states for the others
 	int tipCount = nTips;
@@ -297,8 +306,13 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	//so, just allocate enough scalers to do it whether we will or not
 	//int scalerCount = (IsRescaling() ? nClas + 1 : 0);
 	int scalerCount = nClas + 1;
-	int resourceList[1] = {NULL};
+	int resourceList[1] = {0};
 	int resourceListCount = 0;
+
+	if(beagleDeviceNum > -1){
+		resourceList[0] = beagleDeviceNum;
+		resourceListCount = 1;
+		}
 
 	BeagleInstanceDetails det;
 

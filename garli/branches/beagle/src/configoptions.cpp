@@ -43,6 +43,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	preferredBeagleFlags = "DOUBLE CPU RESCALE";
 	singlePrecEps = FLT_EPSILON * 10.0;
 	doublePrecEps = FLT_EPSILON * 10.0;
+	deviceNumBeagle = -1;
 
 	//output related
 	ofprefix = "ofprefix";
@@ -162,6 +163,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetBoolOption("rescalebeagle", rescaleBeagle, true);
 	cr.GetStringOption("preferredbeagleflags", preferredBeagleFlags, true);
 	cr.GetStringOption("requiredbeagleflags", requiredBeagleFlags, true);
+	cr.GetIntOption("devicenumbeagle", deviceNumBeagle, true);
 
 	cr.GetPositiveNonZeroDoubleOption("singlepreceps", singlePrecEps, true);
 	cr.GetPositiveNonZeroDoubleOption("doublepreceps", doublePrecEps, true);

@@ -36,6 +36,7 @@ class GeneralGamlConfig{
 	string preferredBeagleFlags;
 	double singlePrecEps;
 	double doublePrecEps;
+	int deviceNumBeagle;
 
 	//these options will be the same regardless of whether a population is master or remote
 

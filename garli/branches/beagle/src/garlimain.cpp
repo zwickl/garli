@@ -160,12 +160,13 @@ void UsageMessage(char *execName){
 	outman.UserMessage    ("  -t                run internal tests (requires dataset and config file)");
 	outman.UserMessage    ("  -V                validate: load config file and data, validate config file, data, starting trees"); 
 	outman.UserMessage    ("                    and constraint files, print required memory and selected model, then exit");
-	outman.UserMessage    ("  -f                pass flags to beagle to help it choose a specific resource. Options are");
+#ifdef USE_BEAGLE
+	outman.UserMessage    ("                                 BEAGLE LIBRARY OPTIONS");
+	outman.UserMessage    ("  -f <FLAGS>        pass flags to beagle library to help it choose a specific resource. Options are");
 	outman.UserMessage    ("                    CPU GPU SINGLE DOUBLE SSE OPENMP.  They may not all work. Flags are interpreted");
 	outman.UserMessage    ("                    as beagle *preferences*, so can be ignored when not able to be met");
-	outman.UserMessage    ("  -F                same as -f, except interpret the flags as beagle *requirements*");
-#ifdef CUDA_GPU
-	outman.UserMessage    ("  --device d_number	use specified CUDA device");
+	outman.UserMessage    ("  -F <FLAGS>        same as -f, except interpret the flags as beagle *requirements*");
+	outman.UserMessage    ("  -d <device num>   use specified beagle device number");
 #endif
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"\n");
 #endif
@@ -212,6 +213,7 @@ int main( int argc, char* argv[] )	{
 	string svnRev = GetSvnRev();
 	string svnDate = GetSvnDate();
 	string cmdLineBeagleFlags;
+	int beagleDeviceNum = -1;
 
 #ifdef OLD_SUBROUTINE_GARLI
 	char name[12];
@@ -281,17 +283,23 @@ int main( int argc, char* argv[] )	{
 							cmdLineBeagleFlags += argv[curarg++];
 							}
 						}
+					else if(!strcmp(argv[curarg], "-d")){
+						curarg++;
+						if(curarg == argc || ! isdigit(argv[curarg][0])){
+							outman.UserMessage("-d flag must be followed by beagle device #");
+							exit(1);
+							} 
+						else
+							beagleDeviceNum = atoi(argv[curarg]);
+						}   
 					else if(!strcmp(argv[curarg], "-V"))
 						//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
 						//which is essentially a stripped down version of pop::SeedPopWithStartingTree
 						validateMode = true;
-#ifdef CUDA_GPU
-					else if(!_stricmp(argv[curarg], "--device")) cuda_device_number = atoi(argv[++curarg]);
-#endif
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						UsageMessage(argv[0]);
-						exit(0);
+						exit(1);
 						}
 					}
 				//if anything else appears, we'll assume that it's a config file
@@ -322,6 +330,8 @@ int main( int argc, char* argv[] )	{
 				else
 					conf.preferredBeagleFlags = cmdLineBeagleFlags;
 				}
+			if(beagleDeviceNum > -1)
+				conf.deviceNumBeagle = beagleDeviceNum;
 
 #ifdef SUBROUTINE_GARLI
 			//override the ofprefix here, tacking .runXX onto it
