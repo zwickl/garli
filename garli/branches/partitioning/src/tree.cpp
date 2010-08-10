@@ -70,6 +70,7 @@ extern int optCalcs;
 extern ofstream opt;
 extern ofstream optsum;
 extern int memLevel;
+extern vector<DataSubsetInfo> dataSubInfo;
 //extern ModelSpecification modSpec;
 
 //Tree static definitions
@@ -89,6 +90,9 @@ AttemptedSwapList Tree::attemptedSwaps;
 FLOAT_TYPE Tree::uniqueSwapBias;
 FLOAT_TYPE Tree::distanceSwapBias;
 FLOAT_TYPE Tree::expectedPrecision;
+bool Tree::rootWithDummy;
+bool Tree::someOrientedGap;
+bool Tree::useOptBoundedForBlen;
 
 FLOAT_TYPE Tree::uniqueSwapPrecalc[500];
 FLOAT_TYPE Tree::distanceSwapPrecalc[1000];
@@ -100,9 +104,6 @@ FLOAT_TYPE Tree::distanceSwapPrecalc[1000];
 FLOAT_TYPE Tree::rescalePrecalcThresh[RESCALE_ARRAY_LENGTH];
 FLOAT_TYPE Tree::rescalePrecalcMult[RESCALE_ARRAY_LENGTH];
 int Tree::rescalePrecalcIncr[RESCALE_ARRAY_LENGTH];
-
-int Tree::effectiveRootNode;
-bool Tree::useOptBoundedForBlen;
 
 Bipartition *Tree::outgroup = NULL;
 
@@ -175,11 +176,33 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 	Tree::min_brlen = conf->minBrlen;
 	Tree::max_brlen = conf->maxBrlen;
 	Tree::exp_starting_brlen = conf->startingBrlen;
-	Tree::effectiveRootNode = -1;
-	Tree::useOptBoundedForBlen = false;
+	
+	Tree::someOrientedGap = false;
+	for(vector<DataSubsetInfo>::iterator it = dataSubInfo.begin();it < dataSubInfo.end();it++){
+		if((*it).readAs == DataSubsetInfo::ORIENTEDGAP)
+			Tree::someOrientedGap = true;
+		}
+
+	string outString = conf->outgroupString;
+
+	if(someOrientedGap){
+		Tree::rootWithDummy = true;
+		Tree::useOptBoundedForBlen = true;
+		//set the dummy taxon as the effective outgroup
+		if(conf->outgroupString.length() > 0)
+			outman.UserMessage("WARNING - specified outgroup (%s) being ignored due to inference of a rooted true", conf->outgroupString.c_str());
+			
+		char num[10];
+		sprintf(num, "&d", data->NTax());
+		outString = num;
+		}
+	else{
+		Tree::rootWithDummy = false;
+		Tree::useOptBoundedForBlen = false;
+		}
 
 	//deal with the outgroup specification, if there is one
-	if(conf->outgroupString.length() > 0){
+	if(outString.length() > 0){
 		//NxsString s(conf->outgroupString.c_str());
 		const char *o = conf->outgroupString.c_str();
 		vector<int> nums;
@@ -290,16 +313,17 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			assert(temp->anc);
 			if(!temp->anc) throw ErrorException("Problem reading tree description.  Mismatched parentheses?");
 			temp=temp->anc;
-			numBranchesAdded--;//sloppy way to avoid over incrementing numBranchesAdded
+			//DEBUG
+			//numBranchesAdded--;//sloppy way to avoid over incrementing numBranchesAdded
 			if(*(s+1)!='(') s++;
 			cont = true;
 			}
 		if(*s == '(' || isdigit(*s) || cont==true){
 			//here we're about to add a node of some sort
-			numBranchesAdded++;
 			if(*(s+1)=='('){//add an internal node
 				temp=temp->AddDes(allNodes[current++]);
 				numNodesAdded++;
+				numBranchesAdded++;
 				s++;
 				}
 			else{
@@ -323,6 +347,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 					int internalnodeNum = atoi( num.c_str() );
 	                temp=temp->AddDes(allNodes[internalnodeNum]);
 	                numNodesAdded++;
+					numBranchesAdded++;
 	                s++;							
 					}
 				else{//add a terminal node
@@ -351,6 +376,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 						}
 	                temp=temp->AddDes(allNodes[taxonnodeNum]);
 	                numNodesAdded++;
+					numBranchesAdded++;
 					numTipsAdded++;
 	                s++;
 					while(*s == ' ') s++;;//eat any spaces here
@@ -398,6 +424,15 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 		EliminateNode(2*dataPart->NTax()-2);
 		}
 	assert(root->left->next!=root->right);
+
+	//Arbitrarily throw in the extra fake root taxon now.  Note that the extra tip is allNodes[numTipsTotal] (and 
+	//numNodesTotal includes that extra tip) because allNodes[0] is the root, but the extra connector is 
+	//allNodes[numNodesTotal - 1], i.e., the last node allocated.  Note that the dummy root will always be the same
+	//node, but its anc (the dummy connector) won't be
+	if(rootWithDummy){
+		int connector = numNodesTotal - 1;
+		AddRandomNode(numTipsTotal, connector);
+		}
 
 	if((allowMissingTaxa == false) && (numTipsAdded != numTipsTotal)) 
 		throw ErrorException("Number of taxa in tree description (%d) not equal to number of taxa in dataset (%d)!", numTipsAdded, numTipsTotal);
@@ -3262,6 +3297,9 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 	//The only reason I can think of for doing that is to calc internal state probs
 	//the fuction will then return a pointer to the CLA
 
+	/*NOTE - if a dummy gap rooting is being used, it is assumed that this will be called with
+	nd = dummy->anc*/
+
 	assert(this != NULL);
 	calcCount++;
 
@@ -3329,68 +3367,14 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			blen2 = Rchild->dlen;
 			}
 
-	//	mod->CalcPmats(blen1, blen2, Lprmat, Rprmat);
-
-		if(direction==DOWN) destCLA=GetClaDown(nd, false);
-		else if(direction==UPRIGHT) destCLA=GetClaUpRight(nd, false);
-		else if(direction==UPLEFT) destCLA=GetClaUpLeft(nd, false);
+		if(direction==DOWN) 
+			destCLA=GetClaDown(nd, false);
+		else if(direction==UPRIGHT) 
+			destCLA=GetClaUpRight(nd, false);
+		else if(direction==UPLEFT) 
+			destCLA=GetClaUpLeft(nd, false);
 
 		UpdateCLAs(destCLA, LCLA, RCLA, Lchild, Rchild, blen1, blen2);
-
-	/*
-		if(LCLA!=NULL && RCLA!=NULL){
-			//two internal children
-			ProfIntInt.Start();
-#ifdef EQUIV_CALCS
-			if(direction==DOWN){
-				CalcFullCLAInternalInternalEQUIV(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0], nsites,  mod->NRateCats(), nd->left->tipData, nd->right->tipData);
-				}
-			else 
-#endif
-			if(modSpec.IsNucleotide() == false)
-				CalcFullCLAInternalInternalNState(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0]);
-			else
-				CalcFullCLAInternalInternal(destCLA, LCLA, RCLA, &Lprmat[0], &Rprmat[0]);
-			ProfIntInt.Stop();
-			}
-
-		else if(LCLA==NULL && RCLA==NULL){
-			//two terminal children
-			ProfTermTerm.Start();
-			if(modSpec.IsNucleotide() == false)
-				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData);
-			else
-				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], Lchild->tipData, Rchild->tipData);
-			ProfTermTerm.Stop();
-			}
-
-		else{
-			//one terminal, one internal
-			ProfIntTerm.Start();
-
-			if(modSpec.IsNucleotide() == false){
-				if(LCLA==NULL)
-					CalcFullCLAInternalTerminalNState(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData);
-				else 
-					CalcFullCLAInternalTerminalNState(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData);
-				}
-			else{
-#ifdef OPEN_MP
-				if(LCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, Lchild->ambigMap);
-				else
-					CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, Rchild->ambigMap);
-				}
-#else
-				if(LCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, RCLA, &Rprmat[0], &Lprmat[0], Lchild->tipData, NULL);
-				else 
-					CalcFullCLAInternalTerminal(destCLA, LCLA, &Lprmat[0], &Rprmat[0], Rchild->tipData, NULL);
-				}
-#endif
-			ProfIntTerm.Stop();
-			}
-*/
 		}
 	
 	if(direction==ROOT){
@@ -3400,55 +3384,82 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		//only change one of the branches again and again.
 		TreeNode *child;
 		CondLikeArraySet *childCLA=NULL;
-		
-		if(claMan->IsDirty(nd->claIndexUL) == false){
-			partialCLA=GetClaUpLeft(nd, false);
-			child=nd->left;
-			if(child->IsInternal()){
-				childCLA=GetClaDown(child, true);
+
+		/*Here the dummy root (if used) needs to be the last taxon combined.
+		This rooting isn't currently necessary except in the case of oriented gap models.
+		Otherwise it becomes difficult to enforce the single-insert-on-tree rule.
+		Note that this assumes that this function was called with dummy->anc, so that it
+		must be one of the descendent taxa.*/
+		if(rootWithDummy){
+			if(nd->left == allNodes[numTipsTotal]){
+				child=nd->left;
+				assert(!child->IsInternal());
+
+				partialCLA = GetClaUpLeft(nd, claMan->IsDirty(nd->claIndexUL));
 				}
+			else if(nd->right == allNodes[numTipsTotal]){
+				child=nd->right;
+				assert(!child->IsInternal());
+
+				partialCLA = GetClaUpRight(nd, claMan->IsDirty(nd->claIndexUR));
+				}
+			else if(nd->left->next == allNodes[numTipsTotal]){
+				child = nd->left->next;
+				assert(!child->IsInternal());
+
+				partialCLA = GetClaDown(nd, claMan->IsDirty(nd->claIndexDown));
+				}
+			else 
+				assert(0);
 			blen1 = child->dlen;
 			}
-		else if(claMan->IsDirty(nd->claIndexUR) == false){
-			partialCLA=GetClaUpRight(nd, false);
-			child=nd->right;
-			if(child->IsInternal()){
-				childCLA=GetClaDown(child, true);
-				}
-			blen1 = child->dlen;
-			}
-		else{//both of the UP clas must be dirty.  We'll use the down one as the 
-			//partial, and calc it now if necessary
-			if(claMan->IsDirty(nd->claIndexDown) == true)
-				partialCLA=GetClaDown(nd, true);
-			else partialCLA=GetClaDown(nd, false);
-			if(nd->anc!=NULL){
-				child=nd->anc;
-				if(child->left==nd){
-					childCLA=GetClaUpLeft(child, true);							
-					}
-				else if(child->right==nd){
-					childCLA=GetClaUpRight(child, true);
-					}
-				else{
-					//the node down that we want to get must be the root, and this
-					//node must be it's middle des.  Remember that the cla for that 
-					//direction is stored as the root DOWN direction
-					childCLA=GetClaDown(child);
-					}
-				blen1 = nd->dlen;
-				}
-			else{
-				child=nd->left->next;
+		else{//not dummy rooting
+			if(claMan->IsDirty(nd->claIndexUL) == false){
+				partialCLA=GetClaUpLeft(nd, false);
+				child=nd->left;
 				if(child->IsInternal()){
 					childCLA=GetClaDown(child, true);
 					}
 				blen1 = child->dlen;
 				}
-			}	
-
-		//PARTITION
-		//GetScore here
+			else if(claMan->IsDirty(nd->claIndexUR) == false){
+				partialCLA=GetClaUpRight(nd, false);
+				child=nd->right;
+				if(child->IsInternal()){
+					childCLA=GetClaDown(child, true);
+					}
+				blen1 = child->dlen;
+				}
+			else{//both of the UP clas must be dirty.  We'll use the down one as the 
+				//partial, and calc it now if necessary
+				if(claMan->IsDirty(nd->claIndexDown) == true)
+					partialCLA=GetClaDown(nd, true);
+				else partialCLA=GetClaDown(nd, false);
+				if(nd->anc!=NULL){
+					child=nd->anc;
+					if(child->left==nd){
+						childCLA=GetClaUpLeft(child, true);							
+						}
+					else if(child->right==nd){
+						childCLA=GetClaUpRight(child, true);
+						}
+					else{
+						//the node down that we want to get must be the root, and this
+						//node must be it's middle des.  Remember that the cla for that 
+						//direction is stored as the root DOWN direction
+						childCLA=GetClaDown(child);
+						}
+					blen1 = nd->dlen;
+					}
+				else{
+					child=nd->left->next;
+					if(child->IsInternal()){
+						childCLA=GetClaDown(child, true);
+						}
+					blen1 = child->dlen;
+					}
+				}
+			}
 		GetTotalScore(partialCLA, childCLA, child, blen1);
 /*
 		mod->CalcPmats(blen1, -1.0, Lprmat, Rprmat);
@@ -3489,19 +3500,6 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 			}
 */
 		}
-/*
-	if(direction != ROOT){
-		if(destCLA->rescaleRank >= rescaleEvery){
-			ProfRescale.Start();
-			if(modSpec.IsNucleotide())
-				RescaleRateHet(destCLA);
-			else
-				RescaleRateHetNState(destCLA);
-
-			ProfRescale.Stop();
-			}
-		}
-*/
 	return -1;
 	}
 
@@ -3529,6 +3527,8 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 			childCLA = childCLAset->GetCLA((*specs).claIndex);
 
 		if(childCLA!=NULL){//if child is internal
+			//when doing oriented gap we assume that the tree must be rooted, thus the child must be the dummy tip
+			assert(! mod->IsOrientedGap());
 			ProfScoreInt.Start();
 			if(isNucleotide)
 				modlnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
@@ -3659,8 +3659,11 @@ int Tree::Score(int rootNodeNum /*=0*/){
 	do{
 		try{
 			scoreOK=true;
-			if(effectiveRootNode > 0 && rootNodeNum == 0) 
-				ConditionalLikelihoodRateHet( ROOT, allNodes[effectiveRootNode]);
+		
+			if(rootWithDummy){
+				assert(rootNodeNum == 0);
+				ConditionalLikelihoodRateHet( ROOT, allNodes[numTipsTotal]->anc);
+				}
 			else
 				ConditionalLikelihoodRateHet( ROOT, rootNode);
 			}
@@ -7754,3 +7757,6 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 	assert(0);
 	}
 
+void Tree::C4(const FLOAT_TYPE *a){
+	printf("%f %f %f %f\n", a[0], a[1], a[2], a[3]);
+	}

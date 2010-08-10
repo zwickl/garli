@@ -84,8 +84,10 @@ class Tree{
 		static unsigned rescaleEvery;
 		static FLOAT_TYPE rescaleBelow;
 		static list<TreeNode *> nodeOptVector;
-		static int effectiveRootNode;
+		
 		static bool useOptBoundedForBlen;
+		static bool rootWithDummy;
+		static bool someOrientedGap;
 		
 		static FLOAT_TYPE uniqueSwapPrecalc[500];
 		static FLOAT_TYPE distanceSwapPrecalc[1000];
@@ -362,7 +364,8 @@ class Tree{
 		void InferAllInternalStateProbs(const char *ofprefix);
 
 		static void SetTreeStatics(ClaManager *, const DataPartition *, const GeneralGamlConfig *);
-		void SetEffectiveRootNode(int r) {effectiveRootNode = r;}
+
+		void C4(const FLOAT_TYPE *a);
 		};
 
 
