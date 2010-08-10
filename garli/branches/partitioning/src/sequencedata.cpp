@@ -1663,11 +1663,14 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 	if(realCharSet->size() == 0)
 		return;
 
+	//include an extra taxon for the dummy root
+	int myEffectiveTaxa = numActiveTaxa + 1;
+
 	//make room for a dummy constant character here
 	if(type == ONLY_VARIABLE)
-		NewMatrix( numActiveTaxa, realCharSet->size() + 1);
+		NewMatrix( myEffectiveTaxa, realCharSet->size() + 1);
 	else
-		NewMatrix( numActiveTaxa, realCharSet->size());
+		NewMatrix( myEffectiveTaxa, realCharSet->size());
 
 /*
 	bool recodeSkippedIndeces = true;
@@ -1739,4 +1742,11 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 			effectiveTax++;
 			}
 		}
+
+	SetTaxonLabel( effectiveTax, "ROOT\0");
+	int j = 0;
+	for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+		SetMatrix( effectiveTax, j++, maxNumStates );
+		}
+
 	}

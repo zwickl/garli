@@ -321,13 +321,14 @@ FLOAT_TYPE Tree::SetAndEvaluateParameter(int modnum, int which, FLOAT_TYPE val, 
 		Model *mod = modPart->GetModel(modnum);	
 		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, val);
 		MakeAllNodesDirty();
-		Score();
 		}
-	else{//A negative which means that this is a branchlength being set.  In that case the SetParam function is just a dummy functio of Model
+	else{//A negative which means that this is a branchlength being set.  In that case the SetParam function is just a dummy function of Model
 		//that allow this function to be called
 		SetBranchLength(allNodes[-which], val);
-		Score(effectiveRootNode);
 		}
+
+	Score();
+
 	if(lnL > bestKnownScore){
 		bestKnownVal = val;
 		bestKnownScore = lnL;
@@ -347,7 +348,12 @@ bool Tree::CheckScoreAndRestore(int modnum, int which, void (Model::*SetParam)(i
 	bool restored = false;
 	if(otherScore + tolerance < bestScore){
 //		outman.DebugMessage("Rest %.12f", otherScore - bestScore);
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, bestVal);
+		if(which > -1)
+			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, bestVal);
+		else{//A negative which means that this is a branchlength being set.  In that case the SetParam function is just a dummy function of Model
+			//that allow this function to be called
+			SetBranchLength(allNodes[-which], bestVal);
+			}
 		otherScore = bestScore;
 		restored = true;
 		}
@@ -357,7 +363,12 @@ bool Tree::CheckScoreAndRestore(int modnum, int which, void (Model::*SetParam)(i
 /*		else 
 			outman.DebugMessage("Stay %.12f", otherScore - bestScore);
 */
-		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, otherVal);
+		if(which > -1)
+			CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, otherVal);
+		else{//A negative which means that this is a branchlength being set.  In that case the SetParam function is just a dummy function of Model
+			//that allow this function to be called
+			SetBranchLength(allNodes[-which], otherVal);
+			}	
 		}
 	MakeAllNodesDirty();
 	lnL = otherScore;
@@ -382,9 +393,14 @@ void Tree::TraceLikelihoodForParameter(int modnum, int which, FLOAT_TYPE init, F
 		curves << c << "\t" << v << "\n";
 		}
 	curves.close();
-
-	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, init);
-	MakeAllNodesDirty();
+	if(which > -1){
+		CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, init);
+		MakeAllNodesDirty();
+		}
+	else{//A negative which means that this is a branchlength being set.  In that case the SetParam function is just a dummy function of Model
+		//that allow this function to be called
+		SetBranchLength(allNodes[-which], init);
+		}
 	Score();
 	}
 
@@ -397,6 +413,12 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 #else
 	FLOAT_TYPE baseIncr = min(max(0.001*optPrecision, 1.0e-6), initialVal * 0.01);
 #endif
+	//DEBUG
+	//for blen opt (which < 0) super small incrs don't make sense.  If initialVal is at 1e-8
+	//it will get bumped below
+	if(which < 0){
+		baseIncr = max(baseIncr, min_brlen);
+		}
 
 	//this first bit of checking and bumping used to use epsilon rather than the default baseIncr
 	assert(initialVal > lowBound - baseIncr && initialVal < highBound + baseIncr);
@@ -681,7 +703,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 			//if we're already very close to that bound, exit
 			//if(prevVal - lowerBracket - epsilon < epsilon * ZERO_POINT_FIVE){
 			if(curVal - (lowerBracket + closeToBound) <= ZERO_POINT_ZERO){
-				bool stayed = !CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
+				bool restored = CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
 /*
 				if(restored) outman.DebugMessage("LOW:took bestKnown: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 				else outman.DebugMessage("LOW:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
@@ -716,7 +738,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 		else if(d1 > ZERO_POINT_ZERO && proposed > upperBracket - veryCloseToBound){
 			//if we're already very close to that bound, exit
 			if(upperBracket - closeToBound - curVal <= ZERO_POINT_ZERO){
-				bool stayed = !CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
+				bool restored = CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
 //				if(restored) outman.DebugMessage("HIGH:took bestKnown: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 //				else outman.DebugMessage("HIGH:took current: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 #ifdef OPT_BOUNDED_LOG
@@ -749,7 +771,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 		//The expected amount of improvement from an NR move is low
 		//require that we didn't significantly worsen the likelihood overall or on the last pass
 		if(estImprove < optPrecision && curScore >= initialScore - 1.0e-6 && lastChange > -1.0e-6){
-			bool stayed = !CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
+			bool restored = CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
 /*			if(bestKnownScore > curScore)
 				outman.DebugMessage("IMPROVE:took best: init=%.6f cur=%.6f best=%.6f initV=%.6f curV=%.6f bestV=%.6f", initialScore, curScore, bestKnownScore, initialVal, curVal, bestKnownVal);
 			else
@@ -780,7 +802,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 
 		if((lowerBracket + closeToBound > proposed) && (upperBracket - closeToBound < proposed)){
 			//this means the point we moved to isn't > closeToBound from both bounds
-			bool stayed = !CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
+			bool restored = CheckScoreAndRestore(modnum, which, SetParam, curScore, curVal, bestKnownScore, bestKnownVal, (pass > 0 ? ZERO_POINT_ZERO : STEP_TOL));
 #ifdef OPT_BOUNDED_LOG
 				log << "\t" << bestKnownVal << "\treturn5" << (restored ? "_best" : "") << endl; log.close();
 #endif
@@ -1041,6 +1063,11 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 #ifdef BRENT
 	improve = BrentOptimizeBranchLength(optPrecision, nd, goodGuess);
 #else
+
+	//don't optimize the length of the entirely missing dummy branch
+	if(rootWithDummy && nd->nodeNum == numTipsTotal)
+		return 0.0;
+
 	//improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, goodGuess);
 	//abandoning use of goodGuess.  Doesn't seem to be reducing opt passes, which
 	//was the point.
