@@ -2810,9 +2810,6 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 		ordered << t << "\t" << -indiv[0].treeStruct->lnL << "\n";
 		ordered.close();
 
-		//DEBUG
-//		outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
-//		indiv[bestIndiv].modPart.OutputHumanReadableModelReportWithParams();
 		Individual *repResult = new Individual(&indiv[0]);
 		storedTrees.push_back(repResult);
 		Reset();

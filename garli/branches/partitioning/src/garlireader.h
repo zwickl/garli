@@ -47,6 +47,25 @@
 
 class ModelSpecification;
 
+//the reader is no longer derived from NexusBlock itself which was done such that it was it's own
+//custom block (a bit weird).  Garli block is separate entity now.
+class GarliBlock: public NxsBlock{
+    public:   
+        GarliBlock():NxsBlock(){
+			id ="GARLI";
+			}
+		NxsString modelString;
+		char *next_command;
+        void Read(NxsToken &token);
+        void HandleEndblock(NxsToken &token);
+		const NxsString GetModelString(){return modelString;}
+		bool ModelStringWasRead(){return modelString.empty() == false;}
+		void Clear() { modelString.clear();}
+		void Report(ostream &out) const;
+	//	void HandleNextCommand();
+//		void NexusError(NxsString msg, file_pos pos, long line, long col);
+    }; 
+
 /*----------------------------------------------------------------------------------------------------------------------
 |	GarliReader provides a template for creating a program that reads NEXUS data files and provides a basic command 
 |	line. After compiling GarliReader, you will already have a program that understands the following commands, either 
@@ -78,10 +97,6 @@ class ModelSpecification;
 |	This class handles reading and storage for the NxsReader block GarliReader. It also serves as the main class for 
 |	the program GarliReader, acting as both a NxsReader object (in order to be capable of parsing data files) as well 
 |	as a NxsBlock object (in order to be able to process commands in a GarliReader block). 
-|
-|	Acting as a NxsBlock, it overrides the member functions Read and Reset, which are virtual functions in the base 
-|	class NxsBlock. Acting as a NxsReader object, it overrides the member functions EnteringBlock, SkippingBlock, and 
-|	NexusError.
 |	
 |	Adding a new data member? Don't forget to:
 |~
@@ -94,9 +109,9 @@ class ModelSpecification;
 */
 
 class GarliReader
-  : public NxsBlock,
-  public MultiFormatReader
+  : public MultiFormatReader
 	{
+	friend class NxsBlock;
 	public:
 		static GarliReader & GetInstance();
 		enum UserQueryEnum		/* enumeration used with UserQuery member function to specify which choices to provide the user */
@@ -116,84 +131,69 @@ class GarliReader
 		void				ExecuteStopping();
 		void				OutputComment(const NxsString &msg);
 		void				HandleNextCommand();
-		void				NexusError(NxsString msg, file_pos pos, long line, long col);
+		void				NexusError(NxsString msg, file_pos pos, long line, long col){
+							NexusError(msg, pos, line, col, true);
+							}
+		void				NexusError(NxsString msg, file_pos pos, long line, long col, bool throwExcept);
 		void				PreprocessNextCommand();
 		void				PrintMessage(bool linefeed = true);
-		virtual void		Report(ostream &out);
+	//	virtual void		Report(ostream &out);
 		void				Run(char *infile_name);
 		void				SkippingBlock(NxsString blockName);
 		void				SkippingCommand(NxsString commandName);
 		void				SkippingDisabledBlock(NxsString blockName);
 		virtual bool		UserQuery(NxsString mb_message, NxsString mb_title, GarliReader::UserQueryEnum mb_choices = GarliReader::uq_ok);
 
-		//all of the following hacky stuff went by the wayside when moving to the new Reader than internally handles multiple
+		//a bunch of hacky stuff here got removed when going to the new NLC Factory API and deriving the reader
+		//from Multiformat Reader- I don't need to worry about multiple charblocks and such myself.  Many functions
+		//that were here are now further up in the inheritance chain and not part of my code
 		//char blocks
-	//	NxsTaxaBlock	*GetTaxaBlock(){return taxa;}
-	//	NxsTreesBlock	*GetTreesBlock(){return trees;}
-
-		//I've added the charBlocks vector of characters blocks below, which 
-		//acts as storage for multiple char blocks.  Normally muliple blocks
-		//just overwrite earlier ones.  The vector will be empty unless multiple
-		//char blocks are found, in which case each character block will be pushed
-		//into the vector just before the next one is read (this happens in EnteringBlock
-		//which is probably not the ideal place to put it).  When the GetCharacterBlock
-		//function is called it will return the blocks in the order that they were read,
-		//which means that the one is the "characters" field is actually last
-//FACTORY
-	/*		NxsCharactersBlock	*GetCharactersBlock(int i){
-			assert(i < charBlocks.size() + 1);
-			if(charBlocks.size() > 0){
-				if(i < charBlocks.size()) return charBlocks[i];
-				else return characters;
-				}
-			return characters;
-			}
-		int NumCharBlocks() {return charBlocks.size() + 1;}
-*/
+	
 	protected:
-
 		bool				inf_open;			/* true if `inf' is currently open */
 		bool				logf_open;			/* true if `logf' is currently open */
 		bool				quit_now;			/* set to false at beginning of Run and turns true only when QUIT command processed */
 		ofstream			logf;				/* the log file output stream */
 		NxsString			message;			/* workspace for composing output strings */
+		//none of these should be getting used with the new Factory/MultiformatReader system
 		NxsTreesBlock		*trees;				/* pointer to NxsTreesBlock object */
 		NxsTaxaBlock		*taxa;				/* pointer to NxsTaxaBlock object */
 		NxsAssumptionsBlock	*assumptions;		/* pointer to NxsAssumptionsBlock object */
 		NxsDistancesBlock	*distances;			/* pointer to NxsDistancesBlock object */
 		NxsCharactersBlock	*characters;		/* pointer to NxsCharactersBlock object */
-		vector<NxsCharactersBlock *> charBlocks; 
 		NxsDataBlock		*data;				/* pointer to NxsDataBlock object */
+		//this still is being used
+		GarliBlock			*garliBlock;
 
+		NxsString			errormsg;
 		char				*next_command;		/* workspace for processing next command entered interactively by user */
-		NxsString			modelString;
 
-		unsigned			CharLabelToNumber(NxsString s);
+		unsigned			CharLabelToNumber(NxsString s) const;
 		bool				FileExists(const char* fn) const;
 		bool				FileIsNexus(const char *name) const;
 		bool				FileIsFasta(const char *name) const;
 		int					GetToken( FILE *in, char* tokenbuf, int maxlen) const;
 		NxsString			GetFileName(NxsToken& token);
-		void				FactoryDefaults();
 		void				HandleEndblock(NxsToken& token);
 		void				HandleShow(NxsToken& token);
 		void				HandleHelp(NxsToken& token);
 		void				HandleLog(NxsToken& token);
 		void				HandleExecute(NxsToken& token);
-		void				PurgeBlocks();
-		virtual void		Read(NxsToken& token);
-		virtual void		Reset();
-		void HandleGarliReader(NxsToken &token);
+		void				HandleGarliReader(NxsToken &token);
 
 	public:
 		int				HandleExecute(const char *filename, bool purge);
-		const char*			GetModelString(){
-			return modelString.c_str();
-			}
-		bool FoundModelString() {return modelString.length() > 0;}
-		void ClearModelString() {modelString.clear();}
-		void ResetReader(){ FactoryDefaults();}
+		string			GetModelString(){
+							return garliBlock->GetModelString();
+							}
+		bool FoundModelString() {return garliBlock->ModelStringWasRead();}
+		void ClearModelString() {garliBlock->Clear();}
+
+		//this removes and deallocates everything in the reader and gets it ready
+		//for further reading
+		void ClearContent();
 		bool ReadData(const char* filename, const ModelSpecification &modspec);
+		const NxsCharactersBlock *CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec) const;
 		};
 
 /*----------------------------------------------------------------------------------------------------------------------
