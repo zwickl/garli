@@ -652,19 +652,23 @@ public:
 		CODON = 2, 
 		NSTATE= 3,
 		NSTATEV = 4,
-		ORIENTEDGAP = 5
+		ORDNSTATE = 5,
+		ORDNSTATEV = 6,
+		ORIENTEDGAP = 7
 		}readAs, usedAs;
 	int totalCharacters;
 	int uniqueCharacters;
-	string outputNames[6];//{"Nucleotide data", "Amino acid data", "Codon data"};
+	string outputNames[8];//{"Nucleotide data", "Amino acid data", "Codon data"};
 	DataSubsetInfo(int gssNum, int cbNum, string cbName, int psNum, string psName, type rAs, type uAs) :
 		garliSubsetNum(gssNum), charblockNum(cbNum), charblockName(cbName), partitionSubsetNum(psNum), partitionSubsetName(psName), readAs(rAs), usedAs(uAs){
-			outputNames[0]="Nucleotide data";
-			outputNames[1]="Amino acid data";
-			outputNames[2]="Codon data";
-			outputNames[3]="Standard k-state data";
-			outputNames[4]="Standard k-state data, variable only";
-			outputNames[5]="Gap-coded data, oriented with respect to time";
+			outputNames[NUCLEOTIDE]="Nucleotide data";
+			outputNames[AMINOACID]="Amino acid data";
+			outputNames[CODON]="Codon data";
+			outputNames[NSTATE]="Standard k-state data";
+			outputNames[NSTATEV]="Standard k-state data, variable only";
+			outputNames[ORDNSTATE]="Standard ordered k-state data";
+			outputNames[ORDNSTATEV]="Standard ordered k-state data, variable only";
+			outputNames[ORIENTEDGAP]="Gap-coded data, oriented with respect to time";
 			}
 	void Report(){
 		outman.UserMessage("GARLI partition subset %d", garliSubsetNum+1);
@@ -800,7 +804,7 @@ inline char NStateData::DatumToChar( unsigned char d ){
 class OrientedGapData : public NStateData{
 	public:
 		OrientedGapData() : NStateData(){
-			maxNumStates = 3;
+			maxNumStates = 2;
 			}
 		OrientedGapData(int ns) : NStateData(){
 			assert(0);

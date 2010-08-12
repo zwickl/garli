@@ -46,6 +46,11 @@ class ErrorException{
 		fprintf(out, "ERROR!: %s\n\n", message);
 		}
 	};
-	
+
+class UnscoreableException{
+public:
+	UnscoreableException(){};
+	};
+
 #endif
 
