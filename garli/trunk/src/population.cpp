@@ -2813,8 +2813,12 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 		ordered.precision(10);
 		ordered << t << "\t" << -indiv[0].treeStruct->lnL << "\n";
 		ordered.close();
+
+		Individual *repResult = new Individual(&indiv[0]);
+		storedTrees.push_back(repResult);
 		Reset();
 		}
+	EvaluateStoredTrees(true);
 	}
 
 void Population::VariableStartingTreeOptimization(bool reducing){
