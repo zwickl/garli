@@ -314,7 +314,10 @@ public:
 		CODONAMINOACID = 4,
 		NSTATE = 5,
 		NSTATEV = 6,
-		ORIENTEDGAP = 7
+		ORDNSTATE = 7,
+		ORDNSTATEV = 8,
+		ORIENTEDGAP = 9
+
 		}datatype;
 	
 	enum{
@@ -376,8 +379,12 @@ public:
 	bool IsAminoAcid() const {return (datatype == AMINOACID || datatype == CODONAMINOACID);}//for most purposes codon-aminoacid should be considered AA
 	bool IsCodonAminoAcid() const {return datatype == CODONAMINOACID;}
 	bool IsNState() const {return datatype == NSTATE;}
+	bool IsOrderedNState() const {return datatype == ORDNSTATE;}
 	bool IsNStateV() const {return datatype == NSTATEV;}
+	bool IsOrderedNStateV() const {return datatype == ORDNSTATEV;}
 	bool IsOrientedGap() const {return datatype == ORIENTEDGAP;}
+
+	bool IsStandardData() const {return datatype == NSTATE || datatype == NSTATEV || datatype == ORDNSTATE || datatype == ORDNSTATEV;}
 
 	bool GotAnyParametersFromFile() const{
 		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile;
@@ -453,8 +460,26 @@ public:
 		fixStateFreqs=true;
 		}
 
+	void SetOrderedNState(){
+		datatype = ORDNSTATE;
+		rateMatrix = NST1;
+		stateFrequencies = EQUAL;
+		nstates = -1; //this will need to be reset later 
+		fixRelativeRates=true;
+		fixStateFreqs=true;
+		}
+
 	void SetNStateV(){
 		datatype = NSTATEV;
+		rateMatrix = NST1;
+		stateFrequencies = EQUAL;
+		nstates = -1; //this will need to be reset later 
+		fixRelativeRates=true;
+		fixStateFreqs=true;
+		}
+
+	void SetOrderedNStateV(){
+		datatype = ORDNSTATEV;
 		rateMatrix = NST1;
 		stateFrequencies = EQUAL;
 		nstates = -1; //this will need to be reset later 
@@ -743,8 +768,10 @@ public:
 		else if(_stricmp(str, "nucleotide") == 0) str;
 		else if(_stricmp(str, "nstate") == 0) SetNState();
 		else if(_stricmp(str, "standard") == 0) SetNState();
+		else if(_stricmp(str, "orderedstandard") == 0) SetOrderedNState();
 		else if(_stricmp(str, "mk") == 0) SetNState();
 		else if(_stricmp(str, "standardvariable") == 0) SetNStateV();
+		else if(_stricmp(str, "orderedstandardvariable") == 0) SetOrderedNStateV();
 		else if(_stricmp(str, "mkv") == 0) SetNStateV();
 		else if(_stricmp(str, "orientedgap") == 0) SetOrientedGap();
 		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna, binary, nstate)", str));
@@ -857,6 +884,9 @@ class Model{
 	FLOAT_TYPE *alpha;
 	FLOAT_TYPE *propInvar;
 
+	FLOAT_TYPE insertRate;
+	FLOAT_TYPE deleteRate;
+
 	//variables used for the eigen process if nst=6
 	int *iwork, *indx;
 	MODEL_FLOAT **eigvals, *eigvalsimag, ***eigvecs, ***inveigvecs, **teigvecs, *work, *temp, *col, **c_ijk, *EigValexp, *EigValderiv, *EigValderiv2;
@@ -927,6 +957,7 @@ class Model{
 	void CalcSynonymousBranchlengthProportions(vector<FLOAT_TYPE> &results);
 	void UpdateQMatAminoAcid();
 	void UpdateQMatNState();
+	void UpdateQMatOrderedNState();
 	void DiscreteGamma(FLOAT_TYPE *, FLOAT_TYPE *, FLOAT_TYPE);
 	bool IsModelEqual(const Model *other) const ;	
 	void CopyModel(const Model *from);
@@ -981,7 +1012,12 @@ class Model{
 	bool IsOrientedGap() const {return modSpec->IsOrientedGap();}
 	bool IsNState() const {return modSpec->IsNState();}
 	bool IsNStateV() const {return modSpec->IsNStateV();}
+	bool IsOrderedNState() const {return modSpec->IsOrderedNState();}
+	bool IsOrderedNStateV() const {return modSpec->IsOrderedNStateV();}
 	const ModelSpecification *GetModSpec() const {return modSpec;}
+
+	FLOAT_TYPE AbsenceFrequency() const {return (1.0 / ((insertRate / deleteRate) + 1.0));}
+	FLOAT_TYPE PresenceFrequency() const {return (insertRate / deleteRate) / ((insertRate / deleteRate) + 1.0);}
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
@@ -1691,6 +1727,7 @@ public:
 			}
 		}
 
+	void ReadParameterValues(string &modstr);
 	};
 
 typedef void (Model::*SetParamFunc) (int, FLOAT_TYPE);

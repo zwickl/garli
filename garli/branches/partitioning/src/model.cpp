@@ -227,12 +227,19 @@ void Model::UpdateQMat(){
 		UpdateQMatCodon();
 		return;
 		}
+	else if(modSpec->IsOrientedGap()){
+		return;
+		}	
 	else if(modSpec->IsAminoAcid()){
 		UpdateQMatAminoAcid();
 		return;
 		}
 	else if(modSpec->IsNState() || modSpec->IsNStateV()){
 		UpdateQMatNState();
+		return;
+		}
+	else if(modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV()){
+		UpdateQMatOrderedNState();
 		return;
 		}
 	
@@ -725,6 +732,31 @@ void Model::UpdateQMatNState(){
 	blen_multiplier[0] = ONE_POINT_ZERO / weightedDiagSum;
 	}
 
+void Model::UpdateQMatOrderedNState(){
+	for(int from=0;from<nstates;from++)
+		for(int to=0;to<nstates;to++){
+			if(abs(from - to) == 1)
+				qmat[0][from][to] = *stateFreqs[to];
+			else
+				qmat[0][from][to] = ZERO_POINT_ZERO;
+			}
+
+	//set diags to sum rows to 0 and calculate the branch length rescaling factor
+	double sum, weightedDiagSum = 0.0;
+	blen_multiplier[0] = 0.0;
+
+	for(int from=0;from<nstates;from++){
+		//qmat[0][from][from] = 0.0;
+		sum = 0.0;
+		for(int to=0;to<nstates;to++){
+			if(from != to) sum += qmat[0][from][to];
+			}
+		qmat[0][from][from] = -sum;
+		weightedDiagSum += sum * *stateFreqs[from];
+		}
+	blen_multiplier[0] = ONE_POINT_ZERO / weightedDiagSum;
+	}
+
 void Model::CalcEigenStuff(){
 	ProfCalcEigen.Start();
 	//if rate params or statefreqs have been altered, requiring the recalculation of the eigenvectors and c_ijk
@@ -801,9 +833,28 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 
 void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 
-	double rateI = 0.2;
-	double rateD = 0.1;
+	//insertion rate
+	double lambda = 0.2;
+	//deletion rate
+	double mu = 0.1;
 	
+	double expLam = exp(-lambda * blen);
+	double expMu  = exp(-mu * blen);
+
+	//worked out with Mark
+	mat[0][0][0] = expLam;
+	mat[0][0][1] = ((expLam - expMu) * lambda) / (mu - lambda); 
+	mat[0][0][2] = (mu - (mu * expLam) + (expMu - 1.0) * lambda) / (mu - lambda);
+	
+	mat[0][1][1] = expMu;	
+	mat[0][1][2] = 1.0 - expMu;
+	
+	mat[0][2][2] = 1.0;
+	
+	mat[0][1][0] = mat[0][2][0] =  mat[0][2][1] = ZERO_POINT_ZERO;
+
+/*	
+ //my initial attempt at this
 	int ns = 3;
 
 	//insertions 0 -> 1
@@ -822,7 +873,7 @@ void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 	mat[0][2][2] = 1.0;
 
 	mat[0][0][2] = mat[0][1][0] = mat[0][2][0] =  mat[0][2][1] = ZERO_POINT_ZERO;
-
+*/
 /*
 	//insertions 0 -> 1
 	**mat[0 * ns + 1] = 1.0 - exp(-rateI * blen);
@@ -1212,7 +1263,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 				}
 			}
 		}
-	else if(modSpec->IsNState() || modSpec->IsNStateV()){
+	else if(modSpec->IsStandardData()){
 		for(int rate=0;rate<NRateCats();rate++){
 			int model=0;
 			const unsigned rateOffset = nstates*rate;
@@ -2040,6 +2091,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		outman.UserMessage("  Number of states = 20 (amino acid data)");
 	else if(modSpec->IsNState() || modSpec->IsNStateV())
 		outman.UserMessage("  Number of states = %d (standard data)", nstates);
+	else if(modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV())
+		outman.UserMessage("  Number of states = %d (ordered standard data)", nstates);
 	else if(modSpec->IsOrientedGap())
 		outman.UserMessage("  Number of states = 2 (gap encoding, # states = 3 with unobserved state)", nstates);
 	else
@@ -2078,6 +2131,12 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 	else if(modSpec->IsNStateV()){
 		outman.UserMessage("  Character change matrix:\n    One rate (symmetric one rate Mkv model)");
 		}
+	else if(modSpec->IsOrderedNState()){
+		outman.UserMessage("  Character change matrix:\n    One rate (ordered symmetric one rate Mk model)");
+		}
+	else if(modSpec->IsOrderedNStateV()){
+		outman.UserMessage("  Character change matrix:\n    One rate (ordered symmetric one rate Mkv model)");
+		}
 	else if(modSpec->IsOrientedGap()){
 		outman.UserMessage("  Character change matrix:\n    irreversible matrix, insertion rate and deletion rate parameters");
 		}
@@ -2091,10 +2150,10 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 			}
 		else if(modSpec->IsAminoAcid())
 			outman.UserMessage("equal (0.05, fixed)");
-		else if(modSpec->IsNState() || modSpec->IsNStateV())
+		else if(modSpec->IsStandardData())
 			outman.UserMessage("equal (%.2f, fixed)", 1.0/nstates);
 		else if(modSpec->IsOrientedGap()){
-			outman.UserMessage("equal (for now) (uninserted = inserted = deleted)");
+			outman.UserMessage("determined by insertion and deletion rates");
 			}
 		else 
 			outman.UserMessage("equal (0.25, fixed)");
@@ -2405,6 +2464,11 @@ void Model::CreateModelFromSpecification(int modnum){
 	
 	else nst = -1;
 
+	if(IsOrientedGap()){
+		insertRate = 0.1;
+		deleteRate = 0.2;
+		}
+
 	nRateCats = modSpec->numRateCats;
 	
 	//deal with rate het models
@@ -2582,7 +2646,7 @@ void Model::CreateModelFromSpecification(int modnum){
 		//require the Eigen stuff	
 
 	if(modSpec->IsNucleotide()) UpdateQMat();
-	else if(modSpec->IsNState() || modSpec->IsNStateV() || modSpec->IsOrientedGap()){
+	else if(modSpec->IsStandardData() || modSpec->IsOrientedGap()){
 		//NSTATE - nothing needs to be done here right now
 		}
 	else if(modSpec->IsCodon()){
@@ -4068,4 +4132,39 @@ int ModelPartition::PerformModelMutation(){
 		retType=Individual::subsetRate;
 		}
 	return retType;
+	}
+
+void ModelPartition::ReadParameterValues(string &modstr){
+	NxsString mod(modstr.c_str());
+	NxsString::to_lower(mod);
+
+	//now, read through the string, figuring out where each of the model strings start and end, and what numbers they are
+	int start = mod.find("model");
+	if(start != 0)
+		throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tmodel# <garli formatted param string> model# etc.\n\tThe first model is model0");
+	mod.erase(0, 5);
+	int space = mod.find(" ");
+	string num = mod.substr(0, space - 1);
+	int modNum = atoi(num.c_str());
+	mod.erase(0, space);
+	
+	//now we've eaten off everything up to the actual model string.  figure out where it ends for this model.
+	int end = mod.find("model");
+	if(end > mod.length())
+		end = mod.length() - 1;
+	string thismod = mod.substr(0, end);
+	mod.erase(0, end);
+	GetModelSet(modNum)->GetModel(0)->ReadGarliFormattedModelString(thismod);
+
+/*
+	char str[50];
+
+	strncpy(str, modString.c_str(), 5);
+	str[5] = '\0';
+	if(_stricmp(str, "model") != 0){
+		throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tmodel# <garli formatted param string> model# etc.\n\tThe first model is model0");
+		}
+	modPart.ReadParameterValues(modString);
+	modPart.GetModelSet(0)->GetModel(0)->ReadGarliFormattedModelString(modString);
+*/	
 	}
