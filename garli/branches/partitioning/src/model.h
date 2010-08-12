@@ -376,6 +376,7 @@ public:
 
 	bool IsCodon() const {return datatype == CODON;}
 	bool IsNucleotide() const {return (datatype == DNA || datatype == RNA);}
+	bool IsRna() const {return (datatype == RNA);} //rna will be treated identically to dna almost everywhere, but it might be good to know when reading
 	bool IsAminoAcid() const {return (datatype == AMINOACID || datatype == CODONAMINOACID);}//for most purposes codon-aminoacid should be considered AA
 	bool IsCodonAminoAcid() const {return datatype == CODONAMINOACID;}
 	bool IsNState() const {return datatype == NSTATE;}
