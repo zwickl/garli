@@ -497,8 +497,8 @@ int main( int argc, char* argv[] )	{
 					modSpec = modSpecSet.GetModSpec(0);
 					claSpecs.push_back(ClaSpecifier(0,0,0));
 					}
-				if(conf.linkModels && (modSpec->IsNState() || modSpec->IsNState()))
-					throw ErrorException("Model linkage cannot be used with Mk/Mkv models (nor does it\n\tneed to be, since there are no estimated parameters.\n\tSet linkmodels = 0");
+				if(conf.linkModels && (modSpec->IsStandardData() || modSpec->IsOrientedGap()))
+					throw ErrorException("Model linkage cannot be used with Mk/Mkv models (nor does it\n\tneed to be, since there are no estimated parameters).\n\tSet linkmodels = 0");
 
 				//defaults here are NUCLEOTIDE, so make changes as necessary
 				if(modSpec->IsCodon()) 
@@ -511,6 +511,10 @@ int main( int argc, char* argv[] )	{
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATE;
 				else if(modSpec->IsNStateV())
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATEV;
+				else if(modSpec->IsOrderedNState())
+					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORDNSTATE;
+				else if(modSpec->IsOrderedNStateV())
+					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORDNSTATEV;
 				else if(modSpec->IsOrientedGap())
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORIENTEDGAP;
 
@@ -523,9 +527,9 @@ int main( int argc, char* argv[] )	{
 				int actuallyUsedImpliedMatrixIndex = 0;
 				int maxObservedStates = effectiveMatrices[dataChunk].first->GetMaxObsNumStates(false);
 				//for Mk the impliedMatrix number is the number of states
-				for(int impliedMatrix = 2;impliedMatrix < ((modSpec->IsNState() || modSpec->IsNStateV()) ? maxObservedStates + 1 : 3);impliedMatrix++){
-					if(modSpec->IsNState() || modSpec->IsNStateV())
-						data = new NStateData(impliedMatrix, modSpec->IsNStateV());
+				for(int impliedMatrix = 2;impliedMatrix < (modSpec->IsStandardData() ? maxObservedStates + 1 : 3);impliedMatrix++){
+					if(modSpec->IsStandardData())
+						data = new NStateData(impliedMatrix, (modSpec->IsNStateV() || modSpec->IsOrderedNStateV()));
 					else if(modSpec->IsOrientedGap())
 						data = new OrientedGapData();
 					else if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
@@ -546,12 +550,12 @@ int main( int argc, char* argv[] )	{
 						//totally excluded subsets, but that gets complicated because it
 						//isn't clear how the indexing of models specified in the config
 						//file should work
-						assert(modSpec->IsNState() || modSpec->IsNStateV());
+						assert(modSpec->IsStandardData());
 						outman.UserMessage("NOTE: No characters found with %d observed states.", impliedMatrix);
 						delete data;
 						}
 					else{//now we have a data matrix object created, already filtered for the correct sites or number of states
-						if(modSpec->IsNState() || modSpec->IsNStateV()){
+						if(modSpec->IsStandardData()){
 #ifdef OPEN_MP
 							throw ErrorException("Sorry, discrete Mk type models cannot currently be used with the OpenMP version");
 #endif
@@ -620,13 +624,13 @@ int main( int argc, char* argv[] )	{
 				
 						dataPart.AddSubset(data);
 
-						if(modSpec->IsNState() || modSpec->IsNStateV())
+						if(modSpec->IsStandardData())
 							outman.UserMessage("Subset of data with %d states:", impliedMatrix);
 
 						//this accounts for the dummy character stuck into each data subset
 						//for Mkv.  We don't want the screen output to include it.
 						int mkvDiff = 0;
-						if(modSpec->IsNStateV()) mkvDiff = 1;
+						if(modSpec->IsNStateV() || modSpec->IsOrderedNStateV()) mkvDiff = 1;
 
 						data->Summarize();
 						outman.UserMessage("\tSummary of data or data subset:");
@@ -653,7 +657,7 @@ int main( int argc, char* argv[] )	{
 						//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 						data->ReserveOriginalCounts();
 						
-						if(!modSpec->IsNState() && !modSpec->IsNStateV())
+						if(!(modSpec->IsStandardData() || modSpec->IsOrientedGap()))
 							data->DetermineConstantSites();
 						}
 					}

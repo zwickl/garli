@@ -131,57 +131,66 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 			}
 		}
 
-	if(r <= adap->topoMutateProb){
-	  r = rnd.uniform();
-	  if(r<adap->limSPRprob){
-	    int reconDist = treeStruct->TopologyMutator(optPrecision, adap->limSPRrange, 0);
-		if(reconDist == 1 || reconDist == -1) mutation_type |= randNNI;
-	    else if(reconDist < 0) mutation_type |= limSPRCon;
-		else  mutation_type |= limSPR;
-	    if(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1.0e-8)){
-		    fitness=treeStruct->lnL;
-		    dirty=false;
-		    }
-   		else dirty=true;
-	  }
-	  else if (r< adap->randSPRprob + adap->limSPRprob){
-	    int reconDist = treeStruct->TopologyMutator(optPrecision, -1, 0);
-		if(reconDist < 0){
-			if(reconDist == -1) mutation_type |= randNNI;
-			else if(reconDist < -1 * (int)adap->limSPRrange) mutation_type |= randSPRCon;
-			else mutation_type |= limSPRCon;
+	try{
+		if(r <= adap->topoMutateProb){
+		  r = rnd.uniform();
+		  if(r<adap->limSPRprob){
+			int reconDist = treeStruct->TopologyMutator(optPrecision, adap->limSPRrange, 0);
+			if(reconDist == 1 || reconDist == -1) mutation_type |= randNNI;
+			else if(reconDist < 0) mutation_type |= limSPRCon;
+			else  mutation_type |= limSPR;
+			if(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1.0e-8)){
+				fitness=treeStruct->lnL;
+				dirty=false;
+				}
+   			else dirty=true;
+		  }
+		  else if (r< adap->randSPRprob + adap->limSPRprob){
+			int reconDist = treeStruct->TopologyMutator(optPrecision, -1, 0);
+			if(reconDist < 0){
+				if(reconDist == -1) mutation_type |= randNNI;
+				else if(reconDist < -1 * (int)adap->limSPRrange) mutation_type |= randSPRCon;
+				else mutation_type |= limSPRCon;
+				}
+			else {
+				if(reconDist == 1) mutation_type |= randNNI;
+				else if(reconDist >  (int) adap->limSPRrange) mutation_type |= randSPR;
+				else mutation_type |= limSPR;
+				}
+			if(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1.0e-8)){
+				fitness=treeStruct->lnL;
+				dirty=false;
+				}
+			else dirty=true;
+		  } 
+		  else {
+			treeStruct->TopologyMutator(optPrecision, 1, 0);
+			mutation_type |= randNNI;
+   			if(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1.0e-8)){
+				fitness=treeStruct->lnL;
+				dirty=false;
+				}
+			else dirty=true;
+		  }
+		} // end if of topomutation
+		
+		//model mutations
+		else if( r < adap->modelMutateProb + adap->topoMutateProb){
+			mutation_type |= modPart.PerformModelMutation();
+			treeStruct->MakeAllNodesDirty();
+			dirty = true;
 			}
-		else {
-			if(reconDist == 1) mutation_type |= randNNI;
-			else if(reconDist >  (int) adap->limSPRrange) mutation_type |= randSPR;
-			else mutation_type |= limSPR;
-			}
-	    if(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1.0e-8)){
-		    fitness=treeStruct->lnL;
-		    dirty=false;
-		    }
-		else dirty=true;
-	  } 
-	  else {
-		treeStruct->TopologyMutator(optPrecision, 1, 0);
-		mutation_type |= randNNI;
-   	    if(!FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1.0e-8)){
-		    fitness=treeStruct->lnL;
-		    dirty=false;
-		    }
-		else dirty=true;
-	  }
-	} // end if of topomutation
-	
-	//model mutations
-	else if( r < adap->modelMutateProb + adap->topoMutateProb){
-		mutation_type |= modPart.PerformModelMutation();
-		treeStruct->MakeAllNodesDirty();
-		dirty = true;
-		}
 
-	//be sure that we have an accurate score before any CLAs get invalidated
-	CalcFitness(0);
+		//be sure that we have an accurate score before any CLAs get invalidated
+		CalcFitness(0);
+		}
+	catch(UnscoreableException ex){
+		//in some situations the tree just underflows no matter what - I've only seen this and only
+		//throw this from orientedGap models with very poor trees.
+		outman.DebugMessage("WARNING - created individual deemed unscorable!");
+		treeStruct->lnL = -FLT_MAX;
+		SetFitness(-FLT_MAX);
+		}
 
 /*	FLOAT_TYPE lnL = fitness;
 	dirty = true;
@@ -542,8 +551,9 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 			modString += c;
 			//}while(c != '(' && c != '\r' && c != '\n' && !stf.eof());
 			}while(stf.peek() != '(' && stf.peek() != '\r' && stf.peek() != '\n' && !stf.eof());
-		while((stf.peek() == '\n' || stf.peek() == '\r') && stf.eof() == false) stf.get(c);
-		modPart.GetModelSet(0)->GetModel(0)->ReadGarliFormattedModelString(modString);
+		while((stf.peek() == '\n' || stf.peek() == '\r') && stf.eof() == false) 
+			stf.get(c);
+		modPart.ReadParameterValues(modString);
 		}
 
 	if(foundTree==true){
@@ -676,6 +686,20 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			optSubsetRates = true;
 		}
 
+	//DEBUG
+/*
+	outman.UserMessage("Scoring at nodes across tree...");
+	Tree::useOptBoundedForBlen = true;
+	treeStruct->sitelikeLevel = 1;
+	treeStruct->ofprefix = "orientgap";
+	for(int i = treeStruct->NTax() + 1;i < treeStruct->NTax() * 2 - 2;i++){
+		Tree::effectiveRootNode = i;
+		treeStruct->Score(i);
+		outman.UserMessage("node %d score %f", i, treeStruct->lnL);
+		treeStruct->sitelikeLevel = -1;
+		}
+*/	
+		
 	outman.UserMessageNoCR("optimizing: starting branch lengths");
 	if(optAlpha) outman.UserMessageNoCR(", alpha shape");
 	if(optPinv) outman.UserMessageNoCR(", prop. invar");

@@ -252,9 +252,13 @@ class Tree{
 		void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, int modIndex, int dataIndex);
 		void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, int modIndex, int dataIndex);
 		void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex);
-		
+/*		
 		void CalcFullCLATerminalTerminalOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex);
 		void CalcFullCLAInternalTerminalOrientedGap(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, int modIndex, int dataIndex);
+		void CalcFullCLAInternalInternalOrientedGap(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, int modIndex, int dataIndex);
+*/
+		//new version that should work for any node - for each child data or a CLA will be passed in
+		void CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const char *Ldata, const char *Rdata, int modIndex, int dataIndex);
 
 		void UpdateCLAs(CondLikeArraySet *destCLA, CondLikeArraySet *firstCLA, CondLikeArraySet *secCLA, TreeNode *firstChild, TreeNode *secChild, FLOAT_TYPE blen1, FLOAT_TYPE blen2);
 		void GetTotalScore(CondLikeArraySet *partialCLA, CondLikeArraySet *childCLA, TreeNode *child, FLOAT_TYPE blen1);
@@ -318,7 +322,7 @@ class Tree{
 		inline CondLikeArraySet *GetClaUpLeft(TreeNode *nd, bool calc=true);
 		inline CondLikeArraySet *GetClaUpRight(TreeNode *nd, bool calc=true);
 		void OutputValidClaIndeces();
-		void OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site);
+		void OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int modIndex);
 		void ClaReport(ofstream &cla);
 		FLOAT_TYPE CountClasInUse();
 		void OutputSiteLikelihoods(int partnum, vector<double> &likes, const int *under1, const int *under2);
