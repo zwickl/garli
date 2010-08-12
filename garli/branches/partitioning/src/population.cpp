@@ -396,7 +396,7 @@ void Population::CheckForIncompatibleConfigEntries(){
 
 	if(conf->inferInternalStateProbs && conf->bootstrapReps > 0) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
 	for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
-		if(modSpecSet.GetModSpec(ms)->IsNStateV() && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
+		if((modSpecSet.GetModSpec(ms)->IsNStateV()  || modSpecSet.GetModSpec(ms)->IsOrderedNStateV()) && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
 			throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used if\n\tthe Mkv model (datatype = standardvariable) is used for any data.\n\tTry streefname = random.");
 		}
 	}
@@ -1201,6 +1201,8 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		//first.  This caused the stepwise to be slow, and to not be reproducible when the seed from a rep > 1 was specified
 		//as the initial seed for a new run
 		globalBest = ZERO_POINT_ZERO;
+		//DEBUG - haven't worked this out with the rooted tree yet, since the fake root needs to be in the tree before it is scored
+		assert(!indiv[0].treeStruct->rootWithDummy);
 		indiv[0].MakeStepwiseTree(dataPart->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 		}
 	else if(_stricmp(conf->streefname.c_str(), "random") == 0 || indiv[0].treeStruct == NULL){
@@ -1237,7 +1239,14 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	
 	indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->modPart=&indiv[0].modPart;
-	indiv[0].CalcFitness(0);
+	
+	try{
+		indiv[0].CalcFitness(0);
+		}
+	catch(UnscoreableException ex){
+		throw ErrorException("Initial individual unscorable, perhaps due to poorness of starting tree.\n\tTry providing a tree if you previously tried random.");
+		}
+	
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
 	//if(indiv[0].mod->NumMutatableParams() == 0) {
@@ -1770,7 +1779,8 @@ void Population::Run(){
 				if(modSpecSet.InferSubsetRates()){
 					improve += bestTree->OptimizeSubsetRates(adap->branchOptPrecision);
 					}
-				outman.UserMessage("   Optimizing parameters...    improved %8.3f lnL", improve);
+				if(!(FloatingPointEquals(adap->modWeight, 0.0, 1e-8)))
+					outman.UserMessage("   Optimizing parameters...    improved %8.3f lnL", improve);
 				/////
 
 				FLOAT_TYPE before=bestFitness;
@@ -2613,7 +2623,7 @@ void Population::PerformSearch(){
 			indiv[bestIndiv].treeStruct->Score();
 			ordered.open(oname.c_str(), ios::app);
 			ordered.precision(12);
-			ordered << currentSearchRep << "\t" << indiv[bestIndiv].treeStruct->lnL << "\n";
+			ordered << currentSearchRep << "\t" << -indiv[bestIndiv].treeStruct->lnL << "\n";
 			ordered.close();
 			}
 
@@ -2769,7 +2779,8 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	//find out how many trees we have
 	GarliReader & reader = GarliReader::GetInstance();
 	const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
-	assert(treesblock != NULL);
+	if(treesblock == NULL)
+		throw ErrorException("You must specify a treefile to use this runmode.");
 	int numTrees = treesblock->GetNumTrees();
 
 	string oname = conf->ofprefix + ".sitelikes.log";
@@ -2798,8 +2809,15 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 		ordered.precision(10);
 		ordered << t << "\t" << -indiv[0].treeStruct->lnL << "\n";
 		ordered.close();
+
+		//DEBUG
+//		outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
+//		indiv[bestIndiv].modPart.OutputHumanReadableModelReportWithParams();
+		Individual *repResult = new Individual(&indiv[0]);
+		storedTrees.push_back(repResult);
 		Reset();
 		}
+	EvaluateStoredTrees(true);
 	}
 
 void Population::VariableStartingTreeOptimization(bool reducing){
