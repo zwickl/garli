@@ -2423,7 +2423,7 @@ int Population::EvaluateStoredTrees(bool report){
 					}
 				}
 //			}
-		if(conf->bootstrapReps == 0){
+		if(conf->bootstrapReps == 0 && conf->runmode != 11){
 			outman.UserMessage("\nFinal result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
 			outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
 			}
