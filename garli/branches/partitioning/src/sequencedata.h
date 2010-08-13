@@ -48,7 +48,6 @@ protected:
 	virtual int	NumStates(int) const { return 4; }
 
 public:
-	virtual void CreateMatrixFromNCL(NxsCharactersBlock *) = 0;
 	virtual void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
 	virtual void CalcEmpiricalFreqs() = 0;
 	virtual void GetEmpiricalFreqs(FLOAT_TYPE *f) const{
@@ -185,7 +184,6 @@ public:
 
 	unsigned char CharToDatum(char d);
 	void CalcEmpiricalFreqs();
-	void CreateMatrixFromNCL(NxsCharactersBlock *);
 	void CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset);
 	void MakeAmbigStrings();
 	char *GetAmbigString(int i) const{
@@ -565,12 +563,7 @@ public:
 		assert(0);
 		return 0;
 		}
-	void CreateMatrixFromNCL(NxsCharactersBlock *){
-		//this also should not be getting called.  The codon matrix
-		//is created from a DNA matrix that has been read in, possibly
-		//by the NCL
-		assert(0);
-		}
+
 	void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset){
 		//this also should not be getting called.  The codon matrix
 		//is created from a DNA matrix that has been read in, possibly
@@ -611,7 +604,6 @@ public:
 	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code);
 	void CalcEmpiricalFreqs();
 	unsigned char CharToDatum(char d);
-	void CreateMatrixFromNCL(NxsCharactersBlock *);
 	void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
 	};
 
@@ -688,7 +680,6 @@ class BinaryData : public SequenceData{
 
 		unsigned char CharToDatum(char d);
 		char DatumToChar( unsigned char d );
-		void CreateMatrixFromNCL(NxsCharactersBlock *);
 		void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
@@ -730,23 +721,32 @@ class NStateData : public SequenceData{
 			ALL = 0,
 			ONLY_VARIABLE = 1,
 			ONLY_INFORM = 2
-			}type;
+			}datatype;
+		enum{
+			UNORDERED = 0,
+			ORDERED = 1
+			}modeltype;
 		NStateData() : SequenceData(){
 			maxNumStates = 99;
 			}
 		NStateData(int ns) : SequenceData(){
 			maxNumStates = ns;
 			}
-		NStateData(int ns, bool isMkv) : SequenceData(){
-			if(isMkv)type = ONLY_VARIABLE;
-			else type = ALL;
+		NStateData(int ns, bool isMkv, bool isOrdered) : SequenceData(){
+			if(isMkv)
+				datatype = ONLY_VARIABLE;
+			else 
+				datatype = ALL;
+			if(isOrdered)
+				modeltype = ORDERED;
+			else
+				modeltype = UNORDERED;
 			maxNumStates = ns;
 			}
 		void SetNumStates(int ns){maxNumStates = ns;}
 
 		virtual unsigned char CharToDatum(char d);
 		char DatumToChar( unsigned char d );
-		void CreateMatrixFromNCL(NxsCharactersBlock *);
 		virtual void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding

@@ -529,7 +529,7 @@ int main( int argc, char* argv[] )	{
 				//for Mk the impliedMatrix number is the number of states
 				for(int impliedMatrix = 2;impliedMatrix < (modSpec->IsStandardData() ? maxObservedStates + 1 : 3);impliedMatrix++){
 					if(modSpec->IsStandardData())
-						data = new NStateData(impliedMatrix, (modSpec->IsNStateV() || modSpec->IsOrderedNStateV()));
+						data = new NStateData(impliedMatrix, (modSpec->IsNStateV() || modSpec->IsOrderedNStateV()), (modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV()));
 					else if(modSpec->IsOrientedGap())
 						data = new OrientedGapData();
 					else if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
@@ -570,8 +570,8 @@ int main( int argc, char* argv[] )	{
 								//also clone the modspec.  This isn't really necessary (or good) except that the number of states is stored by the modspecs
 								if(conf.linkModels)
 									modSpecSet.AddModSpec(conf.configModelSets[0]);
-								else
-									modSpecSet.AddModSpec(conf.configModelSets[dataChunk]);
+								else//there may be only a single model set specified, but no linkage
+									modSpecSet.AddModSpec(conf.configModelSets[conf.configModelSets.size() > 1 ? dataChunk : 0]);
 								modSpec = modSpecSet.GetModSpec(modSpecSet.NumSpecs() - 1);
 								}
 							modSpec->SetNStates(impliedMatrix);
@@ -591,8 +591,8 @@ int main( int argc, char* argv[] )	{
 								//also clone the modspec.  This isn't really necessary (or good) except that the number of states is stored by the modspecs
 								if(conf.linkModels)
 									modSpecSet.AddModSpec(conf.configModelSets[0]);
-								else
-									modSpecSet.AddModSpec(conf.configModelSets[dataChunk]);
+								else//there may be only a single model set specified, but no linkage
+									modSpecSet.AddModSpec(conf.configModelSets[conf.configModelSets.size() > 1 ? dataChunk : 0]);
 								modSpec = modSpecSet.GetModSpec(modSpecSet.NumSpecs() - 1);
 								}
 							}
@@ -624,8 +624,12 @@ int main( int argc, char* argv[] )	{
 				
 						dataPart.AddSubset(data);
 
-						if(modSpec->IsStandardData())
+						if(modSpec->IsStandardData()){
 							outman.UserMessage("Subset of data with %d states:", impliedMatrix);
+							string chars;
+							data->GetStringOfOrigDataColumns(chars, (modSpec->IsNStateV() || modSpec->IsOrderedNStateV()));
+							outman.UserMessage("(chars%s)", chars.c_str());
+							}
 
 						//this accounts for the dummy character stuck into each data subset
 						//for Mkv.  We don't want the screen output to include it.
@@ -644,7 +648,6 @@ int main( int argc, char* argv[] )	{
 							outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar() - mkvDiff);
 							}
 						else outman.UserMessage("\t%5d total characters.", total - mkvDiff);
-						
 						outman.flush();
 						
 						data->Collapse();

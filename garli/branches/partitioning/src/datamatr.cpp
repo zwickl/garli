@@ -46,6 +46,7 @@ DataMatrix::~DataMatrix()
 	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates is of length nChar
 	if( stateDistr ) MEM_DELETE_ARRAY(stateDistr); // stateDistr is of length (maxNumStates+1)
 	if( number ) MEM_DELETE_ARRAY(number); // number is of length nChar
+	if( origDataNumber ) MEM_DELETE_ARRAY(origDataNumber); // origDataNumber is of length nChar
 	if( taxonLabel ) {
 		int j;
 		for( j = 0; j < nTax; j++ )
@@ -325,7 +326,9 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 	if( number ) {
                 MEM_DELETE_ARRAY(number); // number has length nChar
         }
-
+	if( origDataNumber ) {
+                MEM_DELETE_ARRAY(origDataNumber); // origDataNumber has length nChar
+        }
 	// create new data matrix, and new count and number arrays
 	// all counts are initially 1, and characters are numbered
 	// sequentially from 0 to nChar-1
@@ -335,11 +338,13 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 		MEM_NEW_ARRAY(numStates,int,sites);
 		MEM_NEW_ARRAY(stateDistr,FLOAT_TYPE,(maxNumStates+1));
 		MEM_NEW_ARRAY(number,int,sites);
+		MEM_NEW_ARRAY(origDataNumber,int,sites);
 
 		for( int j = 0; j < sites; j++ ) {
 			count[j] = 1;
 			numStates[j] = 1;
 			number[j] = j;
+			origDataNumber[j] = j;
 		}
 		for( int i = 0; i < taxa; i++ ) {
 			matrix[i]=new unsigned char[sites];
@@ -368,13 +373,17 @@ DataMatrix& DataMatrix::operator =(const DataMatrix& d)
 
 	for( j = 0; j < nChar; j++ ) {
 		SetCount(j, d.Count(j) );
-		number[j] = d.Number(j);
 	}
 
 	for( i = 0; i < nTax; i++ ) {
 		for( j = 0; j < nChar; j++ )
-			SetMatrix(i, j, d.Matrix(i, j) );
+			SetMatrix(i, j, d.Matrix(i, j));
 	}
+
+	for( j = 0; j < gapsIncludedNChar; j++ ) {
+		number[j] = d.Number(j);
+		origDataNumber[j] = d.origDataNumber[j];
+		}
 
 	return *this;
 }
@@ -1671,7 +1680,8 @@ void DataMatrix::ExplicitDestructor()	{
 	if( count ) MEM_DELETE_ARRAY(count); // count is of length nChar
 	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates is of length nChar
 	if( stateDistr ) MEM_DELETE_ARRAY(stateDistr); // stateDistr is of length (maxNumStates+1)
-	if( number ) MEM_DELETE_ARRAY(number); // number is of length nChar
+	if( number ) MEM_DELETE_ARRAY(number); // number is of length gapsIncludedNChar
+	if( origDataNumber ) MEM_DELETE_ARRAY(origDataNumber); // origDataNumber is of length gapsIncludedNChar
 	if( taxonLabel ) {
 		int j;
 		for( j = 0; j < nTax; j++ )
@@ -1774,4 +1784,13 @@ void DataMatrix::CheckForIdenticalTaxonNames(){
 			}
 		throw(ErrorException("Terminating.  Please make all sequence names unique!"));
 		}
+	}
+
+void DataMatrix::GetStringOfOrigDataColumns(string &str, bool skipFirst){
+	//note that GetSetAsNexusString takes zero offset indeces and converts them to
+	//char nums, ie adds 1 to each
+	NxsUnsignedSet chars;
+	for(int c = (skipFirst ? 1 : 0);c < GapsIncludedNChar();c++)
+		chars.insert(origDataNumber[c]);
+	str = NxsSetReader::GetSetAsNexusString(chars);
 	}
