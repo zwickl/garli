@@ -58,11 +58,30 @@ protected:
 	unsigned char**         matrix;
 	int*		count;
 	int*		origCounts;
-	int*		number; //maping of chars to columns
-						//Indeces are original char numbers,
-						//contents are the packed column representing that char
-						//both start at 0, so offset upon output
-						//This used to represent something else (I think)
+	//maping of chars to columns. indeces are original char numbers, values are the packed column representing that char
+	//both start at 0, so offset upon output
+	int*		number; 
+	/*in the partitioned context number maps the columns of the original partition subset to the columns of the
+	compressed matrix.  So, number[j] is the column of the packed matrix that represents column j of the 
+	partition subset.  So, this may have no relationship to the original data matrix before the subsets were
+	even made.  origDataNumber then maps the columns of the uncompressed subset to the original full datamatrix.
+	Thus, number[j] is the compressed column that represents uncompressed subset column j (many-to-one mapping)
+	origDataNumber[j] is the column of the orignal matrix that corresponds to uncompressed subset column j (one-to-one mapping)
+	example (zero offset): partition by codon position, so sub1 = {0, 3, 6, ...}, sub2 = {1, 4, 7, ...} and sub3 = {2, 5, 8, ...}
+	each subset is its own datamatrix object, with its own number and origDataNumber arrays.
+	so, sub1->number[0] is the column of the compressed sub1 matrix that represents the first column of sub1
+	    (same for sub2 and sub3)
+	    sub1->number[1] is the column of the compressed sub2 matrix that represents the second column of sub2
+	    (same for sub2 and sub3)
+		sub1->origDataNumber[0] = 0
+		sub2->origDataNumber[0] = 1
+		sub1->origDataNumber[1] = 3
+		sub2->origDataNumber[1] = 4
+		etc.
+	the values in number must the shuffled around as the matrix is compressed
+	the values in origDataNumber are set when SetMatrix is called, and don't change thereafter
+	*/
+	int*		origDataNumber;
 	char**          taxonLabel;
 	char**          taxonColor;
 	int		nMissing;
@@ -107,13 +126,13 @@ protected:
 
 	public:
 		DataMatrix() : dmFlags(0), dense(0), nTax(0), nChar(0), matrix(0), count(0)
-			, number(0), taxonLabel(0), numStates(0), stateDistr(0)
+			, number(0), origDataNumber(0), taxonLabel(0), numStates(0), stateDistr(0)
 			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
 			: nTax(ntax), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
-			, number(0), taxonLabel(0), numStates(0), stateDistr(0)
+			, number(0), origDataNumber(0), taxonLabel(0), numStates(0), stateDistr(0)
 			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
@@ -161,10 +180,15 @@ protected:
 		void Flush() { NewMatrix( 0, 0 ); }
 		int Dense() const { return dense; }
 		
+		//argument here is column number from uncompressed subset
+		//return val is compressed pattern representing that column
 		int Number(int j) const
-			//this appears to have been a bug.  Should be gapsIncludedNChar
-			//{ return ( number && (j < totalNChar) ? number[j] : 0 ); }
 			{ return ( number && (j < gapsIncludedNChar) ? number[j] : 0 ); }
+
+		//argument here is column number from uncompressed subset
+		//return val is column from original full matrix before partitioning
+		int OrigDataNumber(int j) const
+			{ return ( origDataNumber && (j < gapsIncludedNChar) ? origDataNumber[j] : 0 ); }
 
 		virtual int Count(int j) const
 			{ return ( count && (j < nChar) ? count[j] : 0 ); }
@@ -193,7 +217,6 @@ protected:
 			}
 
 		void BeginNexusTreesBlock(ofstream &treeout) const;
-		virtual void CreateMatrixFromNCL(NxsCharactersBlock *) = 0;
 	
 		virtual unsigned char Matrix( int i, int j ) const {
 			assert( matrix );
@@ -210,8 +233,11 @@ protected:
 			assert( i < nTax );
 			return matrix[i];
 		}
-		virtual void SetMatrix( int i, int j, unsigned char c )
-			{ if( matrix && (i < nTax) && (j < nChar) ) matrix[i][j] = c; }
+		virtual void SetMatrix( int i, int j, unsigned char c, int origColumn = -1){
+			if(matrix && (i < nTax) && (j < nChar))
+				matrix[i][j] = c;
+			origDataNumber[j] = origColumn;
+			}
 
 		int MatrixExists() const { return ( matrix && nTax>0 && nChar>0 ? 1 : 0 ); }
 		int NMissing() const { return nMissing; }
@@ -243,6 +269,7 @@ protected:
 		bool operator==(const DataMatrix& rhs) const; // cjb - to test serialization
 		void ExplicitDestructor();  // cjb - totally clear the DataMatrix and revert it to its original state as if it was just constructed
 		void CheckForIdenticalTaxonNames();
+		void GetStringOfOrigDataColumns(string &str, bool skipFirst);
 
 	public:	// exception classes
 #if defined( CPLUSPLUS_EXCEPTIONS )

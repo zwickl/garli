@@ -769,10 +769,10 @@ public:
 		else if(_stricmp(str, "nucleotide") == 0) str;
 		else if(_stricmp(str, "nstate") == 0) SetNState();
 		else if(_stricmp(str, "standard") == 0) SetNState();
-		else if(_stricmp(str, "orderedstandard") == 0) SetOrderedNState();
+		else if(_stricmp(str, "standardordered") == 0) SetOrderedNState();
 		else if(_stricmp(str, "mk") == 0) SetNState();
 		else if(_stricmp(str, "standardvariable") == 0) SetNStateV();
-		else if(_stricmp(str, "orderedstandardvariable") == 0) SetOrderedNStateV();
+		else if(_stricmp(str, "standardorderedvariable") == 0) SetOrderedNStateV();
 		else if(_stricmp(str, "mkv") == 0) SetNStateV();
 		else if(_stricmp(str, "orientedgap") == 0) SetOrientedGap();
 		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna, binary, nstate)", str));
