@@ -46,7 +46,9 @@ echo "**************************"
 echo "Running scoring tests ..."
 echo "**************************"
 line=1
-for i in $TESTS_DIR/scoring/a.conf $TESTS_DIR/scoring/a.G3.conf $TESTS_DIR/scoring/a.G4.conf $TESTS_DIR/scoring/c.conf $TESTS_DIR/scoring/c.M3x2.conf $TESTS_DIR/scoring/n.conf $TESTS_DIR/scoring/n.G4.conf $TESTS_DIR/scoring/n.G5.conf 
+for i in $TESTS_DIR/scoring/a.conf $TESTS_DIR/scoring/a.G3.conf $TESTS_DIR/scoring/a.G4.conf $TESTS_DIR/scoring/c.conf $TESTS_DIR/scoring/c.M3x2.conf $TESTS_DIR/scoring/n.conf $TESTS_DIR/scoring/n.G4.conf $TESTS_DIR/scoring/n.G5.conf $TESTS_DIR/scoring/p.mk.conf $TESTS_DIR/scoring/p.mkO.conf $TESTS_DIR/scoring/p.mkO.ssr.conf $TESTS_DIR/scoring/p.mk.ssr.conf $TESTS_DIR/scoring/p.mkv.conf $TESTS_DIR/scoring/p.mkvO.conf $TESTS_DIR/scoring/p.mkvO.ssr.conf $TESTS_DIR/scoring/p.mkv.ssr.conf
+
+
 do
 	base=${i/*\/}
 	base=${base/.conf/}
