@@ -16,10 +16,7 @@ then
                 fi
 		nclv="ncl-svn"
                 cd ${nclv} || exit
-		if [ ! -f configure ]
-		then
-                	sh bootstrap.sh || exit
-		fi
+                sh bootstrap.sh || exit
                 cd ..
         elif [ "$1" = "-h" ] || [ "$1" = "--help" ]
 	then
@@ -76,7 +73,7 @@ echo "CONFIGURING GARLI ..."
 if [ ! -f configure ]
 then
 	if [ -f bootstrap.sh ]
-	then		
+	then
 		sh bootstrap.sh || exit
 	else
 		echo "Neither configure nor bootstrap.sh found.  This is not a complete distribution."
