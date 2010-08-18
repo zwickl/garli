@@ -195,7 +195,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 			outman.UserMessage("WARNING - specified outgroup (%s) being ignored due to inference of a rooted true", conf->outgroupString.c_str());
 			
 		char num[10];
-		sprintf(num, "&d", data->NTax());
+		sprintf(num, "%d", data->NTax());
 		outString = num;
 		}
 	else{
@@ -206,12 +206,12 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 	//deal with the outgroup specification, if there is one
 	if(outString.length() > 0){
 		//NxsString s(conf->outgroupString.c_str());
-		const char *o = conf->outgroupString.c_str();
+		const char *o = outString.c_str();
 		vector<int> nums;
 		unsigned pos1=0, pos2;
-		while(pos1 < conf->outgroupString.size()){
-			pos2 = conf->outgroupString.find(" ", pos1+1);
-			string tax = conf->outgroupString.substr(pos1, pos2);
+		while(pos1 < outString.size()){
+			pos2 = outString.find(" ", pos1+1);
+			string tax = outString.substr(pos1, pos2);
 			nums.push_back(atoi(tax.c_str()));
 			pos1 = pos2;
 			}
