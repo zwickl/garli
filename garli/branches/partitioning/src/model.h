@@ -885,8 +885,8 @@ class Model{
 	FLOAT_TYPE *alpha;
 	FLOAT_TYPE *propInvar;
 
-	FLOAT_TYPE insertRate;
-	FLOAT_TYPE deleteRate;
+	FLOAT_TYPE *insertRate;
+	FLOAT_TYPE *deleteRate;
 
 	//variables used for the eigen process if nst=6
 	int *iwork, *indx;
@@ -1016,9 +1016,11 @@ class Model{
 	bool IsOrderedNState() const {return modSpec->IsOrderedNState();}
 	bool IsOrderedNStateV() const {return modSpec->IsOrderedNStateV();}
 	const ModelSpecification *GetModSpec() const {return modSpec;}
-
-	FLOAT_TYPE AbsenceFrequency() const {return (1.0 / ((insertRate / deleteRate) + 1.0));}
-	FLOAT_TYPE PresenceFrequency() const {return (insertRate / deleteRate) / ((insertRate / deleteRate) + 1.0);}
+	
+	FLOAT_TYPE InsertRate() const {return *insertRate;}
+	FLOAT_TYPE DeleteRate() const {return *deleteRate;}
+	FLOAT_TYPE AbsenceFrequency() const {return (1.0 / ((*insertRate / *deleteRate) + 1.0));}
+	FLOAT_TYPE PresenceFrequency() const {return (*insertRate / *deleteRate) / ((*insertRate / *deleteRate) + 1.0);}
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
@@ -1223,6 +1225,14 @@ class Model{
 		//This is odd, but we need to call normalize rates here if we are just using a gamma distrib to get starting rates for 
 		//flex.  Flex expects that the rates will be normalized including pinv elsewhere
 		if(modSpec->IsFlexRateHet()) NormalizeRates();
+		}
+
+	void SetDeleteRate(int which, FLOAT_TYPE val){
+		*deleteRate = val;
+		}
+
+	void SetInsertRate(int which, FLOAT_TYPE val){
+		*insertRate = val;
 		}
 
 	//these are the bounds on a particular rate that keep it from crossing a neighboring rate when rescaling happens
