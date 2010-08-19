@@ -430,11 +430,11 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 						}
 					else if(modSpec->fixAlpha == false){//normal gamma
 						//do NOT let alpha go too low here - on bad or random starting trees the branch lengths get crazy long
-						improve += scratchT->OptimizeBoundedParameter(optPrecision, mod->Alpha(), 0, 0.05, 999.9, modnum, &Model::SetAlpha);
+						improve += scratchT->OptimizeBoundedParameter(modnum, optPrecision, mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 						}
 					}
 				if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
-					improve += scratchT->OptimizeBoundedParameter(optPrecision, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, modnum, &Model::SetPinv);
+					improve += scratchT->OptimizeBoundedParameter(modnum, optPrecision, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, &Model::SetPinv);
 				}
 			if(modSpecSet.InferSubsetRates()){
 				improve += scratchT->OptimizeSubsetRates(optPrecision);
