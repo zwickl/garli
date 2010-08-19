@@ -23,7 +23,7 @@ fi
 rm  -f *.log00.log *.screen.log *.best*.tre *.best*.tre.phy *.boot.tre *.boot.phy *treelog00.tre *treelog00.log *problog00.log *fate00.log .*lock* *swaplog* *.check out.* qout.* mpi_m* *SiteLikes.log *sitelikes.log *best.all.phy *best.phy *current.phy *internalstates.log
 
 echo "Linking to data ...."
-if [ -d $TESTS_DIR ];then
+if [ -d $TESTS_DIR/data ];then
 	echo "data folder already exists"
 else
 	ln -sf $TESTS_DIR/data | exit 1
