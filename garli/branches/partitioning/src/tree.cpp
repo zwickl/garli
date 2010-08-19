@@ -6411,7 +6411,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum){
 				FLOAT_TYPE maxV = min(MAX_REL_RATE, befval * maxChangeProportion);
 				if(maxV < SUM_TO * 1.0e-3/190.0)
 					maxV = SUM_TO * 1.0e-3/190.0;
-				rateImprove += OptimizeBoundedParameter(prec, befval, *it, 
+				rateImprove += OptimizeBoundedParameter(modnum, prec, befval, *it, 
 					minV, maxV,
 					&Model::SetSumConstrainedRelativeRate, scoreDiffTarget);
 #else
@@ -6421,8 +6421,8 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum){
 				FLOAT_TYPE maxV = min(max(9999.0, befval), befval * maxChangeProportion);
 				if(maxV < 0.01)
 					maxV = 0.01;
-				rateImprove += OptimizeBoundedParameter(prec, befval, *it, 
-					minV, maxV, modnum,
+				rateImprove += OptimizeBoundedParameter(modnum, prec, befval, *it, 
+					minV, maxV, 
 					&Model::SetRelativeNucRate, scoreDiffTarget);
 #endif
 				if(FloatingPointEquals(lnL, beflnL, 1e-8)){
@@ -6460,32 +6460,32 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec, int modnum){
 	double maxRateChangeProp = 0.75;
 	double maxProbChange = 0.20;
 	
-	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
+	flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexRate(i), i, 
 		max(minVal, mod->FlexRate(i)*maxRateChangeProp),
-		min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),  modnum,
+		min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),
 		&Model::SetFlexRate);
 
-	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
+	flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexProb(i), i, 
 		max(minVal, mod->FlexProb(i)-maxProbChange), 
-		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), modnum,
+		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), 
 		&Model::SetFlexProb);
 	for(i=1;i < mod->NRateCats()-1;i++){
-		flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
+		flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexRate(i), i, 
 			max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp), 
-			min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), modnum,
+			min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), 
 			&Model::SetFlexRate);
-		flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
+		flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexProb(i), i, 
 			max(minVal, mod->FlexProb(i)-maxProbChange), 
-			min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), modnum,
+			min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), 
 			&Model::SetFlexProb);
 		}
-	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, 
+	flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexRate(i), i, 
 		max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp),
-		min(999.9, mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), modnum,
+		min(999.9, mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), 
 		&Model::SetFlexRate);
-	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, 
+	flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexProb(i), i, 
 		max(minVal, mod->FlexProb(i)-maxProbChange), 
-		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), modnum,
+		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), 
 		&Model::SetFlexProb);
 
 
