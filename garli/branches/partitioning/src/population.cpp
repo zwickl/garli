@@ -604,6 +604,11 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 void Population::LoadNexusStartingConditions(){
 	GarliReader & reader = GarliReader::GetInstance();
  	NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
+	//if(indiv[0].treeStruct->rootWithDummy){//add this in case a tree output by GARLI that contains the dummy root taxon is used as input
+	if(Tree::rootWithDummy){
+		string n = "ROOT";
+		tax->AppendNewLabel(n);
+		}
 	//DEBUG - this wasn't right, since having multiple trees with the data isn't a problem if we're getting the
 	//start from elsewhere
 	/*
@@ -1236,8 +1241,9 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	
 	indiv[0].treeStruct->root->CheckTreeFormation();
 	indiv[0].treeStruct->root->CheckforPolytomies();
-	
-	indiv[0].treeStruct->CheckBalance();
+
+	if(!indiv[0].treeStruct->rootWithDummy)
+		indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->modPart=&indiv[0].modPart;
 	
 	try{

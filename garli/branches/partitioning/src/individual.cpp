@@ -42,6 +42,7 @@ using namespace std;
 extern int memLevel;
 extern int calcCount;
 extern OutputManager outman;
+extern FLOAT_TYPE globalBest;
 
 #define MUTUALLY_EXCLUSIVE_MUTS
 
@@ -665,6 +666,8 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates, optSubsetRates;
 	optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = optSubsetRates = false;
 
+	bool optInsDel = false;
+
 	if(optModel){
 		for(int modnum = 0;modnum < modPart.NumModels();modnum++){
 			Model *mod = modPart.GetModel(modnum);
@@ -673,6 +676,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			if(modSpec->IsFlexRateHet()) optFlex = true;
 			if(modSpec->includeInvariantSites && modSpec->fixInvariantSites == false) optPinv = true;
 			if(modSpec->IsCodon()) optOmega = true;
+			if(modSpec->IsOrientedGap()) optInsDel = true;
 
 #ifdef MORE_DETERM_OPT
 			if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
@@ -687,16 +691,38 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		}
 
 	//DEBUG
-/*
-	outman.UserMessage("Scoring at nodes across tree...");
+/*	outman.UserMessage("Rooting at nodes across tree...");
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	Tree *scratchT = tempIndiv.treeStruct;
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, this);
 	Tree::useOptBoundedForBlen = true;
-	treeStruct->sitelikeLevel = 1;
-	treeStruct->ofprefix = "orientgap";
-	for(int i = treeStruct->NTax() + 1;i < treeStruct->NTax() * 2 - 2;i++){
-		Tree::effectiveRootNode = i;
-		treeStruct->Score(i);
-		outman.UserMessage("node %d score %f", i, treeStruct->lnL);
-		treeStruct->sitelikeLevel = -1;
+	scratchT->sitelikeLevel = 1;
+	scratchT->ofprefix = "varyingRoot";
+	//for(int i = treeStruct->NTax() + 1;i < treeStruct->NTax() * 2 - 2;i++){
+	scratchT->GatherValidReconnectionNodes(99999, scratchT->dummyRoot, NULL);
+	scratchT->sprRang.SortByDist();
+
+	int num=0;
+	ReconList attempted;
+	ofstream trees("rootings.tre");
+	//globalBest = -99999.9;
+	for(listIt broken = scratchT->sprRang.begin();broken != scratchT->sprRang.end();broken++){
+		//try a reattachment point
+		scratchT->SPRMutate(scratchT->dataPart->NTax(), &(*broken), 0.01, 0);
+		//record the score
+		double initial = scratchT->lnL;
+		scratchT->OptimizeAllBranches(0.01);
+		broken->chooseProb = scratchT->lnL;
+		attempted.AddNode(*broken);
+		outman.UserMessage("node\t%d\tlnL\t%f\t%f", (*broken).nodeNum, initial, scratchT->lnL);
+		char str[10000];
+		scratchT->root->MakeNewick(str, false, true);
+		trees << "tree r" << broken->nodeNum << "=[" << scratchT->lnL << "] " << str << ";" << endl;
+		//restore the tree
+		tempIndiv.CopySecByRearrangingNodesOfFirst(scratchT, this, true);
+		num++;
+		scratchT->sitelikeLevel = -1;
 		}
 */	
 		
@@ -708,6 +734,10 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	if(optFreqs) outman.UserMessageNoCR(", eq freqs");
 #endif
 	if(optOmega) outman.UserMessageNoCR(", dN/dS (aka omega) parameters");
+	if(optInsDel){
+		outman.UserMessageNoCR(", ins rate");
+		outman.UserMessageNoCR(", del rate");
+		}
 	if(optSubsetRates) outman.UserMessageNoCR(", subset rates");
 	outman.UserMessage("...");
 	FLOAT_TYPE improve=(FLOAT_TYPE)999.9;
@@ -715,7 +745,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 
 	for(int i=1;improve > branchPrec;i++){
 		FLOAT_TYPE alphaOptImprove=0.0, pinvOptImprove = 0.0, omegaOptImprove = 0.0, flexOptImprove = 0.0, optImprove=0.0, scaleOptImprove=0.0, subsetRateImprove=0.0, rateOptImprove=0.0;
-		FLOAT_TYPE freqOptImprove=0.0;
+		FLOAT_TYPE freqOptImprove=0.0, insDelImprove = 0.0;
 		
 		CalcFitness(0);
 		FLOAT_TYPE passStart=Fitness();
@@ -752,12 +782,15 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 						//rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
 						//do NOT let alpha go too low here - on bad or random starting trees the branch lengths get crazy long
 						//rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 1.0e-8, 999.9, &Model::SetAlpha);
-						alphaOptImprove += treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 0.05, 999.9, modnum, &Model::SetAlpha);
+						//alphaOptImprove += treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 0.05, 999.9, modnum, &Model::SetAlpha);
+						alphaOptImprove += treeStruct->OptimizeBoundedParameter(modnum, branchPrec, mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
 						}
 					}
 				if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
-					pinvOptImprove += treeStruct->OptimizeBoundedParameter(branchPrec, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, modnum, &Model::SetPinv);
-
+					pinvOptImprove += treeStruct->OptimizeBoundedParameter(modnum, branchPrec, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, &Model::SetPinv);
+				if(optInsDel){
+					insDelImprove += treeStruct->OptimizeInsertDeleteRates(branchPrec, modnum);
+					}
 #ifdef MORE_DETERM_OPT
 				if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
 					freqOptImprove += treeStruct->OptimizeEquilibriumFreqs(branchPrec, modnum);
@@ -769,7 +802,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 				subsetRateImprove += treeStruct->OptimizeSubsetRates(branchPrec);
 				}
 			}
-		improve=scaleOptImprove + trueImprove + alphaOptImprove + pinvOptImprove + flexOptImprove + omegaOptImprove + subsetRateImprove;
+		improve=scaleOptImprove + trueImprove + alphaOptImprove + pinvOptImprove + flexOptImprove + omegaOptImprove + subsetRateImprove + insDelImprove;
 		outman.precision(8);
 		outman.UserMessageNoCR("pass%2d:+%9.3f (branch=%7.2f scale=%6.2f", i, improve, trueImprove, scaleOptImprove);
 		if(optOmega) outman.UserMessageNoCR(" omega=%6.2f", omegaOptImprove);
@@ -782,6 +815,9 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 
 		if(optFlex) outman.UserMessageNoCR(" flex=%6.2f", flexOptImprove);
 		if(optPinv) outman.UserMessageNoCR(" pinv=%6.2f", pinvOptImprove);
+		if(optInsDel){
+			outman.UserMessageNoCR(" ins/del=%6.2f", insDelImprove);
+			}
 		if(optSubsetRates) outman.UserMessageNoCR(" subset rates=%6.2f", subsetRateImprove);
 		outman.UserMessage(")");
 		}

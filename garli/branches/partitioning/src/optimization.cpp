@@ -828,6 +828,8 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 
 FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, int modnum, void (Model::*SetParam)(int, FLOAT_TYPE)){
 
+	//should be using the better version of this above
+	assert(0);
 	Model *mod = modPart->GetModel(modnum);
 
 	FLOAT_TYPE epsilon = min(optPrecision, 1.0e-5);

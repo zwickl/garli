@@ -419,6 +419,30 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 				}
 			}
 		}
+	//See if the fake ROOT taxon is in the tree, and place it if necessary. Note that the extra tip is 
+	//allNodes[numTipsTotal] (and numNodesTotal includes that extra tip) because allNodes[0] is the root, but 
+	//the extra connector is allNodes[numNodesTotal - 1], i.e., the last node allocated.  Note that during the run the dummy root 
+	//will always be the same node, but its anc (the dummy connector) won't be
+	if(rootWithDummy){
+		assert(dummyRoot);
+		SetBranchLength(dummyRoot, 0.5);
+		if(root->left->next == root->right){
+			//if the root only has two descendents (i.e., it is a rooted tree) then add the dummy root there
+			//there will be no connector, and all connectors should already have been used.
+			assert(numNodesAdded == numNodesTotal - 2);
+			root->AddDes(dummyRoot);
+			numNodesAdded++;
+			numTipsAdded++;
+			}
+		else if(numNodesAdded == numNodesTotal - 3){
+			//tree didn't have dummy in it, nor was it rooted.  Toss in anywhere
+			int connector = numNodesTotal - 2;
+			AddRandomNode(numTipsTotal, connector);
+			}
+		else//the input tree must have had the dummy in it already
+			assert(dummyRoot->attached = true);
+		}
+
 	if(root->left->next==root->right){
 		MakeTrifurcatingRoot(true, false);	
 		}
@@ -427,16 +451,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 		}
 	assert(root->left->next!=root->right);
 
-	//Arbitrarily throw in the extra fake root taxon now.  Note that the extra tip is allNodes[numTipsTotal] (and 
-	//numNodesTotal includes that extra tip) because allNodes[0] is the root, but the extra connector is 
-	//allNodes[numNodesTotal - 1], i.e., the last node allocated.  Note that the dummy root will always be the same
-	//node, but its anc (the dummy connector) won't be
-	if(rootWithDummy){
-		int connector = numNodesTotal - 1;
-		AddRandomNode(numTipsTotal, connector);
-		}
-
-	if((allowMissingTaxa == false) && (numTipsAdded != numTipsTotal)) 
+	if((allowMissingTaxa == false) && (numTipsAdded != numTipsTotal) && !rootWithDummy) 
 		throw ErrorException("Number of taxa in tree description (%d) not equal to number of taxa in dataset (%d)!", numTipsAdded, numTipsTotal);
 
 	root->CheckforLeftandRight();
@@ -475,6 +490,11 @@ void Tree::AllocateTree(bool withExtraNode){
 	numNodesAdded=1;//root
 	numTipsTotal=dataPart->NTax();
 	lnL=0.0;
+
+	if(rootWithDummy)
+		dummyRoot = allNodes[numTipsTotal];
+	else
+		dummyRoot = NULL;
 
 	calcs=0;
 	sitelikeLevel = 0;
@@ -3394,19 +3414,19 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 		Note that this assumes that this function was called with dummy->anc, so that it
 		must be one of the descendent taxa.*/
 		if(rootWithDummy){
-			if(nd->left == allNodes[numTipsTotal]){
+			if(nd->left == dummyRoot){
 				child=nd->left;
 				assert(!child->IsInternal());
 
 				partialCLA = GetClaUpLeft(nd, claMan->IsDirty(nd->claIndexUL));
 				}
-			else if(nd->right == allNodes[numTipsTotal]){
+			else if(nd->right == dummyRoot){
 				child=nd->right;
 				assert(!child->IsInternal());
 
 				partialCLA = GetClaUpRight(nd, claMan->IsDirty(nd->claIndexUR));
 				}
-			else if(nd->left->next == allNodes[numTipsTotal]){
+			else if(nd->left->next == dummyRoot){
 				child = nd->left->next;
 				assert(!child->IsInternal());
 
@@ -3682,7 +3702,7 @@ int Tree::Score(int rootNodeNum /*=0*/){
 		
 			if(rootWithDummy){
 				assert(rootNodeNum == 0);
-				ConditionalLikelihoodRateHet( ROOT, allNodes[numTipsTotal]->anc);
+				ConditionalLikelihoodRateHet( ROOT, dummyRoot->anc);
 				}
 			else
 				ConditionalLikelihoodRateHet( ROOT, rootNode);
@@ -6141,6 +6161,14 @@ void Tree::ReadBinaryFormattedTree(FILE *in){
 		
 		fread((char*) &allNodes[i]->dlen, sizeof(FLOAT_TYPE), 1, in);
 		}
+	}
+
+FLOAT_TYPE Tree::OptimizeInsertDeleteRates(FLOAT_TYPE prec, int modnum){
+	FLOAT_TYPE improve = 0.0;
+	//delete > insert	
+	improve += OptimizeBoundedParameter(modnum, prec, modPart->GetModel(modnum)->InsertRate(), 0, 1e-8, modPart->GetModel(modnum)->DeleteRate(), &Model::SetInsertRate);
+	improve += OptimizeBoundedParameter(modnum, prec, modPart->GetModel(modnum)->DeleteRate(), 0, modPart->GetModel(modnum)->InsertRate(), 999.9, &Model::SetDeleteRate);
+	return improve;
 	}
 
 FLOAT_TYPE Tree::OptimizeOmegaParameters(FLOAT_TYPE prec, int modnum){

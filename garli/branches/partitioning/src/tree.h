@@ -62,6 +62,7 @@ class Tree{
 		FLOAT_TYPE lnL;	// holds likelihood score
 		ModelPartition *modPart;
 		TreeNode *root;
+		TreeNode *dummyRoot;//when we are dummy rootinging this will just alias allNodes[numTipsTotal]
 		TreeNode **allNodes;
 		ReconList sprRang;
 
@@ -277,6 +278,7 @@ class Tree{
 		FLOAT_TYPE OptimizeFlexRates(FLOAT_TYPE prec, int modnum);
 		FLOAT_TYPE OptimizeEquilibriumFreqs(FLOAT_TYPE prec, int modnum);
 		FLOAT_TYPE OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum);
+		FLOAT_TYPE OptimizeInsertDeleteRates(FLOAT_TYPE prec, int modnum);
 		FLOAT_TYPE OptimizeSubsetRates(FLOAT_TYPE prec);
 //the new versions from the trunk
 #ifdef SINGLE_PRECISION_FLOATS

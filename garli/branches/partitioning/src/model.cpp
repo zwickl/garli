@@ -82,6 +82,11 @@ Model::~Model(){
 
 	if(alpha != NULL) delete alpha;
 
+	if(insertRate != NULL)
+		delete insertRate;
+	if(deleteRate !=NULL)
+		delete deleteRate;
+
 	for(vector<BaseParameter*>::iterator delit=paramsToMutate.begin();delit!=paramsToMutate.end();delit++)
 		delete *(delit);
 
@@ -2465,8 +2470,13 @@ void Model::CreateModelFromSpecification(int modnum){
 	else nst = -1;
 
 	if(IsOrientedGap()){
-		insertRate = 0.1;
-		deleteRate = 0.2;
+		insertRate = new FLOAT_TYPE;
+		*insertRate = 0.1;
+		deleteRate = new FLOAT_TYPE;
+		*deleteRate = 0.2;
+		}
+	else{
+		insertRate = deleteRate = NULL;
 		}
 
 	nRateCats = modSpec->numRateCats;
