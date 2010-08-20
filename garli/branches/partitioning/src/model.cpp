@@ -2088,6 +2088,14 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 			}
 		s += cStr;
 		}
+	if(modSpec->IsOrientedGap()){
+		if(model)
+			sprintf(cStr, "%5.3f %5.3f ", insertRate, deleteRate);
+		else{
+			sprintf(cStr, "%5s %5s", "ins", "del");
+			}
+		s += cStr;
+		}
 	}
 
 void Model::OutputHumanReadableModelReportWithParams() const{
@@ -2149,6 +2157,7 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		}
 	else if(modSpec->IsOrientedGap()){
 		outman.UserMessage("  Character change matrix:\n    irreversible matrix, insertion rate and deletion rate parameters");
+		outman.UserMessage("    insert = %.3f, delete = %.3f", insertRate, deleteRate);
 		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
@@ -2278,6 +2287,9 @@ void Model::FillGarliFormattedModelString(string &s) const{
 	if(PropInvar()!=ZERO_POINT_ZERO){
 		sprintf(temp, " p %f", PropInvar());
 		s += temp;
+		}
+	if(modSpec->IsOrientedGap()){
+		sprintf(temp, " i %f d %f", insertRate, deleteRate);
 		}
 	s += " ";
 	}
