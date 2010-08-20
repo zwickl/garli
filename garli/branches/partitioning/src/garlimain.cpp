@@ -676,7 +676,12 @@ int main( int argc, char* argv[] )	{
 						if(actuallyUsedImpliedMatrixIndex > 1)
 							modSpecSet.SetInferSubsetRates(true);
 				}
-
+			
+			//this depends on the fact that an extra taxon slot was allocated by not yet used
+			if(modSpecSet.AnyOrientedGap()){
+				dataPart.AddDummyRoots();
+				}
+	
 			outman.UserMessage("\n###################################################");
 			pop.Setup(&conf, &dataPart, &rawPart, 1, 0);
 			pop.SetOutputDetails();

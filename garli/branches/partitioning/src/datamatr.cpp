@@ -48,14 +48,12 @@ DataMatrix::~DataMatrix()
 	if( number ) MEM_DELETE_ARRAY(number); // number is of length nChar
 	if( origDataNumber ) MEM_DELETE_ARRAY(origDataNumber); // origDataNumber is of length nChar
 	if( taxonLabel ) {
-		int j;
-		for( j = 0; j < nTax; j++ )
+		for( int j = 0; j < nTaxAllocated; j++ )
 			MEM_DELETE_ARRAY( taxonLabel[j] ); // taxonLabel[j] is of length strlen(taxonLabel[j])+1
-	       MEM_DELETE_ARRAY(taxonLabel); // taxonLabel is of length nTax
+	    MEM_DELETE_ARRAY(taxonLabel); // taxonLabel is of length nTax
 	}
 	if( matrix ) {
-		int j;
-		for( j = 0; j < nTax; j++ )
+		for( int j = 0; j < nTaxAllocated; j++ )
 			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] is of length nChar
 		MEM_DELETE_ARRAY(matrix); // matrix is of length nTax
 	}
@@ -290,18 +288,24 @@ void DataMatrix::Summarize()
 //
 void DataMatrix::NewMatrix( int taxa, int sites )
 {
+	//allocate an extra taxon unless there previously wasn't one
+	int extraTax = 1;
+	if(nTaxAllocated > 0){
+		extraTax = nTaxAllocated - nTax;
+		}
+
 	// delete taxon labels
 	if( taxonLabel ) {
 		int i;
-		for( i = 0; i < nTax; i++ )
+		for( i = 0; i < nTaxAllocated; i++ )
 			MEM_DELETE_ARRAY(taxonLabel[i]); // taxonLabel[i] is of length strlen(taxonLabel[i])+1
 		MEM_DELETE_ARRAY(taxonLabel); // taxonLabel is of length nTax
 	}
 
 	// create new array of taxon label pointers
 	if( taxa > 0 ) {
-		MEM_NEW_ARRAY(taxonLabel,char*,taxa);
-		for( int i = 0; i < taxa; i++ )
+		MEM_NEW_ARRAY(taxonLabel,char*,taxa + extraTax);
+		for( int i = 0; i < taxa + extraTax; i++ )
 			taxonLabel[i] = NULL;
 	}
 
@@ -309,7 +313,7 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 	if( matrix ) {
 		int j;
 	//	for( j = 0; j < nChar; j++ )
-		for( j = 0; j < nTax; j++ )
+		for( j = 0; j < nChar; j++ )
 			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] has length nChar
 		MEM_DELETE_ARRAY(matrix); // matrix has length nTax
 	}
@@ -333,7 +337,7 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 	// all counts are initially 1, and characters are numbered
 	// sequentially from 0 to nChar-1
 	if( taxa > 0 && sites > 0 ) {
-		MEM_NEW_ARRAY(matrix,unsigned char*,taxa);
+		MEM_NEW_ARRAY(matrix,unsigned char*,taxa + extraTax);
 		MEM_NEW_ARRAY(count,int,sites);
 		MEM_NEW_ARRAY(numStates,int,sites);
 		MEM_NEW_ARRAY(stateDistr,FLOAT_TYPE,(maxNumStates+1));
@@ -346,7 +350,7 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 			number[j] = j;
 			origDataNumber[j] = j;
 		}
-		for( int i = 0; i < taxa; i++ ) {
+		for( int i = 0; i < taxa + extraTax; i++ ) {
 			matrix[i]=new unsigned char[sites];
 			//MEM_NEW_ARRAY(matrix[i],unsigned char,sites);
 			//memset( matrix[i], 0xff, taxa*sizeof(unsigned char) );
@@ -359,11 +363,14 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 
 	// set dimension variables to new values
 	nTax = taxa;
+	nTaxAllocated = nTax + extraTax;
 	gapsIncludedNChar = totalNChar = nChar = sites;
 }
 
 DataMatrix& DataMatrix::operator =(const DataMatrix& d)
 {
+//dont't think that this is used
+	assert(0);
 	NewMatrix( d.NTax(), d.NChar() );
 
 	int i, j;
@@ -417,7 +424,7 @@ int i, j, newNChar = 0;
 
 	// create new matrix and count and number arrays and fill
 	unsigned char** newMatrix;
-        MEM_NEW_ARRAY(newMatrix,unsigned char*,nTax);
+        MEM_NEW_ARRAY(newMatrix,unsigned char*,nTaxAllocated);
 	int* newCount;
         MEM_NEW_ARRAY(newCount,int,newNChar);
 	int* newNumStates;
@@ -425,7 +432,7 @@ int i, j, newNChar = 0;
 //	int* newNumber;
   //      MEM_NEW_ARRAY(newNumber,int,newNChar);
 
-	for( i = 0; i < nTax; i++ )
+	for( i = 0; i < nTaxAllocated; i++ )
 		 MEM_NEW_ARRAY(newMatrix[i],unsigned char,newNChar);
 
 
@@ -464,7 +471,7 @@ int i, j, newNChar = 0;
 //	if( stateDistr ) MEM_DELETE_ARRAY(stateDistr); // stateDistr has length maxNumStates+1
 //	if( number ) MEM_DELETE_ARRAY(number); // number has length nChar
 	if( matrix ) {
-		for( i = 0; i < nTax; i++ )
+		for( i = 0; i < nTaxAllocated; i++ )
 			MEM_DELETE_ARRAY(matrix[i]); // matrix[i] has length nChar
 		MEM_DELETE_ARRAY(matrix); // matrix has length nTax
         }
@@ -1684,7 +1691,7 @@ void DataMatrix::ExplicitDestructor()	{
 	if( origDataNumber ) MEM_DELETE_ARRAY(origDataNumber); // origDataNumber is of length gapsIncludedNChar
 	if( taxonLabel ) {
 		int j;
-		for( j = 0; j < nTax; j++ )
+		for( j = 0; j < nTaxAllocated; j++ )
 			MEM_DELETE_ARRAY( taxonLabel[j] ); // taxonLabel[j] is of length strlen(taxonLabel[j])+1
 	       MEM_DELETE_ARRAY(taxonLabel); // taxonLabel is of length nTax
 	}
@@ -1696,7 +1703,7 @@ void DataMatrix::ExplicitDestructor()	{
 	}*/
 	if( matrix ) {
 		int j;
-		for( j = 0; j < nTax; j++ )
+		for( j = 0; j < nTaxAllocated; j++ )
 			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] is of length nChar
 		MEM_DELETE_ARRAY(matrix); // matrix is of length nTax
 	}

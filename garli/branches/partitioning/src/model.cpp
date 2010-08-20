@@ -1462,6 +1462,11 @@ void Model::CopyModel(const Model *from){
 		}
 	else 
 		eigenDirty=true;
+
+	if(modSpec->IsOrientedGap()){
+		*insertRate = *from->insertRate;
+		*deleteRate = *from->deleteRate;
+		}
 	}	
 
 void Model::CopyEigenVariables(const Model *from){

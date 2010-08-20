@@ -854,6 +854,14 @@ public:
 			if((*msit)->GotAnyParametersFromFile()) return true;
 		return false;
 		}
+	bool AnyOrientedGap(){
+		for(vector<ModelSpecification *>::iterator msit = modSpecs.begin();msit != modSpecs.end();msit++){
+			if((*msit)->IsOrientedGap()){
+				return true;
+				}
+			}
+		return false;
+		}
 	};
 
 class Model{
