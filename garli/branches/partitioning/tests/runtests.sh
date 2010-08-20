@@ -23,7 +23,7 @@ fi
 rm  -f *.log00.log *.screen.log *.best*.tre *.best*.tre.phy *.boot.tre *.boot.phy *treelog00.tre *treelog00.log *problog00.log *fate00.log .*lock* *swaplog* *.check out.* qout.* mpi_m* *SiteLikes.log *sitelikes.log *best.all.phy *best.phy *current.phy *internalstates.log
 
 echo "Linking to data ...."
-if [ -d $TESTS_DIR/data ];then
+if [ -d data ];then
 	echo "data folder already exists"
 else
 	ln -sf $TESTS_DIR/data | exit 1
@@ -55,9 +55,7 @@ echo "Running scoring tests ..."
 echo "**************************"
 
 if [ -d $TESTS_DIR/scoring ];then
-#	line=1
-	for i in $TESTS_DIR/scoring/a.conf $TESTS_DIR/scoring/a.G3.conf $TESTS_DIR/scoring/a.G4.conf $TESTS_DIR/scoring/c.conf $TESTS_DIR/scoring/c.M3x2.conf $TESTS_DIR/scoring/n.conf $TESTS_DIR/scoring/n.G4.conf $TESTS_DIR/scoring/n.G5.conf $TESTS_DIR/scoring/p.mk.conf $TESTS_DIR/scoring/p.mkO.conf $TESTS_DIR/scoring/p.mkO.ssr.conf $TESTS_DIR/scoring/p.mk.ssr.conf $TESTS_DIR/scoring/p.mkv.conf $TESTS_DIR/scoring/p.mkvO.conf $TESTS_DIR/scoring/p.mkvO.ssr.conf $TESTS_DIR/scoring/p.mkv.ssr.conf $TESTS_DIR/scoring/p.3diff.conf
-
+	for i in $TESTS_DIR/scoring/*.conf
 	do
 		if [ -f $i ];then
 			base=${i/*\/}
@@ -219,5 +217,5 @@ if [ -d $TESTS_DIR/check ];then
 		fi
 	done
 else
-	echo "No output tests found ..."
+	echo "No checkpoint tests found ..."
 fi
