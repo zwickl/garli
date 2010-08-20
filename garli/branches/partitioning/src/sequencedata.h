@@ -54,6 +54,7 @@ public:
 		assert(empStateFreqs);
 		for(int i=0;i<maxNumStates;i++) f[i]=empStateFreqs[i];
 		}
+	virtual void AddDummyRootToExistingMatrix();
 	};
 
 inline unsigned char SequenceData::CharToDatum( char ch )
@@ -186,6 +187,7 @@ public:
 	void CalcEmpiricalFreqs();
 	void CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset);
 	void MakeAmbigStrings();
+	void AddDummyRootToExistingMatrix();
 	char *GetAmbigString(int i) const{
 		return ambigStrings[i];
 		}
@@ -629,6 +631,14 @@ public:
 	void BeginNexusTreesBlock(ofstream &out) const {dataSubsets[0]->BeginNexusTreesBlock(out);}
 	NxsString TaxonLabel(int t) const {return dataSubsets[0]->TaxonLabel(t);}
 	int TaxonNameToNumber(NxsString name) const{return dataSubsets[0]->TaxonNameToNumber(name);}
+
+	void AddDummyRoots(){
+		nTax++;
+		for(int p = 0;p < NumSubsets();p++){
+			dataSubsets[p]->AddDummyRootToExistingMatrix();
+			assert(nTax == dataSubsets[p]->NTax());
+			}
+		}
 	};
 
 class DataSubsetInfo{

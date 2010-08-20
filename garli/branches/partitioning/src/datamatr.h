@@ -49,6 +49,9 @@ typedef FLOAT_TYPE** DblPtrPtr;
 class DataMatrix{
 protected:
 	int		nTax;
+	int		nTaxAllocated;//allocate more than nTax to allow for the addition of dummy taxa
+							//this will only be used during allocating and deallocation
+							//if a dummy taxon is created then nTax will be incremented
 	int		nChar;     //after compression
 	int		totalNChar; //columns in matrix, with all missing columns removed
 	int 	gapsIncludedNChar; //the actual number of columns in the data matrix read in
@@ -125,13 +128,13 @@ protected:
 		};
 
 	public:
-		DataMatrix() : dmFlags(0), dense(0), nTax(0), nChar(0), matrix(0), count(0)
+		DataMatrix() : dmFlags(0), dense(0), nTax(0), nTaxAllocated(0), nChar(0), matrix(0), count(0)
 			, number(0), origDataNumber(0), taxonLabel(0), numStates(0), stateDistr(0)
 			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
-			: nTax(ntax), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
+			: nTax(ntax), nTaxAllocated(0), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
 			, number(0), origDataNumber(0), taxonLabel(0), numStates(0), stateDistr(0)
 			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)

@@ -36,6 +36,28 @@ extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, co
 #	include <io.h>
 #endif
 
+//this depends on the fact that a spare taxon was allocated
+void SequenceData::AddDummyRootToExistingMatrix(){
+	assert(nTaxAllocated > nTax);
+
+	nTax++;
+	SetTaxonLabel( nTax - 1, "ROOT\0");
+	for(int c = 0;c < nChar;c++){	
+		SetMatrix( nTax - 1, c, maxNumStates, origDataNumber[0]);
+		}
+	}
+
+//this depends on the fact that a spare taxon was allocated
+void NucleotideData::AddDummyRootToExistingMatrix(){
+	assert(nTaxAllocated > nTax);
+
+	nTax++;
+	SetTaxonLabel( nTax - 1, "ROOT\0");
+	for(int c = 0;c < nChar;c++){	
+		SetMatrix( nTax - 1, c, 15, origDataNumber[0]);
+		}
+	}
+
 void NucleotideData::CalcEmpiricalFreqs(){
 
 	empStateFreqs=new FLOAT_TYPE[4];//this is a member of the class, and where the final freqs will be stored
@@ -1410,38 +1432,15 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 		return;
 
 	//include an extra taxon for the dummy root
-	int myEffectiveTaxa = numActiveTaxa + 1;
+//the dummy root is now taken care of outside of here in a non-datatype specific way
+//	int myEffectiveTaxa = numActiveTaxa + 1;
 
 	//make room for a dummy constant character here
 	if(datatype == ONLY_VARIABLE)
-		NewMatrix( myEffectiveTaxa, realCharSet->size() + 1);
+		NewMatrix( numActiveTaxa, realCharSet->size() + 1);
 	else
-		NewMatrix( myEffectiveTaxa, realCharSet->size());
+		NewMatrix( numActiveTaxa, realCharSet->size());
 
-/*
-	bool recodeSkippedIndeces = true;
-	map<int, int> nclStateIndexToGarliState;
-	vector< map<int, int> > stateMaps;
-	//Recode characters that skip states (assuming numerical order of states) to not skip any.  i.e., recode a
-	//char with states 0 1 5 7 to 0 1 2 3 and assume that it has 4 states
-	//the 
-	//With assumptions block "options gapmode=newstate" things get even more confusing.  GetNamedStateSetOfColumn
-	//returns the gap as a code of -2, in which case the mapping would be -2 0 1 5 7 -> 0 1 2 3 4 5 
-	if(recodeSkippedIndeces){
-		if(type == ONLY_VARIABLE)		
-			stateMaps.push_back(nclStateIndexToGarliState);
-
-		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){
-			set<int> stateSet = charblock->GetNamedStateSetOfColumn(*cit);
-			int myIndex = 0;
-			for(set<int>::iterator sit = stateSet.begin();sit != stateSet.end();sit++){
-				nclStateIndexToGarliState.insert(pair<int, int>(*sit, myIndex++));
-				}
-			stateMaps.push_back(nclStateIndexToGarliState);
-			nclStateIndexToGarliState.clear();
-			}
-		}
-*/
 	// read in the data, including taxon names
 	int effectiveTax=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
@@ -1488,11 +1487,4 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 			effectiveTax++;
 			}
 		}
-
-	SetTaxonLabel( effectiveTax, "ROOT\0");
-	int j = 0;
-	for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
-		SetMatrix( effectiveTax, j++, maxNumStates, *cit );
-		}
-
 	}

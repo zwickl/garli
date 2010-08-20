@@ -788,7 +788,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 					}
 				if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
 					pinvOptImprove += treeStruct->OptimizeBoundedParameter(modnum, branchPrec, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, &Model::SetPinv);
-				if(optInsDel){
+				if(modSpec->IsOrientedGap()){
 					insDelImprove += treeStruct->OptimizeInsertDeleteRates(branchPrec, modnum);
 					}
 #ifdef MORE_DETERM_OPT
