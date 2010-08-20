@@ -1781,6 +1781,13 @@ void Population::Run(){
 						outman.DebugMessage("rel rates opt = %.4f", paramOpt);
 						}
 #endif
+					if(modSpec->IsOrientedGap()){
+						FLOAT_TYPE paramOpt = bestTree->OptimizeInsertDeleteRates(adap->branchOptPrecision, modnum);
+						if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+							paramOpt = ZERO_POINT_ZERO;
+						improve += paramOpt;
+						outman.DebugMessage("ins/del opt = %.4f", paramOpt);
+						}
 					}
 				if(modSpecSet.InferSubsetRates()){
 					improve += bestTree->OptimizeSubsetRates(adap->branchOptPrecision);
@@ -1971,9 +1978,9 @@ void Population::BetterFinalOptimization(){
 	int pass=1;
 	FLOAT_TYPE incr;
 
-	double freqOptImprove, nucRateOptImprove, pinvOptImprove, alphaOptImprove, omegaOptImprove, flexOptImprove, subRateOpt;
+	double freqOptImprove, nucRateOptImprove, pinvOptImprove, alphaOptImprove, omegaOptImprove, flexOptImprove, subRateOpt, insDelOptImprove;
 	double paramOpt, blenOptImprove;
-	paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = subRateOpt = ZERO_POINT_ZERO;
+	paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = subRateOpt = insDelOptImprove = ZERO_POINT_ZERO;
 
 	FLOAT_TYPE precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
 	FLOAT_TYPE paramPrecThisPass = max(adap->branchOptPrecision*0.1, 0.01);
@@ -2029,8 +2036,8 @@ void Population::BetterFinalOptimization(){
 			Model *mod = indiv[bestIndiv].modPart.GetModel(m);
 			const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
 
-			bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates;
-			optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = false;
+			bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates, optInsDel;
+			optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = optInsDel = false;
 
 			if(modSpec->IsCodon())
 				optOmega = true;
@@ -2047,6 +2054,8 @@ void Population::BetterFinalOptimization(){
 				optFreqs = true;
 			if((modSpec->fixRelativeRates == false && modSpec->Nst() > 1 && modSpec->IsAminoAcid() == false))
 				optRelRates = true;
+			if(modSpec->IsOrientedGap())
+				optInsDel = true;
 
 			//this is taken from the improved version in the trunk, and is a bit redundant in this context.  
 			//the output strings will be generated every time that any of the params are optimized, and will
@@ -2113,6 +2122,15 @@ void Population::BetterFinalOptimization(){
 				outString += temp;
 				incr += paramOpt;
 				}
+			if(optInsDel){
+				paramOpt = optTree->OptimizeInsertDeleteRates(paramPrecThisPass, m);
+				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+					paramOpt = ZERO_POINT_ZERO;
+				insDelOptImprove += paramOpt;
+				sprintf(temp, "  ins/del rates= %4.4f", paramOpt);
+				outString += temp;
+				incr += paramOpt;
+				}
 			
 			optInd->CalcFitness(0);
 			}
@@ -2135,7 +2153,7 @@ void Population::BetterFinalOptimization(){
 //			if(pass > 20 && (goingToExit || (pass % 10 == 0)))
 //				outman.UserMessage(" optimization up to ...");
 			outman.UserMessage("pass %-2d: %.4f   %s", pass, optInd->Fitness(), outString.c_str());
-			paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = subRateOpt = ZERO_POINT_ZERO;
+			paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = subRateOpt = insDelOptImprove = ZERO_POINT_ZERO;
 //			}
 		pass++;
 		}while(!goingToExit);
