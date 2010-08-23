@@ -236,10 +236,12 @@ protected:
 			assert( i < nTax );
 			return matrix[i];
 		}
-		virtual void SetMatrix( int i, int j, unsigned char c, int origColumn = -1){
+		virtual void SetMatrix( int i, int j, unsigned char c){
 			if(matrix && (i < nTax) && (j < nChar))
 				matrix[i][j] = c;
-			origDataNumber[j] = origColumn;
+			}
+		void SetOriginalDataNumber(const int subsetMatColumn, const int origMatColumn){
+			origDataNumber[subsetMatColumn] = origMatColumn;			
 			}
 
 		int MatrixExists() const { return ( matrix && nTax>0 && nChar>0 ? 1 : 0 ); }

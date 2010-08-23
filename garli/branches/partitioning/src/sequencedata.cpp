@@ -43,7 +43,7 @@ void SequenceData::AddDummyRootToExistingMatrix(){
 	nTax++;
 	SetTaxonLabel( nTax - 1, "ROOT\0");
 	for(int c = 0;c < nChar;c++){	
-		SetMatrix( nTax - 1, c, maxNumStates, origDataNumber[0]);
+		SetMatrix( nTax - 1, c, maxNumStates);
 		}
 	}
 
@@ -54,7 +54,7 @@ void NucleotideData::AddDummyRootToExistingMatrix(){
 	nTax++;
 	SetTaxonLabel( nTax - 1, "ROOT\0");
 	for(int c = 0;c < nChar;c++){	
-		SetMatrix( nTax - 1, c, 15, origDataNumber[0]);
+		SetMatrix( nTax - 1, c, 15);
 		}
 	}
 
@@ -924,6 +924,8 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsig
 			int j = 0;
 
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+				if(i == 0)
+					SetOriginalDataNumber(j, *cit);
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 15;
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
@@ -933,7 +935,7 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsig
 						datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
 						}
 					}
-				SetMatrix( i, j++, datum, *cit );
+				SetMatrix( i, j++, datum);
 				}
 			i++;
 			}
@@ -988,6 +990,8 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsign
 			bool firstAmbig = true;
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+				if(i == 0)
+					SetOriginalDataNumber(j, *cit);
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 20;
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 20;
@@ -1007,7 +1011,7 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsign
 						datum = CharToDatum('?');
 						}
 					}
-				SetMatrix( i, j++, datum, *cit);
+				SetMatrix( i, j++, datum );
 				}
 			if(firstAmbig == false) outman.UserMessage("");
 			i++;
@@ -1065,7 +1069,9 @@ void BinaryData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 			int j = 0;
 			bool firstAmbig = true;
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
-			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){
+				if(i == 0)
+					SetOriginalDataNumber(j, *cit);
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 2;
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 2;
@@ -1085,7 +1091,7 @@ void BinaryData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 						datum = CharToDatum('?');
 						}
 					}
-				SetMatrix( i, j++, datum, *cit );
+				SetMatrix( i, j++, datum );
 				}
 			if(firstAmbig == false) outman.UserMessage("");
 			i++;
@@ -1199,12 +1205,17 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 			
 			int effectiveChar = 0;
 			//add the dummy constant character
-			if(datatype == ONLY_VARIABLE)
-				SetMatrix( effectiveTax, effectiveChar++, 0, -1 );
+			if(datatype == ONLY_VARIABLE){
+				if(effectiveTax == 0)
+					SetOriginalDataNumber(0, -1);
+				SetMatrix( effectiveTax, effectiveChar++, 0);
+				}
 
 			bool firstAmbig = true;
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
-			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){
+				if(effectiveTax == 0)
+					SetOriginalDataNumber(effectiveChar, *cit);
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true){
 					//if gapmode=newstate is on (default is gapmode=missing) then need handle the gap properly
@@ -1246,7 +1257,7 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 						datum = maxNumStates;
 						}
 					}
-				SetMatrix( effectiveTax, effectiveChar++, datum, *cit );
+				SetMatrix( effectiveTax, effectiveChar++, datum);
 				}
 			if(firstAmbig == false) outman.UserMessage("");
 			effectiveTax++;
@@ -1454,12 +1465,17 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 			
 			int effectiveChar = 0;
 			//add the dummy constant character
-			if(datatype == ONLY_VARIABLE)
-				SetMatrix( effectiveTax, effectiveChar++, 0, -1 );
+			if(datatype == ONLY_VARIABLE){
+				if(effectiveTax == 0)
+					SetOriginalDataNumber(0, -1);
+				SetMatrix( effectiveTax, effectiveChar++, 0);
+				}
 
 			bool firstAmbig = true;
 //			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+				if(effectiveTax == 0)
+					SetOriginalDataNumber(effectiveChar, *cit);
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true)
 					datum = 0;
@@ -1481,7 +1497,7 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 						datum = maxNumStates;
 						}
 					}
-				SetMatrix( effectiveTax, effectiveChar++, datum, *cit );
+				SetMatrix( effectiveTax, effectiveChar++, datum);
 				}
 			if(firstAmbig == false) outman.UserMessage("");
 			effectiveTax++;
