@@ -5123,7 +5123,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				}
 			Ldata++;
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL+MkvScaler);
+				siteLikes.push_back(unscaledlnL);
 			}
 		if(sitelikeLevel != 0){
 			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
@@ -5206,7 +5206,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				}
 			Ldata++;
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL+MkvScaler);
+				siteLikes.push_back(unscaledlnL);
 			}
 		if(sitelikeLevel != 0){
 			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
@@ -5588,7 +5588,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				}
 
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL+MkvScaler);
+				siteLikes.push_back(unscaledlnL);
 			}
 		if(sitelikeLevel != 0){
 			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
@@ -5666,7 +5666,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				}
 
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL+MkvScaler);
+				siteLikes.push_back(unscaledlnL);
 			}
 		if(sitelikeLevel != 0){
 			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
