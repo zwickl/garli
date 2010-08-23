@@ -82,7 +82,13 @@ if [ -d $TESTS_DIR/scoring ];then
 				fi
 			fi
 
-			score=`tail -1 scr.$base.sitelikes.log | awk '{print $2}'`
+			#sum up the individual site likes and the full likelihood, both appearing
+			#in column 2.  Divide by 2 for the full like.  Thus, this tests that both
+			#general scoring and sitelike output are correct.
+			sum=`awk '{sum+=$2}END{printf("%.5f", sum)}' scr.$base.sitelikes.log`
+			score=`echo "scale=5; $sum / 2.0" | bc`
+			#score=`tail -1 scr.$base.sitelikes.log | awk '{print $2}'`
+
 			expect=`grep $base.conf data/expected.scr | awk '{print $2}'`
 			diff=`echo \($score\) - \($expect\) | bc`
 			echo ***********TEST**************
