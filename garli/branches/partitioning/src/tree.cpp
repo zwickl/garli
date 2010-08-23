@@ -4930,6 +4930,15 @@ void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *
 	//output level 1 is user-level output, just site nums and site likes
 	//output level 2 is for debugging, includes underflow multipliers and output of site likes in packed order
 	const SequenceData *data = dataPart->GetSubset(partNum);
+
+	bool isMkv = false;
+	const NStateData *temp = dynamic_cast<const NStateData*>(data);
+	if(temp){
+		if(temp->datatype == NStateData::ONLY_VARIABLE){
+			isMkv = true;
+			}
+		}
+	
 	assert(sitelikeLevel != 0);
 	//a negative sitelike level means append, but the absolute value meanings are the same
 	bool append = sitelikeLevel < 0;
@@ -4953,15 +4962,16 @@ void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *
 	ordered.precision(8);
 	packed.precision(8);
 	
-	for(int site = 0;site < data->GapsIncludedNChar();site++){
+	for(int site = (isMkv ? 1 : 0);site < data->GapsIncludedNChar();site++){
 		int col = data->Number(site);
-		if(col == -1){
+		int origCol = data->OrigDataNumber(site);
+		if(origCol == -1){
 			ordered << "\t\t" << site+1 << "\t-";
 			if(effectiveSitelikeLevel > 1) ordered << "\t-\t-";
 			ordered << "\n";
 			}
 		else{
-			ordered << "\t\t" << site+1 << "\t" << -likes[col];
+			ordered << "\t\t" << origCol + 1 << "\t" << -likes[col];
 			if(effectiveSitelikeLevel > 1){
 				ordered << "\t" << under1[col];
 				if(under2 != NULL)
