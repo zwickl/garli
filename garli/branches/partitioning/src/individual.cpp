@@ -690,42 +690,6 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			optSubsetRates = true;
 		}
 
-	//DEBUG
-/*	outman.UserMessage("Rooting at nodes across tree...");
-	Individual tempIndiv;
-	tempIndiv.treeStruct=new Tree();
-	Tree *scratchT = tempIndiv.treeStruct;
-	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, this);
-	Tree::useOptBoundedForBlen = true;
-	scratchT->sitelikeLevel = 1;
-	scratchT->ofprefix = "varyingRoot";
-	//for(int i = treeStruct->NTax() + 1;i < treeStruct->NTax() * 2 - 2;i++){
-	scratchT->GatherValidReconnectionNodes(99999, scratchT->dummyRoot, NULL);
-	scratchT->sprRang.SortByDist();
-
-	int num=0;
-	ReconList attempted;
-	ofstream trees("rootings.tre");
-	//globalBest = -99999.9;
-	for(listIt broken = scratchT->sprRang.begin();broken != scratchT->sprRang.end();broken++){
-		//try a reattachment point
-		scratchT->SPRMutate(scratchT->dataPart->NTax(), &(*broken), 0.01, 0);
-		//record the score
-		double initial = scratchT->lnL;
-		scratchT->OptimizeAllBranches(0.01);
-		broken->chooseProb = scratchT->lnL;
-		attempted.AddNode(*broken);
-		outman.UserMessage("node\t%d\tlnL\t%f\t%f", (*broken).nodeNum, initial, scratchT->lnL);
-		char str[10000];
-		scratchT->root->MakeNewick(str, false, true);
-		trees << "tree r" << broken->nodeNum << "=[" << scratchT->lnL << "] " << str << ";" << endl;
-		//restore the tree
-		tempIndiv.CopySecByRearrangingNodesOfFirst(scratchT, this, true);
-		num++;
-		scratchT->sitelikeLevel = -1;
-		}
-*/	
-		
 	outman.UserMessageNoCR("optimizing: starting branch lengths");
 	if(optAlpha) outman.UserMessageNoCR(", alpha shape");
 	if(optPinv) outman.UserMessageNoCR(", prop. invar");

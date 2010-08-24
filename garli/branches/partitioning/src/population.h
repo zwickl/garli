@@ -447,6 +447,7 @@ private:
 		void VariableStartingTreeOptimization(bool reducing);
 		void OptimizeSiteRates();
 		void OptimizeInputAndWriteSitelikelihoods();
+		void OptimizeInputAndWriteSitelikelihoodsAndTryRootings();
 
 		int IsError() const { return error; }
 		void ErrorMsg( char* msgstr, int len );
