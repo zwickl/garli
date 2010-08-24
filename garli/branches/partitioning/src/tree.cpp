@@ -6176,7 +6176,7 @@ void Tree::ReadBinaryFormattedTree(FILE *in){
 FLOAT_TYPE Tree::OptimizeInsertDeleteRates(FLOAT_TYPE prec, int modnum){
 	FLOAT_TYPE improve = 0.0;
 	//delete > insert	
-	improve += OptimizeBoundedParameter(modnum, prec, modPart->GetModel(modnum)->InsertRate(), 0, 1e-8, modPart->GetModel(modnum)->DeleteRate(), &Model::SetInsertRate);
+	improve += OptimizeBoundedParameter(modnum, prec, modPart->GetModel(modnum)->InsertRate(), 0, 1e-4, modPart->GetModel(modnum)->DeleteRate(), &Model::SetInsertRate);
 	improve += OptimizeBoundedParameter(modnum, prec, modPart->GetModel(modnum)->DeleteRate(), 0, modPart->GetModel(modnum)->InsertRate(), 999.9, &Model::SetDeleteRate);
 	return improve;
 	}
