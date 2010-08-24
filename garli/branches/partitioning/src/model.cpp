@@ -1096,6 +1096,34 @@ void Model::OutputPmats(ofstream &deb){
 
 	}
 
+void Model::CalcDerivativesOrientedGap(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&one, FLOAT_TYPE ***&two){
+	
+	CalcOrientedGapPmat(dlen, pr);
+	
+	double expIns = exp(-*insertRate * dlen);
+	double expDel = exp(-*deleteRate * dlen);
+
+	one[0][0][0] = *insertRate * expIns;
+	one[0][0][1] = (*insertRate * (-*insertRate * expIns + *deleteRate * expDel)) / (*deleteRate - *insertRate);
+	one[0][0][2] = (*insertRate * *deleteRate) * (expIns - expDel) / (*insertRate - *deleteRate);
+	
+	one[0][1][0] = 0.0;
+	one[0][1][1] = -*insertRate * expDel;
+	one[0][1][2] = *insertRate * expDel;
+
+	one[0][2][0] = one[0][2][1] = one[0][2][2] = 0.0;
+
+	two[0][0][0] = pow(*insertRate, 2) * expIns;
+	two[0][0][1] = (pow(*insertRate, 2.0) * expIns - pow(*deleteRate, 2.0) * expDel) / (*deleteRate - *insertRate);
+	two[0][0][2] = (*insertRate * *deleteRate) * (-*insertRate * expIns + *deleteRate * expDel) / (*insertRate - *deleteRate);
+	
+	two[0][1][0] = 0.0;
+	two[0][1][1] = pow(*insertRate, 2.0) * expDel;
+	two[0][1][2] = -pow(*insertRate, 2.0) * expDel;
+
+	two[0][2][0] = two[0][2][1] = two[0][2][2] = 0.0;
+	}
+
 void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&one, FLOAT_TYPE ***&two){
 	if(eigenDirty==true)
 		CalcEigenStuff();
@@ -1953,7 +1981,7 @@ void Model::FillPaupBlockStringForModel(string &str, const char *treefname) cons
 void Model::OutputGarliFormattedModel(ostream &outf) const{
 	//no reason to have different versions of the same thing, so just use the fill string function
 	string s;
-	this->FillGarliFormattedModelString(s);
+	FillGarliFormattedModelString(s);
 	outf << s.c_str();
 	return;
 /*
@@ -2262,7 +2290,7 @@ void Model::FillGarliFormattedModelString(string &s) const{
 		sprintf(temp," e %f %f %f %f", StateFreq(0), StateFreq(1), StateFreq(2), StateFreq(3));
 		s += temp;
 		}
-	else{
+	else if(!IsOrientedGap()){
 		sprintf(temp," e ");
 		s += temp;
 		for(int i=0;i<nstates;i++){
@@ -2489,8 +2517,15 @@ void Model::CreateModelFromSpecification(int modnum){
 	if(IsOrientedGap()){
 		insertRate = new FLOAT_TYPE;
 		*insertRate = 0.1;
+		AbsoluteRate *ins = new AbsoluteRate((FLOAT_TYPE **) &insertRate, modnum);
+		ins->SetWeight(1);
+		paramsToMutate.push_back(ins);
+
 		deleteRate = new FLOAT_TYPE;
 		*deleteRate = 0.2;
+		AbsoluteRate *del = new AbsoluteRate((FLOAT_TYPE **) &deleteRate, modnum);
+		del->SetWeight(1);
+		paramsToMutate.push_back(del);
 		}
 	else{
 		insertRate = deleteRate = NULL;
@@ -4194,4 +4229,13 @@ void ModelPartition::ReadParameterValues(string &modstr){
 	modPart.ReadParameterValues(modString);
 	modPart.GetModelSet(0)->GetModel(0)->ReadGarliFormattedModelString(modString);
 */	
+	}
+
+void ModelPartition::FillGarliFormattedModelString(string &s) const{
+	for(int m = 0;m < modSets.size(); m++){
+		s += " M";
+		s += m;
+		s += " ";
+		GetModelSet(m)->GetModel(0)->FillGarliFormattedModelString(s);
+		}
 	}

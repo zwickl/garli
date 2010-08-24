@@ -3954,23 +3954,10 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	else sprintf(temp, "tree bestREP%d = [&U][!GarliScore %f][!GarliModel ", indnum+1, ind->Fitness()); 
 	str += temp;
 	string modstr;
-	//PARTITION
-	//ind->mod->FillGarliFormattedModelString(modstr);
-	if(ind->modPart.NumModels() == 1){
-		ind->modPart.GetModel(0)->FillGarliFormattedModelString(modstr);
-		str += modstr;
-		modstr.clear();
-		}
-	else{
-		for(int m = 0;m < ind->modPart.NumModels();m++){
-			ind->modPart.GetModel(m)->FillGarliFormattedModelString(modstr);
-			char mStr[20];
-			sprintf(mStr, " mod%d", m);
-			str += mStr;
-			str += modstr;
-			modstr.clear();
-			}
-		}
+	ind->modPart.FillGarliFormattedModelString(modstr);
+	str += modstr;
+	modstr.clear();
+
 	str += "]";
 
 #ifdef BOINC
