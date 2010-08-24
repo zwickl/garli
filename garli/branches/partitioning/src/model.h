@@ -54,7 +54,8 @@ extern vector<ClaSpecifier> claSpecs;
 		RATEMULTS = 4,
 		RATEPROPS = 5,
 		PROPORTIONINVARIANT = 6,
-		SUBSETRATE = 7
+		SUBSETRATE = 7,
+		ABSOLUTERATE = 8
 		};
 
 class BaseParameter {
@@ -277,6 +278,16 @@ public:
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
 		if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;
+		}
+	};
+
+class AbsoluteRate:public BaseParameter{
+public:
+	AbsoluteRate(FLOAT_TYPE **dv, int modnum):BaseParameter("Absolute rate", dv, ABSOLUTERATE, 1, (FLOAT_TYPE)0.0001, (FLOAT_TYPE)999.0, modnum){};
+	void Mutator(FLOAT_TYPE mutationShape){
+		*vals[0] *= rnd.gamma( mutationShape );
+		if(*vals[0]>maxv) 
+			*vals[0]=maxv;
 		}
 	};
 
@@ -958,6 +969,7 @@ class Model{
 	void CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLOAT_TYPE *&mat2);
 	void CalcPmatNState(FLOAT_TYPE blen, MODEL_FLOAT *metaPmat);
 	void CalcDerivatives(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
+	void CalcDerivativesOrientedGap(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
 	void OutputPmats(ofstream &deb);
 	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pr);
 	void CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat);
@@ -1747,6 +1759,7 @@ public:
 		}
 
 	void ReadParameterValues(string &modstr);
+	void FillGarliFormattedModelString(string &s) const;
 	};
 
 typedef void (Model::*SetParamFunc) (int, FLOAT_TYPE);
