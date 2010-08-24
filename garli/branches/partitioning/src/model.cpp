@@ -2318,6 +2318,7 @@ void Model::FillGarliFormattedModelString(string &s) const{
 		}
 	if(modSpec->IsOrientedGap()){
 		sprintf(temp, " i %f d %f", insertRate, deleteRate);
+		s += temp;
 		}
 	s += " ";
 	}
