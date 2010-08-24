@@ -1661,11 +1661,11 @@ public:
 			subsetRates[d] = mp->subsetRates[d];
 			}
 		}
-	unsigned NumModelSets()const {return modSets.size();}
-	unsigned NumModels()const {return models.size();}
+	unsigned NumModelSets() const {return modSets.size();}
+	unsigned NumModels() const {return models.size();}
 	unsigned NumMutableParams() const {return allParamsToMutate.size();}
 	unsigned NumSubsetRates() const {return subsetRates.size();}
-	FLOAT_TYPE SubsetRate(int i){return subsetRates[i];}
+	FLOAT_TYPE SubsetRate(int i) const {return subsetRates[i];}
 	//can't think of anything else that really needs to get reset here
 	void Reset(){
 		for(int d = 0;d < subsetRates.size();d++){
