@@ -4193,6 +4193,13 @@ int ModelPartition::PerformModelMutation(){
 		NormalizeSubsetRates();
 		retType=Individual::subsetRate;
 		}
+	else if(mut->Type() == ABSOLUTERATE){
+		//For now this is only insert and delete rates.  Need to ensure that insert stays < delete
+		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++)
+			if(models[*mit]->InsertRate() > models[*mit]->DeleteRate())
+				*models[*mit]->insertRate = *models[*mit]->deleteRate;
+		retType=Individual::indel;
+		}
 	return retType;
 	}
 
