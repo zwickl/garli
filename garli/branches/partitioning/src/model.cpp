@@ -4233,9 +4233,9 @@ void ModelPartition::ReadParameterValues(string &modstr){
 
 void ModelPartition::FillGarliFormattedModelString(string &s) const{
 	for(int m = 0;m < modSets.size(); m++){
-		s += " M";
-		s += m;
-		s += " ";
+		char temp[10];
+		sprintf(temp, " M%d" , m);
+		s += temp;
 		GetModelSet(m)->GetModel(0)->FillGarliFormattedModelString(s);
 		}
 	}
