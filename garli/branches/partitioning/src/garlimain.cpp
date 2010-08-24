@@ -679,7 +679,9 @@ int main( int argc, char* argv[] )	{
 			
 			//this depends on the fact that an extra taxon slot was allocated by not yet used
 			if(modSpecSet.AnyOrientedGap()){
-				dataPart.AddDummyRoots();
+				NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
+				if(!tax->IsAlreadyDefined("ROOT"))
+					dataPart.AddDummyRoots();
 				}
 	
 			outman.UserMessage("\n###################################################");

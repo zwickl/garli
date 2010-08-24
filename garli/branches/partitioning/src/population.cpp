@@ -605,7 +605,7 @@ void Population::LoadNexusStartingConditions(){
 	GarliReader & reader = GarliReader::GetInstance();
  	NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
 	//if(indiv[0].treeStruct->rootWithDummy){//add this in case a tree output by GARLI that contains the dummy root taxon is used as input
-	if(Tree::rootWithDummy){
+	if(Tree::rootWithDummy && !tax->IsAlreadyDefined("ROOT")){
 		string n = "ROOT";
 		tax->AppendNewLabel(n);
 		}

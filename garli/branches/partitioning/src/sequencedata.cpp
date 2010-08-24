@@ -41,7 +41,7 @@ void SequenceData::AddDummyRootToExistingMatrix(){
 	assert(nTaxAllocated > nTax);
 
 	nTax++;
-	SetTaxonLabel( nTax - 1, "ROOT\0");
+	SetTaxonLabel( nTax - 1, "ROOT");
 	for(int c = 0;c < nChar;c++){	
 		SetMatrix( nTax - 1, c, maxNumStates);
 		}
@@ -52,7 +52,7 @@ void NucleotideData::AddDummyRootToExistingMatrix(){
 	assert(nTaxAllocated > nTax);
 
 	nTax++;
-	SetTaxonLabel( nTax - 1, "ROOT\0");
+	SetTaxonLabel( nTax - 1, "ROOT");
 	for(int c = 0;c < nChar;c++){	
 		SetMatrix( nTax - 1, c, 15);
 		}
