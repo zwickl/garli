@@ -2836,7 +2836,100 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 
 		Individual *repResult = new Individual(&indiv[0]);
 		storedTrees.push_back(repResult);
+
 		Reset();
+		}
+	EvaluateStoredTrees(true);
+	}
+
+void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
+	
+	assert(Tree::someOrientedGap);
+	//find out how many trees we have
+	GarliReader & reader = GarliReader::GetInstance();
+	const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
+	if(treesblock == NULL || treesblock->GetNumTrees() > 1)
+		throw ErrorException("You must specify a treefile with exactly one tree to use this runmode.");
+//	int numTrees = treesblock->GetNumTrees();
+//	assert(numTrees == 1);
+
+	adap->branchOptPrecision = 0.01;
+	bestIndiv = 0;
+
+	//start the sitelike file
+	string oname = conf->ofprefix + ".sitelikes.log";
+	ofstream ordered;
+	ordered.open(oname.c_str());
+	ordered << "Tree\t-lnL\tSite\t-lnL\n";
+	ordered.close();
+
+	//DEBUG
+	Tree::useOptBoundedForBlen = true;
+
+	currentSearchRep = 1;
+	outman.UserMessage("Optimizing tree %d ...", 1);
+
+	SeedPopulationWithStartingTree(currentSearchRep);
+	bestIndiv = 0;
+	BetterFinalOptimization();
+	//this will stick the current tree into the treelog
+	InitializeOutputStreams();
+
+	outman.UserMessage("Writing site likelihoods for tree %d ...", 1);
+	indiv[0].treeStruct->sitelikeLevel = -1;
+	indiv[0].treeStruct->ofprefix = conf->ofprefix;
+	indiv[0].treeStruct->Score();
+	
+	//put the score of the initial indiv in the file
+	ordered.open(oname.c_str(), ios::app);
+	ordered.precision(10);
+	ordered << "0\t" << -indiv[0].treeStruct->lnL << "\n";
+	ordered.close();
+
+	//store the indiv 
+	Individual *repResult = new Individual(&indiv[0]);
+	storedTrees.push_back(repResult);
+
+	//copy the tree and model into indiv[1]
+	outman.UserMessage("Rooting at nodes across tree...");
+	Tree *indiv1Tree = indiv[1].treeStruct;
+	indiv[1].CopySecByRearrangingNodesOfFirst(indiv1Tree, &indiv[0]);
+
+	//get ready to swap on indiv[1]
+	indiv1Tree->GatherValidReconnectionNodes(99999, indiv1Tree->dummyRoot, NULL);
+	indiv1Tree->sprRang.SortByDist();
+
+	int tnum = 2;
+
+	for(listIt broken = indiv1Tree->sprRang.begin();broken != indiv1Tree->sprRang.end();broken++){
+		//try a reattachment point for the dummy root taxon
+		indiv1Tree->SPRMutate(indiv1Tree->dataPart->NTax(), &(*broken), 0.01, 0);
+		//optimize the result
+		bestIndiv = 1;
+		BetterFinalOptimization();
+
+		outman.UserMessage("%d\tnode\t%d\tlnL\t%f", tnum, (*broken).nodeNum, indiv1Tree->lnL);
+
+		//output the sitelikes
+		indiv1Tree->ofprefix = conf->ofprefix;
+		indiv1Tree->sitelikeLevel = -1;
+		indiv1Tree->Score();
+
+		//add the total score
+		ordered.open(oname.c_str(), ios::app);
+		ordered.precision(10);
+		ordered << tnum << "\t" << -indiv1Tree->lnL << "\n";
+		ordered.close();
+
+		//store the indiv and write the tree to file
+		repResult = new Individual(&indiv[1]);
+		storedTrees.push_back(repResult);
+		//this will make the various trees have different names
+		gen = tnum;
+		AppendTreeToTreeLog(0, 1);
+
+		indiv[1].CopySecByRearrangingNodesOfFirst(indiv1Tree, &indiv[0], true);
+		tnum++;
 		}
 	EvaluateStoredTrees(true);
 	}

@@ -720,6 +720,9 @@ int main( int argc, char* argv[] )	{
 				else if(conf.runmode == 11){
 					pop.OptimizeInputAndWriteSitelikelihoods();
 					}
+				else if(conf.runmode == 12){
+					pop.OptimizeInputAndWriteSitelikelihoodsAndTryRootings();
+					}
 				else if(conf.runmode > 20){
 					pop.GenerateTreesOnly(conf.runmode);
 					}
