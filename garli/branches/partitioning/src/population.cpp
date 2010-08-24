@@ -2906,6 +2906,12 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 		indiv1Tree->SPRMutate(indiv1Tree->dataPart->NTax(), &(*broken), 0.01, 0);
 		//optimize the result
 		bestIndiv = 1;
+
+		//this will make the various trees have different names when they are appended to the treelog
+		//in BetterFinalOpt
+		gen = tnum;
+		//AppendTreeToTreeLog(0, 1);
+
 		BetterFinalOptimization();
 
 		outman.UserMessage("%d\tnode\t%d\tlnL\t%f", tnum, (*broken).nodeNum, indiv1Tree->lnL);
@@ -2924,9 +2930,6 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 		//store the indiv and write the tree to file
 		repResult = new Individual(&indiv[1]);
 		storedTrees.push_back(repResult);
-		//this will make the various trees have different names
-		gen = tnum;
-		AppendTreeToTreeLog(0, 1);
 
 		indiv[1].CopySecByRearrangingNodesOfFirst(indiv1Tree, &indiv[0], true);
 		tnum++;
