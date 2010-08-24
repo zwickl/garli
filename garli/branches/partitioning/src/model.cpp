@@ -4232,8 +4232,15 @@ void ModelPartition::ReadParameterValues(string &modstr){
 	}
 
 void ModelPartition::FillGarliFormattedModelString(string &s) const{
+	char temp[10];
+	if(modSpecSet.InferSubsetRates()){
+		s += " SSR ";
+		for(int r = 0;r < NumSubsetRates();r++){
+			sprintf(temp, " %f ", SubsetRate(r));
+			s += temp;
+			}
+		}
 	for(int m = 0;m < modSets.size(); m++){
-		char temp[10];
 		sprintf(temp, " M%d" , m);
 		s += temp;
 		GetModelSet(m)->GetModel(0)->FillGarliFormattedModelString(s);
