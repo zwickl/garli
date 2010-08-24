@@ -3834,11 +3834,11 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 		
 	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
 	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
-	//DEBUG PARTITION
-	//ind->mod->OutputGarliFormattedModel(treeLog);
-	ind->modPart.GetModel(0)->OutputGarliFormattedModel(treeLog);
+
+	string modstr;
+	ind->modPart.FillGarliFormattedModelString(modstr);
 	ind->treeStruct->root->MakeNewick(treeString, false, true);
-	treeLog << "]" << treeString << ";" << endl;
+	treeLog << modstr.c_str() << "]" << treeString << ";" << endl;
 	}
 
 
