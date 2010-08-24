@@ -286,8 +286,10 @@ public:
 	AbsoluteRate(FLOAT_TYPE **dv, int modnum):BaseParameter("Absolute rate", dv, ABSOLUTERATE, 1, (FLOAT_TYPE)0.0001, (FLOAT_TYPE)999.0, modnum){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *= rnd.gamma( mutationShape );
-		if(*vals[0]>maxv) 
-			*vals[0]=maxv;
+		if(*vals[0] > maxv) 
+			*vals[0] = maxv;
+		if(*vals[0] < minv) 
+			*vals[0] = minv;
 		}
 	};
 
