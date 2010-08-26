@@ -7148,12 +7148,9 @@ void Tree::CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr,
 
 	FLOAT_TYPE **tipStates = New2DArray<FLOAT_TYPE>(3, 4);
 
-	//OOPS - in NCL's gapcoder output 0 means base and 1 means gap - so, I had this backward
-	//this then does NOT match up with the pmat or cla's which start with gap.  Not really
-	//a problem, just swap the tip coding below.
-	bool gapIs0 = false;
-	int gapState = (gapIs0 ? 0 : 1);
-	int baseState = (gapIs0 ? 1 : 0);
+	bool gapIsState0 = true;
+	int gapState = (gapIsState0 ? 0 : 1);
+	int baseState = (gapIsState0 ? 1 : 0);
 
 	//gap with base in subtree should always be zero at tip
 
