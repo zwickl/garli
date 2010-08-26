@@ -2883,12 +2883,22 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 	//put the score of the initial indiv in the file
 	ordered.open(oname.c_str(), ios::app);
 	ordered.precision(10);
-	ordered << "0\t" << -indiv[0].treeStruct->lnL << "\n";
+	ordered << "0\t" << -indiv[0].treeStruct->lnL << "\t";
+	indiv[0].treeStruct->root->MakeNewick(treeString, false, true, false);
+	ordered << treeString << "\n";
 	ordered.close();
 
 	//store the indiv 
 	Individual *repResult = new Individual(&indiv[0]);
 	storedTrees.push_back(repResult);
+
+	//return the rates to initial vals to have them reopt each time
+	for(int m = 0;m < indiv[0].modPart.NumModels();m++){
+		if(indiv[0].modPart.GetModel(m)->IsOrientedGap()){
+			indiv[0].modPart.GetModel(m)->SetInsertRate(0, 0.1);
+			indiv[0].modPart.GetModel(m)->SetDeleteRate(0, 0.2);
+			}
+		}
 
 	//copy the tree and model into indiv[1]
 	outman.UserMessage("Rooting at nodes across tree...");
@@ -2921,10 +2931,12 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 		indiv1Tree->sitelikeLevel = -1;
 		indiv1Tree->Score();
 
-		//add the total score
+		//add the total score and the tree
 		ordered.open(oname.c_str(), ios::app);
 		ordered.precision(10);
-		ordered << tnum << "\t" << -indiv1Tree->lnL << "\n";
+		ordered << tnum << "\t" << -indiv1Tree->lnL << "\t";
+		indiv[1].treeStruct->root->MakeNewick(treeString, false, true, false);
+		ordered << treeString << "\n";
 		ordered.close();
 
 		//store the indiv and write the tree to file
@@ -2935,6 +2947,9 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 		tnum++;
 		}
 	EvaluateStoredTrees(true);
+	FinalizeOutputStreams(0);
+	FinalizeOutputStreams(1);
+	FinalizeOutputStreams(2);
 	}
 
 void Population::VariableStartingTreeOptimization(bool reducing){
