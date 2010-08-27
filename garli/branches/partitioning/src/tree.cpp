@@ -618,6 +618,16 @@ void Tree::ScaleWholeTree(FLOAT_TYPE factor/*=-1.0*/){
 	lnL=-ONE_POINT_ZERO;
 	}
 
+//this returns the average tree length for the whole dataset, and might need to be scaled for a given subset if SSR is being used
+FLOAT_TYPE Tree::Treelength(){
+	FLOAT_TYPE tot = 0.0;
+	for(int i=1;i<numNodesTotal;i++){
+		if(allNodes[i] != dummyRoot) 
+			tot += allNodes[i]->dlen;
+		}
+	return tot;
+	}
+
 int Tree::BrlenMutateSubset(vector<int> const &subtreeMemberNodes){
 	int numBrlenMuts;
 	do{
@@ -4965,8 +4975,8 @@ void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *
 	for(int site = (isMkv ? 1 : 0);site < data->GapsIncludedNChar();site++){
 		int col = data->Number(site);
 		int origCol = data->OrigDataNumber(site);
-		if(origCol == -1){
-			ordered << "\t\t" << site+1 << "\t-";
+		if(col == -1){
+			ordered << "\t\t" << origCol + 1 << "\t-";
 			if(effectiveSitelikeLevel > 1) ordered << "\t-\t-";
 			ordered << "\n";
 			}
@@ -5257,7 +5267,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 		if(countit[i] > 0){
 			siteL = ZERO_POINT_ZERO;
 
-			for(int from=0;from<4;from++){
+			for(int from = 0;from < claStates;from++){
 				siteL += partial[from] * freqs[from];
 				}
 			partial += claStates;					
@@ -5281,6 +5291,24 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 	if(sitelikeLevel != 0){
 		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
 		}
+
+
+	//DEBUG
+	//this takes into account the sequence length
+	double ins = mod->InsertRate();
+	double del = mod->DeleteRate();
+	int numNoIndels = 1497;
+	double term = 0.0;
+//	double term = log(1.0 - (ins / del)) + numNoIndels * log(ins / del);
+
+	//add in a factor for the constant columns
+	double expectedDels = Treelength() * del * modPart->SubsetRate(modIndex);
+	//this would be ln(pi * exp(-expectedDels)), so simplifies to:
+	double term2 = numNoIndels * (log(freqs[2]) - expectedDels) ;
+
+	outman.DebugMessage("%f\t%f\t%f\t%f\t%f\t%f", totallnL + term + term2, totallnL, term, term2, mod->InsertRate(), mod->DeleteRate());
+	totallnL += (term + term2);
+
 	return totallnL;
 	}
 
@@ -6175,9 +6203,13 @@ void Tree::ReadBinaryFormattedTree(FILE *in){
 
 FLOAT_TYPE Tree::OptimizeInsertDeleteRates(FLOAT_TYPE prec, int modnum){
 	FLOAT_TYPE improve = 0.0;
-	//delete > insert	
-	improve += OptimizeBoundedParameter(modnum, prec, modPart->GetModel(modnum)->InsertRate(), 0, 1e-4, modPart->GetModel(modnum)->DeleteRate(), &Model::SetInsertRate);
-	improve += OptimizeBoundedParameter(modnum, prec, modPart->GetModel(modnum)->DeleteRate(), 0, modPart->GetModel(modnum)->InsertRate(), 999.9, &Model::SetDeleteRate);
+	//delete > insert
+	FLOAT_TYPE ins, del;
+	ins = modPart->GetModel(modnum)->InsertRate();
+	del = modPart->GetModel(modnum)->DeleteRate();
+	improve += OptimizeBoundedParameter(modnum, prec, ins, 0, 1e-3, max(ins, min(ins * 1.05, del - 1e-3)), &Model::SetInsertRate);
+	ins = modPart->GetModel(modnum)->InsertRate();
+	improve += OptimizeBoundedParameter(modnum, prec, del, 0,       min(del, max((1.0 / 1.05) * del, ins + 1e-3)), 999.9, &Model::SetDeleteRate);
 	return improve;
 	}
 

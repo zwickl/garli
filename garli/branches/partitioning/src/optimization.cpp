@@ -452,7 +452,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 			}
 		boundBumped = fabs(curVal - (lowBound + bumpAmt));
 		curVal = lowBound + bumpAmt;
-		curScore = SetAndEvaluateParameter(which, curVal, bestKnownScore, bestKnownVal, SetParam);
+		curScore = SetAndEvaluateParameter(modnum, which, curVal, bestKnownScore, bestKnownVal, SetParam);
 		}
 	else if(highBound - bumpAmt < initialVal){
 		if(highBound - bumpAmt < lowBound + bumpAmt){
@@ -461,7 +461,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 			}
 		curVal = highBound - bumpAmt;
 		boundBumped = initialVal - curVal;
-		curScore = SetAndEvaluateParameter(which, curVal, bestKnownScore, bestKnownVal, SetParam);
+		curScore = SetAndEvaluateParameter(modnum, which, curVal, bestKnownScore, bestKnownVal, SetParam);
 		}
 #else
 	//the older version
@@ -583,7 +583,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 					incr = baseIncr;
 				//apply the new increment and check score difference again
 				higherEval = curVal+incr;
-				higherEvalScore = SetAndEvaluateParameter(which, higherEval, bestKnownScore, bestKnownVal, SetParam);
+				higherEvalScore = SetAndEvaluateParameter(modnum, which, higherEval, bestKnownScore, bestKnownVal, SetParam);
 				}
 			else cont = true;
 			} 
@@ -1390,8 +1390,6 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 	lnL = ZERO_POINT_ZERO;
 	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
 		Model *mod = modPart->GetModel((*specs).modelIndex);
-		//don't have derivs worked out for oriented gaps, so should be using OptBounded to optimize blens and not getting here at all
-		assert(!mod->GetModSpec()->IsOrientedGap());
 		
 		ProfModDeriv.Start();
 		//DEBUG - this should be double checked

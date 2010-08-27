@@ -318,6 +318,8 @@ public:
 	bool gotFlexFromFile;
 	bool gotPinvFromFile;
 	bool gotOmegasFromFile;
+	bool gotInsertFromFile;
+	bool gotDeleteFromFile;
 
 	enum{
 		DNA = 0,
@@ -382,7 +384,7 @@ public:
 		SetNumRateCats(4, false);
 		SetInvariantSites();
 		datatype=DNA;
-		gotRmatFromFile = gotStateFreqsFromFile = gotAlphaFromFile = gotFlexFromFile = gotPinvFromFile = gotOmegasFromFile = false;
+		gotRmatFromFile = gotStateFreqsFromFile = gotAlphaFromFile = gotFlexFromFile = gotPinvFromFile = gotOmegasFromFile = gotInsertFromFile = gotDeleteFromFile = false;
 		geneticCode=STANDARD;
 		isSetup = false;
 		}
@@ -401,7 +403,7 @@ public:
 	bool IsStandardData() const {return datatype == NSTATE || datatype == NSTATEV || datatype == ORDNSTATE || datatype == ORDNSTATEV;}
 
 	bool GotAnyParametersFromFile() const{
-		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile;
+		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile || gotInsertFromFile || gotDeleteFromFile;
 		}
 	//A number of canned model setups
 	
@@ -1376,8 +1378,12 @@ class Model{
 		}
 
 	void SetPinv(FLOAT_TYPE p, bool checkValidity){
-		if(checkValidity == true)
-			if(modSpec->includeInvariantSites==false && p!=0.0) throw(ErrorException("Config file specifies invariantsites = none, but starting model contains it!\n"));
+		if(checkValidity == true){
+			if(modSpec->includeInvariantSites == false && p!=0.0) 
+				throw(ErrorException("Config file specifies invariantsites = none, but starting model contains it!\n"));
+			else if(modSpec->includeInvariantSites == true && p == 0.0)
+				throw(ErrorException("Config file specifies invariantsites, but starting model sets it to zero!\n"));
+			}
 		*propInvar=p;
 		//change the proportion of rates in each gamma cat
 		for(int i=0;i<NRateCats();i++){
@@ -1684,6 +1690,7 @@ public:
 		subsetRates.clear();
 		for(int i = 0;i < vals.size();i++)
 			subsetRates.push_back(vals[i]);
+		NormalizeSubsetRates();
 		}
 
 	int PerformModelMutation();
@@ -1760,8 +1767,8 @@ public:
 			}
 		}
 
-	void ReadParameterValues(string &modstr);
-	void FillGarliFormattedModelString(string &s) const;
+	void ReadGarliFormattedModelStrings(string &modstr);
+	void FillGarliFormattedModelStrings(string &s) const;
 	};
 
 typedef void (Model::*SetParamFunc) (int, FLOAT_TYPE);

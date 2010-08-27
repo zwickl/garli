@@ -1127,7 +1127,7 @@ void GarliBlock::Read(
 			}
 		else if(token.AtEOF() == false){
 			NxsString s = token.GetToken();
-			if(s.size() > 1 && (s.IsADouble() == false && s.IsALong() == false)){
+			if(s.size() > 1 && (s.IsADouble() == false && s.IsALong() == false && s.find("M") > s.length())){
 				errormsg = "Unexpected character(s) in Garli block.\n     See manual for model parameter format.";
 				throw NxsException(errormsg, token.GetFilePosition(), token.GetFileLine(), token.GetFileColumn());
 				}
