@@ -554,7 +554,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 			}while(stf.peek() != '(' && stf.peek() != '\r' && stf.peek() != '\n' && !stf.eof());
 		while((stf.peek() == '\n' || stf.peek() == '\r') && stf.eof() == false) 
 			stf.get(c);
-		modPart.ReadParameterValues(modString);
+		modPart.ReadGarliFormattedModelStrings(modString);
 		}
 
 	if(foundTree==true){

@@ -2434,7 +2434,9 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			c=stf.get();
 			modSpec->gotAlphaFromFile=true;
 			}				
-		else if(c == 'P' || c == 'p' || c == 'i' || c == 'I'){//proportion invariant
+		//apropriating "i" for insert rate
+		//else if(c == 'P' || c == 'p' || c == 'i' || c == 'I'){//proportion invariant
+		else if(c == 'P' || c == 'p'){//proportion invariant
 			stf >> temp;
 			if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading proportion of invariant sites parameter from file.\nExamine file and check manual for format.\n"));
 			FLOAT_TYPE p=(FLOAT_TYPE)atof(temp);
@@ -2501,9 +2503,41 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			c=stf.get();
 			assert(0);
 			}
+		else if(c == 'I' || c == 'i'){
+			stf >> temp;
+			if(temp[0] != '.' && (!isdigit(temp[0])))
+				throw(ErrorException("Problem reading insertion rate parameter from file.\nExamine file and check manual for format.\nNote that the proportion of invariable sites parameter is specified with \"p\", not \"i\""));
+			if(! NxsString(temp).IsADouble())
+				throw(ErrorException("Problem reading insertion rate parameter from file.\nExamine file and check manual for format.\nNote that the proportion of invariable sites parameter is specified with \"p\", not \"i\""));
+			
+			FLOAT_TYPE i = (FLOAT_TYPE)atof(temp);
+			SetInsertRate(0, i);
+			do{c=stf.get();}while(c==' ');		
+			modSpec->gotInsertFromFile=true;
+			}
+		else if(c == 'D' || c == 'd'){
+			stf >> temp;
+			if(temp[0] != '.' && (!isdigit(temp[0])))
+				throw(ErrorException("Problem reading deletion rate parameter from file.\nExamine file and check manual for format.\n"));
+			if(! NxsString(temp).IsADouble())
+				throw(ErrorException("Problem reading deletion rate parameter from file.\nExamine file and check manual for format.\n"));
+			FLOAT_TYPE d = (FLOAT_TYPE)atof(temp);
+			SetDeleteRate(0, d);
+			do{c=stf.get();}while(c==' ');		
+			modSpec->gotDeleteFromFile=true;
+			}
 		else if(isalpha(c)) throw(ErrorException("Unknown model parameter specification in file.\nExamine file and check manual for format.\n"));
 		else if(c != '(') c=stf.get();
 		}while(c != '(' && c != '\r' && c != '\n' && !stf.eof());
+		//adjust the indel rates, if necessary
+		if(IsOrientedGap() && *insertRate > *deleteRate){
+			if(modSpec->gotInsertFromFile && modSpec->gotDeleteFromFile && *insertRate > *deleteRate - 1.0e-2)
+				throw ErrorException("Insertion and deletion rates specified are not compatible.  Insertion rate must be < deletion rate");
+			else if(modSpec->gotInsertFromFile)
+				*deleteRate = *insertRate + 0.001;
+			else if(modSpec->gotDeleteFromFile)
+				*insertRate = *deleteRate - 0.001;
+			}
 	}
 
 void Model::CreateModelFromSpecification(int modnum){
@@ -4198,51 +4232,77 @@ int ModelPartition::PerformModelMutation(){
 		//For now this is only insert and delete rates.  Need to ensure that insert stays < delete
 		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++)
 			if(models[*mit]->InsertRate() > models[*mit]->DeleteRate())
-				*models[*mit]->insertRate = *models[*mit]->deleteRate;
+				*models[*mit]->insertRate = *models[*mit]->deleteRate - 1.0e-3;
 		retType=Individual::indel;
 		}
 	return retType;
 	}
 
-void ModelPartition::ReadParameterValues(string &modstr){
+void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 	NxsString mod(modstr.c_str());
 	NxsString::to_lower(mod);
 
-	//now, read through the string, figuring out where each of the model strings start and end, and what numbers they are
-	int start = mod.find("model");
-	if(start != 0)
-		throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tmodel# <garli formatted param string> model# etc.\n\tThe first model is model0");
-	mod.erase(0, 5);
-	int space = mod.find(" ");
-	string num = mod.substr(0, space - 1);
-	int modNum = atoi(num.c_str());
-	mod.erase(0, space);
-	
-	//now we've eaten off everything up to the actual model string.  figure out where it ends for this model.
-	int end = mod.find("model");
-	if(end > mod.length())
-		end = mod.length() - 1;
-	string thismod = mod.substr(0, end);
-	mod.erase(0, end);
-	GetModelSet(modNum)->GetModel(0)->ReadGarliFormattedModelString(thismod);
+	while(mod.length() > 0){
+		//now, read through the string, figuring out where each of the model strings start and end, and what numbers they are
+		unsigned start = mod.find("m");
+		unsigned start2 = mod.find("s");
+		if(start < start2){
+			if(start == string::npos)
+				throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tM# <garli formatted param string> M# etc.\n\tThe first model is M0");
+			mod.erase(0, 1);
+			int space = mod.find(" ");
+			if(space == string::npos)
+				throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tM# <garli formatted param string> M# etc.\n\tThe first model is M0");
 
-/*
-	char str[50];
-
-	strncpy(str, modString.c_str(), 5);
-	str[5] = '\0';
-	if(_stricmp(str, "model") != 0){
-		throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tmodel# <garli formatted param string> model# etc.\n\tThe first model is model0");
+			//space here is the number of elements, not a range
+			string num = mod.substr(0, space);
+			int modNum = atoi(num.c_str());
+			mod.erase(0, space + 1);
+			
+			//now we've eaten off everything up to the actual model string.  figure out where it ends for this model.
+			unsigned end = mod.find_first_of("ms");
+			if(end == string::npos){
+				if(mod.length() == 0)
+					throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tS <subset rates> M# <garli formatted param string for mod 1> M# etc.\n\tThe first model is M0");
+				end = mod.length();
+				}
+			string thismod = mod.substr(0, end);
+			mod.erase(0, end);
+			GetModelSet(modNum)->GetModel(0)->ReadGarliFormattedModelString(thismod);
+			}
+		else if(start2 != string::npos){
+			unsigned space = mod.find(" ");
+			if(space == string::npos)
+				throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tS <subset rates> M# <garli formatted param string for mod 1> M# etc.\n\tThe first model is M0");
+			mod.erase(0, space + 1);
+			char temp[100];
+			vector<double> ssr;
+			NxsString val;
+			for(int m = 0;m < models.size();m++){
+				space = mod.find(" ");
+				if(space == string::npos){
+					if(mod.length() == 0){
+						throw(ErrorException("Problem reading subset rate parameters from file.  Wrong number of rates?", val.c_str()));
+						}
+					}
+				val = mod.substr(0, space).c_str();
+				mod.erase(0, space + 1);
+				if(! val.IsADouble())
+					throw(ErrorException("Problem reading subset rate parameters from file.  Expected a number, found %s.", val.c_str()));
+				ssr.push_back(atof(val.c_str()));
+				}
+			SetSubsetRates(ssr);
+			}
+		else{
+			throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tS <subset rates> M# <garli formatted param string for mod 1> M# etc.\n\tThe first model is M0");
+			}
 		}
-	modPart.ReadParameterValues(modString);
-	modPart.GetModelSet(0)->GetModel(0)->ReadGarliFormattedModelString(modString);
-*/	
 	}
 
-void ModelPartition::FillGarliFormattedModelString(string &s) const{
-	char temp[10];
+void ModelPartition::FillGarliFormattedModelStrings(string &s) const{
+	char temp[50];
 	if(modSpecSet.InferSubsetRates()){
-		s += " SSR ";
+		s += " S ";
 		for(int r = 0;r < NumSubsetRates();r++){
 			sprintf(temp, " %f ", SubsetRate(r));
 			s += temp;

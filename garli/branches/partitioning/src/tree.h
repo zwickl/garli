@@ -184,6 +184,7 @@ class Tree{
 		int BrlenMutate();
 		int BrlenMutateSubset(const vector<int> &subtreeList);
 		void ScaleWholeTree(FLOAT_TYPE factor=-1.0);
+		FLOAT_TYPE Treelength();
 		//deprecated mutation functions
 		int VariableSPRMutate(int range, FLOAT_TYPE optPrecision);
 		void SPRMutate(int cutnum, int broknum, FLOAT_TYPE optPrecision, const vector<int> &nonSubNodes);

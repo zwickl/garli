@@ -1169,9 +1169,9 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		indiv[0].SetDirty();
 		}
 
-	if(reader.FoundModelString()) startingModelInNCL = true;
-	if(indiv[0].modPart.NumModels() > 1 && (startingModelInNCL || modSpecSet.GotAnyParametersFromFile()))
-		throw ErrorException("Sorry, parameter values cannot currently be provided for unlinked partitioned models");
+	if(reader.FoundModelString()) 
+		startingModelInNCL = true;
+
 	if(startingModelInNCL){
 		//crap out if we already got some parameters above in an old style starting conditions file
 #ifndef SUBROUTINE_GARLI
@@ -1183,7 +1183,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		//DEBUG PARTITION
 		//need to figure out how the hell this will work
 		string modString = reader.GetModelString();
-		indiv[0].modPart.GetModel(0)->ReadGarliFormattedModelString(modString);
+		indiv[0].modPart.ReadGarliFormattedModelStrings(modString);
 		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
 		}
 
@@ -2871,6 +2871,16 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 
 	SeedPopulationWithStartingTree(currentSearchRep);
 	bestIndiv = 0;
+
+	double initIns = 0.05, initDel = 0.1;
+
+	for(int m = 0;m < indiv[0].modPart.NumModels();m++){
+		if(indiv[0].modPart.GetModel(m)->IsOrientedGap()){
+			initIns = indiv[0].modPart.GetModel(m)->InsertRate();
+			initDel = indiv[0].modPart.GetModel(m)->DeleteRate();
+			}
+		}
+
 	BetterFinalOptimization();
 	//this will stick the current tree into the treelog
 	InitializeOutputStreams();
@@ -2895,8 +2905,8 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 	//return the rates to initial vals to have them reopt each time
 	for(int m = 0;m < indiv[0].modPart.NumModels();m++){
 		if(indiv[0].modPart.GetModel(m)->IsOrientedGap()){
-			indiv[0].modPart.GetModel(m)->SetInsertRate(0, 0.1);
-			indiv[0].modPart.GetModel(m)->SetDeleteRate(0, 0.2);
+			indiv[0].modPart.GetModel(m)->SetInsertRate(0, initIns);
+			indiv[0].modPart.GetModel(m)->SetDeleteRate(0, initDel);
 			}
 		}
 
@@ -3854,7 +3864,7 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
 
 	string modstr;
-	ind->modPart.FillGarliFormattedModelString(modstr);
+	ind->modPart.FillGarliFormattedModelStrings(modstr);
 	ind->treeStruct->root->MakeNewick(treeString, false, true);
 	treeLog << modstr.c_str() << "]" << treeString << ";" << endl;
 	}
@@ -3972,7 +3982,7 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	else sprintf(temp, "tree bestREP%d = [&U][!GarliScore %f][!GarliModel ", indnum+1, ind->Fitness()); 
 	str += temp;
 	string modstr;
-	ind->modPart.FillGarliFormattedModelString(modstr);
+	ind->modPart.FillGarliFormattedModelStrings(modstr);
 	str += modstr;
 	modstr.clear();
 
