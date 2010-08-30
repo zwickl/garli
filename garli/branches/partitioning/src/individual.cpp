@@ -630,19 +630,27 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	delete []temp;
 	}
 
-void Individual::GetStartingTreeFromNCL(NxsTreesBlock *treesblock, int rank, int nTax, bool restart /*=false*/){
+void Individual::GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart /*=false*/){
 	assert(treeStruct == NULL);
 
 	int totalTrees = treesblock->GetNumTrees();
 
 	int effectiveRank = rank % totalTrees;
 	
-	//we will get the tree string from NCL with names rather than numbers, regardless of how it was initially read in 
-	NxsString treestr = treesblock->GetTranslatedTreeDescription(effectiveRank);
-	treestr.BlanksToUnderscores();
-	
-	treeStruct=new Tree(treestr.c_str(), false, true);
-	//treeStruct=new Tree(treesblock->GetTreeDescription(effectiveRank).c_str(), false);
+	//the call to the tree constructor can change the seed because random branch lengths are generated when the tree doesn't
+	//have them.  So, store and restore the seed, mainly for output purposes (the seed output to the screen happens after this
+	//call
+	int seed = rnd.seed();
+
+	//we will get the tree string from NCL with taxon numbers (starting at 1), regardless of how it was initially read in 
+	const NxsFullTreeDescription &t = treesblock->GetFullTreeDescription(effectiveRank);
+	if(t.AllTaxaAreIncluded() == false && !treeStruct->someOrientedGap)
+		throw ErrorException("Starting tree description must contain all taxa.");
+	string ts = t.GetNewick();
+	ts += ";";
+	treeStruct=new Tree(ts.c_str(), true, true);
+
+	rnd.set_seed(seed);
 
 	//check that any defined constraints are present in the starting tree
 	int conNum=1;

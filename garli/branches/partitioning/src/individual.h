@@ -102,7 +102,7 @@ class Individual
 			dirty=false;
 			}
 		void GetStartingConditionsFromFile(const char *fname, int rank, int nTax, bool restart=false);
-		void GetStartingTreeFromNCL(NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false);
+		void GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int rank, int nTax, bool restart=false);
 		void RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec);
 		void CalcFitness(int subtreeNode);
 		void ReadTreeFromFile(istream & inf);
