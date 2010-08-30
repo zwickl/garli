@@ -1026,10 +1026,9 @@ void Population::ValidateInput(int rep){
 #endif
 		//model string from garli block, which could have come either in starting condition file
 		//or in file with Nexus dataset.  Cases 2, 4, 5, 7 and 8 come through here.
-		//DEBUG PARTITION
-		//need to figure out how the hell this will work
+
 		string modString = reader.GetModelString();
-		indiv[0].modPart.GetModel(0)->ReadGarliFormattedModelString(modString);
+		indiv[0].modPart.ReadGarliFormattedModelStrings(modString);
 		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
 		}
 
@@ -1185,8 +1184,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 #endif
 		//model string from garli block, which could have come either in starting condition file
 		//or in file with Nexus dataset.  Cases 2, 4, 5, 7 and 8 come through here.
-		//DEBUG PARTITION
-		//need to figure out how the hell this will work
+
 		string modString = reader.GetModelString();
 		indiv[0].modPart.ReadGarliFormattedModelStrings(modString);
 		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
@@ -4018,15 +4016,11 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 			ind->modPart.GetModel(0)->FillPaupBlockStringForModel(str, filename.c_str());
 			}
 		else{
-			for(int m = 0;m < ind->modPart.NumModels();m++){
-				char mStr[20];
-				sprintf(mStr, "[model%d\n", m);
-				str += mStr;
-				ind->modPart.GetModel(m)->FillGarliFormattedModelString(modstr);
-				str += modstr;
-				str += "\n]";
-				modstr.clear();
-				}
+			str += "[\n";
+			ind->modPart.FillGarliFormattedModelStrings(modstr);
+			str += modstr;
+			str += "\n]";
+			modstr.clear();
 			}
 		}
 #ifdef BOINC
@@ -4083,10 +4077,10 @@ void Population::WriteStoredTrees( const char* treefname ){
 	for(unsigned r=0;r<storedTrees.size();r++){
 		if(r == bestRep) outf << "tree rep" << r+1 << "BEST = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
 		else outf << "tree rep" << r+1 << " = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
-		//PARTITION
-		//storedTrees[r]->mod->OutputGarliFormattedModel(outf);
-		
-		storedTrees[r]->modPart.GetModel(0)->OutputGarliFormattedModel(outf);
+
+		string mods;
+		storedTrees[r]->modPart.FillGarliFormattedModelStrings(mods);
+		outf << mods;
 
 		outf << "]";
 
@@ -4115,7 +4109,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 				//DEBUG
 				if(storedTrees[bestRep]->modPart.GetModel(m)->IsNucleotide()){
 					char mStr[20];
-					sprintf(mStr, "[model%d\n", m);
+					sprintf(mStr, "[M%d\n", m);
 					outf << mStr;
 					storedTrees[bestRep]->modPart.GetModel(m)->OutputPaupBlockForModel(outf, name.c_str());
 					outf << "\n]";

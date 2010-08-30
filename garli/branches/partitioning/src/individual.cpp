@@ -596,28 +596,19 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 			outman.UserMessage("Obtained starting tree %d from file %s",  effectiveRank+1, fname);
 		else{
 			outman.UserMessage("No starting tree found in file %s", fname);
-/*			if(treeStruct->constraints.size() == 0)
-				outman.UserMessage("No starting tree found in file %s, creating random tree", fname);
-			else 
-				outman.UserMessage("No starting tree found in file %s, creating random tree (compatible with constraint)", fname);
-*/			}
+			}
 
 		if(foundModel==true){
 			outman.UserMessage("Obtained starting or fixed model parameter values from file %s", fname);
-/*			string m;
-			mod->FillGarliFormattedModelString(m);
+			string m;
+			modPart.FillGarliFormattedModelStrings(m);
 			outman.UserMessage("%s", m.c_str());
-*/			}
+			}
 		else{
 			//this checks whether we have already gotten some parameter values from file, which might have come from a garli block in the datafile
-			//PARTITION
-			if(!(modSpecSet.GetModSpec(0)->GotAnyParametersFromFile())){
-			//if(!(modSpec->GotAnyParametersFromFile())){
+			if(!(modSpecSet.GotAnyParametersFromFile())){
 				outman.UserMessage("No starting model parameter values found in %s\nUsing default parameter values", fname);
-/*				string m;
-				mod->FillGarliFormattedModelString(m);
-				outman.UserMessage("%s", m.c_str());
-*/				}
+				}
 			}
 			
 		outman.UserMessage("");
