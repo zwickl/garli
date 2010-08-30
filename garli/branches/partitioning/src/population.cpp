@@ -2869,6 +2869,7 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 	currentSearchRep = 1;
 	outman.UserMessage("Optimizing tree %d ...", 1);
 
+	conf->refineStart = false;
 	SeedPopulationWithStartingTree(currentSearchRep);
 	bestIndiv = 0;
 
