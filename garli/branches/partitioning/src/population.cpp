@@ -1149,9 +1149,14 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		//be handled below, although both a garli block (in the data) and an old style model specification
 		//are not allowed
 		if(startingTreeInNCL){//cases 3, 5, 6 and 8
-			NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
-			NxsTreesBlock *treesblock = reader.GetTreesBlock(tax, 0);
-			
+			//CAREFUL here - we may have more than one trees block because a tree could appear with the
+			//dataset and in a different starting tree file.  The factory api allows this fine, so we
+			//need to be sure to grab the last trees block.  Checking for whether the starting tree
+			//file contained multiple trees blocks was already done in LoadNexusStartingConditions
+			const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
+			assert(treesblock != NULL);
+			//this should verify some aspects of the tree description and change everything to taxon numbers
+			treesblock->ProcessAllTrees();
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
 				int treeNum = (rank+rep-1) % numTrees;
