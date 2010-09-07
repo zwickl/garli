@@ -620,9 +620,7 @@ void Population::LoadNexusStartingConditions(){
 
 	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
 		//in this case we should have already read in the tree when getting the data, so check
-		if(treesblock == NULL && reader.FoundModelString() == false) //with the NCL factory API the trees block will be null if none was found
-			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->streefname.c_str());
-		if(treesblock->GetNumTrees() == 0 && reader.FoundModelString() == false) //with the old API it will be allocated but empty
+		if((treesblock == NULL || (treesblock && treesblock->GetNumTrees() == 0)) && reader.FoundModelString() == false) //with the NCL factory API the trees block will be null if none was found
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->streefname.c_str());
 		if(reader.GetNumTreesBlocks(tax) > 1){
 			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
@@ -656,8 +654,10 @@ void Population::LoadNexusStartingConditions(){
 		if(( treesblock == NULL || treesblock->GetNumTrees() == 0) && reader.FoundModelString() == false)
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting model and/or tree", conf->streefname.c_str());
 		}
-	if(treesblock->GetNumTrees() > 0) startingTreeInNCL = true;
-	if(reader.FoundModelString()) startingModelInNCL = true;
+	if(treesblock && treesblock->GetNumTrees() > 0) 
+		startingTreeInNCL = true;
+	if(reader.FoundModelString()) 
+		startingModelInNCL = true;
 	}
 
 //return population more or less to what it looked like just after Setup()
