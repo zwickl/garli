@@ -519,18 +519,33 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 #endif
 
 #ifdef OPT_BOUNDED_TRACE
+	if(which > -1){
 	ofstream curves("lcurve.log", ios::app);
 	curves.precision(12);
 	curves << "\n";
-	for(double c = max(curVal - 2 * 1.0e-6, lowBound); c <= min(curVal + 2 * 1.0e-6, highBound) ; c += 1.0e-6){
-		FLOAT_TYPE v = SetAndEvaluateParameter(which, c, SetParam);
+	ofprefix = "SLs";
+	string oname = ofprefix;
+	oname += ".sitelikes.log";
+	Model *mod = modPart->GetModel(modnum);
+	sitelikeLevel = 1;
+	for(double c = curVal * 0.5; c < curVal * 1.99 ; c += 0.005){
+		FLOAT_TYPE v = SetAndEvaluateParameter(modnum, which, c, bestKnownScore, bestKnownVal, SetParam);
 		curves << c << "\t" << v << "\n";
+		ofstream ordered(oname.c_str(), ios::app);
+		ordered.precision(10);
+		ordered << "1" << "\t" << -lnL << "\n";
+		ordered.close();
+
+		sitelikeLevel = -1;
 		}
 	curves.close();
-
-	CALL_SET_PARAM_FUNCTION(*mod, SetParam)(which, curVal);
-	MakeAllNodesDirty();
-	Score();
+	sitelikeLevel = 0;
+	SetAndEvaluateParameter(modnum, which, curVal, bestKnownScore, bestKnownVal, SetParam);
+/*	ofstream ordered(oname.c_str(), ios::app);
+	ordered.precision(10);
+	ordered << "1" << "\t" << -lnL << "\n";
+	ordered.close();
+*/	}
 #endif
 
 	FLOAT_TYPE incrLimit;

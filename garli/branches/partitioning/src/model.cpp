@@ -839,10 +839,14 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 
 	//insertion rate
-	double lambda = 0.2;
+	double lambda = InsertRate();
 	//deletion rate
-	double mu = 0.1;
-	
+	double mu = DeleteRate();
+	assert(lambda <= mu);
+	if(FloatingPointEquals(blen, 0.5, 1e-8)){
+		int poo=2;
+		}	
+
 	double expLam = exp(-lambda * blen);
 	double expMu  = exp(-mu * blen);
 
@@ -857,7 +861,17 @@ void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 	mat[0][2][2] = 1.0;
 	
 	mat[0][1][0] = mat[0][2][0] =  mat[0][2][1] = ZERO_POINT_ZERO;
-
+/*
+	ofstream mats("mats.log", ios::app);
+	mats << lambda << "\t" << mu << "\t" << blen << "\t"; //endl;
+	for(int f = 0;f < 3;f++){
+		for(int t = 0;t < 3;t++){
+			mats << mat[0][f][t] << "\t";
+			}
+		//mats << endl;
+	}
+	mats << endl;
+*/
 /*	
  //my initial attempt at this
 	int ns = 3;
@@ -4242,60 +4256,75 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 	NxsString mod(modstr.c_str());
 	NxsString::to_lower(mod);
 
-	while(mod.length() > 0){
-		//now, read through the string, figuring out where each of the model strings start and end, and what numbers they are
-		unsigned start = mod.find("m");
-		unsigned start2 = mod.find("s");
-		if(start < start2){
-			if(start == string::npos)
-				throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tM# <garli formatted param string> M# etc.\n\tThe first model is M0");
-			mod.erase(0, 1);
-			int space = mod.find(" ");
-			if(space == string::npos)
-				throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tM# <garli formatted param string> M# etc.\n\tThe first model is M0");
+	try{
+		while(mod.length() > 0){
+			//now, read through the string, figuring out where each of the model strings start and end, and what numbers they are
+			unsigned start = mod.find("m");
+			unsigned start2 = mod.find("s");
+			if(start < start2){
+				if(start == string::npos)
+					throw ErrorException("Problem reading model parameter string.");
+				mod.erase(0, 1);
+				int space = mod.find(" ");
+				if(space == string::npos)
+					throw ErrorException("Problem reading model parameter string.");
 
-			//space here is the number of elements, not a range
-			string num = mod.substr(0, space);
-			int modNum = atoi(num.c_str());
-			mod.erase(0, space + 1);
-			
-			//now we've eaten off everything up to the actual model string.  figure out where it ends for this model.
-			unsigned end = mod.find_first_of("ms");
-			if(end == string::npos){
-				if(mod.length() == 0)
-					throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tS <subset rates> M# <garli formatted param string for mod 1> M# etc.\n\tThe first model is M0");
-				end = mod.length();
-				}
-			string thismod = mod.substr(0, end);
-			mod.erase(0, end);
-			GetModelSet(modNum)->GetModel(0)->ReadGarliFormattedModelString(thismod);
-			}
-		else if(start2 != string::npos){
-			unsigned space = mod.find(" ");
-			if(space == string::npos)
-				throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tS <subset rates> M# <garli formatted param string for mod 1> M# etc.\n\tThe first model is M0");
-			mod.erase(0, space + 1);
-			char temp[100];
-			vector<double> ssr;
-			NxsString val;
-			for(int m = 0;m < models.size();m++){
-				space = mod.find(" ");
-				if(space == string::npos){
-					if(mod.length() == 0){
-						throw(ErrorException("Problem reading subset rate parameters from file.  Wrong number of rates?", val.c_str()));
-						}
-					}
-				val = mod.substr(0, space).c_str();
+				//space here is the number of elements, not a range
+				//string num = mod.substr(0, space);
+				NxsString num = mod.substr(0, space).c_str();
+				if(!num.IsALong())
+					throw ErrorException("Expecting a model number, found %s!", num.c_str());
+				int modNum = atoi(num.c_str());
+				if(modNum >= models.size())
+					throw ErrorException("Model number appearing in param string (%d) is too large!", modNum);
 				mod.erase(0, space + 1);
-				if(! val.IsADouble())
-					throw(ErrorException("Problem reading subset rate parameters from file.  Expected a number, found %s.", val.c_str()));
-				ssr.push_back(atof(val.c_str()));
+					
+				//now we've eaten off everything up to the actual model string.  figure out where it ends for this model.
+				//find_first_of looks for the first occurence of the letters m or s.
+				unsigned end = mod.find_first_of("ms");
+				if(end == string::npos){
+					if(mod.length() == 0)
+						throw ErrorException("Problem reading model parameter string.");
+					end = mod.length();
+					}
+				string thismod = mod.substr(0, end);
+				mod.erase(0, end);
+				GetModelSet(modNum)->GetModel(0)->ReadGarliFormattedModelString(thismod);
 				}
-			SetSubsetRates(ssr);
+			else if(start2 != string::npos){
+				unsigned space = mod.find(" ");
+				if(space == string::npos)
+					throw ErrorException("Problem reading subset rate parameters from file.");
+				mod.erase(0, space + 1);
+				char temp[100];
+				vector<double> ssr;
+				NxsString val;
+				for(int m = 0;m < models.size();m++){
+					space = mod.find(" ");
+					if(space == string::npos){
+						if(mod.length() == 0){
+							throw(ErrorException("Problem reading subset rate parameters from file.  Wrong number of rates?", val.c_str()));
+							}
+						}
+					val = mod.substr(0, space).c_str();
+					mod.erase(0, space + 1);
+					if(! val.IsADouble())
+						throw ErrorException("Problem reading subset rate parameters from file.  Expected a number, found %s.", val.c_str());
+					ssr.push_back(atof(val.c_str()));
+					}
+				SetSubsetRates(ssr);
+				}
+			else{
+				throw ErrorException("Problem reading model specification string");
+				}
 			}
-		else{
-			throw ErrorException("Proper format for specification of model parameters in the partitioned version is\n\tS <subset rates> M# <garli formatted param string for mod 1> M# etc.\n\tThe first model is M0");
-			}
+		}
+	catch(ErrorException &mess){
+		outman.UserMessage("\nERROR. There was a problem with the model specification string near this point:\n\"%s\"", mod.c_str());
+		outman.UserMessage("\nProper format for specification of model parameters in the partitioned\nversion is as follows. Neither subset rates nor all models are required to\nappear. Line breaks are ignored, but the string must be terminated with a \";\".\nThe first model is M0. Omit the <>'s in the following.");
+		outman.UserMessage("\n\nS <subset rate 0> <subset rate 1> <etc.>\nM<first model number> <garli formatted param string for model>\nM<second model number>  <garli formatted param string for model>\n <etc.> ;");
+		outman.UserMessage("\nExample for 3 models:\nS  0.551458  0.302705  2.145837\nM0 r 1.959444 2.571568 1.406484 1.406484 3.725263 e 0.310294 0.176855 0.297080 0.215771 a 0.410964\nM1 r 4.366321 7.061605 1.603498 7.061605 4.366321 e 0.269302 0.163670 0.160508 0.406520 a 0.361294\nM2 r 1.000000 4.908101 3.372480 0.457829 4.908101 e 0.156505 0.353697 0.287843 0.201954 a 4.098323 p 0.034152;");
+		throw mess;
 		}
 	}
 

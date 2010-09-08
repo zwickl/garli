@@ -1381,8 +1381,11 @@ class Model{
 		if(checkValidity == true){
 			if(modSpec->includeInvariantSites == false && p!=0.0) 
 				throw(ErrorException("Config file specifies invariantsites = none, but starting model contains it!\n"));
-			else if(modSpec->includeInvariantSites == true && p == 0.0)
-				throw(ErrorException("Config file specifies invariantsites, but starting model sets it to zero!\n"));
+			else if(modSpec->includeInvariantSites == true && p == 0.0){
+				outman.UserMessage("WARNING: Config file specifies estimation of invariantsites, but starting model sets it to zero!\n");
+				p = 1.0e-8;
+				//throw(ErrorException("Config file specifies invariantsites, but starting model sets it to zero!\n"));
+				}
 			}
 		*propInvar=p;
 		//change the proportion of rates in each gamma cat
