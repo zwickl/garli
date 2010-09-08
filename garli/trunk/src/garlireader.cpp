@@ -44,6 +44,7 @@
 #include "errorexception.h"
 #include "model.h"
 #include <sstream>
+#include <cassert>
 
 int GARLI_main( int argc, char* argv[] );
 
