@@ -3551,7 +3551,8 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 
 	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
 		Model *mod = modPart->GetModel((*specs).modelIndex);
-		mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
+		if(! mod->IsOrientedGap())//we don't actually use a pmat with oriented gap, so no need to calc it here
+			mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
 
 		partialCLA = partialCLAset->GetCLA((*specs).claIndex);
 
@@ -5295,7 +5296,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 
 	//DEBUG
 	//this takes into account the sequence length
-	double ins = mod->InsertRate();
+/*	double ins = mod->InsertRate();
 	double del = mod->DeleteRate();
 	int numNoIndels = 1497;
 	double term = 0.0;
@@ -5308,7 +5309,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 
 	outman.DebugMessage("%f\t%f\t%f\t%f\t%f\t%f", totallnL + term + term2, totallnL, term, term2, mod->InsertRate(), mod->DeleteRate());
 	totallnL += (term + term2);
-
+*/
 	return totallnL;
 	}
 
@@ -6207,6 +6208,7 @@ FLOAT_TYPE Tree::OptimizeInsertDeleteRates(FLOAT_TYPE prec, int modnum){
 	FLOAT_TYPE ins, del;
 	ins = modPart->GetModel(modnum)->InsertRate();
 	del = modPart->GetModel(modnum)->DeleteRate();
+	assert(del >= ins);
 	improve += OptimizeBoundedParameter(modnum, prec, ins, 0, 1e-3, max(ins, min(ins * 1.05, del - 1e-3)), &Model::SetInsertRate);
 	ins = modPart->GetModel(modnum)->InsertRate();
 	improve += OptimizeBoundedParameter(modnum, prec, del, 0,       min(del, max((1.0 / 1.05) * del, ins + 1e-3)), 999.9, &Model::SetDeleteRate);

@@ -21,6 +21,7 @@
 #include <stdarg.h>
 #include <ostream>
 #include "outputman.h"
+#include <cassert>
 
 using namespace std;
 
@@ -31,6 +32,7 @@ class ErrorException{
 	public:
 	char message[400];
 	ErrorException(const char *fmt, ...){
+		assert(strlen(fmt) < 400);
 		va_list vl;
 		va_start(vl, fmt);
 		vsprintf(message, fmt, vl);
