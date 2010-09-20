@@ -21,6 +21,8 @@
 #include "sequencedata.h"
 #include "garlireader.h"
 
+#include <iterator>
+
 #undef DEBUG_CALCFREQ
 #undef DEBUG_CALCPRMATRIX
 #undef DEBUGGING_PRMATRICES
@@ -932,20 +934,13 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 		}
 
 	NewMatrix( numActiveTaxa, numActiveChar );
+//	patman.Initialize(numActiveTaxa, maxNumStates);
 
-	//get weightsets if any were specified - not turning this on by default
-	if(useDefaultWeightsets){
-		const NxsTransformationManager &transformer = charblock->GetNxsTransformationManagerRef();
-		string wset = transformer.GetDefaultWeightSetName();
-		vector<int> charWeights;
-		if(wset.length() > 0){
-			if(transformer.IsDoubleWeightSet(wset))
-				throw ErrorException("WeightSet \"%s\" contains non-integer weights", wset.c_str()); 
-			charWeights = transformer.GetIntWeights(wset);
-			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++)
-				SetCount(*cit, charWeights[*cit]);
-			}
-		}
+	//get weightset if one was specified
+	vector<int> charWeights;
+	GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
+	if(charWeights.size() > 0)
+		assert(charWeights.size() == charblock->GetNumChar());
 
 	// read in the data, including taxon names
 	int i=0;
@@ -970,10 +965,49 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 						}
 					}
 				SetMatrix( i, j++, datum );
+				if(charWeights.size() > 0)
+					SetCount(i, charWeights[*cit]);
 				}
 			i++;
 			}
 		}
+/*
+	//taxa inside characters
+	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+		if(charblock->IsActiveTaxon(origTaxIndex)){
+			//Now storing names as escaped Nexus values - this means:
+			//if they have underscores - store with underscores
+			//if they have spaces within single quotes - store with underscores
+			//if they have punctuation within single parens (including spaces) - store with single quotes maintained
+			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
+			SetTaxonLabel(i, NxsString::GetEscaped(tlabel).c_str());
+			}
+		}
+	//list<vector<unsigned char>>::iterator col = columnMatrix.begin();
+	bool haveWeights = !charWeights.empty();
+	Pattern thisPat;
+	for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+		int tax = 0;
+		for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+			if(charblock->IsActiveTaxon(origTaxIndex)){
+				unsigned char datum = '\0';
+				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 15;
+				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
+				else{
+					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+					for(int s=0;s<nstates;s++){
+						datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
+						}
+					}
+				thisPat.AddChar(datum);
+				}
+			}
+		thisPat.siteNumbers.push_back(*cit);
+		thisPat.SetCount((haveWeights ? charWeights[*cit] : 1));
+		patman.AddPattern(thisPat);
+		thisPat.Reset();
+		}
+*/
 	}
 
 void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock){
@@ -1076,19 +1110,11 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 
 	NewMatrix( numActiveTaxa, numActiveChar );
 
-	//get weightsets if any were specified - not turning this on by default
-	if(useDefaultWeightsets){
-		const NxsTransformationManager &transformer = charblock->GetNxsTransformationManagerRef();
-		string wset = transformer.GetDefaultWeightSetName();
-		vector<int> charWeights;
-		if(wset.length() > 0){
-			if(transformer.IsDoubleWeightSet(wset))
-				throw ErrorException("WeightSet \"%s\" contains non-integer weights", wset.c_str()); 
-			charWeights = transformer.GetIntWeights(wset);
-			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++)
-				SetCount(*cit, charWeights[*cit]);
-			}
-		}
+	//get weightset if one was specified
+	vector<int> charWeights;
+	GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
+	if(charWeights.size() > 0)
+		assert(charWeights.size() == charblock->GetNumChar());
 
 	// read in the data, including taxon names
 	int i=0;
@@ -1125,6 +1151,8 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 						}
 					}
 				SetMatrix( i, j++, datum );
+				if(charWeights.size() > 0)
+					SetCount(i, charWeights[*cit]);
 				}
 			if(firstAmbig == false) outman.UserMessage("");
 			i++;

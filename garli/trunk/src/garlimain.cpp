@@ -282,9 +282,8 @@ int main( int argc, char* argv[] )	{
 	if(Tree::random_p==false) Tree::ComputeRealCatalan();
 #endif
 
-
-		//create the population object
-		Population pop;
+		//population is defined here, but not allocated until much later
+		Population *pop = NULL;
 		SequenceData *data = NULL;
 
 		try{
@@ -420,132 +419,174 @@ int main( int argc, char* argv[] )	{
 			//set up the model specification
 			modSpec.SetupModSpec(conf);
 
-			// Create the data object
-			if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid() == false)
-				data = new AminoacidData();
-			else //all data besides AA will be read into a DNA matrix and
-				//then converted if necessary
-				data = new NucleotideData();
-
+			//read the datafile
 			GarliReader &reader = GarliReader::GetInstance();
-			pop.usedNCL = reader.ReadData(datafile.c_str(), modSpec);
-			if(! pop.usedNCL) throw ErrorException("There was a problem reading the data file.");
+			bool usedNCL = reader.ReadData(datafile.c_str(), modSpec);
+			if(! usedNCL) 
+				throw ErrorException("There was a problem reading the data file.");
 			const NxsCharactersBlock *charblock = reader.CheckBlocksAndGetCorrectCharblock(modSpec);
 
-			//using 2 argument form of CreateMatrix (taken from paritition branch) but passing dummy charset for
-			//now.  Exsets will be taken care of in CreateMatrix
-			NxsUnsignedSet charSet;
-			data->CreateMatrixFromNCL(charblock, charSet);
+			string origOfPrefix = conf.ofprefix;
 
-			if(modSpec.IsCodon()){
-				CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
-				pop.rawData = data;
-				data = d;
-				//this probably shouldn't go here, but...
-				if(modSpec.IsF1x4StateFrequencies()) d->SetF1X4Freqs();
-				else if(modSpec.IsF3x4StateFrequencies()) d->SetF3X4Freqs();
-				else if(modSpec.IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
-				//this is a hack that makes user-specified fixed codon freqs work
-				else if(modSpec.IsUserSpecifiedStateFrequencies()) d->SetCodonTableFreqs();
-				}
-			else if(modSpec.IsCodonAminoAcid()){
-				AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
-				pop.rawData = data;
-				data = d;
-				}
+			//Allow a sliding window mode, enabled by setting the windowlength config option
+			//if no window stride or a stride of zero is specified, default to no overlap
+			if(conf.siteWindowLength > 0 && conf.siteWindowStride == 0)
+				 conf.siteWindowStride = conf.siteWindowLength;
+			int numWindows = (conf.siteWindowLength > 0 ? (charblock->GetNumChar() / conf.siteWindowStride) : 1);
 
-			outman.UserMessage("\n#######################################################");
-			data->Summarize();
-			outman.UserMessage("Summary of dataset:");
-			outman.UserMessage(" %d sequences.", data->NTax());
-			outman.UserMessage(" %d constant characters.", data->NConstant());
-			outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
-			outman.UserMessage(" %d uninformative variable characters.", data->NVarUninform());
-			int total = data->NConstant() + data->NInformative() + data->NVarUninform();
-			if(data->NMissing() > 0){
-				outman.UserMessage(" %d characters were completely missing or ambiguous (removed).", data->NMissing());
-				outman.UserMessage(" %d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
-				}
-			else outman.UserMessage(" %d total characters.", total);
+			for(int winNum = 0;winNum < numWindows;winNum++){
+				//if this is empty, all sites will be included
+				NxsUnsignedSet includedSites;
 
-			outman.flush();
-
-			data->Collapse();
-			outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
-			outman.UserMessage("#######################################################");
-#ifdef CUDA_GPU
-			cudaman = new CudaManager(modSpec.nstates, modSpec.numRateCats, data->NChar(),
-					cuda_device_number, CUDA_TEST_ITERATIONS, CUDA_PRINT_TESTS, CUDA_PRINT_DEVICE_QUERY);
-#endif
-
-			//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
-			data->ReserveOriginalCounts();
-
-			data->DetermineConstantSites();
-
-			pop.Setup(&conf, data, 1, (validateMode == true ? -1 : 0));
-			pop.SetOutputDetails();
-
-			if(runTests){
-				outman.UserMessage("starting internal tests...");
-				pop.RunTests();
-				outman.UserMessage("******Successfully completed tests.******");
-				return 0;
-				}
-			
-			if(validateMode){
-				//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
-				//which is essentially a stripped down version of pop::SeedPopWithStartingTree
-				pop.ValidateInput(1);
-				outman.UserMessage("VALIDATION COMPLETE. Check output above for information and possible errors.");
-				}
-			//the runmodes are essentially a hidden way of causing different (often very different) program
-			//behavior at runtime.  not really for user consumption
-			else if(conf.runmode != 0){
-				if(conf.runmode == 1)
-					pop.ApplyNSwaps(10);
-				else if(conf.runmode == 7)
-					pop.VariableStartingTreeOptimization(false);
-				else if(conf.runmode == 9)
-					pop.VariableStartingTreeOptimization(true);
-				else if(conf.runmode == 8){
-#ifdef OPEN_MP
-					throw ErrorException("can't estimate site rates in openmp version!");
-#endif
-#ifndef ALLOW_SINGLE_SITE
-					throw ErrorException("the program must be compiled with ALLOW_SINGLE_SITE defined in defs.h to use site rate estimation (runmode = 8)!");
-#endif
-					pop.OptimizeSiteRates();
+				if(numWindows > 1){
+					int winStart = winNum * conf.siteWindowStride;
+					int winEnd = min(winStart + conf.siteWindowLength - 1, charblock->GetNumChar());
+					for(int s = winStart;s <= winEnd;s++){
+						includedSites.insert(s);
+						}
+					//override the ofprefix here, tacking run info onto it
+					conf.ofprefix = origOfPrefix;
+					char temp[50];
+					sprintf(temp, ".win%04d.L%d.S%d", winNum, conf.siteWindowLength,  conf.siteWindowStride);
+					conf.ofprefix += temp;
+					outman.UserMessage("####RUNNING WINDOW NUMBER %d of %d (sites %d-%d). LENGTH=%d STRIDE=%d", winNum, numWindows, winStart + 1, winEnd + 1, conf.siteWindowLength, conf.siteWindowStride);
+					if(winEnd != winStart + conf.siteWindowLength - 1)
+						outman.UserMessage("####->WINDOW TRUNCATED BY END OF SEQUENCE<-"); 
 					}
-				else if(conf.runmode == 11){
-					pop.OptimizeInputAndWriteSitelikelihoods();
-					}
-				else if(conf.runmode > 20){
-					pop.GenerateTreesOnly(conf.runmode);
-					}
-				else if(conf.runmode > 1) //this is runmodes 2-6
-					pop.SwapToCompletion(conf.startOptPrec);
-				}
-			else{
-				//if no checkpoint files are actually found conf->restart will be set to zero
-				if(pop.conf->restart) pop.conf->restart = pop.ReadStateFiles();
 
-				pop.SetOutputDetails();
-				if(pop.conf->bootstrapReps == 0){//NOT bootstrapping
-					pop.PerformSearch();
+				// Create the data object
+				if(modSpec.IsAminoAcid() && modSpec.IsCodonAminoAcid() == false)
+					data = new AminoacidData();
+				else //all data besides AA will be read into a DNA matrix and
+					//then converted if necessary
+					data = new NucleotideData();
+
+				//using 2 argument form of CreateMatrix (taken from paritition branch)
+				//Default exsets and wtsets will be taken care of in CreateMatrix
+				if(numWindows > 1 && ! charblock->GetExcludedIndexSet().empty())
+					throw ErrorException("Sorry, exsets cannot currently be used with sliding window mode.  Remove exsets or create a new dataset without those sites.");
+				data->CreateMatrixFromNCL(charblock, includedSites);
+
+				//allocate the population
+				pop = new Population();
+				pop->usedNCL = usedNCL;
+
+				if(modSpec.IsCodon()){
+					CodonData *d = new CodonData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
+					pop->rawData = data;
+					data = d;
+					//this probably shouldn't go here, but...
+					if(modSpec.IsF1x4StateFrequencies()) d->SetF1X4Freqs();
+					else if(modSpec.IsF3x4StateFrequencies()) d->SetF3X4Freqs();
+					else if(modSpec.IsEmpiricalStateFrequencies()) d->SetCodonTableFreqs();
+					//this is a hack that makes user-specified fixed codon freqs work
+					else if(modSpec.IsUserSpecifiedStateFrequencies()) d->SetCodonTableFreqs();
 					}
-				else pop.Bootstrap();
-				pop.FinalizeOutputStreams(2);
-				}
+				else if(modSpec.IsCodonAminoAcid()){
+					AminoacidData *d = new AminoacidData(dynamic_cast<NucleotideData *>(data), modSpec.geneticCode);
+					pop->rawData = data;
+					data = d;
+					}
+
+				outman.UserMessage("\n#######################################################");
+				data->Summarize();
+				outman.UserMessage("Summary of dataset:");
+				outman.UserMessage(" %d sequences.", data->NTax());
+				outman.UserMessage(" %d constant characters.", data->NConstant());
+				outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
+				outman.UserMessage(" %d uninformative variable characters.", data->NVarUninform());
+				int total = data->NConstant() + data->NInformative() + data->NVarUninform();
+				if(data->NMissing() > 0){
+					outman.UserMessage(" %d characters were completely missing or ambiguous (removed).", data->NMissing());
+					outman.UserMessage(" %d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
+					}
+				else outman.UserMessage(" %d total characters.", total);
+
+				outman.flush();
+
+				data->Collapse();
+				outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
+				outman.UserMessage("#######################################################");
+
+				//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
+				data->ReserveOriginalCounts();
+
+				data->DetermineConstantSites();
+
+				pop->Setup(&conf, data, 1, (validateMode == true ? -1 : 0));
+				pop->SetOutputDetails();
+
+				if(runTests){
+					outman.UserMessage("starting internal tests...");
+					pop->RunTests();
+					outman.UserMessage("******Successfully completed tests.******");
+					return 0;
+					}
+				
+				if(validateMode){
+					//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
+					//which is essentially a stripped down version of pop::SeedPopWithStartingTree
+					pop->ValidateInput(1);
+					outman.UserMessage("VALIDATION COMPLETE. Check output above for information and possible errors.");
+					}
+				//the runmodes are essentially a hidden way of causing different (often very different) program
+				//behavior at runtime.  not really for user consumption
+				else if(conf.runmode != 0){
+					if(conf.runmode == 1)
+						pop->ApplyNSwaps(10);
+					else if(conf.runmode == 7)
+						pop->VariableStartingTreeOptimization(false);
+					else if(conf.runmode == 9)
+						pop->VariableStartingTreeOptimization(true);
+					else if(conf.runmode == 8){
+	#ifdef OPEN_MP
+						throw ErrorException("can't estimate site rates in openmp version!");
+	#endif
+	#ifndef ALLOW_SINGLE_SITE
+						throw ErrorException("the program must be compiled with ALLOW_SINGLE_SITE defined in defs.h to use site rate estimation (runmode = 8)!");
+	#endif
+						pop->OptimizeSiteRates();
+						}
+					else if(conf.runmode == 11){
+						pop->OptimizeInputAndWriteSitelikelihoods();
+						}
+					else if(conf.runmode > 20){
+						pop->GenerateTreesOnly(conf.runmode);
+						}
+					else if(conf.runmode > 1) //this is runmodes 2-6
+						pop->SwapToCompletion(conf.startOptPrec);
+					}
+				else{
+					//if no checkpoint files are actually found conf->restart will be set to zero
+					if(pop->conf->restart) pop->conf->restart = pop->ReadStateFiles();
+
+					pop->SetOutputDetails();
+					if(pop->conf->bootstrapReps == 0){//NOT bootstrapping
+						pop->PerformSearch();
+						}
+					else pop->Bootstrap();
+					pop->FinalizeOutputStreams(2);
+					}
+				if(data != NULL){
+					delete data;
+					data = NULL;
+					}
+				if(pop != NULL){
+					delete pop;
+					pop = NULL;
+					}
+				}//outer loop across windows
 			}catch(ErrorException err){
 				if(outman.IsLogSet() == false){
 					outman.SetLogFile("ERROR.log");
 					if(interactive == false) UsageMessage(argv[0]);
 					}
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
-				pop.FinalizeOutputStreams(0);
-				pop.FinalizeOutputStreams(1);
-				pop.FinalizeOutputStreams(2);
+				if(pop != NULL){
+					pop->FinalizeOutputStreams(0);
+					pop->FinalizeOutputStreams(1);
+					pop->FinalizeOutputStreams(2);
+					}
 
 #ifdef MAC_FRONTEND
 				NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -562,8 +603,10 @@ int main( int argc, char* argv[] )	{
 			catch(int error){
 				if(error==Population::nomem) cout << "not able to allocate enough memory!!!" << endl;
 				}
-		if(data != NULL) delete data;
-
+		if(data != NULL){
+			delete data;
+			data = NULL;
+			}
 		if(interactive==true){
 			outman.UserMessage("\n-Press enter to close program.-");
 			char d=getchar();
