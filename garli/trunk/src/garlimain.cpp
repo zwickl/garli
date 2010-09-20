@@ -439,6 +439,10 @@ int main( int argc, char* argv[] )	{
 				NxsUnsignedSet includedSites;
 
 				if(numWindows > 1){
+					if(! charblock->GetExcludedIndexSet().empty())
+						throw ErrorException("Sorry, exsets cannot currently be used with sliding window mode. Remove exsets or create a new dataset without those sites.");
+					if(conf.restart || conf.checkpoint)
+						throw ErrorException("Sorry, checkpointing cannot currently be used with sliding window mode. Set checkpoint and restart to 0 in config file.");
 					int winStart = winNum * conf.siteWindowStride;
 					int winEnd = min(winStart + conf.siteWindowLength - 1, charblock->GetNumChar());
 					for(int s = winStart;s <= winEnd;s++){
@@ -449,9 +453,12 @@ int main( int argc, char* argv[] )	{
 					char temp[50];
 					sprintf(temp, ".win%04d.L%d.S%d", winNum, conf.siteWindowLength,  conf.siteWindowStride);
 					conf.ofprefix += temp;
-					outman.UserMessage("####RUNNING WINDOW NUMBER %d of %d (sites %d-%d). LENGTH=%d STRIDE=%d", winNum, numWindows, winStart + 1, winEnd + 1, conf.siteWindowLength, conf.siteWindowStride);
+					outman.UserMessage("####RUNNING WINDOW NUMBER %d of %d (sites %d-%d). LENGTH=%d STRIDE=%d", winNum + 1, numWindows, winStart + 1, winEnd + 1, conf.siteWindowLength, conf.siteWindowStride);
 					if(winEnd != winStart + conf.siteWindowLength - 1)
 						outman.UserMessage("####->WINDOW TRUNCATED BY END OF SEQUENCE<-"); 
+					//this will just reset the init_seed to the current seed, which will be used in output
+					if(winNum > 1)
+						rnd.set_seed(rnd.seed());
 					}
 
 				// Create the data object
@@ -463,8 +470,6 @@ int main( int argc, char* argv[] )	{
 
 				//using 2 argument form of CreateMatrix (taken from paritition branch)
 				//Default exsets and wtsets will be taken care of in CreateMatrix
-				if(numWindows > 1 && ! charblock->GetExcludedIndexSet().empty())
-					throw ErrorException("Sorry, exsets cannot currently be used with sliding window mode.  Remove exsets or create a new dataset without those sites.");
 				data->CreateMatrixFromNCL(charblock, includedSites);
 
 				//allocate the population
