@@ -1416,3 +1416,14 @@ GarliReader & GarliReader::GetInstance()
 	static GarliReader gr;
 	return gr;
 	}
+
+//This doesn't really have anything to do with the GarliReader class, it just acts on the passed in charblock
+void GarliReader::GetDefaultIntWeightSet(const NxsCharactersBlock *charblock, vector<int> &charWeights) {
+	const NxsTransformationManager transformer = charblock->GetNxsTransformationManagerRef();
+	string wset = transformer.GetDefaultWeightSetName();
+	if(wset.length() > 0){
+		charWeights = transformer.GetDefaultIntWeights();
+		if(charWeights.size() == 0)
+			throw ErrorException("Default weightSet \"%s\" contains non-integer weights", wset.c_str()); 
+		}
+	}
