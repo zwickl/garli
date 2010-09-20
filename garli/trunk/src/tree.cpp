@@ -3141,8 +3141,8 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA){
 
 		//check if any clas are getting close to underflow
 #ifdef UNIX
-		madvise(destination, sizeof(FLOAT_TYPE)*4*nRateCats*nsites, MADV_SEQUENTIAL);
-		madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
+		posix_madvise(destination, sizeof(FLOAT_TYPE)*4*nRateCats*nsites, POSIX_MADV_SEQUENTIAL);
+		posix_madvise(underflow_mult, sizeof(int)*nsites, POSIX_MADV_SEQUENTIAL);
 #endif
 		FLOAT_TYPE large1 = 0.0, large2 = 0.0;
 		for(int i=0;i<nsites;i++){
@@ -3273,8 +3273,8 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA){
 
 	//check if any clas are getting close to underflow
 #ifdef UNIX
-	madvise(destination, sizeof(FLOAT_TYPE)*nstates*nRateCats*nsites, MADV_SEQUENTIAL);
-	madvise(underflow_mult, sizeof(int)*nsites, MADV_SEQUENTIAL);
+	posix_madvise(destination, sizeof(FLOAT_TYPE)*nstates*nRateCats*nsites, POSIX_MADV_SEQUENTIAL);
+	posix_madvise(underflow_mult, sizeof(int)*nsites, POSIX_MADV_SEQUENTIAL);
 #endif
 	FLOAT_TYPE large1 = 0.0;
 	for(int i=0;i<nsites;i++){
@@ -4959,7 +4959,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	const FLOAT_TYPE prI=mod->PropInvar();
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, unscaledlnL, grandSumlnL=ZERO_POINT_ZERO;
@@ -5148,7 +5148,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 #ifdef ALLOW_SINGLE_SITE
@@ -5278,8 +5278,8 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	//DEBUG
@@ -5374,8 +5374,8 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	const int *conStates=data->GetConstStates();
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE totallnL=ZERO_POINT_ZERO, siteL, unscaledlnL, grandSumlnL=ZERO_POINT_ZERO;
@@ -5547,8 +5547,8 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialInternalNState(CondLikeArray *de
 	const int *conStates=data->GetConstStates();
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
@@ -5626,7 +5626,7 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalRateHet(CondLikeArray *d
 		freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	//note that we don't need to zero the whole thing
@@ -5705,7 +5705,7 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalNState(CondLikeArray *de
 	const FLOAT_TYPE prI=mod->PropInvar();
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, unscaledlnL, grandSumlnL=ZERO_POINT_ZERO;
@@ -6644,9 +6644,9 @@ void Tree::CalcFullCLAInternalInternalEQUIV(CondLikeArray *destCLA, const CondLi
 	assert(nRateCats == 1);
 
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	for(int i=0;i<nchar;i++) {
@@ -6705,9 +6705,9 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 #endif
 
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	if(nRateCats == 4){//the unrolled 4 rate version
@@ -6888,9 +6888,9 @@ void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondL
 #endif
 
 #ifdef UNIX
-	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void *)LCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void *)RCL, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 #ifdef OMP_INTINTCLA_NSTATE
@@ -6954,7 +6954,7 @@ void Tree::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const FLOAT_TYPE 
 	const int *counts = data->GetCounts();
 
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 #ifdef ALLOW_SINGLE_SITE
@@ -7122,7 +7122,7 @@ void Tree::CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT
 	const int *counts = data->GetCounts();
 
 #ifdef UNIX
-	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 	if(siteToScore > 0){
 		Ldata += siteToScore;
@@ -7203,8 +7203,8 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 	const int *counts = data->GetCounts();
 
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 #ifdef ALLOW_SINGLE_SITE
@@ -7407,8 +7407,8 @@ void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondL
 	const int *counts = data->GetCounts();
 
 #ifdef UNIX
-	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	if(siteToScore > 0) data2 += siteToScore;
@@ -7464,9 +7464,9 @@ void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondL
 	const int nRateCats = mod->NRateCats();
 
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise(partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise(partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	if(nRateCats==4){
@@ -7525,8 +7525,8 @@ void Tree::CalcFullCLAPartialInternalNState(CondLikeArray *destCLA, const CondLi
 	const int nchar = data->NChar();
 
 #ifdef UNIX
-	madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void *)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	for(int i=0;i<nchar;i++) {
@@ -7557,8 +7557,8 @@ void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondL
 	const int nRateCats = mod->NRateCats();
 
 #ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	for(int i=0;i<nchar;i++){
@@ -7617,8 +7617,8 @@ void Tree::CalcFullCLAPartialTerminalNState(CondLikeArray *destCLA, const CondLi
 	const int nchar = data->NChar();
 
 #ifdef UNIX
-	madvise((void*)dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)dest, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	for(int i=0;i<nchar;i++){

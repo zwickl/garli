@@ -2610,7 +2610,7 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE siteL;
@@ -2779,7 +2779,7 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
@@ -3012,7 +3012,7 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
@@ -3194,8 +3194,8 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE siteL;
@@ -3310,8 +3310,8 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
@@ -3471,8 +3471,8 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
@@ -3620,8 +3620,8 @@ void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const 
 	const int nRateCats=mod->NRateCats();
 
 #ifdef UNIX
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
+	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE siteL;
