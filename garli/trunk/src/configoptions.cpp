@@ -66,6 +66,9 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	
 	attachmentsPerTaxon = 50;
 
+	siteWindowLength = 0;
+	siteWindowStride = 0;
+
 	//finishing the run
 	enforceTermConditions = true;
 	lastTopoImproveThresh = 10000;
@@ -167,6 +170,8 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetIntOption("genthreshforswapterm", swapTermThreshold, true);
 
 	cr.GetStringOption("arbitrarystring", arbitraryString, true);
+	cr.GetUnsignedOption("windowlength", siteWindowLength, true);
+	cr.GetUnsignedOption("windowstride", siteWindowStride, true);
 
 	//changed the wording of this from besttree to besttopology, to match outputeachbettertopology
 	//still allow besttree, since that is what I told Maddison, and I think has already been incorporated
