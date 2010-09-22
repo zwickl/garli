@@ -43,6 +43,124 @@ typedef FLOAT_TYPE** DblPtrPtr;
 #  define THROW_BADSTATE(a) BadState(a)
 #endif
 
+class Pattern{
+public:
+	char count;
+	//TODO - deal with orig counts here - should be orig relative to packed matrix
+	char origCount;
+	char numStates;
+	char constStates;
+	static int numTax;
+	static int maxNumStates;
+	vector<unsigned char> stateVec;
+	vector<int> siteNumbers;
+	enum patternType{
+		MISSING = 1,
+		CONSTANT = 2,
+		UNINFORM_VARIABLE = 3,
+		INFORMATIVE = 2
+		}type;
+
+	Pattern(){Reset();}
+	Pattern(const Pattern &rhs){
+		Reset();
+		siteNumbers = rhs.siteNumbers;
+		stateVec = rhs.stateVec;
+		count = rhs.count;
+		origCount = rhs.origCount;
+		numStates = rhs.numStates;
+		constStates = rhs.constStates;
+		}
+	~Pattern(){
+		stateVec.clear();
+		siteNumbers.clear();
+		}
+	void Reset(){
+		count = origCount = numStates = constStates = -1;
+		stateVec.clear();
+		siteNumbers.clear();
+//		if(numTax > 0)
+//			stateVec.reserve(numTax);
+		}
+	static void SetStatics(int nt, int ns){
+		numTax = nt;
+		maxNumStates = ns;
+		}
+
+	//bool PatternLessThan(const Pattern &lhs, const Pattern &rhs) const;
+	bool operator==(const Pattern &rhs) const;
+	bool operator<(const Pattern &rhs) const;
+	void AddChar(const unsigned char c){
+		stateVec.push_back(c);
+		}
+	void SetCount(int c) {
+		count = origCount = c;
+		}
+	int CalcPatternTypeAndNumStates(vector<unsigned int> &stateCounts);
+	int MinScore(set<unsigned char> patt, int bound, unsigned char bits=15, int prevSc=0) const;
+	};
+
+class PatternManager{
+	friend class DataMatrix;
+
+	int numTax;
+	int maxNumStates;
+	int totNumPats;
+	int numNonMissingPats;
+	int numUniquePats;
+
+	int numMissingPats;
+	int numConstantPats;
+	int numInformativePats;
+	int numUninformVariablePats;
+	
+	int lastConstant;
+	bool compressed;
+	list<Pattern> patterns;
+	list<Pattern> uniquePatterns;
+	vector<int> constStates;
+
+	~PatternManager(){
+		patterns.clear();
+		uniquePatterns.clear();
+		constStates.clear();
+		}
+	virtual void NewCollapse();
+	virtual void NewPack();
+	virtual void NewSort();
+	virtual void NewDetermineConstantSites();
+
+public:
+	void Initialize(int nt, int max){
+		Reset();
+		numTax = nt;
+		maxNumStates = max;
+		Pattern::maxNumStates = max;
+		Pattern::numTax = nt;
+		}
+	void Reset(){
+		numTax = maxNumStates = totNumPats = numNonMissingPats = numUniquePats = numMissingPats = numConstantPats = numInformativePats = lastConstant = numUninformVariablePats = 0;
+		compressed = false;
+		patterns.clear();
+		uniquePatterns.clear();
+		constStates.clear();
+		}
+	void AddPattern(const Pattern &add){
+		patterns.push_back(add);
+		}
+	//these are named along the lines of the old DataMatrix members
+	int NChar() const {
+		if(uniquePatterns.empty())
+			return -1;
+		else
+			return uniquePatterns.size();
+		}
+	void ProcessPatterns();
+	void FillNumberVector(vector<int> &nums);
+	void FillTaxaXCharMatrix(unsigned char **mat);
+	void CalcPatternTypesAndNumStates();
+	};
+
 // Note: the class below has pure virtual member functions
 class DataMatrix{
 protected:
@@ -58,6 +176,8 @@ protected:
 								//is done varies depending on the context
 	
 	unsigned char**         matrix;
+	//PatternManager patman;
+
 	int*		count;
 	int*		origCounts;
 	int*		number; //maping of chars to columns
@@ -65,6 +185,7 @@ protected:
 						//contents are the packed column representing that char
 						//both start at 0, so offset upon output
 						//This used to represent something else (I think)
+	//vector<int> newNumber;
 	char**          taxonLabel;
 	int		nMissing;
 	int		nConstant;
@@ -80,6 +201,7 @@ protected:
 		int		dmFlags;
 		int     maxNumStates;
 		bool	useDefaultWeightsets;
+		string	wtsetName;
 
 	protected:
 		char	info[80];
@@ -110,14 +232,14 @@ protected:
 			, number(0), taxonLabel(0), numStates(0) 
 			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
-			fullyAmbigChar(15), useDefaultWeightsets(false)
+			fullyAmbigChar(15), useDefaultWeightsets(true)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
 			: nTax(ntax), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
 			, number(0), taxonLabel(0), numStates(0)
 			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
-			fullyAmbigChar(15), useDefaultWeightsets(false)
+			fullyAmbigChar(15), useDefaultWeightsets(true)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
 		virtual ~DataMatrix();
 
@@ -140,6 +262,14 @@ protected:
 		int VariableNumStates() const { return (dmFlags & vnstates); }
 		int AmbiguousStates() const { return (dmFlags & ambigstates); }
 
+		void ProcessPatterns() {
+//			patman.ProcessPatterns();
+//			GetDataFromPatternManager();
+			}
+		void GetDataFromPatternManager(){
+//			patman.FillNumberVector(newNumber);
+//			patman.FillTaxaXCharMatrix(matrix);
+			}
 		// functions for getting the data in and out
 		int GetToken( istream& in, char* tokenbuf, int maxlen, bool acceptComments=true );
 		int GetToken( FILE *in, char* tokenbuf, int maxlen);
@@ -256,6 +386,8 @@ protected:
 		bool operator==(const DataMatrix& rhs) const; // cjb - to test serialization
 		void ExplicitDestructor();  // cjb - totally clear the DataMatrix and revert it to its original state as if it was just constructed
 		void CheckForIdenticalTaxonNames();
+		bool DidUseDefaultWeightsets() const {return (wtsetName.length() > 0);}
+		string WeightsetName() const { return wtsetName;}
 
 		//for determining parsimony informative chars
 		int MinScore(set<unsigned char> patt, int bound, unsigned char bits=15, int sc=0) const;

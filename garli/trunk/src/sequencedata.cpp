@@ -325,6 +325,10 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
 
+	string wtsetName = dnaData->WeightsetName();
+	if(wtsetName.length() > 0)
+		throw ErrorException("Cannot use wtsets with DNA to Codon translation! Remove wtset \"%s\".", wtsetName.c_str());  
+
 	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
 	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon datatype specified, but number of nucleotides not divisible by 3!");  
@@ -408,6 +412,10 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 	//first we need to convert the nucleotide data to codons, and then translate the codons to AA's
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
+
+	string wtsetName = dnaData->WeightsetName();
+	if(wtsetName.length() > 0)
+		throw ErrorException("Cannot use wtsets with DNA to Aminoacid translation! Remove wtset \"%s\" or do the translation yourself.", wtsetName.c_str());  
 
 	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
@@ -938,9 +946,13 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 
 	//get weightset if one was specified
 	vector<int> charWeights;
-	GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
-	if(charWeights.size() > 0)
-		assert(charWeights.size() == charblock->GetNumChar());
+	if(useDefaultWeightsets){
+		wtsetName = GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
+		if(charWeights.size() > 0){
+			assert(charWeights.size() == charblock->GetNumChar());
+			outman.UserMessage("Found wtset \"%s\" with data, applying...", wtsetName.c_str());
+			}
+		}
 
 	// read in the data, including taxon names
 	int i=0;
@@ -964,9 +976,10 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 						datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
 						}
 					}
-				SetMatrix( i, j++, datum );
-				if(charWeights.size() > 0)
-					SetCount(i, charWeights[*cit]);
+				if(i == 0 && charWeights.size() > 0)
+					SetCount(j, charWeights[*cit]);
+				SetMatrix( i, j, datum );
+				j++;
 				}
 			i++;
 			}
@@ -1112,9 +1125,13 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 
 	//get weightset if one was specified
 	vector<int> charWeights;
-	GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
-	if(charWeights.size() > 0)
-		assert(charWeights.size() == charblock->GetNumChar());
+	if(useDefaultWeightsets){
+		wtsetName = GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
+		if(charWeights.size() > 0){
+			assert(charWeights.size() == charblock->GetNumChar());
+			outman.UserMessage("Found wtset \"%s\" with data, applying...", wtsetName.c_str());
+			}
+		}
 
 	// read in the data, including taxon names
 	int i=0;
@@ -1150,9 +1167,10 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 						datum = CharToDatum('?');
 						}
 					}
-				SetMatrix( i, j++, datum );
-				if(charWeights.size() > 0)
-					SetCount(i, charWeights[*cit]);
+				if(i == 0 && charWeights.size() > 0)
+					SetCount(j, charWeights[*cit]);
+				SetMatrix( i, j, datum );
+				j++;
 				}
 			if(firstAmbig == false) outman.UserMessage("");
 			i++;

@@ -41,6 +41,465 @@ extern ModelSpecification modSpec;
 extern rng rnd;
 extern OutputManager outman;
 
+bool my_pair_compare(pair<int, int> fir, pair<int,int> sec) {return fir.second < sec.second;}
+
+int Pattern::numTax;
+int Pattern::maxNumStates;
+
+//DEBUG
+int		numSwaps;
+int		numCompares;
+
+/*
+bool Pattern::PatternLessThan(const Pattern &lhs, const Pattern &rhs) const{
+	//potentially constant sites always need to come first
+	if(lhs.numStates < rhs.numStates)
+		return true;
+
+	if(lhs.numStates == 1){
+		//i is constant
+		if(rhs.numStates == 1){
+			//j is as well
+			//constant sites might not match though, due to ambiguity or different placements of gaps.
+			//this lexigraphically compares the vector contents
+			if(lhs.column < rhs.column){
+				return true;
+				}
+			else{//there used to be a whole bunch of stuff here, but I'm not sure why it was ever necessary
+				return false;
+				}
+			}
+		else return true;
+		}
+
+	else if(rhs.numStates==1){
+		//j is constant, not i
+		return false;
+		}
+
+	//this lexigraphically compares the vector contents
+	if(lhs.column < rhs.column)
+		return true;
+
+	return false;
+	}
+*/
+/*
+bool Pattern::PatternLessThan(const Pattern &rhs) const{
+	//potentially constant sites always need to come first
+	if(numStates < rhs.numStates)
+		return true;
+
+	if(numStates == 1){
+		//i is constant
+		if(rhs.numStates == 1){
+			//j is as well
+			//constant sites might not match though, due to ambiguity or different placements of gaps.
+			//this lexigraphically compares the vector contents
+			if(column < rhs.column){
+				return true;
+				}
+			else{//there used to be a whole bunch of stuff here, but I'm not sure why it was ever necessary
+				return false;
+				}
+			}
+		else return true;
+		}
+
+	else if(rhs.numStates==1){
+		//j is constant, not i
+		return false;
+		}
+
+	//this lexigraphically compares the vector contents
+	if(column < rhs.column)
+		return true;
+
+	return false;
+	}
+*/
+
+bool Pattern::operator<(const Pattern &rhs) const{
+	//zero state sites (all missing) will now be shuffled to the start (previously the end) and removed later
+	//potentially constant sites always need to come just after that
+	//DEBUG
+/*	bool tf;
+	if(numStates < rhs.numStates)
+		tf = true;
+	if(stateVec < rhs.stateVec)
+		tf = true;
+	else tf = false;
+	outman.UserMessage("%d\t%d\t%d\t%d\t%d\t%s\t%d\t%d\t%d\t%d\t%d", numStates, stateVec[0], stateVec[1], stateVec[2], stateVec[3], (tf ? "<" : ">"), rhs.numStates, rhs.stateVec[0], rhs.stateVec[1], rhs.stateVec[2], rhs.stateVec[3]);
+*/
+	numCompares++;
+	if(numCompares % 10000 == 0)
+		outman.UserMessage("%d comparisons done", numCompares);
+	assert(numStates > -1 && rhs.numStates > -1);
+	if(numStates != rhs.numStates){
+		if(numStates < rhs.numStates)
+			return true;
+		else
+			return false;
+		}
+
+	assert(stateVec.empty() == false);
+	assert(stateVec.size() == rhs.stateVec.size());
+	//this lexigraphically compares the vector contents
+	if(stateVec < rhs.stateVec)
+		return true;
+
+	return false;
+	}
+
+bool Pattern::operator==(const Pattern &rhs) const{
+	return (stateVec == rhs.stateVec);
+	}
+
+//
+// PatternType determines whether pattern k is constant, informative, or missing
+//it used to try to determine autapomorphies, although not correctly
+//
+int Pattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts ){
+	bool ambig = false;	//any total or partial ambiguity
+	int nStates = 0; 
+	bool informative = false;
+	bool constant = false;
+	bool missing = false;
+
+	//fill the scratch array with zeros
+	std::fill(stateCounts.begin(), stateCounts.end(), 0);
+
+	//count the number of times each state occurs, and whether there are any partially
+	//ambiguous characters (currently only allowed for nuc data)
+	unsigned char full_ambig = (maxNumStates == 4 ? 15 : maxNumStates);
+	if(maxNumStates == 4){
+		for(vector<unsigned char>::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
+			unsigned char c = *sit;
+			if(c != full_ambig && (c & (c - 1))){
+				ambig = true;
+				break;
+				}
+			else if(c != full_ambig){
+				stateCounts[(c > 1) + (c > 2) + (c > 4)]++;
+				}
+			}
+		}
+	else {
+		for(vector<unsigned char>::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
+			unsigned char c = *sit;
+			if(c != full_ambig){
+				stateCounts[c]++;
+				}
+			}
+		}
+
+	if(!ambig){
+		//no partial ambiguity (all AA and codon will come this way) 
+		//without ambiguity, having 2+ states with 2+ counts means informativeness
+		int numDoubles = 0;
+		for(int s = 0; s < maxNumStates; s++ ){
+			if(stateCounts[s] > 0){
+				nStates++;
+				if(stateCounts[s] > 1){
+					numDoubles++;
+					}
+				}
+			}
+
+		if(nStates == 0){
+			missing = true;
+			assert(numDoubles == 0);
+			}
+		else if(nStates == 1){
+			constant = true;
+			assert(numDoubles < 2);
+			}
+		else{
+			if(numDoubles > 1){
+				informative = true;
+				}
+			}
+		}
+	else{
+		assert(maxNumStates == 4);
+		//this very convoluted scheme (worked out by Mark) must be used to determine informativeness
+		//if ambiguity is allowed (only for nuc data currently)
+		multiset<unsigned char> pat;
+		unsigned char conStates = 15;
+		for(vector<unsigned char>::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
+			unsigned char c = *sit;
+			pat.insert(c);
+			conStates &= c;
+			}
+
+		//constant sites are possible with ambiguity if some resolution gives a single state
+		if(conStates){
+			if(conStates == 15) 
+				missing = true;
+			else 
+				constant = true;
+			}
+		else{
+			vector< pair<int, int> > stateScores;
+			for(unsigned state=0;state < 4;state++){
+				int sc = 0;
+				for(multiset<unsigned char>::iterator it=pat.begin();it != pat.end();it++){
+					if(!((*it) & (1 << state))){
+						sc++;
+						}
+					}
+				stateScores.push_back(pair<int, int>(state, sc));
+				}
+			sort(stateScores.begin(), stateScores.end(), my_pair_compare);
+			int minStar = stateScores[0].second;
+			if(minStar > 1){
+				set<unsigned char> uPat;
+				for(multiset<unsigned char>::iterator it=pat.begin();it != pat.end();it++)
+					uPat.insert(*it);
+				int minScore = MinScore(uPat, minStar);
+				if(minScore < minStar){
+					informative = true;
+					}
+				}
+			}
+		}
+
+	if(missing){
+		type = MISSING;
+		nStates = 0;
+		}
+	else if(constant){
+		type = CONSTANT;
+		nStates = 1;
+		}
+	else if(informative){
+		type = INFORMATIVE;
+		nStates = max(2, nStates);
+		}
+	else{
+		type = UNINFORM_VARIABLE;
+		nStates = max(2, nStates);
+		}
+
+	//DEBUG
+/*	ofstream deb;
+	if(k==0) deb.open("pat.log");
+	else deb.open("pat.log", ios::app);
+	deb << k << "\t" << constant << "\t" << informative << "\t" << nStates << "\n";
+	deb.close();
+*/
+	//Note that numStates here may not be the true number of states in the
+	//case of ambiguity, but it really only matters that it is accurate in 
+	//discriminating 0/1/1+ states because code elsewhere depends on it.
+	numStates = nStates;
+	return (int)type;
+	}
+
+int Pattern::MinScore(set<unsigned char> patt, int bound, unsigned char bits/*=15*/, int prevSc/*=0*/) const{
+	if(patt.size() == 0) return 0;
+	int min_sc_this_lvl = 9999;
+	int curr_sc_this_lvl = 9999;
+	for(unsigned s2 = 0;s2 < 4;s2++){
+		unsigned char thisBit = (1 << s2);
+		if(bits & thisBit){
+			set<unsigned char> remaining;
+			for(set<unsigned char>::iterator it=patt.begin();it != patt.end();it++){
+				if(!(*it & thisBit)) remaining.insert(*it);
+				}
+			if(remaining.size() > 0){
+				if(prevSc + 1 < bound)
+					curr_sc_this_lvl = 1 + MinScore(remaining, bound, bits & ~thisBit, prevSc+1);
+				else 
+					curr_sc_this_lvl = bound - prevSc;
+				}
+			else return 0;
+			
+			if(curr_sc_this_lvl < min_sc_this_lvl)
+				min_sc_this_lvl = curr_sc_this_lvl;
+			if(min_sc_this_lvl == 0 || min_sc_this_lvl + prevSc < bound)
+				return min_sc_this_lvl;
+			}
+		}
+	return min_sc_this_lvl;
+	}
+
+//Collapse merges like patterns, transfering over the counts and site numbers represented by each sucessive identical column.
+//Patterns that are assigned zero counts here will be removed in Pack(), but will still contribute to the totalNChar, except
+//for those with zero states (=missing)
+void PatternManager::NewCollapse(){
+	list<Pattern>::iterator first;
+	list<Pattern>::iterator second  = patterns.begin();
+	second++;
+	while(second != patterns.end()){
+		first = second++;
+		while(second != patterns.end() && (*first == *second)){
+			(*first).count += (*second).count;
+			(*first).siteNumbers.insert((*first).siteNumbers.end(), (*second).siteNumbers.begin(), (*second).siteNumbers.end());
+			(*second).count = 0;
+			second++;
+			}
+		}
+	}
+
+void PatternManager::NewSort(){
+	numSwaps = 0;
+	numCompares = 0;
+
+//DEBUG
+	for(list<Pattern>::iterator it=patterns.begin();it != patterns.end();it++){
+		assert(it->numStates > -1);
+		}
+
+
+#define STL_SORT
+
+#ifdef STL_SORT
+	//this is the stl list sort function, using Pattern::operator<
+	patterns.sort();
+#else
+	vector<int> finalToCurrent(NChar());
+	for(int i = 0;i < NChar();i++)
+		finalToCurrent[i] = i;
+	NewQSort( finalToCurrent, 0, NChar()-1 );
+
+	for(int finalNum = 0;finalNum < NChar();finalNum++){
+		int nextCur = finalToCurrent[finalNum];
+		int swapped = finalNum;
+//		if(nextCur != swapped){
+			int oldPtr;
+			for(oldPtr = finalNum;oldPtr < NChar();oldPtr++)
+				if(finalToCurrent[oldPtr] == finalNum)
+					break;
+//			SwapCharacters(nextCur, swapped);
+			NewSwapCharacters(nextCur, swapped);
+			finalToCurrent[oldPtr] = nextCur;
+			finalToCurrent[finalNum] = finalNum;
+//			}
+		}
+	for(int finalNum = 1;finalNum < NChar();finalNum++){
+//		assert(ComparePatterns(finalNum - 1, finalNum) <= 0);
+		assert(NewComparePatterns(finalNum - 1, finalNum) <= 0);
+		}
+	outman.UserMessage("sorting required %d swaps", numSwaps);
+#endif
+	}
+
+// This version of pack copies unique patterns from the patterns list into the uniquePatterns list
+void PatternManager::NewPack(){
+	for(list<Pattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
+		if(pit->numStates > 0){
+			if(pit->count > 0){
+				uniquePatterns.push_back(*pit);
+				}
+			}
+		else
+			numMissingPats++;
+		}
+	numUniquePats = uniquePatterns.size();
+	}
+
+//
+// Summarize tallies number of constant, informative, and autapomorphic characters
+//
+void PatternManager::ProcessPatterns(){
+	CalcPatternTypesAndNumStates();
+	NewSort();
+	NewCollapse();
+	NewPack();
+	NewDetermineConstantSites();
+	}
+
+//it would really make more sense to do this after packing, but the number of states
+//is needed in pattern comparison in sorting
+void PatternManager::CalcPatternTypesAndNumStates(){
+	//this is just a scratch array to be used repeatedly in PatternType	
+	vector<unsigned int> s(maxNumStates);
+
+	numMissingPats = numConstantPats = numInformativePats = numUninformVariablePats;
+
+	for(list<Pattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
+		int t = pit->CalcPatternTypeAndNumStates(s);
+		if( t == Pattern::MISSING )
+			numMissingPats++;
+		else if( t & Pattern::CONSTANT )
+			numConstantPats += pit->count;
+		else if( t & Pattern::INFORMATIVE )
+			numInformativePats += pit->count;
+		else{
+			assert(t & Pattern::UNINFORM_VARIABLE);
+			numUninformVariablePats += pit->count;
+			}
+		}
+	}
+
+void PatternManager::NewDetermineConstantSites(){
+	//note where all of the constant sites are, and what they are
+	//this is kind of ugly, but will never be rate limiting
+	lastConstant=-1;
+	list<Pattern>::iterator pat = uniquePatterns.begin();
+	assert(pat->numStates > 0);
+	while(pat->numStates == 1){
+		lastConstant++;
+		pat++;
+		}
+	
+	pat = uniquePatterns.begin();
+	int t = 0;
+	int thisCon = 0;
+	if(maxNumStates == 4){
+		for(pat = patterns.begin();thisCon++ <= lastConstant;pat++){
+			t = 0;
+			char c=15;
+			while(t < numTax){
+				char ch = pat->stateVec[t];
+				c = c & ch;
+				t++;
+				}
+			assert(c != 0);
+			pat->constStates = c;
+			}
+		}
+	else{//not allowing ambiguity for codon/AA's, so this is a bit easier
+		
+		for(pat = patterns.begin();thisCon++ <= lastConstant;pat++){
+			t = 0;
+			char c = maxNumStates;
+			do{
+				c = pat->stateVec[t];
+				t++;
+				}while(c == maxNumStates && t < numTax);
+			assert(t <= numTax);
+			pat->constStates = c;
+			}
+		}
+	}
+
+//This takes the unique pattern types and uses their siteNumbers vector to map back to the original
+//ordering of sites, as used to tbe stored in the number array.
+void PatternManager::FillNumberVector(vector<int> &nums){
+	if(nums.size() != uniquePatterns.size()){
+		nums.clear();
+		nums.resize(uniquePatterns.size());
+		}
+
+	int p = 0;
+	for(list<Pattern>::iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
+		for(vector<int>::iterator nit = (*pit).siteNumbers.begin(); nit != (*pit).siteNumbers.end();nit++)
+			nums[*nit] = p;
+		p++;
+		}
+	}
+
+//Takes the data out of the Pattern list and copies into the DataMatrix matrix array
+void PatternManager::FillTaxaXCharMatrix(unsigned char **mat){
+	int c = 0;
+	for(int t = 0;t > numTax;t++){
+		for(list<Pattern>::iterator cit = uniquePatterns.begin();cit != uniquePatterns.end();cit++){
+			mat[t][c] = (*cit).stateVec[t];
+			}
+		}
+	}
+
 DataMatrix::~DataMatrix(){
 	if( count ) MEM_DELETE_ARRAY(count); // count is of length nChar
 	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates is of length nChar
@@ -59,7 +518,7 @@ DataMatrix::~DataMatrix(){
 	}
 	if(constStates!=NULL) delete []constStates;
 	if(origCounts!=NULL) delete []origCounts;
-	memset(this, 0, sizeof(DataMatrix));
+	//memset(this, 0, sizeof(DataMatrix));
 	}
 
 void DataMatrix::SetTaxonLabel(int i, const char* s){
@@ -152,8 +611,6 @@ int DataMatrix::MinScore(set<unsigned char> patt, int bound, unsigned char bits/
 	return min_sc_this_lvl;
 	}
 
-bool my_compare(pair<int, int> fir, pair<int,int> sec) {return fir.second < sec.second;}
-
 //
 // PatternType determines whether pattern k is constant, informative, or missing
 //it used to try to determine autapomorphies, although not correctly
@@ -245,7 +702,7 @@ int DataMatrix::PatternType( int k , unsigned int *stateCounts) const{
 					}
 				stateScores.push_back(pair<int, int>(state, sc));
 				}
-			sort(stateScores.begin(), stateScores.end(), my_compare);
+			sort(stateScores.begin(), stateScores.end(), my_pair_compare);
 			int minStar = stateScores[0].second;
 			if(minStar > 1){
 				set<unsigned char> uPatt;
@@ -305,7 +762,7 @@ void DataMatrix::Summarize(){
 	for( k = 0; k < nChar; k++ ) {
 		int ptFlags = PatternType(k, &s[0]);
 		if( ptFlags == PT_MISSING )
-			nMissing++;
+			nMissing += count[k];
 		else if( ptFlags & PT_CONSTANT )
 			nConstant += count[k];
 		else if( ptFlags & PT_INFORMATIVE )
@@ -353,7 +810,7 @@ void DataMatrix::NewMatrix( int taxa, int sites ){
 		MEM_DELETE_ARRAY(numStates); // numStates has length nChar
 	}
 	if( number ) {
-                MEM_DELETE_ARRAY(number); // number has length nChar
+        MEM_DELETE_ARRAY(number); // number has length nChar
         }
 
 	// create new data matrix, and new count and number arrays
@@ -375,7 +832,7 @@ void DataMatrix::NewMatrix( int taxa, int sites ){
 			//MEM_NEW_ARRAY(matrix[i],unsigned char,sites);
 			//memset( matrix[i], 0xff, taxa*sizeof(unsigned char) );
 			memset( matrix[i], 0xff, sites*sizeof(unsigned char) );
-		}
+			}
 	}
 
 	// set dimension variables to new values
@@ -393,7 +850,9 @@ DataMatrix& DataMatrix::operator =(const DataMatrix& d){
 
 	for( j = 0; j < nChar; j++ ) {
 		SetCount(j, d.Count(j) );
+		origCounts[j] = d.origCounts[j];
 		number[j] = d.Number(j);
+		numStates[j] = d.NumStates(j);
 	}
 
 	for( i = 0; i < nTax; i++ ) {
@@ -409,12 +868,7 @@ DataMatrix& DataMatrix::operator =(const DataMatrix& d){
 //
 void DataMatrix::Pack(){
 
-//ofstream deb("debug.log");
-//for(int q=0;q<nChar;q++){
-//	deb << q << "\t" << count[q] << "\t" << numStates[q] << "\t" << number[q] << endl;
-//	}
-
-int i, j, newNChar = 0;
+	int i, j, newNChar = 0;
 
 	// determine dimensions of new matrix
 	for( j = 0; j < nChar; j++ ) {
@@ -521,22 +975,24 @@ void DataMatrix::DetermineConstantSites(){
 //	SwapCharacters swaps matrix column i with column j
 //
 void DataMatrix::SwapCharacters( int i, int j ){
-	//this should NOT be called if the data is already packed
-	assert(count[i] == 1 && count[j] == 1);
-
 	unsigned char tmp;
 	for( int k = 0; k < nTax; k++ ) {
 		tmp = Matrix( k, i );
 		SetMatrix( k, i, Matrix( k, j ) );
 		SetMatrix( k, j, tmp );
-		
-	}
-	//DJZ also swap the nStates array
+		}
+
+	//swap pattern counts
+	int c = count[i];
+	count[i] = count[j];
+	count[j] = c;
+
+	//and the nStates
 	int s=numStates[i];
 	numStates[i]=numStates[j];
 	numStates[j]=s;
 
-	//DJZ 2/14/06 and the number array
+	//and the number
 	for(int c=0;c<gapsIncludedNChar;c++){
 		if(number[c] == i) number[c]=j;
 		else if(number[c] == j) number[c]=i;
