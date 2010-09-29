@@ -44,6 +44,8 @@ class GeneralGamlConfig{
 	unsigned int siteWindowLength;
 	unsigned int siteWindowStride;
 
+	bool usePatternManager;
+
 	//starting the run
 	int randseed;
 	string streefname;
