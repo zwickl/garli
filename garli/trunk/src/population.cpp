@@ -275,8 +275,6 @@ void ClearDebugLogs(){
 
 Population::~Population()
 {
-//	EliminateDuplicateTreeReferences();  // TODO this be broken
-
 	if(indiv != NULL){
 		for (unsigned i = 0; i < total_size; ++i)	{
 			for (unsigned j = 0; j < total_size; ++j)	{
@@ -1182,6 +1180,13 @@ void Population::SeedPopulationWithStartingTree(int rep){
 
 	outman.precision(10);
 	outman.UserMessage("Initial ln Likelihood: %.4f", indiv[0].Fitness());
+
+/*
+	indiv[0].treeStruct->ofprefix = conf->ofprefix;
+	indiv[0].treeStruct->MakeAllNodesDirty();
+	indiv[0].treeStruct->sitelikeLevel = 2;
+	indiv[0].treeStruct->Score();
+*/
 
 #ifdef SCORE_INITIAL_ONLY
 exit(0);
@@ -2784,7 +2789,8 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	//find out how many trees we have
 	GarliReader & reader = GarliReader::GetInstance();
 	const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
-	assert(treesblock != NULL);
+	if(treesblock == NULL)
+		throw ErrorException("You must specify a treefile to use this runmode.");
 	int numTrees = treesblock->GetNumTrees();
 
 	string oname = conf->ofprefix + ".sitelikes.log";

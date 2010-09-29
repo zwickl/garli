@@ -468,6 +468,8 @@ int main( int argc, char* argv[] )	{
 					//then converted if necessary
 					data = new NucleotideData();
 
+				data->SetUsePatternManager(conf.usePatternManager);
+
 				//using 2 argument form of CreateMatrix (taken from paritition branch)
 				//Default exsets and wtsets will be taken care of in CreateMatrix
 				data->CreateMatrixFromNCL(charblock, includedSites);
@@ -493,30 +495,10 @@ int main( int argc, char* argv[] )	{
 					data = d;
 					}
 
-				outman.UserMessage("\n#######################################################");
-				data->Summarize();
-				outman.UserMessage("Summary of dataset:");
-				outman.UserMessage(" %d sequences.", data->NTax());
-				outman.UserMessage(" %d constant characters.", data->NConstant());
-				outman.UserMessage(" %d parsimony-informative characters.", data->NInformative());
-				outman.UserMessage(" %d uninformative variable characters.", data->NVarUninform());
-				int total = data->NConstant() + data->NInformative() + data->NVarUninform();
-				if(data->NMissing() > 0){
-					outman.UserMessage(" %d characters were completely missing or ambiguous (removed).", data->NMissing());
-					outman.UserMessage(" %d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar());
-					}
-				else outman.UserMessage(" %d total characters.", total);
-
-				outman.flush();
-
-				data->Collapse();
-				outman.UserMessage("%d unique patterns in compressed data matrix.\n", data->NChar());
-				outman.UserMessage("#######################################################");
+				data->ProcessPatterns();
 
 				//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 				data->ReserveOriginalCounts();
-
-				data->DetermineConstantSites();
 
 				pop->Setup(&conf, data, 1, (validateMode == true ? -1 : 0));
 				pop->SetOutputDetails();

@@ -45,11 +45,10 @@ typedef FLOAT_TYPE** DblPtrPtr;
 
 class Pattern{
 public:
-	char count;
-	//TODO - deal with orig counts here - should be orig relative to packed matrix
-	char origCount;
-	char numStates;
-	char constStates;
+	int count;
+	int origCount;
+	int numStates;
+	int constStates;
 	static int numTax;
 	static int maxNumStates;
 	vector<unsigned char> stateVec;
@@ -58,7 +57,7 @@ public:
 		MISSING = 1,
 		CONSTANT = 2,
 		UNINFORM_VARIABLE = 3,
-		INFORMATIVE = 2
+		INFORMATIVE = 4
 		}type;
 
 	Pattern(){Reset();}
@@ -105,17 +104,17 @@ class PatternManager{
 
 	int numTax;
 	int maxNumStates;
-	int totNumPats;
-	int numNonMissingPats;
-	int numUniquePats;
+	int totNumPats;				//gapsIncludedNChar
+	int numNonMissingPats;		//totalNChar
+	int numUniquePats;			//NChar
 
-	int numMissingPats;
-	int numConstantPats;
-	int numInformativePats;
-	int numUninformVariablePats;
+	int numMissingPats;			//nMissing
+	int numConstantPats;		//nConstant
+	int numInformativePats;		//nInformative
+	int numUninformVariablePats;//nVarUninform
 	
-	int lastConstant;
-	bool compressed;
+	int lastConstant;			//lastConstant
+	bool compressed;			//dense
 	list<Pattern> patterns;
 	list<Pattern> uniquePatterns;
 	vector<int> constStates;
@@ -156,9 +155,14 @@ public:
 			return uniquePatterns.size();
 		}
 	void ProcessPatterns();
-	void FillNumberVector(vector<int> &nums);
-	void FillTaxaXCharMatrix(unsigned char **mat);
 	void CalcPatternTypesAndNumStates();
+	//funcs for getting info back out of the patman into the datamatrix object
+	void FillNumberVector(vector<int> &nums) const;
+	void FillTaxaXCharMatrix(unsigned char **mat) const;
+	void FillNumStatesVector(vector<int> &ns) const;
+	void FillCountVector(vector<int> &counts) const;
+	void FillConstStatesVector(vector<int> &cs) const;
+	void FillIntegerValues(int &miss, int &cons, int &vNonInf, int &inf, int &lastConst) const;
 	};
 
 // Note: the class below has pure virtual member functions
@@ -176,7 +180,7 @@ protected:
 								//is done varies depending on the context
 	
 	unsigned char**         matrix;
-	//PatternManager patman;
+	PatternManager patman;
 
 	int*		count;
 	int*		origCounts;
@@ -185,7 +189,16 @@ protected:
 						//contents are the packed column representing that char
 						//both start at 0, so offset upon output
 						//This used to represent something else (I think)
-	//vector<int> newNumber;
+
+	//These are new correlates to the old dynamicaly allocated arrays.  They will be filled from
+	//the pattern manager.
+	vector<int> newNumber;
+	vector<int> newNumStates;
+	vector<int> newCount;
+	vector<int> newOrigCounts;
+	vector<int> newConstStates;
+	vector<string> newTaxonLabel;
+
 	char**          taxonLabel;
 	int		nMissing;
 	int		nConstant;
@@ -198,10 +211,10 @@ protected:
 	
 	protected:
 		int*	numStates;
-		int		dmFlags;
 		int     maxNumStates;
 		bool	useDefaultWeightsets;
 		string	wtsetName;
+		bool	usePatternManager;
 
 	protected:
 		char	info[80];
@@ -211,15 +224,8 @@ protected:
 		void	DebugSaveQSortState( int top, int bottom, int ii, int jj, int xx, const char* title );
 		void	QSort( int top, int bottom );
 		void	ReplaceTaxonLabel( int i, const char* s );
-		void	ReplaceTaxonColor( int i, const char* s );
 
 	public:
-		enum {STANDARD, DNA, RNA, PROTEIN };
-		enum {	// for dmFlags variable
-			allvariable = 0x0001,	// all characters in data matrix variable
-			vnstates    = 0x0002,	// characters vary in maximum number of states
-			ambigstates = 0x0004	// ambiguous states found in data matrix
-		};
 		enum {
 			PT_MISSING		= 0x0000,
 			PT_CONSTANT		= 0x0001,
@@ -228,18 +234,18 @@ protected:
 		};
 
 	public:
-		DataMatrix() : dmFlags(0), dense(0), nTax(0), nChar(0), matrix(0), count(0)
+		DataMatrix() : dense(0), nTax(0), nChar(0), matrix(0), count(0)
 			, number(0), taxonLabel(0), numStates(0) 
 			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
-			fullyAmbigChar(15), useDefaultWeightsets(true)
+			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(false)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
-			: nTax(ntax), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
+			: nTax(ntax), nChar(nchar), dense(0), matrix(0), count(0)
 			, number(0), taxonLabel(0), numStates(0)
 			, nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
 			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
-			fullyAmbigChar(15), useDefaultWeightsets(true)
+			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(false)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
 		virtual ~DataMatrix();
 
@@ -257,19 +263,12 @@ protected:
 		virtual int NumStates(int j) const
 			{ return ( numStates && (j < nChar) ? numStates[j] : 0 ); }
 
-		// functions for quizzing dmFlags
-		int InvarCharsExpected() const { return !(dmFlags & allvariable); }
-		int VariableNumStates() const { return (dmFlags & vnstates); }
-		int AmbiguousStates() const { return (dmFlags & ambigstates); }
+		void SetUsePatternManager(bool tf) {usePatternManager = tf;}
+		bool GetUsePatternManager() const {return usePatternManager;}
+		void ProcessPatterns();
+		void OutputDataSummary() const;
 
-		void ProcessPatterns() {
-//			patman.ProcessPatterns();
-//			GetDataFromPatternManager();
-			}
-		void GetDataFromPatternManager(){
-//			patman.FillNumberVector(newNumber);
-//			patman.FillTaxaXCharMatrix(matrix);
-			}
+		void GetDataFromPatternManager();
 		// functions for getting the data in and out
 		int GetToken( istream& in, char* tokenbuf, int maxlen, bool acceptComments=true );
 		int GetToken( FILE *in, char* tokenbuf, int maxlen);
@@ -292,21 +291,31 @@ protected:
 		void Flush() { NewMatrix( 0, 0 ); }
 		int Dense() const { return dense; }
 		
-		int Number(int j) const
-			//this appears to have been a bug.  Should be gapsIncludedNChar
-			//{ return ( number && (j < totalNChar) ? number[j] : 0 ); }
-			{ return ( number && (j < gapsIncludedNChar) ? number[j] : 0 ); }
+		int Number(int j) const{
+			if(newNumber.size() > 0)
+				return newNumber[j];
+			return ( number && (j < gapsIncludedNChar) ? number[j] : 0 );
+			}
 
 		virtual int Count(int j) const{ 
+			if(newCount.size() > 0)
+				return newCount[j];
 			return ( count && (j < nChar) ? count[j] : 0 ); 
 			}
 		virtual int CountByOrigIndex(int j) const{ 
+			if(newCount.size() > 0)
+				if(newNumber.size() > 0)
+				return newCount[newNumber[j]];
 			return ( count && (j < nChar) ? count[number[j]] : 0 ); 
 			}
 		virtual const int *GetCounts() const {
+			if(newCount.size() > 0)
+				return &(newCount[0]);
 			return count;
 			}
 		const int *GetConstStates() const {
+			if(newConstStates.size() > 0)
+				return &(newConstStates[0]);
 			return constStates;
 			}
 		void SetCount(int j, int c){
@@ -374,16 +383,12 @@ protected:
 		virtual void Collapse();
 		virtual void Pack();
 		void NewMatrix(int nt, int nc);	// flushes old matrix, creates new one
+		void ResizeCharacterNumberDependentVariables(int nCh);
 		int PositionOf( char* s ) const; // returns pos (0..nTax-1) of taxon named s
-		void AllocPr( DblPtrPtr& pr );
-		void DeletePr( DblPtrPtr& pr );
 		void DumpCounts( const char* s );
 		void WriteCollapsedData();  //DZ
 		void SaveNexus(const char* filename, int iosFlags /* = 0 */); //DZ
 		void DetermineConstantSites();
-		int Serialize(char**, int*);  // cjb
-		int Deserialize(const char*, const int);  // cjb
-		bool operator==(const DataMatrix& rhs) const; // cjb - to test serialization
 		void ExplicitDestructor();  // cjb - totally clear the DataMatrix and revert it to its original state as if it was just constructed
 		void CheckForIdenticalTaxonNames();
 		bool DidUseDefaultWeightsets() const {return (wtsetName.length() > 0);}

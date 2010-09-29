@@ -333,6 +333,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 	nTax = dnaData->NTax();
 	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon datatype specified, but number of nucleotides not divisible by 3!");  
 	NewMatrix(nTax, nChar);
+	patman.Initialize(nTax, maxNumStates);
 
 	//this will just map from the bitwise format to the index format (A, C, G, T = 0, 1, 2, 3)
 	//partial ambiguity is mapped to total ambiguity currently
@@ -406,6 +407,21 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 		empBaseFreqsPos2[b] /= total;
 		empBaseFreqsPos3[b] /= total;
 		}
+	
+	//copy matrix into alternative PatternManager for pattern sorting
+	if(usePatternManager){
+		Pattern thisPat;
+		for(int cod=0;cod<nChar;cod++){
+			for(int tax=0;tax<NTax();tax++){
+				thisPat.AddChar(matrix[tax][cod]);
+				}
+			//numbers directly copy over, and should actually be in 0->nchar order now anyway
+			thisPat.siteNumbers.push_back(number[cod]);
+			thisPat.SetCount(1);
+			patman.AddPattern(thisPat);
+			thisPat.Reset();
+			}
+		}
 	}
 
 void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, GeneticCode *code){
@@ -421,6 +437,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 	nTax = dnaData->NTax();
 	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon to Aminoacid translation specified, but number of nucleotides not divisible by 3!");  
 	NewMatrix(nTax, nChar);
+	patman.Initialize(nTax, maxNumStates);
 
 	//this will just map from the bitwise format to the index format (A, C, G, T = 0, 1, 2, 3)
 	//partial ambiguity is mapped to total ambiguity currently
@@ -470,7 +487,22 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 			matrix[tax][cod] = prot;
 			}
 		if(firstAmbig == false) outman.UserMessage("");
-		}	
+		}
+
+	//copy matrix into alternative PatternManager for pattern sorting
+	if(usePatternManager){
+		Pattern thisPat;
+		for(int cod=0;cod<nChar;cod++){
+			for(int tax=0;tax<NTax();tax++){
+				thisPat.AddChar(matrix[tax][cod]);
+				}
+			//numbers directly copy over, and should actually be in 0->nchar order now anyway
+			thisPat.siteNumbers.push_back(number[cod]);
+			thisPat.SetCount(1);
+			patman.AddPattern(thisPat);
+			thisPat.Reset();
+			}
+		}
 	}
 
 void CodonData::CalcF1x4Freqs(){
@@ -942,7 +974,7 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 		}
 
 	NewMatrix( numActiveTaxa, numActiveChar );
-//	patman.Initialize(numActiveTaxa, maxNumStates);
+	patman.Initialize(numActiveTaxa, maxNumStates);
 
 	//get weightset if one was specified
 	vector<int> charWeights;
@@ -984,43 +1016,33 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 			i++;
 			}
 		}
-/*
-	//taxa inside characters
-	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
-		if(charblock->IsActiveTaxon(origTaxIndex)){
-			//Now storing names as escaped Nexus values - this means:
-			//if they have underscores - store with underscores
-			//if they have spaces within single quotes - store with underscores
-			//if they have punctuation within single parens (including spaces) - store with single quotes maintained
-			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
-			SetTaxonLabel(i, NxsString::GetEscaped(tlabel).c_str());
-			}
-		}
-	//list<vector<unsigned char>>::iterator col = columnMatrix.begin();
-	bool haveWeights = !charWeights.empty();
-	Pattern thisPat;
-	for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
-		int tax = 0;
-		for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
-			if(charblock->IsActiveTaxon(origTaxIndex)){
-				unsigned char datum = '\0';
-				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 15;
-				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
-				else{
-					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
-					for(int s=0;s<nstates;s++){
-						datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
+
+	if(usePatternManager){
+		//optionally also read into the alternative pattern manager, this is taxa loop inside char loop
+		bool haveWeights = !charWeights.empty();
+		Pattern thisPat;
+		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+			int tax = 0;
+			for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+				if(charblock->IsActiveTaxon(origTaxIndex)){
+					unsigned char datum = '\0';
+					if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 15;
+					else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
+					else{
+						int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+						for(int s=0;s<nstates;s++){
+							datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
+							}
 						}
+					thisPat.AddChar(datum);
 					}
-				thisPat.AddChar(datum);
 				}
+			thisPat.siteNumbers.push_back(*cit);
+			thisPat.SetCount((haveWeights ? charWeights[*cit] : 1));
+			patman.AddPattern(thisPat);
+			thisPat.Reset();
 			}
-		thisPat.siteNumbers.push_back(*cit);
-		thisPat.SetCount((haveWeights ? charWeights[*cit] : 1));
-		patman.AddPattern(thisPat);
-		thisPat.Reset();
 		}
-*/
 	}
 
 void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock){
@@ -1122,6 +1144,7 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 		}
 
 	NewMatrix( numActiveTaxa, numActiveChar );
+	patman.Initialize(numActiveTaxa, maxNumStates);
 
 	//get weightset if one was specified
 	vector<int> charWeights;
@@ -1174,6 +1197,39 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 				}
 			if(firstAmbig == false) outman.UserMessage("");
 			i++;
+			}
+		}
+	
+	//read the same data into the alternate pattern sorting machinery, which only makes sense looping over tax within char
+	if(usePatternManager){
+		Pattern thisPat;
+		bool haveWeights = !charWeights.empty();
+		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+			int tax = 0;
+			for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+				if(charblock->IsActiveTaxon(origTaxIndex)){
+					unsigned char datum = '\0';
+					if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = maxNumStates;
+					else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = maxNumStates;
+					else{
+						int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+
+						//need to deal with the possibility of multiple states represented in matrix
+						//just convert to full ambiguity
+						if(nstates == 1)
+							datum = CharToDatum(charblock->GetState(origTaxIndex, *cit, 0));
+						else{
+							outman.UserMessageNoCR("%d ", *cit+1);
+							datum = CharToDatum('?');
+							}
+						}
+					thisPat.AddChar(datum);
+					}
+				}
+			thisPat.siteNumbers.push_back(*cit);
+			thisPat.SetCount((haveWeights ? charWeights[*cit] : 1));
+			patman.AddPattern(thisPat);
+			thisPat.Reset();
 			}
 		}
 	}

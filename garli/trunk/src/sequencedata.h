@@ -72,7 +72,6 @@ inline unsigned char SequenceData::CharToDatum( char ch ){
 		datum = MISSING_DATA;
 	else if( strchr( "rRyYmMkKsSwWhHbBvVdDnN", ch ) ) {
 		datum = MISSING_DATA;
-		dmFlags |= ambigstates;
 	}
 	else
 		THROW_BADSTATE(ch);
@@ -145,20 +144,6 @@ inline char SequenceData::DatumToChar( unsigned char d ) const
        	case 15 : ch='?'; break;
 		default  : assert(0);
 		}
-/*		
-	char ch = 'X';
-
-	if( d == MISSING_DATA )
-		ch = '?';
-	else if( d == 0 )
-		ch = 'A';
-	else if( d == 1 )
-		ch = 'C';
-	else if( d == 2 )
-		ch = 'G';
-	else if( d == 3 )
-		ch = 'T';
-*/
 	return ch;
 }
 
@@ -582,7 +567,7 @@ class GeneticCode{
 			for(int s = 0;s < 4;s++){
 				for(int t = 0;t < 4;t++){
 					if(CodonLookup(f * 16 + s * 4 + t) != 20){ 
-						sprintf(cod, "%c%c%c\0", nucs[f], nucs[s], nucs[t]);
+						sprintf(cod, "%c%c%c", nucs[f], nucs[s], nucs[t]);
 						mapIndexToCodonDisplay.push_back(cod);
 						}
 					}
@@ -640,6 +625,7 @@ public:
 		else{
 			throw ErrorException("Sorry, only the standard, vert mito and invert mito codes can be used with codon models");
 			}
+		usePatternManager = dat->GetUsePatternManager();
 		FillCodonMatrixFromDNA(dat);
 		CopyNamesFromOtherMatrix(dat);
 		empType = NOT_EMPIRICAL;
@@ -715,6 +701,7 @@ public:
 			else assert(0);
 			maxNumStates = 21;	
 			}
+		usePatternManager = dat->GetUsePatternManager();
 		FillAminoacidMatrixFromDNA(dat, &c);
 		CopyNamesFromOtherMatrix(dat);
 		fullyAmbigChar = maxNumStates;

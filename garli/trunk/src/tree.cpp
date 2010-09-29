@@ -105,11 +105,6 @@ FLOAT_TYPE Tree::expectedPrecision;
 FLOAT_TYPE Tree::uniqueSwapPrecalc[500];
 FLOAT_TYPE Tree::distanceSwapPrecalc[1000];
 
-//DEBUG
-//FLOAT_TYPE Tree::rescalePrecalcThresh[30];
-//FLOAT_TYPE Tree::rescalePrecalcMult[30];
-//int Tree::rescalePrecalcIncr[30];
-
 FLOAT_TYPE Tree::rescalePrecalcThresh[RESCALE_ARRAY_LENGTH];
 FLOAT_TYPE Tree::rescalePrecalcMult[RESCALE_ARRAY_LENGTH];
 int Tree::rescalePrecalcIncr[RESCALE_ARRAY_LENGTH];
@@ -4896,13 +4891,13 @@ void Tree::OutputSiteLikelihoods(vector<double> &likes, const int *under1, const
 			}
 		}
 	if(sitelikeLevel > 1){
-		packed << "packedIndex\ttruelnL\tunder1\tunder2" << endl;
+		packed << "packedIndex\ttruelnL\tunder1\tunder2\tpatCount" << endl;
 		for(int c = 0;c < data->NChar();c++){
 			packed << c << "\t" << likes[c] << "\t" << under1[c];
 			if(under2 != NULL)
-				packed << "\t" << under2[c] << endl;
+				packed << "\t" << under2[c] << "\t" << data->Count(c) << endl;
 			else
-				packed << "\t-" << endl;
+				packed << "\t-" << "\t" << data->Count(c) << endl;
 			}
 		}
 	//sitelike output is non-persistent, so clear it out here
