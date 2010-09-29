@@ -1783,7 +1783,7 @@ if(nd->nodeNum == 8){
 														opt << "IgnoreNRUp\t";
 														#endif
 							}
-//DEBUG
+
 	//					else if(iter == 30){
 						else if(((iter - 20) > 0) && ((iter - 20) % 10 == 0)){
 							//another annoying special case (only for codon models I think)
