@@ -257,7 +257,6 @@ void PatternManager::NewCollapse(){
 	}
 
 void PatternManager::NewSort(){
-	numSwaps = 0;
 	numCompares = 0;
 
 	//this is the stl list sort function, using Pattern::operator<
