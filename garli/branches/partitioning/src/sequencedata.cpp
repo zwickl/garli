@@ -1446,8 +1446,10 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 //the dummy root is now taken care of outside of here in a non-datatype specific way
 //	int myEffectiveTaxa = numActiveTaxa + 1;
 
+	bool allGapChar = true;
+
 	//make room for a dummy constant character here
-	if(datatype == ONLY_VARIABLE)
+	if(datatype == ONLY_VARIABLE || allGapChar)
 		NewMatrix( numActiveTaxa, realCharSet->size() + 1);
 	else
 		NewMatrix( numActiveTaxa, realCharSet->size());
@@ -1464,8 +1466,8 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 			SetTaxonLabel( effectiveTax, tlabel.c_str());
 			
 			int effectiveChar = 0;
-			//add the dummy constant character
-			if(datatype == ONLY_VARIABLE){
+			//add the dummy character
+			if(datatype == ONLY_VARIABLE || allGapChar){
 				if(effectiveTax == 0)
 					SetOriginalDataNumber(0, -1);
 				SetMatrix( effectiveTax, effectiveChar++, 0);

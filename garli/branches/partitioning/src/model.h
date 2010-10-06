@@ -55,7 +55,8 @@ extern vector<ClaSpecifier> claSpecs;
 		RATEPROPS = 5,
 		PROPORTIONINVARIANT = 6,
 		SUBSETRATE = 7,
-		ABSOLUTERATE = 8
+		DELETERATE = 8,
+		INSERTPROPORTION = 9
 		};
 
 class BaseParameter {
@@ -265,9 +266,25 @@ public:
 
 class ProportionInvariant:public BaseParameter{
 public:
-	ProportionInvariant(FLOAT_TYPE **dv, int modnum):BaseParameter("Prop. invar.", dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0, (FLOAT_TYPE)1.0, modnum){};
+	ProportionInvariant(FLOAT_TYPE **dv, int modnum):BaseParameter("Prop. invar.", dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0001, (FLOAT_TYPE)0.9999, modnum){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
+		if(*vals[0] < minv) 
+			*vals[0] = minv;
+		if(*vals[0] > maxv) 
+			*vals[0] = maxv;
+		}
+	};
+
+class InsertProportion:public BaseParameter{
+public:
+	InsertProportion(FLOAT_TYPE **dv, int modnum):BaseParameter("Insert prop.", dv, INSERTPROPORTION, 1, (FLOAT_TYPE)0.0001, (FLOAT_TYPE)0.9999, modnum){};
+	void Mutator(FLOAT_TYPE mutationShape){
+		*vals[0] *=rnd.gamma( mutationShape );
+		if(*vals[0] < minv) 
+			*vals[0] = minv;
+		if(*vals[0] > maxv) 
+			*vals[0] = maxv;
 		}
 	};
 
@@ -281,9 +298,9 @@ public:
 		}
 	};
 
-class AbsoluteRate:public BaseParameter{
+class DeleteRate:public BaseParameter{
 public:
-	AbsoluteRate(FLOAT_TYPE **dv, int modnum):BaseParameter("Absolute rate", dv, ABSOLUTERATE, 1, (FLOAT_TYPE)0.0001, (FLOAT_TYPE)999.0, modnum){};
+	DeleteRate(FLOAT_TYPE **dv, int modnum):BaseParameter("Delete rate", dv, DELETERATE, 1, (FLOAT_TYPE)0.0001, (FLOAT_TYPE)999.0, modnum){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *= rnd.gamma( mutationShape );
 		if(*vals[0] > maxv) 
@@ -789,8 +806,9 @@ public:
 		else if(_stricmp(str, "standardvariable") == 0) SetNStateV();
 		else if(_stricmp(str, "standardorderedvariable") == 0) SetOrderedNStateV();
 		else if(_stricmp(str, "mkv") == 0) SetNStateV();
+		else if(_stricmp(str, "gapmixturemodel") == 0) SetOrientedGap();
 		else if(_stricmp(str, "orientedgap") == 0) SetOrientedGap();
-		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, dna, rna, binary, nstate)", str));
+		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, nucleotide, standard[ordered], standardvariable[ordered], gapmixturemodel)", str));
 		}
 	void SetGeneticCode(const char *str){
 		if(datatype != DNA && datatype != RNA){
@@ -1043,8 +1061,12 @@ class Model{
 	
 	FLOAT_TYPE InsertRate() const {return *insertRate;}
 	FLOAT_TYPE DeleteRate() const {return *deleteRate;}
+	//these are the old freqs, no longer used.  Came from TKF I think
 	FLOAT_TYPE AbsenceFrequency() const {return (1.0 / ((*insertRate / *deleteRate) + 1.0));}
 	FLOAT_TYPE PresenceFrequency() const {return (*insertRate / *deleteRate) / ((*insertRate / *deleteRate) + 1.0);}
+	//these were from Rivas and Eddy, also not used currently
+	FLOAT_TYPE IndelPsi(FLOAT_TYPE blen)   const {return (InsertRate() / (InsertRate() + DeleteRate()) * (1.0 - exp(-(InsertRate() + DeleteRate()) * blen)));}
+	FLOAT_TYPE IndelGamma(FLOAT_TYPE blen) const {return (DeleteRate() / (InsertRate() + DeleteRate()) * (1.0 - exp(-(InsertRate() + DeleteRate()) * blen)));}
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
