@@ -92,7 +92,7 @@ class ClaManager{
 			//for(int m = 0;m < mods->NumModels();m++){
 			for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
 				const Model *thisMod = mods->GetModel((*specs).modelIndex);
-				CondLikeArray *thisCLA = new CondLikeArray(data->GetSubset((*specs).dataIndex)->NChar(), (thisMod->IsOrientedGap() ? 4: thisMod->NStates()), thisMod->NRateCats());
+				CondLikeArray *thisCLA = new CondLikeArray(data->GetSubset((*specs).dataIndex)->NChar(), (thisMod->IsOrientedGap() ? 3: thisMod->NStates()), thisMod->NRateCats());
 				allClas[i]->AddCLA(thisCLA);
 				}
 			allClas[i]->Allocate();

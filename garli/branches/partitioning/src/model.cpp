@@ -838,19 +838,29 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 
 void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 
-	//insertion rate
-	double lambda = InsertRate();
+	//insertion proportion only figures in at scoring
+	
 	//deletion rate
 	double mu = DeleteRate();
-	assert(lambda <= mu);
-	if(FloatingPointEquals(blen, 0.5, 1e-8)){
-		int poo=2;
-		}	
-
-	double expLam = exp(-lambda * blen);
 	double expMu  = exp(-mu * blen);
 
-	//worked out with Mark
+	//very simple pmat
+	mat[0][0][0] = 1.0;					//remain in "will be inserted state"
+	
+	//Although the insertion prob depends on the total treelength (it is blen/TL for a given branch)
+	//the TL factor can be figured in at the root.  Since the blens could be > 1.0, this opens the
+	//possibility of overflow, so reduce the blen here.  If the artificial reduction is too much
+	//the normal rescaling will kick in
+	mat[0][0][1] = blen * 0.1;	//prob of insert, uniform along branches
+
+	mat[0][0][2] = 0.0;					//insert and del on same branch (should be 0?)
+	mat[0][1][2] = 1.0 - expMu;			//deletion
+	mat[0][1][1] = 1.0 - mat[0][1][2];	//no deletion
+	mat[0][2][2] = 1.0;					//stay deleted (?)
+	
+	mat[0][1][0] = mat[0][2][0] =  mat[0][2][1] = ZERO_POINT_ZERO;
+/*
+	//earlier abandoned stuff worked out with Mark
 	mat[0][0][0] = expLam;
 	mat[0][0][1] = ((expLam - expMu) * lambda) / (mu - lambda); 
 	mat[0][0][2] = (mu - (mu * expLam) + (expMu - 1.0) * lambda) / (mu - lambda);
@@ -861,6 +871,24 @@ void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 	mat[0][2][2] = 1.0;
 	
 	mat[0][1][0] = mat[0][2][0] =  mat[0][2][1] = ZERO_POINT_ZERO;
+*/
+	//from Rivas and Eddy
+/*
+	double psi = IndelPsi(blen);
+	double gamma = IndelGamma(blen);
+	double delProb = (1.0 - psi) * gamma;
+	//here R&E multiply by pi(j) for the base being inserted.  Not sure if I should have any
+	//value here or not.
+	double insProb = psi; //psi * 0.25;
+
+	mat[0][0][0] = ONE_POINT_ZERO - insProb;
+	mat[0][0][1] = insProb;
+	//we used to have a value here, but not sure if it is necessary when conditioning on a base making it to the present day
+	mat[0][0][2] = ZERO_POINT_ZERO;
+	
+	mat[0][1][1] = ONE_POINT_ZERO - delProb;
+	mat[0][1][2] = delProb;
+*/	
 /*
 	ofstream mats("mats.log", ios::app);
 	mats << lambda << "\t" << mu << "\t" << blen << "\t"; //endl;
@@ -2154,7 +2182,7 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 	else if(modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV())
 		outman.UserMessage("  Number of states = %d (ordered standard data)", nstates);
 	else if(modSpec->IsOrientedGap())
-		outman.UserMessage("  Number of states = 2 (gap encoding, # states = 3 with unobserved state)", nstates);
+		outman.UserMessage("  Number of states = 2 (0/1 coding of gaps)");
 	else
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
@@ -2198,8 +2226,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		outman.UserMessage("  Character change matrix:\n    One rate (ordered symmetric one rate Mkv model)");
 		}
 	else if(modSpec->IsOrientedGap()){
-		outman.UserMessage("  Character change matrix:\n    irreversible matrix, insertion rate and deletion rate parameters");
-		outman.UserMessage("    insert = %.3f, delete = %.3f", *insertRate, *deleteRate);
+		outman.UserMessage("  Character change matrix: irreversible matrix\n    deletion rate parameter only estimated if using a partitioned\n    model without subset rates");
+		outman.UserMessage("    deletion rate = %.3f", *deleteRate);
 		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
@@ -2214,7 +2242,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		else if(modSpec->IsStandardData())
 			outman.UserMessage("equal (%.2f, fixed)", 1.0/nstates);
 		else if(modSpec->IsOrientedGap()){
-			outman.UserMessage("determined by insertion and deletion rates");
+			outman.UserMessage("proportion of inserted sites parameter");
+			outman.UserMessage("    insert proportion = %.3f", *insertRate);
 			}
 		else 
 			outman.UserMessage("equal (0.25, fixed)");
@@ -2565,16 +2594,20 @@ void Model::CreateModelFromSpecification(int modnum){
 
 	if(IsOrientedGap()){
 		insertRate = new FLOAT_TYPE;
-		*insertRate = 0.1;
-		AbsoluteRate *ins = new AbsoluteRate((FLOAT_TYPE **) &insertRate, modnum);
+		*insertRate = 0.5;
+		//AbsoluteRate *ins = new AbsoluteRate((FLOAT_TYPE **) &insertRate, modnum);
+		InsertProportion *ins = new InsertProportion((FLOAT_TYPE **) &insertRate, modnum);
 		ins->SetWeight(1);
 		paramsToMutate.push_back(ins);
 
+		//del rate may be optimized elsewhere, but not randomly during GA
+		//(optimized if part. model and no SSR)
 		deleteRate = new FLOAT_TYPE;
-		*deleteRate = 0.2;
-		AbsoluteRate *del = new AbsoluteRate((FLOAT_TYPE **) &deleteRate, modnum);
+		*deleteRate = 1.0;
+/*		DeleteRate *del = new DeleteRate((FLOAT_TYPE **) &deleteRate, modnum);
 		del->SetWeight(1);
 		paramsToMutate.push_back(del);
+*/
 		}
 	else{
 		insertRate = deleteRate = NULL;
@@ -2995,6 +3028,9 @@ int Model::PerformModelMutation(){
 			eigenDirty = true;
 			}
 		retType=Individual::alpha;
+		}
+	else if(mut->Type() == INSERTPROPORTION || mut->Type() == DELETERATE){
+		retType=Individual::indel;
 		}
 	return retType;
 	}
@@ -4242,11 +4278,7 @@ int ModelPartition::PerformModelMutation(){
 		NormalizeSubsetRates();
 		retType=Individual::subsetRate;
 		}
-	else if(mut->Type() == ABSOLUTERATE){
-		//For now this is only insert and delete rates.  Need to ensure that insert stays < delete
-		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++)
-			if(models[*mit]->InsertRate() > models[*mit]->DeleteRate())
-				*models[*mit]->insertRate = *models[*mit]->deleteRate - 1.0e-3;
+	else if(mut->Type() == INSERTPROPORTION || mut->Type() == DELETERATE){
 		retType=Individual::indel;
 		}
 	return retType;

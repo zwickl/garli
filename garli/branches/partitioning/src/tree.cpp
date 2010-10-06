@@ -425,7 +425,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	//will always be the same node, but its anc (the dummy connector) won't be
 	if(rootWithDummy){
 		assert(dummyRoot);
-		SetBranchLength(dummyRoot, 0.5);
+		SetBranchLength(dummyRoot, 0.01);
 		if(root->left->next == root->right){
 			//if the root only has two descendents (i.e., it is a rooted tree) then add the dummy root there
 			//there will be no connector, and all connectors should already have been used.
@@ -567,8 +567,9 @@ int Tree::BrlenMutate(){
 		for(int i=0;i<numBrlenMuts;i++){
 			int branch=GetRandomNonRootNode();
 			allNodes[branch]->dlen*=rnd.gamma( Tree::alpha );
-			SweepDirtynessOverTree(allNodes[branch]);
 			allNodes[branch]->dlen = (allNodes[branch]->dlen > min_brlen ? (allNodes[branch]->dlen < max_brlen ? allNodes[branch]->dlen : max_brlen) : min_brlen);
+			
+			SweepDirtynessOverTree(allNodes[branch]);
 			}
 		}
 	return numBrlenMuts;
@@ -3282,6 +3283,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA, int dataIndex){
 			assert(large1 < 1.0e15);
 			if(large1< rescaleBelow){
 				if(large1 < 1e-190){
+					//poor blens can very rarely kill a gap model
 					if(someOrientedGap)
 						throw(UnscoreableException());
 					else
@@ -3551,7 +3553,7 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 
 	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
 		Model *mod = modPart->GetModel((*specs).modelIndex);
-		if(! mod->IsOrientedGap())//we don't actually use a pmat with oriented gap, so no need to calc it here
+		if(! mod->IsOrientedGap())//we don't actually use a pmat with final scoring in gap model, so no need to calc it here
 			mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
 
 		partialCLA = partialCLAset->GetCLA((*specs).claIndex);
@@ -3613,7 +3615,6 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 			if(isNucleotide)
 				CalcFullCLAInternalInternal(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], (*specs).modelIndex, (*specs).dataIndex);
 			else if(mod->IsOrientedGap())
-				//CalcFullCLAInternalInternalOrientedGap(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], (*specs).modelIndex, (*specs).dataIndex);
 				CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], firstCLA, secCLA, NULL, NULL, (*specs).modelIndex, (*specs).dataIndex);
 			else
 				CalcFullCLAInternalInternalNState(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], (*specs).modelIndex, (*specs).dataIndex);
@@ -3627,7 +3628,6 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 			if(isNucleotide)
 				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 			else if(mod->IsOrientedGap())
-				//CalcFullCLATerminalTerminalOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 				CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, NULL, firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 			else
 				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
@@ -3641,10 +3641,8 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 			if(isNucleotide == false){
 				if(mod->IsOrientedGap()){
 					if(firstCLAset==NULL)
-						//CalcFullCLAInternalTerminalOrientedGap(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 						CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, secCLA, firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
 					else
-						//CalcFullCLAInternalTerminalOrientedGap(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 						CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], firstCLA, NULL, NULL, secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 					}
 				else{
@@ -5111,7 +5109,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 					else 
 						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult[i]);
 					}
-				unscaledlnL = (log(siteL) - underflow_mult[i]);
+				unscaledlnL = (log(siteL) - ONE_POINT_ZERO - nstates * siteL);
 				assert(siteL > ZERO_POINT_ZERO);//this should be positive
 				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
 				//rounding error in multiplying a site that is fully ambiguous across the tree
@@ -5124,8 +5122,12 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 					if(i == 0){
 						if(underflow_mult[i] == 0)
 							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
-						else 
-							MkvScaler = ZERO_POINT_ZERO;
+						else{ 
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[0], exp((double)(partialCLA->underflow_mult[0])));
+							MkvScaler = log(ONE_POINT_ZERO - nstates * siteL / exp((FLOAT_TYPE)partialCLA->underflow_mult[0]));
+							//MkvScaler = ZERO_POINT_ZERO;
+							}
+
 						}
 					else{
 						unscaledlnL += MkvScaler;
@@ -5209,8 +5211,11 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 					if(i == 0){
 						if(underflow_mult[i] == 0)
 							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
-						else 
-							MkvScaler = ZERO_POINT_ZERO;
+						else{
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", underflow_mult[0], exp((double)(underflow_mult[0])));
+							MkvScaler = log(ONE_POINT_ZERO - nstates * siteL / exp((FLOAT_TYPE)underflow_mult[0]));
+							//MkvScaler = ZERO_POINT_ZERO;
+							}
 						}
 					else{
 						unscaledlnL += MkvScaler;
@@ -5250,39 +5255,55 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 	const SequenceData *data = dataPart->GetSubset(dataIndex);
 	Model *mod = modPart->GetModel(modIndex);
 
-	const int claStates = 4;
+	const int claStates = 3;
 	const int nchar = data->NChar();
 	const int *countit=data->GetCounts();
 
 	FLOAT_TYPE siteL, totallnL = ZERO_POINT_ZERO, unscaledlnL = ZERO_POINT_ZERO;
 
 	vector<FLOAT_TYPE> freqs(4);
-	
-	freqs[0] = freqs[3] = 0.0;
-	freqs[1] = mod->AbsenceFrequency();
-	freqs[2] = mod->PresenceFrequency();
 
 	vector<FLOAT_TYPE> siteLikes;
 
+	bool allGapChar = true;
+	
+	//rescaler for conditioning on not seeing all gap columns
+	double condScaler = ZERO_POINT_ZERO;
+
+	FLOAT_TYPE oneInsertProportion = mod->InsertRate();
+	assert(oneInsertProportion >= 0.0001);
+
+	//the 10.0 here comes in because we scaled down the blen by 10 when the pmats were calced to avoid potential overflow
+	double TLrescaler = 10.0 / Treelength();
+
 	for(int i=0;i<nchar;i++){
 		if(countit[i] > 0){
-			siteL = ZERO_POINT_ZERO;
+			//include the treelength once here, not in the insert prob in the pmat
+			double oneInsert = oneInsertProportion * partial[1] * TLrescaler;
+			double noInsert = (1.0 - oneInsertProportion) * partial[2];
+			siteL = oneInsert + noInsert;
 
-			for(int from = 0;from < claStates;from++){
-				siteL += partial[from] * freqs[from];
+			partial += claStates;
+
+			if(i == 0 && allGapChar){
+				condScaler = -log(ONE_POINT_ZERO - siteL / exp((double) underflow_mult[i]));
+				}	
+			else{
+				unscaledlnL = log(siteL) - underflow_mult[i] + condScaler;
+				assert(siteL > ZERO_POINT_ZERO);//this should be positive
+				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
+				//rounding error in multiplying a site that is fully ambiguous across the tree
+				//(which might not have been removed from the data because we are only scoring a
+				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
+				//> zero.  If that is the case, just ignore it
+
+				if(unscaledlnL < ZERO_POINT_ZERO)
+					totallnL += (countit[i] * unscaledlnL);
+			
+				assert(unscaledlnL == unscaledlnL);
+				assert(unscaledlnL < 0.0);
+				assert(unscaledlnL > -10000.0);
 				}
-			partial += claStates;					
-
-			unscaledlnL = (log(siteL) - underflow_mult[i]);
-			assert(siteL > ZERO_POINT_ZERO);//this should be positive
-			assert(unscaledlnL < 1.0e-4);//this should be negative or zero
-			//rounding error in multiplying a site that is fully ambiguous across the tree
-			//(which might not have been removed from the data because we are only scoring a
-			//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
-			//> zero.  If that is the case, just ignore it
-
-			if(unscaledlnL < ZERO_POINT_ZERO)
-				totallnL += (countit[i] * unscaledlnL);
 			}
 		else{//nothing needs to be done if the count for this site is 0
 			}
@@ -5293,6 +5314,76 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
 		}
 
+	//Previous Rivas and Eddy style method
+/* 
+	//This is the p parameter from the geometric length distribution.  Setting it dependent
+	//on the actual seq length L, it is p = ( L / (L + 1)).  So, 0.999 is expected len of 1000
+	double p = 0.999;
+
+	//freqs of gaps and bases doesn't come in here as it would with a nuc model.  However,
+	//a factor of p multiplies the conditional of a non-gap base as part of the seq. length prior
+	//so, just include it here in the freq
+	freqs[0] = freqs[3] = 0.0;
+	freqs[1] = 1.0;
+	freqs[2] = p;
+
+	//this calculates the product of the (1 - psi) factors that come from each branch
+	double runningTot = 1.0;
+	for(int i = 1;i < numNodesTotal;){
+		runningTot *= (1.0 - mod->IndelPsi(allNodes[i]->dlen * modPart->SubsetRate(modIndex)));
+		assert(runningTot > 0.0);
+		i++;
+		if(i == numTipsTotal)
+			i++;
+		}
+
+	double extraColTerm = (1.0 - p) * runningTot;
+
+	for(int i=0;i<nchar;i++){
+		if(countit[i] > 0){
+			siteL = ZERO_POINT_ZERO;
+
+			for(int from = 0;from < claStates;from++){
+				siteL += partial[from] * freqs[from];
+				}
+			partial += claStates;					
+
+			if(i == 0 && allGapChar){
+				if(underflow_mult[i] == 0)
+					condScaler = -log(ONE_POINT_ZERO - siteL);
+				else 
+					condScaler = ZERO_POINT_ZERO;
+				}	
+			else{
+				unscaledlnL = log(siteL) - underflow_mult[i] + condScaler;
+				assert(siteL > ZERO_POINT_ZERO);//this should be positive
+				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
+				//rounding error in multiplying a site that is fully ambiguous across the tree
+				//(which might not have been removed from the data because we are only scoring a
+				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
+				//> zero.  If that is the case, just ignore it
+
+				if(unscaledlnL < ZERO_POINT_ZERO)
+					totallnL += (countit[i] * unscaledlnL);
+			
+				assert(unscaledlnL == unscaledlnL);
+				assert(unscaledlnL < 0.0);
+				assert(unscaledlnL > -100.0);
+				}
+			}
+		else{//nothing needs to be done if the count for this site is 0
+			}
+		if(sitelikeLevel != 0)
+			siteLikes.push_back(unscaledlnL);
+		}
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
+		}
+				assert(extraColTerm == extraColTerm);
+				assert(extraColTerm > 0.0);
+				assert(extraColTerm < 1.0);
+	totallnL += log(extraColTerm);
+*/
 
 	//DEBUG
 	//this takes into account the sequence length
@@ -5605,10 +5696,13 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				if(mod->IsNStateV() || mod->IsOrderedNStateV()){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					if(i == 0){
-						if(underflow_mult1[i] + underflow_mult2[i] == 0)
+						if(underflow_mult1[0] + underflow_mult2[0] == 0)
 							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
-						else 
-							MkvScaler = ZERO_POINT_ZERO;
+						else{
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", (underflow_mult1[0] + underflow_mult2[0]), exp((double)underflow_mult1[0] + underflow_mult2[0]));
+							MkvScaler = log(ONE_POINT_ZERO - nstates * siteL / exp((FLOAT_TYPE)underflow_mult1[0] + underflow_mult2[0]));
+							//MkvScaler = ZERO_POINT_ZERO;
+							}
 						}
 					else{
 						unscaledlnL += MkvScaler;
@@ -5683,10 +5777,13 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				if(mod->IsNStateV() || mod->IsOrderedNStateV()){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					if(i == 0){
-						if(underflow_mult1[i] + underflow_mult2[i] == 0)
+						if(underflow_mult1[0] + underflow_mult2[0] == 0)
 							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
-						else 
-							MkvScaler = ZERO_POINT_ZERO;
+						else{
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", (underflow_mult1[0] + underflow_mult2[0]), exp((double)underflow_mult1[0] + underflow_mult2[0]));
+							MkvScaler = log(ONE_POINT_ZERO - nstates * siteL / exp((FLOAT_TYPE)underflow_mult1[0] + underflow_mult2[0]));
+							//MkvScaler = ZERO_POINT_ZERO;
+							}
 						}
 					else{
 						unscaledlnL += MkvScaler;
@@ -6204,14 +6301,17 @@ void Tree::ReadBinaryFormattedTree(FILE *in){
 
 FLOAT_TYPE Tree::OptimizeInsertDeleteRates(FLOAT_TYPE prec, int modnum){
 	FLOAT_TYPE improve = 0.0;
-	//delete > insert
-	FLOAT_TYPE ins, del;
-	ins = modPart->GetModel(modnum)->InsertRate();
+	FLOAT_TYPE insProp, del;
+	insProp = modPart->GetModel(modnum)->InsertRate();
 	del = modPart->GetModel(modnum)->DeleteRate();
-	assert(del >= ins);
-	improve += OptimizeBoundedParameter(modnum, prec, ins, 0, 1e-3, max(ins, min(ins * 1.05, del - 1e-3)), &Model::SetInsertRate);
-	ins = modPart->GetModel(modnum)->InsertRate();
-	improve += OptimizeBoundedParameter(modnum, prec, del, 0,       min(del, max((1.0 / 1.05) * del, ins + 1e-3)), 999.9, &Model::SetDeleteRate);
+
+	//insert rate here is really the proportion of sites in the one insert category
+	improve += OptimizeBoundedParameter(modnum, prec, insProp, 0, max(1e-4, insProp / 1.5), min(insProp * 1.5, 0.9999), &Model::SetInsertRate);
+
+	//don't optimize del rate in these cases because it becomes non-identifiable
+	if(modSpecSet.NumSpecs() != 1 && modSpecSet.InferSubsetRates() == false)
+		improve += OptimizeBoundedParameter(modnum, prec, del, 0,       max(0.001, del / 1.5), min(del * 1.5, 999.9), &Model::SetDeleteRate);
+	
 	return improve;
 	}
 
@@ -7171,12 +7271,8 @@ void Tree::CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr,
 	const int nchar = data->NChar();
 	const int *counts = data->GetCounts();
 
-	//confusingly, the number of states in the pmat and model is 3 (no base, base, deleted)
-	//although only 2 in the data (difference between no base and deleted can't be observed)
-	//and 4 in the cla's because of the dynamic programming trick to disallow multiple inserts
-
 	const int pmatStates = mod->NStates();
-	const int claStates = mod->NStates() + 1;
+	const int claStates = mod->NStates();
 
 	FLOAT_TYPE *dest=destCLA->arr;
 
@@ -7189,6 +7285,52 @@ void Tree::CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr,
 	//gap with base in subtree should always be zero at tip
 
 	//gap at tip
+	tipStates[gapState][0] = 1.0;
+	tipStates[gapState][2] = tipStates[gapState][1] = 0.0;
+	//base at tip
+	tipStates[baseState][0] = tipStates[baseState][1] = 0.0;
+	tipStates[baseState][2] = 1.0;
+	//missing data 
+	tipStates[2][0] = 1.0;
+	tipStates[2][1] = 0.0; //??
+	tipStates[2][2] = 1.0;
+
+	const FLOAT_TYPE *left, *right;
+
+	//conditioning on zero or 1 insert. cla[0] is now essentially an indicator func of "no bases in subtree"
+	//the categories also amount to state freqs at the root, being gap (one insert site, cla[1]) or base (no inserts, cla[2])
+	for(int i=0;i<nchar;i++){
+		if(counts[i]> 0){
+			if(Ldata)
+				left = tipStates[*Ldata++];
+			else
+				left = &LCL[i * claStates];
+			if(Rdata)
+				right = tipStates[*Rdata++];
+			else
+				right = &RCL[i * claStates];
+
+			//element 0 is just an indicator of when NO bases observed in subtree (i.e., 1 = no bases, 0 = bases)
+			dest[0] = left[0] * right[0];
+			//we think that pr[0][0] here can be set to 1.0
+			dest[1] = left[0] * (Rpr[0 * claStates + 1] * right[2] + right[1]) + right[0] * (Lpr[0 * claStates + 1] * left[2] + left[1]);
+			//dest[1] = left[0] * (Rpr[0 * claStates + 1] * right[2] + Rpr[0 * claStates + 0] * right[1]) + right[0] * (Lpr[0 * claStates + 1] * left[2] + Lpr[0 * claStates + 0] * left[1]);
+			dest[2] = (left[2] * Lpr[1 * claStates + 1] + left[0] * Lpr[1 * claStates + 2]) * (right[2] * Rpr[1 * claStates + 1] + right[0] * Rpr[1 * claStates + 2]);
+
+			//DEBUG
+			if(!(dest[1] > 0.0 || dest[2] > 0.0))
+				outman.UserMessage("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t", left[0], left[1], left[2], right[0], right[1], right[2], dest[0], dest[1], dest[2]);
+			assert(dest[1] > 0.0 || dest[2] > 0.0);
+			dest += 3;
+			}
+		}
+
+/*
+	//initial attempt with dynamic programming trick for only 1 insert. 4 states in CLA
+	//gap at tip
+	const int pmatStates = mod->NStates();
+	const int claStates = mod->NStates() + 1;
+
 	tipStates[gapState][0] = tipStates[gapState][3] = 1.0;
 	tipStates[gapState][2] = tipStates[gapState][1] = 0.0;
 	//base at tip
@@ -7197,8 +7339,6 @@ void Tree::CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr,
 	//missing data 
 	tipStates[2][0] = 0.0;
 	tipStates[2][1] = tipStates[2][2] = tipStates[2][3] = 1.0;
-
-	const FLOAT_TYPE *left, *right;
 
 	for(int i=0;i<nchar;i++){
 		if(counts[i]> 0){
@@ -7225,6 +7365,7 @@ void Tree::CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr,
 			dest += 4;
 			}
 		}
+*/	
 	for(int i=0;i<nchar;i++)
 		destCLA->underflow_mult[i] = (Ldata ? 0 : LCLA->underflow_mult[i]) + (Rdata ? 0 : RCLA->underflow_mult[i]);
 	

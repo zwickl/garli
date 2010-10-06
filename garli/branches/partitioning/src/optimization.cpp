@@ -519,7 +519,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 #endif
 
 #ifdef OPT_BOUNDED_TRACE
-	if(which > -1){
+//	if(which > -1){
 	ofstream curves("lcurve.log", ios::app);
 	curves.precision(12);
 	curves << "\n";
@@ -528,7 +528,8 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 	oname += ".sitelikes.log";
 	Model *mod = modPart->GetModel(modnum);
 	sitelikeLevel = 1;
-	for(double c = curVal * 0.5; c < curVal * 1.99 ; c += 0.005){
+	double inc = curVal / 20.0;
+	for(double c = curVal / 20.0; c < curVal * 20.0 ; c += inc){
 		FLOAT_TYPE v = SetAndEvaluateParameter(modnum, which, c, bestKnownScore, bestKnownVal, SetParam);
 		curves << c << "\t" << v << "\n";
 		ofstream ordered(oname.c_str(), ios::app);
@@ -545,7 +546,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 	ordered.precision(10);
 	ordered << "1" << "\t" << -lnL << "\n";
 	ordered.close();
-*/	}
+*/	//}
 #endif
 
 	FLOAT_TYPE incrLimit;
@@ -1090,8 +1091,11 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 	//was the point.
 	ProfNewton.Start();
 	if(useOptBoundedForBlen){
+		double before = nd->dlen;
 		//the first argument here is the modnum, which doesn't matter for this hack way of optimizing blens 
-		improve = OptimizeBoundedParameter(0, optPrecision, nd->dlen, -nd->nodeNum, min_brlen, max_brlen, &Model::SetBranchlengthDummy);
+		//improve = OptimizeBoundedParameter(0, optPrecision, nd->dlen, -nd->nodeNum, min_brlen, max_brlen, &Model::SetBranchlengthDummy);
+		improve = OptimizeBoundedParameter(0, optPrecision, nd->dlen, -nd->nodeNum, max(nd->dlen * 0.1, min_brlen), min(nd->dlen * 10.0, max_brlen), &Model::SetBranchlengthDummy);
+		//outman.UserMessage("%d\t%f -> %f", nd->nodeNum, before, nd->dlen);
 		}
 	else{
 		improve = NewtonRaphsonOptimizeBranchLength(optPrecision, nd, true);
@@ -2847,12 +2851,21 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 							constD2 = siteD2 * nstates;
 							}
 						else{
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[0], exp((double)partialCLA->underflow_mult[0]));
+							constL = siteL / exp((double)partialCLA->underflow_mult[0]);
+							pC = nstates * constL;
+							pV = (ONE_POINT_ZERO - pC);
+							MkvScaler = log(pV);
+							constD1 = siteD1 * nstates; 
+							constD2 = siteD2 * nstates;
+							/*
 							constL = ZERO_POINT_ZERO; 
 							pC = ZERO_POINT_ZERO;
 							pV = ONE_POINT_ZERO;
 							MkvScaler = ZERO_POINT_ZERO;
 							constD1 = ZERO_POINT_ZERO;
 							constD2 = ZERO_POINT_ZERO;
+							*/
 							}
 						}
 					else{ 
@@ -3097,7 +3110,7 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 				if(mod->IsNStateV() || mod->IsOrderedNStateV()){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					if(i == 0){
-						if(partialCLA->underflow_mult[i] == 0){
+						if(partialCLA->underflow_mult[0] == 0){
 							constL = siteL;
 							pC = nstates * constL;
 							pV = (ONE_POINT_ZERO - pC);
@@ -3106,12 +3119,21 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 							constD2 = siteD2 * nstates;
 							}
 						else{
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[0], exp((double)partialCLA->underflow_mult[0]));
+							constL = siteL / exp((double)partialCLA->underflow_mult[0]);
+							pC = nstates * constL;
+							pV = (ONE_POINT_ZERO - pC);
+							MkvScaler = log(pV);
+							constD1 = siteD1 * nstates; 
+							constD2 = siteD2 * nstates;
+							/*
 							constL = ZERO_POINT_ZERO; 
 							pC = ZERO_POINT_ZERO;
 							pV = ONE_POINT_ZERO;
 							MkvScaler = ZERO_POINT_ZERO;
 							constD1 = ZERO_POINT_ZERO;
 							constD2 = ZERO_POINT_ZERO;
+							*/
 							}
 						}
 					else{ 
@@ -3382,12 +3404,21 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 						constD2 = siteD2 * nstates;
 						}
 					else{
+						outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[0] + childCLA->underflow_mult[0], exp((double)(partialCLA->underflow_mult[0] + childCLA->underflow_mult[0])));
+						constL = siteL / exp((double)(partialCLA->underflow_mult[0] + childCLA->underflow_mult[0]));
+						pC = nstates * constL;
+						pV = (ONE_POINT_ZERO - pC);
+						MkvScaler = log(pV);
+						constD1 = siteD1 * nstates; 
+						constD2 = siteD2 * nstates;
+						/*
 						constL = ZERO_POINT_ZERO; 
 						pC = ZERO_POINT_ZERO;
 						pV = ONE_POINT_ZERO;
 						MkvScaler = ZERO_POINT_ZERO;
 						constD1 = ZERO_POINT_ZERO;
 						constD2 = ZERO_POINT_ZERO;
+						*/
 						}
 					}
 				else{ 
@@ -3525,7 +3556,7 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 			if(mod->IsNStateV() || mod->IsOrderedNStateV()){
 				assert(unscaledlnL < ZERO_POINT_ZERO);
 				if(i == 0){
-					if(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i] == 0){
+					if(partialCLA->underflow_mult[0] + childCLA->underflow_mult[0] == 0){
 						constL = siteL;
 						pC = nstates * constL;
 						pV = (ONE_POINT_ZERO - pC);
@@ -3534,12 +3565,21 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 						constD2 = siteD2 * nstates;
 						}
 					else{
+						outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[0] + childCLA->underflow_mult[0], exp((double)(partialCLA->underflow_mult[0] + childCLA->underflow_mult[0])));
+						constL = siteL / exp((double)(partialCLA->underflow_mult[0] + childCLA->underflow_mult[0]));
+						pC = nstates * constL;
+						pV = (ONE_POINT_ZERO - pC);
+						MkvScaler = log(pV);
+						constD1 = siteD1 * nstates; 
+						constD2 = siteD2 * nstates;
+						/*
 						constL = ZERO_POINT_ZERO; 
 						pC = ZERO_POINT_ZERO;
 						pV = ONE_POINT_ZERO;
 						MkvScaler = ZERO_POINT_ZERO;
 						constD1 = ZERO_POINT_ZERO;
 						constD2 = ZERO_POINT_ZERO;
+						*/
 						}
 					}
 				else{ 

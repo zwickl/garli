@@ -2440,16 +2440,21 @@ int Population::EvaluateStoredTrees(bool report){
 					outman.UserMessage("\t Model contains no estimated parameters");
 					}
 				}
-			if(modSpecSet.InferSubsetRates()){
-				outman.UserMessage("\nSubset rate multipliers:");
-				for(unsigned i=0;i<storedTrees.size();i++){
-					outman.UserMessageNoCR("rep%2d:", i+1);
+			outman.UserMessageNoCR("\nTreelength ");
+			if(modSpecSet.InferSubsetRates())
+				outman.UserMessageNoCR("and subset rate multipliers:");
+			outman.UserMessage("");
+			for(unsigned i=0;i<storedTrees.size();i++){
+				outman.UserMessageNoCR("rep%2d:", i+1);
+				outman.UserMessageNoCR("%6.3f ", storedTrees[i]->treeStruct->Treelength());
+				if(modSpecSet.InferSubsetRates()){
 					for(int d = 0;d < dataPart->NumSubsets();d++){
 						outman.UserMessageNoCR("%6.3f ", storedTrees[i]->modPart.SubsetRate(d));
 						}
-					outman.UserMessage("");
 					}
+				outman.UserMessage("");
 				}
+			//	}
 //			}
 		if(conf->bootstrapReps == 0 && conf->runmode != 11){
 			outman.UserMessage("\nFinal result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());

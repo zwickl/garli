@@ -518,10 +518,12 @@ void TreeNode::OutputNodeConnections(){
 		cout << dlen << "\t" << endl;
 		nd = left;
 		while(nd){
-			if(nd->IsInternal())
-				nd->OutputNodeConnections();
+			nd->OutputNodeConnections();
 			nd = nd->next;
 			}
+		}
+	else{
+		cout << nodeNum << "\t" << dlen << endl;
 		}
 	}
 

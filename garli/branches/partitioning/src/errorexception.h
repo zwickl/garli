@@ -20,6 +20,7 @@
 
 #include <stdarg.h>
 #include <ostream>
+#include <cstring>
 #include "outputman.h"
 #include <cassert>
 
