@@ -273,8 +273,6 @@ void PatternManager::NewPack(){
 				uniquePatterns.push_back(*pit);
 				}
 			}
-		else
-			numMissingPats++;
 		}
 	numUniquePats = uniquePatterns.size();
 	compressed = true;
@@ -283,6 +281,7 @@ void PatternManager::NewPack(){
 //This does all necessary processing in the patman (assuming that it has already been filled with data)
 //up to the point when the compressed matrix can be copied back into 
 void PatternManager::ProcessPatterns(){
+	totNumChars = patterns.size();
 	CalcPatternTypesAndNumStates();
 	NewSort();
 	NewCollapse();
@@ -297,21 +296,22 @@ void PatternManager::CalcPatternTypesAndNumStates(){
 	//this is just a scratch array to be used repeatedly in PatternType	
 	vector<unsigned int> s(maxNumStates);
 
-	numMissingPats = numConstantPats = numInformativePats = numUninformVariablePats;
+	numMissingChars = numConstantChars = numInformativeChars = numUninformVariableChars = 0;
 
 	for(list<Pattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
 		int t = pit->CalcPatternTypeAndNumStates(s);
 		if( t == Pattern::MISSING )
-			numMissingPats++;
+			numMissingChars++;
 		else if( t == Pattern::CONSTANT )
-			numConstantPats += pit->count;
+			numConstantChars += pit->count;
 		else if( t == Pattern::INFORMATIVE )
-			numInformativePats += pit->count;
+			numInformativeChars += pit->count;
 		else{
 			assert(t == Pattern::UNINFORM_VARIABLE);
-			numUninformVariablePats += pit->count;
+			numUninformVariableChars += pit->count;
 			}
 		}
+	numNonMissingChars = totNumChars - numMissingChars;
 	}
 
 //note where all of the constant sites are, and what state they are.
@@ -405,11 +405,15 @@ void PatternManager::FillTaxaXCharMatrix(unsigned char **mat) const{
 		}
 	}
 
-void PatternManager::FillIntegerValues(int &miss, int &cons, int &vNonInf, int &inf, int &lastConst) const {
-	miss = numMissingPats;
-	cons = numConstantPats;
-	vNonInf = numUninformVariablePats;
-	inf = numInformativePats;
+void PatternManager::FillIntegerValues(int &nMissing, int &nConstant, int &nVarUninform, int &nInformative, int &lastConst, int &gapsIncludedNChar, int &totNChar, int &NChar) const {
+	gapsIncludedNChar = totNumChars;
+	totNChar = numNonMissingChars;
+	NChar = numUniquePats;
+
+	nMissing = numMissingChars;
+	nConstant = numConstantChars;
+	nVarUninform = numUninformVariableChars;
+	nInformative = numInformativeChars;
 	lastConst = lastConstant;
 	}
 
@@ -456,7 +460,7 @@ void DataMatrix::GetDataFromPatternManager(){
 	patman.FillCountVector(newCount);
 	patman.FillNumStatesVector(newNumStates);
 	patman.FillConstStatesVector(newConstStates);
-	patman.FillIntegerValues(nMissing, nConstant, nVarUninform, nInformative, lastConstant);
+	patman.FillIntegerValues(nMissing, nConstant, nVarUninform, nInformative, lastConstant, gapsIncludedNChar, totalNChar, nChar);
 	patman.FillTaxaXCharMatrix(matrix);
 	if(patman.compressed)
 		dense = 1;
@@ -1654,13 +1658,19 @@ long DataMatrix::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 	
 	FLOAT_TYPE p=0.0;
 	cumProbs[0]=(FLOAT_TYPE) origCounts[0] / ((FLOAT_TYPE) totalNChar);
-	for(int i=1;i<nChar;i++){
+	for(int i = 1;i < nChar;i++){
 		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar);
+		count[i] = 0;
 		}
-		
-	for(int q=0;q<nChar;q++) count[q]=0;
+	cumProbs[nChar - 1] = 1.0;
 
-//	ofstream deb("counts.log", ios::app);
+	//ofstream deb("counts.log", ios::app);
+/*	ofstream deb("counts.log");
+
+	for(int i = 0;i < nChar;i++)
+		deb << i << "\t" << count[i] << "\t" << origCounts[i] << endl;
+*/
+
 
 	//round to nearest int
 	int numToSample = (int) (((FLOAT_TYPE)totalNChar * resampleProportion) + 0.5);
