@@ -5109,7 +5109,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 					else 
 						siteL += prI*freqs[conStates[i]]*exp((FLOAT_TYPE)underflow_mult[i]);
 					}
-				unscaledlnL = (log(siteL) - ONE_POINT_ZERO - nstates * siteL);
+				unscaledlnL = (log(siteL) - underflow_mult[i]);
 				assert(siteL > ZERO_POINT_ZERO);//this should be positive
 				assert(unscaledlnL < 1.0e-4);//this should be negative or zero
 				//rounding error in multiplying a site that is fully ambiguous across the tree
