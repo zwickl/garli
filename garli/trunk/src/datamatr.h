@@ -104,17 +104,17 @@ class PatternManager{
 
 	int numTax;
 	int maxNumStates;
-	int totNumPats;				//gapsIncludedNChar
-	int numNonMissingPats;		//totalNChar
-	int numUniquePats;			//NChar
+	int numUniquePats;				//NChar
 
-	int numMissingPats;			//nMissing
-	int numConstantPats;		//nConstant
-	int numInformativePats;		//nInformative
-	int numUninformVariablePats;//nVarUninform
+	int totNumChars;				//gapsIncludedNChar
+	int numNonMissingChars;			//totalNChar
+	int numMissingChars;			//nMissing
+	int numConstantChars;			//nConstant
+	int numInformativeChars;		//nInformative
+	int numUninformVariableChars;	//nVarUninform
 	
-	int lastConstant;			//lastConstant
-	bool compressed;			//dense
+	int lastConstant;				//lastConstant
+	bool compressed;				//dense
 	list<Pattern> patterns;
 	list<Pattern> uniquePatterns;
 	vector<int> constStates;
@@ -138,7 +138,7 @@ public:
 		Pattern::numTax = nt;
 		}
 	void Reset(){
-		numTax = maxNumStates = totNumPats = numNonMissingPats = numUniquePats = numMissingPats = numConstantPats = numInformativePats = lastConstant = numUninformVariablePats = 0;
+		numTax = maxNumStates = totNumChars = numNonMissingChars = numUniquePats = numMissingChars = numConstantChars = numInformativeChars = lastConstant = numUninformVariableChars = 0;
 		compressed = false;
 		patterns.clear();
 		uniquePatterns.clear();
@@ -162,7 +162,7 @@ public:
 	void FillNumStatesVector(vector<int> &ns) const;
 	void FillCountVector(vector<int> &counts) const;
 	void FillConstStatesVector(vector<int> &cs) const;
-	void FillIntegerValues(int &miss, int &cons, int &vNonInf, int &inf, int &lastConst) const;
+	void FillIntegerValues(int &nMissing, int &nConstant, int &nVarUninform, int &nInformative, int &lastConstant, int &gapsIncludedNChar, int &totNChar, int &NChar) const;
 	};
 
 // Note: the class below has pure virtual member functions
@@ -304,8 +304,10 @@ protected:
 			}
 		virtual int CountByOrigIndex(int j) const{ 
 			if(newCount.size() > 0)
-				if(newNumber.size() > 0)
-				return newCount[newNumber[j]];
+				if(newNumber.size() > 0){
+					assert(newCount.size() > j);
+					return newCount[newNumber[j]];
+					}
 			return ( count && (j < nChar) ? count[number[j]] : 0 ); 
 			}
 		virtual const int *GetCounts() const {
@@ -319,7 +321,13 @@ protected:
 			return constStates;
 			}
 		void SetCount(int j, int c){
-			if( count && (j < nChar) ) count[j] = c; 
+			if(newCount.size() > 0){
+				assert(newCount.size() > j);
+				newCount[j] = c;
+				}
+			else
+				if( count && (j < nChar) ) 
+					count[j] = c; 
 			}
 		void SetNumStates(int j, int c){ 
 			if( numStates && (j < nChar) ) numStates[j] = c;
@@ -422,13 +430,23 @@ protected:
       void ReserveOriginalCounts(){
       		if(origCounts==NULL) origCounts=new int[nChar];
       		for(int i=0;i<nChar;i++){
-      			origCounts[i]=count[i];
+				if(newCount.size() > 0){
+					assert(newCount.size() > i);
+					origCounts[i] = newCount[i];
+					}
+				else
+					origCounts[i] = count[i];
       			}
       		}
       void RestoreOriginalCounts(){
 			if(origCounts==NULL) return;
       		for(int i=0;i<nChar;i++){
-      			count[i]=origCounts[i];
+				if(newCount.size() > 0){
+					assert(newCount.size() > i);
+					newCount[i] = origCounts[i];
+					}
+				else
+      				count[i] = origCounts[i];
       			}
       		}
       void Reweight(FLOAT_TYPE prob);
