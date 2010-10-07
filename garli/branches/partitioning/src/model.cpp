@@ -2552,8 +2552,9 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				throw(ErrorException("Problem reading insertion rate parameter from file.\nExamine file and check manual for format.\nNote that the proportion of invariable sites parameter is specified with \"p\", not \"i\""));
 			if(! NxsString(temp).IsADouble())
 				throw(ErrorException("Problem reading insertion rate parameter from file.\nExamine file and check manual for format.\nNote that the proportion of invariable sites parameter is specified with \"p\", not \"i\""));
-			
 			FLOAT_TYPE i = (FLOAT_TYPE)atof(temp);
+			if(insertRate == NULL)
+				throw ErrorException("insert rate (%f) specified for non-gap model!  Check configuration.", i);
 			SetInsertRate(0, i);
 			do{c=stf.get();}while(c==' ');		
 			modSpec->gotInsertFromFile=true;
@@ -2565,6 +2566,8 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			if(! NxsString(temp).IsADouble())
 				throw(ErrorException("Problem reading deletion rate parameter from file.\nExamine file and check manual for format.\n"));
 			FLOAT_TYPE d = (FLOAT_TYPE)atof(temp);
+			if(deleteRate == NULL)
+				throw ErrorException("delete rate (%f) specified for non-gap model!  Check configuration.", d);
 			SetDeleteRate(0, d);
 			do{c=stf.get();}while(c==' ');		
 			modSpec->gotDeleteFromFile=true;
