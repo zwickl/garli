@@ -1104,7 +1104,7 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 #endif
 
 #ifdef OPT_DEBUG
-	optsum << nd->dlen << "\t" << improve << endl;
+	optsum << nd->dlen << "\t" << improve << "\t" << lnL << endl;
 	
 /*	ofstream opttrees;
 	if(num == 1) opttrees.open("everyTree.tre");
