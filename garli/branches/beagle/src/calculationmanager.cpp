@@ -966,7 +966,7 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 	CheckBeagleReturnValue(
 		beagleUpdatePartials(
 			beagleInst,
-			&tupleList[0],
+			(BeagleOperation*)&tupleList[0],
 			operationCount,
 			cumulativeScaleIndex),
 		"beagleUpdatePartials");
@@ -1267,7 +1267,7 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 		CheckBeagleReturnValue(
 			beagleUpdatePartials(
 				beagleInst,
-				operationTuple,
+				(BeagleOperation*)operationTuple,
 				operationCount,
 				cumulativeScaleIndex),
 			"beagleUpdatePartials");
