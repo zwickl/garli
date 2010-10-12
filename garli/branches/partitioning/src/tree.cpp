@@ -5274,7 +5274,10 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 	assert(oneInsertProportion >= 0.0001);
 
 	//the 10.0 here comes in because we scaled down the blen by 10 when the pmats were calced to avoid potential overflow
-	double TLrescaler = 10.0 / Treelength();
+	double TL = Treelength();
+	double TLrescaler = 10.0 / TL;
+
+	double mu = mod->DeleteRate();
 
 	for(int i=0;i<nchar;i++){
 		if(countit[i] > 0){
@@ -5286,7 +5289,22 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 			partial += claStates;
 
 			if(i == 0 && allGapChar){
-				condScaler = -log(ONE_POINT_ZERO - siteL / exp((double) underflow_mult[i]));
+				double sum = 0.0;
+				double allGapLike = siteL / exp((double) underflow_mult[i]);
+				//condScaler = -log(ONE_POINT_ZERO - siteL / exp((double) underflow_mult[i]));
+#ifdef ONE_BRANCH_INS_DEL
+				//also need to figure in prob of single branch insert then delete for each branch
+				for(int i = 1;i < numTipsTotal - 1;i++){
+					double expMu = exp(-mu * allNodes[i]->dlen);
+					//the TL would appear in the denominator of both of the following terms
+					sum += (allNodes[i]->dlen - (1.0 - expMu));
+					}
+				sum /= TL;
+#endif
+				condScaler = -log(1.0 - (allGapLike + sum));
+				assert(condScaler > 0.0);
+				//this is just for sitelike purposes
+				unscaledlnL = condScaler;
 				}	
 			else{
 				unscaledlnL = log(siteL) - underflow_mult[i] + condScaler;

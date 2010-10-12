@@ -581,7 +581,9 @@ int main( int argc, char* argv[] )	{
 							throw ErrorException("Sorry, oriented-gap models cannot currently be used with the OpenMP version");
 #endif
 							if(modSpec->IsGammaRateHet() || modSpec->IsFlexRateHet())
-								throw ErrorException("Sorry, rate heterogeneity cannot be used with oriented-gap models yet.\n\tSet ratehetmodel = none.");
+								throw ErrorException("Sorry, rate heterogeneity cannot be used with gap models yet.\n\tSet ratehetmodel = none.");
+							if(modSpecSet.InferSubsetRates())
+								outman.UserMessage("WARNING - YOU SHOULD TURN OFF SUBSET SPECIFIC RATE ESTIMATION WHEN USING GAP MODELS");
 							if(actuallyUsedImpliedMatrixIndex > 0){
 								//the specs are being added as we read and create subsets, so we can add them for the implied matrices
 								//as we go
