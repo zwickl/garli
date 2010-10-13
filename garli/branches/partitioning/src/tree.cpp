@@ -5273,15 +5273,14 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 	FLOAT_TYPE oneInsertProportion = mod->InsertRate();
 	assert(oneInsertProportion >= 0.0001);
 
-	//the 10.0 here comes in because we scaled down the blen by 10 when the pmats were calced to avoid potential overflow
-	double TL = Treelength();
-	double TLrescaler = 10.0 / TL;
-
 	double mu = mod->DeleteRate();
+
+	double TL = Treelength();
+	double TLrescaler = 1.0 / (TL * mu);
 
 	for(int i=0;i<nchar;i++){
 		if(countit[i] > 0){
-			//include the treelength once here, not in the insert prob in the pmat
+			//include the treelength and mu once here, not in the insert prob in the pmat
 			double oneInsert = oneInsertProportion * partial[1] * TLrescaler;
 			double noInsert = (1.0 - oneInsertProportion) * partial[2];
 			siteL = oneInsert + noInsert;
@@ -5294,10 +5293,13 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 				//condScaler = -log(ONE_POINT_ZERO - siteL / exp((double) underflow_mult[i]));
 #ifdef ONE_BRANCH_INS_DEL
 				//also need to figure in prob of single branch insert then delete for each branch
+				//the full term here for each branch would be 
+				//(blen / TL) - (1.0 - expMu) / (mu * TL);
+				//or (blen - (1.0 - expMu) / mu)) / TL
 				for(int i = 1;i < numTipsTotal - 1;i++){
 					double expMu = exp(-mu * allNodes[i]->dlen);
 					//the TL would appear in the denominator of both of the following terms
-					sum += (allNodes[i]->dlen - (1.0 - expMu));
+					sum += (allNodes[i]->dlen - (1.0 - expMu) / mu);
 					}
 				sum /= TL;
 #endif
@@ -5305,6 +5307,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 				assert(condScaler > 0.0);
 				//this is just for sitelike purposes
 				unscaledlnL = condScaler;
+				//outman.UserMessage("mu\t%f\tTL\t%f\toneInsert\t%f\tnoInsert\t%f\tallGapLike\t%f\tsum\t%f\tcondScaler\t%f", mu, TL, oneInsert, noInsert, allGapLike, sum, condScaler);
 				}	
 			else{
 				unscaledlnL = log(siteL) - underflow_mult[i] + condScaler;
