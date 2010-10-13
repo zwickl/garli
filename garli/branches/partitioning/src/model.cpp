@@ -858,12 +858,15 @@ void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 	//that integrate over all possible placements of ins then del on the branch.  The denominator for
 	//both still has the treelength in it, so will be taken care of at the root.  mat[0][2] will
 	//only appear for fully gap sites.  The 0.1 will be figured in again to avoid overflow.
-	mat[0][0][1] = (1.0 - expMu) * 0.1;
+
+	//this full term is:
+	//mat[0][0][1] = (1.0 - expMu) / (mu * TL);
+	//but the (mu * TL) will be factored in at the root
+	mat[0][0][1] = (1.0 - expMu);
+
 	//(actually mat[0][2] is now figured in at the root, so not even used from the pmat
-	mat[0][0][2] = (blen - (1.0 - expMu)) * 0.1;
-	//why the hell did I have mu on the bottom here?
-	//mat[0][0][1] = ((1.0 - expMu) / mu) * 0.1;
-	//mat[0][0][2] = (blen - ((1.0 - expMu) / mu)) * 0.1;
+	//mat[0][0][2] = (blen / TL) - (1.0 - expMu) / (mu * TL);
+
 #else
 	mat[0][0][1] = blen * 0.1;	//prob of insert, uniform along branches
 	mat[0][0][2] = 0.0;					//insert and del on same branch (should be 0?)
