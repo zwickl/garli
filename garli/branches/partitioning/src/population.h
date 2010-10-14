@@ -33,7 +33,6 @@ using namespace std;
 #include "errorexception.h"
 
 class CondLikeArray;
-class TopologyList;
 class Tree;
 class ClaManager;
 class Adaptation;
@@ -368,8 +367,6 @@ private:
 
 	FLOAT_TYPE** cumfit;//allocated in setup, deleted in dest
 		
-	TopologyList **topologies;//allocated in Setup(), deleted in dest
-	
 	DataPartition *dataPart;
 	DataPartition *rawPart;//this will hold the original data as read in, before it might be converted
 					//to codons or aminoacid
@@ -387,7 +384,7 @@ private:
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			treeString(NULL), adap(NULL), fraction_done(ZERO_POINT_ZERO),
-			topologies(NULL), prematureTermination(false), currentBootstrapRep(0),
+			prematureTermination(false), currentBootstrapRep(0),
 			finishedRep(false), lastBootstrapSeed(0), dataPart(NULL), rawPart(NULL)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
@@ -470,12 +467,8 @@ private:
 		int GetSpecifiedPis(FLOAT_TYPE**, int , int*);
 		int GetSpecifiedModels(FLOAT_TYPE** model_string, int n, int* indiv_list);
 		
-		void UpdateTopologyList(Individual *inds);
 		void CheckAllTrees();
 		void CheckIndividuals();
-		void TopologyReport();
-		void RemoveFromTopologyList(Individual *ind);
-		void SetupTopologyList(int maxNumTopos);
 		void CheckTreesVsClaManager();
 		FLOAT_TYPE IndivFitness(int i);
 		
@@ -533,7 +526,6 @@ private:
 		void CheckForIncompatibleConfigEntries();
 
 		void Bootstrap();
-		void AssignNewTopology(Individual *ind, int indNum);
 		void FindLostClas();
 		void FinalOptimization();
 		void BetterFinalOptimization();

@@ -298,15 +298,6 @@ Population::~Population()
 	if( treeString!=NULL)
 		MEM_DELETE_ARRAY(treeString);
 
-	if(topologies!=NULL){
-		for(unsigned i=0;i<total_size;i++){
-			if(*(topologies+i)!=NULL){
-				delete *(topologies+i);
-				}
-			}
-		delete []topologies;
-		}
-		
 	for(vector<Tree*>::iterator vit=unusedTrees.begin();vit!=unusedTrees.end();vit++){
 		delete *vit;
 		}
@@ -487,21 +478,6 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	cumfit = new FLOAT_TYPE*[total_size];
 	for(unsigned i = 0; !error && i < total_size; i++ )
 		cumfit[i] = new FLOAT_TYPE[2];
-
-	//setup the topology list
-	int max_topos = total_size;
-	topologies=new TopologyList*[max_topos];
-	TopologyList::SetIndL(indiv);
-	ntopos=total_size;
-	for(int i=0;i<max_topos;i++)
-		{topologies[i]=new TopologyList();
-		topologies[i]->Allocate(100<(max_topos +1) ? 100 : (max_topos+1));
-		if(i<(int)total_size){
-			topologies[i]->AddInd(i);
-			TopologyList::ntoposexamined++;
-			indiv[i].topo=i;
-			}
-		}
 
 	//instantiate the clamanager and figure out how much memory to snatch
 	FLOAT_TYPE memToUse;
@@ -1308,7 +1284,6 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		}
 #endif
 
-	UpdateTopologyList(indiv);
 	CalcAverageFitness();
 	}
 
@@ -2936,6 +2911,7 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 		indiv1Tree->SPRMutate(indiv1Tree->dataPart->NTax(), &(*broken), 0.01, 0);
 		//optimize the result
 		bestIndiv = 1;
+		indiv[bestIndiv].CalcFitness(0);
 
 		//this will make the various trees have different names when they are appended to the treelog
 		//in BetterFinalOpt
@@ -3488,32 +3464,19 @@ void Population::FindTreeStructsForNextGeneration(){
 	for(unsigned i = 0; i < total_size; i++ ){
 		//see if the parent indiv has already been used in the new generation, or if it will recombine
 		if( i < conf->nindivs && (indiv[newindiv[i].parent].reproduced||indiv[newindiv[i].parent].willrecombine )){	      
-			//See if there is another ind with the same topology that also will not recombine
-			int sot=-1;
-			if(topologies[indiv[newindiv[i].parent].topo]->nInds>1)//if this isn't the only individual of this topo
-				do{
-					sot=topologies[indiv[newindiv[i].parent].topo]->GetNumberOfUnselectedInd();
-					if( !(sot==newindiv[i].parent) && !(indiv[sot].reproduced) && !(indiv[sot].willrecombine)) break;
-					}while(sot!=-1);
-			if(sot>=0){
-				newindiv[i].CopySecByStealingFirstTree(&indiv[sot],&indiv[newindiv[i].parent]);
-				indiv[sot].reproduced=true;
+			//use a tree from the unused Indiv stack.  If it is empty, create an extra indiv that will 
+			//eventually make it's way /back to that stack.  At most we should only ever have nindiv 
+			//trees in the unused stack
+			Tree *destPtr;
+			if(unusedTrees.empty()){//create a new tree
+				Tree *ttree=new Tree();
+				destPtr=ttree;
 				}
 			else{
-				//DZ 7-5 rewriting this.  If no unused tree with the same topology exists, use a tree from the 
-				//unused Indiv stack.  If it is empty, create an extra indiv that will eventually make it's way 
-				//back to that stack.  At most we should only ever have nindiv trees in the unused stack
-				Tree *destPtr;
-				if(unusedTrees.empty()){//create a new tree
-					Tree *ttree=new Tree();
-					destPtr=ttree;
-					}
-				else{
-					destPtr=*(unusedTrees.end()-1);
-					unusedTrees.pop_back();
-					}
-				newindiv[i].CopySecByRearrangingNodesOfFirst(destPtr,&indiv[newindiv[i].parent]);
+				destPtr=*(unusedTrees.end()-1);
+				unusedTrees.pop_back();
 				}
+			newindiv[i].CopySecByRearrangingNodesOfFirst(destPtr,&indiv[newindiv[i].parent]);
 			}
 		else{
 			//if the tree will not be used in recombination and has not already been used
@@ -3620,39 +3583,13 @@ void Population::PerformMutation(int indNum){
 		if(rank==0 && ind->accurateSubtrees==true)
 			paraMan->CheckSubtreeAccuracy(ind->treeStruct);
 		#endif
-
-		if((ind->mutation_type & Individual::anyTopo) || (ind->mutation_type & Individual::rerooted))
-			AssignNewTopology(newindiv, indNum);		
-		}
-
-//note that we're passing the entire array of individuals here, not just a pointer to an individual
-void Population::AssignNewTopology(Individual *indArray, int indNum){
-	assert(indArray == topologies[0]->GetListOfInd());
-	Individual *ind = &indArray[indNum];
-	if(ind->topo == -1){
-		ind->topo=ntopos++;
-		topologies[ind->topo]->AddInd(indNum);
-		}
-	else if(topologies[ind->topo]->nInds>1){
-		topologies[ind->topo]->RemoveInd(indNum);
-		ind->topo=ntopos++;
-		topologies[ind->topo]->AddInd(indNum);
-		}
-	topologies[ind->topo]->gensAlive=0;
-	assert(topologies[ind->topo]->nInds==1);
-	TopologyList::ntoposexamined++;
 	}
 
 void Population::NextGeneration(){
 
 	DetermineParentage();
 
-	for(unsigned i=0;i<ntopos;i++)
-		topologies[i]->NewGeneration();
-
 	FindTreeStructsForNextGeneration();
-
-	UpdateTopologyList(newindiv);
 
 	//return any treestructs from the indivs that won't be used in recombination
 	//and weren't used to make the newindivs.  This is necessary to keep from having
@@ -3675,7 +3612,6 @@ void Population::NextGeneration(){
 		PerformMutation(indnum);
 		}
 
-	UpdateTopologyList(newindiv);
 	UpdateTreeModels();
 
 	//the only trees that we need to return at this point are ones that
@@ -3920,7 +3856,6 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 	if(r->IsNotRoot()){
 		ind->treeStruct->RerootHere(r->nodeNum);
 		if(indnum != -1){
-			AssignNewTopology(indiv, indnum);
 			ind->SetDirty();
 			ind->CalcFitness(0);
 			}
@@ -4161,23 +4096,6 @@ char * Population::MakeNewick(int i, bool internalNodes)
 	assert(!treeString[stringSize]);
 	return treeString;
 }
-	
-void Population::CompactTopologiesList(){
-	for(unsigned i=0;i<ntopos;i++)
-		{if(topologies[i]->nInds==0)
-				{topologies[i]->exNNItried=false;
-				TopologyList *temp=topologies[i];
-				for(unsigned j=i;j<ntopos-1;j++)
-					{topologies[j]=topologies[j+1];
-					topologies[j]->DecrementTopoFieldOfInds();
-					}
-				topologies[ntopos-1]=temp;
-				temp->gensAlive=0;
-				ntopos--;
-				i--;
-				}
-		}
-}
 
 //DZ 7-7 This function will get rid of multiple references to the same treeStruct
 //from different individuals.  This keeps FLOAT_TYPE deletion from occuring in the destructor.
@@ -4245,59 +4163,6 @@ void Population::CheckAllTrees(){//debugging function
 			assert(!(indiv[i].treeStruct==indiv[j].treeStruct));
 			}
 		}
-	
-void Population::UpdateTopologyList(Individual *inds){
-	//bring topo list up to date
-	//also checks if any individuals have not been assigned a topo (topo=-1), and does so.
-	//BE SURE that conf->nindivs has been updated to the new size before calling this.
-	int new_topos=0;
-	for(unsigned i=0;i<total_size;i++){
-		if(inds[i].topo<0){
-			inds[i].topo=ntopos+new_topos++;
-			}
-		}
-	ntopos+=new_topos;
-	assert(ntopos<=total_size);
-	TopologyList::SetIndL(inds);
-	for(unsigned i=0;i<ntopos;i++)
-		topologies[i]->Clear();
-	for(unsigned i = 0; i <total_size; i++ )
-		topologies[inds[i].topo]->AddInd(i);
-	CompactTopologiesList();
-	if(ntopos < total_size) assert(topologies[ntopos]->nInds == 0);
-	}	
-
-void Population::RemoveFromTopologyList(Individual *ind){
-	topologies[ind->topo]->nInds--;
-	ntopos--;
-	ind->topo=-1;
-	}			
-
-void Population::CheckIndividuals(){
-	for(unsigned i=0;i<conf->nindivs;i++){
-		assert(!(indiv[i].topo>(int)ntopos));
-		}
-	}
-	
-void Population::TopologyReport(){
-	//this is for debugging purposes
-	ofstream out("toporeport.log");
-	if(!(out.good())) throw ErrorException("problem opening toporeport.log");
-
-	for(unsigned i=0;i<total_size;i++){
-		out << "topo# " << i << "\t" << "ngen " << topologies[i]->gensAlive << "\t";
-		out << "nInds " << topologies[i]->nInds << "\t" << "inds" << "\t";
-		for(int j=0;j<topologies[i]->nInds;j++){
-			out << topologies[i]->GetIndNums(j) << "\t";
-			}
-		out << endl;
-		}
-	out << "ind\ttopo" << endl;
-	for(unsigned i=0;i<conf->nindivs;i++){
-		out << i << "\t" << indiv[i].topo << endl;
-		}
-	out.close();
-	}		
 
 void Population::CheckTreesVsClaManager(){
 	//go through each node for each tree and make sure that the numbers in the assignedClaArray are correct
@@ -4516,31 +4381,6 @@ void Population::OutputModelAddresses(){
 		}
 	mods << endl;
 	}
-
-/*  Methods added by Alan Zhang on Jan,09,2004     */
-
-void Population::NNIoptimization(){
-	for(unsigned i=0;i<conf->nindivs;i++)
-		indiv[i].ResetIndiv();
-
-	//	for(int i = 0;i<conf->nindivs;i++){
-		bool topoChange=NNIoptimization(bestIndiv, 1);
-	//	}
-	
-	if(topoChange==true){
-		if(topologies[indiv[bestIndiv].topo]->nInds>1){
-			topologies[indiv[bestIndiv].topo]->RemoveInd(bestIndiv);
-			indiv[bestIndiv].topo=ntopos++;
-			topologies[indiv[bestIndiv].topo]->AddInd(bestIndiv);
-			assert(topologies[indiv[bestIndiv].topo]->nInds==1);
-			}
-		topologies[indiv[bestIndiv].topo]->gensAlive=0;
-		TopologyList::ntoposexamined++;
-		UpdateTopologyList(indiv);
-		}	
-	
-	CalcAverageFitness();
-}
 
 bool Population::NNIoptimization(unsigned indivIndex, int steps){
 	Individual  currentBest;
@@ -5334,7 +5174,6 @@ void Population::StartSubtreeMode(){
 
 		if(bestRoot!=0){
 			indiv[bestIndiv].treeStruct->RerootHere(bestRoot);
-			AssignNewTopology(indiv, bestIndiv);
 			}
 
 		//mark all of the trees inaccurate
@@ -5728,20 +5567,16 @@ void Population::CheckSubtrees(){
 	}
 
 void Population::FillPopWithClonesOfBest(){
-	UpdateTopologyList(indiv);
 	Individual *best=&indiv[bestIndiv];
 	best->treeStruct->modPart=&best->modPart;
 	for(unsigned i=0;i<conf->nindivs;i++){
 		if(&indiv[i]!=best){
 			indiv[i].treeStruct->RemoveTreeFromAllClas();
-			topologies[indiv[i].topo]->RemoveInd(i);
 			indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct,best);
-			topologies[indiv[bestIndiv].topo]->AddInd(i);
 			indiv[i].mutation_type=-1;
 			}
 		indiv[i].treeStruct->modPart=&indiv[i].modPart;
 		}
-	UpdateTopologyList(indiv);
 	CalcAverageFitness();
 	}
 
