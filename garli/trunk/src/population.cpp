@@ -2394,17 +2394,17 @@ void Population::Bootstrap(){
 #endif
 		if(conf->restart == false){
 			lastBootstrapSeed = data->BootstrapReweight(0, conf->resampleProportion);
-/*//for debuggng
-			string wtstring;
+//for debuggng
+/*			string wtstring;
 			char name[20];
 			sprintf(name, "bootRep%d", currentBootstrapRep);
 			data->MakeWeightSetString(wtstring, name);
 			//outman.UserMessage("bootstrapped weightset is : \n %s", wtstring.c_str());
-			ofstream boot("proshek.processed.nex", ios::app);
+			ofstream boot("bootweights.log", ios::app);
 			boot << wtstring.c_str() << "\n";
 			cout << wtstring.c_str() << "\n";
 			boot.close();
-*/
+*/			
 			//outman.UserMessage("Random seed for bootstrap reweighting: %d", lastBootstrapSeed);
 			}
 

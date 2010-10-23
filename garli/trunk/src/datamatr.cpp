@@ -1658,6 +1658,7 @@ long DataMatrix::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 	
 	FLOAT_TYPE p=0.0;
 	cumProbs[0]=(FLOAT_TYPE) origCounts[0] / ((FLOAT_TYPE) totalNChar);
+	count[0] = 0;
 	for(int i = 1;i < nChar;i++){
 		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar);
 		count[i] = 0;
@@ -1665,12 +1666,7 @@ long DataMatrix::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 	cumProbs[nChar - 1] = 1.0;
 
 	//ofstream deb("counts.log", ios::app);
-/*	ofstream deb("counts.log");
-
-	for(int i = 0;i < nChar;i++)
-		deb << i << "\t" << count[i] << "\t" << origCounts[i] << endl;
-*/
-
+	//ofstream deb("counts.log");
 
 	//round to nearest int
 	int numToSample = (int) (((FLOAT_TYPE)totalNChar * resampleProportion) + 0.5);
@@ -1682,13 +1678,23 @@ long DataMatrix::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 		while(p > cumProbs[pat]) pat++;
 		count[pat]++;
 		}
+/*
+	for(int i = 0;i < nChar;i++)
+		deb << i << "\t" << origCounts[i] << "\t" << count[i] <<  endl;
+*/
 	//take a count of the number of chars that were actually resampled
 	nonZeroCharCount = 0;
 	int numZero = 0;
+	int totCounts = 0;
 	for(int d=0;d<nChar;d++){
-		if(count[d] > 0) nonZeroCharCount++;
-		else numZero++;
+		if(count[d] > 0) {
+			nonZeroCharCount++;
+			totCounts += count[d];
+			}
+		else 
+			numZero++;
 		}
+	assert(totCounts == totalNChar);
 	assert(nonZeroCharCount + numZero == nChar);
 	currentBootstrapSeed = rnd.seed();
 	if(restartSeed > 0) rnd.set_seed(originalSeed);
