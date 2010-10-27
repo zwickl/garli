@@ -137,17 +137,6 @@ if test "$enable_beagle" = yes; then
            ])
 fi
 
-#DLA - using hmsbeagle library with cuda gpu
-AC_ARG_ENABLE(beagle-cuda,
-        AC_HELP_STRING([--enable-beagle-cuda],[enable CUDA GPU for hmsbeagle (requires --enable-beagle)]), , [enable_beagle_cuda=no])
-if test "$enable_beagle" = yes; then
-    if test "$enable_beagle_cuda" = yes; then
-        AC_MSG_NOTICE([
-           *** NOTE: compiling version using hmsbeagle library with CUDA GPU
-           ])
-    fi
-fi
-
 # single precision version (still being tested)
 AC_ARG_ENABLE(single-prec,
         AC_HELP_STRING([--enable-single-prec],[use single precision floating point variables (EXPERIMENTAL)]), , [enable_single_prec=no])
@@ -266,14 +255,14 @@ AC_ARG_WITH(
 if test  "$enable_beagle" = yes; then
    BEAGLE_LDFLAGS="-L$BEAGLE_INSTALL_PATH/lib"
    BEAGLE_LIB="-lhmsbeagle"
-   BEAGLE_INCLUDES="-I$BEAGLE_INSTALL_PATH/include/libhmsbeagle-1.0/libhmsbeagle/ -I$BEAGLE_INSTALL_PATH/include/libhmsbeagle-1.0/"
+   BEAGLE_INCLUDES="-I$BEAGLE_INSTALL_PATH/include/libhmsbeagle-1 -I$BEAGLE_INSTALL_PATH/include/libhmsbeagle-1/libhmsbeagle"
    LDFLAGS="$LDFLAGS $BEAGLE_LDFLAGS"
    LIBS="$LIBS $BEAGLE_LIB"
    CXXFLAGS="$CXXFLAGS $BEAGLE_INCLUDES -DNEW_MANAGEMENT -DUSE_BEAGLE"
 fi
 
 ####################################################################
-# DLA cuda toolkit (required for both beagle-cuda and original cuda version) 
+# DLA cuda toolkit (required for original cuda version) 
 CUDA_INSTALL_PATH="/usr/local/cuda"
 
 AC_ARG_WITH(
@@ -288,18 +277,6 @@ AC_ARG_WITH(
 	fi
 	])
 
-####################################################################    
-# DLA beagle-cuda gpu
-if test  "$enable_beagle_cuda" = yes; then
-   BEAGLE_CUDA_CFLAGS="-I$CUDA_INSTALL_PATH/include"
-   BEAGLE_CUDA_LDFLAGS="-L$CUDA_INSTALL_PATH/lib64 -L$CUDA_INSTALL_PATH/lib"
-   BEAGLE_CUDA_LIBS="-lcuda"
-   LDFLAGS="$LDFLAGS $BEAGLE_CUDA_LDFLAGS"
-   LIBS="$LIBS $BEAGLE_CUDA_LIBS"
-   CXXFLAGS="$CXXFLAGS $BEAGLE_CUDA_CFLAGS"
-fi
-
-####################################################################
 # DLA original cuda gpu version
 CUDA_SDK_INSTALL_PATH="/Developer/CUDA"
 
