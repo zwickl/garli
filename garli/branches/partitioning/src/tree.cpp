@@ -5301,7 +5301,9 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 					//the TL would appear in the denominator of both of the following terms
 					sum += (allNodes[i]->dlen - (1.0 - expMu) / mu);
 					}
-				sum /= TL;
+				//the oneInsertProportion needs to appear here because this single branch ins->del scenario
+				//is only relavent for the class with one insert 
+				sum *= oneInsertProportion / TL;
 #endif
 				condScaler = -log(1.0 - (allGapLike + sum));
 				assert(condScaler > 0.0);
@@ -7333,7 +7335,7 @@ void Tree::CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr,
 
 			//element 0 is just an indicator of when NO bases observed in subtree (i.e., 1 = no bases, 0 = bases)
 			dest[0] = left[0] * right[0];
-			//we think that pr[0][0] here can be set to 1.0
+			//the pr[0][0] (never inserted to never inserted transition) that would appear here can be set to 1.0
 			dest[1] = left[0] * (Rpr[0 * claStates + 1] * right[2] + right[1]) + right[0] * (Lpr[0 * claStates + 1] * left[2] + left[1]);
 			//dest[1] = left[0] * (Rpr[0 * claStates + 1] * right[2] + Rpr[0 * claStates + 0] * right[1]) + right[0] * (Lpr[0 * claStates + 1] * left[2] + Lpr[0 * claStates + 0] * left[1]);
 			dest[2] = (left[2] * Lpr[1 * claStates + 1] + left[0] * Lpr[1 * claStates + 2]) * (right[2] * Rpr[1 * claStates + 1] + right[0] * Rpr[1 * claStates + 2]);
