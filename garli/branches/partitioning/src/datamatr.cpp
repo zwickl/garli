@@ -550,19 +550,38 @@ void DataMatrix::SwapCharacters( int i, int j ){
 		}
 }
 
+void DataMatrix::BeginNexusTreesBlock(string &trans) const{
+	//this outputs everything up through the translate table
+	trans = "#NEXUS\n\nbegin trees;\ntranslate\n";
+
+	char temp[500];
+	for(int k=0;k<nTax;k++){
+		//DO NOT call GetEscaped() or BlanksToUnderscores() on the names here - they are stored 
+		//exactly as they should be output upon initial reading
+		NxsString tnstr = TaxonLabel(k);
+		if( k == nTax-1 )
+			sprintf(temp, " %d %s;\n", (k+1), tnstr.c_str());
+		else
+			sprintf(temp, " %d %s,\n", (k+1), tnstr.c_str());
+		trans += temp;
+		}
+	}
+
 void DataMatrix::BeginNexusTreesBlock(ofstream &treeout) const{
 	//this outputs everything up through the translate table
 	treeout << "#NEXUS\n\nbegin trees;\ntranslate\n";
-	for(int k=0;k<nTax;k++){
+ 	for(int k=0;k<nTax;k++){
+		//DO NOT call GetEscaped() or BlanksToUnderscores() on the names here - they are stored 
+		//exactly as they should be output upon initial reading
 		treeout << "  " << (k+1);
 		NxsString tnstr = TaxonLabel(k);
-		tnstr.BlanksToUnderscores();
 		treeout << "  " << tnstr.c_str();
 		if( k == nTax-1 )
 			treeout << ";\n";
 		else
 			treeout << ",\n";
 		}
+	treeout.flush();
 	}
 
 //

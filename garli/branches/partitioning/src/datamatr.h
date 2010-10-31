@@ -219,6 +219,7 @@ protected:
 			for(int t=0;t<nTax;t++) SetTaxonLabel(t, dat->TaxonLabel(t));
 			}
 
+		void BeginNexusTreesBlock(string &trans) const;
 		void BeginNexusTreesBlock(ofstream &treeout) const;
 	
 		virtual unsigned char Matrix( int i, int j ) const {
