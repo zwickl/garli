@@ -586,13 +586,7 @@ void Population::LoadNexusStartingConditions(){
 		string n = "ROOT";
 		tax->AppendNewLabel(n);
 		}
-	//DEBUG - this wasn't right, since having multiple trees with the data isn't a problem if we're getting the
-	//start from elsewhere
-	/*
-	if(reader.GetNumTreesBlocks(tax) > 1){
-		throw ErrorException("Expecting only one trees block (not sure which to use)");
-		}
-	*/
+
 	NxsTreesBlock *treesblock = reader.GetTreesBlock(tax, 0);
 
 	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
@@ -2828,7 +2822,7 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 
 void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 	
-	assert(Tree::someOrientedGap);
+	//assert(Tree::someOrientedGap);
 	//find out how many trees we have
 	GarliReader & reader = GarliReader::GetInstance();
 	const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
