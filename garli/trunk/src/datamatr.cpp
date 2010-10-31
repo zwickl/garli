@@ -972,12 +972,9 @@ void DataMatrix::BeginNexusTreesBlock(string &trans) const{
 
 	char temp[500];
 	for(int k=0;k<nTax;k++){
-		//DO NOT call GetEscaped on the names here - they are stored with the proper escaping upon initial reading,
-		//and will get OVER-escaped.  The blanks to underscores really shouldn't be necessary as blanks
-		//should already be stored as underscores
+		//DO NOT call GetEscaped() or BlanksToUnderscores() on the names here - they are stored 
+		//exactly as they should be output upon initial reading
 		NxsString tnstr = TaxonLabel(k);
-		tnstr.BlanksToUnderscores();
-		//NxsString tnstr = NxsString::GetEscaped(TaxonLabel(k)).c_str();
 		if( k == nTax-1 )
 			sprintf(temp, " %d %s;\n", (k+1), tnstr.c_str());
 		else
@@ -989,14 +986,11 @@ void DataMatrix::BeginNexusTreesBlock(string &trans) const{
 void DataMatrix::BeginNexusTreesBlock(ofstream &treeout) const{
 	//this outputs everything up through the translate table
 	treeout << "#NEXUS\n\nbegin trees;\ntranslate\n";
-	for(int k=0;k<nTax;k++){
-		//DO NOT call GetEscaped on the names here - they are stored with the proper escaping upon initial reading,
-		//and will get OVER-escaped.  The blanks to underscores really shouldn't be necessary as blanks
-		//should already be stored as underscores
+ 	for(int k=0;k<nTax;k++){
+		//DO NOT call GetEscaped() or BlanksToUnderscores() on the names here - they are stored 
+		//exactly as they should be output upon initial reading
 		treeout << "  " << (k+1);
 		NxsString tnstr = TaxonLabel(k);
-		tnstr.BlanksToUnderscores();
-//		NxsString tnstr = NxsString::GetEscaped(TaxonLabel(k)).c_str();
 		treeout << "  " << tnstr.c_str();
 		if( k == nTax-1 )
 			treeout << ";\n";
