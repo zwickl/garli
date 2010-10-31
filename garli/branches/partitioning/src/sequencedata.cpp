@@ -558,208 +558,6 @@ void CodonData::BaseFreqXPositionReport(){
 	outman.UserMessage(" all pos %10.5f%10.5f%10.5f%10.5f\n", empBaseFreqsAllPos[0], empBaseFreqsAllPos[1], empBaseFreqsAllPos[2], empBaseFreqsAllPos[3]);
 	}
 
-//
-// ComparePatterns returns:
-//	 0		complete identity
-//	-1		if i less than j
-//	 1		if i greater than j
-//
-/*
-int CodonData::ComparePatterns( const int i, const int j ) const{
-	int cmp = 0;
-
-	for( int k = 0; k < nTax; k++ ) {
-		int same = ( Matrix( k, i ) == Matrix( k, j ) );
-		if( !same )	{
-			FLOAT_TYPE diff = ( (FLOAT_TYPE)Matrix( k, i ) - (FLOAT_TYPE)Matrix( k, j ) );
-			cmp = ( diff < 0.0 ? -1 : 1 );
-			break;
-		}
-	}
-	return cmp;
-}
-*/
-
-// PatternType determines whether pattern k is constant, informative, or autoapomorphic
-//
-/*
-int CodonData::PatternType( int k , int *c, unsigned char *s) const
-{
-	if( k >= NChar() )
-		return 0;
-	int i, j, retval;
-
-	for( i = 0; i < nTax; i++ )
-		c[i] = 1;
-
-	for( i = 0; i < nTax; i++ )
-		s[i] = Matrix( i, k );
-
-	// sort elements of s
-	for( i = 0; i < nTax-1; i++ ) {
-		for( j = i+1; j < nTax; j++ ) {
-			if( s[i] > s[j] ) {
-				unsigned char tmp = s[i];
-				s[i] = s[j];
-				s[j] = tmp;
-			}
-		}
-	}
-	
-	// add counts of duplicate elements of s to first instance
-	int nStates = 1; 	// treats ? as a new state
-	bool ambig = false;	// will be true if any ? found
-	bool allMissing = true;
-	i = 0;
-	for( j = 1; j < nTax; j++ ) {
-		if(s[j]!=maxNumStates)  allMissing=false;
-		if( s[j] == s[i] ) {
-			c[i]++;
-			c[j]--;
-			}
-		else {
-			i = j;
-			nStates++;
-			}
-		}
-
-	//DJZ 10/28/03 changing this to allow for invariant sites.  Sites which contain 
-	//some missing data but are otherwise constant must be marked as such because they 
-	//will be considered constant for the purposes of invariant sites calcs.
-	//also marking sites that are all missing
-
-//	if( nStates == 1 )
-	if( nStates == 1 /*|| (nStates==2 && missing)*/
-/*
-)
-		retval = PT_CONSTANT;
-	else if( nStates == 2 && ( c[0] == 1 || c[0] == nTax-1 ) )
-		retval = PT_AUTAPOMORPHIC | PT_VARIABLE;
-	else if( nStates < nTax )
-		retval = PT_INFORMATIVE | PT_VARIABLE;
-	else
-		retval = PT_VARIABLE;
-
-//	MEM_DELETE_ARRAY(s); // s is of length nTax
-//	MEM_DELETE_ARRAY(c); // c is of length nTax
-
-//	numStates[k] = ( missing ? nStates-1 : nStates );
-	if(allMissing) nStates=0;
-	numCodonStates[k] = nStates;
-
-	return retval;
-}
-*/
-/*
-void CodonData::NewCodonMatrix( int taxa, int sites ){
-
-	// delete data matrix and count and number arrays
-	if( codonMatrix ) {
-		int j;
-		for( j = 0; j < nTax; j++ )
-			MEM_DELETE_ARRAY(codonMatrix[j]);
-		MEM_DELETE_ARRAY(codonMatrix); 
-		}
-
-	if( codonCount ) {
-		MEM_DELETE_ARRAY(codonCount); 
-		}
-	if( numCodonStates ) {
-		MEM_DELETE_ARRAY(numCodonStates); 
-		}
-	if( codonNumber ) {
-        MEM_DELETE_ARRAY(codonNumber); 
-        }
-
-	// create new data matrix, and new count and number arrays
-	// all counts are initially 1, and characters are numbered
-	// sequentially from 0 to nChar-1
-	if( taxa > 0 && sites > 0 ) {
-		MEM_NEW_ARRAY(codonMatrix,char*,taxa);
-		MEM_NEW_ARRAY(codonCount,int,sites);
-		MEM_NEW_ARRAY(numCodonStates,int,sites);
-		MEM_NEW_ARRAY(codonNumber,int,sites);
-
-		for( int j = 0; j < sites; j++ ) {
-			codonCount[j] = 1;
-			numCodonStates[j] = 1;
-			codonNumber[j] = j;
-		}
-		for( int i = 0; i < taxa; i++ ) {
-			codonMatrix[i]=new char[sites];
-			//MEM_NEW_ARRAY(matrix[i],unsigned char,sites);
-			//memset( matrix[i], 0xff, taxa*sizeof(unsigned char) );
-			memset( codonMatrix[i], 0xff, sites*sizeof(unsigned char) );
-		}
-		int max = maxNumStates;
-		for( int k = 0; k <= max; k++ )
-			stateDistr[k] = 0.0;
-		}
-
-	// set dimension variables to new values
-	nTax = taxa;
-	gapsIncludedNChar = sites;
-	}
-*/
-
-/*
-void CodonData::Pack()
-{
-	int i, j, newNChar = 0;
-
-	// determine dimensions of new matrix
-	for( j = 0; j < nCodonChar; j++ ) {
-		if( codonCount[j] )
-			newNChar++;
-	}
-
-	// create new matrix and count and number arrays and fill
-	char** newMatrix;
-        MEM_NEW_ARRAY(newMatrix,char*,nTax);
-	int* newCount;
-        MEM_NEW_ARRAY(newCount,int,newNChar);
-	int* newNumStates;
-        MEM_NEW_ARRAY(newNumStates,int,newNChar);
-
-	for( i = 0; i < nTax; i++ )
-		 MEM_NEW_ARRAY(newMatrix[i],char,newNChar);
-
-
-	i = 0;
-	for( j = 0; j < nCodonChar; j++ ) {
-		if( codonCount[j] ) {
-			for( int k = 0; k < nTax; k++ )
-				newMatrix[k][i] = codonMatrix[k][j];
-			newCount[i] = codonCount[j];
-			newNumStates[i] = numCodonStates[j];
-			//newNumber[i] = number[j];
-			i++;
-			}
-		else{//as we remove columns, shift all the greater numbers over
-			for(int c=0;c<gapsIncludedNCodonChar;c++){
-				if(codonNumber[c] >= i) codonNumber[c]--;
-				}
-			}
-		}
-
-	// delete old matrix and count and number arrays
-	if( codonCount ) MEM_DELETE_ARRAY(codonCount); // count has length nChar
-	if( numCodonStates ) MEM_DELETE_ARRAY(numCodonStates); // numStates has length nChar
-//	if( number ) MEM_DELETE_ARRAY(number); // number has length nChar
-	if( codonMatrix ) {
-		for( i = 0; i < nTax; i++ )
-			MEM_DELETE_ARRAY(codonMatrix[i]); // matrix[i] has length nChar
-		MEM_DELETE_ARRAY(codonMatrix); // matrix has length nTax
-        }
-
-	// set count, number and matrix to their new counterparts
-	codonCount = newCount;
-	numCodonStates = newNumStates;
-	codonMatrix = newMatrix;
-	nCodonChar = newNChar;	
-}
-*/
-
 unsigned char NucleotideData::CharToDatum( char ch ){
 	unsigned char datum=0;
 	switch(ch){
@@ -914,12 +712,10 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsig
 	int i=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
-			//internally, blanks in taxon names will be stored as underscores
-			//FACTORY
-			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			//store the taxon names based on NCL's "escaped" version, which will properly deal
+			//with whether quotes are necessary, etc.  No conversion needed at output.
 			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
-			tlabel.BlanksToUnderscores();
-			SetTaxonLabel( i, tlabel.c_str());
+			SetTaxonLabel(i, NxsString::GetEscaped(tlabel).c_str());
 			
 			int j = 0;
 
@@ -979,16 +775,12 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsign
 	int i=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
-			//internally, blanks in taxon names will be stored as underscores
-			//FACTORY
-			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			//store the taxon names based on NCL's "escaped" version, which will properly deal
+			//with whether quotes are necessary, etc.  No conversion needed at output.
 			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
-			tlabel.BlanksToUnderscores();
-			SetTaxonLabel( i, tlabel.c_str());
-			
+			SetTaxonLabel(i, NxsString::GetEscaped(tlabel).c_str());
 			int j = 0;
 			bool firstAmbig = true;
-//			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				if(i == 0)
 					SetOriginalDataNumber(j, *cit);
@@ -997,7 +789,6 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsign
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 20;
 				else{
 					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
-					//assert(nstates == 1);
 					//need to deal with the possibility of multiple states represented in matrix
 					//just convert to full ambiguity
 					if(nstates == 1)
@@ -1059,16 +850,13 @@ void BinaryData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 	int i=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
-			//internally, blanks in taxon names will be stored as underscores
-			//FACTORY
-			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			//store the taxon names based on NCL's "escaped" version, which will properly deal
+			//with whether quotes are necessary, etc.  No conversion needed at output.
 			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
-			tlabel.BlanksToUnderscores();
-			SetTaxonLabel( i, tlabel.c_str());
+			SetTaxonLabel(i, NxsString::GetEscaped(tlabel).c_str());
 			
 			int j = 0;
 			bool firstAmbig = true;
-//			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){
 				if(i == 0)
 					SetOriginalDataNumber(j, *cit);
@@ -1077,7 +865,6 @@ void BinaryData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 2;
 				else{
 					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
-					//assert(nstates == 1);
 					//need to deal with the possibility of multiple states represented in matrix
 					//just convert to full ambiguity
 					if(nstates == 1)
@@ -1196,12 +983,10 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 	int effectiveTax=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
-			//internally, blanks in taxon names will be stored as underscores
-			//FACTORY
-			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			//store the taxon names based on NCL's "escaped" version, which will properly deal
+			//with whether quotes are necessary, etc.  No conversion needed at output.
 			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
-			tlabel.BlanksToUnderscores();
-			SetTaxonLabel( effectiveTax, tlabel.c_str());
+			SetTaxonLabel(effectiveTax, NxsString::GetEscaped(tlabel).c_str());
 			
 			int effectiveChar = 0;
 			//add the dummy constant character
@@ -1212,7 +997,6 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 				}
 
 			bool firstAmbig = true;
-//			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){
 				if(effectiveTax == 0)
 					SetOriginalDataNumber(effectiveChar, *cit);
@@ -1238,7 +1022,6 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 					}
 				else{
 					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
-					//assert(nstates == 1);
 					//need to deal with the possibility of multiple states represented in matrix
 					//just convert to full ambiguity
 					if(nstates == 1){
@@ -1280,7 +1063,6 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 					outman.UserMessage("\nWARNING - some state in a %d-state character appeared only as part\n\tof an ambiguity code, e.g., a column with states 0, 1 and (12).", maxNumStates);
 					outman.UserMessage("\tThe ambiguity code will be treated as missing data,\n\tbut the character will still be considered to have %d states.\n", maxNumStates);
 					}
-				//assert(found);
 				}
 			}
 		}
@@ -1393,57 +1175,10 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 		throw ErrorException("Sorry, fully excluded characters blocks or partition subsets are not currently supported.");
 		}
 
-/*	//first count the number of characters with the number of observed states that was specified for
-	//this matrix, create a matrix with those dimensions  and grab them from the charblock and make a matrix.
-	//If not, just return and the function that called this should be able to check if any characters were actually read, and act accordingly
-	//remove_if(realCharSet->begin(), realCharSet->end(), charblock->GetObsNumStates);
-
-	NxsUnsignedSet consts;
-	for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();){
-		unsigned num = *cit;
-		cit++;
-		int ns = charblock->GetObsNumStates(num, false);
-		if(ns == 1)
-			consts.insert(num);
-		else if(ns == 0 && maxNumStates == 2)
-			outman.UserMessage("NOTE: entirely missing character #%d removed from matrix.", num+1);
-		if(ns != maxNumStates){
-			realCharSet->erase(num);
-			}
-		}
-	if(consts.size() > 0 && type == ONLY_VARIABLE){
-		string c = NxsSetReader::GetSetAsNexusString(consts);
-		throw ErrorException("Constant characters are not allowed when using the Mkv\n\tmodel (as opposed to Mk), because it assumes that all\n\tcharacters are variable.  Change to datatype = standard\n\tor exclude them by adding this to your nexus datafile:\nbegin assumptions;\nexset * const = %s;\nend;", c.c_str());
-
-		}
-*/
-//DEBUG
-	//further filter for no ambiguities - I'm not sure how to deal with them under Mkv
-/*
-	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
-		if(charblock->IsActiveTaxon(origTaxIndex)){
-			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
-				for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();){	
-					unsigned num = *cit;
-					cit++;
-					if(charblock->IsGapState(origTaxIndex, num) == true || charblock->IsMissingState(origTaxIndex, num) == true){
-						realCharSet->erase(num);
-						outman.UserMessage("Note: Discarding character %d due to missing data", num);
-						}
-					else if(charblock->GetNumStates(origTaxIndex, num) > 1){
-						realCharSet->erase(num);
-						outman.UserMessage("Note: Discarding character %d due to ambiguous data", num);
-						}
-					}
-				}
-			}
-		}
-*/
 	if(realCharSet->size() == 0)
 		return;
 
-	//include an extra taxon for the dummy root
-//the dummy root is now taken care of outside of here in a non-datatype specific way
+//	the dummy root is now taken care of outside of here in a non-datatype specific way
 //	int myEffectiveTaxa = numActiveTaxa + 1;
 
 	bool allGapChar = true;
@@ -1458,12 +1193,10 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 	int effectiveTax=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
-			//internally, blanks in taxon names will be stored as underscores
-			//FACTORY
-			//NxsString tlabel = taxablock->GetTaxonLabel(origTaxIndex);
+			//store the taxon names based on NCL's "escaped" version, which will properly deal
+			//with whether quotes are necessary, etc.  No conversion needed at output.
 			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
-			tlabel.BlanksToUnderscores();
-			SetTaxonLabel( effectiveTax, tlabel.c_str());
+			SetTaxonLabel(effectiveTax, NxsString::GetEscaped(tlabel).c_str());
 			
 			int effectiveChar = 0;
 			//add the dummy character
@@ -1474,7 +1207,6 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 				}
 
 			bool firstAmbig = true;
-//			for( int origIndex = 0; origIndex < numOrigChar; origIndex++ ) {
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				if(effectiveTax == 0)
 					SetOriginalDataNumber(effectiveChar, *cit);
