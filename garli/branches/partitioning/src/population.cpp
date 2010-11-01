@@ -3903,7 +3903,9 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	str += "begin trees;\ntranslate\n";
 	for(k=0;k<ntaxa;k++){
 		NxsString tnstr = dataPart->TaxonLabel(k);
-		tnstr.BlanksToUnderscores();
+		//DO NOT call GetEscaped() or BlanksToUnderscores() on the names here - they are stored 
+		//exactly as they should be output upon initial reading
+		//tnstr.BlanksToUnderscores();
 		sprintf(temp, " %d %s", k+1, tnstr.c_str());
 		str += temp;
 		if(k < ntaxa-1) 
