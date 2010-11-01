@@ -371,8 +371,6 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 							assert(*s);
 							name += *++s;
 							}
-						//its possible that the treestring has spaces in the names rather than underscores
-						name.BlanksToUnderscores();
 						taxonnodeNum = dataPart->TaxonNameToNumber(name);
 						if(taxonnodeNum < 0) throw ErrorException("Unknown taxon \"%s\" encountered in tree description!", name.c_str());
 						}
