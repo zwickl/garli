@@ -3927,7 +3927,7 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	str += modstr;
 	modstr.clear();
 
-	str += "]";
+	str += "]\n";
 
 #ifdef BOINC
 	const char *s = str.c_str();
@@ -3956,7 +3956,7 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 			str += "[\n";
 			ind->modPart.FillGarliFormattedModelStrings(modstr);
 			str += modstr;
-			str += "\n]";
+			str += "\n]\n";
 			modstr.clear();
 			}
 		}
@@ -4049,7 +4049,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 					sprintf(mStr, "[M%d\n", m);
 					outf << mStr;
 					storedTrees[bestRep]->modPart.GetModel(m)->OutputPaupBlockForModel(outf, name.c_str());
-					outf << "\n]";
+					outf << "\n]\n";
 					}
 				}
 			}
