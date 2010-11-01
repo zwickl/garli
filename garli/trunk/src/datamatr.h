@@ -337,12 +337,8 @@ protected:
 			}
 		void SetTaxonLabel(int i, const char* s);
 		
-		int TaxonNameToNumber(const NxsString &name) const{
-			for(int i=0;i<nTax;i++){
-				if(strcmp(name.c_str(), TaxonLabel(i)) == 0) return i+1;//indeces run 0->ntax-1, taxon numbers 1->ntax
-				}
-			return -1;
-			}
+		int TaxonNameToNumber(const NxsString &name) const;
+
 		void CopyNamesFromOtherMatrix(const DataMatrix *dat){
 			assert(taxonLabel);
 			for(int t=0;t<nTax;t++) SetTaxonLabel(t, dat->TaxonLabel(t));
