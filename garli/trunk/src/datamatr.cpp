@@ -1000,6 +1000,15 @@ void DataMatrix::BeginNexusTreesBlock(ofstream &treeout) const{
 	treeout.flush();
 	}
 
+int DataMatrix::TaxonNameToNumber(const NxsString &name) const{\
+	string nameStr = NxsToken::Tokenize(name)[0].GetToken();
+	for(int i=0;i<nTax;i++){
+		if(nameStr == (NxsToken::Tokenize(TaxonLabel(i)))[0].GetToken())
+			return i+1;//indeces run 0->ntax-1, taxon numbers 1->ntax
+			}
+	return -1;
+	}
+
 //
 // ComparePatterns returns:
 //	 0		complete identity
