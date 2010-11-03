@@ -7430,7 +7430,7 @@ void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondL
 						}
 					dest[from] = (*data2 < nstates ? d * pr2[rate*nstates*nstates + (*data2)+from*nstates] : d);
 					}
-				assert(dest[19] < 1e10);
+				assert(dest[nstates - 1] < 1e10);
 				dest += nstates;
 				CL1 += nstates;
 				}
