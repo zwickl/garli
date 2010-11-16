@@ -2909,7 +2909,7 @@ void Model::CreateModelFromSpecification(int modnum){
 #ifdef SUM_AA_REL_RATES	
 			this->NormalizeSumConstrainedRelativeRates(true, -1);
 #endif
-			if(! modSpec.IsUserSpecifiedRateMatrix()){
+			if((modSpec.IsUserSpecifiedRateMatrix() == false) && ((modSpec.IsTwoSerineRateMatrix() &&  modSpec.fixRelativeRates) == false)){
 #ifdef SUM_AA_REL_RATES
 				SumConstrainedRelativeRates *r = new SumConstrainedRelativeRates("Rate matrix", &relNucRates[0], matrixRates, SUM_TO * 1.0e-6/(double)matrixRates, SUM_TO * 1.0e6/(double)matrixRates, SUM_TO);
 #else
