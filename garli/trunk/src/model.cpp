@@ -1372,7 +1372,23 @@ void Model::CopyModel(const Model *from){
 			*omegaProbs[i]=*(from->omegaProbs[i]);
 		}
 
-	if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix() || (modSpec.IsTwoSerineRateMatrix() && !modSpec.fixRelativeRates) || (modSpec.IsAminoAcid() && modSpec.IsUserSpecifiedRateMatrix()))
+	//CANNOT memcpy stateFreqs and relNucRates because they are vectors of pointers, not of doubles
+
+	//Arg, had twoserine bug here.  If AA, rel rates need to be copied:
+	//1) If IsEstimateAAMatrix - matrix needs to be propagated as it changes
+	//2) If is estimated two-serine model (i.e., modSpec.IsTwoSerineRateMatrix() && !modSpec.fixRelativeRates) - as above
+
+	//THE FOLLOWING TWO ONE-TIME CASES COULD BE REMOVED FROM HERE AND ONLY CALLED DURING INITIAL CLONING, AND I LOOKED INTO
+	//THIS, BUT IT GETS NASTY AND POTENTIALLY BUGGY TO TRY IT.  THESE ARE RARE USE CASES, SO I WON'T WORRY ABOUT THE OVERHEAD,
+	//WHICH MAY BE LARGE
+	//3) If IsUserSpecifiedRateMatrix (=fixed) - Doesn't need to be copied during run since it won't be changing, but DOES need to be copied 
+										//when the initial tree is cloned into the pop, to overwrite the default parameter values
+	//This is what was missing in two serine bug:
+	//4) If is a fixed two-serine matrix (i.e., modSpec.IsTwoSerineRateMatrix() && modSpec.fixRelativeRates) - for same reason as previous,
+										//to overwrite default values
+
+	//if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix() || (modSpec.IsTwoSerineRateMatrix() && !modSpec.fixRelativeRates) || (modSpec.IsAminoAcid() && modSpec.IsUserSpecifiedRateMatrix()))
+	if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix() || modSpec.IsTwoSerineRateMatrix() || (modSpec.IsAminoAcid() && modSpec.IsUserSpecifiedRateMatrix()))
 		for(int i=0;i<relNucRates.size();i++)
 			*relNucRates[i]=*(from->relNucRates[i]);
 	
