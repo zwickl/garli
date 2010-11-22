@@ -40,7 +40,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	singlePrecBeagle = false;
 	gpuBeagle = false;
 	rescaleBeagle = false;
-	preferredBeagleFlags = "DOUBLE CPU RESCALE";
+	preferredBeagleFlags = "SINGLE CPU RESCALE";
 	singlePrecEps = FLT_EPSILON * 10.0;
 	doublePrecEps = FLT_EPSILON * 10.0;
 	deviceNumBeagle = -1;
