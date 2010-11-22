@@ -166,7 +166,7 @@ void UsageMessage(char *execName){
 	outman.UserMessage    ("                    CPU GPU SINGLE DOUBLE SSE OPENMP.  They may not all work. Flags are interpreted");
 	outman.UserMessage    ("                    as beagle *preferences*, so can be ignored when not able to be met");
 	outman.UserMessage    ("  -F <FLAGS>        same as -f, except interpret the flags as beagle *requirements*");
-	outman.UserMessage    ("  -d <device num>   use specified beagle device number");
+	outman.UserMessage    ("  --device <device num>   use specified beagle device number");
 #endif
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"\n");
 #endif
@@ -283,14 +283,17 @@ int main( int argc, char* argv[] )	{
 							cmdLineBeagleFlags += argv[curarg++];
 							}
 						}
-					else if(!strcmp(argv[curarg], "-d")){
+					else if(!strcmp(argv[curarg], "--device")){
 						curarg++;
 						if(curarg == argc || ! isdigit(argv[curarg][0])){
-							outman.UserMessage("-d flag must be followed by beagle device #");
+							outman.UserMessage("--device flag must be followed by beagle device #");
 							exit(1);
 							} 
 						else
 							beagleDeviceNum = atoi(argv[curarg]);
+#ifdef BOINC
+							beagleDeviceNum++; // with BOINC the first GPU is device 0
+#endif
 						}   
 					else if(!strcmp(argv[curarg], "-V"))
 						//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
