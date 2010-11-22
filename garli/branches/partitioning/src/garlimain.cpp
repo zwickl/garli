@@ -18,8 +18,8 @@
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #define PROGRAM_NAME "GARLI-PART"
-#define MAJOR_VERSION 0.97
-#define MINOR_VERSION "r750"
+#define MAJOR_VERSION 0.98
+#define MINOR_VERSION "r891"
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
@@ -296,7 +296,7 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 			
-			outman.UserMessage("Running BOINC GARLI-PART Version %.2f.%s (Partitioning Branch) (March 2010)\n", MAJOR_VERSION, MINOR_VERSION);
+			outman.UserMessage("Running BOINC GARLI-PART Version %.2f.%s (Partitioning Branch) (Nov 2010)\n", MAJOR_VERSION, MINOR_VERSION);
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -315,12 +315,12 @@ int main( int argc, char* argv[] )	{
 			else outman.SetLogFile(temp_buf);
 	#ifdef SUBROUTINE_GARLI
 			//MPI search forking version
-			outman.UserMessage("Running GARLI-PART Version %.2f.%s (Partitioning Branch) (March 2010)\n", MAJOR_VERSION, MINOR_VERSION);
+			outman.UserMessage("Running GARLI-PART Version %.2f.%s (Partitioning Branch) (Nov 2010)\n", MAJOR_VERSION, MINOR_VERSION);
 			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 
 	#else	//nonMPI version
-			outman.UserMessage("Running GARLI-PART Version %.2f.%s (Partitioning Branch) (March 2010)\n", MAJOR_VERSION, MINOR_VERSION);
+			outman.UserMessage("Running GARLI-PART Version %.2f.%s (Partitioning Branch) (Nov 2010)\n", MAJOR_VERSION, MINOR_VERSION);
 	#endif
 
 #endif //end of BOINC / nonBOINC
