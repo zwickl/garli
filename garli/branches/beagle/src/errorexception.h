@@ -19,6 +19,7 @@
 #define ERROREXCEPTION
 
 #include <stdarg.h>
+#include <cassert>
 #include <ostream>
 #include "outputman.h"
 
@@ -29,7 +30,7 @@ extern OutputManager outman;
 class ErrorException{
 	
 	public:
-	char message[400];
+	char message[10000];
 	//this is just a hack to allow using a thrown exception to bail from the program
 	//without actually returning non-zero, so as not to cause scripts to think that it failed
 	bool returnZero;
@@ -37,6 +38,7 @@ class ErrorException{
 		va_list vl;
 		va_start(vl, fmt);
 		vsprintf(message, fmt, vl);
+		assert(strlen(message) < 10000);
 		va_end(vl);
 		returnZero = false;
 		}
