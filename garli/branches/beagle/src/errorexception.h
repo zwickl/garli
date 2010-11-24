@@ -30,7 +30,7 @@ extern OutputManager outman;
 class ErrorException{
 	
 	public:
-	char message[10000];
+	char message[4000];
 	//this is just a hack to allow using a thrown exception to bail from the program
 	//without actually returning non-zero, so as not to cause scripts to think that it failed
 	bool returnZero;
