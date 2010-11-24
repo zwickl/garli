@@ -31,12 +31,12 @@ extern OutputManager outman;
 class ErrorException{
 	
 	public:
-	char message[400];
+	char message[10000];
 	ErrorException(const char *fmt, ...){
-		assert(strlen(fmt) < 400);
 		va_list vl;
 		va_start(vl, fmt);
 		vsprintf(message, fmt, vl);
+		assert(strlen(message) < 10000);
 		va_end(vl);
 		}
 
