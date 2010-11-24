@@ -20,6 +20,7 @@
 
 #include <stdarg.h>
 #include <cassert>
+#include <cstring>
 #include <ostream>
 #include "outputman.h"
 
@@ -30,7 +31,8 @@ extern OutputManager outman;
 class ErrorException{
 	
 	public:
-	char message[10000];
+	char message[5000];
+	//char message[400];
 	ErrorException(const char *fmt, ...){
 		va_list vl;
 		va_start(vl, fmt);

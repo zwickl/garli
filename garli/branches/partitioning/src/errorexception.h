@@ -31,7 +31,7 @@ extern OutputManager outman;
 class ErrorException{
 	
 	public:
-	char message[10000];
+	char message[4000];
 	ErrorException(const char *fmt, ...){
 		va_list vl;
 		va_start(vl, fmt);
