@@ -30,9 +30,9 @@ using namespace std;
 class SequenceData : public DataMatrix{
 public:
 	SequenceData() : DataMatrix()
-		{ maxNumStates=4; strcpy( info, "DNA" ); empStateFreqs=NULL;}
+		{ maxNumStates=4; strcpy( info, "DNA" ); empStateFreqs=NULL; numConditioningPatterns = 0;}
 	SequenceData( int ntax, int nchar ) : DataMatrix( ntax, nchar )
-		{ maxNumStates=4; strcpy( info, "DNA" ); empStateFreqs=NULL;}
+		{ maxNumStates=4; strcpy( info, "DNA" ); empStateFreqs=NULL; numConditioningPatterns = 0;}
 	virtual ~SequenceData() {
 		if(empStateFreqs != NULL) delete []empStateFreqs;
 		}
@@ -656,11 +656,13 @@ public:
 		NSTATEV = 4,
 		ORDNSTATE = 5,
 		ORDNSTATEV = 6,
-		ORIENTEDGAP = 7
+		ORIENTEDGAP = 7,
+		BINARY = 8,
+		BINARY_NOT_ALL_ZEROS = 9
 		}readAs, usedAs;
 	int totalCharacters;
 	int uniqueCharacters;
-	string outputNames[8];//{"Nucleotide data", "Amino acid data", "Codon data"};
+	string outputNames[10];//{"Nucleotide data", "Amino acid data", "Codon data"};
 	DataSubsetInfo(int gssNum, int cbNum, string cbName, int psNum, string psName, type rAs, type uAs) :
 		garliSubsetNum(gssNum), charblockNum(cbNum), charblockName(cbName), partitionSubsetNum(psNum), partitionSubsetName(psName), readAs(rAs), usedAs(uAs){
 			outputNames[NUCLEOTIDE]="Nucleotide data";
@@ -671,6 +673,8 @@ public:
 			outputNames[ORDNSTATE]="Standard ordered k-state data";
 			outputNames[ORDNSTATEV]="Standard ordered k-state data, variable only";
 			outputNames[ORIENTEDGAP]="Gap-coded data, oriented with respect to time";
+			outputNames[BINARY]="Binary data";
+			outputNames[BINARY_NOT_ALL_ZEROS]="Binary data, no constant state 0 chars";
 			}
 	void Report(){
 		outman.UserMessage("GARLI partition subset %d", garliSubsetNum+1);
@@ -730,7 +734,9 @@ class NStateData : public SequenceData{
 		enum{
 			ALL = 0,
 			ONLY_VARIABLE = 1,
-			ONLY_INFORM = 2
+			ONLY_INFORM = 2,
+			BINARY = 3,
+			BINARY_NOT_ALL_ZEROS = 4
 			}datatype;
 		enum{
 			UNORDERED = 0,
@@ -742,8 +748,15 @@ class NStateData : public SequenceData{
 		NStateData(int ns) : SequenceData(){
 			maxNumStates = ns;
 			}
-		NStateData(int ns, bool isMkv, bool isOrdered) : SequenceData(){
-			if(isMkv)
+		//NStateData(int ns, bool isMkv, bool isOrdered) : SequenceData(){'
+		NStateData(int ns, bool isOrdered, bool isBinary, bool isConditioned) : SequenceData(){
+			if(isBinary){
+				if(isConditioned)
+					datatype = BINARY_NOT_ALL_ZEROS;
+				else
+					datatype = BINARY;
+				}
+			else if(isConditioned)
 				datatype = ONLY_VARIABLE;
 			else 
 				datatype = ALL;

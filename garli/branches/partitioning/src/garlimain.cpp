@@ -510,6 +510,7 @@ int main( int argc, char* argv[] )	{
 				else if(modSpec->IsNState())
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATE;
 				else if(modSpec->IsNStateV())
+
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATEV;
 				else if(modSpec->IsOrderedNState())
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORDNSTATE;
@@ -517,6 +518,10 @@ int main( int argc, char* argv[] )	{
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORDNSTATEV;
 				else if(modSpec->IsOrientedGap())
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORIENTEDGAP;
+				else if(modSpec->IsBinaryNotAllZeros())
+					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::BINARY_NOT_ALL_ZEROS;
+				else if(modSpec->IsBinary())
+					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::BINARY;
 
 				dataSubInfo[dataChunk].Report();
 				outman.UserMessage("");
@@ -528,8 +533,13 @@ int main( int argc, char* argv[] )	{
 				int maxObservedStates = effectiveMatrices[dataChunk].first->GetMaxObsNumStates(false);
 				//for Mk the impliedMatrix number is the number of states
 				for(int impliedMatrix = 2;impliedMatrix < (modSpec->IsStandardData() ? maxObservedStates + 1 : 3);impliedMatrix++){
-					if(modSpec->IsStandardData())
-						data = new NStateData(impliedMatrix, (modSpec->IsNStateV() || modSpec->IsOrderedNStateV()), (modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV()));
+					if(modSpec->IsStandardData()){
+						bool isOrdered = (modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV());
+						bool isBinary = modSpec->IsBinary() || modSpec->IsBinaryNotAllZeros();
+						bool isConditioned =  (modSpec->IsNStateV() || modSpec->IsOrderedNStateV() || modSpec->IsBinaryNotAllZeros());
+						//data = new NStateData(impliedMatrix, (modSpec->IsNStateV() || modSpec->IsOrderedNStateV()), (modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV()));
+						data = new NStateData(impliedMatrix, isOrdered, isBinary, isConditioned);
+						}
 					else if(modSpec->IsOrientedGap())
 						data = new OrientedGapData();
 					else if(modSpec->IsAminoAcid() && modSpec->IsCodonAminoAcid() == false)
@@ -629,31 +639,30 @@ int main( int argc, char* argv[] )	{
 						if(modSpec->IsStandardData()){
 							outman.UserMessage("Subset of data with %d states:", impliedMatrix);
 							string chars;
-							data->GetStringOfOrigDataColumns(chars, (modSpec->IsNStateV() || modSpec->IsOrderedNStateV()));
+							data->GetStringOfOrigDataColumns(chars);
 							outman.UserMessage("(chars%s)", chars.c_str());
 							}
 
-						//this accounts for the dummy character stuck into each data subset
+						//this accounts for the dummy character(s) stuck into each data subset
 						//for Mkv.  We don't want the screen output to include it.
-						int mkvDiff = 0;
-						if(modSpec->IsNStateV() || modSpec->IsOrderedNStateV()) mkvDiff = 1;
+						int numCondPats = data->NumConditioningPatterns();
 
 						data->Summarize();
 						outman.UserMessage("\tSummary of data or data subset:");
 						outman.UserMessage("\t%5d sequences.", data->NTax());
-						outman.UserMessage("\t%5d constant characters.", data->NConstant() - mkvDiff);
+						outman.UserMessage("\t%5d constant characters.", data->NConstant() - numCondPats);
 						outman.UserMessage("\t%5d parsimony-informative characters.", data->NInformative());
 						outman.UserMessage("\t%5d autapomorphic characters.", data->NAutapomorphic());
 						int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
 						if(data->NMissing() > 0){
 							outman.UserMessage("\t%5d characters were completely missing or ambiguous (removed).", data->NMissing());
-							outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar() - mkvDiff);
+							outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar() - numCondPats);
 							}
-						else outman.UserMessage("\t%5d total characters.", total - mkvDiff);
+						else outman.UserMessage("\t%5d total characters.", total - numCondPats);
 						outman.flush();
 						
 						data->Collapse();
-						outman.UserMessage("\t%5d unique patterns in compressed data matrix.\n", data->NChar() - mkvDiff);
+						outman.UserMessage("\t%5d unique patterns in compressed data matrix.\n", data->NChar() - numCondPats);
 
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].uniqueCharacters = data->NChar();
