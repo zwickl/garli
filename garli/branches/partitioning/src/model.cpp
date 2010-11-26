@@ -239,7 +239,7 @@ void Model::UpdateQMat(){
 		UpdateQMatAminoAcid();
 		return;
 		}
-	else if(modSpec->IsNState() || modSpec->IsNStateV()){
+	else if(modSpec->IsNState() || modSpec->IsNStateV() || modSpec->IsBinary() || modSpec->IsBinaryNotAllZeros()){
 		UpdateQMatNState();
 		return;
 		}
@@ -2198,6 +2198,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		outman.UserMessage("  Number of states = %d (standard data)", nstates);
 	else if(modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV())
 		outman.UserMessage("  Number of states = %d (ordered standard data)", nstates);
+	else if(modSpec->IsBinary() || modSpec->IsBinaryNotAllZeros())
+		outman.UserMessage("  Number of states = 2 (binary data)");
 	else if(modSpec->IsOrientedGap())
 		outman.UserMessage("  Number of states = 2 (0/1 coding of gaps)");
 	else
@@ -2246,6 +2248,12 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		outman.UserMessage("  Character change matrix: irreversible matrix\n    deletion rate parameter only estimated if using a partitioned\n    model without subset rates");
 		outman.UserMessage("    deletion rate = %.3f", *deleteRate);
 		}
+	else if(modSpec->IsBinary()){
+		outman.UserMessage("  Character change matrix:\n    Binary (2-state symmetric one rate model)");
+		}
+	else if(modSpec->IsBinaryNotAllZeros()){
+		outman.UserMessage("  Character change matrix:\n    Binary, no all-zero columns (2-state symmetric one rate model)");
+		}
 
 	outman.UserMessageNoCR("  Equilibrium State Frequencies: ");
 	if(modSpec->IsEqualStateFrequencies()){
@@ -2256,7 +2264,7 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 			}
 		else if(modSpec->IsAminoAcid())
 			outman.UserMessage("equal (0.05, fixed)");
-		else if(modSpec->IsStandardData())
+		else if(modSpec->IsStandardData() || modSpec->IsBinary() || modSpec->IsBinaryNotAllZeros())
 			outman.UserMessage("equal (%.2f, fixed)", 1.0/nstates);
 		else if(modSpec->IsOrientedGap()){
 			outman.UserMessage("proportion of inserted sites parameter");

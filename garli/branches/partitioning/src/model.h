@@ -348,7 +348,9 @@ public:
 		NSTATEV = 6,
 		ORDNSTATE = 7,
 		ORDNSTATEV = 8,
-		ORIENTEDGAP = 9
+		ORIENTEDGAP = 9,
+		BINARY = 10,
+		BINARY_NOTALLZEROS = 11
 
 		}datatype;
 	
@@ -416,8 +418,10 @@ public:
 	bool IsNStateV() const {return datatype == NSTATEV;}
 	bool IsOrderedNStateV() const {return datatype == ORDNSTATEV;}
 	bool IsOrientedGap() const {return datatype == ORIENTEDGAP;}
+	bool IsBinary() const {return datatype == BINARY;}
+	bool IsBinaryNotAllZeros() const {return datatype == BINARY_NOTALLZEROS;}
 
-	bool IsStandardData() const {return datatype == NSTATE || datatype == NSTATEV || datatype == ORDNSTATE || datatype == ORDNSTATEV;}
+	bool IsStandardData() const {return (IsNState() || IsNStateV() || IsOrderedNState() || IsOrderedNStateV() || IsBinary() || IsBinaryNotAllZeros() || IsOrientedGap());}
 
 	bool GotAnyParametersFromFile() const{
 		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile || gotInsertFromFile || gotDeleteFromFile;
@@ -525,6 +529,24 @@ public:
 		rateMatrix = NST1;
 		stateFrequencies = EQUAL;
 		nstates = 3;
+		fixRelativeRates=true;
+		fixStateFreqs=true;
+		}
+
+	void SetBinary(){
+		datatype = BINARY;
+		rateMatrix = NST1;
+		stateFrequencies = EQUAL;
+		nstates = 2;
+		fixRelativeRates=true;
+		fixStateFreqs=true;
+		}
+
+	void SetBinaryNotAllZeros(){
+		datatype = BINARY_NOTALLZEROS;
+		rateMatrix = NST1;
+		stateFrequencies = EQUAL;
+		nstates = 2;
 		fixRelativeRates=true;
 		fixStateFreqs=true;
 		}
@@ -806,9 +828,11 @@ public:
 		else if(_stricmp(str, "standardvariable") == 0) SetNStateV();
 		else if(_stricmp(str, "standardorderedvariable") == 0) SetOrderedNStateV();
 		else if(_stricmp(str, "mkv") == 0) SetNStateV();
-		else if(_stricmp(str, "gapmixturemodel") == 0) SetOrientedGap();
+		else if(_stricmp(str, "indelmixturemodel") == 0) SetOrientedGap();
 		else if(_stricmp(str, "orientedgap") == 0) SetOrientedGap();
-		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, nucleotide, standard[ordered], standardvariable[ordered], gapmixturemodel)", str));
+		else if(_stricmp(str, "binary") == 0) SetBinary();
+		else if(_stricmp(str, "binarynotallzeros") == 0) SetBinaryNotAllZeros();
+		else throw(ErrorException("Unknown setting for datatype: %s\n\t(options are: codon, codon-aminoacid, aminoacid, nucleotide, standard[ordered], standardvariable[ordered], indelmixturemodel, binary, binarynotallzeros)", str));
 		}
 	void SetGeneticCode(const char *str){
 		if(datatype != DNA && datatype != RNA){
@@ -1057,6 +1081,8 @@ class Model{
 	bool IsNStateV() const {return modSpec->IsNStateV();}
 	bool IsOrderedNState() const {return modSpec->IsOrderedNState();}
 	bool IsOrderedNStateV() const {return modSpec->IsOrderedNStateV();}
+	bool IsBinary() const {return modSpec->IsBinary();}
+	bool IsBinaryNotAllZeros() const {return modSpec->IsBinaryNotAllZeros();}
 	const ModelSpecification *GetModSpec() const {return modSpec;}
 	
 	FLOAT_TYPE InsertRate() const {return *insertRate;}
