@@ -3701,7 +3701,6 @@ int Tree::Score(int rootNodeNum /*=0*/){
 		dirtyEQ=false;
 		}
 #endif
-
 	bool scoreOK=true;
 	do{
 		try{
@@ -4938,14 +4937,6 @@ void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *
 	//output level 2 is for debugging, includes underflow multipliers and output of site likes in packed order
 	const SequenceData *data = dataPart->GetSubset(partNum);
 
-	bool isMkv = false;
-	const NStateData *temp = dynamic_cast<const NStateData*>(data);
-	if(temp){
-		if(temp->datatype == NStateData::ONLY_VARIABLE){
-			isMkv = true;
-			}
-		}
-	
 	assert(sitelikeLevel != 0);
 	//a negative sitelike level means append, but the absolute value meanings are the same
 	bool append = sitelikeLevel < 0;
@@ -4969,7 +4960,7 @@ void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *
 	ordered.precision(8);
 	packed.precision(8);
 	
-	for(int site = (isMkv ? 1 : 0);site < data->GapsIncludedNChar();site++){
+	for(int site = data->NumConditioningPatterns();site < data->GapsIncludedNChar();site++){
 		int col = data->Number(site);
 		int origCol = data->OrigDataNumber(site);
 		if(col == -1){
@@ -5054,14 +5045,16 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	const int lastConst=data->LastConstant();
 	const int *conStates=data->GetConstStates();
 	const FLOAT_TYPE prI=mod->PropInvar();
+	const int numCondPats = data->NumConditioningPatterns();
 
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
 	FLOAT_TYPE siteL, totallnL = ZERO_POINT_ZERO, unscaledlnL = ZERO_POINT_ZERO;
-	FLOAT_TYPE MkvScaler = ZERO_POINT_ZERO;
-
+	FLOAT_TYPE logConditioningFactor = ZERO_POINT_ZERO;
+	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
+	
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
@@ -5115,20 +5108,26 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
 
-				if(mod->IsNStateV() || mod->IsOrderedNStateV()){
+				if(numCondPats > 0){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
-					if(i == 0){
+					if(i < numCondPats){
 						if(underflow_mult[i] == 0)
-							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
-						else{ 
-							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[0], exp((double)(partialCLA->underflow_mult[0])));
-							MkvScaler = log(ONE_POINT_ZERO - nstates * siteL / exp((FLOAT_TYPE)partialCLA->underflow_mult[0]));
-							//MkvScaler = ZERO_POINT_ZERO;
+							conditioningLikeSum += siteL;
+						else{
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", (underflow_mult[i]), exp((double)underflow_mult[i]));
+							double unscaler = exp((FLOAT_TYPE)underflow_mult[i]);
+							//Guard against this over or underflowing, which I think are very unlikely. If it does, just ignore this siteL
+							if(unscaler == unscaler){
+								double unscaled = siteL / unscaler;
+								if(unscaled == unscaled)
+									conditioningLikeSum += unscaled;
+								}
 							}
-
+						if(i == numCondPats - 1)
+							logConditioningFactor = -log(ONE_POINT_ZERO - conditioningLikeSum);
 						}
 					else{
-						unscaledlnL += MkvScaler;
+						unscaledlnL += logConditioningFactor;
 						totallnL += (countit[i] * unscaledlnL);
 						}
 					assert(unscaledlnL < ZERO_POINT_ZERO);
@@ -5204,19 +5203,26 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
 
-				if(mod->IsNStateV() || mod->IsOrderedNStateV()){
+				if(numCondPats > 0){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
-					if(i == 0){
+					if(i < numCondPats){
 						if(underflow_mult[i] == 0)
-							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
+							conditioningLikeSum += siteL;
 						else{
-							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", underflow_mult[0], exp((double)(underflow_mult[0])));
-							MkvScaler = log(ONE_POINT_ZERO - nstates * siteL / exp((FLOAT_TYPE)underflow_mult[0]));
-							//MkvScaler = ZERO_POINT_ZERO;
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", (underflow_mult[i], exp((double)underflow_mult[i])));
+							double unscaler = exp((FLOAT_TYPE)underflow_mult[i]);
+							//Guard against this over or underflowing, which I think are very unlikely. If it does, just ignore this siteL
+							if(unscaler == unscaler){
+								double unscaled = siteL / unscaler;
+								if(unscaled == unscaled)
+									conditioningLikeSum += unscaled;
+								}
 							}
+						if(i == numCondPats - 1)
+							logConditioningFactor = -log(ONE_POINT_ZERO - conditioningLikeSum);
 						}
 					else{
-						unscaledlnL += MkvScaler;
+						unscaledlnL += logConditioningFactor;
 						totallnL += (countit[i] * unscaledlnL);
 						}
 					assert(unscaledlnL < ZERO_POINT_ZERO);
@@ -5658,6 +5664,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	const FLOAT_TYPE prI=mod->PropInvar();
 	const int lastConst=data->LastConstant();
 	const int *conStates=data->GetConstStates();
+	const int numCondPats = data->NumConditioningPatterns();
 
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
@@ -5666,7 +5673,8 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 
 	FLOAT_TYPE totallnL=ZERO_POINT_ZERO, siteL;
 	FLOAT_TYPE unscaledlnL;
-	FLOAT_TYPE MkvScaler=ZERO_POINT_ZERO;
+	FLOAT_TYPE logConditioningFactor = ZERO_POINT_ZERO;
+	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
@@ -5714,19 +5722,26 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
 
-				if(mod->IsNStateV() || mod->IsOrderedNStateV()){
+				if(numCondPats > 0){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
-					if(i == 0){
-						if(underflow_mult1[0] + underflow_mult2[0] == 0)
-							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
+					if(i < numCondPats){
+						if(underflow_mult1[i] + underflow_mult2[i] == 0)
+							conditioningLikeSum += siteL;
 						else{
-							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", (underflow_mult1[0] + underflow_mult2[0]), exp((double)underflow_mult1[0] + underflow_mult2[0]));
-							MkvScaler = log(ONE_POINT_ZERO - nstates * siteL / exp((FLOAT_TYPE)underflow_mult1[0] + underflow_mult2[0]));
-							//MkvScaler = ZERO_POINT_ZERO;
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", (underflow_mult1[i] + underflow_mult2[i]), exp((double)underflow_mult1[i] + underflow_mult2[i]));
+							double unscaler = exp((FLOAT_TYPE)underflow_mult1[i] + underflow_mult2[i]);
+							//Guard against this over or underflowing, which I think are very unlikely. If it does, just ignore this siteL
+							if(unscaler == unscaler){
+								double unscaled = siteL / unscaler;
+								if(unscaled == unscaled)
+									conditioningLikeSum += unscaled;
+								}
 							}
+						if(i == numCondPats - 1)
+							logConditioningFactor = -log(ONE_POINT_ZERO - conditioningLikeSum);
 						}
 					else{
-						unscaledlnL += MkvScaler;
+						unscaledlnL += logConditioningFactor;
 						totallnL += (countit[i] * unscaledlnL);
 						}
 					assert(unscaledlnL < ZERO_POINT_ZERO);
@@ -5795,19 +5810,25 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				//partial tree during stepwise addition) can cause the unscaledlnL to be slightly
 				//> zero.  If that is the case, just ignore it
 
-				if(mod->IsNStateV() || mod->IsOrderedNStateV()){
+				if(numCondPats > 0){
 					assert(unscaledlnL < ZERO_POINT_ZERO);
-					if(i == 0){
-						if(underflow_mult1[0] + underflow_mult2[0] == 0)
-							MkvScaler = -log(ONE_POINT_ZERO - nstates * siteL);
-						else{
-							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", (underflow_mult1[0] + underflow_mult2[0]), exp((double)underflow_mult1[0] + underflow_mult2[0]));
-							MkvScaler = log(ONE_POINT_ZERO - nstates * siteL / exp((FLOAT_TYPE)underflow_mult1[0] + underflow_mult2[0]));
-							//MkvScaler = ZERO_POINT_ZERO;
+					if(i < numCondPats){
+						if(underflow_mult1[i] + underflow_mult2[i] == 0)
+							conditioningLikeSum += siteL;
+						else
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", (underflow_mult1[i] + underflow_mult2[i]), exp((double)underflow_mult1[i] + underflow_mult2[i]));
+							double unscaler = exp((FLOAT_TYPE)underflow_mult1[i] + underflow_mult2[i]);
+							//Guard against this over or underflowing, which I think are very unlikely. If it does, just ignore this siteL
+							if(unscaler == unscaler){
+								double unscaled = siteL / unscaler;
+								if(unscaled == unscaled)
+									conditioningLikeSum += unscaled;
+								}
 							}
-						}
+						if(i == numCondPats - 1)
+							logConditioningFactor = -log(ONE_POINT_ZERO - conditioningLikeSum);
 					else{
-						unscaledlnL += MkvScaler;
+						unscaledlnL += logConditioningFactor;
 						totallnL += (countit[i] * unscaledlnL);
 						}
 					assert(unscaledlnL < ZERO_POINT_ZERO);
