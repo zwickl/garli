@@ -96,7 +96,8 @@ protected:
 	FLOAT_TYPE*	stateDistr;
 	int		stateDistrComputed;
 	int		currentBootstrapSeed;
-	
+	unsigned numConditioningPatterns;
+
 	protected:
 		int*	numStates;
 		int		dmFlags;
@@ -131,13 +132,13 @@ protected:
 		DataMatrix() : dmFlags(0), dense(0), nTax(0), nTaxAllocated(0), nChar(0), matrix(0), count(0)
 			, number(0), origDataNumber(0), taxonLabel(0), numStates(0), stateDistr(0)
 			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
-			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
+			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0), numConditioningPatterns(0)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
 			: nTax(ntax), nTaxAllocated(0), nChar(nchar), dmFlags(0), dense(0), matrix(0), count(0)
 			, number(0), origDataNumber(0), taxonLabel(0), numStates(0), stateDistr(0)
 			, nMissing(0), nConstant(0), nInformative(0), nAutapomorphic(0), stateDistrComputed(0),
-			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0)
+			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0), numConditioningPatterns(0)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
 		virtual ~DataMatrix();
 
@@ -179,6 +180,7 @@ protected:
 		int TotalNChar() const { return totalNChar; }
 		int GapsIncludedNChar() const { return gapsIncludedNChar; }
 		void SetNChar(int nchar) { nChar = nchar; }
+		unsigned NumConditioningPatterns() const{return numConditioningPatterns;}
 
 		void Flush() { NewMatrix( 0, 0 ); }
 		int Dense() const { return dense; }
@@ -271,7 +273,7 @@ protected:
 		bool operator==(const DataMatrix& rhs) const; // cjb - to test serialization
 		void ExplicitDestructor();  // cjb - totally clear the DataMatrix and revert it to its original state as if it was just constructed
 		void CheckForIdenticalTaxonNames();
-		void GetStringOfOrigDataColumns(string &str, bool skipFirst);
+		void GetStringOfOrigDataColumns(string &str) const;
 
 	public:	// exception classes
 #if defined( CPLUSPLUS_EXCEPTIONS )
