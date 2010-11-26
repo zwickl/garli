@@ -932,36 +932,86 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 		int ns = charblock->GetObsNumStates(num, false);
 		if(ns == 1)
 			consts.insert(num);
+		//the maxNumStates == 2 part here is so that the message is only output when reading the first standard data matrix
 		else if(ns == 0 && maxNumStates == 2)
 			outman.UserMessage("NOTE: entirely missing character #%d removed from matrix.", num+1);
-		if(ns != maxNumStates){
+		if(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS){
+			if(ns > 2){
+				throw ErrorException("More than two character states found in binary data (character %d)!", num + 1);  
+				}
+			}
+		//In all cases zero-state characters are tossed.  If not binary data, toss any char with #states not equal to the 
+		//prespecified maxNumStates for this matrix.  For binary data accept all chars with > 0 states (because any with > 2
+		//should already have caused an error above)
+		if(ns == 0 || (ns != maxNumStates && !(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS))){
 			realCharSet->erase(num);
 			}
 		}
-	if(consts.size() > 0 && datatype == ONLY_VARIABLE){
+
+	//verify that we're not breaking the assumptions of these datatypes
+	if(consts.size() > 0 && (datatype == ONLY_VARIABLE || datatype == BINARY_NOT_ALL_ZEROS)){
 		string c = NxsSetReader::GetSetAsNexusString(consts);
-		throw ErrorException("Constant characters are not allowed when using the Mkv\n\tmodel (as opposed to Mk), because it assumes that all\n\tcharacters are variable.  Change to datatype = standard\n\tor exclude them by adding this to your nexus datafile:\nbegin assumptions;\nexset * const = %s;\nend;", c.c_str());
+		if(datatype == BINARY_NOT_ALL_ZEROS){
+			for(NxsUnsignedSet::iterator cit = consts.begin(); cit != consts.end();){
+				int num = *cit;
+				cit++;
+				std::set<NxsDiscreteStateCell> states = charblock->GetNamedStateSetOfColumn(num);
+				assert(states.size() == 1);
+				if(states.find(0) == states.end())
+					consts.erase(num);
+				}
+			if(consts.size() > 0){
+				string c = NxsSetReader::GetSetAsNexusString(consts);
+				throw ErrorException("Constant characters of state 0 are not allowed when using the binarynotallzeros datatype (as opposed to plain binary).\nChange to datatype = binary\n\tor exclude them by adding this to your nexus datafile:\nbegin assumptions;\nexset * const = %s;\nend;", c.c_str());  
+				}
+			}
+		else{
+			string c = NxsSetReader::GetSetAsNexusString(consts);
+			throw ErrorException("Constant characters are not allowed when using the Mkv\n\tmodel (as opposed to Mk), because it assumes that all\n\tcharacters are variable.  Change to datatype = standard\n\tor exclude them by adding this to your nexus datafile:\nbegin assumptions;\nexset * const = %s;\nend;", c.c_str());
+			}
+		}
+	//maxNumStates = 2 here is only so that the message is output when creating the first standard matrix
+	else if(consts.size() > 0 && !(datatype == BINARY) && maxNumStates == 2){
+		string c = NxsSetReader::GetSetAsNexusString(consts);
+		outman.UserMessage("WARNING - Constant characters found in standard data matrix (sites %s)", c.c_str());
+		outman.UserMessage("Currently these will be ignored because including them in the likelihood");
+		outman.UserMessage("calculations would require knowledge of how many states were possible for");
+		outman.UserMessage("those columns (i.e., 1 state was observed, but was that out of 2 possible,");
+		outman.UserMessage("or 3 or 4, etc)\n#####################################");
 		}
 
 	if(realCharSet->size() == 0)
 		return;
 
-	//make room for a dummy constant character here
-	if(datatype == ONLY_VARIABLE)
-		NewMatrix( numActiveTaxa, realCharSet->size() + 1);
-	else
-		NewMatrix( numActiveTaxa, realCharSet->size());
+	//Make room for dummy conditioning (generally constant) character(s) here.
+	//For anything besides BINARY_NOT_ALL_ZEROS the # will be equal to maxNumStates
+	//although for symetrical Mkv that many are not needed because they are all equal
+	//it defaults to zero in the constructor
+	if(datatype == ONLY_VARIABLE || datatype == BINARY_NOT_ALL_ZEROS){
+		if(datatype == BINARY_NOT_ALL_ZEROS)
+			numConditioningPatterns = 1;
+		else
+			numConditioningPatterns = maxNumStates;
+		}
+
+	NewMatrix( numActiveTaxa, realCharSet->size() + numConditioningPatterns);
 
 	map<int, int> nclStateIndexToGarliState;
 	vector< map<int, int> > stateMaps;
 
-	if(modeltype == UNORDERED){
+	bool recodeSkipped = false;
+	if(modeltype == UNORDERED && !(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS))
+		recodeSkipped = true;
+
+	if(recodeSkipped){
 		//Recode characters that skip states (assuming numerical order of states) to not skip any.  i.e., recode a
 		//char with states 0 1 5 7 to 0 1 2 3 and assume that it has 4 states
 		//With assumptions block "options gapmode=newstate" things get even more confusing.  GetNamedStateSetOfColumn
 		//returns the gap as a code of -2, in which case the mapping would be -2 0 1 5 7 -> 0 1 2 3 4 5 
-		if(datatype == ONLY_VARIABLE)		
-			stateMaps.push_back(nclStateIndexToGarliState);
+		if(datatype == ONLY_VARIABLE)
+			//add in the conditioning patterns such that the character numbers match up later
+			for(int i = 0;i < numConditioningPatterns;i++)
+				stateMaps.push_back(nclStateIndexToGarliState);
 
 		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){
 			set<int> stateSet = charblock->GetNamedStateSetOfColumn(*cit);
@@ -989,11 +1039,14 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 			SetTaxonLabel(effectiveTax, NxsString::GetEscaped(tlabel).c_str());
 			
 			int effectiveChar = 0;
-			//add the dummy constant character
-			if(datatype == ONLY_VARIABLE){
-				if(effectiveTax == 0)
-					SetOriginalDataNumber(0, -1);
-				SetMatrix( effectiveTax, effectiveChar++, 0);
+			//add the dummy constant character(s).  This will be one of each possible constant
+			//state, except for BINARY_NOT_ALL_ZEROS, where it will be only state 0
+			if(numConditioningPatterns > 0){
+				for(int s = 0; s < (datatype == BINARY_NOT_ALL_ZEROS ? 1 : maxNumStates); s ++){
+					if(effectiveTax == 0)
+						SetOriginalDataNumber(s, -1);
+					SetMatrix( effectiveTax, effectiveChar++, s);
+					}
 				}
 
 			bool firstAmbig = true;
@@ -1002,10 +1055,12 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 					SetOriginalDataNumber(effectiveChar, *cit);
 				unsigned char datum = '\0';
 				if(charblock->IsGapState(origTaxIndex, *cit) == true){
+					if(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS)
+						throw ErrorException("Cannot use gap characters with binary datatype.  Recode to 0 and 1");
 					//if gapmode=newstate is on (default is gapmode=missing) then need handle the gap properly
 					//changes in NCL should now have it correctly reporting the number of states with gaps {in, ex}cluded
 					if(charblock->GetGapModeSetting() == CharactersBlock::GAP_MODE_NEWSTATE){
-						if(modeltype == UNORDERED){
+						if(recodeSkipped){
 							datum = stateMaps[effectiveChar][NXS_GAP_STATE_CODE];
 							}
 						else{
@@ -1026,7 +1081,7 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 					//just convert to full ambiguity
 					if(nstates == 1){
 						int nclIndex = charblock->GetStateIndex(origTaxIndex, *cit, 0);
-						if(modeltype == UNORDERED)
+						if(recodeSkipped)
 							datum = stateMaps[effectiveChar][nclIndex];
 						else 
 							datum = nclIndex;
@@ -1049,8 +1104,8 @@ void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 	//verify that every allowed state was observed for each character
 #ifndef NDEBUG
 	bool found;
-	if(modeltype == UNORDERED){
-		for(int c = (datatype == ONLY_VARIABLE ? 1 : 0);c < nChar;c++){
+	if(recodeSkipped){
+		for(int c = numConditioningPatterns;c < nChar;c++){
 			for(int s = 0;s < maxNumStates;s++){
 				found = false;
 				for(int t = 0;t < nTax;t++){
@@ -1183,11 +1238,14 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 
 	bool allGapChar = true;
 
+	//Make room for dummy conditioning (all zero) character here.
+	//it defaults to zero in the constructor
+	if(datatype == ONLY_VARIABLE || allGapChar){
+		numConditioningPatterns = 1;
+		}
+
 	//make room for a dummy constant character here
-	if(datatype == ONLY_VARIABLE || allGapChar)
-		NewMatrix( numActiveTaxa, realCharSet->size() + 1);
-	else
-		NewMatrix( numActiveTaxa, realCharSet->size());
+	NewMatrix( numActiveTaxa, realCharSet->size() + numConditioningPatterns);
 
 	// read in the data, including taxon names
 	int effectiveTax=0;
@@ -1200,7 +1258,7 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 			
 			int effectiveChar = 0;
 			//add the dummy character
-			if(datatype == ONLY_VARIABLE || allGapChar){
+			if(numConditioningPatterns > 0){
 				if(effectiveTax == 0)
 					SetOriginalDataNumber(0, -1);
 				SetMatrix( effectiveTax, effectiveChar++, 0);
