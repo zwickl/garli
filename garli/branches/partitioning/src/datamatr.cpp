@@ -1821,11 +1821,11 @@ void DataMatrix::CheckForIdenticalTaxonNames(){
 		}
 	}
 
-void DataMatrix::GetStringOfOrigDataColumns(string &str, bool skipFirst){
+void DataMatrix::GetStringOfOrigDataColumns(string &str) const{
 	//note that GetSetAsNexusString takes zero offset indeces and converts them to
 	//char nums, ie adds 1 to each
 	NxsUnsignedSet chars;
-	for(int c = (skipFirst ? 1 : 0);c < GapsIncludedNChar();c++)
+	for(int c = numConditioningPatterns;c < GapsIncludedNChar();c++)
 		chars.insert(origDataNumber[c]);
 	str = NxsSetReader::GetSetAsNexusString(chars);
 	}
