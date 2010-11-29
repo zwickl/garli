@@ -4960,7 +4960,9 @@ void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *
 	ordered.precision(8);
 	packed.precision(8);
 	
-	for(int site = data->NumConditioningPatterns();site < data->GapsIncludedNChar();site++){
+	int startPat = (effectiveSitelikeLevel > 1 ? 0 : data->NumConditioningPatterns());
+
+	for(int site = startPat;site < data->GapsIncludedNChar();site++){
 		int col = data->Number(site);
 		int origCol = data->OrigDataNumber(site);
 		if(col == -1){
