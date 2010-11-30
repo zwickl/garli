@@ -2803,7 +2803,7 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 		BetterFinalOptimization();
 
 		outman.UserMessage("Writing site likelihoods for tree %d ...", t);
-		indiv[0].treeStruct->sitelikeLevel = - (max(conf->outputSitelikelihoods, 1));
+		indiv[0].treeStruct->sitelikeLevel = - (max((int) conf->outputSitelikelihoods, 1));
 		indiv[0].treeStruct->ofprefix = conf->ofprefix;
 		indiv[0].treeStruct->Score();
 		
