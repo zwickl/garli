@@ -1556,6 +1556,10 @@ void Population::ReadPopulationCheckpoint(){
 
 	if(gen == UINT_MAX) finishedRep = true;
 
+	//DEBUG
+	ofstream mods("CHECKMODS.log");
+	mods << bestFitness << endl;
+
 	for(unsigned i=0;i<total_size;i++){
 		indiv[i].mod->SetDefaultModelParameters(data);
 		indiv[i].mod->ReadBinaryFormattedModel(pin);
@@ -1566,7 +1570,15 @@ void Population::ReadPopulationCheckpoint(){
 		indiv[i].SetDirty();
 		indiv[i].treeStruct->root->CheckTreeFormation();
 		indiv[i].CalcFitness(0);
+
+		//DEBUG
+		string modstr;
+		indiv[i].mod->FillGarliFormattedModelString(modstr);
+		mods << indiv[i].treeStruct->lnL << "\n" << modstr.c_str() << endl;
 		}
+
+	//DEBUG
+	mods.close();
 
 	//if we are doing multiple reps, there should have been one tree per completed rep written to file
 	//remember that currentSearchRep starts at 1
@@ -2811,7 +2823,7 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 		FinalOptimization();
 
 		outman.UserMessage("Writing site likelihoods for tree %d ...", t);
-		indiv[0].treeStruct->sitelikeLevel = - (max(conf->outputSitelikelihoods, 1));
+	indiv[0].treeStruct->sitelikeLevel = - (max((int) conf->outputSitelikelihoods, 1));
 		indiv[0].treeStruct->ofprefix = conf->ofprefix;
 		indiv[0].treeStruct->Score();
 		
