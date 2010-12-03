@@ -1355,7 +1355,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 				}
 			}
 		}
-	else if(modSpec->IsStandardData()){
+	else if(modSpec->IsMkTypeModel()){
 		for(int rate=0;rate<NRateCats();rate++){
 			int model=0;
 			const unsigned rateOffset = nstates*rate;
@@ -2264,7 +2264,7 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 			}
 		else if(modSpec->IsAminoAcid())
 			outman.UserMessage("equal (0.05, fixed)");
-		else if(modSpec->IsStandardData() || modSpec->IsBinary() || modSpec->IsBinaryNotAllZeros())
+		else if(modSpec->IsMkTypeModel())
 			outman.UserMessage("equal (%.2f, fixed)", 1.0/nstates);
 		else if(modSpec->IsOrientedGap()){
 			outman.UserMessage("proportion of inserted sites parameter");
@@ -2818,7 +2818,7 @@ void Model::CreateModelFromSpecification(int modnum){
 		//require the Eigen stuff	
 
 	if(modSpec->IsNucleotide()) UpdateQMat();
-	else if(modSpec->IsStandardData() || modSpec->IsOrientedGap()){
+	else if(modSpec->IsMkTypeModel() || modSpec->IsOrientedGap()){
 		//NSTATE - nothing needs to be done here right now
 		}
 	else if(modSpec->IsCodon()){

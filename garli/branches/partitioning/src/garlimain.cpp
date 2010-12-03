@@ -497,7 +497,7 @@ int main( int argc, char* argv[] )	{
 					modSpec = modSpecSet.GetModSpec(0);
 					claSpecs.push_back(ClaSpecifier(0,0,0));
 					}
-				if(conf.linkModels && (modSpec->IsStandardData() || modSpec->IsOrientedGap()))
+				if(conf.linkModels && (modSpec->IsMkTypeModel() || modSpec->IsOrientedGap()))
 					throw ErrorException("Model linkage cannot be used with Mk/Mkv models (nor does it\n\tneed to be, since there are no estimated parameters).\n\tSet linkmodels = 0");
 
 				//defaults here are NUCLEOTIDE, so make changes as necessary
@@ -532,8 +532,8 @@ int main( int argc, char* argv[] )	{
 				int actuallyUsedImpliedMatrixIndex = 0;
 				int maxObservedStates = effectiveMatrices[dataChunk].first->GetMaxObsNumStates(false);
 				//for Mk the impliedMatrix number is the number of states
-				for(int impliedMatrix = 2;impliedMatrix < (modSpec->IsStandardData() ? maxObservedStates + 1 : 3);impliedMatrix++){
-					if(modSpec->IsStandardData()){
+				for(int impliedMatrix = 2;impliedMatrix < (modSpec->IsMkTypeModel() ? maxObservedStates + 1 : 3);impliedMatrix++){
+					if(modSpec->IsMkTypeModel() && !modSpec->IsOrientedGap()){
 						bool isOrdered = (modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV());
 						bool isBinary = modSpec->IsBinary() || modSpec->IsBinaryNotAllZeros();
 						bool isConditioned =  (modSpec->IsNStateV() || modSpec->IsOrderedNStateV() || modSpec->IsBinaryNotAllZeros());
@@ -560,12 +560,12 @@ int main( int argc, char* argv[] )	{
 						//totally excluded subsets, but that gets complicated because it
 						//isn't clear how the indexing of models specified in the config
 						//file should work
-						assert(modSpec->IsStandardData());
+						assert(modSpec->IsMkTypeModel());
 						outman.UserMessage("NOTE: No characters found with %d observed states.", impliedMatrix);
 						delete data;
 						}
 					else{//now we have a data matrix object created, already filtered for the correct sites or number of states
-						if(modSpec->IsStandardData()){
+						if(modSpec->IsMkTypeModel()){
 #ifdef OPEN_MP
 							throw ErrorException("Sorry, discrete Mk type models cannot currently be used with the OpenMP version");
 #endif
@@ -636,7 +636,7 @@ int main( int argc, char* argv[] )	{
 				
 						dataPart.AddSubset(data);
 
-						if(modSpec->IsStandardData()){
+						if(modSpec->IsMkTypeModel()){
 							outman.UserMessage("Subset of data with %d states:", impliedMatrix);
 							string chars;
 							data->GetStringOfOrigDataColumns(chars);
@@ -671,7 +671,7 @@ int main( int argc, char* argv[] )	{
 						//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 						data->ReserveOriginalCounts();
 						
-						if(!(modSpec->IsStandardData() || modSpec->IsOrientedGap()))
+						if(!(modSpec->IsMkTypeModel() || modSpec->IsOrientedGap()))
 							data->DetermineConstantSites();
 						}
 					}
