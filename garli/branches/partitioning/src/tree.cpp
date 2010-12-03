@@ -186,8 +186,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 	string outString = conf->outgroupString;
 
 	if(someOrientedGap){
-		//DEBUG
-		Tree::rescaleEvery = 2;
+		//Tree::rescaleEvery = 2;
 		Tree::rootWithDummy = true;
 		Tree::useOptBoundedForBlen = true;
 		//set the dummy taxon as the effective outgroup
@@ -432,13 +431,14 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			numNodesAdded++;
 			numTipsAdded++;
 			}
-		else if(numNodesAdded == numNodesTotal - 3){
+		//else if(numNodesAdded == numNodesTotal - 3){
+		else if( dummyRoot->attached == false ){
 			//tree didn't have dummy in it, nor was it rooted.  Toss in anywhere
 			int connector = numNodesTotal - 2;
 			AddRandomNode(numTipsTotal, connector);
 			}
 		else//the input tree must have had the dummy in it already
-			assert(dummyRoot->attached = true);
+			assert(dummyRoot->attached == true);
 		}
 
 	if(root->left->next==root->right){

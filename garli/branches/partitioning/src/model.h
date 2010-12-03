@@ -421,7 +421,8 @@ public:
 	bool IsBinary() const {return datatype == BINARY;}
 	bool IsBinaryNotAllZeros() const {return datatype == BINARY_NOTALLZEROS;}
 
-	bool IsStandardData() const {return (IsNState() || IsNStateV() || IsOrderedNState() || IsOrderedNStateV() || IsBinary() || IsBinaryNotAllZeros() || IsOrientedGap());}
+	//DO NOT INCLUDE OrientedGap here!
+	bool IsMkTypeModel() const {return (IsNState() || IsNStateV() || IsOrderedNState() || IsOrderedNStateV() || IsBinary() || IsBinaryNotAllZeros());}
 
 	bool GotAnyParametersFromFile() const{
 		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile || gotInsertFromFile || gotDeleteFromFile;
@@ -829,6 +830,7 @@ public:
 		else if(_stricmp(str, "standardorderedvariable") == 0) SetOrderedNStateV();
 		else if(_stricmp(str, "mkv") == 0) SetNStateV();
 		else if(_stricmp(str, "indelmixturemodel") == 0) SetOrientedGap();
+		else if(_stricmp(str, "gapmixturemodel") == 0) SetOrientedGap();
 		else if(_stricmp(str, "orientedgap") == 0) SetOrientedGap();
 		else if(_stricmp(str, "binary") == 0) SetBinary();
 		else if(_stricmp(str, "binarynotallzeros") == 0) SetBinaryNotAllZeros();
