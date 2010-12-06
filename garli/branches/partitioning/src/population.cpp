@@ -2886,8 +2886,10 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 		if(indiv[0].modPart.GetModel(m)->IsOrientedGap()){
 			indiv[0].modPart.GetModel(m)->SetInsertRate(0, initIns);
 			indiv[0].modPart.GetModel(m)->SetDeleteRate(0, initDel);
+			indiv[0].treeStruct->MakeAllNodesDirty();
 			}
 		}
+	indiv[0].CalcFitness(0);
 
 	//copy the tree and model into indiv[1]
 	outman.UserMessage("Rooting at nodes across tree...");
@@ -2906,6 +2908,7 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 		//optimize the result
 		bestIndiv = 1;
 		indiv[bestIndiv].CalcFitness(0);
+		bestFitness = indiv[bestIndiv].Fitness();
 
 		//this will make the various trees have different names when they are appended to the treelog
 		//in BetterFinalOpt
