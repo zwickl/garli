@@ -653,7 +653,7 @@ int main( int argc, char* argv[] )	{
 						outman.UserMessage("\t%5d constant characters.", data->NConstant() - numCondPats);
 						outman.UserMessage("\t%5d parsimony-informative characters.", data->NInformative());
 						outman.UserMessage("\t%5d autapomorphic characters.", data->NAutapomorphic());
-						int total = data->NConstant() + data->NInformative() + data->NAutapomorphic();
+						int total = data->NConstant() + data->NInformative() + data->NAutapomorphic() - numCondPats;
 						if(data->NMissing() > 0){
 							outman.UserMessage("\t%5d characters were completely missing or ambiguous (removed).", data->NMissing());
 							outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar() - numCondPats);
