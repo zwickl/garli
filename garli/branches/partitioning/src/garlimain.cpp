@@ -658,7 +658,7 @@ int main( int argc, char* argv[] )	{
 							outman.UserMessage("\t%5d characters were completely missing or ambiguous (removed).", data->NMissing());
 							outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar() - numCondPats);
 							}
-						else outman.UserMessage("\t%5d total characters.", total - numCondPats);
+						else outman.UserMessage("\t%5d total characters.", total);
 						outman.flush();
 						
 						data->Collapse();
