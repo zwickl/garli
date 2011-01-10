@@ -179,18 +179,28 @@ void InterruptMessage( int )
 	askQuitNow = 1;
 }
 
-void CatchInterrupt()
-{
+void TurnOnSignalCatching()
+{//if SIGINT (generally Ctrl-C) isn't already set to be ignored, set it to the custom handler 
 	if( signal( SIGINT, SIG_IGN ) != SIG_IGN ){
 		signal( SIGINT, InterruptMessage );
 		}
 }
 
+void TurnOffSignalCatching()
+{//if SIGINT (generally Ctrl-C) isn't already set to be ignored, set it back to the default
+	if( signal( SIGINT, SIG_IGN ) != SIG_IGN ){
+		signal( SIGINT, SIG_DFL );
+		}
+}
+
 bool CheckForUserSignal(){
-	if(askQuitNow == 1){//this will be set if the user raises a signal with ctrl-C
+	//this will be set if the user raises a signal with ctrl-C
+	if(askQuitNow == 1){
 		char c;
 		if(interactive == false){
-			signal( SIGINT, SIG_DFL );
+			//The run will begin terminating gracefully after this returns, but turn off further catching
+			//in case the user wants to fully kill the run fully
+			TurnOffSignalCatching();
 			return true;
 			}
 		else{
@@ -208,15 +218,17 @@ bool CheckForUserSignal(){
 	#endif
 	#endif
 			if(c=='y'){
-				signal( SIGINT, SIG_DFL );
+				//as above, give up further catching
+				TurnOffSignalCatching();
 	#ifdef MAC
 				cin.get();
 	#endif   
 				return true;
 				}
 			else{
+				//the user changed their mind
 				askQuitNow = 0;
-				CatchInterrupt();
+				TurnOnSignalCatching();
 				outman.UserMessage("continuing ...");
 	#ifndef MAC_FRONTEND
 	#ifndef WIN32
@@ -262,7 +274,8 @@ void ClearDebugLogs(){
 
 	ofstream optb("blendeb.log");
 	optb.close();
-*/	#endif
+*/
+#endif
 	}
 
 Population::~Population()
@@ -1667,16 +1680,12 @@ void Population::Run(){
 		outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
 
 	outman.UserMessage("");
+
 	OutputLog();
 	if(conf->outputMostlyUselessFiles) OutputFate();	
 
-#ifndef BOINC
-	CatchInterrupt();
-#endif
-
 	gen++;
 	for (; gen < conf->stopgen+1; ++gen){
-
 		NextGeneration();
 #ifdef SWAP_BASED_TERMINATION
 		if(uniqueSwapTried){
@@ -2555,13 +2564,11 @@ void Population::ClearStoredTrees(){
 	}
 
 void Population::Bootstrap(){
+
 	//if we're not restarting
 	if(conf->restart == false) currentBootstrapRep=1;
 
 	for( ;currentBootstrapRep<=conf->bootstrapReps;currentBootstrapRep++){
-#ifndef BOINC
-		CatchInterrupt();
-#endif
 #ifdef MAC_FRONTEND
 		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 		[[MFEInterfaceClient sharedClient] didBeginBootstrapReplicate:rep];
@@ -2678,8 +2685,8 @@ void Population::PerformSearch(){
 			}
 
 #ifndef BOINC
-		//3/24/08 moving this after SeedPop, since it disallows normal ctrl-c killing of runs during stepwise
-		CatchInterrupt();
+		//Start catching Ctrl-C's
+		TurnOnSignalCatching();
 #endif				
 		InitializeOutputStreams();
 		Run();
