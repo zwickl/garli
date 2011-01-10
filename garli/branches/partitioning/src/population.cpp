@@ -1464,6 +1464,10 @@ void Population::ReadStateFiles(){
 	//Read the population checkpoint
 	ReadPopulationCheckpoint();
 
+#ifdef BOINC
+	boinc_fraction_done(tot_fraction_done);
+#endif
+
 	//Read the swap checkpoint, if necessary
 	if(conf->uniqueSwapBias != ONE_POINT_ZERO){
 		sprintf(name, "%s.swaps.check", conf->ofprefix.c_str());
@@ -1513,7 +1517,7 @@ void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 	//data member) rather than counting the number of each type and adding it up 
 	//manually.  This should make it work irrespective of things like memory padding
 	//for data member alignment, which could vary between platforms and compilers
-	intptr_t scalarSize = (intptr_t) &fraction_done - (intptr_t) this + sizeof(fraction_done);
+	intptr_t scalarSize = (intptr_t) &rep_fraction_done - (intptr_t) this + sizeof(rep_fraction_done);
 	out.WRITE_TO_FILE(this, (streamsize) scalarSize, 1);
 
 	//save the current members of the population
@@ -1563,7 +1567,7 @@ void Population::ReadPopulationCheckpoint(){
 	//data member) rather than counting the number of each type and adding it up 
 	//manually.  This should make it work irrespective of things like memory padding
 	//for data member alignment, which could vary between platforms and compilers
-	intptr_t scalarSize = (intptr_t) &fraction_done - (intptr_t) this + sizeof(fraction_done);
+	intptr_t scalarSize = (intptr_t) &rep_fraction_done - (intptr_t) this + sizeof(rep_fraction_done);
 	fread(this, scalarSize, 1, pin);
 
 	//if were restarting a bootstrap run we need to change to the bootstrapped data
@@ -1641,12 +1645,28 @@ void Population::Run(){
 	CalcAverageFitness();
 
 	outman.precision(6);
+
+	outman.UserMessageNoCR("%-8s %-14s %-8s  %-14s ", "gen", "current_lnL", "precision", "last_tree_imp");
+
 #ifdef SWAP_BASED_TERMINATION
-	outman.UserMessage("%-10s%-15s%-10s%-15s%-15s", "gen", "current_lnL", "precision", "last_tree_imp", "swaps_on_cur");
-#else
-	outman.UserMessage("%-10s%-15s%-10s%-15s", "gen", "current_lnL", "precision", "last_tree_imp");
+	outman.UserMessageNoCR("%-14s ", "swaps_on_cur");
 #endif
-	outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+
+	if(conf->reportRunProgress)
+		outman.UserMessageNoCR("%-14s %-14s", "rep_prop_done", "tot_prop_done");
+
+	outman.UserMessage("");
+
+	outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+
+#ifdef SWAP_BASED_TERMINATION
+		outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
+#endif
+
+	if(conf->reportRunProgress)
+		outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
+
+	outman.UserMessage("");
 	OutputLog();
 	if(conf->outputMostlyUselessFiles) OutputFate();	
 
@@ -1674,11 +1694,15 @@ void Population::Run(){
 				WriteTreeFile( outname.c_str() );
 				}
 
+			outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+
 #ifdef SWAP_BASED_TERMINATION
-			outman.UserMessage("%-10d%-15.4f%-10.3f\t%-15d%-15d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove, indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
-#else
-			outman.UserMessage("%-10d%-15.4f%-10.3f%-8d", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+			outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
 #endif
+			if(conf->reportRunProgress)
+				outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
+
+			outman.UserMessage("");
 			
 			if(conf->outputMostlyUselessFiles){
 #ifdef DETAILED_SWAP_REPORT
@@ -1779,26 +1803,10 @@ void Population::Run(){
 				if(bImp < ZERO_POINT_ZERO && bImp > -1e-4)//avoid printing very slightly negative values
 					bImp = ZERO_POINT_ZERO;
 				outman.UserMessage("   Optimizing branchlengths... improved %8.3f lnL", bImp);
-
-/*				if(modSpec->IsCodon()){
-					before=bestFitness;
-					indiv[bestIndiv].treeStruct->OptimizeOmegaParameters(adap->branchOptPrecision);
-					indiv[bestIndiv].SetDirty();
-					CalcAverageFitness();
-					outman.UserMessage("optimizing omega parameters:%.4f -> %.4f", before, bestFitness);
-					}
-*/				}
-
-			UpdateFractionDone();
-
-/*			else if(adap->topoWeight==0.0 && !(gen%(adap->intervalLength))){
-				FLOAT_TYPE before=bestFitness;
-				indiv[bestIndiv].treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-				indiv[bestIndiv].SetDirty();
-				CalcAverageFitness();
-				outman.UserMessage("optimizing branchlengths...\t%.4f %.4f", before, bestFitness);
 				}
-*/			
+
+			UpdateFractionDone(2);
+
 			//termination conditions
 			if(conf->enforceTermConditions == true
 #ifdef SWAP_BASED_TERMINATION
@@ -1850,13 +1858,11 @@ void Population::Run(){
 #endif
 		}
 
-#ifdef BOINC
-	boinc_fraction_done(0.99);
-#endif
-
+	UpdateFractionDone(3);
 #ifdef MORE_DETERM_OPT
 	//the version adapted from trunk 1.0 final opt
-	BetterFinalOptimization();
+	if(conf->refineEnd)
+		BetterFinalOptimization();
 #else
 	FinalOptimization();
 #endif
@@ -1869,54 +1875,160 @@ void Population::Run(){
 	if(conf->bootstrapReps==0) outman.UserMessage("finished");
 	
 	//outman.UserMessage("%d conditional likelihood calculations\n%d branch optimization passes", calcCount, optCalcs);
-#ifdef BOINC
-	boinc_fraction_done(1.0);
-#endif
+	UpdateFractionDone(4);
 	}
 
-void Population::UpdateFractionDone(){
-	//update the proportion done.  This is mainly for BOINC, but might be used elsewhere.  
+//This was the revised version from the trunk
+void Population::UpdateFractionDone(int phase){
+	//update the proportion done.  This is mainly for BOINC, but might be used elsewhere.
 	//The algorithm used to determine the progress is fairly arbitrary
-	FLOAT_TYPE fract = 0.0;
-	FLOAT_TYPE current_fract = fraction_done;
+	//CAREFUL about multiple reps/bootstrap reps.  The stored fraction_done is for this
+	//replicate, so it needs to be manually prorated for the expected number of reps
 
-	if(conf->enforceTermConditions){
-		if(adap->branchOptPrecision == adap->startOptPrecision){
-			//we've done a decent number of gen, but haven't yet reduced the prec
-			fract = min(0.01 + 0.01 * (double) (gen / 2000), 0.1);
+	//if a positive value is passed in it will be set FOR THIS REP and the auto calculations won't be done
+	//this passing in should only happen before the run actually begins (set to 1% at the end of Pop::Setup)
+	//or when FinalOptimization is about to be called (set to 95%)
+
+	//periods:
+	//started - data has been read and everything allocated (1%)
+	//initial - before generations actually start (pop seeding and refinement) : 1% - initialBreak
+	//pre-reduction - before first precision reduction : initialBreak - firstBreak
+	//reduction - while reductions are happening : firstBreak - secondBreak
+	//terminal - remaining gens after min prec reached : secondBreak - thirdBreak
+	//final - final opt : after thirdBreak
+
+	FLOAT_TYPE new_fract = 0.01;
+	FLOAT_TYPE current_fract = rep_fraction_done;
+	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
+
+	bool willReduce = (FloatingPointEquals(adap->startOptPrecision, adap->minOptPrecision, 1e-6) == false) 
+		&& (adap->numPrecReductions > 0);
+	//the 0.45 here is for rounding purposes.  Don't want to round down if precReductionFactor ends up being slightly more than the diff due to floating point rep
+	int reduction_number = willReduce ? (int) (0.45 + ((adap->startOptPrecision - adap->branchOptPrecision) / adap->precReductionFactor)) : 0;
+	int remaining_reductions = willReduce ? adap->numPrecReductions - reduction_number : 0;
+	
+	FLOAT_TYPE minFract = min(current_fract, max((double) stopwatch.SplitTime() / conf->stoptime, (double) gen / conf->stopgen));
+	FLOAT_TYPE startPoint, initialBreak, firstBreak, secondBreak, thirdBreak, t_fraction_done;
+	
+	double evalInterval = (adap->intervalLength * adap->intervalsToStore);
+	
+	startPoint = 0.01;
+	initialBreak = 0.05;
+	thirdBreak = 0.95;
+
+	if(!conf->enforceTermConditions){
+		//proportion done is just this
+		FLOAT_TYPE timeFract = (FLOAT_TYPE) stopwatch.SplitTime() / conf->stoptime;
+
+		FLOAT_TYPE repGenFract = (FLOAT_TYPE) gen / conf->stopgen;
+		int totSearches = conf->searchReps * (conf->bootstrapReps > 0 ? conf->bootstrapReps : 1);
+		int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
+		FLOAT_TYPE perRep = 1.0 / totSearches;
+		FLOAT_TYPE totGenFract = (curSearch - 1) * perRep + repGenFract * perRep;
+
+		t_fraction_done = max(timeFract, totGenFract);
+		//this can't really be calculated in the time limited case, but it doesn't really matter since it isn't output
+		rep_fraction_done = t_fraction_done / 2.0;
+		}
+	else {
+		if(willReduce){
+			//let the period between gen 0 and the first reduction be larger for larger datasets
+			firstBreak = 0.15 + min(0.1, 0.01 * (dataPart->NTax() / 50));
+			//figure out what proportion of the run the reduction period is vs the final period before termination (minimally)
+			double minPhase2 = (adap->numPrecReductions - 1) * evalInterval;
+			//since the final portion will be slower per gen because of the lower prec, downweight the reduction phase further
+			FLOAT_TYPE p = 0.9 * (minPhase2 / (double) (minPhase2 + conf->lastTopoImproveThresh));
+			secondBreak = firstBreak + (thirdBreak - firstBreak) * p;
+			}
+		else{
+			initialBreak = firstBreak = secondBreak = 0.10;
 			}
 
-		else if(adap->branchOptPrecision < adap->startOptPrecision){
-			//divide the rest of the way up to 70% evenly among the precision reductions
-			FLOAT_TYPE reduction_number = (adap->startOptPrecision - adap->branchOptPrecision) / adap->precReductionFactor;
-			fract = 0.1 + ((reduction_number - 1) / (FLOAT_TYPE) (adap->numPrecReductions - 1)) * 0.6;
+		if(phase == 0){
+			//reading of the data and memory allocation are done, but not much else
+			new_fract = startPoint;
 			}
+		else if(phase == 1){
+			//the population has been seeding and is at gen 0
+			new_fract = initialBreak;
+			}
+		else if(phase == 2){
+			//the normal generation cycle has started.
+			//The function will now start doing its own calculations of the fraction done.
+			if(willReduce && remaining_reductions == adap->numPrecReductions){
+				//we've done a decent number of gen, but haven't yet reduced the prec
 
-		else if(adap->branchOptPrecision == adap->minOptPrecision){
-			//we've entered the home stretch.  But, it's hard to judge progress here because a new tree can always be found
-			//that would reset the number of generations left to go.  So, be conservative, because we aren't allowed to reduce
-			//the percentage
-			unsigned genSinceImprove = gen-max(lastTopoImprove, lastPrecisionReduction);
-			unsigned num_chunks = 5;
-			unsigned chunk_length = (unsigned) (conf->lastTopoImproveThresh / num_chunks);
-			FLOAT_TYPE chunkFracSize = 0.29 / (FLOAT_TYPE) num_chunks;
-			unsigned currentChunkNum = (unsigned) (genSinceImprove / chunk_length);
-			if(currentChunkNum > 0){//if we're above the first chunk boundary
-				if(genSinceImprove % chunk_length <= adap->intervalLength){//if we've just entered this chunk						
-					FLOAT_TYPE baseChunkFrac = 0.70 + currentChunkNum * chunkFracSize;
-					FLOAT_TYPE maxAllowedFrac = baseChunkFrac + chunkFracSize;
-					if(current_fract - maxAllowedFrac < -1.0e-3){//this is effectively maxAllowedFrac > currentBoincFrac 
-						fract = min(max(current_fract + 0.01, baseChunkFrac), maxAllowedFrac);
-						}
+				//this will be linear to "split" proportion of the way to the first break, when the minimum possible
+				//number of generations before a prec reduction could happen have passed
+				//then it will be asymptotic toward the first break
+				FLOAT_TYPE split = 0.5;
+				FLOAT_TYPE remainingFract = (firstBreak - initialBreak);
+				if(gen <= evalInterval){
+					new_fract = initialBreak + (split * remainingFract * (gen / evalInterval));
+					}
+				else{
+					new_fract = initialBreak + (split * remainingFract) + (1.0 - split) * remainingFract * (1.0 - (evalInterval / (FLOAT_TYPE) gen));
+					}
+				}
+	
+			else if(willReduce && remaining_reductions > 0){
+				//divide the rest of the way up to the second break evenly among the precision reductions
+				FLOAT_TYPE perReduction = (secondBreak - firstBreak) / ((FLOAT_TYPE) adap->numPrecReductions - 1.0);
+				//again, linear to "split" proportion, then asymptotic
+				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
+				FLOAT_TYPE split = 0.5;
+				if(sinceLastReduction <= evalInterval){
+					new_fract = firstBreak + ((reduction_number - 1) * perReduction) + (split * perReduction * ((FLOAT_TYPE) sinceLastReduction / evalInterval));
+					}
+				else{
+					new_fract = firstBreak + ((reduction_number - 1) * perReduction) + (split * perReduction) + (1.0 - split) * perReduction * (1.0 - (evalInterval / (FLOAT_TYPE) sinceLastReduction));
+					}
+				}
+	
+			else if(remaining_reductions == 0){
+				//this is linear to "split" proportion until we get past the absolute minimum point that the run could have finished
+				FLOAT_TYPE remainingFract = thirdBreak - secondBreak;
+				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
+				//the chance of going over the minimum # gen in the last phase is small with lower # of taxa, which makes for a big jump
+				//in proportion because the asymptotic phase isn't entered at all.  Scale the proportion where the asymp phase starts
+				//with the # of taxa
+				double split = max(0.5, 0.9 - 0.10 * (dataPart->NTax() / 50));
+				if(sinceLastReduction <=  conf->lastTopoImproveThresh){
+					new_fract = secondBreak + remainingFract * split * (sinceLastReduction / (FLOAT_TYPE) conf->lastTopoImproveThresh);
+					}
+				//thereafter it is conservatively asymtotic
+				else{
+					assert( (1.0 - (conf->lastTopoImproveThresh / (FLOAT_TYPE) sinceLastReduction)) >= 0.0);
+					new_fract = secondBreak + remainingFract * split + remainingFract * (1 - split) * min(1.0, (1.0 - (conf->lastTopoImproveThresh / (FLOAT_TYPE) sinceLastReduction)));
 					}
 				}
 			}
+		else if(phase == 3){
+			//the generations are over, and we're ready for final optimization
+			new_fract = thirdBreak;
+			}
+		else{
+			//we're fully done
+			assert(phase == 4);
+			new_fract = 1.0;
+			}
+
+		if(phase != 0 && !(new_fract >= current_fract)){
+			outman.DebugMessage("new_fract less than current_fract: %.4f vs %.4f", new_fract, current_fract);
+			}
+		rep_fraction_done = new_fract;
+
+		//now figure out the total proportion done from the amount of this rep that is done and the current rep #
+		int totSearches = conf->searchReps * (conf->bootstrapReps > 0 ? conf->bootstrapReps : 1);
+		int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
+		FLOAT_TYPE repFract = 1.0 / totSearches;
+		t_fraction_done = (curSearch - 1) * repFract + (repFract * rep_fraction_done);
+		assert(t_fraction_done >= tot_fraction_done);
 		}
-	if(fract != current_fract){
-		fraction_done = fract;
-		}
+	tot_fraction_done = t_fraction_done;
+	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
 #ifdef BOINC
-	boinc_fraction_done(fraction_done);
+	boinc_fraction_done(tot_fraction_done);
 #endif
 	}
 
@@ -2552,8 +2664,10 @@ void Population::PerformSearch(){
 
 		GetRepNums(s);
 		if(conf->restart == false){
+			UpdateFractionDone(0);
 			if(s.length() > 0) outman.UserMessage("\n>>>%s<<<", s.c_str());
 			SeedPopulationWithStartingTree(currentSearchRep);
+			UpdateFractionDone(1);
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
 			if(conf->checkpoint) WriteStateFiles();
 			}
@@ -4331,7 +4445,11 @@ int Population::GetSpecifiedModels(FLOAT_TYPE** model_string, int n, int* indiv_
 void Population::OutputLog()	{
 	//log << gen << "\t" << bestFitness << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
 	if(gen < UINT_MAX) {
-		log << gen << "\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
+		log << gen << "\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision;
+		if(conf->reportRunProgress)
+			log << "\t" << 0.01 * (int) ceil(rep_fraction_done * 100) << "\t" << 0.01 * (int) ceil(tot_fraction_done * 100);
+
+		log << endl;
 #ifdef MAC_FRONTEND
 		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 		NSDictionary *progressDict = [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithInt:gen], @"generation", [NSNumber numberWithDouble:BestFitness()], @"likelihood", [NSNumber numberWithInt:stopwatch.SplitTime()], @"time", [NSNumber numberWithDouble:adap->branchOptPrecision], @"precision", [NSNumber numberWithInt:lastTopoImprove], @"lastImprovement", nil];

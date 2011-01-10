@@ -1,5 +1,5 @@
-// GARLI version 0.96b8 source code
-// Copyright 2005-2008 Derrick J. Zwickl
+// GARLI version 1.00 source code
+// Copyright 2005-2010 Derrick J. Zwickl
 // email: zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -289,7 +289,8 @@ private:
 
 	FLOAT_TYPE bestFitness;
 	FLOAT_TYPE prevBestFitness;
-	FLOAT_TYPE fraction_done;//make sure this remains the last scalar in the class for checkpointing to work
+	FLOAT_TYPE tot_fraction_done;
+	FLOAT_TYPE rep_fraction_done;//make sure this remains the last scalar in the class for checkpointing to work
 
 public:
 	GeneralGamlConfig *conf;
@@ -383,7 +384,7 @@ private:
 			bestFitness(-(FLT_MAX)), bestIndiv(0), currentSearchRep(1), 
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
-			treeString(NULL), adap(NULL), fraction_done(ZERO_POINT_ZERO),
+			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
 			prematureTermination(false), currentBootstrapRep(0),
 			finishedRep(false), lastBootstrapSeed(0), dataPart(NULL), rawPart(NULL)
 #ifdef INCLUDE_PERTURBATION			 
@@ -438,7 +439,7 @@ private:
 		void DetermineParentage();
 		void FindTreeStructsForNextGeneration();
 		void PerformMutation(int indNum);
-		void UpdateFractionDone();
+		void UpdateFractionDone(int phase);
 		bool OutgroupRoot(Individual *ind, int indnum);
 		void LoadNexusStartingConditions();
 		void VariableStartingTreeOptimization(bool reducing);
