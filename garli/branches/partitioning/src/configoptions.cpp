@@ -45,11 +45,13 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	outputCurrentBestTopology = false;
 	collapseBranches = false;
 	outputSitelikelihoods = 0;
+	reportRunProgress = 0;
 
 	//starting the run
 	randseed = -1;
 	streefname = "random";
 	refineStart = true;
+	refineEnd = true;
 
 	//general run details
 	datafname = "datafname";
@@ -71,6 +73,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	improveOverStoredIntervalsThresh = (FLOAT_TYPE)0.05;
 	stopgen = UINT_MAX;
 	stoptime = UINT_MAX;
+	swapTermThreshold = 0;
 
 	linkModels = false;
 	subsetSpecificRates = true;
@@ -143,6 +146,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetStringOption("constraintfile", constraintfile, true);
 	errors += cr.GetIntNonZeroOption("randseed", randseed);
 	errors += cr.GetBoolOption("refinestart", refineStart);
+	cr.GetBoolOption("refineend", refineEnd, true);
 	errors += cr.GetBoolOption("outputeachbettertopology", outputTreelog);
 	errors += cr.GetBoolOption("enforcetermconditions", enforceTermConditions);
 	errors += cr.GetUnsignedNonZeroOption("genthreshfortopoterm", lastTopoImproveThresh);
@@ -150,10 +154,12 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetPositiveNonZeroDoubleOption("significanttopochange", significantTopoChange, true);
 	cr.GetUnsignedNonZeroOption("attachmentspertaxon", attachmentsPerTaxon, true);
 	cr.GetUnsignedOption("outputsitelikelihoods", outputSitelikelihoods, true);
+	cr.GetBoolOption("reportrunprogress", reportRunProgress, true);
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
 	cr.GetBoolOption("collapsebranches", collapseBranches, true);
+	cr.GetIntOption("genthreshforswapterm", swapTermThreshold, true);
 
 	cr.GetStringOption("arbitrarystring", arbitraryString, true);
 

@@ -70,6 +70,7 @@ class GeneralGamlConfig{
 	int randseed;
 	string streefname;
 	bool refineStart;
+	bool refineEnd;
 
 	//general run details
 	string datafname;
@@ -83,6 +84,7 @@ class GeneralGamlConfig{
 	unsigned searchReps;
 	unsigned runmode;
 	unsigned outputSitelikelihoods;
+	bool reportRunProgress;
 
 	//finishing the run
 	bool enforceTermConditions;
@@ -90,6 +92,7 @@ class GeneralGamlConfig{
 	FLOAT_TYPE improveOverStoredIntervalsThresh;
 	unsigned stopgen;
 	unsigned stoptime;
+	int swapTermThreshold;
 
 	unsigned attachmentsPerTaxon;
 
