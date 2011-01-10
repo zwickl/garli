@@ -2849,37 +2849,25 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					if(i < numCondPats){
 						if(partialCLA->underflow_mult[i] == 0){
-/*
-							constL = siteL;
-							pC = nstates * constL;
-							pV = (ONE_POINT_ZERO - pC);
-							MkvScaler = log(pV);
-							constD1 = siteD1 * nstates; 
-							constD2 = siteD2 * nstates;
-*/
 							conditioningLikeSum += siteL;
 							conditioningD1Sum += siteD1;
 							conditioningD2Sum += siteD2;
 							}
 						else{
 							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[i], exp((double)partialCLA->underflow_mult[i]));
-							/*
-							constL = siteL / exp((double)partialCLA->underflow_mult[0]);
-							pC = nstates * constL;
-							pV = (ONE_POINT_ZERO - pC);
-							MkvScaler = log(pV);
-							constD1 = siteD1 * nstates; 
-							constD2 = siteD2 * nstates;
-							*/
 							double unscaler = exp((double)(partialCLA->underflow_mult[i]));
 							//Guard against this over or underflowing, which I think are very unlikely. If it does, just ignore this site
 
 							if(unscaler == unscaler){
 								double unscaled = siteL / unscaler;
+								double unscaledD1 = siteD1 / unscaler;
+								double unscaledD2 = siteD2 / unscaler;
 								if(unscaled == unscaled){
 									conditioningLikeSum += unscaled;
-									conditioningD1Sum += siteD1; 
-									conditioningD2Sum += siteD2;
+									assert(unscaledD1 == unscaledD1);
+									conditioningD1Sum += unscaledD1; 
+									assert(unscaledD2 == unscaledD2);
+									conditioningD2Sum += unscaledD2;
 									}
 								}
 							}
@@ -2894,22 +2882,14 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 						}
 					else{ 
 						//condition the likelihood on variability
-	/*					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
-						assert(condlnL < ZERO_POINT_ZERO);
-						totL += condlnL * countit[i];
-	*/
 						FLOAT_TYPE condlnL = unscaledlnL + logLikeConditioningFactor;
 						assert(condlnL < ZERO_POINT_ZERO);
 						totL += condlnL * countit[i];
 
 						//condition the first deriv
-						//FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
 						FLOAT_TYPE condD1 = (siteD1 + ((siteL * conditioningD1Sum) / probVariable)) / siteL; 
 
 						//condition the second
-	/*					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
-						FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
-	*/
 						FLOAT_TYPE t1 = conditioningLikeSum - ONE_POINT_ZERO;
 						FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (conditioningD1Sum * conditioningD1Sum - t1 * conditioningD2Sum))) / (siteL * siteL * t1 * t1);
 
@@ -3152,35 +3132,24 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 					assert(unscaledlnL < ZERO_POINT_ZERO);
 					if(i < numCondPats){
 						if(partialCLA->underflow_mult[i] == 0){
-	/*
-							constL = siteL;
-							pC = nstates * constL;
-							pV = (ONE_POINT_ZERO - pC);
-							MkvScaler = log(pV);
-							constD1 = siteD1 * nstates; 
-							constD2 = siteD2 * nstates;
-	*/
 							conditioningLikeSum += siteL;
 							conditioningD1Sum += siteD1;
 							conditioningD2Sum += siteD2;
 							}
 						else{
 							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[i], exp((double)(partialCLA->underflow_mult[i])));
-	/*						constL = siteL / exp((double)(partialCLA->underflow_mult[0] + childCLA->underflow_mult[0]));
-							pC = nstates * constL;
-							pV = (ONE_POINT_ZERO - pC);
-							MkvScaler = log(pV);
-							constD1 = siteD1 * nstates; 
-							constD2 = siteD2 * nstates;
-	*/						
 							double unscaler = exp((double)(partialCLA->underflow_mult[i]));
 							//Guard against this over or underflowing, which I think are very unlikely. If it does, just ignore this site
 							if(unscaler == unscaler){
 								double unscaled = siteL / unscaler;
+								double unscaledD1 = siteD1 / unscaler;
+								double unscaledD2 = siteD2 / unscaler;
 								if(unscaled == unscaled){
 									conditioningLikeSum += unscaled;
-									conditioningD1Sum += siteD1; 
-									conditioningD2Sum += siteD2;
+									assert(unscaledD1 == unscaledD1);
+									conditioningD1Sum += unscaledD1; 
+									assert(unscaledD2 == unscaledD2);
+									conditioningD2Sum += unscaledD2;
 									}
 								}
 							}
@@ -3191,23 +3160,14 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 						}
 					else{ 
 						//condition the likelihood on variability
-	/*					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
-						assert(condlnL < ZERO_POINT_ZERO);
-						totL += condlnL * countit[i];
-	*/
 						FLOAT_TYPE condlnL = unscaledlnL + logLikeConditioningFactor;
 						assert(condlnL < ZERO_POINT_ZERO);
 						totL += condlnL * countit[i];
 
 						//condition the first deriv
-						//FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
-
 						FLOAT_TYPE condD1 = (siteD1 + ((siteL * conditioningD1Sum) / probVariable)) / siteL; 
 
 						//condition the second
-	/*					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
-						FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
-	*/
 						FLOAT_TYPE t1 = conditioningLikeSum - ONE_POINT_ZERO;
 						FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (conditioningD1Sum * conditioningD1Sum - t1 * conditioningD2Sum))) / (siteL * siteL * t1 * t1);
 
@@ -3465,35 +3425,24 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 				assert(unscaledlnL < ZERO_POINT_ZERO);
 				if(i < numCondPats){
 					if(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i] == 0){
-/*
-						constL = siteL;
-						pC = nstates * constL;
-						pV = (ONE_POINT_ZERO - pC);
-						MkvScaler = log(pV);
-						constD1 = siteD1 * nstates; 
-						constD2 = siteD2 * nstates;
-*/
 						conditioningLikeSum += siteL;
 						conditioningD1Sum += siteD1;
 						conditioningD2Sum += siteD2;
 						}
 					else{
 						outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[i] + childCLA->underflow_mult[i], exp((double)(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i])));
-/*						constL = siteL / exp((double)(partialCLA->underflow_mult[0] + childCLA->underflow_mult[0]));
-						pC = nstates * constL;
-						pV = (ONE_POINT_ZERO - pC);
-						MkvScaler = log(pV);
-						constD1 = siteD1 * nstates; 
-						constD2 = siteD2 * nstates;
-*/						
 						double unscaler = exp((double)(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i]));
 						//Guard against this over or underflowing, which I think are very unlikely. If it does, just ignore this site
 						if(unscaler == unscaler){
 							double unscaled = siteL / unscaler;
+							double unscaledD1 = siteD1 / unscaler;
+							double unscaledD2 = siteD2 / unscaler;
 							if(unscaled == unscaled){
 								conditioningLikeSum += unscaled;
-								conditioningD1Sum += siteD1; 
-								conditioningD2Sum += siteD2;
+								assert(unscaledD1 == unscaledD1);
+								conditioningD1Sum += unscaledD1; 
+								assert(unscaledD2 == unscaledD2);
+								conditioningD2Sum += unscaledD2;
 								}
 							}
 						}
@@ -3508,23 +3457,14 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 					}
 				else{ 
 					//condition the likelihood on variability
-/*					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
-					assert(condlnL < ZERO_POINT_ZERO);
-					totL += condlnL * countit[i];
-*/
 					FLOAT_TYPE condlnL = unscaledlnL + logLikeConditioningFactor;
 					assert(condlnL < ZERO_POINT_ZERO);
 					totL += condlnL * countit[i];
 
 					//condition the first deriv
-					//FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
-
 					FLOAT_TYPE condD1 = (siteD1 + ((siteL * conditioningD1Sum) / probVariable)) / siteL; 
 
 					//condition the second
-/*					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
-					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
-*/
 					FLOAT_TYPE t1 = conditioningLikeSum - ONE_POINT_ZERO;
 					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (conditioningD1Sum * conditioningD1Sum - t1 * conditioningD2Sum))) / (siteL * siteL * t1 * t1);
 
@@ -3657,35 +3597,24 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 				assert(unscaledlnL < ZERO_POINT_ZERO);
 				if(i < numCondPats){
 					if(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i] == 0){
-/*
-						constL = siteL;
-						pC = nstates * constL;
-						pV = (ONE_POINT_ZERO - pC);
-						MkvScaler = log(pV);
-						constD1 = siteD1 * nstates; 
-						constD2 = siteD2 * nstates;
-*/
 						conditioningLikeSum += siteL;
 						conditioningD1Sum += siteD1;
 						conditioningD2Sum += siteD2;
 						}
 					else{
 						outman.DebugMessage("SCALED MKV SCALER = %d (%f)", partialCLA->underflow_mult[i] + childCLA->underflow_mult[i], exp((double)(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i])));
-/*						constL = siteL / exp((double)(partialCLA->underflow_mult[0] + childCLA->underflow_mult[0]));
-						pC = nstates * constL;
-						pV = (ONE_POINT_ZERO - pC);
-						MkvScaler = log(pV);
-						constD1 = siteD1 * nstates; 
-						constD2 = siteD2 * nstates;
-*/						
 						double unscaler = exp((double)(partialCLA->underflow_mult[i] + childCLA->underflow_mult[i]));
 						//Guard against this over or underflowing, which I think are very unlikely. If it does, just ignore this site
 						if(unscaler == unscaler){
 							double unscaled = siteL / unscaler;
+							double unscaledD1 = siteD1 / unscaler;
+							double unscaledD2 = siteD2 / unscaler;
 							if(unscaled == unscaled){
 								conditioningLikeSum += unscaled;
-								conditioningD1Sum += siteD1; 
-								conditioningD2Sum += siteD2;
+								assert(unscaledD1 == unscaledD1);
+								conditioningD1Sum += unscaledD1; 
+								assert(unscaledD2 == unscaledD2);
+								conditioningD2Sum += unscaledD2;
 								}
 							}
 						}
