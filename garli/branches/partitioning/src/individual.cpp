@@ -109,6 +109,21 @@ void Individual::CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const 
 	treeStruct->modPart = &modPart;
 	}
 
+void Individual::DuplicateIndivWithoutCLAs(const Individual *sourceOfInformation){
+	CopyNonTreeFields(sourceOfInformation);
+	if(treeStruct == NULL)
+		treeStruct = new Tree;
+
+	for(int i=treeStruct->getNumTipsTotal()+1;i<(2*treeStruct->getNumTipsTotal()-2);i++)
+		treeStruct->allNodes[i]->attached=false;
+		
+	treeStruct->MimicTopo(sourceOfInformation->treeStruct);
+	dirty=true;
+	treeStruct->lnL=sourceOfInformation->fitness;
+	modPart.CopyModelPartition(&sourceOfInformation->modPart);
+	treeStruct->modPart = &modPart;
+	}
+
 void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 	//this is the original version of mutate, and will be called by both 
 	//master and remote when they are mutating a tree that does not have
@@ -439,15 +454,12 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 			if(modSpecSet.InferSubsetRates()){
 				improve += scratchT->OptimizeSubsetRates(optPrecision);
 				}
-			if(!FloatingPointEquals(improve, 0.0, 1e-8)) outman.UserMessage("\n   Optimizing parameters...    improved %8.3f lnL", improve);
-		//	this used to depend on param improvement - not sure why
-		//	if(rateOptImprove > 0.0){
-				scratchT->Score();
-				FLOAT_TYPE start=scratchT->lnL;
-				scratchT->OptimizeAllBranches(optPrecision);
-				FLOAT_TYPE bimprove = scratchT->lnL - start;
-				outman.UserMessage("\nOptimizing branchlengths... improved %f lnL", bimprove);
-	//			}
+			outman.UserMessageNoCR("\nOptimizing parameters... improved %.3f lnL", improve);
+			scratchT->Score();
+			FLOAT_TYPE start=scratchT->lnL;
+			scratchT->OptimizeAllBranches(optPrecision);
+			FLOAT_TYPE bimprove = scratchT->lnL - start;
+			outman.UserMessage("\nOptimizing branchlengths... improved %.3f lnL", bimprove);
 			}
 		}		
 
@@ -566,6 +578,11 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 			stf.get(c);
 			}while(c != '\n' && c!= '\r' && stf.eof() == false);
 		while((stf.peek() == '\n' || stf.peek() == '\r') && stf.eof() == false) stf.get(c);
+
+		//the call to the tree constructor can change the seed because random branch lengths are generated when the tree doesn't
+		//have them.  So, store and restore the seed, mainly for output purposes (the seed output to the screen happens after this
+		//call
+		int seed = rnd.seed();
 
 		//now allowing polytomies, since they will be taken care of in Population::SeedPopulationWithStartingTree
 		treeStruct=new Tree(treeString.c_str(), numericalTaxa, true);

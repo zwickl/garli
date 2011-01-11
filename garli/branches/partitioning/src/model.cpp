@@ -2207,8 +2207,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 	
 	if(modSpec->IsNucleotide() || modSpec->IsCodon()){
 		if(modSpec->IsCodon() && modSpec->numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega) = %f\n", Omega(0));
-		if(modSpec->IsCodon()) outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model:     ");
-		else outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix: ");
+		if(modSpec->IsCodon()) outman.UserMessage("  Nucleotide Relative Rate Matrix Assumed by Codon Model:     ");
+		else outman.UserMessage("  Nucleotide Relative Rate Matrix: ");
 		if(nst == 6){
 			if(modSpec->IsArbitraryRateMatrix()) outman.UserMessage("\n    User specified matrix type: %s ", modSpec->arbitraryRateMatrixString.c_str());
 			else outman.UserMessage("    6 rates ");
@@ -2217,7 +2217,7 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 			outman.UserMessage("    AC = %.3f, AG = %.3f, AT = %.3f, CG = %.3f, CT = %.3f, GT = %.3f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
 			}
 		else if(nst == 2){
-			outman.UserMessageNoCR("\n    2 rates (transition and transversion) K param = %.4f", Rates(1));
+			outman.UserMessageNoCR("    2 rates (transition and transversion) K param = %.4f", Rates(1));
 			if(modSpec->IsCodon() == false) outman.UserMessage(" (ti/tv = %.4f)",  TRatio());
 			else outman.UserMessage("");
 			}

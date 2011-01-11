@@ -92,17 +92,9 @@ FLOAT_TYPE globalBest;
 
 #undef PERIODIC_SCORE_DEBUG
 
-//#undef DEBUG_SCORES
-
 #undef NNI_SPECTRUM
 
 #undef MASTER_DOES_SUBTREE
-
-//#undef VARIABLE_OPTIMIZATION
-
-#undef DETAILED_SWAP_REPORT
-
-//#undef NO_EVOLUTION
 
 bool output_tree=false;
 
@@ -280,8 +272,6 @@ void ClearDebugLogs(){
 
 Population::~Population()
 {
-//	EliminateDuplicateTreeReferences();  // TODO this be broken
-	
 	if(indiv != NULL){
 		for (unsigned i = 0; i < total_size; ++i)	{
 			for (unsigned j = 0; j < total_size; ++j)	{
@@ -299,8 +289,7 @@ Population::~Population()
 	if( newindiv!=NULL )
 		MEM_DELETE_ARRAY(newindiv); // newindiv has length params.nindivs
 
-	for(vector<Individual *>::iterator vit = storedTrees.begin() ; vit != storedTrees.end() ; vit++)
-		delete *vit;
+	ClearStoredTrees();
 
 	if( cumfit!=NULL ) {
 		for( unsigned i = 0; i < total_size; i++ )
@@ -556,8 +545,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		outman.UserMessage("**Your memory level is: very low\n\t(if possible, you should increase the availablememory setting)**");
 	else if(memLevel == -1)
 		outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
-	outman.UserMessage("");
-
+	outman.UserMessage("\n#######################################################");
 /*
 	outman.precision(4);
 	outman.UserMessage("allocating memory...\nusing %.1f MB for conditional likelihood arrays.  Memlevel= %d", (FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB, memLevel);
@@ -593,55 +581,55 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 
 void Population::LoadNexusStartingConditions(){
 	GarliReader & reader = GarliReader::GetInstance();
- 	NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
-	//if(indiv[0].treeStruct->rootWithDummy){//add this in case a tree output by GARLI that contains the dummy root taxon is used as input
+	NxsTaxaBlock *tax = NULL;
+	NxsTreesBlock *treesblock = NULL;
+
+	if(reader.GetNumTaxaBlocks() == 1)
+		tax = reader.GetTaxaBlock(0);
+	else //I think this check happens in NCL as well, but best to be safe
+		throw ErrorException("multiple non-identical taxa blocks have been read");
+
 	if(Tree::rootWithDummy && !tax->IsAlreadyDefined("ROOT")){
 		string n = "ROOT";
 		tax->AppendNewLabel(n);
 		}
-
-	NxsTreesBlock *treesblock = reader.GetTreesBlock(tax, 0);
-
 	if(usedNCL && strcmp(conf->streefname.c_str(), conf->datafname.c_str()) == 0){
-		//in this case we should have already read in the tree when getting the data, so check
-		if((treesblock == NULL || (treesblock && treesblock->GetNumTrees() == 0)) && reader.FoundModelString() == false) //with the NCL factory API the trees block will be null if none was found
+		//in this case we should have already read in the tree when getting the data, so check that we have either one
+		//trees block for this taxa block or a garli block
+		if(reader.GetNumTreesBlocks(tax) == 0 && reader.FoundModelString() == false)
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as source of starting tree and/or model", conf->streefname.c_str());
-		if(reader.GetNumTreesBlocks(tax) > 1){
+		else if(reader.GetNumTreesBlocks(tax) > 1)
 			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
-			}
+		else if(reader.GetNumTreesBlocks(tax) == 1)
+			startingTreeInNCL = true;
+		else startingTreeInNCL = false;
 		}
 	else{
 		//use NCL to get trees from the specified file
 		outman.UserMessage("Loading starting model and/or tree from file %s", conf->streefname.c_str());
-#ifndef FACTORY
-		//3/25/08 Made a change such that if a gblock was already read with the data and another
-		//is found with the following execute, an exception will be thrown in GarliReader::EnteringBlock
-		if(treesblock != NULL){
-			if(treesblock->GetNumTrees() > 0)//if we already had trees loaded, toss them
-				treesblock->Reset();
-			}
-		reader.HandleExecute(conf->streefname.c_str(), false);
-		//treesblock = reader.GetTreesBlock(tax, 0);
-		treesblock = reader.GetTreesBlock();
-#else
-		//clearing trees block doesn't actually remove it in factory mode, so we need to do this
+		//it isn't easy to remove a previous trees block in factory mode, so we need to do this
 		int initNumTreesBlocks = reader.GetNumTreesBlocks(tax);
-
+		try{
 		reader.ReadFilepath(conf->streefname.c_str(), MultiFormatReader::NEXUS_FORMAT);
+			}
+		catch (const NxsException & x){
+			throw ErrorException("%s", x.msg.c_str());
+			}
 		int afterNumTreesBlocks = reader.GetNumTreesBlocks(tax);;
-		if(afterNumTreesBlocks - initNumTreesBlocks > 1){
+		if(afterNumTreesBlocks - initNumTreesBlocks > 1){//we added more than one trees block
 			throw ErrorException("Expecting only one trees block in file %s (not sure which to use)", conf->streefname.c_str());
 			}
-		else treesblock = reader.GetTreesBlock(tax, afterNumTreesBlocks - 1);
-#endif
+		//otherwise we want the last one because others may have been read with the data
+		else if(afterNumTreesBlocks == initNumTreesBlocks)//we didnt' add any tree blocks
+			startingTreeInNCL = false;
+		else //we found exactly one trees block.  WE NEED TO BE SURE THAT WE USE THE LATEST ONE LATER in SeeedPop
+			startingTreeInNCL = true;
 
-		if(( treesblock == NULL || treesblock->GetNumTrees() == 0) && reader.FoundModelString() == false)
-			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified\n\tas source of starting model and/or tree", conf->streefname.c_str());
+		//we read the file, but didn't find either
+		if(startingTreeInNCL == false && reader.FoundModelString() == false)
+			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as the source of starting model and/or tree", conf->streefname.c_str());
 		}
-	if(treesblock && treesblock->GetNumTrees() > 0) 
-		startingTreeInNCL = true;
-	if(reader.FoundModelString()) 
-		startingModelInNCL = true;
+	if(reader.FoundModelString()) startingModelInNCL = true;
 	}
 
 //return population more or less to what it looked like just after Setup()
@@ -653,6 +641,7 @@ void Population::Reset(){
 	//move on to another it should be false
 	conf->restart = false;
 	finishedRep = false;
+	genTermination = false;
 	bestFitness = prevBestFitness = -(FLT_MAX);
 
 	for(unsigned i=0;i<total_size;i++){
@@ -694,7 +683,6 @@ void Population::ApplyNSwaps(int numSwaps){
 		}
 
 	WriteStoredTrees("swapped.tre");		
-
 	}
 
 void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
@@ -714,7 +702,7 @@ void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
 
 	bestIndiv = 0;
 	FinalOptimization();
-	WriteTreeFile(besttreefile.c_str());
+	WriteTreeFile(besttreefile.c_str(), -1);
 /*	double imp = 999.9;
 	do{
 		imp = indiv[0].treeStruct->OptimizeAllBranches(optPrecision);
@@ -979,9 +967,14 @@ void Population::ValidateInput(int rep){
 		//be handled below, although both a garli block (in the data) and an old style model specification
 		//are not allowed
 		if(startingTreeInNCL){//cases 3, 5, 6 and 8
-			NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
-			NxsTreesBlock *treesblock = reader.GetTreesBlock(tax, 0);
-			
+			//CAREFUL here - we may have more than one trees block because a tree could appear with the
+			//dataset and in a different starting tree file.  The factory api allows this fine, so we
+			//need to be sure to grab the last trees block.  Checking for whether the starting tree
+			//file contained multiple trees blocks was already done in LoadNexusStartingConditions
+			const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
+			assert(treesblock != NULL);
+			//this should verify some aspects of the tree description and change everything to taxon numbers
+			treesblock->ProcessAllTrees();
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
 				int treeNum = (rank+rep-1) % numTrees;
@@ -1000,8 +993,6 @@ void Population::ValidateInput(int rep){
 		}
 
 	if(reader.FoundModelString()) startingModelInNCL = true;
-	if(indiv[0].modPart.NumModels() > 1 && (startingModelInNCL || modSpecSet.GotAnyParametersFromFile()))
-		throw ErrorException("Sorry, parameter values cannot currently be provided for unlinked partitioned models");
 	if(startingModelInNCL){
 		//crap out if we already got some parameters above in an old style starting conditions file
 #ifndef SUBROUTINE_GARLI
@@ -1052,7 +1043,6 @@ void Population::ValidateInput(int rep){
 		}
 	
 	//if there are not mutable params in the model, remove any weight assigned to the model
-	//if(indiv[0].mod->NumMutatableParams() == 0) {
 	if(indiv[0].modPart.NumMutableParams() == 0) {
 		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
 			outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
@@ -1062,9 +1052,6 @@ void Population::ValidateInput(int rep){
 	}
 
 void Population::SeedPopulationWithStartingTree(int rep){
-
-	//SequenceData *curData = dataPart->GetSubset(0);
-
 	for(unsigned i=0;i<total_size;i++){
 		if(indiv[i].treeStruct != NULL) indiv[i].treeStruct->RemoveTreeFromAllClas();
 		if(newindiv[i].treeStruct != NULL) newindiv[i].treeStruct->RemoveTreeFromAllClas();
@@ -1622,6 +1609,7 @@ void Population::ReadPopulationCheckpoint(){
 		ind->SetDirty();
 		ind->treeStruct->root->CheckTreeFormation();
 		ind->CalcFitness(0);
+		ind->treeStruct->RemoveTreeFromAllClas();
 		storedTrees.push_back(ind);
 		}
 
@@ -1700,7 +1688,7 @@ void Population::Run(){
 			if(best_output & WRITE_CONTINUOUS){
 				string outname = besttreefile;
 				outname += ".current";
-				WriteTreeFile( outname.c_str() );
+				WriteTreeFile( outname.c_str(), -1);
 				}
 
 			outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
@@ -1723,8 +1711,11 @@ void Population::Run(){
 				}
 			}
 #ifndef BOINC
-		prematureTermination = CheckForUserSignal();
-		if(prematureTermination) break;
+		userTermination = CheckForUserSignal();
+		if(userTermination){
+			outman.UserMessage("NOTE: ****Run terminated by user interuption ...");
+			break;
+			}
 #endif
 
 #ifdef PERIODIC_SCORE_DEBUG
@@ -1849,9 +1840,14 @@ void Population::Run(){
 			boinc_checkpoint_completed();
 			}
 #endif
-		if(conf->stoptime - stopwatch.SplitTime() < 120){
-			outman.UserMessage("time limit of %d seconds reached...", conf->stoptime);
+		if(stopwatch.SplitTime() > conf->stoptime){
+			outman.UserMessage("NOTE: ****Specified time limit (%d seconds) reached...", conf->stoptime);
+			timeTermination = true;
 			break;
+			}
+		if(gen == conf->stopgen){
+			outman.UserMessage("NOTE: ****Specified generation limit (%d) reached...", conf->stopgen);
+			genTermination = true;
 			}
 #ifdef INCLUDE_PERTURBATION
 		if(pertMan->pertAbandoned==true && pertMan->restartAfterAbandon==true && (gen - pertMan->lastPertGeneration > pertMan->gensBeforeRestart)){
@@ -1868,20 +1864,24 @@ void Population::Run(){
 		}
 
 	UpdateFractionDone(3);
+	//Allow killing during FinalOpt
+	TurnOffSignalCatching();
+	//don't optimize if checkpointing is happening and the run was prematurely killed
+	if(conf->refineEnd  && !(conf->checkpoint && (timeTermination || userTermination)))
 #ifdef MORE_DETERM_OPT
 	//the version adapted from trunk 1.0 final opt
-	if(conf->refineEnd)
 		BetterFinalOptimization();
 #else
-	FinalOptimization();
+		FinalOptimization();
 #endif
+	finishedRep = true;
 
 	gen = UINT_MAX;
 	OutputLog();
 
 	//outman.UserMessage("Maximum # clas used = %d out of %d", claMan->MaxUsedClas(), claMan->NumClas());
 	
-	if(conf->bootstrapReps==0) outman.UserMessage("finished");
+//	if(conf->bootstrapReps==0) outman.UserMessage("finished");
 	
 	//outman.UserMessage("%d conditional likelihood calculations\n%d branch optimization passes", calcCount, optCalcs);
 	UpdateFractionDone(4);
@@ -2481,7 +2481,6 @@ int Population::EvaluateStoredTrees(bool report){
 			outman.UserMessage("\nNOTE: Unless the following output indicates that search replicates found the\n\tsame topology, you should assume that they found different topologies.");
 		outman.UserMessage("Results:");
 		}
-
 	for(unsigned r=0;r<storedTrees.size();r++){
 		storedTrees[r]->treeStruct->CalcBipartitions(true);	
 		if(storedTrees[r]->Fitness() > bestL){
@@ -2489,66 +2488,85 @@ int Population::EvaluateStoredTrees(bool report){
 			bestRep = r;
 			}
 		}
-
 	if(report){
 		for(unsigned r=0;r<storedTrees.size();r++){
 			unsigned r2;
 			for(r2=0;r2<r;r2++){
 				if(conf->collapseBranches){
-					//DEBUG **** I don't think that this is working right currently 5/20/08 ****
-					//The IdenticalTopologyAllowingRerooting function really expects fully bifurcating trees, so
-					//if one tree contains all of the branches of the other plus some extra then it will return
-					//true.  Just doing the reverse comparison should take care of that
-					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)
+/*					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)
 						&& storedTrees[r2]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r]->treeStruct->root))
+						break;
+*/		
+					//This is where only collapsing branches upon output gets annoying.  We really want to check
+					//whether the collapsed trees are the same, but we're no longer storing them.  So, generate the collapsed
+					//trees and check.  A set of collapsed trees could be generated in adavance, so doing this every time is 
+					//a bit of extra work
+					Individual tempInd, tempInd2;
+					tempInd.DuplicateIndivWithoutCLAs(storedTrees[r]);
+					tempInd2.DuplicateIndivWithoutCLAs(storedTrees[r2]);
+					int num = 0;
+					tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+					tempInd2.treeStruct->root->CollapseMinLengthBranches(num);
+					tempInd.treeStruct->CalcBipartitions(true);
+					tempInd2.treeStruct->CalcBipartitions(true);
+					if(tempInd.treeStruct->IdenticalTopologyAllowingRerooting(tempInd2.treeStruct->root)
+						&& tempInd2.treeStruct->IdenticalTopologyAllowingRerooting(tempInd.treeStruct->root))
 						break;
 					}
 				else
 					if(storedTrees[r]->treeStruct->IdenticalTopologyAllowingRerooting(storedTrees[r2]->treeStruct->root)) break;
 				}
-			if(r == bestRep) outman.UserMessageNoCR("Replicate %d : %.4f (best)", r+1, storedTrees[r]->Fitness());
-			else outman.UserMessageNoCR("Replicate %d : %.4f       ", r+1, storedTrees[r]->Fitness());
-			if(r2 < r) outman.UserMessage(" (same topology as %d)", r2+1);
-			else outman.UserMessage("");
+			if(r == bestRep && conf->searchReps > 1) 
+				outman.UserMessageNoCR("Replicate %d : %.4f (best)", r+1, storedTrees[r]->Fitness());
+			else 
+				outman.UserMessageNoCR("Replicate %d : %.4f       ", r+1, storedTrees[r]->Fitness());
+			if(r2 < r) 
+				outman.UserMessageNoCR(" (same topology as %d)", r2+1);
+			if((userTermination || timeTermination) && r == storedTrees.size() - 1)
+				outman.UserMessageNoCR(" (TERMINATED PREMATURELY) ", r2+1);
+			outman.UserMessage("");
 			}
 
-//		if(storedTrees[0]->modPart.NumModels() > 1){
+		if(conf->searchReps > 1)
+			outman.UserMessage("\nParameter estimates across search replicates:");
+		else 
 			outman.UserMessage("\nParameter estimates:");
-			for(int part = 0;part < storedTrees[0]->modPart.NumModels();part++){
-				if(storedTrees[0]->modPart.NumModels() > 1)
-					outman.UserMessage("\nPartition subset %d:", part);
-				if(storedTrees[0]->modPart.GetModel(part)->GetMutableParameters()->size() > 0){
-					string s;
-					storedTrees[0]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, false);
-					outman.UserMessage("       %s", s.c_str());
-					for(unsigned i=0;i<storedTrees.size();i++){
-						storedTrees[i]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, true);
-						outman.UserMessage("rep%2d: %s", i+1, s.c_str());
-						}
-					}
-				else{
-					outman.UserMessage("\t Model contains no estimated parameters");
+		for(int part = 0;part < storedTrees[0]->modPart.NumModels();part++){
+			if(storedTrees[0]->modPart.NumModels() > 1)
+				outman.UserMessage("\nPartition subset %d:", part);
+			if(storedTrees[0]->modPart.GetModel(part)->GetMutableParameters()->size() > 0){
+				string s;
+				storedTrees[0]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, false);
+				outman.UserMessage("       %s", s.c_str());
+				for(unsigned i=0;i<storedTrees.size();i++){
+					storedTrees[i]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, true);
+					outman.UserMessage("rep%2d: %s", i+1, s.c_str());
 					}
 				}
-			outman.UserMessageNoCR("\nTreelength ");
-			if(modSpecSet.InferSubsetRates())
-				outman.UserMessageNoCR("and subset rate multipliers:");
+			else{
+				outman.UserMessage("\t Model contains no estimated parameters");
+				}
+			}
+		outman.UserMessageNoCR("\nTreelength ");
+		if(modSpecSet.InferSubsetRates())
+			outman.UserMessageNoCR("and subset rate multipliers:");
+		outman.UserMessage("");
+		outman.UserMessageNoCR("        TL");
+		if(modSpecSet.InferSubsetRates()){
+			for(int d = 0;d < dataPart->NumSubsets();d++){
+				outman.UserMessageNoCR("     R%d", d);
+				}
+			}
+		outman.UserMessage("");
+		for(unsigned i=0;i<storedTrees.size();i++){
+			outman.UserMessageNoCR("rep%2d:", i+1);
+			outman.UserMessageNoCR("%6.3f ", storedTrees[i]->treeStruct->Treelength());
+			if(modSpecSet.InferSubsetRates()){
+				for(int d = 0;d < dataPart->NumSubsets();d++){
+					outman.UserMessageNoCR("%6.3f ", storedTrees[i]->modPart.SubsetRate(d));
+					}
+				}
 			outman.UserMessage("");
-			for(unsigned i=0;i<storedTrees.size();i++){
-				outman.UserMessageNoCR("rep%2d:", i+1);
-				outman.UserMessageNoCR("%6.3f ", storedTrees[i]->treeStruct->Treelength());
-				if(modSpecSet.InferSubsetRates()){
-					for(int d = 0;d < dataPart->NumSubsets();d++){
-						outman.UserMessageNoCR("%6.3f ", storedTrees[i]->modPart.SubsetRate(d));
-						}
-					}
-				outman.UserMessage("");
-				}
-			//	}
-//			}
-		if(conf->bootstrapReps == 0 && conf->runmode != 11){
-			outman.UserMessage("\nFinal result of the best scoring rep (#%d) stored in %s.tre", bestRep+1, besttreefile.c_str());
-			outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
 			}
 		}
 	return bestRep;
@@ -2586,7 +2604,7 @@ void Population::Bootstrap(){
 		PerformSearch();
 		Reset();
 		
-		if(prematureTermination == false){
+		if(!userTermination && !timeTermination){
 
 #ifdef MAC_FRONTEND
 			pool = [[NSAutoreleasePool alloc] init];
@@ -2595,7 +2613,7 @@ void Population::Bootstrap(){
 #endif		
 			}
 		else {
-			outman.UserMessage("abandoning bootstrap rep %d ....terminating", currentBootstrapRep);
+			outman.UserMessage("abandoning bootstrap rep %d.... terminating\n", currentBootstrapRep);
 			break;
 			}
 		}
@@ -2622,7 +2640,7 @@ void Population::Bootstrap(){
 		SeedPopulationWithStartingTree();
 		Run();
 		
-		if(prematureTermination == false){
+		if(userTermination == false){
 			adap->branchOptPrecision = adap->startOptPrecision;
 			FinishBootstrapRep(rep);
 			outman.UserMessage("finished with bootstrap rep %d\n", rep);
@@ -2663,14 +2681,19 @@ void Population::PerformSearch(){
 
 	for(;currentSearchRep<=conf->searchReps;currentSearchRep++){
 		string s;
-		if(conf->restart == false && currentSearchRep > 1) Reset();
+		if(conf->restart == false && currentSearchRep > 1){
+			Reset();
+			//this just changes what the rng has stored as the init seed ix0, for output purposes
+			rnd.set_seed(rnd.seed());
+			}
 		
 		//ensure that the user can ctrl-c kill the program during creation of each stepwise addition tree
-		//the signal handling will be returned to the custom message below
-		signal( SIGINT, SIG_DFL );
+		TurnOffSignalCatching();
 
 		GetRepNums(s);
 		if(conf->restart == false){
+			//the fraction done is set to 1% here, indicating the this rep is ready to go
+			//if we restarted, the fraction should already have been set when reading the state files
 			UpdateFractionDone(0);
 			if(s.length() > 0) outman.UserMessage("\n>>>%s<<<", s.c_str());
 			SeedPopulationWithStartingTree(currentSearchRep);
@@ -2691,39 +2714,67 @@ void Population::PerformSearch(){
 		InitializeOutputStreams();
 		Run();
 
-		//this rep is over
-		if(prematureTermination == false){
-			if(s.length() > 0) outman.UserMessage(">>>Completed %s<<<\n", s.c_str());
-			//not sure where this should best go
-			outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
-			indiv[bestIndiv].modPart.OutputHumanReadableModelReportWithParams();
+		//for most purposes, these two types of termination are premature and treated identically
+		//gen termination is treated as normal termination besides some warnings
+		bool prematureTermination = (userTermination || timeTermination);
 
-			if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
-			Individual *repResult = new Individual(&indiv[bestIndiv]);
-			if(conf->collapseBranches){
-				int numCollapsed = 0;
-				repResult->treeStruct->root->CollapseMinLengthBranches(numCollapsed);
-				outman.UserMessage("\nNOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");\
-				if(numCollapsed == 0)
-					outman.UserMessage("    No branches were short enough to be collapsed.");
-				else 
-					outman.UserMessage("    %d branches were collapsed.", numCollapsed);
+		//if we're checkpointing and terminated prematurely just bail without doing anything else
+		if(prematureTermination && conf->checkpoint){
+			outman.UserMessage("\nNOTE: A CHECKPOINTED RUN (writecheckpoints = 1) WAS PREMATURELY");
+			outman.UserMessage("TERMINATED.  OUTPUT FILES (tree files, etc.) WILL NOT BE" ); 
+			outman.UserMessage("FINALIZED SO THAT THE RUN CAN BE RESTARTED WHERE IT LEFT OFF");
+			outman.UserMessage("(set restart = 1 in the config file).  IF YOU WANT TO USE THE");
+			outman.UserMessage("PARTIAL OUTPUT FILES WITHOUT RESTARTING YOU WILL NEED TO MANUALLY");
+			outman.UserMessage("ADD \"end;\" TO THE TREE FILES.\n");
+			exit(0);
+			}
+
+		outman.UserMessage("");
+		if(userTermination)
+			outman.UserMessage("MODEL REPORT - SEARCH TERMINATED BY USER");
+		else if(timeTermination)
+			outman.UserMessage("MODEL REPORT - SEARCH TERMINATED AFTER REACHING TIME LIMIT");
+		else if(genTermination)
+			outman.UserMessage("MODEL REPORT - SEARCH TERMINATED AFTER REACHING GENERATION LIMIT");
+		else
+			outman.UserMessage("MODEL REPORT - Parameter values are FINAL");
+		indiv[bestIndiv].modPart.OutputHumanReadableModelReportWithParams();
+
+		//this rep is over
+		//11/28/09 We will now always store the final individual in the stored trees array, 
+		//even if prematureTerm
+		if(Tree::outgroup != NULL) 
+			OutgroupRoot(&indiv[bestIndiv], bestIndiv);
+		//this individual will be stored in the storedTrees array until population deletes it much later,
+		Individual *repResult = new Individual(&indiv[bestIndiv]);
+		//Note that the collapsed individual is intentionally not stored here.  It will be re-collapsed on
+		//output to file, and the collapsing here is just for this message
+		if(conf->collapseBranches){
+			Individual repResultColl(&indiv[bestIndiv]);
+			int numCollapsed = 0;
+			repResultColl.treeStruct->root->CollapseMinLengthBranches(numCollapsed);
+			outman.UserMessage("NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)");\
+			if(numCollapsed == 0)
+				outman.UserMessage("    No branches were short enough to be collapsed.\n");
+			else 
+				outman.UserMessage("    %d branches were collapsed.\n", numCollapsed);
+			if(repResult->treeStruct->constraints.empty() == false){
+				for(vector<Constraint>::iterator con=repResult->treeStruct->constraints.begin();con!=repResult->treeStruct->constraints.end();con++){
+					if(con->IsPositive()){
+						outman.UserMessage("\nNOTE: If collapsing of minimum length branches is requested (collapsebranches = 1) in a run with\n\ta positive constraint, it is possible for a constrained branch itself to be collapsed.\n\tIf you care, be careful to check whether this has happened or turn off branch collapsing.\n");
+						break;
+						}
+					}
 				}
-			storedTrees.push_back(repResult);
 			}
-		else{
-			if(s.length() > 0) outman.UserMessage(">>>Terminated %s<<<\n", s.c_str());
-			outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
-			}
+		storedTrees.push_back(repResult);
 
 		//output site likelihoods if requested
 		if(conf->outputSitelikelihoods > 0){
-			//assert(conf->searchReps == 1 && conf->bootstrapReps == 0);
-			if(prematureTermination == false){
-				outman.UserMessage("Outputting site likelihoods ...");
-				}
-			else{
-				outman.UserMessage("WARNING: Site likelihoods being output on prematurely terminated run ...");
+			outman.UserMessage("Saving site likelihoods to file %s.sitelikes.log ...", conf->ofprefix.c_str());
+			
+			if( (userTermination || timeTermination || genTermination) ){
+				outman.UserMessage("WARNING: Site likelihoods being output on prematurely terminated search ...");
 				}
 
 			//This has to work somewhat differently for partitioning.  As far as the tree functions know we will always
@@ -2750,7 +2801,22 @@ void Population::PerformSearch(){
 			ordered.close();
 			}
 
+		//warn if the normal auto-term conditions weren't used
+		if(userTermination || timeTermination || genTermination){
+			if(s.length() > 0 && (userTermination || timeTermination))
+				outman.UserMessage(">>>Terminated %s<<<", s.c_str());
+			outman.UserMessage("%s", TerminationWarningMessage().c_str());
+			}
+		else{
+			//I think that this should only be reported here if there is > 1 search rep per boot rep, since it should really be noting that
+			//a given rep has finished, and the overall boot rep doesn't really finish until after the summary across search reps
+			if(s.length() > 0 && (conf->bootstrapReps == 0 || (conf->bootstrapReps > 0 && conf->searchReps > 1)))
+				outman.UserMessage(">>>Completed %s<<<", s.c_str());
+			}
+
 		int best=0;
+		//If this is the last search of a run, bootstrap rep, or it was killed prematurely
+		//Note that EvaluateStoredTrees does some summary output for the model estimates from those trees
 		if((currentSearchRep == conf->searchReps) || prematureTermination){
 			if(storedTrees.size() > 0){
 				best=EvaluateStoredTrees(true);
@@ -2793,40 +2859,88 @@ void Population::PerformSearch(){
 				Individual *repResult = new Individual(&indiv[0]);
 				storedTrees.push_back(repResult);
 				outman.UserMessage("Best topology created by recombination: %f", indiv[0].Fitness());
+				
 	*/			}
 			}
 
-		if( (prematureTermination == false && (all_best_output & WRITE_REP_TERM)) ||
-			(prematureTermination == false && (currentSearchRep == conf->searchReps) && (all_best_output & WRITE_REPSET_TERM)) ||
-			(prematureTermination && (all_best_output & WRITE_PREMATURE)))
-			if(storedTrees.size() > 0) WriteStoredTrees(besttreefile.c_str());
-
-		if( (prematureTermination == false && (best_output & WRITE_REP_TERM)) ||
-			(prematureTermination == false && (currentSearchRep == conf->searchReps) && (best_output & WRITE_REPSET_TERM)) ||
-			(prematureTermination && (best_output & WRITE_PREMATURE))){
-			if(conf->searchReps > 1 && storedTrees.size() > 0){
-				WriteTreeFile(besttreefile.c_str(), best);
+		//write the best trees from all completed reps:
+		//at the end of each rep
+		//at the end of all reps
+		//if termination was premature and we're told to write in that case (the premature tree will be included)
+		if( ( (! prematureTermination) && (all_best_output & WRITE_REP_TERM)) ||
+			( (! prematureTermination) && (currentSearchRep == conf->searchReps) && (all_best_output & WRITE_REPSET_TERM)) ||
+			( (prematureTermination) && (storedTrees.size() > 1) && (all_best_output & WRITE_PREMATURE))){
+			if(storedTrees.size() > 0){
+				if(prematureTermination || currentSearchRep == conf->searchReps)//message only if last
+					//outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
+					outman.UserMessage("\nSaving final trees from all search reps to %s.all.tre", besttreefile.c_str());
+				WriteStoredTrees(besttreefile.c_str());
 				}
-			else WriteTreeFile(besttreefile.c_str());
+			}
+
+		//write the best overall tree:
+		//at the end of each rep
+		//at the end of all reps
+		////if termination was premature and we're told to write in that case (the premature tree will be written if it is best)
+		if( ( (! prematureTermination) && (best_output & WRITE_REP_TERM)) ||
+			( (! prematureTermination) && (currentSearchRep == conf->searchReps) && (best_output & WRITE_REPSET_TERM)) ||
+			( (prematureTermination) && (best_output & WRITE_PREMATURE))){
+			//the first two options here write trees from the storedTrees array, the last writes the best from the current population
+			//outman.UserMessage("\nFinal result of the best scoring rep (#%d) stored in %s.tre", best + 1, besttreefile.c_str());
+			outman.UserMessage("\nSaving final tree from best search rep (#%d) to %s.tre", best + 1, besttreefile.c_str());
+			if(conf->searchReps > 1 && storedTrees.size() > 0){
+				WriteTreeFile(besttreefile.c_str(), best, conf->collapseBranches);
+				}
+			else if(storedTrees.size() == 1)
+				WriteTreeFile(besttreefile.c_str(), 0, conf->collapseBranches);
+			else
+				WriteTreeFile(besttreefile.c_str(), -1, conf->collapseBranches);
 			}
 		
 		if(conf->bootstrapReps > 0){
-			if( (prematureTermination == false && (bootlog_output & WRITE_REP_TERM)) ||
-				(prematureTermination == false && (currentSearchRep == conf->searchReps) && (bootlog_output & WRITE_REPSET_TERM)) ||
-				(prematureTermination && (bootlog_output & WRITE_PREMATURE))){
+			//write best boot tree if:
+			//end of single search rep of many, and we're supposed to (not normal)
+			//end of search rep set or single search
+			//premature termination and we're told to
+			//premature termination and we've already stored a tree (due to change, even a single termed run will now be in here)
+			if( ( (! prematureTermination) && (bootlog_output & WRITE_REP_TERM)) ||
+				( (! prematureTermination) && (currentSearchRep == conf->searchReps) && (bootlog_output & WRITE_REPSET_TERM)) ||
+				( (prematureTermination) && (bootlog_output & WRITE_PREMATURE)) ||
+				( (prematureTermination) && storedTrees.size() > 0)){
 				if(conf->searchReps > 1 && storedTrees.size() > 0){
-					outman.UserMessage("Saving best search rep (#%d) to bootstrap file", best+1);
+					//we're doing multiple searches per boot rep, and have successfully completed at least one replicate
+					//(although the present replicate could have been prematurely terminated)
+					char temp_buf[100];
+					char suffix[100];
+					sprintf(suffix, "boot.tre");
+					DetermineFilename(bootlog_output, temp_buf, suffix);
+					outman.UserMessage("\nSaving tree from best search rep (#%d) to bootstrap file %s\n", best+1, temp_buf);
+					if(prematureTermination && best == storedTrees.size() - 1)
+						outman.UserMessage("WARNING: Tree from prematurely terminated search saved to bootstrap file");
 					FinishBootstrapRep(storedTrees[best], currentBootstrapRep);
 					}
-				//this was a bug - when collapse was on and bootstrapping was being done with one search
-				//rep, the best tree was being written to the boot file.  The tree in the storedTrees is
-				//the one that was actually collapsed though	
-				//else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
-				else if(storedTrees.size() == 1)
+
+				else if(storedTrees.size() == 1){
+					//We just successfully completed a one-search-rep bootstrap replicate 
 					FinishBootstrapRep(storedTrees[0], currentBootstrapRep);	
-				else FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
+					char temp_buf[100];
+					char suffix[100];
+					sprintf(suffix, "boot.tre");
+					DetermineFilename(bootlog_output, temp_buf, suffix);
+					outman.UserMessage("\nSaving best tree to bootstrap file %s\n", temp_buf);
+					if(prematureTermination)
+						outman.UserMessage("WARNING: Tree from prematurely terminated search saved to bootstrap file");
+					}
+				else //This rep was prematurely killed, but we're supposed to write it
+					FinishBootstrapRep(&indiv[bestIndiv], currentBootstrapRep);
+				if(!prematureTermination){
+					outman.UserMessage(">>>Completed Bootstrap rep %d<<<", currentBootstrapRep);
+					}
 				}
-			else if(prematureTermination && !(bootlog_output & WRITE_PREMATURE)) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
+			else{ 
+				if(prematureTermination && !(bootlog_output & WRITE_PREMATURE)) 
+					outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
+				}
 			}
 
 		if(conf->inferInternalStateProbs == true){
@@ -2840,48 +2954,19 @@ void Population::PerformSearch(){
 					}
 				}
 			else if(prematureTermination){
-				outman.UserMessage(">>>Internal state probabilities not inferred due to premature termination<<<");
+				outman.UserMessage(">>>Internal state probabilities not inferred due to premature termination<<<\n");
 				}
 			}
-/*				
-		//the entire set of replicate searches is over, or was terminated early
-		if(currentSearchRep == conf->searchReps || prematureTermination){
-			int best=0;
-			if(conf->searchReps > 1 && storedTrees.size() > 0) best=EvaluateStoredTrees(true);
-			if(conf->bootstrapReps > 0){
-				//if bootstrapping, write the overall best tree to the bootstrap tree file
-				if(prematureTermination && (!(bootlog_output & WRITE_PREMATURE))) outman.UserMessage("Not saving search rep to bootstrap file due to early termination");
-				else{
-					if(conf->searchReps > 1) outman.UserMessage("Saving best search rep (#%d) to bootstrap file", best+1);
-					FinishBootstrapRep(storedTrees[best], currentBootstrapRep);
-					}
-				}
-			else{
-				if(!prematureTermination || (best_output & WRITE_PREMATURE)){
-					if(storedTrees.size() > 0)
-						WriteTreeFile(besttreefile.c_str(), best);
-					else WriteTreeFile(besttreefile.c_str());
-					}
-				if(prematureTermination == true) outman.UserMessage("NOTE: ***Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not\nbe fully optimal!***");
-		
-				if(conf->inferInternalStateProbs == true){
-					if(storedTrees.size() > 0){
-						outman.UserMessage("Inferring internal state probabilities on best tree....");
-						storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
-						}
-					else{
-						outman.UserMessage(">>>Internal state probabilities not inferred due to premature termination<<<");
-						}
-					}
-				}
-			}
-*/
 		//finalize anything that needs it at rep end
 		FinalizeOutputStreams(0);
 		//finalize anything that needs it at the end of the repset
-		if(currentSearchRep == conf->searchReps) FinalizeOutputStreams(1);
+		if(currentSearchRep == conf->searchReps || prematureTermination) {
+			FinalizeOutputStreams(1);
+			outman.UserMessage("#######################################################");
+			}
 
-		if(prematureTermination == true) break;
+		if(userTermination == true || timeTermination == true) 
+			break;
 
 #ifndef BOINC
 		if(conf->checkpoint)
@@ -2924,7 +3009,7 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 		BetterFinalOptimization();
 
 		outman.UserMessage("Writing site likelihoods for tree %d ...", t);
-		indiv[0].treeStruct->sitelikeLevel = - (max((int) conf->outputSitelikelihoods, 1));
+		indiv[0].treeStruct->sitelikeLevel = - (max((int)conf->outputSitelikelihoods, 1));
 		indiv[0].treeStruct->ofprefix = conf->ofprefix;
 		indiv[0].treeStruct->Score();
 		
@@ -2935,7 +3020,6 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 
 		Individual *repResult = new Individual(&indiv[0]);
 		storedTrees.push_back(repResult);
-
 		Reset();
 		}
 	EvaluateStoredTrees(true);
@@ -3658,11 +3742,10 @@ void Population::PerformMutation(int indNum){
 
 						if(output_tree){
 							treeLog << "  tree gen" << gen <<  "." << indNum << "= [&U] [" << ind->Fitness() << "][ ";
-							//DEBUG PARTITION
-							//ind->mod->OutputGarliFormattedModel(treeLog);
-							ind->modPart.GetModel(0)->OutputGarliFormattedModel(treeLog);
+							string modstr;
+							ind->modPart.FillGarliFormattedModelStrings(modstr);
 							ind->treeStruct->root->MakeNewick(treeString, false, true);
-							treeLog << "]" << treeString << ";" << endl;
+							treeLog << modstr.c_str() << "]" << treeString << ";" << endl;
 							output_tree=false;
 							}
 
@@ -3835,7 +3918,7 @@ if(rank > 0) return;
 	if(ind==NULL){
 		for(unsigned i=0;i<total_size;i++){
 			outf << "  utree " << gen << i << "= ";
-			indiv[i].treeStruct->root->MakeNewick(treeString, false, true);
+			indiv[i].treeStruct->root->MakeNewick(treeString, false, true, true);
 			outf << treeString << ";\n";
 			
 			paupf << "lset userbr ";
@@ -3917,19 +4000,39 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	
 	if(treeLog.is_open() == false || conf->outputTreelog==false) return;
 
-	Individual *ind;
+	const Individual *ind;
 	int i = (indNum >= 0 ? indNum : bestIndiv);
 
 	ind=&indiv[i];
 
-	if(Tree::outgroup != NULL) OutgroupRoot(ind, i);
+//	if(Tree::outgroup != NULL) 
+//		OutgroupRoot(ind, i);
 		
-	if(gen == UINT_MAX) treeLog << "  tree final= [&U] [" << ind->Fitness() << "][ ";
-	else treeLog << "  tree gen" << gen <<  "= [&U] [" << ind->Fitness() << "\tmut=" << mutType << "][ ";
+	int num = 0;
+	Individual tempInd;
+	const Individual *theInd;
+	if(Tree::outgroup != NULL || conf->collapseBranches){
+		tempInd.DuplicateIndivWithoutCLAs(ind);
+		if(Tree::outgroup != NULL)
+			OutgroupRoot(&tempInd, -1);
+/*		//Can't decide if these should be collapsed or not here.  Thinking no.
+		if(conf->collapseBranches){
+			tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+			outman.UserMessage("%d COLLAPSED", num);
+			}
+*/
+		theInd = &tempInd;
+		}
+	else
+		theInd = ind;
 
+	if(gen == UINT_MAX)
+		treeLog << "  tree final= [&U] [" << theInd->Fitness() << "][ ";
+	else 
+		treeLog << "  tree gen" << gen <<  "= [&U] [" << theInd->Fitness() << "\tmut=" << mutType << "][ ";
 	string modstr;
 	ind->modPart.FillGarliFormattedModelStrings(modstr);
-	ind->treeStruct->root->MakeNewick(treeString, false, true);
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	treeLog << modstr.c_str() << "]" << treeString << ";" << endl;
 	}
 
@@ -3938,16 +4041,29 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 
 	if(bootLog.is_open() == false) return;
 
-	if(Tree::outgroup != NULL) OutgroupRoot(&indiv[bestIndiv], bestIndiv);
+	int num = 0;
+	Individual tempInd;
+	const Individual *theInd;
+	if(Tree::outgroup != NULL || conf->collapseBranches){
+		tempInd.DuplicateIndivWithoutCLAs(ind);
+		if(Tree::outgroup != NULL)
+			OutgroupRoot(&tempInd, -1);
+		if(conf->collapseBranches){
+			tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+//			outman.UserMessage("%d COLLAPSED", num);
+			}
+		theInd = &tempInd;
+		}
+	else
+		theInd = ind;
 
 	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << ind->Fitness() << " ";
 	
-	//DEBUG PARTITION
-	//ind->mod->OutputGarliFormattedModel(bootLog);
-	ind->modPart.GetModel(0)->OutputGarliFormattedModel(bootLog);
+	string modstr;
+	ind->modPart.FillGarliFormattedModelStrings(modstr);
 
 	ind->treeStruct->root->MakeNewick(treeString, false, true);
-	bootLog << "] " << treeString << ";" << endl;
+	bootLog << modstr.c_str() << "] " << treeString << ";" << endl;
 
 	if(conf->outputPhylipTree == true){
 		WritePhylipTree(bootLogPhylip);
@@ -3956,6 +4072,7 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 
 bool Population::OutgroupRoot(Individual *ind, int indnum){
 	//if indnum != -1 the individual is in the indiv array, and a few extra things need to be done 
+	ind->treeStruct->root->CheckforPolytomies();
 
 	ind->treeStruct->CalcBipartitions(true);
 	Bipartition b = *(Tree::outgroup);
@@ -3969,9 +4086,12 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 		}
 	
 	TreeNode *temp = r;
-	while(temp->IsTerminal() == false) temp=temp->left;
-	if(Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal()) r = r->anc;
+	while(temp->IsTerminal() == false) 
+		temp=temp->left;
+	if(Tree::outgroup->ContainsTaxon(temp->nodeNum) == false || r->IsTerminal()) 
+		r = r->anc;
 	if(r->IsNotRoot()){
+//		outman.UserMessage("REROOTED");
 		ind->treeStruct->RerootHere(r->nodeNum);
 		if(indnum != -1){
 			ind->SetDirty();
@@ -3982,7 +4102,7 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 	else return false;
 	}
 
-void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
+void Population::WriteTreeFile( const char* treefname, int indnum, bool collapse /*=false*/ ){
 	int k;
 
 	assert( treefname );
@@ -3991,16 +4111,30 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 
 	//output an individual from the storedTrees if an indnum is passed in
 	//otherwise the best in the population
-	Individual *ind;
+	const Individual *ind;
 	if(indnum == -1){
 		ind = &indiv[bestIndiv];
-		if(Tree::outgroup != NULL) OutgroupRoot(ind, bestIndiv);
 		}
 	else{
 		assert(indnum < storedTrees.size());
 		ind = storedTrees[indnum];
-		if(Tree::outgroup != NULL) OutgroupRoot(ind, -1);
 		}
+
+	int num = 0;
+	Individual tempInd;
+	const Individual *theInd;
+	if(Tree::outgroup != NULL || (conf->collapseBranches && collapse)){
+		tempInd.DuplicateIndivWithoutCLAs(ind);
+		if(Tree::outgroup != NULL)
+			OutgroupRoot(&tempInd, -1);
+		if(conf->collapseBranches && collapse){
+			tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+//			outman.UserMessage("%d COLLAPSED", num);
+			}
+		theInd = &tempInd;
+		}
+	else
+		theInd = ind;
 
 #ifdef INCLUDE_PERTURBATION
 	if(allTimeBest != NULL){
@@ -4018,55 +4152,38 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 	outf.open( filename.c_str() );
 	outf.precision(8);
 #endif
-
+	string trans;
 	string str;
-	char temp[101];//the max taxon name is 100 (defined as MAX_TAXON_LABEL in datamatr.cpp)
-	str = "#nexus\n\n";
-
-	int ntaxa = dataPart->NTax();
-	str += "begin trees;\ntranslate\n";
-	for(k=0;k<ntaxa;k++){
-		NxsString tnstr = dataPart->TaxonLabel(k);
-		//DO NOT call GetEscaped() or BlanksToUnderscores() on the names here - they are stored 
-		//exactly as they should be output upon initial reading
-		//tnstr.BlanksToUnderscores();
-		sprintf(temp, " %d %s", k+1, tnstr.c_str());
-		str += temp;
-		if(k < ntaxa-1) 
-			str += ",\n";
-		}		
-
-	str += ";\n";
-	if(prematureTermination == true){
-		if(indnum == -1)
-			str += "[NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!]\n";
-		else
-			str += "[NOTE: GARLI Run was terminated before full completion!  This is the best tree from a completed replicate.]\n";
-		}
-	if(indnum == -1) sprintf(temp, "tree best = [&U][!GarliScore %f][!GarliModel ", ind->Fitness()); 
-	else sprintf(temp, "tree bestREP%d = [&U][!GarliScore %f][!GarliModel ", indnum+1, ind->Fitness()); 
+	dataPart->BeginNexusTreesBlock(trans);
+	//data->BeginNexusTreesBlock(outf);
+	char temp[101];	
+	if(indnum == -1)
+		sprintf(temp, "tree best = [&U][!GarliScore %f][!GarliModel ", theInd->Fitness());
+	else
+		sprintf(temp, "tree bestREP%d = [&U][!GarliScore %f][!GarliModel ", indnum+1, theInd->Fitness());
 	str += temp;
 	string modstr;
 	ind->modPart.FillGarliFormattedModelStrings(modstr);
 	str += modstr;
-	modstr.clear();
-
-	str += "]\n";
+	str += "]";
 
 #ifdef BOINC
-	const char *s = str.c_str();
+	const char *s = trans.c_str();
+	outf.write(s, sizeof(char), trans.length());
+	s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
-	ind->treeStruct->root->MakeNewick(treeString, false, true);
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	size_t len = strlen(treeString);
 	outf.write(treeString, sizeof(char), len);
 	str = ";\nend;\n";
 	s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
 #else
+	outf << trans;
 	outf << str;
 	outf.setf( ios::floatfield, ios::fixed );
 	outf.setf( ios::showpoint );
-	ind->treeStruct->root->MakeNewick(treeString, false, true);
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	outf << treeString << ";\n";
 	outf << "end;\n";
 #endif	
@@ -4078,7 +4195,8 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 			}
 		else{
 			str += "[\n";
-			ind->modPart.FillGarliFormattedModelStrings(modstr);
+			//modstr was already filled above
+			//ind->modPart.FillGarliFormattedModelStrings(modstr);
 			str += modstr;
 			str += "\n]\n";
 			modstr.clear();
@@ -4087,14 +4205,18 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 #ifdef BOINC
 	s = str.c_str();
 	outf.write(s, sizeof(char), str.length());
-	if(prematureTermination == true){
-		str = "[!****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****\n]";
+	if((userTermination || timeTermination) && (indnum == storedTrees.size() - 1)){
+		//str = "[!****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****\n]";
+		str = TerminationWarningMessage();
+		str += "\n";
 		s = str.c_str();
 		outf.write(s, sizeof(char), str.length());
 		}
 #else
 	outf << str; 
-	if(prematureTermination == true) outf << "[!****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****]" << endl;
+	//if(indnum < 0 && (userTermination || timeTermination))
+	if((userTermination || timeTermination) && (indnum == storedTrees.size() - 1))
+		outf << TerminationWarningMessage().c_str() << endl;
 #endif
 		
 	outf.close();
@@ -4107,12 +4229,6 @@ void Population::WriteTreeFile( const char* treefname, int indnum/* = -1 */ ){
 		WritePhylipTree(phytree);
 		phytree.close();
 		}
-
-//if using the UD serial version, just output the best tree in phylip format, with it's score before it
-/*	best->treeStruct->root->MakeNewick(treeString, false);
-	outf << best->treeStruct->lnL << "\t" << best->kappa << "\t" << treeString << ";";
-	outf.close();
-*/
 	}
 
 void Population::WriteStoredTrees( const char* treefname ){
@@ -4135,19 +4251,55 @@ void Population::WriteStoredTrees( const char* treefname ){
 		}
 
 	int bestRep = EvaluateStoredTrees(false);
+	
+	Individual tempInd;
 	for(unsigned r=0;r<storedTrees.size();r++){
-		if(r == bestRep) outf << "tree rep" << r+1 << "BEST = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
-		else outf << "tree rep" << r+1 << " = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
-
+		const Individual *curInd;
+		if(Tree::outgroup != NULL || conf->collapseBranches){
+			tempInd.DuplicateIndivWithoutCLAs(storedTrees[r]);
+			if(Tree::outgroup != NULL)
+				OutgroupRoot(&tempInd, -1);
+			if(conf->collapseBranches){
+				int num = 0;
+				tempInd.treeStruct->root->CollapseMinLengthBranches(num);
+//				outman.UserMessage("%d COLLAPSED", num);
+				}
+			curInd = &tempInd;
+			}
+		else
+			curInd = storedTrees[r];
+		if(r == bestRep) 
+			outf << "tree rep" << r+1 << "BEST = [&U][!GarliScore " << curInd->Fitness() << "][!GarliModel ";
+		else 
+			outf << "tree rep" << r+1 << " = [&U][!GarliScore " << curInd->Fitness() << "][!GarliModel ";
 		string mods;
-		storedTrees[r]->modPart.FillGarliFormattedModelStrings(mods);
+		curInd->modPart.FillGarliFormattedModelStrings(mods);
 		outf << mods;
-
 		outf << "]";
 
 		outf.setf( ios::floatfield, ios::fixed );
 		outf.setf( ios::showpoint );
-		if(Tree::outgroup != NULL) OutgroupRoot(storedTrees[r], -1);
+		curInd->treeStruct->root->MakeNewick(treeString, false, true);
+		outf << treeString << ";\n";
+
+		if(conf->outputPhylipTree){//output a phylip formatted tree if requested
+			WritePhylipTree(phytree);
+			}
+		}
+
+/*
+	for(unsigned r=0;r<storedTrees.size();r++){
+		if(r == bestRep) 
+			outf << "tree rep" << r+1 << "BEST = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
+		else 
+			outf << "tree rep" << r+1 << " = [&U][!GarliScore " << storedTrees[r]->Fitness() << "][!GarliModel ";
+		storedTrees[r]->mod->OutputGarliFormattedModel(outf);
+		outf << "]";
+
+		outf.setf( ios::floatfield, ios::fixed );
+		outf.setf( ios::showpoint );
+		if(Tree::outgroup != NULL) 
+			OutgroupRoot(storedTrees[r], -1);
 		storedTrees[r]->treeStruct->root->MakeNewick(treeString, false, true);
 		outf << treeString << ";\n";
 
@@ -4155,6 +4307,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 			WritePhylipTree(phytree);
 			}
 		}
+*/
 	outf << "end;\n";
 
 //	if(modSpecSet.GetModSpec(0)->IsNucleotide()){
@@ -4178,6 +4331,9 @@ void Population::WriteStoredTrees( const char* treefname ){
 				}
 			}
 //		}
+	if(userTermination || timeTermination){
+		outf << TerminationWarningMessage().c_str();
+		}
 	outf.close();
 	if(conf->outputPhylipTree) phytree.close();
 	}
@@ -4202,7 +4358,21 @@ void Population::WritePhylipTree(ofstream &phytree){
 		else{
 			while(isdigit(*loc))
 				temp += *loc++;
-			phytree << dataPart->TaxonLabel(atoi(temp.c_str())-1);
+			//The stored taxon names will have been gotten with GetEscaped, and thus might
+			//have quotes around them if they have Nexus punctuation.  The quotes probably
+			//shouldn't appear in the phylip output.  However, if the names have three single
+			//quotes this corresponds to a single literal quote, in which case it will be output
+			NxsString pname = dataPart->TaxonLabel(atoi(temp.c_str())-1);
+			if(pname[0] == '\'' && pname[pname.size()-1] == '\''){
+				pname.erase(pname.end()-1);
+				pname.erase(pname.begin());
+				}
+			if(pname[0] == '\'' && pname[1] == '\'' ){
+				pname.erase(pname.end()-1);
+				pname.erase(pname.begin());
+				}
+			phytree << pname.c_str();
+			//phytree << data->TaxonLabel(atoi(temp.c_str())-1);
 			temp="";
 			}
 		}
@@ -4213,7 +4383,7 @@ void Population::WritePhylipTree(ofstream &phytree){
 char * Population::MakeNewick(int i, bool internalNodes)
 {
 	indiv[i].treeStruct->root->MakeNewick(treeString, internalNodes, true);
-	assert(!treeString[stringSize]);
+	assert(!treeString[stringSize-1]);
 	return treeString;
 }
 
@@ -6482,11 +6652,14 @@ void Population::FinalizeOutputStreams(int type){
 		fullTerm = 2
 	*/
 
+	bool prematureTermination = (userTermination || timeTermination);
+
 	if(prematureTermination == true && type == 0){
 		if(log_output & WARN_PREMATURE)
-			log << "***NOTE: Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***" << endl;
+			log << TerminationWarningMessage().c_str() << endl;
 		if(treelog_output & WARN_PREMATURE)
-			if(treeLog.is_open()) treeLog << "[!****NOTE: GARLI run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***]" << endl;
+			if(treeLog.is_open()) 
+				treeLog << TerminationWarningMessage().c_str() << endl;
 		}
 
 	bool repTerm, repsetTerm, fullTerm;

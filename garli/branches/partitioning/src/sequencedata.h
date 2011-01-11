@@ -628,6 +628,7 @@ public:
 		}
 	int NTax() const {return nTax;}
 	int NumSubsets() const {return dataSubsets.size();}
+	void BeginNexusTreesBlock(string &trans) const {dataSubsets[0]->BeginNexusTreesBlock(trans);}
 	void BeginNexusTreesBlock(ofstream &out) const {dataSubsets[0]->BeginNexusTreesBlock(out);}
 	NxsString TaxonLabel(int t) const {return dataSubsets[0]->TaxonLabel(t);}
 	int TaxonNameToNumber(NxsString name) const{return dataSubsets[0]->TaxonNameToNumber(name);}
