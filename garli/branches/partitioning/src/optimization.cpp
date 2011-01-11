@@ -104,6 +104,24 @@ FLOAT_TYPE Tree::OptimizeAllBranches(FLOAT_TYPE optPrecision){
 	return improve;
 	}
 
+int Tree::PushBranchlengthsToMin(){
+	int num = 0;
+	pair<FLOAT_TYPE, FLOAT_TYPE> derivs;
+	for(int i=1;i < numNodesTotal;i++){
+		if(allNodes[i]->dlen < 1.0e-4 && !(FloatingPointEquals(allNodes[i]->dlen, min_brlen, 1e-9))){
+			derivs = CalcDerivativesRateHet(allNodes[i]->anc, allNodes[i]);
+			if(derivs.first < ZERO_POINT_ZERO){
+				//outman.DebugMessage("(branch %d: %.9f -> %.9f", i, allNodes[i]->dlen, 1e-8);
+				SetBranchLength(allNodes[i], min_brlen);
+				num++;
+				}
+			else
+				outman.DebugMessage("pos d1\t%.9f\t%.9f", allNodes[i]->dlen, derivs.first);
+			}
+		}
+	return num;
+	}
+
 FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
 	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1e-8)) Score();
 	Score();

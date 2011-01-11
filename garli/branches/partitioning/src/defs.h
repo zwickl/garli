@@ -60,6 +60,7 @@
 #undef MONITORING_ALLOCATION
 #include "memchk.h"
 
+#define PUSH_TO_MIN_BLEN
 #define CONSTRAINTS
 #define STOCHASTIC_STARTING_BLENS
 #undef IGNORE_SMALL_TOPO_IMP

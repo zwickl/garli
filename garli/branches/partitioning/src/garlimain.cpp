@@ -699,7 +699,7 @@ int main( int argc, char* argv[] )	{
 			pop.Setup(&conf, &dataPart, &rawPart, 1, 0);
 			pop.SetOutputDetails();
 
-			outman.UserMessage("###################################################\nSTARTING RUN");
+			outman.UserMessage("STARTING RUN");
 			if(runTests){
 				outman.UserMessage("starting internal tests...");
 				pop.RunTests();

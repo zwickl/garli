@@ -119,6 +119,7 @@ class Individual
 		void CopyByStealingTree(Individual* ind );
 		void CopySecByStealingFirstTree(Individual * sourceOfTreePtr, const Individual *sourceOfInformation);
 		void CopySecByRearrangingNodesOfFirst(Tree * sourceOfTreePtr, const Individual *sourceOfInformation, bool CLAassigned=false);
+		void DuplicateIndivWithoutCLAs(const Individual *sourceOfInformation);
 		void ResetIndiv();
 		void MakeRandomTree(int nTax);
 		void MakeStepwiseTree(int nTax, int attemptsPerTaxon, FLOAT_TYPE optPrecision );
