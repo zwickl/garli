@@ -107,7 +107,6 @@ if [ -d $TESTS_DIR/scoring ];then
 					exit 1
 				fi
 			fi
-			line=`expr $line + 1`
 		fi	
 	done
 else
