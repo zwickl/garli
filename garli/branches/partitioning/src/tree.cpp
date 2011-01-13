@@ -35,6 +35,7 @@ using namespace std;
 #include "model.h"
 #include "tree.h"
 #include "reconnode.h"
+#include "garlireader.h"
 
 #include "utility.h"
 Profiler ProfIntInt   ("ClaIntInt     ");
@@ -196,6 +197,12 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 		char num[10];
 		sprintf(num, "%d", data->NTax());
 		outString = num;
+		GarliReader &reader = GarliReader::GetInstance();
+		NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
+		if(!tax->IsAlreadyDefined("ROOT")){
+			string n = "ROOT";
+			tax->AppendNewLabel(n);
+			}
 		}
 	else{
 		Tree::rootWithDummy = false;
@@ -204,35 +211,71 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 
 	//deal with the outgroup specification, if there is one
 	if(outString.length() > 0){
-		//NxsString s(conf->outgroupString.c_str());
-		const char *o = outString.c_str();
-		vector<int> nums;
-		unsigned pos1=0, pos2;
-		while(pos1 < outString.size()){
-			pos2 = outString.find(" ", pos1+1);
-			string tax = outString.substr(pos1, pos2);
-			nums.push_back(atoi(tax.c_str()));
-			pos1 = pos2;
-			}
-
 		if(outgroup) outgroup->ClearBipartition();
 		else outgroup = new Bipartition();
-		outgroup->BipartFromNodenums(nums);
-		
-		//if the outgroup consists of multiple taxa, make a constraint that the ingroup be monophyletic
-/*		if(nums.size() > 1){
-			Constraint out(outgroup, true);
-			out.Standardize();
-			out.SetAsOutgroup();
 
-			int num=1;
-			for(vector<Constraint>::iterator con=constraints.begin();con!=constraints.end();con++){
-				if((*con).IsCompatibleWithConstraint(&out) == false) throw ErrorException("Specified outgroup is not compatible with constraint number %d!", num);
-				num++;
+		GarliReader &reader = GarliReader::GetInstance();
+		if(reader.GetTaxaBlock(0)->GetNTax() > 0){
+			//now using NCL to much more rigorously and flexibly read the outgroup specification
+			NxsString tax(outString.c_str());
+			tax += ";";
+			std::istringstream s(tax);
+			NxsToken tok(s);
+			tok.GetNextToken();
+			NxsUnsignedSet iset;
+			try{
+				NxsSetReader::ReadSetDefinition(tok, *reader.GetTaxaBlock(0), "outgroup", "GARLI configuration", &iset);
+				if(!rootWithDummy)
+					outman.UserMessage("Found outgroup specification: %s", NxsSetReader::GetSetAsNexusString(iset).c_str());
 				}
-			constraints.push_back(out);
+			catch (const NxsException & x){
+				throw ErrorException("%s", x.msg.c_str());
+				}
+
+			//the set has been read as indeces, so change to taxon numbers before passing to the bipart func
+			NxsUnsignedSet nset;
+			for(NxsUnsignedSet::const_iterator it = iset.begin();it != iset.end(); it++)
+				nset.insert(*it + 1);
+
+			outgroup->BipartFromNodenums(nset);
 			}
-*/		}
+		else{//the old half-assed outgroup reader
+			vector<int> nums;
+			unsigned pos1=0, pos2;
+			while(pos1 < outString.size()){
+				pos2 = outString.find(" ", pos1+1);
+				string tax = outString.substr(pos1, pos2 - pos1);
+				tax = NxsString::strip_whitespace(tax);
+				for(string::iterator it = tax.begin();it != tax.end();it++)
+					if(isdigit(*it) == false)
+						throw ErrorException("problem in outgroup specification.\nExpecting taxon numbers separated by spaces, found %s.", tax.c_str());
+				nums.push_back(atoi(tax.c_str()));
+				pos1 = pos2;
+				}
+			outman.UserMessageNoCR("Found outgroup specification: ");
+			for(vector<int>::iterator it = nums.begin();it != nums.end();it++)
+				outman.UserMessageNoCR("%d ", *it);
+			outman.UserMessage("\n");
+			outgroup->BipartFromNodenums(nums);
+			}
+		outman.UserMessage("\n#######################################################");
+		}
+	}
+		
+//this assumes that a tree string has been passed in with *s pointing to the first char of a blen
+//description, and reads and advances the string up to the next non-blen character.  The string that
+//was interpreted as the branch length is placed into the NxsString passed in
+double ReadBranchlength(const char *&s, NxsString &blen){
+	blen = "";
+	while(*(s+1) && *(s+1)!=')'&& *(s+1)!=',' && *(s+1)!=';'){
+		blen += *(s+1);
+		s++;
+		}
+	s++;
+	double len;
+	if(NxsString::to_double(blen.c_str(), &len) == false)
+		throw ErrorException("Problem reading tree description.  Illegal branch-length specification: \"%s\"", blen.c_str());
+	return len;
 	}
 
 //DJZ 4-28-04
@@ -901,6 +944,13 @@ void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipar
 			compat=true;
 			CalcBipartitions(true);
 			proposed.FillWithXORComplement(*(nd->bipart), *(otherDes->bipart));
+
+			//6/23/09 This call was moved here from within SwapAllowedByConstraint.  This saves a lot
+			//of work when looping over many constraints for a single swap that really only requires a single adjustment.
+			//Doing the adjustment isn't necessary for positive non-backbone constraints with no mask (and isn't always
+			//necessary when there is a mask either), but there will always be a mask here since we're building a partial tree.
+			AdjustBipartsForSwap(nd->nodeNum, otherDes->nodeNum);
+
 			for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
 				//if the taxon being added isn't in the backbone, it can go anywhere
 				if(((*conit).IsBackbone() == false) || (*conit).GetBackboneMask()->ContainsTaxon(nd->nodeNum)){
@@ -2071,7 +2121,22 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 #ifdef CONSTRAINTS
 	//now deal with constraints, if any
 	if(constraints.size() > 0){
-		if(sprRang.size() != 0){
+/*		int ok =0;
+		int bad = 0;
+		int calls = 0;
+		int attach = sprRang.size();
+*/		bool bypass = false;
+
+		//6/30/09 If all constraints are backbone on the same set of taxa, check that both sides of the split where the tree was broken
+		//actually appear in the backbone mask.  Otherwise the swap is always valid and we can skip the whole following loop.
+		//This is very helpful when, for example, a terminal taxon not in the backbone is cut.
+		CalcBipartitions(true);
+		if(Constraint::allBackbone && Constraint::sharedMask){
+			if(!(constraints[0].GetBackboneMask()->HasIntersection(*cut->bipart, NULL)) || !(constraints[0].GetBackboneMask()->HasIntersectionWithComplement(*cut->bipart, NULL))){
+				bypass = true;
+				}
+			}
+		if(!bypass && sprRang.size() != 0){
 			Bipartition proposed;
 			listIt it=sprRang.begin();
 			do{
@@ -2079,21 +2144,37 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 				CalcBipartitions(true);
 				proposed.FillWithXORComplement(*(cut->bipart), *(allNodes[broken->nodeNum]->bipart));
 				bool allowed = true;
+				
+				//6/23/09 This call was moved here from within SwapAllowedByConstraint.  This saves a lot
+				//of work when looping over many constraints for a single swap that really only requires a single adjustment.
+				//Doing the adjustment isn't necessary for positive non-backbone constraints with no mask (and isn't always
+				//necessary when there is a mask either) so skip this if we can
+				if(it->withinCutSubtree == false && (partialMask || Constraint::anyBackbone || constraints[0].IsPositive() == false))
+					AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
+
 				for(vector<Constraint>::iterator conit=constraints.begin();conit!=constraints.end();conit++){
+//					calls++;
 					allowed = SwapAllowedByConstraint((*conit), cut, &*it, proposed, partialMask); 
 					if(!allowed) break;
 					}
+//				if(allowed) ok++;
+//				else bad++;
 				if(!allowed) it=sprRang.RemoveElement(it);
 				else it++;
 				}while(it != sprRang.end());
 			}
-		else return;
-		}
+/*		if(bypass)
+			outman.UserMessage("%d max range, %d attach, %d calls, %d ok, %d bad, BYPASSED", maxDist, attach, calls, ok, bad);
+		else
+			outman.UserMessage("%d max range, %d attach, %d calls, %d ok, %d bad", maxDist, attach, calls, ok, bad);
+*/		}
 #endif
 	}
 
 //same as the normal GatherValidReconnectionNodes, but fills ReconList passed in, not the normal tree one
+//6/23/09 I don't think that this has been updated for the most recent constraint implementation, so shouldn't be being used
 void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNode *cut, const TreeNode *subtreeNode, Bipartition *partialMask /*=NULL*/){
+	assert(0);
 	const TreeNode *center=cut->anc;
 	
 	//add the descendent branches
@@ -2684,18 +2765,43 @@ void Tree::LoadConstraints(ifstream &con, int nTaxa){
 		}while(con.eof() == false);
 
 	//make sure the constraints are compatible with each other!
-	if(conNum > 1){
-		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
-			for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++){
-				if((*first).IsPositive() != (*sec).IsPositive()) throw ErrorException("cannot mix positive and negative constraints!");
-				if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false)) throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
-				if((*first).ConstraintIsCompatibleWithConstraint((*sec)) == false) throw ErrorException("constraints are not compatible with one another!");
+	bool allBackbone = true;
+	bool anyBackbone = false;
+	bool sameMask = true;
+	for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
+		if(first->IsBackbone() == false){
+			allBackbone = false;
+			sameMask = false;
 			}
-			}
+		else 
+			anyBackbone = true;
+		for(vector<Constraint>::iterator sec=first+1;sec!=constraints.end();sec++){
+			if((*first).IsPositive() != (*sec).IsPositive()) 
+				throw ErrorException("cannot mix positive and negative constraints!");
+			if(((*first).IsPositive()==false) && ((*sec).IsPositive()==false)) 
+				throw ErrorException("Sorry, GARLI can currently only handle a single negatively (conversely) constrainted branch :-(");
+			if((*first).ConstraintIsCompatibleWithConstraint((*sec)) == false) 
+				throw ErrorException("constraints are not compatible with one another!");
+			if(allBackbone && sameMask && first->IsBackbone() && sec->IsBackbone() && first == constraints.begin()){
+				if(first->GetBackboneMask()->EqualsEquals(*sec->GetBackboneMask()) == false)
+					sameMask = false;
 		}
+		}
+	}
+	Constraint::SetConstraintStatics(allBackbone, anyBackbone, sameMask);
 	//summarize the constraint info to the screen
 	string str;
 	int num=1;
+
+	if(allBackbone){
+		outman.UserMessage("All constraints are backbone");
+		if(sameMask)
+			outman.UserMessage("All constraints involve the same backbone set of taxa");
+		else 
+			outman.UserMessage("Constraints involve differing sets of taxa");
+		}
+	else if(anyBackbone)
+		outman.UserMessage("Some constraints are backbone");
 	if(constraints[0].IsPositive()){
 		outman.UserMessage("Found %d positively constrained bipartition(s)", constraints.size());
 		for(vector<Constraint>::iterator first=constraints.begin();first!=constraints.end();first++){
@@ -2737,7 +2843,8 @@ bool Tree::SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, Reco
 		/*(check for meaningful intersection of constraint and partial/backbone mask here)*/
 		Bipartition jointMask;
 		bool meaningfulIntersection = jointMask.MakeJointMask(constr, partialMask);
-		if(!meaningfulIntersection) return true;
+		if(!meaningfulIntersection) 
+			return true;
 
 		if(!broken->withinCutSubtree){
 			//if this is a normal SPR swap in which the cut subtree has the same orientation after the swap then we can 
@@ -2746,8 +2853,10 @@ bool Tree::SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, Reco
 			compat = constr.BipartitionIsCompatibleWithConstraint(proposed, &jointMask);
 			if(compat == false) return compat;
 
-			//this screws up the biparitions, so they need to be recalculated before returning
-			AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
+			//6/23/09 This call was moved up one level, so that it MUST called in AddRandomNodeWithConstraints or GatherValidReconnectionNodes
+			//before calling SwapAllowedByConstraint.  This saves a lot of work when looping over many constraints for a single swap
+			//that really only requires a single adjustment
+			//AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
 			
 			compat = RecursiveAllowedByConstraintWithMask(constr, &jointMask, root);
 			}
