@@ -588,7 +588,7 @@ void Population::LoadNexusStartingConditions(){
 		tax = reader.GetTaxaBlock(0);
 	else //I think this check happens in NCL as well, but best to be safe
 		throw ErrorException("multiple non-identical taxa blocks have been read");
-
+	//this actually is also checked in SetTreeStatics
 	if(Tree::rootWithDummy && !tax->IsAlreadyDefined("ROOT")){
 		string n = "ROOT";
 		tax->AppendNewLabel(n);

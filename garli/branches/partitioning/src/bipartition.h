@@ -24,6 +24,7 @@
 #include <cstring>
 #include <vector>
 #include <cassert>
+#include <set>
 
 using namespace std;
 
@@ -67,19 +68,32 @@ class Bipartition{
 		Standardize();
 		}
 
-	~Bipartition();
+	~Bipartition(){
+		if(rep!=NULL) delete []rep;
+		rep=NULL;
+		}	
 
-	void ClearBipartition(){
-		for(int i=0;i<nBlocks;i++)
-			rep[i]=0;
-		}
+	bool IsCompatibleWithBipartition(const Bipartition &constr) const;
+	bool OldIsCompatibleWithBipartition(const Bipartition &constr) const;
+	
+	bool IsCompatibleWithBipartitionWithMask(const Bipartition &constr, const Bipartition &mask) const;
+	bool OldIsCompatibleWithBipartitionWithMask(const Bipartition &bip, const Bipartition &mask) const;
 
+	//this is not being used
+	bool IsIncompatibleWithBipartitionWithMask(const Bipartition &bip, const Bipartition &mask) const;
+
+	bool MakeJointMask(const Constraint &constr, const Bipartition *partialMask);
+	void NumericalOutput(string &out, const Bipartition *mask);
 	static void SetBipartitionStatics(int);
 	static void SetPartialBlockMask();
 	
+	void ClearBipartition(){
+		memset(rep, 0L, sizeof(int) * nBlocks);
+		}
+	
 	void operator+=(const Bipartition *rhs){
 		for(int i=0;i<nBlocks;i++){
-			rep[i]|=rhs->rep[i];
+			rep[i] |= rhs->rep[i];
 			}
 		}
 
@@ -112,14 +126,36 @@ class Bipartition{
 		return num;
 		}
 
+	bool MoreThanOneBitSet() const{
+		int num = 0;
+		int i = 0;
+		for(i=0;i<nBlocks-1;i++){
+			//check if there is more than one bit set in this block
+			if(rep[i] & (rep[i] - 1))
+				return true;
+			//keep track of how many bits we've seen on
+			if(rep[i])
+				num++;
+			if(num > 1)
+				return true;
+			}
+		if((rep[i] & partialBlockMask) & ((rep[i] & partialBlockMask) - 1))
+			return true;
+		if(rep[i] & partialBlockMask)
+			num++;
+		if(num > 1)
+			return true;
+		return false;
+		}
+
 	void FlipBits(const Bipartition &flip){
 		//this just flips the bits in the passed in bipartition
 		EqualsXORComplement(flip);
 		}
 
 	void FillAllBits(){
-		for(int i=0;i<nBlocks;i++)
-			rep[i] = allBitsOn;
+		//the argument here is what to fill each _byte_ of the ints with
+		memset(rep, 0xFF, sizeof(int) * nBlocks);
 		}
 
 	bool EqualsEquals(const Bipartition &rhs) const{
@@ -127,9 +163,11 @@ class Bipartition{
 		//assert(rhs.ContainsTaxon(1));
 		int i;
 		for(i=0;i<nBlocks-1;i++){
-			if(rep[i]!=rhs.rep[i]) return false;
+			if(rep[i] != rhs.rep[i]) 
+				return false;
 			}
-		if((rep[i]&partialBlockMask)!=((rhs.rep[i])&partialBlockMask)) return false;
+		if((rep[i]&partialBlockMask)!=((rhs.rep[i])&partialBlockMask)) 
+			return false;
 		return true;
 		}
 
@@ -138,12 +176,16 @@ class Bipartition{
 		//assert(rhs.ContainsTaxon(1));
 		int i;
 		for(i=0;i<nBlocks-1;i++){
-			if((rep[i] & mask.rep[i]) != (rhs.rep[i] & mask.rep[i])) return false;
+			if((rep[i] & mask.rep[i]) != (rhs.rep[i] & mask.rep[i])) 
+				return false;
 			}
-		if((rep[i] & partialBlockMask & mask.rep[i]) != ((rhs.rep[i]) & partialBlockMask & mask.rep[i])) return false;
+		if((rep[i] & partialBlockMask & mask.rep[i]) != ((rhs.rep[i]) & partialBlockMask & mask.rep[i])) 
+			return false;
 		return true;
 		}
 
+	//this flips bits in the unused portion of the last block, but since it is
+	//always masked it doesn't matter
 	void Complement(){
 		for(int i=0;i<nBlocks;i++){
 			rep[i] = ~rep[i];
@@ -153,10 +195,12 @@ class Bipartition{
 	bool ComplementEqualsEquals(const Bipartition &rhs) const{
 		int i;
 		for(i=0;i<nBlocks-1;i++){
-			if(~rep[i]!=rhs.rep[i]) return false;
+			if(~rep[i]!=rhs.rep[i]) 
+				return false;
 			}
 			
-		if(((~rep[i])&partialBlockMask)!=(rhs.rep[i]&partialBlockMask)) return false;
+		if(((~rep[i])&partialBlockMask)!=(rhs.rep[i]&partialBlockMask)) 
+			return false;
 		
 		return true;
 		}
@@ -166,25 +210,26 @@ class Bipartition{
 		//assert(rhs.ContainsTaxon(1));
 		int i;
 		for(i=0;i<nBlocks-1;i++){
-			if((~rep[i] & mask.rep[i]) != (rhs.rep[i] & mask.rep[i])) return false;
+			if((~rep[i] & mask.rep[i]) != (rhs.rep[i] & mask.rep[i])) 
+				return false;
 			}
-		if((~rep[i] & partialBlockMask & mask.rep[i]) != ((rhs.rep[i]) & partialBlockMask & mask.rep[i])) return false;
+		if((~rep[i] & partialBlockMask & mask.rep[i]) != ((rhs.rep[i]) & partialBlockMask & mask.rep[i])) 
+			return false;
 		return true;
 		}
 
 	void Standardize(){
-		if(ContainsTaxon(1)==true) return;
-		else{
-			for(int i=0;i<nBlocks;i++){
-				rep[i]=~rep[i];
-				}
-			}
+		if(ContainsFirstTaxon())
+			return;
+		else
+			Complement();
 		}
 	
 	int FirstPresentTaxon() const{
 		int blk=0;
 		unsigned int tmp=rep[blk];
-		while(tmp==0) tmp=rep[++blk];
+		while(tmp == 0) 
+			tmp=rep[++blk];
 		
 		int t=blockBits*blk+1;
 		while( ! (tmp & largestBlockDigit)){
@@ -197,7 +242,8 @@ class Bipartition{
 	int FirstNonPresentTaxon() const{
 		int blk=0;
 		unsigned int tmp=rep[blk];
-		while(tmp==allBitsOn) tmp=rep[++blk];
+		while(tmp==allBitsOn) 
+			tmp=rep[++blk];
 		
 		int t=blockBits*blk+1;
 		while((tmp & largestBlockDigit)){
@@ -209,7 +255,16 @@ class Bipartition{
 
 	bool ContainsTaxon(int t) const{
 		unsigned int tmp=rep[(t-1)/blockBits];
-		if(tmp & largestBlockDigit>>((t-1)%blockBits)) return true;
+		if(tmp & largestBlockDigit>>((t-1)%blockBits)) 
+			return true;
+		return false;
+		}
+
+	//if you know the taxon is in the first block, it is unnecessary and very slow to do 
+	//the divisions in ContainsTaxon
+	inline bool ContainsFirstTaxon() const{
+		if(rep[0] & largestBlockDigit) 
+			return true;
 		return false;
 		}
 
@@ -232,97 +287,155 @@ class Bipartition{
 			}
 		}
 
-	bool IsCompatibleWithBipartition(const Bipartition &constr) const{
-		//using buneman's 4 point condition.  At least one of the four intersections must be empty
-		bool compat=true;
+//NOTE that the _BETTER_BIPART sections here are usually (much) slower unless intersections are rare.
+//They don't have the branch within the loop, but they do have an extra bitwise operation and don't
+//allow breaking out early.  With branch prediction the branch cost is only paid upon early return
+//(I think).  So, when the number of taxa is small and the loop executes few times it might be more
+//helpful.  For nine blocks (329 taxa) with a mask it is much slower.  The story might be different
+//without the mask, when the per loop cost is lower but the misprediction cost is the same.
+bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
+	{
 		int i;
-		//A & B
+		if(!mask){
 		for(i=0;i<nBlocks-1;i++){
-			if((rep[i] & constr.rep[i]) == 0) continue;
+				if(rep[i] & rhs.rep[i]){
+					return true;
+					}
+				}
+			if(((rep[i] & rhs.rep[i]) & partialBlockMask))
+				return true;
+			}
+#ifdef _BETTER_BIPART
 			else{
-				compat=false;
-				break;
+			unsigned sum = 0;
+			for(i=0;i<nBlocks-1;i++){
+				sum |= ((rep[i] & rhs.rep[i]) & mask->rep[i]);
+				}
+			if(sum)
+				return true;
+			if((rep[i] & rhs.rep[i]) & (mask->rep[i] & partialBlockMask))
+				return true;
+
+			}
+#else
+		else{
+		for(i=0;i<nBlocks-1;i++){
+				if((rep[i] & rhs.rep[i]) & mask->rep[i]){
+					return true;
 				}
 			}
-		if(compat==true && (((rep[i] & constr.rep[i]) & partialBlockMask) == 0)) return true;
-		//A & ~B
-		compat=true;
-		for(i=0;i<nBlocks-1;i++){
-			if((rep[i] & ~(constr.rep[i])) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
+			if(((rep[i] & rhs.rep[i]) & (mask->rep[i] & partialBlockMask)))
+				return true;
 			}
-		if(compat==true && (((rep[i] & ~(constr.rep[i])) & partialBlockMask) == 0)) return true;
-		//~A & B
-		compat=true;
-		for(i=0;i<nBlocks-1;i++){
-			if((~rep[i] & constr.rep[i]) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
-			}
-		if(compat==true && (((~rep[i] & constr.rep[i]) & partialBlockMask) == 0)) return true;
-		//~A & ~B
-		compat=true;
-		for(i=0;i<nBlocks-1;i++){
-			if((~rep[i] & ~(constr.rep[i])) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
-			}
-		if(compat==true && (((~rep[i] & ~(constr.rep[i])) & partialBlockMask) == 0)) return true;
+#endif
 		return false;
 		}
 
-	bool IsCompatibleWithBipartitionWithMask(const Bipartition &bip, const Bipartition &mask) const{
-		//using buneman's 4 point condition.  At least one of the four intersections must be empty
-		//typically this will be called with 'this' as a POSITIVE constraint
-		bool compat=true;
+	bool HasIntersectionWithComplement(const Bipartition &rhs, const Bipartition *mask) const{
 		int i;
+		if(!mask){
+		for(i=0;i<nBlocks-1;i++){
+				if(rep[i] & ~rhs.rep[i]){
+					return true;
+					}
+				}
+			if(((rep[i] & ~rhs.rep[i]) & partialBlockMask))
+				return true;
+			}
+#ifdef _BETTER_BIPART
+			else{
+			unsigned sum = 0;
+			for(i=0;i<nBlocks-1;i++){
+				sum |= ((rep[i] & ~rhs.rep[i]) & mask->rep[i]); 
+				}
+			if(sum)
+				return true;
+			if((rep[i] & ~rhs.rep[i]) & (mask->rep[i] & partialBlockMask))
+				return true;
+			}
+#else
+		else{
+		for(i=0;i<nBlocks-1;i++){
+				if((rep[i] & ~rhs.rep[i]) & mask->rep[i]){
+					return true;
+					}
+				}
+			if(((rep[i] & ~rhs.rep[i]) & (mask->rep[i] & partialBlockMask)))
+				return true;
+			}
+#endif
+		return false;
+		}
 
-		//A & B
+	bool ComplementHasIntersection(const Bipartition &rhs, const Bipartition *mask) const{
+		int i;
+		if(!mask){
 		for(i=0;i<nBlocks-1;i++){
-			if(((rep[i] & bip.rep[i]) & mask.rep[i]) == 0) continue;
+				if(~rep[i] & rhs.rep[i]){
+					return true;
+					}
+				}
+			if(((~rep[i] & rhs.rep[i]) & partialBlockMask))
+				return true;
+			}
+#ifdef _BETTER_BIPART
 			else{
-				compat=false;
-				break;
+			unsigned sum = 0;
+			for(i=0;i<nBlocks-1;i++){
+				sum |= ((~rep[i] & rhs.rep[i]) & mask->rep[i]); 
+				}
+			if(sum)
+				return true;
+			if((~rep[i] & rhs.rep[i]) & (mask->rep[i] & partialBlockMask))
+				return true;
+			}
+#else
+		else{
+		for(i=0;i<nBlocks-1;i++){
+				if((~rep[i] & rhs.rep[i]) & mask->rep[i]){
+					return true;
+					}
+				}
+			if(((~rep[i] & rhs.rep[i]) & (mask->rep[i] & partialBlockMask)))
+				return true;
+				}
+#endif
+		return false;
+			}
+
+	bool ComplementHasIntersectionWithComplement(const Bipartition &rhs, const Bipartition *mask) const{
+		int i;
+		if(!mask){
+		for(i=0;i<nBlocks-1;i++){
+				if(~rep[i] & ~rhs.rep[i]){
+					return true;
+					}
+				}
+			if(((~rep[i] & ~rhs.rep[i]) & partialBlockMask))
+				return true;
+			}
+#ifdef _BETTER_BIPART
+			else{
+			unsigned sum = 0;
+			for(i=0;i<nBlocks-1;i++){
+				sum |= ((~rep[i] & ~rhs.rep[i]) & mask->rep[i]); 
+				}
+			if(sum)
+				return true;
+			if((~rep[i] & ~rhs.rep[i]) & (mask->rep[i] & partialBlockMask))
+				return true;
+			}
+#else
+		else{
+		for(i=0;i<nBlocks-1;i++){
+				if((~rep[i] & ~rhs.rep[i]) & mask->rep[i]){
+					return true;
 				}
 			}
-		if(compat==true && ((((rep[i] & bip.rep[i]) & mask.rep[i]) & partialBlockMask) == 0)) return true;
-		//A & ~B
-		compat=true;
-		for(i=0;i<nBlocks-1;i++){
-			if(((rep[i] & ~bip.rep[i]) & mask.rep[i]) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
+			if(((~rep[i] & ~rhs.rep[i]) & (mask->rep[i] & partialBlockMask)))
+				return true;
 			}
-		if(compat==true && ((((rep[i] & ~bip.rep[i]) & mask.rep[i]) & partialBlockMask) == 0)) return true;
-		//~A & B
-		compat=true;
-		for(i=0;i<nBlocks-1;i++){
-			if(((~rep[i] & bip.rep[i]) & mask.rep[i]) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
-			}
-		if(compat==true && ((((~rep[i] & bip.rep[i]) & mask.rep[i]) & partialBlockMask) == 0)) return true;
-		//~A & ~B
-		compat=true;
-		for(i=0;i<nBlocks-1;i++){
-			if(((~rep[i] & ~bip.rep[i]) & mask.rep[i]) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
-			}
-		if(compat==true && ((((~rep[i] & ~bip.rep[i]) & mask.rep[i]) & partialBlockMask) == 0)) return true;
+#endif
 		return false;
 		}
 
@@ -330,7 +443,7 @@ class Bipartition{
 		//To be consistent with a negative bipartition (constraint) neither the bipartition
 		//or its complement can BE the constraint bipartition
 		if(this->EqualsEquals(bip)==false && this->ComplementEqualsEquals(bip)==false) return true;
-		else return false;
+ 		else return false;
 		}
 
 	bool IsCompatibleWithNegativeBipartitionWithMask(const Bipartition &bip, const Bipartition &mask) const{
@@ -338,81 +451,6 @@ class Bipartition{
 		//or its masked complement can BE the constraint bipartition
 		if(this->MaskedEqualsEquals(bip, mask)==false && this->MaskedComplementEqualsEquals(bip, mask)==false) return true;
 		else return false;
-		}
-
-	bool IsIncompatibleWithBipartitionWithMask(const Bipartition &bip, const Bipartition &mask) const{
-		//using buneman's 4 point condition.  At none of the four intersections must be empty
-		//typically this will be called with 'this' as a NEGATIVE constraint
-		//2/28/08 - I think that I had the true/falses backwards here.  As soon as an
-		//empty intersection is found the bipartition IS compatable with the constraint
-		//so it should return FALSE.  If there are 4 intersections, it is INcompatable, so return TRUE
-
-		bool compat=true;
-		int i;
-
-		//first check if there is no intersection between the mask and the constraint
-		//or the complement of the constraint. If not, the question of incompatability
-		//is moot (but it is consistent with incompatability, so return true)
-		bool intersect=false;
-		for(i=0;i<nBlocks-1;i++){
-			if((rep[i] & mask.rep[i]) == 0) continue;
-			else{
-				intersect=true;
-				break;
-				}
-			}
-		if(intersect==false && ((((rep[i] & mask.rep[i]) & partialBlockMask) == 0))) return true;
-
-		intersect=false;
-		for(i=0;i<nBlocks-1;i++){
-			if((~rep[i] & mask.rep[i]) == 0) continue;
-			else{
-				intersect=true;
-				break;
-				}
-			}
-		if(intersect==false && ((((~rep[i] & mask.rep[i]) & partialBlockMask) == 0))) return true;
-
-		//A & B
-		for(i=0;i<nBlocks-1;i++){
-			if(((rep[i] & mask.rep[i]) & (bip.rep[i] & mask.rep[i])) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
-			}
-		if(compat==true && ((((rep[i] & mask.rep[i]) & (bip.rep[i] & mask.rep[i])) & partialBlockMask) == 0)) return false;
-		//A & ~B
-		compat=true;
-		for(i=0;i<nBlocks-1;i++){
-			if(((rep[i] & mask.rep[i]) & (~bip.rep[i] & mask.rep[i])) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
-			}
-		if(compat==true && ((((rep[i] & mask.rep[i]) & (~bip.rep[i]& mask.rep[i])) & partialBlockMask) == 0)) return false;
-		//~A & B
-		compat=true;
-		for(i=0;i<nBlocks-1;i++){
-			if(((~rep[i] & mask.rep[i]) & (bip.rep[i] & mask.rep[i])) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
-			}
-		if(compat==true && ((((~rep[i] & mask.rep[i]) & (bip.rep[i] & mask.rep[i])) & partialBlockMask) == 0)) return false;
-		//~A & ~B
-		compat=true;
-		for(i=0;i<nBlocks-1;i++){
-			if(((~rep[i] & mask.rep[i]) & (~bip.rep[i] & mask.rep[i])) == 0) continue;
-			else{
-				compat=false;
-				break;
-				}
-			}
-		if(compat==true && ((((~rep[i] & mask.rep[i]) & (~bip.rep[i] & mask.rep[i])) & partialBlockMask) == 0)) return false;
-		return true;
 		}
 
 	bool IsASubsetOf(const Bipartition &target) const{
@@ -447,7 +485,7 @@ class Bipartition{
 
 	Bipartition *TerminalBipart(int taxNum){
 		assert(taxNum > 0 && taxNum <= ntax);
-		for(int i=0;i<nBlocks;i++) rep[i]=0;
+		ClearBipartition();
 		//8-19-05 fixed this bit of stupidity
 		//rep[(taxNum)/blockBits]|=(largestBlockDigit>>((taxNum-1)%blockBits));
 		rep[(taxNum-1)/blockBits]|=(largestBlockDigit>>((taxNum-1)%blockBits));
@@ -466,57 +504,6 @@ class Bipartition{
 		return str;
 		}
 	
-	void NumericalOutput(string &out, const Bipartition *mask){
-		string left = "(";
-		string right = "(";
-		char temp[100];
-		if(mask != NULL){
-			for(int i=0;i<nBlocks;i++){
-				unsigned int t=rep[i];
-				unsigned int m=mask->rep[i];
-				unsigned int bit = largestBlockDigit;
-				for(int j=0;j<blockBits;j++){
-					if(i*blockBits+j >= ntax) break;
-					if(bit & m){
-						if(bit & t){
-							if(strcmp(left.c_str(), "(")) left += ',';
-							sprintf(temp, "%d", (i*blockBits + j + 1));
-							left += temp;
-							}
-						else{
-							if(strcmp(right.c_str(), "(")) right += ',';
-							sprintf(temp, "%d", (i*blockBits + j + 1));
-							right += temp;
-							}
-						}
-					bit = bit >> 1;	
-					}
-				}
-			}
-		else{
-			for(int i=0;i<nBlocks;i++){
-				unsigned int t=rep[i];
-				unsigned int bit = largestBlockDigit;
-				for(int j=0;j<blockBits;j++){
-					if(i*blockBits+j >= ntax) break;
-					if(bit & t){
-						if(strcmp(left.c_str(), "(")) left += ',';
-						sprintf(temp, "%d", (i*blockBits + j + 1));
-						left += temp;
-						}
-					else{
-						if(strcmp(right.c_str(), "(")) right += ',';
-						sprintf(temp, "%d", (i*blockBits + j + 1));
-						right += temp;
-						}
-					bit = bit >> 1;	 
-					}
-				}
-			}
-		left += ')';
-		right += ')';
-		out = left + " | " + right;
-		}
 /*
 	void BinaryOutput(ofstream &out){
 		int size = nBlocks * sizeof(unsigned int);
@@ -537,14 +524,19 @@ class Bipartition{
 		return nodes; 
 		}
 	
-	void BipartFromNodenums(vector<int> nodes){
+	void BipartFromNodenums(const vector<int> & nodes){
 		ClearBipartition();
 		Bipartition temp;
-		for(vector<int>::iterator it = nodes.begin();it < nodes.end();it++)
+		for(vector<int>::const_iterator it = nodes.begin();it != nodes.end();it++)
 			*this += temp.TerminalBipart(*it);
 		}
 
-	bool MakeJointMask(const Constraint &constr, const Bipartition *partialMask);
+	void BipartFromNodenums(const std::set<unsigned> & nodes){
+		ClearBipartition();
+		Bipartition temp;
+		for(set<unsigned>::const_iterator it = nodes.begin();it != nodes.end();it++)
+			*this += temp.TerminalBipart(*it);
+		}
 	};
 
 bool BipartitionLessThan(const Bipartition &lhs, const Bipartition &rhs);
@@ -563,6 +555,11 @@ class Constraint{
 	//an outgroup is a special type of positive constraint
 	bool outgroup;
 public:
+	//if these are true (and they almost always will be), it makes checking constraint validity much easier
+	static bool allBackbone;
+	static bool anyBackbone;
+	static bool sharedMask;
+
 	Constraint() {
 		backbone=false;
 		};
@@ -578,6 +575,8 @@ public:
 		backbone=true;
 		backboneMask = m;
 		}
+
+	static void SetConstraintStatics(bool allBack, bool anyBack, bool oneMask);
 
 	bool IsPositive() const {return positive;}
 
@@ -620,8 +619,11 @@ public:
 	//contain the and'ing of a backbone mask and/or a mask representing taxa present in a growing tree
 	bool BipartitionIsCompatibleWithConstraint(const Bipartition &other, const Bipartition *mask) const{
 		if(positive){//positive constraint - determine bipartition compatibility with 4-point condition
-			if(mask != NULL) return con.IsCompatibleWithBipartitionWithMask(other, *mask);
-			else return con.IsCompatibleWithBipartition(other);
+			//DEBUG
+			if(mask != NULL)
+				return con.IsCompatibleWithBipartitionWithMask(other, *mask);
+			else 
+				return con.IsCompatibleWithBipartition(other);
 
 /*			if(backbone){
 				if(mask != NULL){
@@ -642,8 +644,10 @@ public:
 */			}
 		else{//negative constraints - for the bipartition to be incompatible with the negative
 			//constraint it needs to acutally BE the constrained bipartition (potentially with a mask)
-			if(mask != NULL) return con.IsCompatibleWithNegativeBipartitionWithMask(other, *mask);
-			else return con.IsCompatibleWithNegativeBipartition(other);
+			if(mask != NULL) 
+				return con.IsCompatibleWithNegativeBipartitionWithMask(other, *mask);
+			else 
+				return con.IsCompatibleWithNegativeBipartition(other);
 
 /*			if(backbone){
 				if(mask != NULL){
@@ -665,8 +669,10 @@ public:
 		}
 
 	void NumericalOutput(string &out){
-		if(IsBackbone()) con.NumericalOutput(out, &backboneMask);
-		else con.NumericalOutput(out, NULL);
+		if(IsBackbone()) 
+			con.NumericalOutput(out, &backboneMask);
+		else 
+			con.NumericalOutput(out, NULL);
 		}
 	};
 

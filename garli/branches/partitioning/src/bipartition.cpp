@@ -27,10 +27,9 @@ unsigned int Bipartition::allBitsOn;
 char * Bipartition::str;
 unsigned int Bipartition::partialBlockMask;
 
-Bipartition::~Bipartition(){
-	if(rep!=NULL) delete []rep;
-	rep=NULL;
-	}	
+bool Constraint::allBackbone;
+bool Constraint::anyBackbone;
+bool Constraint::sharedMask;
 
 //note that this is "less than" for sorting purposes, not in a subset sense
 bool BipartitionLessThan(const Bipartition &lhs, const Bipartition &rhs){
@@ -42,6 +41,12 @@ bool BipartitionLessThan(const Bipartition &lhs, const Bipartition &rhs){
 		
 	if(((lhs.rep[i]) & lhs.partialBlockMask) > ((rhs.rep[i]) & lhs.partialBlockMask)) return false;
 	else return true;
+	}
+
+void Constraint::SetConstraintStatics(bool allBack, bool anyBack, bool oneMask){
+	Constraint::allBackbone = allBack;
+	Constraint::anyBackbone = anyBack;
+	Constraint::sharedMask = oneMask;
 	}
 
 void Bipartition::SetBipartitionStatics(int nt){
@@ -76,21 +81,297 @@ bool Bipartition::MakeJointMask(const Constraint &constr, const Bipartition *par
 	if(constr.IsBackbone()){
 		//this just uses Bipartition::Operator=()
 		*this = *(constr.GetBackboneMask());
-		if(partialMask != NULL)
+		if(partialMask != NULL)//in this case we'll need to test for meaningful intersection below
 			this->AndEquals(*partialMask);
+		else//here we don't need to check, since a backbone constraint and its own mask must be meaningful
+			return true;
 		}
 	else if(partialMask != NULL){
+		//in this case we'll need to test for meaningful intersection below
 		*this = *(partialMask);
 		}
-	else FillAllBits();
+	else{
+		FillAllBits();
+		return true;
+		}
 
 	Bipartition temp;
 	temp = constr.GetBipartition();
 	temp.AndEquals(*this);
-	if(temp.CountOnBits() < 2) return false;
+	if(temp.MoreThanOneBitSet() == false)
+		return false;
+
 	temp = constr.GetBipartition();
 	temp.Complement();
 	temp.AndEquals(*this);
-	if(temp.CountOnBits() < 2) return false;
+	if(temp.MoreThanOneBitSet() == false)
+		return false;
+
 	return true;
+	}
+	
+bool Bipartition::IsCompatibleWithBipartition(const Bipartition &constr) const{
+	//using buneman's 4 point condition.  At least one of the four intersections must be empty
+	//A & B
+	if(HasIntersection(constr, NULL) == false)
+		return true;
+	//A & ~B
+	if(HasIntersectionWithComplement(constr, NULL) == false)
+		return true;
+	//~A & B
+	if(ComplementHasIntersection(constr, NULL) == false)
+		return true;
+	//~A & ~B
+	if(ComplementHasIntersectionWithComplement(constr, NULL) == false)
+		return true;
+	return false;
+	}
+
+
+bool Bipartition::OldIsCompatibleWithBipartition(const Bipartition &constr) const{
+	//using buneman's 4 point condition.  At least one of the four intersections must be empty
+	bool compat=true;
+	int i;
+	//A & B
+	for(i=0;i<nBlocks-1;i++){
+		if((rep[i] & constr.rep[i]) == 0) continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && (((rep[i] & constr.rep[i]) & partialBlockMask) == 0)) return true;
+	//A & ~B
+	compat=true;
+	for(i=0;i<nBlocks-1;i++){
+		if((rep[i] & ~(constr.rep[i])) == 0) continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && (((rep[i] & ~(constr.rep[i])) & partialBlockMask) == 0)) return true;
+	//~A & B
+	compat=true;
+	for(i=0;i<nBlocks-1;i++){
+		if((~rep[i] & constr.rep[i]) == 0) continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && (((~rep[i] & constr.rep[i]) & partialBlockMask) == 0)) return true;
+	//~A & ~B
+	compat=true;
+	for(i=0;i<nBlocks-1;i++){
+		if((~rep[i] & ~(constr.rep[i])) == 0) continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && (((~rep[i] & ~(constr.rep[i])) & partialBlockMask) == 0)) return true;
+	return false;
+	}
+
+bool Bipartition::IsCompatibleWithBipartitionWithMask(const Bipartition &constr, const Bipartition &mask) const{
+	//using buneman's 4 point condition.  At least one of the four intersections must be empty
+	//A & B
+	if(HasIntersection(constr, &mask) == false)
+		return true;
+	//A & ~B
+	if(HasIntersectionWithComplement(constr, &mask) == false)
+		return true;
+	//~A & B
+	if(ComplementHasIntersection(constr, &mask) == false)
+		return true;
+	//~A & ~B
+	if(ComplementHasIntersectionWithComplement(constr, &mask) == false)
+		return true;
+	return false;
+	}
+
+bool Bipartition::OldIsCompatibleWithBipartitionWithMask(const Bipartition &bip, const Bipartition &mask) const{
+	//using buneman's 4 point condition.  At least one of the four intersections must be empty
+	//typically this will be called with 'this' as a POSITIVE constraint
+	bool compat=true;
+	int i;
+
+	//A & B
+	for(i=0;i<nBlocks-1;i++){
+		if(((rep[i] & bip.rep[i]) & mask.rep[i]) == 0) 
+			continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && ((((rep[i] & bip.rep[i]) & mask.rep[i]) & partialBlockMask) == 0)) 
+		return true;
+	//A & ~B
+	compat=true;
+	for(i=0;i<nBlocks-1;i++){
+		if(((rep[i] & ~bip.rep[i]) & mask.rep[i]) == 0) 
+			continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && ((((rep[i] & ~bip.rep[i]) & mask.rep[i]) & partialBlockMask) == 0)) 
+		return true;
+	//~A & B
+	compat=true;
+	for(i=0;i<nBlocks-1;i++){
+		if(((~rep[i] & bip.rep[i]) & mask.rep[i]) == 0) 
+			continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && ((((~rep[i] & bip.rep[i]) & mask.rep[i]) & partialBlockMask) == 0)) 
+	return true;
+	//~A & ~B
+	compat=true;
+	for(i=0;i<nBlocks-1;i++){
+		if(((~rep[i] & ~bip.rep[i]) & mask.rep[i]) == 0) 
+			continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && ((((~rep[i] & ~bip.rep[i]) & mask.rep[i]) & partialBlockMask) == 0)) 
+		return true;
+	return false;
+	}
+
+//This isn't used currently and may not be working
+bool Bipartition::IsIncompatibleWithBipartitionWithMask(const Bipartition &bip, const Bipartition &mask) const{
+	//using buneman's 4 point condition.  At none of the four intersections must be empty
+	//typically this will be called with 'this' as a NEGATIVE constraint
+	//2/28/08 - I think that I had the true/falses backwards here.  As soon as an
+	//empty intersection is found the bipartition IS compatable with the constraint
+	//so it should return FALSE.  If there are 4 intersections, it is INcompatable, so return TRUE
+
+	bool compat=true;
+	int i;
+
+	//first check if there is no intersection between the mask and the constraint
+	//or the complement of the constraint. If not, the question of incompatability
+	//is moot (but it is consistent with incompatability, so return true)
+	bool intersect=false;
+	for(i=0;i<nBlocks-1;i++){
+		if((rep[i] & mask.rep[i]) == 0) continue;
+		else{
+			intersect=true;
+			break;
+			}
+		}
+	if(intersect==false && ((((rep[i] & mask.rep[i]) & partialBlockMask) == 0))) return true;
+
+	intersect=false;
+	for(i=0;i<nBlocks-1;i++){
+		if((~rep[i] & mask.rep[i]) == 0) continue;
+		else{
+			intersect=true;
+			break;
+			}
+		}
+	if(intersect==false && ((((~rep[i] & mask.rep[i]) & partialBlockMask) == 0))) return true;
+
+	//A & B
+	for(i=0;i<nBlocks-1;i++){
+		if(((rep[i] & mask.rep[i]) & (bip.rep[i] & mask.rep[i])) == 0) continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && ((((rep[i] & mask.rep[i]) & (bip.rep[i] & mask.rep[i])) & partialBlockMask) == 0)) return false;
+	//A & ~B
+	compat=true;
+	for(i=0;i<nBlocks-1;i++){
+		if(((rep[i] & mask.rep[i]) & (~bip.rep[i] & mask.rep[i])) == 0) continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && ((((rep[i] & mask.rep[i]) & (~bip.rep[i]& mask.rep[i])) & partialBlockMask) == 0)) return false;
+	//~A & B
+	compat=true;
+	for(i=0;i<nBlocks-1;i++){
+		if(((~rep[i] & mask.rep[i]) & (bip.rep[i] & mask.rep[i])) == 0) continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && ((((~rep[i] & mask.rep[i]) & (bip.rep[i] & mask.rep[i])) & partialBlockMask) == 0)) return false;
+	//~A & ~B
+	compat=true;
+	for(i=0;i<nBlocks-1;i++){
+		if(((~rep[i] & mask.rep[i]) & (~bip.rep[i] & mask.rep[i])) == 0) continue;
+		else{
+			compat=false;
+			break;
+			}
+		}
+	if(compat==true && ((((~rep[i] & mask.rep[i]) & (~bip.rep[i] & mask.rep[i])) & partialBlockMask) == 0)) return false;
+	return true;
+	}
+
+
+void Bipartition::NumericalOutput(string &out, const Bipartition *mask){
+	string left = "(";
+	string right = "(";
+	char temp[100];
+	if(mask != NULL){
+		for(int i=0;i<nBlocks;i++){
+			unsigned int t=rep[i];
+			unsigned int m=mask->rep[i];
+			unsigned int bit = largestBlockDigit;
+			for(int j=0;j<blockBits;j++){
+				if(i*blockBits+j >= ntax) break;
+				if(bit & m){
+					if(bit & t){
+						if(strcmp(left.c_str(), "(")) left += ',';
+						sprintf(temp, "%d", (i*blockBits + j + 1));
+						left += temp;
+						}
+					else{
+						if(strcmp(right.c_str(), "(")) right += ',';
+						sprintf(temp, "%d", (i*blockBits + j + 1));
+						right += temp;
+						}
+					}
+				bit = bit >> 1;	
+				}
+			}
+		}
+	else{
+		for(int i=0;i<nBlocks;i++){
+			unsigned int t=rep[i];
+			unsigned int bit = largestBlockDigit;
+			for(int j=0;j<blockBits;j++){
+				if(i*blockBits+j >= ntax) break;
+				if(bit & t){
+					if(strcmp(left.c_str(), "(")) left += ',';
+					sprintf(temp, "%d", (i*blockBits + j + 1));
+					left += temp;
+					}
+				else{
+					if(strcmp(right.c_str(), "(")) right += ',';
+					sprintf(temp, "%d", (i*blockBits + j + 1));
+					right += temp;
+					}
+				bit = bit >> 1;	 
+				}
+			}
+		}
+	left += ')';
+	right += ')';
+	out = left + " | " + right;
 	}
