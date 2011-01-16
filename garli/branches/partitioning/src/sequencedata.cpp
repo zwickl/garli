@@ -1261,7 +1261,10 @@ void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsi
 			if(numConditioningPatterns > 0){
 				if(effectiveTax == 0)
 					SetOriginalDataNumber(0, -1);
-				SetMatrix( effectiveTax, effectiveChar++, 0);
+				if(tlabel != "ROOT")
+					SetMatrix( effectiveTax, effectiveChar++, 0);
+				else
+					SetMatrix( effectiveTax, effectiveChar++, maxNumStates);
 				}
 
 			bool firstAmbig = true;
