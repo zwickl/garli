@@ -109,14 +109,22 @@ int Tree::PushBranchlengthsToMin(){
 	pair<FLOAT_TYPE, FLOAT_TYPE> derivs;
 	for(int i=1;i < numNodesTotal;i++){
 		if(allNodes[i]->dlen < 1.0e-4 && !(FloatingPointEquals(allNodes[i]->dlen, min_brlen, 1e-9))){
-			derivs = CalcDerivativesRateHet(allNodes[i]->anc, allNodes[i]);
-			if(derivs.first < ZERO_POINT_ZERO){
-				//outman.DebugMessage("(branch %d: %.9f -> %.9f", i, allNodes[i]->dlen, 1e-8);
+			if(useOptBoundedForBlen){
+				//in this case (mainly oriented gap) there is no deriv function, so just set the blens and
+				//count on them being re-optimized if wrong
 				SetBranchLength(allNodes[i], min_brlen);
 				num++;
 				}
-			else
-				outman.DebugMessage("pos d1\t%.9f\t%.9f", allNodes[i]->dlen, derivs.first);
+			else{
+				derivs = CalcDerivativesRateHet(allNodes[i]->anc, allNodes[i]);
+				if(derivs.first < ZERO_POINT_ZERO){
+					//outman.DebugMessage("(branch %d: %.9f -> %.9f", i, allNodes[i]->dlen, 1e-8);
+					SetBranchLength(allNodes[i], min_brlen);
+					num++;
+					}
+				else
+					outman.DebugMessage("pos d1\t%.9f\t%.9f", allNodes[i]->dlen, derivs.first);
+				}
 			}
 		}
 	return num;
@@ -532,8 +540,13 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 	int pass = 0, incrIncreases = 0;
 
 #ifdef OPT_BOUNDED_LOG
-	ofstream log("optbounded.log", ios::app);
-	log.precision(8);
+//	ofstream log("optbounded.log", ios::app);
+//	log.precision(10);
+
+	char name[50];
+	sprintf(name, "%s.optbounded.log", ofprefix.c_str());
+	ofstream log(name, ios::app);
+	log.precision(10);
 #endif
 
 #ifdef OPT_BOUNDED_TRACE
@@ -620,7 +633,7 @@ FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, F
 				higherEvalScore = SetAndEvaluateParameter(modnum, which, higherEval, bestKnownScore, bestKnownVal, SetParam);
 				}
 			else cont = true;
-			} 
+			}
 #endif
 		//we'll never move to a point closer than this (except maybe on exit)
 		//this ensures that we'll be able to have the low evaluation point just inside the bound
@@ -1110,6 +1123,13 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 	ProfNewton.Start();
 	if(useOptBoundedForBlen){
 		double before = nd->dlen;
+#ifdef OPT_BOUNDED_LOG
+		char name[50];
+		sprintf(name, "%s.optbounded.log", ofprefix.c_str());
+		ofstream log(name, ios::app);
+		log << -nd->nodeNum << "\n";
+		log.close();
+#endif
 		//the first argument here is the modnum, which doesn't matter for this hack way of optimizing blens 
 		//improve = OptimizeBoundedParameter(0, optPrecision, nd->dlen, -nd->nodeNum, min_brlen, max_brlen, &Model::SetBranchlengthDummy);
 		improve = OptimizeBoundedParameter(0, optPrecision, nd->dlen, -nd->nodeNum, max(nd->dlen * 0.1, min_brlen), min(nd->dlen * 10.0, max_brlen), &Model::SetBranchlengthDummy);
