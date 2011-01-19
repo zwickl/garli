@@ -482,6 +482,9 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			}
 		else//the input tree must have had the dummy in it already
 			assert(dummyRoot->attached == true);
+#ifdef DUMMY_ROOT_MIDPOINT
+		MoveDummyRootToBranchMidpoint();
+#endif
 		}
 
 	if(root->left->next==root->right){
@@ -3045,11 +3048,11 @@ void Tree::SPRMutate(int cutnum, int broknum, FLOAT_TYPE optPrecision, const vec
 	broken->SubstituteNodeWithRespectToAnc(connector);
 	connector->AddDes(broken);
 
-	if(broken->dlen*ZERO_POINT_FIVE > min_brlen){
-		connector->dlen=broken->dlen*ZERO_POINT_FIVE;
-		broken->dlen-=connector->dlen;
-		}
-	else connector->dlen=broken->dlen=min_brlen;
+
+
+	double len = max(broken->dlen*ZERO_POINT_FIVE, min_brlen);
+	SetBranchLength(connector, len);
+	SetBranchLength(broken, len);
 
 	SweepDirtynessOverTree(connector, cut);
 	MakeNodeDirty(connector);
@@ -5393,12 +5396,21 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 	double TL = Treelength();
 	double TLrescaler = 1.0 / (TL * mu);
 
+	bool outputCategorySitelikes = false;
+
+	FILE *breakdown = NULL;
+	if(outputCategorySitelikes && sitelikeLevel != 0) 
+		breakdown = fopen("likeMixBreakdown.log", "a");
+
 	for(int i=0;i<nchar;i++){
 		if(countit[i] > 0){
 			//include the treelength and mu once here, not in the insert prob in the pmat
 			double oneInsert = oneInsertProportion * partial[1] * TLrescaler;
 			double noInsert = (1.0 - oneInsertProportion) * partial[2];
 			siteL = oneInsert + noInsert;
+
+			if(outputCategorySitelikes && sitelikeLevel != 0)
+				fprintf(breakdown, "%d\t%.3f\t%.3f\n", i, (oneInsert == 0.0 ? 0.0 : log(oneInsert) - (double) underflow_mult[i]), (noInsert == 0.0 ? 0.0 : log(noInsert) - (double) underflow_mult[i]));
 
 			partial += claStates;
 
@@ -5451,6 +5463,9 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 	if(sitelikeLevel != 0){
 		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
 		}
+
+	if(outputCategorySitelikes && sitelikeLevel != 0) 
+		fclose(breakdown);
 
 	//Previous Rivas and Eddy style method
 /* 

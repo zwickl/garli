@@ -148,7 +148,7 @@ class Tree{
 		void SortAllNodesArray();
 		void EliminateNode(int nn);
 		int FindUnusedNode(int start);
-		inline void SetBranchLength(TreeNode *nd, FLOAT_TYPE len);
+		inline void SetBranchLength(TreeNode *nd, FLOAT_TYPE len, bool dummyRootDontRecurse=false);
 		bool IdenticalSubtreeTopology(const TreeNode *other);
 		bool IdenticalTopology(const TreeNode *other);
 		bool IdenticalTopologyAllowingRerooting(const TreeNode *other);
@@ -381,6 +381,7 @@ class Tree{
 		void GetInternalStateString(char *string, int nodeNum);
 		void RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out);	
 		void InferAllInternalStateProbs(const char *ofprefix);
+		void MoveDummyRootToBranchMidpoint();
 
 		static void SetTreeStatics(ClaManager *, const DataPartition *, const GeneralGamlConfig *);
 
@@ -507,10 +508,76 @@ inline void Tree::RemoveTreeFromAllClas(){
 		}
 	}
 	
-inline void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len){
+inline void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len, bool dummyRootDontRecurse /*=false*/){
 	assert(!(len < min_brlen) && !(len > max_brlen));
 	nd->dlen=len;
+
+#ifdef DUMMY_ROOT_MIDPOINT
+	//the dontRecurse bit here just keeps it from bouncing back and forth setting the 
+	//lengths of the two "root" branches, since changing one triggers a change to the other
+	//There are are few posibilities:
+	//1. nd->anc is the root and dummyRoot->anc is the root
+	//		The other branch to adjust is the descendent of the root that is not the dummyRoot nor nd
+	//2. nd->anc is not the root
+	//	2a. nd is the branch "above" where dummyRoot attaches
+	//		In this case dummyRoot is the next or prev of nd, and the other branch to adjust is nd->anc
+	//	2b. nd is the branch "below" where dummyRoot attaches
+	//		In this case dummyRoot is left or right of nd.  The branch to adjust is the other descendent of nd
+	//	3.	nd is not related to the dummyRooted branch
+	if(rootWithDummy && dummyRootDontRecurse == false){
+		TreeNode *otherNode = NULL;
+		if(nd->anc == root && dummyRoot->anc == root){
+			otherNode = root->left;
+			do{
+				if(otherNode != dummyRoot && otherNode != nd){
+					break;
+					}
+				else
+					otherNode = otherNode->next;
+				}while(otherNode);
+			}
+		else{
+			if(nd->prev == dummyRoot || nd->next == dummyRoot)
+				otherNode = nd->anc;
+			else{
+				if(nd->left == dummyRoot)
+					otherNode = nd->right;
+				else if(nd->right == dummyRoot)
+					otherNode = nd->left;
+				}
+			}
+		if(otherNode)
+			SetBranchLength(otherNode, len, true);
+		}
+#endif
 	SweepDirtynessOverTree(nd);
+	}
+
+inline void Tree::MoveDummyRootToBranchMidpoint(){
+	TreeNode *branch1, *branch2;
+	if(dummyRoot->anc == root){
+		if(root->left != dummyRoot){
+			branch1 = root->left;
+			if(root->left->next != dummyRoot){
+				branch2 = root->left->next;
+				assert(root->right == dummyRoot);
+				}
+			else{
+				branch2 = root->right;
+				}
+			}
+		else{
+			branch1 = root->left->next;
+			branch2 = root->right;
+			}
+		}
+	else{
+		branch1 = dummyRoot->anc;
+		branch2 = (dummyRoot->next ? dummyRoot->next : dummyRoot->prev);
+		}
+	double sum = branch1->dlen + branch2->dlen;
+	//this should automatically adjust the length of branch2 because of code in SetBranchLength
+	SetBranchLength(branch1, sum / 2.0);
 	}
 
 inline CondLikeArraySet *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){

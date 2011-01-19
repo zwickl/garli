@@ -2261,7 +2261,7 @@ void Population::BetterFinalOptimization(){
 	double fin = indiv[bestIndiv].treeStruct->lnL;
 	outman.UserMessage("Looking for minimum length branches...");
 	indiv[bestIndiv].CalcFitness(0);
-	//outman.DebugMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
+	outman.DebugMessage("%d branches pushed to min.\nScore after opt: %.9f\nScore after push: %.9f\nScore after reopt: %.9f", num, init, aft, fin);
 #endif
 
 	outman.UserMessage("Final score = %.4f", indiv[bestIndiv].Fitness());
@@ -3064,9 +3064,17 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 			initDel = indiv[0].modPart.GetModel(m)->DeleteRate();
 			}
 		}
-
+#ifdef OPT_BOUNDED_LOG
+	char name[50];
+	sprintf(name, "%s.optbounded.log", conf->ofprefix.c_str());
+	ofstream log(name);
+	log.close();
+	indiv[0].treeStruct->ofprefix = conf->ofprefix;
+	indiv[1].treeStruct->ofprefix = conf->ofprefix;
+#endif
 	BetterFinalOptimization();
 	//this will stick the current tree into the treelog
+	conf->outputTreelog = true;
 	InitializeOutputStreams();
 
 	outman.UserMessage("Writing site likelihoods for tree %d ...", 1);
@@ -3087,13 +3095,18 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 	storedTrees.push_back(repResult);
 
 	//return the rates to initial vals to have them reopt each time
-	for(int m = 0;m < indiv[0].modPart.NumModels();m++){
-		if(indiv[0].modPart.GetModel(m)->IsOrientedGap()){
-			indiv[0].modPart.GetModel(m)->SetInsertRate(0, initIns);
-			indiv[0].modPart.GetModel(m)->SetDeleteRate(0, initDel);
-			indiv[0].treeStruct->MakeAllNodesDirty();
+		bool resetInsDel = false;
+	if(resetInsDel){
+		for(int m = 0;m < indiv[0].modPart.NumModels();m++){
+			if(indiv[0].modPart.GetModel(m)->IsOrientedGap()){
+				indiv[0].modPart.GetModel(m)->SetInsertRate(0, initIns);
+				indiv[0].modPart.GetModel(m)->SetDeleteRate(0, initDel);
+				indiv[0].treeStruct->MakeAllNodesDirty();
+				}
 			}
 		}
+	else
+		indiv[0].treeStruct->MakeAllNodesDirty();
 	indiv[0].CalcFitness(0);
 
 	//copy the tree and model into indiv[1]

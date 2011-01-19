@@ -52,7 +52,6 @@
 
 #undef OPT_DEBUG
 
-//DEBUG
 #define ONE_BRANCH_INS_DEL
 
 //The ONLY thing that should need to be done to turn on memcheck leak detection
