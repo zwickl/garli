@@ -32,7 +32,7 @@ INP_CXXFLAGS="$CXXFLAGS"
 AC_PROG_CXX
 
 # Initialize CXXFLAGS to prevent it from defaulting to "-g -O2"
-CXXFLAGS="$INP_CXXFLAGS -DUNIX"
+CXXFLAGS="$INP_CXXFLAGS -DUNIX -DNCL_CONST_FUNCS"
 
 # required because we are building a library 
 AC_PROG_RANLIB
@@ -229,7 +229,7 @@ AC_ARG_WITH(
 	[ncl],
 	AC_HELP_STRING(
 		[--with-ncl=DIR],
-		[Specify the root directory for ncl library (parent of the include/ncl and lib directories). Omit this flag to build and use the bundled version of ncl.]
+		[Specify the root directory for the ncl version 2.1 or greater library (parent of the include/ncl and lib directories).  Omit this flag and configure will look for a system level NCL installation.  You might use the build_garli.sh script to automate the build process.]
 		),
 	[
 	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
@@ -240,15 +240,15 @@ AC_ARG_WITH(
 	])
 
 if ! test -d "$NCL_INC_DIR/ncl" ; then
-	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct. You may need to manually make the directory $NCL_INC_DIR/ncl copy all of the ncl headers into that directory if you are using NCL 2.0])
+	AC_MSG_ERROR([NCL 2.1 or higher is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct.])
 else
 	if ! test -f "$NCL_INC_DIR/ncl/nxsdefs.h" ; then
-		AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct. You may need to manually make the directory $NCL_INC_DIR/ncl copy all of the ncl headers into that directory if you are using NCL 2.0])
+		AC_MSG_ERROR([NCL 2.1 or higher is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct.])
 	fi
 fi
 
 if ! test -d "$NCL_LIB_DIR" ; then
-	AC_MSG_ERROR([NCL is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
+	AC_MSG_ERROR([NCL 2.1 or higher is a prerequisite for building Garli. Expecting a directory called $NCL_LIB_DIR, verify that the argument to --with-ncl is correct.])
 fi
 
 CPPFLAGS="$CPPFLAGS -I$NCL_INC_DIR -I$NCL_INC_DIR/ncl $NCL_ASSERT_FLAG"
@@ -257,6 +257,36 @@ if test -d "$NCL_LIB_DIR/ncl" ; then
 else
 	LDFLAGS="$LDFLAGS -L$NCL_LIB_DIR"
 fi
+
+AC_TRY_LINK(
+[],
+[int foo=2;],
+[],
+[AC_MSG_ERROR([Problem with link flags.  Most likely a library cannot be found.  
+Check that any libraries listed below can be found in a system default location or a location specified in LDFLAGS with a -L. 
+LIBS=$LIBS
+LDFLAGS=$LDFLAGS
+])])
+
+LIBS="$LIBS -lncl"
+AC_TRY_LINK( 
+[#include "ncl/nxsdefs.h" ], 
+[onlyDefinedInCouldBeConst ();], 
+[], 
+[AC_MSG_ERROR([NCL must be compiled with the NCL_CONST_FUNCS macro defined. Usually adding -DNCL_CONST_FUNCS to CPPFLAGS in your invocation of the NCL configure script is the solution.])]) 
+
+AC_COMPILE_IFELSE( 
+[#include "ncl/nxsdefs.h" 
+# if ! defined(NCL_MAJOR_VERSION) ||  NCL_MAJOR_VERSION < 2
+#	error "need at least v2"
+# else
+# 	 if ! defined(NCL_MINOR_VERSION) ||  NCL_MINOR_VERSION < 1
+#		error "need at least v2.1"
+#	 endif
+# endif
+], 
+[], 
+[AC_MSG_ERROR([Sorry. NCL 2.1 or greater is required.])]) 
 
 GARLI_LIBS="-lncl"
 
