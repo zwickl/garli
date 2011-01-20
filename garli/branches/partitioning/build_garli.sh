@@ -62,11 +62,11 @@ fi
 cd ${nclv} || exit
 
 echo "CONFIGURING NCL ..."
-./configure --prefix=`pwd`/installed --disable-shared --enable-static || exit
+env CXXFLAGS=-DNCL_CONST_FUNCS ./configure --prefix=`pwd`/installed --disable-shared --enable-static || exit
 make || exit
 echo "BUILDING NCL ..."
 make install || exit
-make installcheck || exit
+#make installcheck || exit
 cd ..
 
 echo "CONFIGURING GARLI ..."
