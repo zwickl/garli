@@ -48,7 +48,7 @@ protected:
 	virtual int	NumStates(int) const { return 4; }
 
 public:
-	virtual void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
+	virtual void CreateMatrixFromNCL(const const NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
 	virtual void CalcEmpiricalFreqs() = 0;
 	virtual void GetEmpiricalFreqs(FLOAT_TYPE *f) const{
 		assert(empStateFreqs);
@@ -185,7 +185,7 @@ public:
 
 	unsigned char CharToDatum(char d);
 	void CalcEmpiricalFreqs();
-	void CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset);
+	void CreateMatrixFromNCL(const const NxsCharactersBlock *charblock, NxsUnsignedSet &charset);
 	void MakeAmbigStrings();
 	void AddDummyRootToExistingMatrix();
 	char *GetAmbigString(int i) const{
@@ -566,7 +566,7 @@ public:
 		return 0;
 		}
 
-	void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset){
+	void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset){
 		//this also should not be getting called.  The codon matrix
 		//is created from a DNA matrix that has been read in, possibly
 		//by the NCL
@@ -606,7 +606,7 @@ public:
 	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code);
 	void CalcEmpiricalFreqs();
 	unsigned char CharToDatum(char d);
-	void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
+	void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset);
 	};
 
 class DataPartition {
@@ -695,7 +695,7 @@ class BinaryData : public SequenceData{
 
 		unsigned char CharToDatum(char d);
 		char DatumToChar( unsigned char d );
-		void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
+		void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset);
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
 			}
@@ -771,7 +771,7 @@ class NStateData : public SequenceData{
 
 		virtual unsigned char CharToDatum(char d);
 		char DatumToChar( unsigned char d );
-		virtual void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
+		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset);
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
 			}
@@ -838,7 +838,7 @@ class OrientedGapData : public NStateData{
 			}
 		void SetNumStates(int ns){maxNumStates = ns;}
 
-		virtual void CreateMatrixFromNCL(NxsCharactersBlock *, NxsUnsignedSet &charset);
+		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset);
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
 			}

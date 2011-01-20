@@ -673,7 +673,7 @@ unsigned char AminoacidData::CharToDatum(char ch){
 	return datum;
 	}
 
-void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
+void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
 	
 	if(charblock->GetDataType() != NxsCharactersBlock::dna 
 		&& charblock->GetDataType() != NxsCharactersBlock::rna 
@@ -738,7 +738,7 @@ void NucleotideData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsig
 		}
 	}
 
-void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
+void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &charset){
 
 	if(charblock->GetDataType() != NxsCharactersBlock::protein)
 		throw ErrorException("Tried to create amino acid matrix from non-amino acid data.\n\t(Did you mean to use datatype = codon-aminoacid?)");
@@ -810,7 +810,7 @@ void AminoacidData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsign
 		}
 	}
 
-void BinaryData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){
+void BinaryData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){
 	if(charblock->GetDataType() != NxsCharactersBlock::standard)
 		throw ErrorException("Tried to create binary matrix from non-standard data.\n\t(Did you mean to use datatype = binary?)");
 
@@ -886,7 +886,7 @@ void BinaryData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedS
 		}
 	}
 
-void NStateData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){
+void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){
 	if(charblock->GetDataType() != NxsCharactersBlock::standard)
 		throw ErrorException("Tried to create n-state matrix from non-standard data.\n\t(Did you mean to use datatype = standard?)");
 
@@ -1196,7 +1196,7 @@ long NStateData::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 	return seedUsed;
 	}
 
-void OrientedGapData::CreateMatrixFromNCL(NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){
+void OrientedGapData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){
 	if(charblock->GetDataType() != NxsCharactersBlock::standard)
 		throw ErrorException("Tried to create n-state matrix from non-standard data.\n\t(Did you mean to use datatype = nstate?)");
 
