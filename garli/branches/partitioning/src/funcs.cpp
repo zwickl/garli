@@ -45,6 +45,86 @@ bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLO
 	return (diff < epsilon);
 	}
 
+//this is for sticking info about what is defined into log files, for later checking
+void OutputImportantDefines(){
+	outman.DebugMessage("#####\nThe following are/are not defined:");
+
+#ifdef RESCALE_ARRAY_LENGTH
+	outman.DebugMessage("RESCALE_ARRAY_LENGTH = %d", RESCALE_ARRAY_LENGTH);
+#endif
+
+	outman.DebugMessageNoCR("LUMP_LIKES : ");
+#ifdef LUMP_LIKES
+	outman.DebugMessage("%d", LUMP_FREQ);
+#else
+	outman.DebugMessage("no");
+#endif
+
+#ifdef DEBUG_SCORES
+	outman.DebugMessage("DEBUG_SCORES");
+#endif
+
+#ifdef OPT_DEBUG
+	outman.DebugMessage("OPT_DEBUG");
+#endif
+
+#ifdef VARIABLE_OPTIMIZATION
+	outman.DebugMessage("VARIABLE_OPTIMIZATION");
+#endif
+
+#ifdef NO_EVOLUTION
+	outman.DebugMessage("NO_EVOLUTION");
+#endif
+
+#ifdef SWAP_BASED_TERMINATION
+	outman.DebugMessage("SWAP_BASED_TERMINATION");
+#endif
+
+#ifdef MORE_DETERM_PARAM_OPT
+	outman.DebugMessage("MORE_DETERM_PARAM_OPT = yes");
+#else
+	outman.DebugMessage("MORE_DETERM_PARAM_OPT = no");
+#endif
+
+#ifdef ADAPTIVE_BOUNDED_OPT
+	outman.DebugMessage("ADAPTIVE_BOUNDED_OPT = yes");
+#else
+	outman.DebugMessage("ADAPTIVE_BOUNDED_OPT = no");
+#endif
+
+#ifdef PUSH_TO_MIN_BLEN
+	outman.DebugMessage("PUSH_TO_MIN_BLEN = yes");
+#else
+	outman.DebugMessage("PUSH_TO_MIN_BLEN = no");
+#endif
+
+#ifdef DEBUG_MESSAGES
+	outman.DebugMessage("DEBUG_MESSAGES = yes");
+#else
+	outman.DebugMessage("DEBUG_MESSAGES = no");
+#endif
+
+#ifdef BOUND_DIGITS
+	outman.DebugMessage("BOUND_DIGITS = %d", BOUND_DIGITS);
+#else
+	outman.DebugMessage("BOUND_DIGITS = default");
+#endif
+
+#ifdef OPT_BOUNDED_RESTORE
+	outman.DebugMessage("OPT_BOUNDED_RESTORE = yes");
+#else
+	outman.DebugMessage("OPT_BOUNDED_RESTORE = no");
+#endif
+
+#ifdef FINAL_RESTORE_BLENS
+	outman.DebugMessage("FINAL_RESTORE_BLENS = yes");
+#else
+	outman.DebugMessage("FINAL_RESTORE_BLENS = no");
+#endif
+
+	outman.DebugMessage("#####\n");
+	}
+
 #ifdef BROOK_GPU
 #include <brook/brook.hpp>
 //#include <brook/profiler.hpp>
@@ -75,7 +155,7 @@ void  Product4 (::brook::stream des1,
 
 //a variety of functions that don't belong to any class
 
-#ifdef SINGLE_PRECISION_FLOATS
+#if defined(SINGLE_PRECISION_FLOATS) && (!defined(_MSC_VER)) || (defined(BOINC) && defined (_WIN32))
 //Overloaded versions of min and max that take different types for the two arguments
 //This should not be used in hot code when possible, and conditional comp should
 //be used to make two different versions of the code
@@ -195,7 +275,7 @@ bool FileIsFasta(const char *name){
 	fclose(inf);
 	return fasta;
 	}
-
+/* //the ReadData within the GarliReader should now be used to read all data files
 bool ReadData(const char* filename)	{
 	bool usedNCL = false;
 
@@ -282,8 +362,9 @@ bool ReadData(const char* filename)	{
 			}
 		}
 */	
-	return usedNCL;
+/*	return usedNCL;
 	}
+*/
 
 int ReadData(GeneralGamlConfig *conf, NucleotideData* data)	{
 	assert(0);
@@ -920,54 +1001,14 @@ FLOAT_TYPE DZbrent(FLOAT_TYPE ax, FLOAT_TYPE bx, FLOAT_TYPE cx, FLOAT_TYPE fa, F
 	 return fx;
 	 }
 	 
-void InferStatesFromCla(char *states, FLOAT_TYPE *cla, int nchar){
-	//this function takes a cla that contains the contribution of the whole tree
-	//and calculates the most probable state at each site.  The resulting array of
-	//states is placed into *states, which should already be allocated.
-	assert(0);//need to generalize this for n rates is it ever needs to be used again
-	FLOAT_TYPE stateProbs[4];
-	
+void InferStatesFromCla(vector<InternalState> &stateVec, const FLOAT_TYPE *cla, int nchar, int nstates){
+	//what is passed in here is really the unscaled posterior values for each state, marginalized across rates (including any invariant class).
+	//thus, the state frqeuencies have already been figured in and nothing needs to be done in CalcProbs besides divide each by the sum
+	//note that this clas then only uses the first nstates x nchar portion, instead of the usual nstates x nchar x nrates
 	for(int c=0;c<nchar;c++){
-		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=ZERO_POINT_ZERO;
-		for(int i=0;i<4;i++){
-			for(int j=0;j<4;j++){
-				stateProbs[j] += *cla++;
-				}
-			}
-		int max=0, next=1;
-
-		while(next < 4){
-			if(stateProbs[next] > stateProbs[max]){
-				max=next;
-				}
-			next++;
-			}
-
-		states[c]=max;
+		stateVec.push_back(InternalState(nstates));
+		stateVec[stateVec.size() - 1].CalcProbs(&cla[c * nstates]);
 		}
-	}
-
-vector<InternalState *> *InferStatesFromCla(FLOAT_TYPE *cla, int nchar, int nrates){
-	FLOAT_TYPE stateProbs[4];
-	
-	vector<InternalState *> *stateVec = new vector<InternalState *>;
-	
-	for(int c=0;c<nchar;c++){
-		stateProbs[0]=stateProbs[1]=stateProbs[2]=stateProbs[3]=ZERO_POINT_ZERO;
-		for(int i=0;i<nrates;i++){	
-			for(int j=0;j<4;j++){
-				stateProbs[j] += *cla++;
-				}
-			}
-		InternalState *site=new InternalState(stateProbs);
-		stateVec->push_back(site);
-						
-			
-	//		out << bases[(stateProbs[max1] > stateProbs[max2] ? max1 : max2)] << "\t";
-	//		out << stateProbs[0]/tot << "\t" << stateProbs[1]/tot << "\t" << stateProbs[2]/tot << "\t" << stateProbs[3]/tot << "\n";
-
-		}
-	return stateVec;
 	}
 
 FLOAT_TYPE CalculateHammingDistance(const char *str1, const char *str2, const int *counts, int nchar, int nstates){

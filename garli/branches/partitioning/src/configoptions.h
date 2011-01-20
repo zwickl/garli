@@ -65,6 +65,10 @@ class GeneralGamlConfig{
 	bool collapseBranches;
 	//this is just a string that I can use for whatever I want in special runmodes
 	string arbitraryString;
+	unsigned int siteWindowLength;
+	unsigned int siteWindowStride;
+
+	bool usePatternManager;
 
 	//starting the run
 	int randseed;

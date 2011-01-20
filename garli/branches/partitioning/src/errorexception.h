@@ -19,10 +19,10 @@
 #define ERROREXCEPTION
 
 #include <stdarg.h>
-#include <ostream>
-#include <cstring>
-#include "outputman.h"
 #include <cassert>
+#include <cstring>
+#include <ostream>
+#include "outputman.h"
 
 using namespace std;
 
@@ -31,7 +31,8 @@ extern OutputManager outman;
 class ErrorException{
 	
 	public:
-	char message[4000];
+	char message[5000];
+	//char message[400];
 	ErrorException(const char *fmt, ...){
 		va_list vl;
 		va_start(vl, fmt);

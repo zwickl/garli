@@ -201,11 +201,26 @@ public:
 class GeneticCode{
 	//mapping from codon number (ordered AAA, AAC, AAG, AAT, ACA, etc) to 
 	//amino acid number (0-19). Stop codons are 20.
+	//except for two-serine models, when they are 21 and the serine with two codons is state 20
 	int codonTable[64];
 	int map64toNonStops[64];
 	vector<int> stops;
 
+	//this holds the correspondence between the state indeces and actual codons
+	//for display purposes.  Stops are removed and thus any mapIndexToCodonDisplay[index]
+	//gives the codon for that index
+	vector<string> mapIndexToCodonDisplay;
+
 	public:
+	enum{
+		STANDARD= 0,
+		VERTMITO = 1,
+		INVERTMITO = 2,
+		STANDARDTWOSERINE = 3,
+		VERTMITOTWOSERINE = 4,
+		INVERTMITOTWOSERINE = 5
+		}codeName;
+	
 	GeneticCode(){
 		SetStandardCode();
 		}
@@ -344,6 +359,21 @@ class GeneticCode{
 		stops.push_back(48);
 		stops.push_back(50);
 		stops.push_back(56);
+
+		FillIndexToCodonDisplayMap();
+		}
+		
+	void SetStandardTwoSerineCode(){
+		//because the stops don't change location, I don't think that anything else needs to be changed here
+
+		//the two lone serines become the 20th state
+		codonTable[ 9 ]= 20;  //AGC
+		codonTable[ 11 ]= 20; //AGT
+
+		//the three stop codons become the 21st state
+		codonTable[ 48 ]= 21;
+		codonTable[ 50 ]= 21;
+		codonTable[ 56 ]= 21;
 		}
 		
 	void SetVertMitoCode(){
@@ -423,6 +453,23 @@ class GeneticCode{
 		stops.push_back(10);
 		stops.push_back(48);
 		stops.push_back(50);
+
+		FillIndexToCodonDisplayMap();
+		}
+
+	//this should be called AFTER SetVertMitoCode()
+	void SetVertMitoTwoSerineCode(){
+		//because the stops don't change location, I don't think that anything else needs to be changed here
+
+		//the two lone serines become the 20th state
+		codonTable[ 9 ]= 20;  //AGC
+		codonTable[ 11 ]= 20; //AGT
+
+		//the four stop codons become the 21st state
+		codonTable[8] = 21;  //AGA
+		codonTable[10] = 21;  //AGG
+		codonTable[ 48 ]= 21;
+		codonTable[ 50 ]= 21;
 		}
 		
 	void SetInvertMitoCode(){
@@ -500,6 +547,21 @@ class GeneticCode{
 		stops.clear();
 		stops.push_back(48);
 		stops.push_back(50);
+		
+		FillIndexToCodonDisplayMap();
+		}
+
+	//this should be called AFTER SetInvertMitoCode()
+	void SetInvertMitoTwoSerineCode(){
+		//because the stops don't change location, I don't think that anything else needs to be changed here
+
+		//the two lone serines become the 20th state
+		codonTable[ 9 ]= 20;  //AGC
+		codonTable[ 11 ]= 20; //AGT
+
+		//the two stop codons become the 21st state
+		codonTable[ 48 ]= 21;
+		codonTable[ 50 ]= 21;
 		}
 
 	int CodonLookup(int i){
@@ -511,6 +573,29 @@ class GeneticCode{
 		assert(map64toNonStops[i] != -1);
 		return map64toNonStops[i];
 		}
+	void FillIndexToCodonDisplayMap(){
+		//this assumes that the correct genetic code has already been set
+		mapIndexToCodonDisplay.clear();
+		char nucs[4] = {'A', 'C', 'G', 'T'};
+		//char cod[3];
+		char *cod = new char[4];
+		for(int f = 0;f < 4;f++){
+			for(int s = 0;s < 4;s++){
+				for(int t = 0;t < 4;t++){
+					if(CodonLookup(f * 16 + s * 4 + t) != 20){ 
+						sprintf(cod, "%c%c%c", nucs[f], nucs[s], nucs[t]);
+						mapIndexToCodonDisplay.push_back(cod);
+						}
+					}
+				}
+			}
+		delete []cod;
+		}
+	const string LookupCodonDisplayFromIndex(int index) const{
+		return mapIndexToCodonDisplay[index];
+		}
+
+	int NumStates() const {return mapIndexToCodonDisplay.size();}
 	};
 
 class CodonData : public SequenceData {
