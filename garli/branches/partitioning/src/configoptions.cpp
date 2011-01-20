@@ -67,6 +67,11 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	
 	attachmentsPerTaxon = 50;
 
+	siteWindowLength = 0;
+	siteWindowStride = 0;
+
+	usePatternManager = false;
+
 	//finishing the run
 	enforceTermConditions = true;
 	lastTopoImproveThresh = 10000;
@@ -162,6 +167,9 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetIntOption("genthreshforswapterm", swapTermThreshold, true);
 
 	cr.GetStringOption("arbitrarystring", arbitraryString, true);
+	cr.GetUnsignedOption("windowlength", siteWindowLength, true);
+	cr.GetUnsignedOption("windowstride", siteWindowStride, true);
+	cr.GetBoolOption("usepatternmanager", usePatternManager, true);
 
 	//changed the wording of this from besttree to besttopology, to match outputeachbettertopology
 	//still allow besttree, since that is what I told Maddison, and I think has already been incorporated
@@ -173,8 +181,9 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetBoolOption("restart", restart, true);
 	cr.GetBoolOption("writecheckpoints", checkpoint, true);
 
-	if((restart || checkpoint) && collapseBranches)
-		throw ErrorException("Sorry, the collapsebranches option can not currently be used with checkpointing");
+	//after changes to Population, this is now allowed
+//	if((restart || checkpoint) && collapseBranches)
+//		throw ErrorException("Sorry, the collapsebranches option can not currently be used with checkpointing");
 
 	cr.GetUnsignedNonZeroOption("searchreps", searchReps, true);
 	cr.GetUnsignedOption("runmode", runmode, true);
