@@ -48,7 +48,7 @@ protected:
 	virtual int	NumStates(int) const { return 4; }
 
 public:
-	virtual void CreateMatrixFromNCL(const const NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
+	virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
 	virtual void CalcEmpiricalFreqs() = 0;
 	virtual void GetEmpiricalFreqs(FLOAT_TYPE *f) const{
 		assert(empStateFreqs);
@@ -185,7 +185,7 @@ public:
 
 	unsigned char CharToDatum(char d);
 	void CalcEmpiricalFreqs();
-	void CreateMatrixFromNCL(const const NxsCharactersBlock *charblock, NxsUnsignedSet &charset);
+	void CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &charset);
 	void MakeAmbigStrings();
 	void AddDummyRootToExistingMatrix();
 	char *GetAmbigString(int i) const{
