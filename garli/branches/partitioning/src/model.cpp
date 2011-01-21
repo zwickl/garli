@@ -4375,7 +4375,13 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 				SetSubsetRates(ssr);
 				}
 			else{
-				throw ErrorException("Problem reading model specification string");
+				//if there is only one model and the M0 wasn't specified, then try to read it anyway
+				if(models.size() == 1){
+					GetModelSet(0)->GetModel(0)->ReadGarliFormattedModelString(mod);
+					break;
+					}
+				else
+					throw ErrorException("Problem reading model specification string");
 				}
 			}
 		}

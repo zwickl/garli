@@ -506,7 +506,8 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 			if(foundModel==false && foundTree==false){
 				if(isalpha(c)){
 					//changing from b for base freqs to e, for equilibrium freqs
-					if(c=='r'||c=='R'||c=='b'||c=='B'||c=='e'||c=='E'||c=='a'||c=='A'||c=='p'||c=='P'||c=='i'||c=='I'||c=='f'||c=='o'||c=='O') foundModel=true;
+					if(c=='r'||c=='R'||c=='b'||c=='B'||c=='e'||c=='E'||c=='a'||c=='A'||c=='p'||c=='P'||c=='i'||c=='I'||c=='f'||c=='o'||c=='O'||c=='M'||c=='m'||c=='S'||c=='s') 
+						foundModel=true;
 					else throw ErrorException("Unknown model parameter specification! \"%c\"", c);
 					}
 				}
@@ -559,8 +560,8 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 	//foundRmat=foundStateFreqs=foundAlpha=foundPinv = false;
 	
 	if(foundModel == true){
-		if(modPart.NumModels() > 1)
-			throw ErrorException("Specification of model parameter values is not yet supported with partitioned models");
+//		if(modPart.NumModels() > 1)
+//			throw ErrorException("Specification of model parameter values is not yet supported with partitioned models");
 		string modString;
 		do{
 			c=stf.get();
