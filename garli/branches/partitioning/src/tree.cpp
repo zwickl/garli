@@ -92,6 +92,7 @@ FLOAT_TYPE Tree::uniqueSwapBias;
 FLOAT_TYPE Tree::distanceSwapBias;
 FLOAT_TYPE Tree::expectedPrecision;
 bool Tree::rootWithDummy;
+bool Tree::dummyRootBranchMidpoint;
 bool Tree::someOrientedGap;
 bool Tree::useOptBoundedForBlen;
 
@@ -184,12 +185,14 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 			Tree::someOrientedGap = true;
 		}
 
+
 	string outString = conf->outgroupString;
 
 	if(someOrientedGap){
 		//Tree::rescaleEvery = 2;
 		Tree::rootWithDummy = true;
 		Tree::useOptBoundedForBlen = true;
+		Tree::dummyRootBranchMidpoint = conf->rootAtBranchMidpoint;
 		//set the dummy taxon as the effective outgroup
 		if(conf->outgroupString.length() > 0)
 			outman.UserMessage("WARNING - specified outgroup (%s) being ignored due to inference of a rooted true", conf->outgroupString.c_str());
@@ -206,7 +209,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 		}
 	else{
 		Tree::rootWithDummy = false;
-		Tree::useOptBoundedForBlen = false;
+		Tree::useOptBoundedForBlen = conf->useOptBoundedForBlen;
 		}
 
 	//deal with the outgroup specification, if there is one
@@ -482,9 +485,9 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			}
 		else//the input tree must have had the dummy in it already
 			assert(dummyRoot->attached == true);
-#ifdef DUMMY_ROOT_MIDPOINT
-		MoveDummyRootToBranchMidpoint();
-#endif
+
+		if(dummyRootBranchMidpoint)
+			MoveDummyRootToBranchMidpoint();
 		}
 
 	if(root->left->next==root->right){

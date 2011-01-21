@@ -280,9 +280,9 @@ void Individual::MakeRandomTree(int nTax){
 			}
 #endif
 		}
-#ifdef DUMMY_ROOT_MIDPOINT
-	treeStruct->MoveDummyRootToBranchMidpoint();
-#endif
+	if(treeStruct->dummyRootBranchMidpoint)
+		treeStruct->MoveDummyRootToBranchMidpoint();
+
 	treeStruct->AssignCLAsFromMaster();
 	}
 
