@@ -69,6 +69,8 @@ class GeneralGamlConfig{
 	unsigned int siteWindowStride;
 
 	bool usePatternManager;
+	bool rootAtBranchMidpoint;
+	bool useOptBoundedForBlen;
 
 	//starting the run
 	int randseed;

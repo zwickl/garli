@@ -88,6 +88,7 @@ class Tree{
 		
 		static bool useOptBoundedForBlen;
 		static bool rootWithDummy;
+		static bool dummyRootBranchMidpoint;
 		static bool someOrientedGap;
 		
 		static FLOAT_TYPE uniqueSwapPrecalc[500];
@@ -512,7 +513,6 @@ inline void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len, bool dummyRootDo
 	assert(!(len < min_brlen) && !(len > max_brlen));
 	nd->dlen=len;
 
-#ifdef DUMMY_ROOT_MIDPOINT
 	//the dontRecurse bit here just keeps it from bouncing back and forth setting the 
 	//lengths of the two "root" branches, since changing one triggers a change to the other
 	//There are are few posibilities:
@@ -524,7 +524,7 @@ inline void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len, bool dummyRootDo
 	//	2b. nd is the branch "below" where dummyRoot attaches
 	//		In this case dummyRoot is left or right of nd.  The branch to adjust is the other descendent of nd
 	//	3.	nd is not related to the dummyRooted branch
-	if(rootWithDummy && dummyRootDontRecurse == false){
+	if(rootWithDummy && dummyRootBranchMidpoint && dummyRootDontRecurse == false){
 		TreeNode *otherNode = NULL;
 		if(nd->anc == root && dummyRoot->anc == root){
 			otherNode = root->left;
@@ -549,7 +549,7 @@ inline void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len, bool dummyRootDo
 		if(otherNode)
 			SetBranchLength(otherNode, len, true);
 		}
-#endif
+
 	SweepDirtynessOverTree(nd);
 	}
 

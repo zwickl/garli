@@ -71,6 +71,8 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	siteWindowStride = 0;
 
 	usePatternManager = false;
+	rootAtBranchMidpoint = false;
+	useOptBoundedForBlen = false;
 
 	//finishing the run
 	enforceTermConditions = true;
@@ -170,6 +172,9 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetUnsignedOption("windowlength", siteWindowLength, true);
 	cr.GetUnsignedOption("windowstride", siteWindowStride, true);
 	cr.GetBoolOption("usepatternmanager", usePatternManager, true);
+
+	cr.GetBoolOption("rootatbranchmidpoint", rootAtBranchMidpoint, true);
+	cr.GetBoolOption("useoptboundedforblen", useOptBoundedForBlen, true);
 
 	//changed the wording of this from besttree to besttopology, to match outputeachbettertopology
 	//still allow besttree, since that is what I told Maddison, and I think has already been incorporated

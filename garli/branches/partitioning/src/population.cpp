@@ -3046,7 +3046,6 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 	ordered << "Tree\t-lnL\tSite\t-lnL\n";
 	ordered.close();
 
-	//DEBUG
 	Tree::useOptBoundedForBlen = true;
 
 	currentSearchRep = 1;
