@@ -1334,14 +1334,16 @@ class Model{
 	void SetFlexRate(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
 		rateMults[which] = val;
-		NormalizeRates(which);
+		NormalizeRates(which, which);
 		eigenDirty = true;
 		}
 
 	void SetFlexProb(int which, FLOAT_TYPE val){
 		assert(which < NRateCats());
 		rateProbs[which] = val;
-		NormalizeRates(which);
+		//here the proportion that changed should remain constant, but there isn't anything wrong with
+		//the corresponding rate changing when rescaling
+		NormalizeRates(which, -1);
 		eigenDirty = true;
 		}
 
