@@ -362,11 +362,18 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &mSpec
 			try{
 				outman.UserMessage("Attempting to read data file %s as\n\t%s format (using NCL) ...", filename, (*formIt).second.c_str());
 				ReadFilepath(filename, (*formIt).first);
-				}catch(NxsException err){
+				}
+			catch(NxsException err){
 					NexusError(err.msg, err.pos, err.line, err.col, false);
 					outman.UserMessage("Problem reading data file as %s format...\n", (*formIt).second.c_str());
 					success = false;
 					}
+			catch(ErrorException err){
+				//Sometimes NCL raises a NxsException, but then catches it and passes it onto my NexusError,
+				//which throws an ErrorException.  So, need to catch both types of exceptions here
+				outman.UserMessage("Problem reading data file as %s format...\n", (*formIt).second.c_str());
+				success = false;
+				}
 			if(success) break;
 			}
 		if(success == false)
