@@ -4319,8 +4319,8 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 	try{
 		while(mod.length() > 0){
 			//now, read through the string, figuring out where each of the model strings start and end, and what numbers they are
-			unsigned start = mod.find("m");
-			unsigned start2 = mod.find("s");
+			size_t start = mod.find("m");
+			size_t start2 = mod.find("s");
 			if(start < start2){
 				if(start == string::npos)
 					throw ErrorException("Problem reading model parameter string.");
