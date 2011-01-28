@@ -2212,7 +2212,7 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		if(nst == 6){
 			if(modSpec->IsArbitraryRateMatrix()) outman.UserMessage("\n    User specified matrix type: %s ", modSpec->arbitraryRateMatrixString.c_str());
 			else outman.UserMessage("    6 rates ");
-			if(modSpec->fixRelativeRates == true) outman.UserMessage("\n    Values specified by user (fixed)");
+			if(modSpec->fixRelativeRates == true) outman.UserMessage("    Values specified by user (fixed)");
 			//else outman.UserMessage("");
 			outman.UserMessage("    AC = %.3f, AG = %.3f, AT = %.3f, CG = %.3f, CT = %.3f, GT = %.3f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
 			}
@@ -4341,7 +4341,7 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 					
 				//now we've eaten off everything up to the actual model string.  figure out where it ends for this model.
 				//find_first_of looks for the first occurence of the letters m or s.
-				unsigned end = mod.find_first_of("ms");
+				size_t end = mod.find_first_of("ms");
 				if(end == string::npos){
 					if(mod.length() == 0)
 						throw ErrorException("Problem reading model parameter string.");
@@ -4352,7 +4352,7 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 				GetModelSet(modNum)->GetModel(0)->ReadGarliFormattedModelString(thismod);
 				}
 			else if(start2 != string::npos){
-				unsigned space = mod.find(" ");
+				size_t space = mod.find(" ");
 				if(space == string::npos)
 					throw ErrorException("Problem reading subset rate parameters from file.");
 				mod.erase(0, space + 1);
