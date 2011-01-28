@@ -4219,8 +4219,9 @@ void Population::WriteTreeFile( const char* treefname, int indnum, bool collapse
 	outf.write(s, sizeof(char), str.length());
 	if((userTermination || timeTermination) && (indnum == storedTrees.size() - 1)){
 		//str = "[!****NOTE: GARLI Run was terminated before termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!****\n]";
-		str = TerminationWarningMessage();
-		str += "\n";
+		str = "["
+		str += TerminationWarningMessage();
+		str += "]\n";
 		s = str.c_str();
 		outf.write(s, sizeof(char), str.length());
 		}
@@ -4228,7 +4229,7 @@ void Population::WriteTreeFile( const char* treefname, int indnum, bool collapse
 	outf << str; 
 	//if(indnum < 0 && (userTermination || timeTermination))
 	if((userTermination || timeTermination) && (indnum == storedTrees.size() - 1))
-		outf << TerminationWarningMessage().c_str() << endl;
+		outf << "[" << TerminationWarningMessage().c_str() << "]" << endl;
 #endif
 		
 	outf.close();
@@ -4344,7 +4345,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 			}
 //		}
 	if(userTermination || timeTermination){
-		outf << TerminationWarningMessage().c_str();
+		outf << "[" << TerminationWarningMessage().c_str() << "]";
 		}
 	outf.close();
 	if(conf->outputPhylipTree) phytree.close();
