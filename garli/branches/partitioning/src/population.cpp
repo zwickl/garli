@@ -4069,12 +4069,12 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 	else
 		theInd = ind;
 
-	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << ind->Fitness() << " ";
+	bootLog << "  tree bootrep" << rep <<  "= [&U] [" << theInd->Fitness() << " ";
 	
 	string modstr;
-	ind->modPart.FillGarliFormattedModelStrings(modstr);
+	theInd->modPart.FillGarliFormattedModelStrings(modstr);
 
-	ind->treeStruct->root->MakeNewick(treeString, false, true);
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	bootLog << modstr.c_str() << "] " << treeString << ";" << endl;
 
 	if(conf->outputPhylipTree == true){
