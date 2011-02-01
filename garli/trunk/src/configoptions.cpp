@@ -63,6 +63,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	searchReps = 1;
 	//this isn't for general consumption, but lets me easily enable hacked in features
 	runmode = 0;
+	scoreOnly = false;
 	
 	attachmentsPerTaxon = 50;
 
@@ -192,6 +193,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 
 	cr.GetUnsignedNonZeroOption("searchreps", searchReps, true);
 	cr.GetUnsignedOption("runmode", runmode, true);
+	cr.GetBoolOption("scoreonly", scoreOnly, true);
 
 	//cr.GetBoolOption("useflexrates", useflexrates, true);
 	//cr.GetBoolOption("dontinferproportioninvariant", dontInferProportionInvariant, true);
