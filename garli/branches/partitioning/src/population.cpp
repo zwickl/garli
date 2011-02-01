@@ -958,11 +958,12 @@ void Population::ValidateInput(int rep){
 	GarliReader & reader = GarliReader::GetInstance();
 
 #ifdef INPUT_RECOMBINATION
-	if(0){
+	if(0)
 #else
-	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0)){
+	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0))
 		//some starting file has been specified - Cases 3-11
 #endif
+	{
 		//we already checked in Setup whether NCL has trees for us.  A starting model in Garli block will
 		//be handled below, although both a garli block (in the data) and an old style model specification
 		//are not allowed
@@ -1110,11 +1111,12 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	GarliReader & reader = GarliReader::GetInstance();
 
 #ifdef INPUT_RECOMBINATION
-	if(0){
+	if(0)
 #else
-	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0)){
+	if((_stricmp(conf->streefname.c_str(), "random") != 0) && (_stricmp(conf->streefname.c_str(), "stepwise") != 0))
 		//some starting file has been specified - Cases 3-11
 #endif
+	{
 		//we already checked in Setup whether NCL has trees for us.  A starting model in Garli block will
 		//be handled below, although both a garli block (in the data) and an old style model specification
 		//are not allowed
@@ -1245,7 +1247,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	[pool release];
 #endif		
 
-	if(conf->refineStart==true){
+	if(conf->refineStart==true && !conf->scoreOnly){
 		//12/26/07 now only passing the first argument here ("optModel") as false if no model muts are used
 		//if single parameters are fixed that will be checked in the Refine function itself
 		indiv[0].RefineStartingConditions(adap->modWeight != ZERO_POINT_ZERO, adap->branchOptPrecision);
@@ -1481,7 +1483,7 @@ void Population::ReadStateFiles(){
 #endif
 		Tree::attemptedSwaps.ReadBinarySwapCheckpoint(sin);
 		fclose(sin);
-		}	
+		}
 	}
 /*
 void Population::WritePopulationCheckpoint(ofstream &out) {
@@ -1545,7 +1547,6 @@ void Population::ReadPopulationCheckpoint(){
 	if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
 
 	SequenceData *curData = dataPart->GetSubset(0);
-
 #ifdef BOINC
 	char physical_name[100];
 	boinc_resolve_filename(str, physical_name, sizeof(physical_name));
@@ -1808,13 +1809,13 @@ void Population::Run(){
 			UpdateFractionDone(2);
 
 			//termination conditions
-			if(conf->enforceTermConditions == true
+			if(conf->enforceTermConditions == true &&
 #ifdef SWAP_BASED_TERMINATION
-				&& (gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, 1e-8))
+				(gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, 1e-8)) &&
 #else
-				&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, 1e-8))
+				(gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, 1e-8)) &&
 #endif
-				&& (gen > adap->intervalsToStore * adap->intervalLength)
+				(gen > adap->intervalsToStore * adap->intervalLength)
 				&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
 				&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, 1e-8) || adap->numPrecReductions==0)){
 				if(adap->topoMutateProb > ZERO_POINT_ZERO) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
@@ -2712,7 +2713,8 @@ void Population::PerformSearch(){
 		TurnOnSignalCatching();
 #endif				
 		InitializeOutputStreams();
-		Run();
+		if(!conf->scoreOnly)
+			Run();
 
 		//for most purposes, these two types of termination are premature and treated identically
 		//gen termination is treated as normal termination besides some warnings
@@ -3002,11 +3004,13 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	//loop over the trees
 	for(int t = 1;t <= numTrees;t++){
 		this->currentSearchRep = t;
+		if(!conf->scoreOnly)
 		outman.UserMessage("Optimizing tree %d ...", t);
 
 		SeedPopulationWithStartingTree(t);
 		bestIndiv = 0;
-		BetterFinalOptimization();
+		if(!conf->scoreOnly)
+			BetterFinalOptimization();
 
 		outman.UserMessage("Writing site likelihoods for tree %d ...", t);
 		indiv[0].treeStruct->sitelikeLevel = - (max((int)conf->outputSitelikelihoods, 1));
@@ -6289,6 +6293,8 @@ void Population::SetOutputDetails(){
 				all_best_output = (output_details) (REPLACE | WRITE_REP_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 				treelog_output = (output_details) (conf->outputTreelog ? (REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
 				}
+			if(conf->scoreOnly)
+				log_output = treelog_output = fate_output = problog_output = swaplog_output = (output_details) DONT_OUTPUT;
 			}
 		//bootstrapping
 		else {

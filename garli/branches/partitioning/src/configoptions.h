@@ -91,6 +91,7 @@ class GeneralGamlConfig{
 	unsigned runmode;
 	unsigned outputSitelikelihoods;
 	bool reportRunProgress;
+	bool scoreOnly;
 
 	//finishing the run
 	bool enforceTermConditions;
