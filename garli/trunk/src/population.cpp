@@ -1188,17 +1188,13 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].treeStruct->Score();
 */
 
-#ifdef SCORE_INITIAL_ONLY
-exit(0);
-#endif
-
 #ifdef MAC_FRONTEND
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	[[MFEInterfaceClient sharedClient] didBeginInitializingSearch];
 	[pool release];
 #endif
 
-	if(conf->refineStart==true){
+	if(conf->refineStart==true && !conf->scoreOnly){
 		//12/26/07 now only passing the first argument here ("optModel") as false if no model muts are used
 		//if single parameters are fixed that will be checked in the Refine function itself
 		indiv[0].RefineStartingConditions(adap->modWeight != ZERO_POINT_ZERO, adap->branchOptPrecision);
@@ -2525,7 +2521,8 @@ void Population::PerformSearch(){
 		TurnOnSignalCatching();
 #endif
 		InitializeOutputStreams();
-		Run();
+		if(!conf->scoreOnly)
+			Run();
 
 		//for most purposes, these two types of termination are premature and treated identically
 		//gen termination is treated as normal termination besides some warnings
@@ -2804,11 +2801,13 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	//loop over the trees
 	for(int t = 1;t <= numTrees;t++){
 		this->currentSearchRep = t;
-		outman.UserMessage("Optimizing tree %d ...", t);
+		if(!conf->scoreOnly)
+			outman.UserMessage("Optimizing tree %d ...", t);
 
 		SeedPopulationWithStartingTree(t);
 		bestIndiv = 0;
-		FinalOptimization();
+		if(!conf->scoreOnly)
+			FinalOptimization();
 
 		outman.UserMessage("Writing site likelihoods for tree %d ...", t);
 		indiv[0].treeStruct->sitelikeLevel = - (max((int) conf->outputSitelikelihoods, 1));
@@ -6035,6 +6034,8 @@ void Population::SetOutputDetails(){
 				all_best_output = (output_details) (REPLACE | WRITE_REP_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 				treelog_output = (output_details) (conf->outputTreelog ? (REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
 				}
+			if(conf->scoreOnly)
+				log_output = treelog_output = fate_output = problog_output = swaplog_output = (output_details) DONT_OUTPUT;
 			}
 		//bootstrapping
 		else {

@@ -347,8 +347,6 @@ protected:
 		void BeginNexusTreesBlock(ofstream &treeout) const;
 		void BeginNexusTreesBlock(string &trans) const;
 
-		//virtual void CreateMatrixFromNCL(GarliReader &reader) {};
-		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *) = 0;
 		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
 		
 		virtual unsigned char Matrix( int i, int j ) const {

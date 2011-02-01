@@ -48,7 +48,6 @@ protected:
 	virtual int	NumStates(int) const { return 4; }
 
 public:
-	virtual void CreateMatrixFromNCL(const NxsCharactersBlock *) = 0;
 	virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
 	virtual void CalcEmpiricalFreqs() = 0;
 	virtual void GetEmpiricalFreqs(FLOAT_TYPE *f) const{
@@ -168,7 +167,6 @@ public:
 
 	unsigned char CharToDatum(char d) ;
 	void CalcEmpiricalFreqs();
-	void CreateMatrixFromNCL(const NxsCharactersBlock *);
 	void CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &charset);
 	void MakeAmbigStrings();
 	char *GetAmbigString(int i) const{
@@ -709,7 +707,6 @@ public:
 	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code);
 	void CalcEmpiricalFreqs();
 	unsigned char CharToDatum(char d) ;
-	void CreateMatrixFromNCL(const NxsCharactersBlock *);
 	void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset);
 	};
 
