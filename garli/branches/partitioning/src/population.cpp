@@ -1445,7 +1445,8 @@ void Population::WriteStateFiles(){
 		}
 	}
 
-void Population::ReadStateFiles(){
+//Returns whether or not checkpoints were actually found and read
+bool Population::ReadStateFiles(){
 	char name[100];
 
 	//read the adaptation binary checkpoint
@@ -1457,7 +1458,14 @@ void Population::ReadStateFiles(){
 	in = boinc_fopen(physical_name, "rb");
 
 #else
-	if(FileExists(name) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe checkpoint files were moved/deleted or the ofprefix setting\nin the config file was changed.", name));
+	if(FileExists(name) == false){
+	#if defined(SUBROUTINE_GARLI) || defined(OLD_SUBROUTINE_GARLI)
+		//for the MPI version we don't care if checkpoint files weren't found
+		return false;
+	#else
+		throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe checkpoint files were moved/deleted or the ofprefix setting\nin the config file was changed.", name));
+	#endif
+		}
 	in = fopen(name, "rb");
 #endif
 	adap->ReadFromCheckpoint(in);
@@ -1484,6 +1492,7 @@ void Population::ReadStateFiles(){
 		Tree::attemptedSwaps.ReadBinarySwapCheckpoint(sin);
 		fclose(sin);
 		}
+	return true;
 	}
 /*
 void Population::WritePopulationCheckpoint(ofstream &out) {
@@ -1509,9 +1518,10 @@ void Population::WritePopulationCheckpoint(ofstream &out) {
 */
 
 void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
+	assert(!timeTermination && !userTermination);
 	long currentSeed = rnd.seed();
 	out.WRITE_TO_FILE(&currentSeed, sizeof(currentSeed), 1);
-	long currentTime = stopwatch.SplitTime();
+	int currentTime = stopwatch.SplitTime();
 	out.WRITE_TO_FILE(&currentTime, sizeof(currentTime), 1);
 
 	//7/13/07 changing this to calculate the actual size of the chunk of scalars
@@ -1524,18 +1534,13 @@ void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 
 	//save the current members of the population
 	for(unsigned i=0;i<total_size;i++){
-		//DEBUG PARTITION
-		//need to work this out
-		//indiv[i].mod->OutputBinaryFormattedModel(out);
-		indiv[i].modPart.GetModel(0)->OutputBinaryFormattedModel(out);
+		indiv[i].modPart.WriteModelPartitionCheckpoint(out);
 		indiv[i].treeStruct->OutputBinaryFormattedTree(out);
 		}
 
 	//write any individuals that we may have stored from previous search reps
 	for(vector<Individual*>::iterator it = storedTrees.begin(); it < storedTrees.end() ; it++){
-		//DEBUG PARTITION
-		//(*it)->mod->OutputBinaryFormattedModel(out);
-		(*it)->modPart.GetModel(0)->OutputBinaryFormattedModel(out);
+		(*it)->modPart.WriteModelPartitionCheckpoint(out);
 		(*it)->treeStruct->OutputBinaryFormattedTree(out);
 		}
 	}
@@ -1546,7 +1551,6 @@ void Population::ReadPopulationCheckpoint(){
 	sprintf(str, "%s.pop.check", conf->ofprefix.c_str());
 	if(FileExists(str) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", str));
 
-	SequenceData *curData = dataPart->GetSubset(0);
 #ifdef BOINC
 	char physical_name[100];
 	boinc_resolve_filename(str, physical_name, sizeof(physical_name));
@@ -1574,17 +1578,20 @@ void Population::ReadPopulationCheckpoint(){
 	//if were restarting a bootstrap run we need to change to the bootstrapped data
 	//now, so that scoring below is correct
 	if(conf->bootstrapReps > 0){
-		curData->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
+		//need to figure out how the seed will work here
+		assert(0);
+		for(int sub = 0;sub < dataPart->NumSubsets();sub++)
+			dataPart->GetSubset(sub)->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
 		}
 
 	if(gen == UINT_MAX) finishedRep = true;
 
 	for(unsigned i=0;i<total_size;i++){
-		//DEBUG PARTITION
-		//indiv[i].mod->SetDefaultModelParameters(curData);
-		//indiv[i].mod->ReadBinaryFormattedModel(pin);
-		indiv[i].modPart.GetModel(0)->SetDefaultModelParameters(curData);
-		indiv[i].modPart.GetModel(0)->ReadBinaryFormattedModel(pin);
+		for(int m = 0;m < indiv[i].modPart.NumModelSets();m++){
+			//it would make more sense to have this happen at a lower level, but the data are needed
+			indiv[i].modPart.GetModelSet(m)->SetDefaultModelSetParameters(dataPart->GetSubset(m));
+			}
+		indiv[i].modPart.ReadModelPartitionCheckpoint(pin);
 		indiv[i].treeStruct = new Tree();
 		indiv[i].treeStruct->ReadBinaryFormattedTree(pin);
 		indiv[i].treeStruct->AssignCLAsFromMaster();
@@ -1598,11 +1605,12 @@ void Population::ReadPopulationCheckpoint(){
 	//remember that currentSearchRep starts at 1
 	for(int i=1;i<(finishedRep == false ? currentSearchRep : currentSearchRep+1);i++){
 		Individual *ind = new Individual;
-		//DEBUG PARTITION
-		//ind->mod->SetDefaultModelParameters(curData);
-		//ind->mod->ReadBinaryFormattedModel(pin);
-		ind->modPart.GetModel(0)->SetDefaultModelParameters(curData);
-		ind->modPart.GetModel(0)->ReadBinaryFormattedModel(pin);
+		for(int m = 0;m < indiv[i].modPart.NumModelSets();m++){
+			//it would make more sense to have this happen at a lower level, but the data are needed
+			ind->modPart.GetModelSet(m)->SetDefaultModelSetParameters(dataPart->GetSubset(m));
+			}
+		ind->modPart.ReadModelPartitionCheckpoint(pin);
+		
 		ind->treeStruct = new Tree();
 		ind->treeStruct->ReadBinaryFormattedTree(pin);
 		ind->treeStruct->AssignCLAsFromMaster();

@@ -430,7 +430,7 @@ private:
 
 		void ReadPopulationCheckpoint();
 		void WriteStateFiles();
-		void ReadStateFiles();
+		bool ReadStateFiles();
 		void GetConstraints();
 		void WriteTreeFile( const char* treefname, int indnum, bool collapse = false);
 		void WritePhylipTree(ofstream &phytree);

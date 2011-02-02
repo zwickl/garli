@@ -4410,3 +4410,36 @@ void ModelPartition::FillGarliFormattedModelStrings(string &s) const{
 		GetModelSet(m)->GetModel(0)->FillGarliFormattedModelString(s);
 		}
 	}
+
+void ModelPartition::WriteModelPartitionCheckpoint(OUTPUT_CLASS &out) const {
+	//subsetProportions are data dependent, not free variables, so don't need to write
+	if(NumModelSets() > 1){
+		double *dummy = new FLOAT_TYPE;	
+		for(int s = 0;s < NumSubsetRates();s++){
+			*dummy = subsetRates[s];
+			out.WRITE_TO_FILE(dummy, sizeof(FLOAT_TYPE), 1);
+			}
+		delete dummy;
+		}
+	for(int m = 0;m < modSets.size(); m++){
+		GetModelSet(m)->WriteModelSetCheckpoint(out);
+		}
+	}
+
+void ModelPartition::ReadModelPartitionCheckpoint(FILE *in) {
+	if(NumModelSets() > 1){	
+		FLOAT_TYPE *dummy = new FLOAT_TYPE;
+		vector<FLOAT_TYPE> rates;
+		for(int s = 0;s < NumSubsetRates();s++){
+			assert(ferror(in) == false);
+			fread(dummy, sizeof(FLOAT_TYPE), 1, in);
+			rates.push_back(*dummy);
+			}
+		SetSubsetRates(rates);
+		delete dummy;
+		}
+	for(int m = 0;m < modSets.size(); m++){
+		GetModelSet(m)->ReadModelSetCheckpoint(in);
+		}	
+	}
+

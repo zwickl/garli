@@ -1154,7 +1154,7 @@ class Model{
 			*stateFreqs[i]=b[i];
 			freqTot += *stateFreqs[i];
 			}
-		if(FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-5) == false)
+		if(FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-3) == false)
 			throw(ErrorException("State frequencies do not appear to add up to 1.0!\n"));
 		eigenDirty=true;
 		}
@@ -1679,6 +1679,22 @@ public:
 				paramVec.push_back((*tempVec)[i]);
 			}
 		}
+	//currently nothing in ModelSet to save, since no mixing
+	void WriteModelSetCheckpoint(OUTPUT_CLASS &out) const{
+		for(vector<Model*>::const_iterator modit = mods.begin();modit != mods.end();modit++){
+			(*modit)->OutputBinaryFormattedModel(out);
+			}
+		}
+	void ReadModelSetCheckpoint(FILE *in){
+		for(vector<Model*>::iterator modit = mods.begin();modit != mods.end();modit++){
+			(*modit)->ReadBinaryFormattedModel(in);
+			}
+		}
+	void SetDefaultModelSetParameters(const SequenceData *data){
+		for(vector<Model*>::iterator modit = mods.begin();modit != mods.end();modit++){
+			(*modit)->SetDefaultModelParameters(data);
+			}
+		}
 	};
 
 class ModelPartition{
@@ -1753,7 +1769,7 @@ public:
 	void CalcMutationProbsFromWeights();
 	unsigned CalcRequiredCLAsize(const DataPartition *dat); //this is the size in BYTES not elements
 
-	const ModelSet *GetModelSet(int ms) const{
+	ModelSet *GetModelSet(int ms) const{
 		if(ms < 0 || ms < modSets.size() == false) throw ErrorException("Attemped to access invalid ModelSet number");
 		return modSets[ms];
 		}
@@ -1824,6 +1840,8 @@ public:
 
 	void ReadGarliFormattedModelStrings(string &modstr);
 	void FillGarliFormattedModelStrings(string &s) const;
+	void WriteModelPartitionCheckpoint(OUTPUT_CLASS &out) const;
+	void ReadModelPartitionCheckpoint(FILE *in);
 	};
 
 typedef void (Model::*SetParamFunc) (int, FLOAT_TYPE);
