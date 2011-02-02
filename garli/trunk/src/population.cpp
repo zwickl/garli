@@ -2392,6 +2392,9 @@ void Population::Bootstrap(){
 		[pool release];
 #endif
 		if(conf->restart == false){
+			//if this is the first rep
+			if(nextBootstrapSeed == 0)
+				nextBootstrapSeed = rnd.seed();
 			lastBootstrapSeed = nextBootstrapSeed;
 			nextBootstrapSeed = data->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
 //for debuggng
