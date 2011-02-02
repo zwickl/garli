@@ -1540,7 +1540,10 @@ void Population::ReadPopulationCheckpoint(){
 	//if were restarting a bootstrap run we need to change to the bootstrapped data
 	//now, so that scoring below is correct
 	if(conf->bootstrapReps > 0){
-		data->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
+		int s = data->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
+		//this should be the case because what was written to the checkpoint for nextBootstrapSeed
+		//should have come out of BootstrapReweight when it was originally called with lastBootstrapSeed
+		assert(s == nextBootstrapSeed);
 /*//for debugging
 			string wtstring;
 			string name = "bootRep";
@@ -2389,7 +2392,8 @@ void Population::Bootstrap(){
 		[pool release];
 #endif
 		if(conf->restart == false){
-			lastBootstrapSeed = data->BootstrapReweight(0, conf->resampleProportion);
+			lastBootstrapSeed = nextBootstrapSeed;
+			nextBootstrapSeed = data->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
 //for debuggng
 /*			string wtstring;
 			char name[20];
