@@ -1641,21 +1641,15 @@ void DataMatrix::Reweight(FLOAT_TYPE prob){
 
 //4-15-08 adding the option to specify a resample proportion, for jackknifing and what Cecile Ane called
 //the "multidimentional bootstrap"
-long DataMatrix::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportion){
-	//allow for a seed to be passed in and used for the reweighting - Used for bootstrap restarting.
-	//Either way we'll save the seed at the end of the reweighting as the DataMatrix currentBootstrapSeed,
+int DataMatrix::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
+	//a seed is passed in and used for the reweighting - Either for restarting or not
+	//Either way we'll return the seed at the end of the reweighting, to be stored as the Population::nextBootstrapSeed
 	//which allows exactly the same bootstraped datasets to be used in multiple runs, but with different
 	//settings for the actual search
 	if(resampleProportion >= 5.0) outman.UserMessage("WARNING: The resampleproportion setting is the proportion to resample,\nNOT the percentage (1.0 = 100%%).\nThe value you specified (%.2f) is a very large proportion.", resampleProportion);
-	if(currentBootstrapSeed == 0) currentBootstrapSeed = rnd.seed();
 
 	int originalSeed = rnd.seed();
-	if(restartSeed > 0) //if a seed was passed in for restarting
-		rnd.set_seed(restartSeed);
-	else //otherwise use the stored bootstrap seed 
-		rnd.set_seed(currentBootstrapSeed);
-
-	long seedUsed = rnd.seed();
+	rnd.set_seed(seedToUse);
 
 	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
 	
@@ -1697,12 +1691,14 @@ long DataMatrix::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 		else 
 			numZero++;
 		}
+	delete []cumProbs;
+
 	assert(totCounts == totalNChar);
 	assert(nonZeroCharCount + numZero == nChar);
-	currentBootstrapSeed = rnd.seed();
-	if(restartSeed > 0) rnd.set_seed(originalSeed);
-	delete []cumProbs;
-	return seedUsed;
+
+	int nextSeed = rnd.seed();
+	rnd.set_seed(originalSeed);
+	return nextSeed;
 	}
 
 void DataMatrix::CheckForIdenticalTaxonNames(){
