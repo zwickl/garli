@@ -1560,12 +1560,16 @@ void Population::ReadPopulationCheckpoint(){
 	FILE *pin = fopen(str, "rb");
 #endif
 
-	int tmp;
-	fread((char *) &tmp, sizeof(int), 1, pin);
-	rnd.set_seed(tmp);
+	long seed;
+	fread((char *) &seed, sizeof(seed), 1, pin);
+	if(ferror(pin) || feof(pin)){//this mainly checks for a zero-byte file
+		throw ErrorException("Error reading checkpoint file %s.\n\tA problem may have occured writing the file to disk, or the file may have been overwritten or truncated.\n\tUnfortunately you'll need to start the run again from scratch.", str);
+		}
+	rnd.set_seed(seed);
 
-	fread((char *) &tmp, sizeof(int), 1, pin);
-	stopwatch.AddPreviousTime(tmp);
+	int t;
+	fread((char *) &t, sizeof(t), 1, pin);
+	stopwatch.AddPreviousTime(t);
 
 	//7/13/07 changing this to calculate the actual size of the chunk of scalars
 	//(the number of bytes between the start of the object and the first nonscalar
@@ -1592,6 +1596,7 @@ void Population::ReadPopulationCheckpoint(){
 			indiv[i].modPart.GetModelSet(m)->SetDefaultModelSetParameters(dataPart->GetSubset(m));
 			}
 		indiv[i].modPart.ReadModelPartitionCheckpoint(pin);
+
 		indiv[i].treeStruct = new Tree();
 		indiv[i].treeStruct->ReadBinaryFormattedTree(pin);
 		indiv[i].treeStruct->AssignCLAsFromMaster();
@@ -1610,7 +1615,7 @@ void Population::ReadPopulationCheckpoint(){
 			ind->modPart.GetModelSet(m)->SetDefaultModelSetParameters(dataPart->GetSubset(m));
 			}
 		ind->modPart.ReadModelPartitionCheckpoint(pin);
-		
+
 		ind->treeStruct = new Tree();
 		ind->treeStruct->ReadBinaryFormattedTree(pin);
 		ind->treeStruct->AssignCLAsFromMaster();
