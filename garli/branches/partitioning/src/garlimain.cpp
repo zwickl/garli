@@ -524,7 +524,7 @@ int main( int argc, char* argv[] )	{
 					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::BINARY;
 
 				dataSubInfo[dataChunk].Report();
-				outman.UserMessage("");
+				//outman.UserMessage("");
 
 				// Create the data object
 				//for nstate data the effective matrices will be further broken up into implied matrices that each have the same number of observed states
@@ -647,22 +647,7 @@ int main( int argc, char* argv[] )	{
 						//for Mkv.  We don't want the screen output to include it.
 						int numCondPats = data->NumConditioningPatterns();
 
-						data->Summarize();
-						outman.UserMessage("\tSummary of data or data subset:");
-						outman.UserMessage("\t%5d sequences.", data->NTax());
-						outman.UserMessage("\t%5d constant characters.", data->NConstant() - numCondPats);
-						outman.UserMessage("\t%5d parsimony-informative characters.", data->NInformative());
-						outman.UserMessage("\t%5d autapomorphic characters.", data->NAutapomorphic());
-						int total = data->NConstant() + data->NInformative() + data->NAutapomorphic() - numCondPats;
-						if(data->NMissing() > 0){
-							outman.UserMessage("\t%5d characters were completely missing or ambiguous (removed).", data->NMissing());
-							outman.UserMessage("\t%5d total characters (%d before removing empty columns).", total, data->GapsIncludedNChar() - numCondPats);
-							}
-						else outman.UserMessage("\t%5d total characters.", total);
-						outman.flush();
-						
-						data->Collapse();
-						outman.UserMessage("\t%5d unique patterns in compressed data matrix.\n", data->NChar() - numCondPats);
+						data->ProcessPatterns();
 
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].uniqueCharacters = data->NChar();
@@ -671,8 +656,6 @@ int main( int argc, char* argv[] )	{
 						//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
 						data->ReserveOriginalCounts();
 						
-						if(!(modSpec->IsMkTypeModel() || modSpec->IsOrientedGap()))
-							data->DetermineConstantSites();
 						}
 					}
 					//subset specific rates will be set if:
