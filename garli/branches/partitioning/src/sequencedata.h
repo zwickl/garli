@@ -41,10 +41,10 @@ protected:
 	FLOAT_TYPE *empStateFreqs;
 	// overrides of base class's virtual fuctions
 	virtual unsigned char CharToDatum( char ch ) = 0;
-	virtual unsigned char CharToBitwiseRepresentation( char ch );
-	virtual char	DatumToChar( unsigned char d );
-	virtual unsigned char	FirstState() { return 0; }
-	virtual unsigned char	LastState() { return 3; }
+	virtual unsigned char CharToBitwiseRepresentation( char ch ) const;
+	virtual char	DatumToChar( unsigned char d ) const;
+	virtual unsigned char	FirstState() const { return 0; }
+	virtual unsigned char	LastState() const { return 3; }
 	virtual int	NumStates(int) const { return 4; }
 
 public:
@@ -57,8 +57,7 @@ public:
 	virtual void AddDummyRootToExistingMatrix();
 	};
 
-inline unsigned char SequenceData::CharToDatum( char ch )
-{
+inline unsigned char SequenceData::CharToDatum( char ch ){
 	unsigned char datum;
 
 	if( ch == 'A' || ch == 'a' )
@@ -73,7 +72,6 @@ inline unsigned char SequenceData::CharToDatum( char ch )
 		datum = MISSING_DATA;
 	else if( strchr( "rRyYmMkKsSwWhHbBvVdDnN", ch ) ) {
 		datum = MISSING_DATA;
-		dmFlags |= ambigstates;
 	}
 	else
 		THROW_BADSTATE(ch);
@@ -81,8 +79,7 @@ inline unsigned char SequenceData::CharToDatum( char ch )
 	return datum;
 }
 
-inline unsigned char SequenceData::CharToBitwiseRepresentation( char ch )
-{
+inline unsigned char SequenceData::CharToBitwiseRepresentation( char ch ) const{
 	unsigned char datum=0;
 	switch(ch){
 		case 'A' : datum=1; break;
@@ -125,7 +122,7 @@ inline unsigned char SequenceData::CharToBitwiseRepresentation( char ch )
 	return datum;
 }
 
-inline char SequenceData::DatumToChar( unsigned char d )
+inline char SequenceData::DatumToChar( unsigned char d ) const
 {
 	char ch;
 	switch(d){
@@ -147,20 +144,6 @@ inline char SequenceData::DatumToChar( unsigned char d )
        	case 15 : ch='?'; break;
 		default  : assert(0);
 		}
-/*		
-	char ch = 'X';
-
-	if( d == MISSING_DATA )
-		ch = '?';
-	else if( d == 0 )
-		ch = 'A';
-	else if( d == 1 )
-		ch = 'C';
-	else if( d == 2 )
-		ch = 'G';
-	else if( d == 3 )
-		ch = 'T';
-*/
 	return ch;
 }
 
@@ -172,8 +155,8 @@ class NucleotideData : public SequenceData{
 #endif
 
 public:		
-	NucleotideData() : SequenceData() {}
-	NucleotideData( int ntax, int nchar ) : SequenceData( ntax, nchar ) {}
+	NucleotideData() : SequenceData() {fullyAmbigChar = 15;}
+	NucleotideData( int ntax, int nchar ) : SequenceData( ntax, nchar ) {fullyAmbigChar = 15;}
 	~NucleotideData() {
 		for(vector<char*>::iterator delit=ambigStrings.begin();delit!=ambigStrings.end();delit++)
 			delete [](*delit);
@@ -621,25 +604,31 @@ public:
 		maxNumStates = 61;
 		code.SetStandardCode();
 		empType = NOT_EMPIRICAL;
+		fullyAmbigChar = maxNumStates;
 		}
 
 	CodonData(const NucleotideData *dat, int genCode) : SequenceData(){
 		assert(dat->Dense() == false);
-		if(genCode == 0){
+		if(genCode == GeneticCode::STANDARD){
 			code.SetStandardCode();
 			maxNumStates = 61;
 			}
-		else if(genCode == 1){
+		else if(genCode == GeneticCode::VERTMITO){
 			code.SetVertMitoCode();
 			maxNumStates = 60;
 			}
-		else{
+		else if(genCode == GeneticCode::INVERTMITO){
 			code.SetInvertMitoCode();
 			maxNumStates = 62;
 			}
+		else{
+			throw ErrorException("Sorry, only the standard, vert mito and invert mito codes can be used with codon models");
+			}
+		usePatternManager = dat->GetUsePatternManager();
 		FillCodonMatrixFromDNA(dat);
 		CopyNamesFromOtherMatrix(dat);
 		empType = NOT_EMPIRICAL;
+		fullyAmbigChar = maxNumStates;
 		}
 
 	~CodonData(){}
@@ -677,16 +666,34 @@ class AminoacidData : public SequenceData{
 public:
 	AminoacidData() : SequenceData(){
 		maxNumStates = 20;
+		fullyAmbigChar = maxNumStates;
 		}
 
 	AminoacidData(const NucleotideData *dat, int genCode) : SequenceData(){
 		maxNumStates = 20;
 		GeneticCode c;
-		if(genCode == 0) c.SetStandardCode();
-		else if(genCode == 1) c.SetVertMitoCode();
-		else c.SetInvertMitoCode();
+		if(genCode == GeneticCode::STANDARD) c.SetStandardCode();
+		else if(genCode == GeneticCode::VERTMITO) c.SetVertMitoCode();
+		else if(genCode == GeneticCode::INVERTMITO) c.SetInvertMitoCode();
+		else{
+			if(genCode == GeneticCode::STANDARDTWOSERINE){
+				c.SetStandardTwoSerineCode();
+				}
+			else if(genCode == GeneticCode::VERTMITOTWOSERINE){
+				c.SetVertMitoCode();
+				c.SetVertMitoTwoSerineCode();
+				}
+			else if(genCode == GeneticCode::INVERTMITOTWOSERINE){
+				c.SetInvertMitoCode();
+				c.SetInvertMitoTwoSerineCode();
+				}
+			else assert(0);
+			maxNumStates = 21;	
+			}
+		usePatternManager = dat->GetUsePatternManager();
 		FillAminoacidMatrixFromDNA(dat, &c);
 		CopyNamesFromOtherMatrix(dat);
+		fullyAmbigChar = maxNumStates;
 		}
 	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code);
 	void CalcEmpiricalFreqs();
@@ -784,6 +791,8 @@ class BinaryData : public SequenceData{
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
 			}
+		//this is just a virtual overload that avoids doing anything if determine const is called with inappropriate data
+		void DetermineConstantSites(){};
 	};
 
 inline unsigned char BinaryData::CharToDatum( char ch ){
@@ -862,6 +871,8 @@ class NStateData : public SequenceData{
 			}
 		//this is a virtual overload for NState because it might have to deal with the dummy char, which shouldn't be included in the resampling
 		long BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportion);
+		//this is just a virtual overload that avoids doing anything if determine const is called with inappropriate data
+		void DetermineConstantSites(){};
 	};
 
 inline unsigned char NStateData::CharToDatum( char ch ){
@@ -927,6 +938,8 @@ class OrientedGapData : public NStateData{
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
 			}
+		//this is just a virtual overload that avoids doing anything if determine const is called with inappropriate data
+		void DetermineConstantSites(){};
 	};
 
 

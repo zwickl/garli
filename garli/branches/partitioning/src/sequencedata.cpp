@@ -926,6 +926,7 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 	//remove_if(realCharSet->begin(), realCharSet->end(), charblock->GetObsNumStates);
 
 	NxsUnsignedSet consts;
+	NxsUnsignedSet missing;
 	for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();){
 		unsigned num = *cit;
 		cit++;
@@ -934,7 +935,7 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 			consts.insert(num);
 		//the maxNumStates == 2 part here is so that the message is only output when reading the first standard data matrix
 		else if(ns == 0 && maxNumStates == 2)
-			outman.UserMessage("NOTE: entirely missing character #%d removed from matrix.", num+1);
+			missing.insert(num + 1);
 		if(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS){
 			if(ns > 2){
 				throw ErrorException("More than two character states found in binary data (character %d)!", num + 1);  
@@ -946,6 +947,10 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 		if(ns == 0 || (ns != maxNumStates && !(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS))){
 			realCharSet->erase(num);
 			}
+		}
+	if(missing.size() > 0){
+		string str = NxsSetReader::GetSetAsNexusString(missing);
+		outman.UserMessage("NOTE: entirely missing characters removed from matrix: %s", str.c_str());
 		}
 
 	//verify that we're not breaking the assumptions of these datatypes
