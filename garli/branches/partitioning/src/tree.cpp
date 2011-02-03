@@ -7473,13 +7473,17 @@ void Tree::CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr,
 	for(int i=0;i<nchar;i++){
 		if(counts[i]> 0){
 			if(Ldata)
-				left = tipStates[*Ldata++];
-			else
-				left = &LCL[i * claStates];
+				left = tipStates[*Ldata];
+			else{
+				left = &LCL[0];
+				LCL += claStates;
+				}
 			if(Rdata)
-				right = tipStates[*Rdata++];
-			else
-				right = &RCL[i * claStates];
+				right = tipStates[*Rdata];
+			else{
+				right = &RCL[0];
+				RCL += claStates;
+				}
 
 			//element 0 is just an indicator of when NO bases observed in subtree (i.e., 1 = no bases, 0 = bases)
 			dest[0] = left[0] * right[0];
@@ -7492,8 +7496,12 @@ void Tree::CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr,
 			if(!(dest[1] > 0.0 || dest[2] > 0.0))
 				outman.UserMessage("%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t", left[0], left[1], left[2], right[0], right[1], right[2], dest[0], dest[1], dest[2]);
 			assert(dest[1] > 0.0 || dest[2] > 0.0);
-			dest += 3;
+			dest += claStates;
 			}
+		if(Ldata)
+			Ldata++;
+		if(Rdata)
+			Rdata++;
 		}
 
 /*
