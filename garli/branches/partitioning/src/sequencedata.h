@@ -732,6 +732,15 @@ public:
 			assert(nTax == dataSubsets[p]->NTax());
 			}
 		}
+	int BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
+		int nextSeed = seedToUse;
+		for(int p = 0;p < NumSubsets();p++){
+			outman.UserMessage("\tSubset %d: Random seed for bootstrap reweighting: %d", p, nextSeed);
+			SequenceData *curData = GetSubset(p);
+			nextSeed = curData->BootstrapReweight(nextSeed, resampleProportion);
+			}
+		return nextSeed;
+		}
 	};
 
 class DataSubsetInfo{
@@ -776,7 +785,7 @@ public:
 		outman.UserMessage("\tData read as %s,\n\tmodeled as %s", outputNames[readAs].c_str(), outputNames[usedAs].c_str());
 		}
 	};
-
+/*
 //
 // Mk type model, with binary data
 class BinaryData : public SequenceData{
@@ -822,6 +831,7 @@ inline char BinaryData::DatumToChar( unsigned char d ){
 
 	return ch;
 	}
+*/
 //
 // Mk or Mkv type model, with n-state data
 class NStateData : public SequenceData{
@@ -869,8 +879,8 @@ class NStateData : public SequenceData{
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
 			}
-		//this is a virtual overload for NState because it might have to deal with the dummy char, which shouldn't be included in the resampling
-		long BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportion);
+		//this is a virtual overload for NState because it might have to deal with the conditioning chars, which shouldn't be included in the resampling
+		int BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportion);
 		//this is just a virtual overload that avoids doing anything if determine const is called with inappropriate data
 		void DetermineConstantSites(){};
 	};

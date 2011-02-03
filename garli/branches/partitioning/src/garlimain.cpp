@@ -652,10 +652,6 @@ int main( int argc, char* argv[] )	{
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].uniqueCharacters = data->NChar();
 						actuallyUsedImpliedMatrixIndex++;
-
-						//DJZ 1/11/07 do this here now, so bootstrapped weights aren't accidentally stored as orig
-						data->ReserveOriginalCounts();
-						
 						}
 					}
 					//subset specific rates will be set if:

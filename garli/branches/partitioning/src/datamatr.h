@@ -230,7 +230,6 @@ protected:
 	int		nVarUninform;
 	int 	lastConstant;//DJZ
 	int 	*constStates;//the state (or states) that a constant site contains
-	int		currentBootstrapSeed;
 	unsigned char fullyAmbigChar;
 	unsigned numConditioningPatterns;
 
@@ -262,7 +261,7 @@ protected:
 		DataMatrix() : dense(0), nTax(0), nChar(0), matrix(0), count(0),
 			number(0), taxonLabel(0), numStates(0),
 			nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
-			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
+			lastConstant(-1), constStates(0), origCounts(0),
 			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(false),
 			nTaxAllocated(0), origDataNumber(0), numConditioningPatterns(0)
 			{ memset( info, 0x00, 80 ); }
@@ -270,7 +269,7 @@ protected:
 			: nTax(ntax), nChar(nchar), dense(0), matrix(0), count(0),
 			number(0), taxonLabel(0), numStates(0),
 			nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
-			lastConstant(-1), constStates(0), origCounts(0), currentBootstrapSeed(0),
+			lastConstant(-1), constStates(0), origCounts(0),
 			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(false),
 			nTaxAllocated(0), origDataNumber(0), numConditioningPatterns(0)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
@@ -382,8 +381,6 @@ protected:
 		void BeginNexusTreesBlock(ofstream &treeout) const;
 		void BeginNexusTreesBlock(string &trans) const;
 
-		//virtual void CreateMatrixFromNCL(GarliReader &reader) {};
-		//virtual void CreateMatrixFromNCL(const NxsCharactersBlock *) = 0;
 		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;
 		
 		virtual unsigned char Matrix( int i, int j ) const {
@@ -487,7 +484,7 @@ protected:
       			}
       		}
       void Reweight(FLOAT_TYPE prob);
-      long BootstrapReweight(int seed, FLOAT_TYPE resampleProportion);
+      virtual int BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion);
 	  void CountMissingCharsByColumn(vector<int> &vec);
 	  void MakeWeightSetString(NxsCharactersBlock &charblock, string &wtstring, string name);
       void MakeWeightSetString(std::string &wtstring, string name);

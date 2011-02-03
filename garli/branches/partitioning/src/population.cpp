@@ -1582,10 +1582,10 @@ void Population::ReadPopulationCheckpoint(){
 	//if were restarting a bootstrap run we need to change to the bootstrapped data
 	//now, so that scoring below is correct
 	if(conf->bootstrapReps > 0){
-		//need to figure out how the seed will work here
-		assert(0);
-		for(int sub = 0;sub < dataPart->NumSubsets();sub++)
-			dataPart->GetSubset(sub)->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
+		int s = dataPart->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
+		//this should be the case because what was written to the checkpoint for nextBootstrapSeed
+		//should have come out of BootstrapReweight when it was originally called with lastBootstrapSeed
+		assert(s == nextBootstrapSeed);
 		}
 
 	if(gen == UINT_MAX) finishedRep = true;
@@ -2608,11 +2608,11 @@ void Population::Bootstrap(){
 #endif
 		if(conf->restart == false){
 			outman.UserMessage("\nBootstrap reweighting...");
-			for(int ss = 0;ss < dataPart->NumSubsets();ss++){
-				SequenceData *curData = dataPart->GetSubset(ss);
-				lastBootstrapSeed = curData->BootstrapReweight(0, conf->resampleProportion);
-				outman.UserMessage("\tSubset %d: Random seed for bootstrap reweighting: %d", ss, lastBootstrapSeed);
-				}
+			//if this is the first rep
+			if(nextBootstrapSeed == 0)
+				nextBootstrapSeed = rnd.seed();
+			lastBootstrapSeed = nextBootstrapSeed;
+			nextBootstrapSeed = dataPart->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
 			}
 		
 		PerformSearch();
