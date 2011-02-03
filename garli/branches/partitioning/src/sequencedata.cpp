@@ -809,7 +809,7 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 			}
 		}
 	}
-
+/*
 void BinaryData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){
 	if(charblock->GetDataType() != NxsCharactersBlock::standard)
 		throw ErrorException("Tried to create binary matrix from non-standard data.\n\t(Did you mean to use datatype = binary?)");
@@ -885,7 +885,7 @@ void BinaryData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 			}
 		}
 	}
-
+*/
 void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){
 	if(charblock->GetDataType() != NxsCharactersBlock::standard)
 		throw ErrorException("Tried to create n-state matrix from non-standard data.\n\t(Did you mean to use datatype = standard?)");
@@ -1130,51 +1130,36 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 	}
 
 //this is a virtual overload for NState because it might have to deal with the dummy char, which shouldn't be included in the resampling
-long NStateData::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportion){
-	//allow for a seed to be passed in and used for the reweighting - Used for bootstrap restarting.
-	//Either way we'll save the seed at the end of the reweighting as the DataMatrix currentBootstrapSeed,
+int NStateData::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
+	//a seed is passed in and used for the reweighting - Either for restarting or not
+	//Either way we'll return the seed at the end of the reweighting, to be stored as the Population::nextBootstrapSeed
+
 	//which allows exactly the same bootstraped datasets to be used in multiple runs, but with different
 	//settings for the actual search
 	if(resampleProportion >= 5.0) outman.UserMessage("WARNING: The resampleproportion setting is the proportion to resample,\nNOT the percentage (1.0 = 100%%).\nThe value you specified (%.2f) is a very large proportion.", resampleProportion);
-	if(currentBootstrapSeed == 0) currentBootstrapSeed = rnd.seed();
 
 	int originalSeed = rnd.seed();
-	if(restartSeed > 0) //if a seed was passed in for restarting
-		rnd.set_seed(restartSeed);
-	else //otherwise use the stored bootstrap seed 
-		rnd.set_seed(currentBootstrapSeed);
+	rnd.set_seed(seedToUse);
 
-	long seedUsed = rnd.seed();
-
-	//for mkv this will include the dummy const char (the first), but it will
+	//for nstate data this will include the conditioning chars, but they will
 	//have a resample prob of zero
 	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
 	
-	FLOAT_TYPE p=0.0;
-	if(datatype == ONLY_VARIABLE){
-		assert(origCounts[0] > 0);
-		assert(origCounts[1] > 0);
-		cumProbs[0] = ZERO_POINT_ZERO;
-		//there was a bug here in which origCounts[0] was used instead of origCounts[1].  As long
-		//as they were both 1 (meaning that the first column in the compressed matrix was only observed
-		//once) it should have worked fine, but should have thrown an assert or crashed otherwise
-		cumProbs[1]=(FLOAT_TYPE) origCounts[1] / ((FLOAT_TYPE) totalNChar - 1);
-		for(int i=2;i<nChar;i++){
-			cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar - 1);
-			assert(origCounts[i] > 0);
-			}
-		for(int q=1;q<nChar;q++) count[q]=0;
-		assert(FloatingPointEquals(cumProbs[nChar-1], ONE_POINT_ZERO, 1e-6));
-		}
-	else{	
-		cumProbs[0]=(FLOAT_TYPE) origCounts[0] / ((FLOAT_TYPE) totalNChar);
-		for(int i=1;i<nChar;i++){
-			cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar);
-			}	
-		for(int q=0;q<nChar;q++) count[q]=0;
-		}
+	assert(origCounts[0] > 0 && origCounts[1] > 0);
 
-	ofstream deb("counts.log", ios::app);
+	for(int i = 0;i < numConditioningPatterns;i++)
+		cumProbs[i] = ZERO_POINT_ZERO;
+	cumProbs[numConditioningPatterns]=(FLOAT_TYPE) origCounts[numConditioningPatterns] / ((FLOAT_TYPE) totalNChar - numConditioningPatterns);
+	for(int i=numConditioningPatterns + 1;i<nChar;i++){
+		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar - numConditioningPatterns);
+		assert(origCounts[i] > 0);
+		}
+	for(int q=numConditioningPatterns;q<nChar;q++) 
+		count[q]=0;
+	assert(FloatingPointEquals(cumProbs[nChar-1], ONE_POINT_ZERO, 1e-6));
+	cumProbs[nChar-1] = ONE_POINT_ZERO;
+		
+	//ofstream deb("counts.log", ios::app);
 
 	//round to nearest int
 	int numToSample = (int) (((FLOAT_TYPE)totalNChar * resampleProportion) + 0.5);
@@ -1186,19 +1171,31 @@ long NStateData::BootstrapReweight(int restartSeed, FLOAT_TYPE resampleProportio
 		while(p > cumProbs[pat]) pat++;
 		count[pat]++;
 		}
-	int num0=0;
-	for(int d=0;d<nChar;d++){
-		if(count[d]==0) num0++;
-		deb << count[d] << "\t";
+/*
+	for(int i = 0;i < nChar;i++)
+		deb << i << "\t" << cumProbs[i] << "\t" << origCounts[i] << "\t" << count[i] <<  endl;
+*/
+	//take a count of the number of chars that were actually resampled
+	nonZeroCharCount = 0;
+	int numZero = 0;
+	int totCounts = 0;
+	for(int d = numConditioningPatterns;d < nChar;d++){
+		if(count[d] > 0) {
+			nonZeroCharCount++;
+			totCounts += count[d];
+			}
+		else 
+			numZero++;
 		}
-	deb << endl;
-	deb.close();
-	if(datatype == ONLY_VARIABLE) assert(count[0] == 1);
+	if(datatype == ONLY_VARIABLE) 
+		assert(count[0] == 1);
+	assert(totCounts == totalNChar);
+	assert(nonZeroCharCount + numZero == nChar - numConditioningPatterns);
 
-	currentBootstrapSeed = rnd.seed();
-	if(restartSeed > 0) rnd.set_seed(originalSeed);
 	delete []cumProbs;
-	return seedUsed;
+	int nextSeed = rnd.seed();
+	rnd.set_seed(originalSeed);
+	return nextSeed;
 	}
 
 void OrientedGapData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &origCharset){

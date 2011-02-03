@@ -277,6 +277,7 @@ private:
 	unsigned gen;
 	unsigned currentBootstrapRep;
 	int lastBootstrapSeed;
+	int nextBootstrapSeed;
 	unsigned currentSearchRep;
 	//termination related variables
 	unsigned lastTopoImprove;
@@ -392,7 +393,7 @@ private:
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
 			userTermination(false), timeTermination(false), genTermination(false), currentBootstrapRep(0),
-			finishedRep(false), lastBootstrapSeed(0), dataPart(NULL), rawPart(NULL)
+			finishedRep(false), lastBootstrapSeed(0), nextBootstrapSeed(0), dataPart(NULL), rawPart(NULL)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
 #endif
