@@ -6670,7 +6670,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum){
 				&Model::SetRelativeNucRate);
 */
 		}
-	else if(modSpec->IsAminoAcid()==false){
+	else if(modSpec->IsNucleotide() || modSpec->IsCodon()){
 /*		char temp[100];
 		int oprec = 4;
 		sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", oprec, mod->Rates(0), oprec, mod->Rates(1), oprec, mod->Rates(2), oprec, mod->Rates(3), oprec, mod->Rates(4));

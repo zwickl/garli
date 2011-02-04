@@ -361,22 +361,7 @@ void Population::CheckForIncompatibleConfigEntries(){
 	if(dataPart->NumSubsets() > 1){
 		if(conf->linkModels && modSpecSet.GetModSpec(0)->IsEmpiricalStateFrequencies())
 			throw ErrorException("Sorry, empirical state frequencies can't be used with partitioned models when models are linked");
-		if(conf->checkpoint)//checkpointing is allowed and actually works if there is only one subset 
-			throw ErrorException("Sorry, checkpointing is not yet implemented for partitioned models");
-/*
-		if(conf->linkModels == false){
-			for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
-				if(modSpecSet.GetModSpec(ms)->IsUserSpecifiedRateMatrix())
-					throw ErrorException("Sorry, rate matrix parameters cannot currently be provided and fixed for partitioned models");
-				if(modSpecSet.GetModSpec(ms)->IsUserSpecifiedStateFrequencies())
-					throw ErrorException("Sorry, state frequency parameters cannot currently be provided and fixed for partitioned models");
-				if(modSpecSet.GetModSpec(ms)->fixAlpha)
-					throw ErrorException("Sorry, the alpha shape parameter cannot currently be provided and fixed for partitioned models");
-				if(modSpecSet.GetModSpec(ms)->fixInvariantSites)
-					throw ErrorException("Sorry, the prop. invar. parameters cannot currently be provided and fixed for partitioned models");
-				}
-			}
-*/		}
+		}
 	//if no model mutations will be performed, parameters cannot be estimated.
 	if(conf->modWeight == ZERO_POINT_ZERO){
 		for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){

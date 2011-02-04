@@ -45,7 +45,26 @@ extern rng rnd;
 extern ModelSpecificationSet modSpecSet;
 extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, const FLOAT_TYPE epsilon);
 
-extern vector<ClaSpecifier> claSpecs;
+#ifdef SINGLE_PRECISION_FLOATS
+	#ifndef SUM_TO
+		#define SUM_TO 1900.0f
+	#endif
+
+	//min rate is 1.0e6 times less than the mean
+	//max is just less than SUM_TO
+	#define MIN_REL_RATE (SUM_TO * (1.0e-6f/190.0f))
+	#define MAX_REL_RATE (SUM_TO - (189.0f * MIN_REL_RATE))
+#else
+
+	#ifndef SUM_TO
+		#define SUM_TO 1900.0
+	#endif
+
+	//min rate is 1.0e6 times less than the mean
+	//max is just less than SUM_TO
+	#define MIN_REL_RATE (SUM_TO * (1.0e-6/190.0))
+	#define MAX_REL_RATE (SUM_TO - (189.0 * MIN_REL_RATE))
+#endif
 
 	enum{//the types
 		STATEFREQS = 1,
@@ -168,7 +187,7 @@ public:
 class RelativeRates:public BaseParameter{
 public:
 	// 5/9/06 now enforcing non-zero minimum relative rate to avoid problems in the linear algebra functions
-	RelativeRates(FLOAT_TYPE **dv, int numE, int modnum):BaseParameter("Rate matrix", dv, RELATIVERATES, numE, (FLOAT_TYPE)1.0e-6, (FLOAT_TYPE)999.9, modnum){};
+	RelativeRates(const char *c, FLOAT_TYPE **dv, int numE, FLOAT_TYPE min, FLOAT_TYPE max, int modnum):BaseParameter(c, dv, RELATIVERATES, numE, min, max, modnum){};
 
 	void Mutator(FLOAT_TYPE mutationShape){
 		if(numElements > 1){
@@ -195,9 +214,8 @@ public:
 #ifdef SINGLE_PRECISION_FLOATS
 				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-6));
 #else
-				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-8));
+				assert(FloatingPointEquals(*vals[numElements-1], ONE_POINT_ZERO, 1.0e-10));
 #endif
-
 				}
 	/*		if(rateToChange<numElements-1){
 				*vals[rateToChange] *= rnd.gamma( mutationShape );
@@ -220,6 +238,37 @@ public:
 			if(*vals[0]>maxv) *vals[0]=maxv;
 			if(*vals[0]<minv) *vals[0]=minv;
 			}
+		}
+	};
+
+class SumConstrainedRelativeRates:public BaseParameter{
+public:
+	FLOAT_TYPE sumTo;
+	SumConstrainedRelativeRates(const char *c, FLOAT_TYPE **dv, int numE, FLOAT_TYPE min, FLOAT_TYPE max, FLOAT_TYPE sum, int modnum):BaseParameter(c, dv, RELATIVERATES, numE, min, max, modnum){sumTo = sum;};
+
+	void Mutator(FLOAT_TYPE mutationShape){
+		assert(numElements > 1);
+		int rateToChange=int(rnd.uniform()*(numElements));
+
+		FLOAT_TYPE newVal = *vals[rateToChange] * rnd.gamma( mutationShape );
+		if(newVal>maxv) 
+			newVal=maxv;
+		if(newVal<minv) 
+			newVal=minv;			
+		*vals[rateToChange] = newVal;
+
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+		for(int i=0;i<numElements;i++)
+			sum += *vals[i];
+		for(int i=0;i<numElements;i++)
+			*vals[i] *= sumTo / sum;
+
+#ifndef NDEBUG
+		sum = ZERO_POINT_ZERO;
+		for(int i=0;i<numElements;i++)
+			sum += *vals[i];
+		assert(FloatingPointEquals(sum, sumTo, 1e-8));
+#endif
 		}
 	};
 
@@ -256,7 +305,7 @@ public:
 
 class AlphaShape:public BaseParameter{
 public:
-	AlphaShape(FLOAT_TYPE **dv, int modnum):BaseParameter("Alpha shape", dv, ALPHASHAPE, 1, (FLOAT_TYPE)0.05, (FLOAT_TYPE)999.9, modnum){};
+	AlphaShape(const char *c, FLOAT_TYPE **dv, int modnum):BaseParameter(c, dv, ALPHASHAPE, 1, (FLOAT_TYPE)0.05, (FLOAT_TYPE)999.9, modnum){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
 		if(*vals[0]<minv) *vals[0]=minv;
@@ -266,7 +315,7 @@ public:
 
 class ProportionInvariant:public BaseParameter{
 public:
-	ProportionInvariant(FLOAT_TYPE **dv, int modnum):BaseParameter("Prop. invar.", dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0001, (FLOAT_TYPE)0.9999, modnum){};
+	ProportionInvariant(const char *c, FLOAT_TYPE **dv, int modnum):BaseParameter(c, dv, PROPORTIONINVARIANT, 1, (FLOAT_TYPE)0.0001, (FLOAT_TYPE)0.9999, modnum){};
 	void Mutator(FLOAT_TYPE mutationShape){
 		*vals[0] *=rnd.gamma( mutationShape );
 		if(*vals[0] < minv) 
@@ -327,6 +376,7 @@ public:
 
 	bool fixInvariantSites;
 	bool fixAlpha;
+	bool fixOmega;
 	bool includeInvariantSites;
 	
 	bool gotRmatFromFile;
@@ -379,6 +429,8 @@ public:
 		WAGMAT = 8,
 		MTMAMMAT = 9,
 		MTREVMAT = 10,
+		ESTIMATEDAAMAT = 11,
+		TWOSERINEMAT = 12,
 		USERSPECIFIEDMAT = 20
 		}rateMatrix;
 	
@@ -392,7 +444,10 @@ public:
 	enum{
 		STANDARD = 0,
 		VERTMITO = 1,
-		INVERTMITO = 2
+		INVERTMITO = 2,
+		STANDARDTWOSERINE = 3,
+		VERTMITOTWOSERINE = 4,
+		INVERTMITOTWOSERINE = 5
 		}geneticCode;	
 
 	ModelSpecification(){
@@ -424,8 +479,8 @@ public:
 	//DO NOT INCLUDE OrientedGap here!
 	bool IsMkTypeModel() const {return (IsNState() || IsNStateV() || IsOrderedNState() || IsOrderedNStateV() || IsBinary() || IsBinaryNotAllZeros());}
 
-	bool GotAnyParametersFromFile() const{
-		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile || gotInsertFromFile || gotDeleteFromFile;
+	bool GotAnyParametersFromFile() const {
+		return gotRmatFromFile || gotStateFreqsFromFile || gotAlphaFromFile || gotFlexFromFile || gotPinvFromFile || gotOmegasFromFile;
 		}
 	//A number of canned model setups
 	
@@ -464,6 +519,16 @@ public:
 		fixRelativeRates=false;
 		}
 
+	//this is the default, and shouldn't really need to be explicitly set
+	//this and SetRna depend on the default model settings from the constructor
+	void SetDna(){
+		datatype = DNA;
+		}
+
+	void SetRna(){
+		datatype = DNA;
+		}
+
 	void SetCodon(){
 		datatype = CODON;
 		rateMatrix = NST2;
@@ -471,6 +536,7 @@ public:
 		nstates = 61;//this might be overridden if a nonstandard code is set
 		numRateCats = 1;
 		fixRelativeRates=false;
+		RemoveInvariantSites();
 		}
 
 	void SetAminoAcid(){
@@ -578,13 +644,16 @@ public:
 					throw(ErrorException("ratehetmodel set to \"gammafixed\", but numratecats is equal to 1!"));
 				else if(rateHetType == FLEX)
 					throw(ErrorException("ratehetmodel set to \"flex\", but numratecats is equal to 1!"));
-				else if(rateHetType == NONSYN)
-					throw(ErrorException("ratehetmodel set to \"nonsynonymous\", but numratecats is equal to 1!"));				
+				//now allowing this to signify a single omega param
+//				else if(rateHetType == NONSYN)
+//					throw(ErrorException("ratehetmodel set to \"nonsynonymous\", but numratecats is equal to 1!"));				
 				}
 			}
 		
-		if(nrates < 1) throw(ErrorException("1 is the minimum value for numratecats."));
-		if(nrates > 20) throw(ErrorException("20 is the maximum value for numratecats."));
+		if(nrates < 1) 
+			throw(ErrorException("1 is the minimum value for numratecats."));
+		if(nrates > 20) 
+			throw(ErrorException("20 is the maximum value for numratecats."));
 		numRateCats=nrates;
 		}
 
@@ -603,6 +672,14 @@ public:
 	void SetEmpiricalStateFreqs(){
 		stateFrequencies = EMPIRICAL;
 		fixStateFreqs=true;
+		}
+
+	//this is a hack to allow estimation of codon frequencies
+	//other parts of the code break if stateFreqs aren't f1x4/f3x4/emp in a codon model
+	//but leaving fixStateFreqs as false allows them to be estimated
+	void SetFakeEmpiricalStateFreqs(){
+		stateFrequencies = EMPIRICAL;
+		fixStateFreqs=false;
 		}
 
 	void SetEqualStateFreqs(){
@@ -663,6 +740,17 @@ public:
 		fixRelativeRates=true;
 		}	
 
+	void SetEstimatedAAMatrix(){
+		rateMatrix = ESTIMATEDAAMAT;
+		fixRelativeRates=false;
+		}
+
+	void SetTwoSerineRateMatrix(){
+		rateMatrix = TWOSERINEMAT;
+		nstates = 21;
+		fixRelativeRates=false;
+		}
+
 	void SetJonesAAFreqs(){
 		stateFrequencies = JONES;
 		fixStateFreqs=true;
@@ -686,9 +774,16 @@ public:
 		fixStateFreqs=true;
 		}
 
-	void SetM3Model(){
+	void SetOmegaModel(){
 		rateHetType = NONSYN;
 		numRateCats = 3;
+		fixOmega = false;
+		}
+
+	void SetFixedOmegaModel(){
+		rateHetType = NONSYN;
+		numRateCats = 3;
+		fixOmega = true;
 		}
 
 	int Nst() const {
@@ -696,7 +791,8 @@ public:
 		else if(rateMatrix == NST2) return 2;
 		else if(rateMatrix == NST6 || rateMatrix == ARBITRARY) return 6;
 		else if(rateMatrix == USERSPECIFIEDMAT && datatype != AMINOACID && datatype != CODONAMINOACID) return 6;
-		else assert(0);
+		//estimation of AA matrices is now legal
+		//else assert(0);
 		return -1;
 		}
 
@@ -710,10 +806,12 @@ public:
 	bool IsMtMamAAMatrix() const {return (rateMatrix == MTMAMMAT);}
 	bool IsMtRevAAFreqs() const {return (stateFrequencies == MTREV);}
 	bool IsMtRevAAMatrix() const {return (rateMatrix == MTREVMAT);}
+	bool IsEstimateAAMatrix() const {return (rateMatrix == ESTIMATEDAAMAT);}
 	bool IsVertMitoCode() const {return (geneticCode == VERTMITO);}
 	bool IsInvertMitoCode() const {return (geneticCode == INVERTMITO);}
 	bool IsPoissonAAMatrix() const {return (rateMatrix == POISSON);}
 	bool IsUserSpecifiedRateMatrix() const {return rateMatrix == USERSPECIFIEDMAT;}
+	bool IsTwoSerineRateMatrix() const {return rateMatrix == TWOSERINEMAT;}
 	bool IsArbitraryRateMatrix() const {return rateMatrix == ARBITRARY;}
 	const string GetArbitraryRateMatrixString() const {return arbitraryRateMatrixString;}
 
@@ -733,9 +831,17 @@ public:
 			throw(ErrorException("Invalid setting for statefrequencies: %s\n\tOnly equal state frequencies are currently available for the standard data type", str));
 		if(_stricmp(str, "equal") == 0) SetEqualStateFreqs();
 		else if(_stricmp(str, "estimate") == 0){
-			if(datatype == CODON) throw ErrorException("Sorry, ML estimation of equilibrium frequencies is not available under\ncodon models.  Try statefrequencies = empirical");
-			else if(datatype == AMINOACID || datatype == CODONAMINOACID) outman.UserMessage("\nWARNING: to obtain good ML estimates of equilibrium aminoacid frequencies you\n\tmay need to run for a very long time or increase the modweight.\n\tConsider statefrequencies = empirical instead.\n");
+			if(datatype == CODON) 
+				throw ErrorException("Sorry, ML estimation of equilibrium frequencies is not available under\ncodon models.  Try statefrequencies = empirical");
+			//else if(datatype == AMINOACID || datatype == CODONAMINOACID) outman.UserMessage("\nWARNING: to obtain good ML estimates of equilibrium aminoacid frequencies you\n\tmay need to run for a very long time or increase the modweight.\n\tConsider statefrequencies = empirical instead.\n");
 			SetEstimateStateFreqs();
+			}
+		else if(_stricmp(str, "estimateF") == 0){
+			//HACK - unfix freqs for codons, to cause estimation
+			if(datatype != CODON) 
+				throw ErrorException("Sorry, forced estimation of frequencies (estimateF) is only for codon models");
+			SetFakeEmpiricalStateFreqs();
+			outman.UserMessage("\n\n\nCUSTOM USAGE - ESTIMATING CODON FREQS BY ML\n\n\n");
 			}
 		else if(_stricmp(str, "empirical") == 0) SetEmpiricalStateFreqs();
 		else if(_stricmp(str, "fixed") == 0) SetUserSpecifiedStateFreqs();
@@ -756,7 +862,21 @@ public:
 			else if(_stricmp(str, "wag") == 0) SetWAGAAMatrix();
 			else if(_stricmp(str, "mtmam") == 0) SetMtMamAAMatrix();
 			else if(_stricmp(str, "mtrev") == 0) SetMtRevAAMatrix();
-			else throw(ErrorException("Sorry, %s is not a valid aminoacid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag, mtmam, mtrev)", str));
+			else if(_stricmp(str, "estimate") == 0){
+				outman.UserMessage("\nWARNING: to obtain good ML estimates of the aminoacid rate matrix (189 free parameters)\n\tyou may need to run for a very long time or increase the modweight.\n\tDo not attempt this unless you have a very large amount of data.\n");
+				SetEstimatedAAMatrix();
+				}
+			else if(_stricmp(str, "fixed") == 0) SetUserSpecifiedRateMatrix();
+			else if(_stricmp(str, "twoserine") == 0 || _stricmp(str, "twoserinefixed") == 0){
+				if(datatype != CODONAMINOACID)
+					throw(ErrorException("Sorry, codon input data (with the codon-aminoacid datatype) are currently required for the Two-Serine model"));
+				if(stateFrequencies != EMPIRICAL && stateFrequencies != ESTIMATE && stateFrequencies != USERSPECIFIED)
+					throw(ErrorException("Sorry, empirical, estimated or fixed must be used as the statefrequencies setting for the Two-Serine model"));
+				SetTwoSerineRateMatrix();
+				if(_stricmp(str, "twoserinefixed") == 0)
+					fixRelativeRates = true;
+				}
+			else throw(ErrorException("Sorry, %s is not a valid aminoacid rate matrix. \n\t(Options are: dayhoff, jones, poisson, wag, mtmam, mtrev, estimate, fixed)", str));
 			}
 		else if(datatype == NSTATE || datatype == NSTATEV){
 			if(_stricmp(str, "1rate") != 0) throw(ErrorException("Sorry, %s is not a valid ratematrix setting for the standard data type.\n\tOnly 1rate matrices are currently allowed.", str));
@@ -778,7 +898,11 @@ public:
 			}
 		}
 	void SetProportionInvariant(const char *str){
-		if(_stricmp(str, "none") == 0) RemoveInvariantSites();
+		//if the entry didn't appear, depend on the correct default being set by the datatype specification
+		if(_stricmp(str, "unspecified") == 0)
+			return;
+		if(_stricmp(str, "none") == 0) 
+			RemoveInvariantSites();
 		//else if(datatype == CODON || datatype == AMINOACID) throw(ErrorException("Sorry, invariant sites not yet supported with Codon/Aminoacid data"));
 		else if(datatype == CODON){
 			if(_stricmp(str, "fixed") == 0 || _stricmp(str, "estimate") == 0) 
@@ -792,13 +916,16 @@ public:
 	void SetRateHetModel(const char *str){
 	//	if((datatype != DNA) && (datatype != AMINOACID) && _stricmp(str, "none")) throw(ErrorException("Sorry, rate heterogeneity not yet supported with Codon/Aminoacid data"));
 		if(datatype == CODON){
-			if(_stricmp(str, "nonsynonymous") == 0) SetM3Model();
+			if(_stricmp(str, "nonsynonymous") == 0) 
+				SetOmegaModel();
+			else if(_stricmp(str, "nonsynonymousfixed") == 0) 
+				SetFixedOmegaModel();
 			else if(_stricmp(str, "none") == 0){
 				SetNumRateCats(1, false);
 				rateHetType = NONE;
 				}
 			else if(_stricmp(str, "gamma") == 0) throw ErrorException("Gamma rate heterogeneity cannot be used with codon models.\n     Try ratehetmodel = nonsynonymous to allow dN/dS variation across sites");
-			else throw(ErrorException("Unknown setting for ratehetmodel: %s\n\t(options for codon datatype are: nonsynonymous, none)", str));
+			else throw(ErrorException("Unknown setting for ratehetmodel: %s\n\t(options for codon datatype are: nonsynonymous, nonsynonymousfixed, none)", str));
 			}
 		else{			
 			if(_stricmp(str, "gamma") == 0) SetGammaRates();
@@ -820,7 +947,7 @@ public:
 		else if(_stricmp(str, "aminoacid") == 0) SetAminoAcid();
 		else if(_stricmp(str, "protein") == 0) SetAminoAcid();
 		else if(_stricmp(str, "dna") == 0) str;
-		else if(_stricmp(str, "rna") == 0) str;
+		else if(_stricmp(str, "rna") == 0) SetRna();
 		else if(_stricmp(str, "nucleotide") == 0) str;
 		else if(_stricmp(str, "nstate") == 0) SetNState();
 		else if(_stricmp(str, "standard") == 0) SetNState();
@@ -847,6 +974,9 @@ public:
 				geneticCode = INVERTMITO;
 				if(datatype == CODON) nstates = 62;
 				}
+			else if(_stricmp(str, "standardtwoserine") == 0) geneticCode = STANDARDTWOSERINE;
+			else if(_stricmp(str, "vertmitotwoserine") == 0) geneticCode = INVERTMITOTWOSERINE;
+			else if(_stricmp(str, "invertmitotwoserine") == 0) geneticCode = VERTMITOTWOSERINE;
 			else throw(ErrorException("Unknown genetic code: %s\n\t(options are: standard, vertmito, invertmito)", str));
 			}
 		}
@@ -939,6 +1069,8 @@ class Model{
 
 	vector<FLOAT_TYPE*> stateFreqs;
 	vector<FLOAT_TYPE*> relNucRates;
+	//this is essentially a temporary scratch variable used during optimization.  See SetReferenceRelativeNucRate
+	FLOAT_TYPE currentRefRateScale;
 	int arbitraryMatrixIndeces[6];//this just keeps track of which rate parameters are aliased to single parameters
 	vector<FLOAT_TYPE*> omegas;
 	vector<FLOAT_TYPE*> omegaProbs;
@@ -1040,6 +1172,7 @@ class Model{
 	void ReadGarliFormattedModelString(string &);
 	void OutputHumanReadableModelReportWithParams() const;
 	void FillModelOrHeaderStringForTable(string &s, bool m) const;
+	void OutputAminoAcidRMatrixArray(ostream &out);
 
 	void ReadBinaryFormattedModel(FILE *);
 	static void FillQMatLookup();
@@ -1077,6 +1210,7 @@ class Model{
 	int NumMutatableParams() const {return (int) paramsToMutate.size();}
 	int Nst() const {return nst;}
 	const int *GetArbitraryRateMatrixIndeces() const {return arbitraryMatrixIndeces;}
+	const GeneticCode *GetGeneticCode(){return code;}
 	bool IsNucleotide() const {return modSpec->IsNucleotide();}
 	bool IsOrientedGap() const {return modSpec->IsOrientedGap();}
 	bool IsNState() const {return modSpec->IsNState();}
@@ -1098,9 +1232,8 @@ class Model{
 
 	//Setting things
 	void SetDefaultModelParameters(const SequenceData *data);
-	void SetRmat(FLOAT_TYPE *r, bool checkValidity){
-		assert(nstates != 20);
-		if(checkValidity == true){
+	void SetRmat(FLOAT_TYPE *r, bool checkValidity, bool renormalize){
+		if(checkValidity == true && modSpec->IsAminoAcid() == false){
 			if(nst==1){
 				if((FloatingPointEquals(r[0], r[1], 1.0e-5) &&
 					FloatingPointEquals(r[1], r[2], 1.0e-5) &&
@@ -1127,7 +1260,7 @@ class Model{
 					}
 				}
 			}
-		if(FloatingPointEquals(r[5], ONE_POINT_ZERO, 1.0e-5) == false){
+/*		if(FloatingPointEquals(r[5], ONE_POINT_ZERO, 1.0e-5) == false){
 			//if an alternate GTR paramterization is used in which GT != 1.0, rescale the rates
 			for(int i=0;i<5;i++)
 				r[i] /= r[5];
@@ -1135,8 +1268,39 @@ class Model{
 		for(int i=0;i<5;i++) *relNucRates[i]=r[i];
 		*relNucRates[5]=1.0;
 		eigenDirty=true;
+*/
+		//if we're reading in from a binary checkpoint we may not want to renormalize if were close because
+		//the scores need to match exactly
+
+			//if we're constraining the matrix by summing the rates AND this is an AA model, do that
+			//otherwise do the normal fix at 1.0 constraint
+		if(modSpec->IsAminoAcid())
+			assert(modSpec->IsEstimateAAMatrix() || modSpec->IsUserSpecifiedRateMatrix() || modSpec->IsTwoSerineRateMatrix());
+	#ifdef SUM_AA_REL_RATES
+		if(modSpec->IsAminoAcid()){
+			for(int i=0;i<relNucRates.size();i++)
+				*relNucRates[i]=r[i];
+			if(renormalize)
+				this->NormalizeSumConstrainedRelativeRates(true, -1);
 		}
-	void SetPis(FLOAT_TYPE *b, bool checkValidity){
+		else{
+	#else
+		if(1){
+	#endif
+			if(renormalize){
+				int refRate = relNucRates.size()-1;
+				if(FloatingPointEquals(r[refRate], ONE_POINT_ZERO, 1.0e-5) == false){
+					for(int i=0;i<relNucRates.size();i++)
+						r[i] /= r[refRate];
+					}
+				r[refRate] = ONE_POINT_ZERO;
+				}
+			for(int i=0;i<relNucRates.size();i++)
+				*relNucRates[i]=r[i];
+			}
+		eigenDirty=true;
+		}
+	void SetPis(FLOAT_TYPE *b, bool checkValidity, bool renormalize){
 		//7/12/07 we'll now assume that all freqs have been passed in, rather than calcing the last
 		//from the others
 		if(checkValidity == true){
@@ -1156,6 +1320,12 @@ class Model{
 			}
 		if(FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-3) == false)
 			throw(ErrorException("State frequencies do not appear to add up to 1.0!\n"));
+		//if the total is near 1, make it exactly 1
+		else if(renormalize && FloatingPointEquals(freqTot, ONE_POINT_ZERO, 1.0e-6) == false){
+			for(int i=0;i<nstates;i++){
+				*stateFreqs[i] /= freqTot;
+				}
+			}
 		eigenDirty=true;
 		}
 
@@ -1177,6 +1347,9 @@ class Model{
 			tot += rateProbs[r];
 		if(!FloatingPointEquals(tot, ONE_POINT_ZERO, 1e-8))
 			throw ErrorException("Specified Flex rate proportions don't add to 1.0!\n\tCorrect spec. is f rate1 prop1 rate2 prop2, etc.");
+		//make the proportions exactly 1
+		for(int r=0;r<NRateCats();r++)
+			rateProbs[r] /= tot;
 		}
 
 	FLOAT_TYPE FlexRate(int which){
@@ -1192,6 +1365,13 @@ class Model{
 	//These are the set parameter functions used in the generic OptimizeBoundedParameter function
 	//They need to have a standardized form, despite the fact that the "which" argument is unneccesary
 	//for some of them
+
+	void CheckStatefreqBounds(){
+		for(int b=0;b<nstates;b++){
+			assert( *stateFreqs[b] >= 1e-4);
+			}
+		}
+
 	void SetEquilibriumFreq(int which, FLOAT_TYPE val){
 
 		assert(which < this->nstates);
@@ -1229,6 +1409,147 @@ class Model{
 			*relNucRates[refRate] *= scaler;
 			}
 		eigenDirty = true;
+		}
+	//
+	void SetReferenceRelativeNucRate(int which, FLOAT_TYPE val){
+		FLOAT_TYPE newVal = val / currentRefRateScale;
+		SetRelativeNucRate(NumRelRates() - 1, newVal);
+		currentRefRateScale = val;
+		}
+	void ResetCurrentRefRateScale(){
+		currentRefRateScale = 1.0;
+		}
+
+//these should really only be getting called when SUM_AA_REL_RATES is defined
+//note that the rates are not actually renormalized such that they sum to one here
+//this should be ok since only one rate is being optimized at a time and renormalization
+//can happen between each.  Normalizing here would be a pain because other rates could
+//be pushed below the minimum, which will do odd things to the likelihood function
+	void SetSumConstrainedRelativeRate(int which, FLOAT_TYPE val){
+#ifndef SUM_AA_REL_RATES
+		assert(0);
+#endif
+		assert(val - 1.0e-8 <= MAX_REL_RATE && val + 1.0e-8 >= MIN_REL_RATE);
+		*relNucRates[which] = val;
+
+		NormalizeSumConstrainedRelativeRates(true, which);
+/*
+		FLOAT_TYPE initial = *relNucRates[which];
+		FLOAT_TYPE rescale = ((SUM_TO - val) / (SUM_TO - initial));
+
+		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
+		FLOAT_TYPE nonMin = ZERO_POINT_ZERO;
+		bool someMin = false;
+
+		for(int i=0;i<NumRelRates();i++){
+			if(i != which){
+				*relNucRates[i] *= rescale;
+				if(*relNucRates[i] < MIN_REL_RATE){
+					*relNucRates[i] = MIN_REL_RATE;
+					minSum += MIN_REL_RATE;
+					someMin = true;
+					}
+				else
+					nonMin += *relNucRates[i];
+				}
+			}
+		if(someMin){
+			FLOAT_TYPE unfixedTarget = SUM_TO - val - minSum;
+			rescale = unfixedTarget / nonMin;
+			for(int i=0;i<NumRelRates();i++){
+				if(i != which && !FloatingPointEquals(*relNucRates[i], MIN_REL_RATE, 1e-8))
+					*relNucRates[i] *= rescale;
+				}
+			}
+		
+#ifndef NDEBUG
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+		for(int i=0;i<NumRelRates();i++)
+			sum += *relNucRates[i];
+		assert(FloatingPointEquals(sum, SUM_TO, 1e-8));
+#endif
+*/
+		eigenDirty = true;
+		}
+
+	void NormalizeSumConstrainedRelativeRates(bool enforceBounds, int toNotChange){
+#ifndef SUM_AA_REL_RATES
+		assert(0);
+#endif
+		bool someMin = false;
+		
+		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+
+		for(int i=0;i<NumRelRates();i++){
+			if(i != toNotChange){
+				sum += *relNucRates[i];
+				if(*relNucRates[i] < MIN_REL_RATE)
+					someMin = true;
+				}
+			}
+		if(someMin || !(FloatingPointEquals(sum, SUM_TO, MIN_REL_RATE * 0.01))){
+			do{
+				FLOAT_TYPE unfixedTarget = SUM_TO - (toNotChange < 0 ? ZERO_POINT_ZERO : *relNucRates[toNotChange]) - minSum;
+				FLOAT_TYPE rescale = unfixedTarget / sum;
+				someMin = false;
+				sum = ZERO_POINT_ZERO;
+				for(int i=0;i<NumRelRates();i++){
+					if(i != toNotChange){
+						if(*relNucRates[i] >= ZERO_POINT_ZERO){
+							*relNucRates[i] *= rescale;
+							if(*relNucRates[i] < MIN_REL_RATE){
+								*relNucRates[i] = -1.0;
+								minSum += MIN_REL_RATE;
+								someMin = true;
+								}
+							else
+								sum += *relNucRates[i];
+							}
+						}
+					}
+				}while(someMin);
+			}
+
+		for(int i=0;i<NumRelRates();i++)
+			if(*relNucRates[i] < ZERO_POINT_ZERO)
+				*relNucRates[i]= MIN_REL_RATE;
+
+#ifndef NDEBUG
+		sum = ZERO_POINT_ZERO;
+		for(int i=0;i<NumRelRates();i++)
+			sum += *relNucRates[i];
+		assert(FloatingPointEquals(sum, SUM_TO, MIN_REL_RATE * 0.1));
+#endif
+		/*
+		FLOAT_TYPE sum = ZERO_POINT_ZERO;
+		FLOAT_TYPE minSum = ZERO_POINT_ZERO;
+		for(int i=0;i<NumRelRates();i++){
+			if(*relNucRates[i] < MIN_REL_RATE && enforceBounds){
+				*relNucRates[i] = MIN_REL_RATE;
+				minSum += MIN_REL_RATE;
+				}
+			//the max rate is a little weird in this context, since after
+			//rescaling it will no longer be at that rate.  I don't think 
+			//that this should cause problems.
+			else if(*relNucRates[i] > MAX_REL_RATE && enforceBounds){
+				*relNucRates[i] = MAX_REL_RATE;
+				sum += *relNucRates[i];
+				}
+			else{
+				sum += *relNucRates[i];
+				}
+			}
+		FLOAT_TYPE nonMinTarget = SUM_TO - minSum;
+		for(int i=0;i<NumRelRates();i++)
+			*relNucRates[i] *= SUM_TO / sum;
+		if(enforceBounds){
+			for(int i=0;i<NumRelRates();i++){
+				if(*relNucRates[i] < MIN_REL_RATE)
+					*relNucRates[i] = MIN_REL_RATE;
+				}
+			}
+			*/		
 		}
 
 	void NormalizeSumConstrainedValues(FLOAT_TYPE **vals, int numVals, FLOAT_TYPE targetSum, FLOAT_TYPE minVal, int toNotChange){
