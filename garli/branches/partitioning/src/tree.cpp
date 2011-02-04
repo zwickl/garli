@@ -1940,7 +1940,7 @@ int Tree::TopologyMutator(FLOAT_TYPE optPrecision, int range, int subtreeNode){
 			GatherValidReconnectionNodes(range, cut, NULL);
 			}while(sprRang.size()==0);
 
-		if((FloatingPointEquals(uniqueSwapBias, 1.0, 1e-8) && FloatingPointEquals(distanceSwapBias, 1.0, 1e-8)) || range < 0)
+		if((FloatingPointEquals(uniqueSwapBias, 1.0, max(1.0e-8, GARLI_FP_EPS * 2.0)) && FloatingPointEquals(distanceSwapBias, 1.0, max(1.0e-8, GARLI_FP_EPS * 2))) || range < 0)
 			broken = sprRang.RandomReconNode();
 		else{//only doing this on limSPR and NNI
 			err = AssignWeightsToSwaps(cut);
@@ -6689,7 +6689,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum){
 				}
 			}
 		}
-	else{
+	else if(modSpec->IsAminoAcid()){
 
 #ifdef DEBUG_MESSAGES
 /*
@@ -6772,61 +6772,103 @@ FLOAT_TYPE Tree::OptimizeFlexRates(FLOAT_TYPE prec, int modnum){
 	Model *mod = modPart->GetModel(modnum);
 
 	//limiting change in any one pass
-	double maxRateChangeProp = 0.75;
-	double maxProbChange = 0.20;
+	double maxRateChangeProp = 1.5;
+	double maxProbChange = 0.10;
+	double curVal;
+
+	//very tight increments really seems to help flex optimization
+	FLOAT_TYPE scoreDiffTarget;
+#ifdef SINGLE_PRECISION_FLOATS
+	scoreDiffTarget = 5.0;
+#else
+	scoreDiffTarget = 10.0;
+#endif
+
+#ifdef DEBUG_FLEX_OPT
+	outman.UserMessage("%.4f", lnL);
+	for(int j=0;j<mod->NRateCats();j++)
+		outman.UserMessage("%f\t%f", mod->FlexRate(j), mod->FlexProb(j));
+#endif
+
+	//the EffectiveXXXFlexBound functions here just give the values at
+	//which the rate currently being optimized would cross the one above
+	//or below it due to rescaling of the rates to keep the mean rate 1.0
+
+	curVal = mod->FlexRate(i);
+	flexImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
+		max(min(minVal, curVal), curVal / maxRateChangeProp),
+		min(mod->EffectiveUpperFlexBound(i), curVal * maxRateChangeProp),
+		&Model::SetFlexRate, scoreDiffTarget);
 	
-	flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexRate(i), i, 
-		max(minVal, mod->FlexRate(i)*maxRateChangeProp),
-		min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp),
-		&Model::SetFlexRate);
+#ifdef DEBUG_FLEX_OPT
+	outman.UserMessage("%.4f", lnL);
+	for(int j=0;j<mod->NRateCats();j++)
+		outman.UserMessage("%f\t%f", mod->FlexRate(j), mod->FlexProb(j));
+#endif
 
-	flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexProb(i), i, 
-		max(minVal, mod->FlexProb(i)-maxProbChange), 
-		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), 
-		&Model::SetFlexProb);
+	curVal = mod->FlexProb(i);
+	flexImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
+		max(min(minVal, curVal), curVal-maxProbChange),
+		min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))), curVal + maxProbChange),
+		&Model::SetFlexProb, scoreDiffTarget);
+
+#ifdef DEBUG_FLEX_OPT
+	outman.UserMessage("%.4f", lnL);
+	for(int j=0;j<mod->NRateCats();j++)
+		outman.UserMessage("%f\t%f", mod->FlexRate(j), mod->FlexProb(j));
+#endif
+
 	for(i=1;i < mod->NRateCats()-1;i++){
-		flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexRate(i), i, 
-			max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp), 
-			min(mod->FlexRate(i+1), mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), 
-			&Model::SetFlexRate);
-		flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexProb(i), i, 
-			max(minVal, mod->FlexProb(i)-maxProbChange), 
-			min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), 
-			&Model::SetFlexProb);
+
+		curVal = mod->FlexRate(i);
+		flexImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
+			max(mod->EffectiveLowerFlexBound(i), curVal / maxRateChangeProp),
+			min(mod->EffectiveUpperFlexBound(i), curVal * maxRateChangeProp),
+			&Model::SetFlexRate, scoreDiffTarget);
+
+#ifdef DEBUG_FLEX_OPT
+		outman.UserMessage("%.4f", lnL);
+		for(int j=0;j<mod->NRateCats();j++)
+			outman.UserMessage("%f\t%f", mod->FlexRate(j), mod->FlexProb(j));
+#endif
+
+		curVal = mod->FlexProb(i);
+		flexImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
+			max(min(minVal, curVal), curVal-maxProbChange),
+			min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))), curVal + maxProbChange),
+			&Model::SetFlexProb, scoreDiffTarget);
+
+#ifdef DEBUG_FLEX_OPT
+		outman.UserMessage("%.4f", lnL);
+		for(int j=0;j<mod->NRateCats();j++)
+			outman.UserMessage("%f\t%f", mod->FlexRate(j), mod->FlexProb(j));
+#endif
 		}
-	flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexRate(i), i, 
-		max(mod->FlexRate(i-1), mod->FlexRate(i)*maxRateChangeProp),
-		min(999.9, mod->FlexRate(i)+mod->FlexRate(i)*maxRateChangeProp), 
-		&Model::SetFlexRate);
-	flexImprove += OptimizeBoundedParameter(modnum, prec, mod->FlexProb(i), i, 
-		max(minVal, mod->FlexProb(i)-maxProbChange), 
-		min(ONE_POINT_ZERO, mod->FlexProb(i)+maxProbChange), 
-		&Model::SetFlexProb);
 
+	curVal = mod->FlexRate(i);
+	flexImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
+		max(mod->EffectiveLowerFlexBound(i), curVal / maxRateChangeProp),
+		min(max(curVal, 999.9), curVal * maxRateChangeProp),
+		&Model::SetFlexRate, scoreDiffTarget);
 
-/*
-	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, minVal, mod->FlexRate(i+1), &Model::SetFlexRate);
+#ifdef DEBUG_FLEX_OPT
+	outman.UserMessage("%.4f", lnL);
+	for(int j=0;j<mod->NRateCats();j++)
+		outman.UserMessage("%f\t%f", mod->FlexRate(j), mod->FlexProb(j));
+#endif
 
-//		for(int j=0;j<mod->NRateCats();j++)
-//			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
-	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetFlexProb);
-//		for(int j=0;j<mod->NRateCats();j++)
-//			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
-	for(i=1;i < mod->NRateCats()-1;i++){
-		flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, mod->FlexRate(i-1), mod->FlexRate(i+1), &Model::SetFlexRate);
-//			for(int j=0;j<mod->NRateCats();j++)
-//				cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
-		flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetFlexProb);
-//			for(int j=0;j<mod->NRateCats();j++)
-//				cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
-		}
-	flexImprove += OptimizeBoundedParameter(prec, mod->FlexRate(i), i, mod->FlexRate(i-1), 9999.9, &Model::SetFlexRate);
-//		for(int j=0;j<mod->NRateCats();j++)
-//			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
-	flexImprove += OptimizeBoundedParameter(prec, mod->FlexProb(i), i, minVal, ONE_POINT_ZERO, &Model::SetFlexProb);
-//		for(int j=0;j<mod->NRateCats();j++)
-//			cout << mod->FlexRate(j) << "\t" << mod->FlexProb(j) << endl;
-*/	
+	curVal = mod->FlexProb(i);
+	flexImprove += OptimizeBoundedParameter(modnum, prec, curVal, i,
+		max(min(minVal, curVal), curVal-maxProbChange),
+		min((ONE_POINT_ZERO - (minVal * (FLOAT_TYPE)(mod->NRateCats() - 1))), curVal + maxProbChange),
+		&Model::SetFlexProb, scoreDiffTarget);
+
+#ifdef DEBUG_FLEX_OPT
+	outman.UserMessage("%.4f", lnL);
+	for(int j=0;j<mod->NRateCats();j++)
+		outman.UserMessage("%f\t%f", mod->FlexRate(j), mod->FlexProb(j));
+#endif
+
 	return flexImprove;
 	}
 
@@ -7864,18 +7906,18 @@ void Tree::CalcFullCLAPartialInternalRateHet(CondLikeArray *destCLA, const CondL
 			*(dest++) = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]) * *(partial++);
 			*(dest++) = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]) * *(partial++);
 			CL1+=16;
-			assert(*(dest-1)>ZERO_POINT_ZERO);
+			assert(*(dest-1)>=ZERO_POINT_ZERO);
 			}
 		}
 	else{
 		for(int i=0;i<nchar;i++){
 			for(int r=0;r<nRateCats;r++){
-				*(dest++) = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * *(partial++);
-				*(dest++) = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * *(partial++);
-				*(dest++) = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * *(partial++);
-				*(dest++) = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+0]*CL1[0]+pr1[16*r+1]*CL1[1]+pr1[16*r+2]*CL1[2]+pr1[16*r+3]*CL1[3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+4]*CL1[0]+pr1[16*r+5]*CL1[1]+pr1[16*r+6]*CL1[2]+pr1[16*r+7]*CL1[3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+8]*CL1[0]+pr1[16*r+9]*CL1[1]+pr1[16*r+10]*CL1[2]+pr1[16*r+11]*CL1[3]) * *(partial++);
+				*(dest++) = ( pr1[16*r+12]*CL1[0]+pr1[16*r+13]*CL1[1]+pr1[16*r+14]*CL1[2]+pr1[16*r+15]*CL1[3]) * *(partial++);
 				CL1+=4;
-				assert(*(dest-1)>ZERO_POINT_ZERO);
+				assert(*(dest-1)>=ZERO_POINT_ZERO);
 				}
 			}
 		}
@@ -7909,7 +7951,7 @@ void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondL
 				*(dest++) = Lpr[(*Ldata+4)+16*i] * *(partial++);
 				*(dest++) = Lpr[(*Ldata+8)+16*i] * *(partial++);
 				*(dest++) = Lpr[(*Ldata+12)+16*i] * *(partial++);
-//				assert(*(dest-1)>ZERO_POINT_ZERO);
+//				assert(*(dest-1)>=ZERO_POINT_ZERO);
 				}
 			Ldata++;
 			}
@@ -7928,7 +7970,7 @@ void Tree::CalcFullCLAPartialTerminalRateHet(CondLikeArray *destCLA, const CondL
 					*(dest+(i*4)+1) += Lpr[(*Ldata+4)+16*i];
 					*(dest+(i*4)+2) += Lpr[(*Ldata+8)+16*i];
 					*(dest+(i*4)+3) += Lpr[(*Ldata+12)+16*i];
-//					assert(*(dest-1)>ZERO_POINT_ZERO);
+//					assert(*(dest-1)>=ZERO_POINT_ZERO);
 					}
 				Ldata++;
 				}
@@ -7979,7 +8021,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 	deb.close();
 #endif
 
-	if(FloatingPointEquals(lnL, ZERO_POINT_ZERO, 1e-8)){
+	if(FloatingPointEquals(lnL, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
 		return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, ZERO_POINT_ZERO);
 		}
 
@@ -8003,7 +8045,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 		ScaleWholeTree(ONE_POINT_ZERO/scale);//return the tree to its original scale	
 		FLOAT_TYPE d12=(cur-prev)/-incr;
 
-		if(pass == 1 && fabs(d12) < 1.0e-8){
+		if(pass == 1 && fabs(d12) < max(1.0e-8, GARLI_FP_EPS * 2.0)){
 			//The surface looks suspiciously flat.  Test if the likelihood
 			//is really invariant for different scales (which means that
 			//the site is all missing or only has an observed state for one taxon)
@@ -8011,7 +8053,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 			Score();
 			FLOAT_TYPE s = lnL/siteCount;
 			ScaleWholeTree(1.0/1.1);
-			if(fabs(prev - s) < 1.0e-8) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, prev);
+			if(fabs(prev - s) < max(1.0e-8, GARLI_FP_EPS * 2.0)) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, prev);
 			}
 
 		scale=ONE_POINT_ZERO + incr;

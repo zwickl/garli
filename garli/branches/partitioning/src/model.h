@@ -1253,7 +1253,7 @@ class Model{
 				for(int rate1=0;rate1<6-1;rate1++){
 					for(int rate2=rate1+1;rate2<6;rate2++){
 						if(arbitraryMatrixIndeces[rate1] == arbitraryMatrixIndeces[rate2]){
-							if(!FloatingPointEquals(r[rate1], r[rate2], 1e-8))
+							if(!FloatingPointEquals(r[rate1], r[rate2], max(1.0e-8, GARLI_FP_EPS * 2.0)))
 								throw(ErrorException("Provided relative rate parameters don't obey the ratematix specification!\n\tGiven this spec: %s, rates %d and %d should be equal.\n", modSpec->arbitraryRateMatrixString.c_str(), rate1+1, rate2+1));
 							}
 						}
@@ -1333,19 +1333,19 @@ class Model{
 		if(modSpec->IsFlexRateHet() == false) throw ErrorException("Flex rate values specified in start file,\nbut ratehetmodel is not flex in conf file.");
 		for(int r=0;r<NRateCats();r++){
 			rateMults[r]=rates[r];
-			if(FloatingPointEquals(rateMults[r], ZERO_POINT_ZERO, 1e-8)){
+			if(FloatingPointEquals(rateMults[r], ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
 				outman.UserMessage("WARNING: Flex rate multipliers cannot be zero. Rate %d changed from zero to 1.0e-5", r);
 				rateMults[r] = 1.0e-5;
 				}
 			rateProbs[r]=probs[r];
-			if(FloatingPointEquals(rateProbs[r], ZERO_POINT_ZERO, 1e-8)){
+			if(FloatingPointEquals(rateProbs[r], ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
 				throw ErrorException("Flex rate proportion %d cannot be zero.", r);
 				}
 			}
 		FLOAT_TYPE tot = ZERO_POINT_ZERO;
 		for(int r=0;r<NRateCats();r++)
 			tot += rateProbs[r];
-		if(!FloatingPointEquals(tot, ONE_POINT_ZERO, 1e-8))
+		if(!FloatingPointEquals(tot, ONE_POINT_ZERO, max(1.0e-3, GARLI_FP_EPS * 2.0)))
 			throw ErrorException("Specified Flex rate proportions don't add to 1.0!\n\tCorrect spec. is f rate1 prop1 rate2 prop2, etc.");
 		//make the proportions exactly 1
 		for(int r=0;r<NRateCats();r++)
@@ -1639,7 +1639,7 @@ class Model{
 		FLOAT_TYPE thisVal = rateMults[which] * factor;
 		FLOAT_TYPE lowerVal = rateMults[which - 1] * (1.0 - factor * rateMults[which] * rateProbs[which]) / (1.0 - rateMults[which] * rateProbs[which]);
 		assert(FloatingPointEquals(thisVal, lowerVal, 1e-4));
-		return max(thisVal, lowerVal)  + FLT_EPSILON;
+		return max(thisVal, lowerVal)  + GARLI_FP_EPS;
 		}
 
 	FLOAT_TYPE EffectiveUpperFlexBound(int which){
@@ -1649,7 +1649,7 @@ class Model{
 		FLOAT_TYPE thisVal = rateMults[which] * factor;
 		FLOAT_TYPE upperVal = rateMults[which + 1] * (1.0 - factor * rateMults[which] * rateProbs[which]) / (1.0 - rateMults[which] * rateProbs[which]);
 		assert(FloatingPointEquals(thisVal, upperVal, 1e-4));
-		return min(thisVal, upperVal) - FLT_EPSILON;
+		return min(thisVal, upperVal) - GARLI_FP_EPS;
 		}
 
 	void SetFlexRate(int which, FLOAT_TYPE val){
@@ -1714,7 +1714,7 @@ class Model{
 	void SetOmegas(const FLOAT_TYPE *rates, const FLOAT_TYPE *probs){
 		FLOAT_TYPE tot=0.0;
 		for(int r=0;r<NRateCats();r++){
-			if(FloatingPointEquals(rates[r], ZERO_POINT_ZERO, 1e-8)){
+			if(FloatingPointEquals(rates[r], ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
 				outman.UserMessage("WARNING: Omega parameter %d cannot be zero.  Setting to 1e-5", r);
 				*omegas[r] = 1.0e-5;
 				}

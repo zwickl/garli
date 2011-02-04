@@ -222,7 +222,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 }
 
 void Individual::CalcFitness(int subtreeNode){
-	if(dirty || FloatingPointEquals(treeStruct->lnL, ZERO_POINT_ZERO, 1e-8) || FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, 1e-8)){
+	if(dirty || FloatingPointEquals(treeStruct->lnL, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)) || FloatingPointEquals(treeStruct->lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2))){
 		if(subtreeNode>0 && accurateSubtrees==true){
 			treeStruct->Score( subtreeNode );
 			}
