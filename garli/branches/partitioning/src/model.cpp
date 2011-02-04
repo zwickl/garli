@@ -50,7 +50,7 @@ Model::~Model(){
 		}
 
 	if(relNucRates.empty() == false){
-		if(nst==6){
+		if(nst==6  || nst == -1){
 			//3/25/08 this needed to change a bit for arbitrary matrices
 			//since some of the elements might be aliased
 			for(int i=0;i<(int)relNucRates.size();i++){
@@ -70,8 +70,7 @@ Model::~Model(){
 		else if(nst==1) delete relNucRates[0];
 		}
 
-	//if(modSpec->IsCodon()){
-	if(omegas.size() > 0){
+	if(modSpec->IsCodon()){
 		for(int r=0;r<NRateCats();r++){
 			delete omegas[r];
 			delete omegaProbs[r];
@@ -376,6 +375,45 @@ void Model::FillQMatLookup(){
 				}
 			}
 		}
+#ifdef CODON_QMAT_HACK
+//WHEN PLAYING HERE, REMEMBER THAT THESE INDECES ARE WITH RESPECT TO THE
+//WHOLE 64X64 MATRIX
+	//Put in whatever ad hoc alterations to the codon matrix
+	//Hack in single changes for serine -> serine double hits
+	//giving them a rate of omega X the first pos change
+	//AGC->TCC
+/*	tempqmatLookup[629] = 1 | 4 | 32;
+	//AGT->TCT
+	tempqmatLookup[759] = 1 | 4 | 32;
+	//TCT->AGT
+	tempqmatLookup[3531] = 1 | 4 | 32;
+	//TCC->AGC
+	tempqmatLookup[3401] = 1 | 4 | 32;
+*/
+//all transitions between
+//the two sets of serine codons
+	//AGC->TCN
+	tempqmatLookup[628] = 1 | 4 | 32;
+	tempqmatLookup[629] = 1 | 4 | 32;
+	tempqmatLookup[630] = 1 | 4 | 32;
+	tempqmatLookup[631] = 1 | 4 | 32;
+	//AGT->TCN
+	tempqmatLookup[756] = 1 | 4 | 32;
+	tempqmatLookup[757] = 1 | 4 | 32;
+	tempqmatLookup[758] = 1 | 4 | 32;
+	tempqmatLookup[759] = 1 | 4 | 32;
+	//TCN->AGC
+	tempqmatLookup[3337] = 1 | 4 | 32;
+	tempqmatLookup[3401] = 1 | 4 | 32;
+	tempqmatLookup[3465] = 1 | 4 | 32;
+	tempqmatLookup[3529] = 1 | 4 | 32;
+	//TCN->AGT
+	tempqmatLookup[3339] = 1 | 4 | 32;
+	tempqmatLookup[3403] = 1 | 4 | 32;
+	tempqmatLookup[3467] = 1 | 4 | 32;
+	tempqmatLookup[3531] = 1 | 4 | 32;
+	
+#endif
 
 	//remove the columns and rows representing stops
 	int reducedCell = 0;
@@ -699,15 +737,33 @@ void Model::UpdateQMatAminoAcid(){
 	else if(modSpec->IsWAGAAMatrix()) MultiplyByWAGAAMatrix();
 	else if(modSpec->IsMtMamAAMatrix()) MultiplyByMtMamAAMatrix();
 	else if(modSpec->IsMtRevAAMatrix()) MultiplyByMtRevAAMatrix();
+	else if(modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix() || modSpec->IsUserSpecifiedRateMatrix()){
+		vector<FLOAT_TYPE *>::iterator r = relNucRates.begin();
+		for(int from=0;from<nstates - 1;from++){
+			for(int to=from+1;to<nstates;to++){
+				qmat[0][from][to] *= **r;
+				r++;
+				}
+			}
+		assert(r == relNucRates.end());
+		r = relNucRates.begin();
+		for(int to=0;to<nstates - 1;to++){
+			for(int from=to+1;from<nstates;from++){
+				qmat[0][from][to] *= **r;
+				r++;
+				}
+			}
+		assert(r == relNucRates.end());
+		}
 	
 	//set diags to sum rows to 0 and calculate the branch length rescaling factor
 	double sum, weightedDiagSum = 0.0;
 	blen_multiplier[0] = 0.0;
 
-	for(int from=0;from<20;from++){
+	for(int from=0;from<nstates;from++){
 		//qmat[0][from][from] = 0.0;
 		sum = 0.0;
-		for(int to=0;to<20;to++){
+		for(int to=0;to<nstates;to++){
 			if(from != to) sum += qmat[0][from][to];
 			}
 		qmat[0][from][from] = -sum;
@@ -1155,34 +1211,6 @@ void Model::OutputPmats(ofstream &deb){
 
 	}
 
-void Model::CalcDerivativesOrientedGap(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&one, FLOAT_TYPE ***&two){
-	
-	CalcOrientedGapPmat(dlen, pr);
-	
-	double expIns = exp(-*insertRate * dlen);
-	double expDel = exp(-*deleteRate * dlen);
-
-	one[0][0][0] = *insertRate * expIns;
-	one[0][0][1] = (*insertRate * (-*insertRate * expIns + *deleteRate * expDel)) / (*deleteRate - *insertRate);
-	one[0][0][2] = (*insertRate * *deleteRate) * (expIns - expDel) / (*insertRate - *deleteRate);
-	
-	one[0][1][0] = 0.0;
-	one[0][1][1] = -*insertRate * expDel;
-	one[0][1][2] = *insertRate * expDel;
-
-	one[0][2][0] = one[0][2][1] = one[0][2][2] = 0.0;
-
-	two[0][0][0] = pow(*insertRate, 2) * expIns;
-	two[0][0][1] = (pow(*insertRate, 2.0) * expIns - pow(*deleteRate, 2.0) * expDel) / (*deleteRate - *insertRate);
-	two[0][0][2] = (*insertRate * *deleteRate) * (-*insertRate * expIns + *deleteRate * expDel) / (*insertRate - *deleteRate);
-	
-	two[0][1][0] = 0.0;
-	two[0][1][1] = pow(*insertRate, 2.0) * expDel;
-	two[0][1][2] = -pow(*insertRate, 2.0) * expDel;
-
-	two[0][2][0] = two[0][2][1] = two[0][2][2] = 0.0;
-	}
-
 void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&one, FLOAT_TYPE ***&two){
 	if(eigenDirty==true)
 		CalcEigenStuff();
@@ -1398,16 +1426,22 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 	for(vector<BaseParameter*>::iterator pit=paramsToMutate.begin();pit != paramsToMutate.end();pit++){
 		(*pit)->SetToDefaultValues();
 		}
-	if(modSpec->numRateCats > 1 && modSpec->IsNonsynonymousRateHet() == false) DiscreteGamma(rateMults, rateProbs, *alpha);
+	if(modSpec->numRateCats > 1 && modSpec->IsNonsynonymousRateHet() == false){
+		if(modSpec->IsFlexRateHet()){
+			//if alpha is only being used to manipulate the flex rates, it wouldn't be reset above
+			SetAlpha(0, 0.5);
+			}
+		DiscreteGamma(rateMults, rateProbs, *alpha);
+		}
 
-	if((modSpec->IsEqualStateFrequencies() == false && modSpec->IsDayhoffAAFreqs() == false && modSpec->IsWAGAAFreqs() == false && modSpec->IsJonesAAFreqs() == false && modSpec->IsMtMamAAFreqs() == false && modSpec->IsMtRevAAFreqs() == false)
+	if((modSpec->IsEqualStateFrequencies() == false && (modSpec->IsCodon() && modSpec->IsUserSpecifiedStateFrequencies()) == false && modSpec->IsPrecaledAAFreqs() == false)
 		|| (modSpec->IsF3x4StateFrequencies() || modSpec->IsF1x4StateFrequencies())){
 		//if the state freqs aren't equal, they will either start at the empirical values 
 		//or be fixed at them
 		//if using the F3x4 or F1x4 flavors, they should have already be calculated and stored in the data empirical frequency field
 		FLOAT_TYPE *f = new FLOAT_TYPE[nstates];
 		data->GetEmpiricalFreqs(f);
-		SetPis(f, false);
+		SetPis(f, false, true);
 		delete []f;
 		}
 
@@ -1428,7 +1462,8 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 		else{
 			SetPinv((FLOAT_TYPE)0.25 * ((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NVarUninform())), false);
 			SetMaxPinv((FLOAT_TYPE)data->NConstant()/(data->NConstant()+data->NInformative()+data->NVarUninform()));			
-			if(modSpec->IsFlexRateHet()) NormalizeRates();
+			if(modSpec->IsFlexRateHet()) 
+				NormalizeRates();
 			else AdjustRateProportions();
 			}
 		}
@@ -1524,8 +1559,24 @@ void Model::CopyModel(const Model *from){
 			*omegaProbs[i]=*(from->omegaProbs[i]);
 		}
 
-	if(modSpec->IsCodon() || modSpec->IsNucleotide())
-		for(int i=0;i<6;i++)
+	//CANNOT memcpy stateFreqs and relNucRates because they are vectors of pointers, not of doubles
+
+	//Arg, had twoserine bug here.  If AA, rel rates need to be copied:
+	//1) If IsEstimateAAMatrix - matrix needs to be propagated as it changes
+	//2) If is estimated two-serine model (i.e., modSpec.IsTwoSerineRateMatrix() && !modSpec.fixRelativeRates) - as above
+
+	//THE FOLLOWING TWO ONE-TIME CASES COULD BE REMOVED FROM HERE AND ONLY CALLED DURING INITIAL CLONING, AND I LOOKED INTO
+	//THIS, BUT IT GETS NASTY AND POTENTIALLY BUGGY TO TRY IT.  THESE ARE RARE USE CASES, SO I WON'T WORRY ABOUT THE OVERHEAD,
+	//WHICH MAY BE LARGE
+	//3) If IsUserSpecifiedRateMatrix (=fixed) - Doesn't need to be copied during run since it won't be changing, but DOES need to be copied 
+										//when the initial tree is cloned into the pop, to overwrite the default parameter values
+	//This is what was missing in two serine bug:
+	//4) If is a fixed two-serine matrix (i.e., modSpec.IsTwoSerineRateMatrix() && modSpec.fixRelativeRates) - for same reason as previous,
+										//to overwrite default values
+
+	//if(modSpec.IsAminoAcid() == false || modSpec.IsEstimateAAMatrix() || (modSpec.IsTwoSerineRateMatrix() && !modSpec.fixRelativeRates) || (modSpec.IsAminoAcid() && modSpec.IsUserSpecifiedRateMatrix()))
+	if((modSpec->IsAminoAcid() == false && modSpec->IsMkTypeModel() == false && modSpec->IsOrientedGap() == false) || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix() || (modSpec->IsAminoAcid() && modSpec->IsUserSpecifiedRateMatrix()))
+		for(int i=0;i<relNucRates.size();i++)
 			*relNucRates[i]=*(from->relNucRates[i]);
 	
 	for(int i=0;i<nstates;i++)
@@ -1593,7 +1644,6 @@ FLOAT_TYPE Model::TRatio() const{
 bool Model::IsModelEqual(const Model *other) const {
 	assert(0);
 	//this will need to be generalized if other models are introduced
-	
 	for(int i=0;i<6;i++)
 		if(!FloatingPointEquals(*relNucRates[i], *(other->relNucRates[i]), 1e-15)) return false;
 	
@@ -2091,34 +2141,52 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 				}
 			}
 		}
-	if(modSpec->IsNucleotide() || modSpec->IsCodon()){
+	if(modSpec->IsNucleotide() || modSpec->IsCodon() || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()){
 		if(model){
-			sprintf(cStr, "%5.2f %5.2f %5.2f %5.2f %5.2f %5.2f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
-			s += cStr;
+			//sprintf(cStr, " %5.2f %5.2f %5.2f %5.2f %5.2f %5.2f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
+			for(int st = 0;st < relNucRates.size();st++){
+				sprintf(cStr," %6.5g", Rates(st));
+				s += cStr;
+				}
 			}
 		else{
+			string states;
+			//Z is second serine type
+			if(modSpec->IsAminoAcid())
+				states="ACDEFGHIKLMNPQRSTVWYZ";
+			else
+				states="ACGT";
+			char rStr[50];
+			for(int from=0;from<(modSpec->IsCodon() ? 4 - 1 : NStates() - 1);from++){
+				for(int to=from+1;to<(modSpec->IsCodon() ? 4 : NStates());to++){
+					sprintf(rStr, "r(%c%c)", states[from], states[to]);
+					sprintf(cStr," %6s", rStr);
+					s += cStr;
+					}
+				}
+/*
 			char rStr[50];
 			sprintf(rStr, "r(AC)");
-			sprintf(cStr,"%5s ", rStr);
+			sprintf(cStr," %5s", rStr);
 			s += cStr;
 			sprintf(rStr, "r(AG)");
-			sprintf(cStr,"%5s ", rStr);
+			sprintf(cStr," %5s", rStr);
 			s += cStr;
 			sprintf(rStr, "r(AT)");
-			sprintf(cStr,"%5s ", rStr);
+			sprintf(cStr," %5s", rStr);
 			s += cStr;
 			sprintf(rStr, "r(CG)");
-			sprintf(cStr,"%5s ", rStr);
+			sprintf(cStr," %5s", rStr);
 			s += cStr;
 			sprintf(rStr, "r(CT)");
-			sprintf(cStr,"%5s ", rStr);
+			sprintf(cStr," %5s", rStr);
 			s += cStr;
 			sprintf(rStr, "r(GT)");
-			sprintf(cStr,"%5s ", rStr);
+			sprintf(cStr," %5s", rStr);
 			s += cStr;
+*/			}
 			}
-		}
-	if(modSpec->IsNucleotide()){
+/*	if(modSpec.IsNucleotide()){
 		if(model){
 			sprintf(cStr," %5.3f %5.3f %5.3f %5.3f ", StateFreq(0), StateFreq(1), StateFreq(2), StateFreq(3));
 			s += cStr;
@@ -2139,6 +2207,29 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 			s += cStr;
 			}
 		}
+*/	//else if(modSpec.IsAminoAcid()){
+		if(modSpec->IsNucleotide() || (modSpec->IsAminoAcid() && (modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false))){
+			if(model){
+				for(int st = 0;st < stateFreqs.size();st++){
+					sprintf(cStr," %5.3f", StateFreq(st));
+					s += cStr;
+					}
+				}
+			else{
+				char pStr[50];
+				string states;
+				//Z is extra serine, and won't be shown in normal models because there are only 20 AA's
+				if(modSpec->IsAminoAcid())
+					states="ACDEFGHIKLMNPQRSTVWYZ";
+				else
+					states="ACGT";
+				for(int st = 0;st < stateFreqs.size();st++){
+					sprintf(pStr,"pi(%c)", states[st]);
+					sprintf(cStr," %5s", pStr);
+					s += cStr;
+					}
+				}
+			}
 
 	if(modSpec->IsFlexRateHet()){
 		for(int i=0;i<NRateCats();i++){
@@ -2184,6 +2275,197 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 		s += cStr;
 		}
 	}
+void Model::OutputAminoAcidRMatrixArray(ostream &out){
+	//assert(el.size() == 400);
+	//first make a full 20x20 matrix
+	assert(modSpec->IsAminoAcid());
+	vector<FLOAT_TYPE> el(nstates * nstates, ZERO_POINT_ZERO);
+	vector<FLOAT_TYPE *>::iterator r = relNucRates.begin();
+	FLOAT_TYPE tot = ZERO_POINT_ZERO;
+	for(int from=0;from<nstates;from++){
+		for(int to=from;to<nstates;to++){
+			if(from == to)
+				el[from * nstates + to] = 0.0;
+			else{
+				el[from * nstates + to] = **r;
+				el[to * nstates + from] = **r;
+				tot += **r;
+				r++;
+				}
+			}
+		}
+	assert(r == relNucRates.end());
+	char str[100];
+
+	out << "Estimated AA rate matrices:" << endl;;
+	out << "NOTE THAT THIS FUNCTION IS FAIRLY EXPERIMENTAL, SO CHECK YOUR OUTPUT AND LET ME KNOW OF ANY PROBLEMS\n" << endl;;
+	out << "GARLI's order of AA's is alphabetically BY SINGLE LETTER CODE, i.e.:\n ACDEFGHIKLMNPQRSTVWY" << endl;
+	out << "The correspondence with the 3-letter codes and full names is this:" << endl;
+
+	out << "A\tAla\tAlanine\nC\tCys\tCysteine\nD\tAsp\tAspartic Acid\nE\tGlu\tGlutamic Acid\nF\tPhe\tPhenylalanine\nG\tGly\tGlycine\nH\tHis\tHistidine\n";
+	out << "I\tIle\tIsoleucine\nK\tLys\tLysine\nL\tLeu\tLeucine\nM\tMet\tMethionine\nN\tAsn\tAsparagine\nP\tPro\tProline\nQ\tGln\tGlutamine\nR\tArg\tArginine\n";
+	out << "S\tSer\tSerine\nT\tThr\tThreonine\nV\tVal\tValine\nW\tTrp\tTryptophan\nY\tTyr\tTyrosine\n" << endl;
+
+	out << "Unfortunately, I beleive that GARLI, PAML, and MrBayes all have different orderings of the amino acids.  PAML" << endl;
+	out << "is alphabetical by three-letter code, MrBayes is alphabetical by full name (same as PAML, but swap Gln and Glu), GARLI" << endl;
+	out << "is alphabetical by single letter code.  Additionally, I believe that PAML takes the below diagonal matrix as input,"<< endl;
+	out << "while GARLI and MrBayes take the upper." << endl;
+	out << "I COULD BE WRONG ABOUT THIS, AND YOU SHOULD VERIFY THAT THE ABOVE FACTS ARE TRUE BEFORE USING THE BELOW MATRICES" << endl;
+	out << "IN ANOTHER PROGRAM" << endl;
+	
+	out << "Following are the matrix inferred by GARLI in GARLI's order, then the same matrices ordered by the other systems" << endl;
+	out << "described above.  Both the above and below diagonal versions appear for each." << endl;
+
+	out << "The entries are scaled such that the mean rate is 100.  It can be rescaled by any constant factor without" << endl;
+	out << "changing its meaning. Entries on the diagonal are all zero." << endl;
+	out << "\nThe ABOVE diagonal SINGLE LETTER order is what would be fed back into GARLI as a starting condition to use this matrix" << endl;
+	out << "in future analyses.  Here is a GARLI block that could be used to do this.  The values could be fixed for further analyses" << endl;
+	out << "by setting \"ratematrix = fixed\" in the configuration file, or it could be used as starting values for another run estimating" << endl;
+	out << "the full matrix by leaving \"ratematrix = estimate\".  The block itself could be put in the same file as a NEXUS" << endl;
+	out << "data matrix, or put in a file (which must start with #NEXUS) specified on the streefname line of the configuarion file.\n" << endl;
+
+	out << "begin garli;" << endl;
+	out << "[this specifies an amino acid rate matrix, with AA's ordered alphabetically by SINGLE LETTER CODE]" << endl;
+	out << "[it is the above diagonal portion of the matrix, in order across each row]" << endl;
+	if(modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
+		out << "[below the rate matrix is a line begining with \"e\" that specifies the estimated AA frequencies in GARLI format]" << endl;
+
+	out << "r ";
+	
+	FLOAT_TYPE scaleTo = 100.0 * ((nstates * nstates) - nstates)/2.0;
+
+	for(int from=0;from<nstates - 1;from++){
+		for(int to=from+1;to<nstates;to++){
+			sprintf(str, "%.5g", (el[from * nstates + to] * (scaleTo/tot)));
+			out << str << " ";
+			}
+		if(modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false){
+			out << "\ne ";
+			for(int st = 0;st < nstates;st++)
+				out << StateFreq(st) << " ";
+			}
+		}
+	out << ";\nend;\n" << endl;
+
+	//21st state is extra serine
+	int corThree[21] = {0, 14, 11, 2, 1, 13, 3, 5, 6, 7, 9, 8, 10, 4, 12, 15, 16, 18, 19, 17, 20};
+	int corFull[21] =  {0, 14, 11, 2, 1, 3, 13, 5, 6, 7, 9, 8, 10, 4, 12, 15, 16, 18, 19, 17, 20};
+
+	out << "This is the SINGLE LETTER order (GARLI), above diagonal matrix\n" << endl;
+	out << "(this is what appears in the above GARLI block)\n";
+	for(int from=0;from<nstates - 1;from++){
+		for(int to=0;to<nstates;to++){
+			if(to <= from)
+				out << "\t";
+			else{
+				sprintf(str, "%.5g", (el[from * nstates + to] * (scaleTo/tot)));
+				out << str;
+				if(to != from -1)
+					out << "\t";
+				}
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "\nThis is the SINGLE LETTER order (GARLI) below diagonal matrix\n" << endl;
+
+	for(int from=1;from<nstates;from++){
+		for(int to=0;to<from;to++){
+			sprintf(str, "%.5g", (el[from * nstates + to] * (scaleTo/tot)));
+			out << str;
+			if(to != from -1)
+				out << "\t";
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "This is the THREE LETTER code order (PAML) above diagonal matrix\n" << endl;
+	//above diagonal
+	for(int from=0;from<nstates - 1;from++){
+		for(int to=0;to<nstates;to++){
+			if(to <= from)
+				out << "\t";
+			else{
+				sprintf(str, "%.5g", (el[corThree[from] * nstates + corThree[to]] * (scaleTo/tot)));
+				out << str;
+				if(to != from -1)
+					out << "\t";
+				}
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "\nThis is the THREE LETTER order (PAML), below diagonal matrix\n" << endl;
+
+	for(int from=1;from<nstates;from++){
+		for(int to=0;to<from;to++){
+			sprintf(str, "%.5g", (el[corThree[from] * nstates + corThree[to]] * (scaleTo/tot)));
+			out << str;
+			if(to != from -1)
+				out << "\t";
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "This is the FULL NAME code order (MrBayes) above diagonal matrix\n" << endl;
+	//above diagonal
+	for(int from=0;from<nstates - 1;from++){
+		for(int to=0;to<nstates;to++){
+			if(to <= from)
+				out << "\t";
+			else{
+				sprintf(str, "%.5g", (el[corFull[from] * nstates + corFull[to]] * (scaleTo/tot)));
+				out << str;
+				if(to != from -1)
+					out << "\t";
+				}
+			}
+		out << endl;
+		}
+	out << endl;
+
+	out << "\nThis is the FULL NAME order (MrBayes), below diagonal matrix\n" << endl;
+
+	for(int from=1;from<nstates;from++){
+		for(int to=0;to<from;to++){
+			sprintf(str, "%.5g", (el[corFull[from] * nstates + corFull[to]] * (scaleTo/tot)));
+			out << str;
+			if(to != from -1)
+				out << "\t";
+			}
+		out << endl;
+		}
+	out << endl;
+
+	
+	out << "These are AA frequencies that were used, which may have been estimated or not." << endl;
+	//Z is the extra serine
+	string states="ACDEFGHIKLMNPQRSTVWYZ";
+	out << "Single letter order" << endl;
+	out.precision(5); 
+	for(int st = 0;st < stateFreqs.size();st++){
+		out << states[st] << "\t";
+		}
+	out << endl;
+	for(int st = 0;st < stateFreqs.size();st++){
+		out << StateFreq(st) << "\t";
+		}
+	out << endl;
+	out << "Three letter order" << endl;
+	for(int st = 0;st < stateFreqs.size();st++){
+		out << StateFreq(corThree[st]) << "\t";
+		}
+	out << endl;
+	out << "Full name order" << endl;
+	for(int st = 0;st < stateFreqs.size();st++){
+		out << StateFreq(corFull[st]) << "\t";
+		}
+	out << endl;
+	}
 
 void Model::OutputHumanReadableModelReportWithParams() const{
 	//Report on the model setup and parameter values - like a beefed up version of Population::ModelReport
@@ -2192,8 +2474,12 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		else if(modSpec->IsInvertMitoCode()) outman.UserMessage("  Number of states = 62 (codon data, invertebrate mitochondrial code)");
 		else outman.UserMessage("  Number of states = 61 (codon data, standard code)");
 		}
-	else if(modSpec->IsAminoAcid())
-		outman.UserMessage("  Number of states = 20 (amino acid data)");
+	else if(modSpec->IsAminoAcid()){
+		if(modSpec->nstates == 20)
+			outman.UserMessage("  Number of states = 20 (amino acid data)");
+		else if(modSpec->nstates == 21)
+			outman.UserMessage("  Number of states = 21 (amino acid data, experimental matrix with two serine types)");
+		}
 	else if(modSpec->IsNState() || modSpec->IsNStateV())
 		outman.UserMessage("  Number of states = %d (standard data)", nstates);
 	else if(modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV())
@@ -2206,8 +2492,14 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		outman.UserMessage("  Number of states = 4 (nucleotide data)");
 	
 	if(modSpec->IsNucleotide() || modSpec->IsCodon()){
-		if(modSpec->IsCodon() && modSpec->numRateCats == 1) outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega) = %f\n", Omega(0));
-		if(modSpec->IsCodon()) outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model: ");
+		if(modSpec->IsCodon() && modSpec->numRateCats == 1){ 
+			if(!modSpec->fixOmega)
+				outman.UserMessageNoCR("  One estimated dN/dS ratio (aka omega) = %f\n", Omega(0));
+			else
+				outman.UserMessageNoCR("  One dN/dS ratio (aka omega).\n    Value provided by user (fixed) = %f\n", Omega(0));
+			}
+		if(modSpec->IsCodon()) 
+			outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix Assumed by Codon Model: ");
 		else outman.UserMessageNoCR("  Nucleotide Relative Rate Matrix: ");
 		if(nst == 6){
 			if(modSpec->IsArbitraryRateMatrix()) outman.UserMessage("\n    User specified matrix type: %s ", modSpec->arbitraryRateMatrixString.c_str());
@@ -2231,6 +2523,10 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		else if(modSpec->IsWAGAAMatrix()) outman.UserMessage("WAG");
 		else if(modSpec->IsMtMamAAMatrix()) outman.UserMessage("MtMam");
 		else if(modSpec->IsMtRevAAMatrix()) outman.UserMessage("MtRev");
+		else if(modSpec->IsEstimateAAMatrix()) outman.UserMessage("Estimated (189 free parameters)");
+		else if(modSpec->IsUserSpecifiedRateMatrix()) outman.UserMessage(" values specified by user (fixed)");
+		else if(modSpec->IsTwoSerineRateMatrix() && !modSpec->fixRelativeRates) outman.UserMessage("Experimental model with two serine types\n    Matrix estimated (209 free parameters)");
+		else if(modSpec->IsTwoSerineRateMatrix()) outman.UserMessage("Experimental model with two serine types\n    Matrix specified by user.");
 		}
 	else if(modSpec->IsNState()){
 		outman.UserMessage("  Character change matrix:\n    One rate (symmetric one rate Mk model)");
@@ -2289,7 +2585,8 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 		
 	if(!modSpec->IsEqualStateFrequencies()){
 		if(modSpec->IsCodon())  outman.UserMessageNoCR("    (AAA, AAC, AAG, AAT, ACA, ... etc)\n    ");
-		else if(modSpec->IsAminoAcid()) outman.UserMessageNoCR("    (ACDEFGHIKLMNPQRSTVWY)\n    ");
+		else if(modSpec->IsAminoAcid() && !modSpec->IsTwoSerineRateMatrix()) outman.UserMessageNoCR("    (ACDEFGHIKLMNPQRSTVWY)\n    ");
+		else if(modSpec->IsAminoAcid() && modSpec->IsTwoSerineRateMatrix()) outman.UserMessageNoCR("    (ACDEFGHIKLMNPQRSTVWYZ) (Z=ACG and AGT Serines)\n    ");
 		else outman.UserMessageNoCR("    (ACGT) ");
 		for(int i=0;i<nstates;i++){
 			outman.UserMessageNoCR("%.4f ", StateFreq(i));
@@ -2309,7 +2606,12 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 	else{
 		outman.UserMessageNoCR("    %d ", modSpec->numRateCats);
 		if(modSpec->IsNonsynonymousRateHet()){
+			if(!modSpec->fixOmega){
 			outman.UserMessage("nonsynonymous rate categories, rate and proportion of each estimated\n     (this is effectively the M3 model of PAML)");
+				}
+			else{
+				outman.UserMessage("nonsynonymous rate categories, rate and proportion of each provided by user (fixed)\n     (this is effectively the M3 model of PAML)");
+				}
 			outman.UserMessage("      dN/dS\tProportion");
 			for(int i=0;i<modSpec->numRateCats;i++)
 				outman.UserMessage("      %5.4f\t%5.4f", Omega(i), OmegaProb(i));
@@ -2341,28 +2643,35 @@ void Model::OutputHumanReadableModelReportWithParams() const{
 
 	}
 
+#define MODEL_OUTPUT_PREC 5
 void Model::FillGarliFormattedModelString(string &s) const{
 	char temp[1000];
+	int prec = MODEL_OUTPUT_PREC;
 	if(modSpec->IsCodon()){
 		s += " o";
 		for(int i=0;i<omegas.size();i++){
-			sprintf(temp," %f %f", *omegas[i], *omegaProbs[i]);
+			sprintf(temp," %.*f %.*f",  prec, *omegas[i],  prec, *omegaProbs[i]);
 			s += temp;
 			}
 		}
-	if(modSpec->IsNucleotide() || modSpec->IsCodon()){
-		sprintf(temp," r %f %f %f %f %f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4));
-		s += temp;
+	if(modSpec->IsNucleotide() || modSpec->IsCodon() || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix() || (modSpec->IsAminoAcid() && modSpec->IsUserSpecifiedRateMatrix())){
+		//sprintf(temp," r %.*f %.*f %.*f %.*f %.*f", prec, Rates(0), prec, Rates(1), prec, Rates(2), prec, Rates(3), prec, Rates(4));
+		//s += temp;
+		s += " r ";
+		for(int st = 0;st < relNucRates.size();st++){
+			sprintf(temp," %.*f", prec, Rates(st));
+			s += temp;
+			}
 		}
 	if(modSpec->IsNucleotide()){
-		sprintf(temp," e %f %f %f %f", StateFreq(0), StateFreq(1), StateFreq(2), StateFreq(3));
+		sprintf(temp," e %.*f %.*f %.*f %.*f",  prec, StateFreq(0),  prec, StateFreq(1),  prec, StateFreq(2),  prec, StateFreq(3));
 		s += temp;
 		}
 	else if(!IsOrientedGap()){
 		sprintf(temp," e ");
 		s += temp;
 		for(int i=0;i<nstates;i++){
-			sprintf(temp," %f ", StateFreq(i));
+			sprintf(temp," %.*f ",  prec, StateFreq(i));
 			s += temp;
 			}
 		}
@@ -2370,18 +2679,18 @@ void Model::FillGarliFormattedModelString(string &s) const{
 	if(modSpec->IsFlexRateHet()){
 		s += " f ";
 		for(int i=0;i<NRateCats();i++){
-			sprintf(temp, " %f %f ", rateMults[i], rateProbs[i]);
+			sprintf(temp, " %.*f %.*f ",  prec, rateMults[i],  prec, rateProbs[i]);
 			s += temp;
 			}
 		}
 	else{
 		if(modSpec->IsGammaRateHet()){
-			sprintf(temp, " a %f", Alpha());
+			sprintf(temp, " a %.*f",  prec, Alpha());
 			s += temp;
 			}
 		}
 	if(PropInvar()!=ZERO_POINT_ZERO){
-		sprintf(temp, " p %f", PropInvar());
+		sprintf(temp, " p %.*f",  prec, PropInvar());
 		s += temp;
 		}
 	if(modSpec->IsOrientedGap()){
@@ -2435,33 +2744,60 @@ void Model::ReadModelFromFile(NexusToken &token){
 */	
 	
 void Model::ReadGarliFormattedModelString(string &modString){
-	stringstream stf(stringstream::in | stringstream::out);
-	stf << modString;
+	istringstream stf(modString, stringstream::in);
 
 	char c;
-	char temp[100];
+	NxsString temp;
 	c=stf.get();
 	do{//read parameter values identified by single letter identifier.  Each section should
 		//take care of advancing to the following letter 
 		if(c == 'R' || c == 'r'){//rate parameters
-			if(modSpec->IsAminoAcid()) throw ErrorException("Rate matrix parameters can only be specified for nucleotide or codon models");
-			FLOAT_TYPE r[6];
-			for(int i=0;i<5;i++){
+			if(modSpec->IsAminoAcid() && modSpec->IsEstimateAAMatrix() == false && modSpec->IsUserSpecifiedRateMatrix() == false && modSpec->IsTwoSerineRateMatrix() == false) 
+				throw ErrorException("Amino acid rate matrix parameters cannot be specified unless \"ratematrix = fixed\" or \"ratematrix = estimate\" are used.");
+			//FLOAT_TYPE r[6];
+			vector<FLOAT_TYPE> r;
+			//for(int i=0;i<5;i++){
+			for(int i=0;i<relNucRates.size() - 1;i++){
+				temp.clear();
 				stf >> temp;
-				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading rate matrix parameters from file.\nExamine file and check manual for format.\n"));
-				r[i]=(FLOAT_TYPE)atof(temp);
+
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading rate matrix parameters.\nExamine file and check manual for format.\n"));
+				if(temp[0] != '.' && (!isdigit(temp[0]))) 
+					throw(ErrorException("Problem reading rate matrix parameters from file (maybe too few rates?).\n\tFor amino acid models 190 rates should be specified, (or 189 rates if the last rate is assumed to be 1.0).\n\tFor nucleotide models 6 should be specified (or 5 if the last rate is assumed to be 1.0).\n\tExamine file and check manual or website for format.\n"));
+				//r[i]=(FLOAT_TYPE)atof(temp.c_str());
+				r.push_back((FLOAT_TYPE)atof(temp.c_str()));
 				}
-			do{c=stf.get();}while(c==' ');
+			do{
+				c=stf.get();
+				}while(!stf.eof() && (c == ' ' || c == '\t'));	
 			if(isdigit(c) || c=='.'){//read the GT rate, if specified
 				string v;
 				v = c;
-				stf >> temp;
-				v += temp;
-				r[5] = atof(v.c_str());
-				c=stf.get();
+				while((!isalpha(c) || c=='e' || c == 'E') && !stf.eof()){
+					c=stf.get();
+					if(isdigit(c) || c=='.' || c=='e' || c=='E' || c == '-')
+						v += c;
+					else if(c == ' ' || c == '\t'){
+						c=stf.get();
+						if(isdigit(c) || c=='.')
+							throw ErrorException("It appears that too many relative rates was specified in the model string.\n\tFor amino acid models 190 rates should be specified, (or 189 rates if the last rate is assumed to be 1.0).\n\tFor nucleotide models 6 should be specified (or 5 if the last rate is assumed to be 1.0).");
+						break;
+						}
+					}
+				//r[5] = atof(v.c_str());
+				r.push_back((FLOAT_TYPE)atof(v.c_str()));
 				}
-			else r[5] = ONE_POINT_ZERO;
-			SetRmat(r, true);
+			//else r[5] = ONE_POINT_ZERO;
+			else 
+				r.push_back(ONE_POINT_ZERO);
+			if(r.size() != relNucRates.size()){
+				if(modSpec->IsAminoAcid())
+					throw ErrorException("It appears that too few relative rates were specified in the model string (found %d).\n\tFor amino acid models 190 rates should be specified, (or 189 rates if the last rate is assumed to be 1.0).", r.size());
+				else
+					throw ErrorException("Incorrect number of relative rates specified in the model string.\t6 rates should be specified, (or 5 rates if the G-T rate is assumed to be 1.0).");
+				}
+			SetRmat(&r[0], true, true);
 			modSpec->gotRmatFromFile=true;
 			}
 		else if(c == 'E' || c == 'e' || c == 'b' || c == 'B'){//base freqs
@@ -2472,57 +2808,96 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			int nstates = modSpec->nstates;
 			vector<FLOAT_TYPE> b(nstates);
 			for(int i=0;i<nstates-1;i++){
+				temp.clear();
 				stf >> temp;
-				if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading equilirium state frequency parameters from file.\nExamine file and check manual for format.\n"));
-				b[i]=(FLOAT_TYPE)atof(temp);
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading equilibrium frequency parameters.\nExamine file and check manual for format.\n"));
+				if(temp[0] != '.' && (!isdigit(temp[0]))) 
+					throw(ErrorException("Problem reading equilibrium state frequency parameters from file.\nExamine file and check manual for format.\n"));
+				b[i]=(FLOAT_TYPE)atof(temp.c_str());
 				}
-			do{c=stf.get();}while(c==' ');
+			do{
+				c=stf.get();
+				}while(!stf.eof() && (c == ' ' || c == '\t'));	
 			if(isdigit(c) || c=='.'){
 				string v;
 				v = c;
-				stf >> temp;
-				v += temp;
+				while(!isalpha(c) && !stf.eof()){
+					c=stf.get();
+					if(isdigit(c) || c=='.')
+						v += c;
+					else if(c == ' ' || c == '\t'){
+						c=stf.get();
+						if(isdigit(c) || c=='.')
+							throw ErrorException("It appears that too many equilibrium frequencies were specified in the model string.\n\tFor amino acid models 20 should be specified, (or 19 if the last is assumed to make the sum 1.0).\n\tFor nucleotide models 4 (or 3 if the last is assumed to make the sum 1.0).");
+						break;
+						}
+					}
 				b[nstates-1]=(FLOAT_TYPE)atof(v.c_str());
-				do{c=stf.get();}while(c==' ');				
 				}
 			else{
 				FLOAT_TYPE tot = ZERO_POINT_ZERO;
-				for(int i=0;i<nstates-1;i++) tot += b[i];
-				b[nstates-1] = ONE_POINT_ZERO - b[0] - b[1] - b[2];
+				for(int i=0;i<nstates-1;i++) 
+					tot += b[i];
+				b[nstates-1] = ONE_POINT_ZERO - tot;
 				}
-			SetPis(&b[0], true);
+			//in this case we're "forcing" estimation of state frequencies but providing starting values, 
+			//and because this is rather a hack we can't actually do the validation without crapping out 
+			if(modSpec->IsCodon() && modSpec->fixStateFreqs == false && modSpec->IsEmpiricalStateFrequencies())
+				SetPis(&b[0], false, true);
+			else
+				SetPis(&b[0], true, true);
 			modSpec->gotStateFreqsFromFile=true;
 			}
 		else if(c == 'A' || c == 'a'){//alpha shape
-			if(modSpec->IsFlexRateHet()) throw(ErrorException("Config file specifies ratehetmodel = flex, but starting model contains alpha!\n"));
-			if(modSpec->IsNonsynonymousRateHet()) throw(ErrorException("Config file specifies ratehetmodel = nonsynonymous, but starting model contains alpha!\n"));
+			if(modSpec->IsFlexRateHet()) 
+				throw(ErrorException("Config file specifies ratehetmodel = flex, but starting model contains alpha!\n"));
+			if(modSpec->IsNonsynonymousRateHet()) 
+				throw(ErrorException("Config file specifies ratehetmodel = nonsynonymous, but starting model contains alpha!\n"));
+			temp.clear();
 			stf >> temp;
-			if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading alpha parameter from file.\nExamine file and check manual for format.\n"));
-			SetAlpha((FLOAT_TYPE)atof(temp), true);
+			if(temp.size() == 0)
+				throw(ErrorException("Unexpected end of model string while reading alpha parameter.\nExamine file and check manual for format.\n"));
+			if(temp[0] != '.' && (!isdigit(temp[0]))) 
+				throw(ErrorException("Problem reading alpha parameter from file.\nExamine file and check manual for format.\n"));
+			SetAlpha((FLOAT_TYPE)atof(temp.c_str()), true);
 			c=stf.get();
 			modSpec->gotAlphaFromFile=true;
 			}				
 		//apropriating "i" for insert rate
 		//else if(c == 'P' || c == 'p' || c == 'i' || c == 'I'){//proportion invariant
 		else if(c == 'P' || c == 'p'){//proportion invariant
+			temp.clear();
 			stf >> temp;
-			if(temp[0] != '.' && (!isdigit(temp[0]))) throw(ErrorException("Problem reading proportion of invariant sites parameter from file.\nExamine file and check manual for format.\n"));
-			FLOAT_TYPE p=(FLOAT_TYPE)atof(temp);
+			if(temp.size() == 0)
+				throw(ErrorException("Unexpected end of model string while reading proportion of invariant sites parameter.\nExamine file and check manual for format.\n"));
+			if(temp[0] != '.' && (!isdigit(temp[0]))) 
+				throw(ErrorException("Problem reading proportion of invariant sites parameter from file.\nExamine file and check manual for format.\n"));
+			FLOAT_TYPE p=(FLOAT_TYPE)atof(temp.c_str());
 			SetPinv(p, true);
 			c=stf.get();
 			modSpec->gotPinvFromFile=true;
 			}
 		else if(c == 'F' || c == 'f'){//flex rates
-			if(modSpec->IsFlexRateHet()==false) throw(ErrorException("Flex rate parameters specified, but ratehetmodel is not flex!\n"));
+			if(modSpec->IsFlexRateHet()==false) 
+				throw(ErrorException("Flex rate parameters specified, but ratehetmodel is not flex!\n"));
 			FLOAT_TYPE rates[20];
 			FLOAT_TYPE probs[20];
 			for(int i=0;i<NRateCats();i++){
+				temp.clear();
 				stf >> temp;
-				if(isalpha(temp[0])) throw ErrorException("Problem with flex rates specification in starting condition file");
-				rates[i]=(FLOAT_TYPE)atof(temp);
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading flex rate parameters.\nExamine file and check manual for format.\n"));
+				if(isalpha(temp[0])) 
+					throw ErrorException("Problem with flex rates specification in starting condition file");
+				rates[i]=(FLOAT_TYPE)atof(temp.c_str());
+				temp.clear();
 				stf >> temp;
-				if(isalpha(temp[0])) throw ErrorException("Problem with flex rates specification in starting condition file");
-				probs[i]=(FLOAT_TYPE)atof(temp);
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading flex rate parameters.\nExamine file and check manual for format.\n"));
+				if(isalpha(temp[0])) 
+					throw ErrorException("Problem with flex rates specification in starting condition file");
+				probs[i]=(FLOAT_TYPE)atof(temp.c_str());
 				}		
 			SetFlexRates(rates, probs);
 			NormalizeRates();
@@ -2530,37 +2905,60 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			modSpec->gotFlexFromFile=true;
 			}
 		else if(c == 'O' || c == 'o'){//omega parameters
-			if(modSpec->IsCodon() == false) throw ErrorException("Omega parameters specified for non-codon model?");
+			if(modSpec->IsCodon() == false) 
+				throw ErrorException("Omega parameters specified for non-codon model?");
 			FLOAT_TYPE rates[20];
 			FLOAT_TYPE probs[20];
 			if(NRateCats() == 1){//just a single omega value to get, maybe with a proportion of 1.0 following it
+				temp.clear();
 				stf >> temp;
-				if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
-				rates[0]=(FLOAT_TYPE)atof(temp);
-				do{c=stf.get();}while(c==' ');
+				if(temp.size() == 0)
+					throw(ErrorException("Unexpected end of model string while reading omega parameters.\nExamine file and check manual for format.\n"));
+				if(isalpha(temp[0])) 
+					throw ErrorException("Problem with omega parameter specification in starting condition file");
+				rates[0]=(FLOAT_TYPE)atof(temp.c_str());
+				do{
+					c=stf.get();
+					}while(!stf.eof() && (c == ' ' || c == '\t'));	
 				if(isdigit(c) || c=='.'){
 					string v;
 					v = c;
+					temp.clear();
 					stf >> temp;
+					if(temp.size() == 0)
+						throw(ErrorException("Unexpected end of model string while reading omega parameters.\nExamine file and check manual for format.\n"));
 					v += temp;
 					if(FloatingPointEquals(atof(v.c_str()), ONE_POINT_ZERO, 1.0e-5) == false)
 						throw ErrorException("Problem with omega parameter specification in starting condition file\n(wrong number of rate cats specified in config?)");
-					do{c=stf.get();}while(c==' ');		
-					if(isdigit(c) || c == '.') throw ErrorException("Problem with omega parameter specification in starting condition file");
+					do{
+						c=stf.get();
+						}while(!stf.eof() && (c == ' ' || c == '\t'));		
+					if(isdigit(c) || c == '.') 
+						throw ErrorException("Problem with omega parameter specification in starting condition file");
 					}
 				probs[0] = ONE_POINT_ZERO;
 				SetOmegas(rates, probs);
 				}
 			else{
 				for(int i=0;i<NRateCats();i++){
+					temp.clear();
 					stf >> temp;
-					if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
-					rates[i]=(FLOAT_TYPE)atof(temp);
+					if(temp.size() == 0)
+						throw(ErrorException("Unexpected end of model string while reading omega parameters.\nExamine file and check manual for format.\n"));
+					if(isalpha(temp[0])) 
+						throw ErrorException("Problem with omega parameter specification in starting condition file");
+					rates[i]=(FLOAT_TYPE)atof(temp.c_str());
+					temp.clear();
 					stf >> temp;
-					if(isalpha(temp[0])) throw ErrorException("Problem with omega parameter specification in starting condition file");
-					probs[i]=(FLOAT_TYPE)atof(temp);
+					if(temp.size() == 0)
+						throw(ErrorException("Unexpected end of model string while reading omega parameters.\nExamine file and check manual for format.\n"));
+					if(isalpha(temp[0])) 
+						throw ErrorException("Problem with omega parameter specification in starting condition file");
+					probs[i]=(FLOAT_TYPE)atof(temp.c_str());
 					}
-				do{c=stf.get();}while(c==' ');		
+				do{
+					c=stf.get();
+					}while(!stf.eof() && (c == ' ' || c == '\t'));			
 				if(isdigit(c) || c == '.') throw ErrorException("Problem with omega parameter specification in starting condition file");
 				SetOmegas(rates, probs);
 				}
@@ -2577,7 +2975,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				throw(ErrorException("Problem reading insertion rate parameter from file.\nExamine file and check manual for format.\nNote that the proportion of invariable sites parameter is specified with \"p\", not \"i\""));
 			if(! NxsString(temp).IsADouble())
 				throw(ErrorException("Problem reading insertion rate parameter from file.\nExamine file and check manual for format.\nNote that the proportion of invariable sites parameter is specified with \"p\", not \"i\""));
-			FLOAT_TYPE i = (FLOAT_TYPE)atof(temp);
+			FLOAT_TYPE i = (FLOAT_TYPE)atof(temp.c_str());
 			if(insertRate == NULL)
 				throw ErrorException("insert rate (%f) specified for non-gap model!  Check configuration.", i);
 			SetInsertRate(0, i);
@@ -2590,16 +2988,18 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				throw(ErrorException("Problem reading deletion rate parameter from file.\nExamine file and check manual for format.\n"));
 			if(! NxsString(temp).IsADouble())
 				throw(ErrorException("Problem reading deletion rate parameter from file.\nExamine file and check manual for format.\n"));
-			FLOAT_TYPE d = (FLOAT_TYPE)atof(temp);
+			FLOAT_TYPE d = (FLOAT_TYPE)atof(temp.c_str());
 			if(deleteRate == NULL)
 				throw ErrorException("delete rate (%f) specified for non-gap model!  Check configuration.", d);
 			SetDeleteRate(0, d);
 			do{c=stf.get();}while(c==' ');		
 			modSpec->gotDeleteFromFile=true;
 			}
-		else if(isalpha(c)) throw(ErrorException("Unknown model parameter specification in file.\nExamine file and check manual for format.\n"));
+		else if(isalpha(c)) 
+			throw(ErrorException("Unknown model parameter specification in file.\nExamine file and check manual for format.\n"));
 		else if(c != '(') c=stf.get();
 		}while(c != '(' && c != '\r' && c != '\n' && !stf.eof());
+/* this isn't necessary with the new definition of the insert "rate" as a proportion
 		//adjust the indel rates, if necessary
 		if(IsOrientedGap() && *insertRate > *deleteRate){
 			if(modSpec->gotInsertFromFile && modSpec->gotDeleteFromFile && *insertRate > *deleteRate - 1.0e-2)
@@ -2609,6 +3009,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 			else if(modSpec->gotDeleteFromFile)
 				*insertRate = *deleteRate - 0.001;
 			}
+*/
 	}
 
 void Model::CreateModelFromSpecification(int modnum){
@@ -2647,11 +3048,10 @@ void Model::CreateModelFromSpecification(int modnum){
 	propInvar = new FLOAT_TYPE;
 	includeInvariantSites = modSpec->includeInvariantSites;
 	if(includeInvariantSites){
-		includeInvariantSites = true;
 		assert(modSpec->IsCodon() == false);
 		*propInvar=(FLOAT_TYPE)0.2;
 		if(modSpec->fixInvariantSites == false){
-			ProportionInvariant *pi = new ProportionInvariant((FLOAT_TYPE **) &propInvar, modnum);
+			ProportionInvariant *pi = new ProportionInvariant("proportion invariant", (FLOAT_TYPE **) &propInvar, modnum);
 			pi->SetWeight(1);
 			paramsToMutate.push_back(pi);
 			}			
@@ -2666,7 +3066,7 @@ void Model::CreateModelFromSpecification(int modnum){
 		if(modSpec->IsFlexRateHet() == false){
 			DiscreteGamma(rateMults, rateProbs, *alpha);
 			if(modSpec->fixAlpha == false){
-				AlphaShape *a= new AlphaShape(&alpha, modnum);
+				AlphaShape *a= new AlphaShape("alpha", &alpha, modnum);
 				a->SetWeight(1);
 				paramsToMutate.push_back(a);
 				}
@@ -2767,7 +3167,7 @@ void Model::CreateModelFromSpecification(int modnum){
 				*relNucRates[1] = 4.0;
 				*relNucRates[4] = 4.0;
 				*relNucRates[5] = ONE_POINT_ZERO;
-				RelativeRates *r=new RelativeRates(&relNucRates[0], 6, modnum);
+				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 6, 1e-5, 999.9, modnum);
 				r->SetWeight(6);
 				paramsToMutate.push_back(r);
 				}
@@ -2781,7 +3181,7 @@ void Model::CreateModelFromSpecification(int modnum){
 				*relNucRates[1]=*relNucRates[4] = 4.0;
 				}
 			if(modSpec->fixRelativeRates == false){
-				RelativeRates *r=new RelativeRates(&relNucRates[0], 6, modnum);
+				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 6, 1e-3, 999.9, modnum);
 				r->SetWeight(6);
 				paramsToMutate.push_back(r);
 				}
@@ -2799,7 +3199,7 @@ void Model::CreateModelFromSpecification(int modnum){
 			relNucRates.push_back(a);
 			
 			if(modSpec->fixRelativeRates == false){
-				RelativeRates *r=new RelativeRates(&b, 1, modnum);
+				RelativeRates *r=new RelativeRates("Rate matrix", &b, 1, 1e-3, 999.9, modnum);
 				r->SetWeight(2);
 				paramsToMutate.push_back(r);
 				}
@@ -2811,16 +3211,47 @@ void Model::CreateModelFromSpecification(int modnum){
 				relNucRates.push_back(a);
 			}
 		}
+	else{//estimating or fixing the aminoacid rate matrix - a two serine matrix is either estimated or fixed and user specified, so goes through here regardless
+		if(modSpec->fixRelativeRates == false || modSpec->IsUserSpecifiedRateMatrix() || modSpec->IsTwoSerineRateMatrix()){
+			int seed = rnd.seed();
+			int matrixRates = nstates * (nstates - 1) / 2;
+			//for(int i=0;i<190;i++){
+			for(int i=0;i < matrixRates;i++){
+				FLOAT_TYPE *d=new FLOAT_TYPE;
+				//*d = ONE_POINT_ZERO;
+				if(i == (matrixRates - 1))
+					*d = 1.0;
+				else
+					*d = max(rnd.gamma(1), MIN_REL_RATE);
+				relNucRates.push_back(d);
+				}
+			rnd.set_seed(seed);
+#ifdef SUM_AA_REL_RATES	
+			this->NormalizeSumConstrainedRelativeRates(true, -1);
+#endif
+			if((modSpec->IsUserSpecifiedRateMatrix() == false) && ((modSpec->IsTwoSerineRateMatrix() &&  modSpec->fixRelativeRates) == false)){
+#ifdef SUM_AA_REL_RATES
+				SumConstrainedRelativeRates *r = new SumConstrainedRelativeRates("Rate matrix", &relNucRates[0], matrixRates, SUM_TO * 1.0e-6/(double)matrixRates, SUM_TO * 1.0e6/(double)matrixRates, SUM_TO, modnum);
+#else
+				RelativeRates *r=new RelativeRates("Rate matrix", &relNucRates[0], 190, 1e-3, 9999.9, modnum);
+#endif
+				
+				r->SetWeight(matrixRates);
+				paramsToMutate.push_back(r);
+				}
+			}
+		}
 
 	AllocateEigenVariables();//these need to be allocated regardless of
 		//nst because I don't feel like simplifying the deriv calcs for simpler
 		//models.  Pmat calcs for simpler models are simplified, and don't
 		//require the Eigen stuff	
 
-	if(modSpec->IsNucleotide()) UpdateQMat();
-	else if(modSpec->IsMkTypeModel() || modSpec->IsOrientedGap()){
+	if(modSpec->IsMkTypeModel() || modSpec->IsOrientedGap()){
 		//NSTATE - nothing needs to be done here right now
 		}
+	else if(modSpec->IsCodon() == false) 
+		UpdateQMat();
 	else if(modSpec->IsCodon()){
 		FLOAT_TYPE *d;
 		for(int i=0;i<NRateCats();i++){
@@ -2866,17 +3297,18 @@ void Model::CreateModelFromSpecification(int modnum){
 */
 		//*relNucRates[1] = 2.89288;
 	
-		if(NRateCats() > 1){
-			RateProportions *omegaP=new RateProportions(&omegaProbs[0], NRateCats(), modnum);
-			omegaP->SetWeight((FLOAT_TYPE)NRateCats());
-			paramsToMutate.push_back(omegaP);
+		if(!modSpec->fixOmega){
+			if(NRateCats() > 1){
+				RateProportions *omegaP=new RateProportions(&omegaProbs[0], NRateCats(), modnum);
+				omegaP->SetWeight((FLOAT_TYPE)NRateCats());
+				paramsToMutate.push_back(omegaP);
+				}
+				
+			RateMultipliers *omegaM=new RateMultipliers(&omegas[0], NRateCats(), modnum);
+			omegaM->SetWeight((FLOAT_TYPE)NRateCats());
+			paramsToMutate.push_back(omegaM);
 			}
 			
-		RateMultipliers *omegaM=new RateMultipliers(&omegas[0], NRateCats(), modnum);
-		omegaM->SetWeight((FLOAT_TYPE)NRateCats());
-		paramsToMutate.push_back(omegaM);
-		
-
 /*		FLOAT_TYPE *NS=new FLOAT_TYPE;
 		*NS = 0.5;
 		FLOAT_TYPE *S=new FLOAT_TYPE;
@@ -2890,7 +3322,6 @@ void Model::CreateModelFromSpecification(int modnum){
 */
 		UpdateQMatCodon();
 		}
-	else UpdateQMatAminoAcid();
 
 	eigenDirty=true;
 	}
@@ -3044,7 +3475,8 @@ int Model::PerformModelMutation(){
 		//flex rates and omega muts come through here
 
 		//enforce an ordering of the rate multipliers, so that they can't "cross" one another
-		if(NRateCats() > 1) CheckAndCorrectRateOrdering();
+		if(NRateCats() > 1)
+			CheckAndCorrectRateOrdering();
 
 		if(modSpec->IsFlexRateHet() == true)
 			NormalizeRates();
@@ -3129,8 +3561,12 @@ void Model::OutputBinaryFormattedModel(OUTPUT_CLASS &out) const{
 
 void Model::OutputBinaryFormattedModel(OUTPUT_CLASS &out) const{
 	FLOAT_TYPE *r = new FLOAT_TYPE;
-	if(modSpec->IsAminoAcid() == false){
-		for(int i=0;i<5;i++){
+	if(modSpec->IsAminoAcid() == false || modSpec->IsUserSpecifiedRateMatrix() || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()){
+		if(modSpec->IsAminoAcid())
+			assert(NumRelRates() == 190 || NumRelRates() == 210);
+		else
+			assert(NumRelRates() == 6);
+		for(int i=0;i<NumRelRates();i++){
 			*r = Rates(i);
 			out.WRITE_TO_FILE(r, sizeof(FLOAT_TYPE), 1);
 			}
@@ -3165,18 +3601,31 @@ void Model::OutputBinaryFormattedModel(OUTPUT_CLASS &out) const{
 		*r = PropInvar();
 		out.WRITE_TO_FILE(r, sizeof(FLOAT_TYPE), 1);
 		}
+
+	if(IsOrientedGap()){
+		*r = *insertRate;
+		out.WRITE_TO_FILE(r, sizeof(FLOAT_TYPE), 1);
+
+		*r = *deleteRate;
+		out.WRITE_TO_FILE(r, sizeof(FLOAT_TYPE), 1);
+		}
+
 	delete r;
 	}
 
 void Model::ReadBinaryFormattedModel(FILE *in){
-	if(modSpec->IsAminoAcid() == false){
-		FLOAT_TYPE r[6];
-		for(int i=0;i<5;i++){
+	if(modSpec->IsAminoAcid() == false || modSpec->IsUserSpecifiedRateMatrix() || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()){
+		if(modSpec->IsAminoAcid())
+			assert(NumRelRates() == 190 || NumRelRates() == 210);
+		else
+			assert(NumRelRates() == 6);
+		FLOAT_TYPE *r = new FLOAT_TYPE[NumRelRates()];
+		for(int i=0;i<NumRelRates();i++){
 			assert(ferror(in) == false);
 			fread(r+i, sizeof(FLOAT_TYPE), 1, in);
 			}
-		r[5] = ONE_POINT_ZERO;
-		SetRmat(r, false);
+		SetRmat(r, false, false);
+		delete []r;
 		}
 
 	if(modSpec->IsCodon()){
@@ -3193,7 +3642,7 @@ void Model::ReadBinaryFormattedModel(FILE *in){
 	for(int i=0;i<NStates();i++){
 		fread((char*) &(b[i]), sizeof(FLOAT_TYPE), 1, in);
 		}
-	SetPis(b, false);
+	SetPis(b, false, false);
 	delete []b;
 
 	if(modSpec->IsFlexRateHet()){
@@ -3214,6 +3663,14 @@ void Model::ReadBinaryFormattedModel(FILE *in){
 		FLOAT_TYPE p;
 		fread((char*) &p, sizeof(FLOAT_TYPE), 1, in);
 		SetPinv(p, false);
+		}
+	if(IsOrientedGap()){
+		FLOAT_TYPE x;
+		fread((char*) &x, sizeof(FLOAT_TYPE), 1, in);
+		*insertRate = x;
+
+		fread((char*) &x, sizeof(FLOAT_TYPE), 1, in);
+		*deleteRate = x;
 		}
 	}
 

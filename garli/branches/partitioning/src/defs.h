@@ -19,6 +19,9 @@
 #ifndef DEFS
 #define DEFS
 
+#if defined(HAVE_CONFIG_H)
+	#include "config.h"
+#endif
 //these will be defined by either the Microsoft compiler
 //or the intel compiler when openmp support is turned on
 //by compiling with /openmp (ms) or -openmp (icc)
@@ -50,7 +53,7 @@
 
 #define USE_COUNTS_IN_BOOT
 
-#undef OPT_DEBUG
+//#undef OPT_DEBUG
 
 #define ONE_BRANCH_INS_DEL
 
@@ -60,26 +63,25 @@
 #include "memchk.h"
 
 #define PUSH_TO_MIN_BLEN
+#define SUM_AA_REL_RATES
 #define CONSTRAINTS
 #define STOCHASTIC_STARTING_BLENS
 #undef IGNORE_SMALL_TOPO_IMP
 #undef INCLUDE_PERTURBATION
 #undef SUBTREE_VERSION
-#undef ENABLE_CUSTOM_PROFILER
-#undef SINGLE_PRECISION_FLOATS
-#undef SWAP_BASED_TERMINATION
+//#undef ENABLE_CUSTOM_PROFILER
+//#undef SINGLE_PRECISION_FLOATS
+//#undef SWAP_BASED_TERMINATION
 
-#undef OUTPUT_UNIQUE_TREES
+//#undef OUTPUT_UNIQUE_TREES
 #undef VARIABLE_OPTIMIZATION
 
 #undef INPUT_RECOMBINATION
 #define NUM_INPUT 12
 
-#undef ALLOW_SINGLE_SITE
+//#undef ALLOW_SINGLE_SITE
 
 #undef EQUIV_CALCS
-
-#define FACTORY
 
 typedef double MODEL_FLOAT;
 
@@ -91,6 +93,11 @@ typedef double MODEL_FLOAT;
 	#define DEF_MIN_BRLEN 1e-8f
 	#define DEF_MAX_BRLEN 100.0f
 	#define DEF_STARTING_BRLEN 0.05f
+	#define GARLI_FP_EPS FLT_EPSILON
+	#define LUMP_LIKES
+	#if !defined(LUMP_FREQ)
+		#define LUMP_FREQ 400
+	#endif
 #else
 	typedef double FLOAT_TYPE;
 	#define ONE_POINT_ZERO 1.0
@@ -99,6 +106,7 @@ typedef double MODEL_FLOAT;
 	#define DEF_MIN_BRLEN 1e-8
 	#define DEF_MAX_BRLEN 100.0
 	#define DEF_STARTING_BRLEN 0.05
+	#define GARLI_FP_EPS DBL_EPSILON
 #endif
 
 #define MAXPATH   		256
