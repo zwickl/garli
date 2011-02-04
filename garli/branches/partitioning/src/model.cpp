@@ -1753,7 +1753,7 @@ FLOAT_TYPE IncompleteGamma (FLOAT_TYPE x, FLOAT_TYPE alpha, FLOAT_TYPE LnGamma_a
 	int 			i;
 #ifdef SINGLE_PRECISION_FLOATS
 	FLOAT_TYPE 		p = alpha, g = LnGamma_alpha,
-					accurate = FLT_EPSILON, overflow = 1e30f,
+					accurate = GARLI_FP_EPS, overflow = 1e30f,
 					factor, gin = 0.0f, rn = 0.0f, a = 0.0f, b = 0.0f, an = 0.0f, 
 					dif = 0.0f, term = 0.0f, pn[6];
 #else

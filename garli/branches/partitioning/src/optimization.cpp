@@ -131,7 +131,7 @@ int Tree::PushBranchlengthsToMin(){
 	}
 
 FLOAT_TYPE Tree::OptimizeTreeScale(FLOAT_TYPE optPrecision){
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1e-8)) Score();
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) Score();
 	Score();
 	FLOAT_TYPE start=lnL;
 	FLOAT_TYPE prev=lnL;
@@ -261,7 +261,7 @@ FLOAT_TYPE Tree::OptimizeAlpha(FLOAT_TYPE optPrecision){
 	Score();	
 #endif
 
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1e-8)) Score();
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) Score();
 	FLOAT_TYPE start, prev, cur;
 	prev = start = cur = lnL;
 	FLOAT_TYPE prevVal=mod->Alpha();
@@ -431,7 +431,7 @@ void Tree::TraceLikelihoodForParameter(int modnum, int which, FLOAT_TYPE init, F
 	}
 
 FLOAT_TYPE Tree::OptimizeBoundedParameter(int modnum, FLOAT_TYPE optPrecision, FLOAT_TYPE initialVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, void (Model::*SetParam)(int, FLOAT_TYPE), FLOAT_TYPE targetScoreDigits /* DP = 9, SP = 5 */){
-	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, 1.0e-6)) 
+	if(FloatingPointEquals(lnL, -ONE_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))) 
 		Score();
 
 #ifdef SINGLE_PRECISION_FLOATS
