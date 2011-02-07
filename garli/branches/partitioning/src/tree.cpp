@@ -293,14 +293,17 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	//a trifurcating root), so use an allocation function that is guaranteed to have enough room and then
 	//trifurcate and delete if necessary
 	
+	//this should strip out any crap in the tree string, although much of it would be disregarded below anyway
+	string editedString = NxsString::strip_whitespace(s);
+	s = editedString.c_str();
+	
 	AllocateTree(true);
 	TreeNode *temp=root;
 	root->attached=true;
 	int current=numTipsTotal+1;
 	bool cont=false;
-//	numBranchesAdded=-1;//if reading in a tree start at -1 so opening ( doesn't add a branch
-	while(*s)
-		{
+	numBranchesAdded = 0;
+	while(*s){
 		cont = false;
 
 		if(*s == ';')
@@ -310,26 +313,24 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			//DEBUG
 			//break;  // ignore spaces
 		else if(*s == ')'){
+			//we're closing a paren, moving a node toward the root
 			assert(temp->anc);
 			if(!temp->anc) throw ErrorException("Problem reading tree description.  Mismatched parentheses?");
 			temp=temp->anc;
 			s++;
-			while(*s && !isgraph(*s))
-				s++;
-			if(*s==':')
-				{NxsString info = "";
-				while( *(s+1)!=')'&& *(s+1)!=','){
-						info+=*(s+1);
+			//while(*s && !isgraph(*s))
+			//an internal node label might appear here, so ignore anything up to one of these valid next characters
+			while(*s && (*s != ',') && (*s != ':') && (*s != ',') && (*s != ')') && (*s != ';'))
 						s++;
-					}
-				s++;
-				temp->dlen = (FLOAT_TYPE) atof( info.c_str() );
+			if(*s==':'){//adding a branch length
+				NxsString len;
+				temp->dlen = ReadBranchlength(s, len);
 				if(temp->dlen < min_brlen){
-					outman.UserMessage("->Branch of length %s is less than min of %.1e.  Setting to min.", info.c_str(), min_brlen);
+					outman.UserMessage("->Branch of length %s is less than min of %.1e.  Setting to min.", len.c_str(), min_brlen);
 					temp->dlen = min_brlen;
 					}
 				else if (temp->dlen > max_brlen){
-					outman.UserMessage("->Branch of length %f is greater than max of %.0f.  Setting to max.", temp->dlen, max_brlen);
+					outman.UserMessage("->Branch of length %s is greater than max of %.0f.  Setting to max.", len.c_str(), max_brlen);
 					temp->dlen = max_brlen;
 					}
 				}
@@ -360,17 +361,22 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			assert(temp->anc);
 			if(!temp->anc) throw ErrorException("Problem reading tree description.  Mismatched parentheses?");
 			temp=temp->anc;
-			//DEBUG
-			//numBranchesAdded--;//sloppy way to avoid over incrementing numBranchesAdded
-			if(*(s+1)!='(') s++;
+			if(*(s+1)!='(') {
+				s++;
+			}
+			else {
+				numBranchesAdded--; // this ( will be encountered in two consecutive loops, so we decrement numBranchesAdded to avoid overcounting.
+			}
 			cont = true;
 			}
 		if(*s == '(' || isdigit(*s) || cont==true){
 			//here we're about to add a node of some sort
+			numBranchesAdded++;
 			if(*(s+1)=='('){//add an internal node
+				if(current >= numNodesTotal)
+					throw ErrorException("Problem reading tree description.  Extra taxa?");
 				temp=temp->AddDes(allNodes[current++]);
 				numNodesAdded++;
-				numBranchesAdded++;
 				s++;
 				}
 			else{
@@ -378,7 +384,10 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 				//num specifed, or a terminal node.  Either way the next characters in the string will be
 				//digits.  We'll have to look ahead to see what the next non-digit character is.  If it's
 				//a '(', we know we are adding a prenumbered internal
-				if(*s=='(') s++;
+				if(*s=='(') {
+					numBranchesAdded++;
+					s++;
+					}
 				int i=0;
 				bool term=true;
 				while(isdigit(*(s+i))) i++;
@@ -394,7 +403,6 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 					int internalnodeNum = atoi( num.c_str() );
 	                temp=temp->AddDes(allNodes[internalnodeNum]);
 	                numNodesAdded++;
-					numBranchesAdded++;
 	                s++;							
 					}
 				else{//add a terminal node
@@ -409,25 +417,48 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 							}						
 						taxonnodeNum = atoi( name.c_str() );
 						if(taxonnodeNum == 0) throw ErrorException("Unexpected character(s) found in tree description \"%s!\"", name.c_str());
-						if(taxonnodeNum > numTipsTotal) throw ErrorException("Taxon  number in tree description (%d) is greater than\n\tnumber of taxa in dataset!", taxonnodeNum);
+						if(taxonnodeNum > numTipsTotal) throw ErrorException("Taxon number in tree description (%d) is greater than\n\tnumber of taxa in dataset!", taxonnodeNum);
 						}
 					else{
 						while(*(s+1) != ':' && *(s+1) != ',' && *(s+1) != ')'){
 							assert(*s);
 							name += *++s;
 							}
+						//This is a bit annoying.  If the tree string came directly from NCL then GetEscaped should get any
+						//names to match the names present in the datamatrix (whether Nexus or not).  But, if the tree string
+						//came from a start file with just a newick string there are various possibilities.  First try interpreting
+						//the name as-is.  If that doesn't work, try GetEscaped.  If that doesn't work, try removing quotes (if any)
+						//before calling GetEscaped
 						taxonnodeNum = dataPart->TaxonNameToNumber(name);
-						if(taxonnodeNum < 0) throw ErrorException("Unknown taxon \"%s\" encountered in tree description!", name.c_str());
+						if(taxonnodeNum < 0){
+							NxsString esc = NxsString::GetEscaped(name).c_str();
+							taxonnodeNum = dataPart->TaxonNameToNumber(esc);
+							}
+						if(taxonnodeNum < 0){
+							if(name.c_str()[0] == '\'' && name.c_str()[name.size()-1] == '\''){
+								NxsString esc2;
+								for(int c=1;c<name.size()-1;c++){
+									esc2 += name[c];
+									}
+								NxsString esc = NxsString::GetEscaped(esc2).c_str();
+								taxonnodeNum = dataPart->TaxonNameToNumber(esc);
+								}
 						}
+						if(taxonnodeNum < 0){
+							throw ErrorException("Unknown taxon \"%s\" encountered in tree description!\nIf you have spaces in your taxon names, try replacing them with underscores.", name.c_str());
+							}
+						}
+					if(allNodes[taxonnodeNum]->attached == true)
+						throw ErrorException("Taxon \"%s\" seems to appear in the tree description twice!\nCheck the tree string.", name.c_str());
+					else
 	                temp=temp->AddDes(allNodes[taxonnodeNum]);
 	                numNodesAdded++;
-					numBranchesAdded++;
 					numTipsAdded++;
 	                s++;
-					while(*s == ' ') s++;;//eat any spaces here
+					while(*s == ' ' || *s == '\t') s++;;//eat any spaces here
 					
 					if(*s!=':' && *s!=',' && *s!=')'){
-						throw ErrorException("Problem parsing tree string!  Expecting : or , or ), found %c", *s);
+						throw ErrorException("Problem parsing tree string!  Expecting \":\" or \",\" or \")\", found %c", *s);
 						s--;	
 						ofstream str("treestring.log", ios::app);
 						str << s << endl;
@@ -436,19 +467,14 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 						}
 						
 	                if(*s==':'){
-						NxsString info = "";
-						while( *(s+1)!=')'&& *(s+1)!=','){
-							info+=*(s+1);
-							s++;
-							}
-						s++;
-						temp->dlen = (FLOAT_TYPE)atof( info.c_str() );
+						NxsString len;
+						temp->dlen = ReadBranchlength(s, len);
 						if(temp->dlen < min_brlen){
-							outman.UserMessage("->Branch of length %s is less than min of %.1e.  Setting to min.", info.c_str(), min_brlen);
+							outman.UserMessage("->Branch of length %s is less than min of %.1e.  Setting to min.", len.c_str(), min_brlen);
 							temp->dlen = min_brlen;
 							}
 						else if (temp->dlen > max_brlen){
-							outman.UserMessage("->Branch of length %f is greater than max of %.0f.  Setting to max.", temp->dlen, max_brlen);
+							outman.UserMessage("->Branch of length %s is greater than max of %.0f.  Setting to max.", len.c_str(), max_brlen);
 							temp->dlen = max_brlen;
 							}
 						}
