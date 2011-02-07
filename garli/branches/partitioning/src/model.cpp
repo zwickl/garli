@@ -2127,16 +2127,16 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 	if(modSpec->IsCodon()){
 		for(int i=0;i<omegas.size();i++){
 			if(model){
-				sprintf(cStr,"%5.3f %5.3f", *omegas[i], *omegaProbs[i]);
+				sprintf(cStr," %5.3f %5.3f", *omegas[i], *omegaProbs[i]);
 				s += cStr;
 				}
 			else{
 				char oStr[50];
-				sprintf(oStr, "w(%d) ", i);
-				sprintf(cStr,"%5s ", oStr);
+				sprintf(oStr, "w(%d)", i);
+				sprintf(cStr," %5s", oStr);
 				s += cStr;
-				sprintf(oStr, "p(%d) ", i);
-				sprintf(cStr,"%5s ", oStr);
+				sprintf(oStr, "p(%d)", i);
+				sprintf(cStr," %5s", oStr);
 				s += cStr;
 				}
 			}
@@ -2145,7 +2145,7 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 		if(model){
 			//sprintf(cStr, " %5.2f %5.2f %5.2f %5.2f %5.2f %5.2f", Rates(0), Rates(1), Rates(2), Rates(3), Rates(4), 1.0);
 			for(int st = 0;st < relNucRates.size();st++){
-				sprintf(cStr," %6.5g", Rates(st));
+				sprintf(cStr," %6.4g", Rates(st));
 				s += cStr;
 				}
 			}
@@ -2234,16 +2234,16 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 	if(modSpec->IsFlexRateHet()){
 		for(int i=0;i<NRateCats();i++){
 			if(model){
-				sprintf(cStr, "%5.3f %5.3f", rateMults[i], rateProbs[i]);
+				sprintf(cStr, " %5.3f %5.3f", rateMults[i], rateProbs[i]);
 				s += cStr;
 				}
 			else{
 				char fStr[50];
 				sprintf(fStr, "fr(%d)", i);
-				sprintf(cStr,"%5s ", fStr);
+				sprintf(cStr," %5s", fStr);
 				s += cStr;
 				sprintf(fStr, "p(%d)", i);
-				sprintf(cStr,"%5s ", fStr);
+				sprintf(cStr," %5s", fStr);
 				s += cStr;
 				}
 			}
@@ -2251,26 +2251,26 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 	else{
 		if(modSpec->IsGammaRateHet()){
 			if(model)
-				sprintf(cStr, "%5.3f ", Alpha());
+				sprintf(cStr, " %5.3f", Alpha());
 			else{
-				sprintf(cStr, "%5s ", "alpha");
+				sprintf(cStr, " %5s", "alpha");
 				}
 			s += cStr;
 			}
 		}
 	if(PropInvar()!=ZERO_POINT_ZERO){
 		if(model)
-			sprintf(cStr, "%5.3f", PropInvar());
+			sprintf(cStr, " %5.3f", PropInvar());
 		else{
-			sprintf(cStr, "%5s ", "pinv");
+			sprintf(cStr, " %5s", "pinv");
 			}
 		s += cStr;
 		}
 	if(modSpec->IsOrientedGap()){
 		if(model)
-			sprintf(cStr, "%5.3f %5.3f ", *insertRate, *deleteRate);
+			sprintf(cStr, " %5.3f %5.3f", *insertRate, *deleteRate);
 		else{
-			sprintf(cStr, "%5s %5s", "ins", "del");
+			sprintf(cStr, " %5s %5s", "ins", "del");
 			}
 		s += cStr;
 		}
