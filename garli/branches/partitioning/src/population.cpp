@@ -2546,26 +2546,33 @@ int Population::EvaluateStoredTrees(bool report){
 				outman.UserMessage("\t Model contains no estimated parameters");
 				}
 			}
-		outman.UserMessageNoCR("\nTreelength ");
+		outman.UserMessageNoCR("\nTreelengths");
 		if(modSpecSet.InferSubsetRates())
-			outman.UserMessageNoCR("and subset rate multipliers:");
-		outman.UserMessage("");
-		outman.UserMessageNoCR("        TL");
+			outman.UserMessageNoCR(" and subset rate multipliers");
+		outman.UserMessage(":");
+		string line;
+		char cStr[100];
+		sprintf(cStr, " %4s ", "TL");
+		line = cStr;
 		if(modSpecSet.InferSubsetRates()){
 			for(int d = 0;d < dataPart->NumSubsets();d++){
-				outman.UserMessageNoCR("     R%d", d);
+				char oStr[10];
+				sprintf(oStr, "R(%d)", d);
+				sprintf(cStr, " %5s", oStr);
+				line += cStr;
 				}
 			}
-		outman.UserMessage("");
+		outman.UserMessage("       %s", line.c_str());
 		for(unsigned i=0;i<storedTrees.size();i++){
-			outman.UserMessageNoCR("rep%2d:", i+1);
-			outman.UserMessageNoCR("%6.3f ", storedTrees[i]->treeStruct->Treelength());
+			sprintf(cStr, " %5.3f", storedTrees[i]->treeStruct->Treelength());
+			line = cStr;
 			if(modSpecSet.InferSubsetRates()){
 				for(int d = 0;d < dataPart->NumSubsets();d++){
-					outman.UserMessageNoCR("%6.3f ", storedTrees[i]->modPart.SubsetRate(d));
+					sprintf(cStr, " %5.3f", storedTrees[i]->modPart.SubsetRate(d));
+					line += cStr;
 					}
 				}
-			outman.UserMessage("");
+			outman.UserMessage("rep%2d: %s", i+1, line.c_str());
 			}
 		}
 	return bestRep;
@@ -2984,6 +2991,9 @@ void Population::PerformSearch(){
 	}
 
 void Population::OptimizeInputAndWriteSitelikelihoods(){
+	log_output = fate_output = swaplog_output = treelog_output = problog_output = Population::DONT_OUTPUT;
+	InitializeOutputStreams();
+
 	//find out how many trees we have
 	GarliReader & reader = GarliReader::GetInstance();
 	const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
@@ -3003,12 +3013,15 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	for(int t = 1;t <= numTrees;t++){
 		this->currentSearchRep = t;
 		if(!conf->scoreOnly)
-		outman.UserMessage("Optimizing tree %d ...", t);
 
 		SeedPopulationWithStartingTree(t);
 		bestIndiv = 0;
-		if(!conf->scoreOnly)
+		if(!conf->scoreOnly){
+			outman.UserMessage("Optimizing tree %d ...", t);
 			BetterFinalOptimization();
+			}
+		else
+			outman.UserMessage("Scoring tree %d ...", t);
 
 		outman.UserMessage("Writing site likelihoods for tree %d ...", t);
 		indiv[0].treeStruct->sitelikeLevel = - (max((int)conf->outputSitelikelihoods, 1));
@@ -3024,11 +3037,21 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 		storedTrees.push_back(repResult);
 		Reset();
 		}
+	bool coll = conf->collapseBranches;
+	conf->collapseBranches = false;
 	EvaluateStoredTrees(true);
+	if(coll)
+		outman.UserMessage("\nNOTE: collapsebranches setting ignored when writing and comparing optimized trees...");
+	outman.UserMessage("\nWriting optimized trees and models to %s.all.tre", besttreefile.c_str());
+	WriteStoredTrees(besttreefile.c_str());
+	FinalizeOutputStreams(0);
+	FinalizeOutputStreams(1);
+	FinalizeOutputStreams(2);
 	}
 
 void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
-	
+	log_output = fate_output = swaplog_output = problog_output = Population::DONT_OUTPUT;
+	InitializeOutputStreams();	
 	//assert(Tree::someOrientedGap);
 	//find out how many trees we have
 	GarliReader & reader = GarliReader::GetInstance();
@@ -3158,7 +3181,13 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 		indiv[1].CopySecByRearrangingNodesOfFirst(indiv1Tree, &indiv[0], true);
 		tnum++;
 		}
+	bool coll = conf->collapseBranches;
+	conf->collapseBranches = false;
 	EvaluateStoredTrees(true);
+	if(coll)
+		outman.UserMessage("\nNOTE: collapsebranches setting ignored when writing and comparing optimized trees...");
+	outman.UserMessage("\nWriting optimized trees and models to %s.all.tre", besttreefile.c_str());
+	WriteStoredTrees(besttreefile.c_str());
 	FinalizeOutputStreams(0);
 	FinalizeOutputStreams(1);
 	FinalizeOutputStreams(2);
