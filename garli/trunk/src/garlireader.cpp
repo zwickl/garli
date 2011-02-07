@@ -377,12 +377,12 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &mSpec
 				outman.UserMessage("Attempting to read data file %s as\n\t%s format (using NCL) ...", filename, (*formIt).second.c_str());
 				ReadFilepath(filename, (*formIt).first);
 				}
-			catch(NxsException err){
+			catch(NxsException &err){
 				NexusError(err.msg, err.pos, err.line, err.col, false);
 				outman.UserMessage("Problem reading data file as %s format...\n", (*formIt).second.c_str());
 				success = false;
 				}
-			catch(ErrorException err){
+			catch(ErrorException &err){
 				//Sometimes NCL raises a NxsException, but then catches it and passes it onto my NexusError,
 				//which throws an ErrorException.  So, need to catch both types of exceptions here
 				outman.UserMessage("Problem reading data file as %s format...\n", (*formIt).second.c_str());
@@ -632,7 +632,7 @@ void GarliReader::HandleExecute(
 			{
 			Execute(ftoken);
 			}
-		catch(NxsException x)
+		catch(NxsException &x)
 			{
 			NexusError(errormsg, x.pos, x.line, x.col);
 			}
@@ -677,7 +677,7 @@ int GarliReader::HandleExecute(const char *filename, bool purge)
 		try{
 			Execute(ftoken);
 			}
-		catch(NxsException x){
+		catch(NxsException &x){
 			//DJZ 3/24/08 this was a bug that I inherited from the NCL example BasicCmdLine
 			//the actual error message in x.msg was never getting printed because the empty
 			//errormsg member of NexusBlock was being passed instead of the error stored in the
@@ -1000,7 +1000,7 @@ void GarliReader::HandleNextCommand()
 		assert(garliBlock);
 		garliBlock->Read(token);
 		}
-	catch(NxsException x) 
+	catch(NxsException &x) 
 		{
 		NexusError(errormsg, x.pos, x.line, x.col);
 		}

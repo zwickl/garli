@@ -200,7 +200,7 @@ void Individual::Mutate(FLOAT_TYPE optPrecision, Adaptation *adap){
 		//be sure that we have an accurate score before any CLAs get invalidated
 		CalcFitness(0);
 		}
-	catch(UnscoreableException ex){
+	catch(UnscoreableException &ex){
 		//in some situations the tree just underflows no matter what - I've only seen this and only
 		//throw this from orientedGap models with very poor trees.
 		outman.DebugMessage("WARNING - created individual deemed unscorable!");
