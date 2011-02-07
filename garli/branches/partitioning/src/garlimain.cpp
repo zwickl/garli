@@ -731,7 +731,7 @@ int main( int argc, char* argv[] )	{
 				else pop.Bootstrap();
 				pop.FinalizeOutputStreams(2);
 				}
-			}catch(ErrorException err){
+			}catch(ErrorException &err){
 				if(outman.IsLogSet() == false){
 					outman.SetLogFile("ERROR.log");
 					if(interactive == false) UsageMessage(argv[0]);

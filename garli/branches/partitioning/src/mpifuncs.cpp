@@ -110,7 +110,7 @@ int MPIMain(int argc, char** argv)	{
 //		LogConfig(conf);
 		RemoteMaster(conf, data);
 		}
-	}catch(ErrorException err){
+	}catch(ErrorException &err){
 		err.Print(cout);
 		}
 	// time to kill some global vars

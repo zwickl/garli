@@ -1210,7 +1210,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	try{
 		indiv[0].CalcFitness(0);
 		}
-	catch(UnscoreableException ex){
+	catch(UnscoreableException &ex){
 		throw ErrorException("Initial individual unscorable, perhaps due to poorness of starting tree.\n\tTry providing a tree if you previously tried random.");
 		}
 	

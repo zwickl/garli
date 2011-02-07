@@ -563,7 +563,7 @@ int main( int argc, char* argv[] )	{
 					pop = NULL;
 					}
 				}//outer loop across windows
-			}catch(ErrorException err){
+			}catch(ErrorException &err){
 				if(outman.IsLogSet() == false){
 					outman.SetLogFile("ERROR.log");
 					if(interactive == false) UsageMessage(argv[0]);
