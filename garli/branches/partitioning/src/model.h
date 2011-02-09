@@ -809,6 +809,9 @@ public:
 	bool IsEstimateAAMatrix() const {return (rateMatrix == ESTIMATEDAAMAT);}
 	bool IsVertMitoCode() const {return (geneticCode == VERTMITO);}
 	bool IsInvertMitoCode() const {return (geneticCode == INVERTMITO);}
+	bool IsTwoSerineCode() const {return (geneticCode == STANDARDTWOSERINE);}
+	bool IsTwoSerineVertMitoCode() const {return (geneticCode == VERTMITOTWOSERINE);}
+	bool IsTwoSerineInvertMitoCode() const {return (geneticCode == INVERTMITOTWOSERINE);}
 	bool IsPoissonAAMatrix() const {return (rateMatrix == POISSON);}
 	bool IsUserSpecifiedRateMatrix() const {return rateMatrix == USERSPECIFIEDMAT;}
 	bool IsTwoSerineRateMatrix() const {return rateMatrix == TWOSERINEMAT;}
@@ -872,6 +875,8 @@ public:
 					throw(ErrorException("Sorry, codon input data (with the codon-aminoacid datatype) are currently required for the Two-Serine model"));
 				if(stateFrequencies != EMPIRICAL && stateFrequencies != ESTIMATE && stateFrequencies != USERSPECIFIED)
 					throw(ErrorException("Sorry, empirical, estimated or fixed must be used as the statefrequencies setting for the Two-Serine model"));
+				if( ! (IsTwoSerineCode() || IsTwoSerineVertMitoCode() || IsTwoSerineInvertMitoCode()))
+					throw(ErrorException("To use the twoserine rate matrix the genetic code must be \"standardtwoserine\" \"vertmitotwoserine\" or \"invertmitotwoserine\"."));
 				SetTwoSerineRateMatrix();
 				if(_stricmp(str, "twoserinefixed") == 0)
 					fixRelativeRates = true;

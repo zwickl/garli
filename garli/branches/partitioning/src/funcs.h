@@ -37,14 +37,14 @@ class StateSet{
 	public:
 		StateSet(int ns){
 			numStates = ns;
-			assert(numStates == 4 || numStates == 20);
+			assert(numStates == 4 || numStates == 20 || numStates == 21);
 			if(numStates == 4){
 				states.push_back("A");
 				states.push_back("C");
 				states.push_back("G");
 				states.push_back("T");
 				}
-			else if(numStates == 20){
+			else if(numStates > 19){
 				states.push_back("A");
 				states.push_back("C");
 				states.push_back("D");
@@ -66,6 +66,8 @@ class StateSet{
 				states.push_back("W");
 				states.push_back("Y");
 				}
+			if(numStates == 21)
+				states.push_back("Z");
 			}
 		StateSet(const GeneticCode *code){
 			numStates = code->NumStates();

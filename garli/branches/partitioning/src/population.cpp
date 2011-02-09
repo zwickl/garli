@@ -356,8 +356,6 @@ void Population::CheckForIncompatibleConfigEntries(){
 	//DEBUG - fill this in better
 
 	//PARTITION - disallow a number of things that aren't implemented/tested with partitioned models
-	if(conf->inferInternalStateProbs)
-		throw ErrorException("Sorry, internal state reconstruction is not yet implemented for the partitioned version of GARLI");
 	if(dataPart->NumSubsets() > 1){
 		if(conf->linkModels && modSpecSet.GetModSpec(0)->IsEmpiricalStateFrequencies())
 			throw ErrorException("Sorry, empirical state frequencies can't be used with partitioned models when models are linked");
@@ -1776,6 +1774,13 @@ void Population::Run(){
 						improve += paramOpt;
 						outman.DebugMessage("rel rates opt = %.4f", paramOpt);
 						}
+					if(modSpec->IsEstimateAAMatrix() || (modSpec->IsTwoSerineRateMatrix() && !modSpec->fixRelativeRates)){
+						FLOAT_TYPE paramOpt = bestTree->OptimizeRelativeNucRates(adap->branchOptPrecision, modnum);
+						if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
+							paramOpt = ZERO_POINT_ZERO;
+						improve += paramOpt;
+						outman.DebugMessage("rel rates opt = %.4f", paramOpt);
+						}
 #endif
 					if(modSpec->IsOrientedGap()){
 						FLOAT_TYPE paramOpt = bestTree->OptimizeInsertDeleteRates(adap->branchOptPrecision, modnum);
@@ -2951,13 +2956,13 @@ void Population::PerformSearch(){
 			}
 
 		if(conf->inferInternalStateProbs == true){
-			//not implemented for partitioned version yet
-			assert(0);
-			if(prematureTermination == false && currentSearchRep == conf->searchReps){
+			//don't infer internals states unless at least one rep successfully completed
+			if((prematureTermination == false && currentSearchRep == conf->searchReps) || (prematureTermination && storedTrees.size() > 0)){
 				if(storedTrees.size() > 0){//careful here, the trees in the storedTrees array don't have clas assigned
-					outman.UserMessage("Inferring internal state probabilities on best tree....");
-					//DEBUG PARTITION
-		//			storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
+					outman.UserMessage("Inferring internal state probabilities on best tree... saving to file %s.internalstates.log\n", conf->ofprefix.c_str());
+					storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
+					if(prematureTermination && best == storedTrees.size() - 1)
+						outman.UserMessage("WARNING: Internal states inferred on tree from prematurely terminated search\n");
 					}
 				}
 			else if(prematureTermination){

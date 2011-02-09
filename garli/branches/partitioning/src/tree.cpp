@@ -3465,7 +3465,7 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA, int dataIndex){
 	destCLA->rescaleRank=0;
 	}
 
-int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFinalCLA /*=false*/){
+int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool returnUnscaledSitePosteriors /*=false*/){
 	//note that fillFinalCLA just refers to whether we actually want to calc a CLA
 	//representing the contribution of the entire tree vs just calcing the score
 	//The only reason I can think of for doing that is to calc internal state probs
@@ -3634,7 +3634,10 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool fillFin
 					}
 				}
 			}
-		GetTotalScore(partialCLA, childCLA, child, blen1);
+		if(returnUnscaledSitePosteriors == false)
+			GetTotalScore(partialCLA, childCLA, child, blen1);
+		else
+			return FillStatewiseUnscaledPosteriors(partialCLA, childCLA, child, blen1);
 /*
 		mod->CalcPmats(blen1, -1.0, Lprmat, Rprmat);
 
@@ -3728,6 +3731,43 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 		}
 	//sitelike output is non-persistent, so clear it out here
 	sitelikeLevel = 0;
+	}
+
+//this is more or less a clone of GetTotalScore that fills a cla set with the necessary values to calculate internal state reconstructions
+//and returns the corresponding cla index
+int Tree::FillStatewiseUnscaledPosteriors(CondLikeArraySet *partialCLAset, CondLikeArraySet *childCLAset, TreeNode *child, FLOAT_TYPE blen1){
+
+	FLOAT_TYPE *Rprmat = NULL, *Lprmat = NULL;
+	CondLikeArray *partialCLA=NULL, *childCLA=NULL, *destCLA=NULL;
+
+	//careful!  The cla will have to be returned manually by the caller
+	int posteriorClaIndex=claMan->AssignClaHolder();
+	claMan->FillHolder(posteriorClaIndex, ROOT);
+	claMan->ReserveCla(posteriorClaIndex);
+	CondLikeArraySet *destCLAset = claMan->GetCla(posteriorClaIndex);
+	//note that the NState functions are used here for both nuc and other datatypes
+
+	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
+		Model *mod = modPart->GetModel((*specs).modelIndex);
+		ModelSpecification *modSpec = modSpecSet.GetModSpec((*specs).modelIndex);
+
+		assert( modSpec->IsNucleotide() || modSpec->IsAminoAcid() || modSpec->IsCodon() );
+		mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
+
+		partialCLA = partialCLAset->GetCLA((*specs).claIndex);
+		destCLA = destCLAset->GetCLA((*specs).claIndex);
+
+		if(childCLAset != NULL)
+			childCLA = childCLAset->GetCLA((*specs).claIndex);
+
+		if(childCLA!=NULL){//if child is internal
+			GetStatewiseUnscaledPosteriorsPartialInternalNState(destCLA, partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
+			}	
+		else{
+			GetStatewiseUnscaledPosteriorsPartialTerminalNState(destCLA, partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+			}
+		}
+	return posteriorClaIndex;
 	}
 
 void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAset, CondLikeArraySet *secCLAset, TreeNode *firstChild, TreeNode *secChild, FLOAT_TYPE blen1, FLOAT_TYPE blen2){
@@ -4982,8 +5022,6 @@ void Tree::GetInternalStateString(char *string, int nodeNum){
 //	InferStatesFromCla(string, claMan->GetTempCla()->arr, data->NChar());	
 	}
 
-//PARTITION
-/*
 void Tree::InferAllInternalStateProbs(const char *ofprefix){
 	char filename[80];
 	sprintf(filename, "%s.internalstates.log", ofprefix);
@@ -4999,43 +5037,60 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 	if(nd->next) RecursivelyCalculateInternalStateProbs(nd->next, out);
 	
 	if(nd->IsInternal()){
-		int wholeTreeIndex=ConditionalLikelihoodRateHet(ROOT, nd, true);
-		vector<InternalState *> *stateProbs=InferStatesFromCla(claMan->GetCla(wholeTreeIndex)->arr, data->NChar(), mod->NRateCats());
+		//what this now returns is really the unscaled posterior values for each state, marginalized across rates (including any invariant class).
+		//thus, the state frqeuencies have already been figured in and nothing needs to be done in InferStatesFromCla besides divide each by the sum
+		//note that this clas then only uses the first nstates x nchar portion, instead of the usual nstates x nchar x nrates
+		int wholeTreeIndex = ConditionalLikelihoodRateHet(ROOT, nd, true);
+		CondLikeArraySet *CLAset = claMan->GetCla(wholeTreeIndex);
 
-		char subtreeString[5000];
-		nd->MakeNewickForSubtree(subtreeString);		
-		out << "node " << nd->nodeNum << "\t" << subtreeString << "\t";
-		char *loc=subtreeString;
-		NxsString temp;
-		
-		while(*loc){
-			if(isdigit(*loc) == false) out << *loc++;
-			else{
-				while(isdigit(*loc))
-					temp += *loc++;
-				out << dataPart->TaxonLabel(atoi(temp.c_str())-1);
-				temp="";
+		//output newick strings with both names and numbers indicating which node this corresponds to
+		string subtreeString;
+		nd->MakeNewickForSubtree(subtreeString, dataPart, false, false, false);	
+		out << "node " << nd->nodeNum << "\t" << subtreeString.c_str() << "\t";
+		subtreeString.clear();
+		nd->MakeNewickForSubtree(subtreeString, dataPart, false, false, true);	
+		out << subtreeString.c_str() << endl;
+
+		for(vector<ClaSpecifier>::iterator c = claSpecs.begin() ; c != claSpecs.end() ; c++){
+			const CondLikeArray *thisCLA = CLAset->GetCLA((*c).claIndex);
+			const ModelSpecification *modSpec = modSpecSet.GetModSpec((*c).modelIndex);
+			
+			vector<InternalState> stateProbs;
+			InferStatesFromCla(stateProbs, thisCLA->arr, thisCLA->NChar(), thisCLA->NStates());
+
+			//this just maps the indecies used in the clas to actual states
+			StateSet *states;
+			if(modSpec->IsNucleotide())
+				states = new StateSet(4);
+			else if(modSpec->IsAminoAcid()){
+				if(modSpec->IsTwoSerineRateMatrix())
+					states = new StateSet(21);
+				else
+					states = new StateSet(20);
 				}
+			else
+				states = new StateSet(modPart->GetModel((*c).modelIndex)->GetGeneticCode());
+
+			states->OutputInternalStateHeader(out);
+			
+			//now map the posteriors of each packed state to the original char order
+			const SequenceData *data = dataPart->GetSubset((*c).dataIndex);
+			for(int s=0;s<data->GapsIncludedNChar();s++){
+				out << s+1 << "\t";
+				if(data->Number(s) > -1)
+					stateProbs[data->Number(s)].Output(out, *states);
+				else 
+					out << "Entirely uninformative character (gaps,N's or ?'s)\n";
+				}
+			
+			//return the cla that we used temporarily
+			claMan->ClearTempReservation(wholeTreeIndex);
+			claMan->DecrementCla(wholeTreeIndex);
+			delete states;
 			}
-		out << "\n";
-		
-		for(int s=0;s<data->GapsIncludedNChar();s++){
-			out << s+1 << "\t";
-			if(data->Number(s) > -1)
-				(*stateProbs)[data->Number(s)]->Output(out);
-			else out << "Entirely uninformative character (gaps,N's or ?'s)\n";
 			}
-		
-		claMan->ClearTempReservation(wholeTreeIndex);
-		claMan->DecrementCla(wholeTreeIndex);
-		
-		for(vector<InternalState*>::iterator delit=stateProbs->begin();delit!=stateProbs->end();delit++){
-			delete *(delit);
-			}
-		delete stateProbs;
 		}
-	}
-*/	
+
 void Tree::ClaReport(ofstream &cla){
 	int totDown=0;
 	int totUL=0;
@@ -6008,6 +6063,167 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 
 	delete []freqs;
 	return totallnL;
+	}
+
+void Tree::GetStatewiseUnscaledPosteriorsPartialInternalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, int modIndex, int dataIndex){
+	
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *CL1=childCLA->arr;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult1=partialCLA->underflow_mult;
+	const int *underflow_mult2=childCLA->underflow_mult;
+
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
+
+	const int nchar=data->NChar();
+	const int *countit=data->GetCounts();
+	const int nRateCats = mod->NRateCats();
+	const int nstates = mod->NStates();
+
+	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+	const FLOAT_TYPE prI=mod->PropInvar();
+	const int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
+
+#ifdef UNIX
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
+
+	//note that we don't need to zero the whole thing
+	//this was not guaranteed to be safe
+	//memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+	for(int d = 0;d < nchar * nstates;d++)
+		dest[d] = ZERO_POINT_ZERO;
+
+	for(int i=0;i<nchar;i++){
+		for(int rate=0;rate<nRateCats;rate++){
+			int rateOffset = rate*nstates*nstates;
+			for(int from=0;from<nstates;from++){
+				FLOAT_TYPE temp = ZERO_POINT_ZERO;
+				int offset = from * nstates;
+				for(int to=0;to<nstates;to++){
+					temp += prmat[rateOffset + offset + to] * CL1[to];
+					}
+				dest[from] += temp * partial[from] * freqs[from] * rateProb[rate];
+				}
+			partial += nstates;
+			CL1 += nstates;
+			}
+
+		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+			//conStates has different meaning with nuc and other models.  
+			//With nuc it is the base in 1, 2, 4, 8 notation (possibly mulitple bits set if ambiguity)
+			//With other models it is the state index, starting at 0
+			FLOAT_TYPE pinvRescaler = ONE_POINT_ZERO;
+			//if the site is constant but was rescaled, this must be done 
+			if((underflow_mult1[i] + underflow_mult2[i]) != 0)
+				pinvRescaler = exp((FLOAT_TYPE)underflow_mult1[i]+(FLOAT_TYPE)underflow_mult2[i]);
+			if(nstates > 4){
+				dest[conStates[i]] += prI * freqs[conStates[i]] * pinvRescaler;
+				}
+			else{
+				if(conStates[i]&1)
+					dest[0] += prI * freqs[0] * pinvRescaler;
+				if(conStates[i]&2) 
+					dest[1] += prI * freqs[1] * pinvRescaler;
+				if(conStates[i]&4) 
+					dest[2] += prI * freqs[2] * pinvRescaler;
+				if(conStates[i]&8) 
+					dest[3] += prI * freqs[3] * pinvRescaler;
+				}
+			}
+		dest += nstates;
+		}
+	delete []freqs;
+	}
+
+void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, int modIndex, int dataIndex){
+	//this function assumes that the pmat is arranged with the nstates^2 entries for the
+	//first rate, followed by nstates^2 for the second, etc.
+	FLOAT_TYPE *dest=destCLA->arr;
+	const FLOAT_TYPE *partial=partialCLA->arr;
+	const int *underflow_mult=partialCLA->underflow_mult;
+
+	const SequenceData *data = dataPart->GetSubset(dataIndex);
+	Model *mod = modPart->GetModel(modIndex);
+
+	const int nstates = mod->NStates();
+	const int nRateCats = mod->NRateCats();
+	const int nchar = data->NChar();
+
+	const FLOAT_TYPE *rateProb=mod->GetRateProbs();
+	const int lastConst=data->LastConstant();
+	const int *conStates=data->GetConstStates();
+	const FLOAT_TYPE prI=mod->PropInvar();
+
+#ifdef UNIX
+	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
+#endif
+
+	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, unscaledlnL, grandSumlnL=ZERO_POINT_ZERO;
+
+	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
+
+	//note that we don't need to zero the whole thing
+	//this was not guaranteed to be safe
+	//memset(dest, 0, nchar * nstates * sizeof(FLOAT_TYPE));
+	for(int d = 0;d < nchar * nstates;d++)
+		dest[d] = ZERO_POINT_ZERO;
+
+	for(int i=0;i<nchar;i++){
+		if(*Ldata < nstates){ //no ambiguity
+			for(int rate=0;rate<nRateCats;rate++){
+				const int rateOffset = rate * nstates * nstates;
+				for(int from=0;from<nstates;from++){
+					const int offset = from * nstates;
+					dest[from] += prmat[rateOffset + offset + (*Ldata)] * partial[from] * freqs[from] * rateProb[rate];
+					}
+				partial += nstates;
+				}
+			}
+		else{ //total ambiguity
+			for(int rate=0;rate<nRateCats;rate++){
+				for(int from=0;from<nstates;from++){
+					dest[from] += partial[from] * freqs[from] * rateProb[rate];
+					}
+				partial += nstates;
+				}
+			}
+
+		if((mod->NoPinvInModel() == false) && (i<=lastConst)){
+			//conStates has different meaning with nuc and other models.  
+			//With nuc it is the base in 1, 2, 4, 8 notation (possibly mulitple bits set if ambiguity)
+			//With other models it is the state index, starting at 0
+			FLOAT_TYPE pinvRescaler = ONE_POINT_ZERO;
+			//if the site is constant but was rescaled, this must be done 
+			if(underflow_mult[i] != 0)
+				pinvRescaler = exp((FLOAT_TYPE)underflow_mult[i]);
+			if(nstates > 4){
+				dest[conStates[i]] += prI * freqs[conStates[i]] * pinvRescaler;
+				}
+			else{
+				if(conStates[i]&1)
+					dest[0] += prI * freqs[0] * pinvRescaler;
+				if(conStates[i]&2) 
+					dest[1] += prI * freqs[1] * pinvRescaler;
+				if(conStates[i]&4) 
+					dest[2] += prI * freqs[2] * pinvRescaler;
+				if(conStates[i]&8) 
+					dest[3] += prI * freqs[3] * pinvRescaler;
+				}
+			}
+
+		Ldata++;
+		dest += nstates;
+		}
 	}
 
 void Tree::LocalMove(){

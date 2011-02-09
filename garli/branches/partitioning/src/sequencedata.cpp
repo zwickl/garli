@@ -471,10 +471,10 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 				}
 
 			char prot;
-			//note that a return code of 20 from the codon lookup indicates a stop codon, but a protein code of 20 generally means total ambiguity
+			//note that a return code of 20 (or 21 for the two serine model) from the codon lookup indicates a stop codon, but a protein code of 20 generally means total ambiguity
 			if(thisCodonNum != 64){
 				prot = code->CodonLookup(thisCodonNum);
-				if(prot == 20){
+				if(prot == maxNumStates){
 					string c;
 					char b[4]={'A','C','G','T'};
 					c += b[pos1];
@@ -483,7 +483,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 					throw ErrorException("stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
 					}
 				}
-			else prot = 20;
+			else prot = maxNumStates;
 
 			matrix[tax][cod] = prot;
 			}
