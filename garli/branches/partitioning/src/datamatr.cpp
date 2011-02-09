@@ -262,7 +262,7 @@ void PatternManager::NewSort(){
 	//this is the stl list sort function, using Pattern::operator<
 	patterns.sort();
 
-	outman.UserMessage("%d pattern comparisons were needed", numCompares);
+	//outman.UserMessage("%d pattern comparisons were needed", numCompares);
 	}
 
 // This version of pack copies unique patterns from the patterns list into the uniquePatterns list
@@ -280,6 +280,7 @@ void PatternManager::NewPack(){
 
 //This does all necessary processing in the patman (assuming that it has already been filled with data)
 //up to the point when the compressed matrix can be copied back into 
+//this will only be used for nuc/AA/codon data
 void PatternManager::ProcessPatterns(){
 	totNumChars = patterns.size();
 	CalcPatternTypesAndNumStates();
@@ -317,8 +318,6 @@ void PatternManager::CalcPatternTypesAndNumStates(){
 //note where all of the constant sites are, and what state they are.
 //this is kind of ugly, but will never be rate limiting
 void PatternManager::NewDetermineConstantSites(){
-	//need to figure out how to deal with this and nstate data, in which case the const sites func should be skipped
-	assert(0);
 	assert(compressed);
 	lastConstant=-1;
 	list<Pattern>::iterator pat = uniquePatterns.begin();
@@ -453,9 +452,11 @@ void DataMatrix::ProcessPatterns() {
 	OutputDataSummary();
 	int t = stoppy.SplitTime();
 	if(t == 0)
-		outman.UserMessage("\tPattern processing took < 1 second");
+		outman.UserMessage("\tPattern processing required < 1 second");
 	else
-		outman.UserMessage("\tPattern processing took %d seconds", stoppy.SplitTime());
+		outman.UserMessage("\tPattern processing required %d second(s)", stoppy.SplitTime());
+	if(numCompares > 0)
+		outman.UserMessage("\t%d pattern comparisons were needed", numCompares);
 	//outman.UserMessage("#######################################################");
 	}
 

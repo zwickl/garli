@@ -621,7 +621,12 @@ int main( int argc, char* argv[] )	{
 						//then converted if necessary
 						data = new NucleotideData();
 
-					data->SetUsePatternManager(conf.usePatternManager);
+					//it really shouldn't be necessary to use the PatternManager on non-sequence data
+					if(modSpec->IsNucleotide() || modSpec->IsAminoAcid() || modSpec->IsCodon())
+						data->SetUsePatternManager(conf.usePatternManager);
+					else
+						data->SetUsePatternManager(0);
+					
 					//if no charpart was specified, the second argument here will be empty
 					data->CreateMatrixFromNCL(effectiveMatrices[dataChunk].first, effectiveMatrices[dataChunk].second);
 

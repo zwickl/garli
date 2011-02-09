@@ -351,10 +351,15 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
 
-	nChar = dnaData->NChar()/3;
+	string wtsetName = dnaData->WeightsetName();
+	if(wtsetName.length() > 0)
+		throw ErrorException("Cannot use wtsets with DNA to Codon translation! Remove wtset \"%s\".", wtsetName.c_str());  
+
+	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
 	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon datatype specified, but number of nucleotides not divisible by 3!");  
 	NewMatrix(nTax, nChar);
+	patman.Initialize(nTax, maxNumStates);
 
 	//this will just map from the bitwise format to the index format (A, C, G, T = 0, 1, 2, 3)
 	//partial ambiguity is mapped to total ambiguity currently
@@ -428,6 +433,21 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 		empBaseFreqsPos2[b] /= total;
 		empBaseFreqsPos3[b] /= total;
 		}
+	
+	//copy matrix into alternative PatternManager for pattern sorting
+	if(usePatternManager){
+		Pattern thisPat;
+		for(int cod=0;cod<nChar;cod++){
+			for(int tax=0;tax<NTax();tax++){
+				thisPat.AddChar(matrix[tax][cod]);
+				}
+			//numbers directly copy over, and should actually be in 0->nchar order now anyway
+			thisPat.siteNumbers.push_back(number[cod]);
+			thisPat.SetCount(1);
+			patman.AddPattern(thisPat);
+			thisPat.Reset();
+			}
+		}
 	}
 
 void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, GeneticCode *code){
@@ -435,10 +455,15 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
 
-	nChar = dnaData->NChar()/3;
+	string wtsetName = dnaData->WeightsetName();
+	if(wtsetName.length() > 0)
+		throw ErrorException("Cannot use wtsets with DNA to Aminoacid translation! Remove wtset \"%s\" or do the translation yourself.", wtsetName.c_str());  
+
+	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
 	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon to Aminoacid translation specified, but number of nucleotides not divisible by 3!");  
 	NewMatrix(nTax, nChar);
+	patman.Initialize(nTax, maxNumStates);
 
 	//this will just map from the bitwise format to the index format (A, C, G, T = 0, 1, 2, 3)
 	//partial ambiguity is mapped to total ambiguity currently
@@ -489,11 +514,26 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 			}
 		if(firstAmbig == false) outman.UserMessage("");
 		}	
+
+	//copy matrix into alternative PatternManager for pattern sorting
+	if(usePatternManager){
+		Pattern thisPat;
+		for(int cod=0;cod<nChar;cod++){
+			for(int tax=0;tax<NTax();tax++){
+				thisPat.AddChar(matrix[tax][cod]);
+				}
+			//numbers directly copy over, and should actually be in 0->nchar order now anyway
+			thisPat.siteNumbers.push_back(number[cod]);
+			thisPat.SetCount(1);
+			patman.AddPattern(thisPat);
+			thisPat.Reset();
+			}
+		}
 	}
 
 void CodonData::CalcF1x4Freqs(){
 	//this assumes that the empirical base freqs have already been calculated in FillCodonMatrixFromDNA
-	assert(fabs(empBaseFreqsAllPos[0] + empBaseFreqsAllPos[1] + empBaseFreqsAllPos[2] + empBaseFreqsAllPos[3] - 1.0) < 1.0e-8);
+	assert(fabs(empBaseFreqsAllPos[0] + empBaseFreqsAllPos[1] + empBaseFreqsAllPos[2] + empBaseFreqsAllPos[3] - 1.0) < 1.0e-4);
 
 	FLOAT_TYPE total = ZERO_POINT_ZERO;
 
@@ -515,7 +555,7 @@ void CodonData::CalcF1x4Freqs(){
 
 void CodonData::CalcF3x4Freqs(){
 	//this assumes that the empirical base freqs have already been calculated in FillCodonMatrixFromDNA
-	assert(fabs(empBaseFreqsPos1[0] + empBaseFreqsPos1[1] + empBaseFreqsPos1[2] + empBaseFreqsPos1[3] - 1.0) < 1.0e-8);
+	assert(fabs(empBaseFreqsPos1[0] + empBaseFreqsPos1[1] + empBaseFreqsPos1[2] + empBaseFreqsPos1[3] - 1.0) < 1.0e-4);
 
 	if((empBaseFreqsPos1[0] == ZERO_POINT_ZERO) ||
 	   (empBaseFreqsPos1[1] == ZERO_POINT_ZERO) ||
@@ -691,10 +731,13 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 			charset.insert(i);
 		}
 
+	//deal with any exclusions
 	NxsUnsignedSet excluded = charblock->GetExcludedIndexSet();
 	const NxsUnsignedSet *realCharSet = & charset;
 	NxsUnsignedSet charsetMinusExcluded;
 	if (!excluded.empty()) {
+		string exsetName = NxsSetReader::GetSetAsNexusString(excluded);
+		outman.UserMessage("Excluded characters: %s\n\t", exsetName.c_str());
 		set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
 		realCharSet = &charsetMinusExcluded;
 	}
@@ -707,16 +750,28 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 		}
 
 	NewMatrix( numActiveTaxa, numActiveChar );
+	patman.Initialize(numActiveTaxa, maxNumStates);
+
+	//get weightset if one was specified
+	vector<int> charWeights;
+	if(useDefaultWeightsets){
+		wtsetName = GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
+		if(charWeights.size() > 0){
+			assert(charWeights.size() == charblock->GetNumChar());
+			outman.UserMessage("\tFound wtset \"%s\" with data, applying...", wtsetName.c_str());
+			}
+		}
 
 	// read in the data, including taxon names
 	int i=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
-			//store the taxon names based on NCL's "escaped" version, which will properly deal
-			//with whether quotes are necessary, etc.  No conversion needed at output.
+			//Now storing names as escaped Nexus values - this means:
+			//if they have underscores - store with underscores
+			//if they have spaces within single quotes - store with underscores
+			//if they have punctuation within single parens (including spaces) - store with single quotes maintained
 			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
 			SetTaxonLabel(i, NxsString::GetEscaped(tlabel).c_str());
-			
 			int j = 0;
 
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
@@ -731,9 +786,39 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 						datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
 						}
 					}
-				SetMatrix( i, j++, datum);
+				if(i == 0 && charWeights.size() > 0)
+					SetCount(j, charWeights[*cit]);
+				SetMatrix( i, j, datum );
+				j++;
 				}
 			i++;
+			}
+		}
+
+	if(usePatternManager){
+		//optionally also read into the alternative pattern manager, this is taxa loop inside char loop
+		bool haveWeights = !charWeights.empty();
+		Pattern thisPat;
+		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+			int tax = 0;
+			for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+				if(charblock->IsActiveTaxon(origTaxIndex)){
+					unsigned char datum = '\0';
+					if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 15;
+					else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
+					else{
+						int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+						for(int s=0;s<nstates;s++){
+							datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
+							}
+						}
+					thisPat.AddChar(datum);
+					}
+				}
+			thisPat.siteNumbers.push_back(*cit);
+			thisPat.SetCount((haveWeights ? charWeights[*cit] : 1));
+			patman.AddPattern(thisPat);
+			thisPat.Reset();
 			}
 		}
 	}
@@ -754,10 +839,13 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 			charset.insert(i);
 		}
 
+	//deal with any exclusions
 	NxsUnsignedSet excluded = charblock->GetExcludedIndexSet();
 	const NxsUnsignedSet *realCharSet = & charset;
 	NxsUnsignedSet charsetMinusExcluded;
 	if (!excluded.empty()) {
+		string exsetName = NxsSetReader::GetSetAsNexusString(excluded);
+		outman.UserMessage("Excluded characters: %s\n\t", exsetName.c_str());
 		set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
 		realCharSet = &charsetMinusExcluded;
 	}	
@@ -770,23 +858,37 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 		}
 
 	NewMatrix( numActiveTaxa, numActiveChar );
+	patman.Initialize(numActiveTaxa, maxNumStates);
+
+	//get weightset if one was specified
+	vector<int> charWeights;
+	if(useDefaultWeightsets){
+		wtsetName = GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
+		if(charWeights.size() > 0){
+			assert(charWeights.size() == charblock->GetNumChar());
+			outman.UserMessage("\tFound wtset \"%s\" with data, applying...", wtsetName.c_str());
+			}
+		}
 
 	// read in the data, including taxon names
 	int i=0;
 	for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
 		if(charblock->IsActiveTaxon(origTaxIndex)){
-			//store the taxon names based on NCL's "escaped" version, which will properly deal
-			//with whether quotes are necessary, etc.  No conversion needed at output.
+			//Now storing names as escaped Nexus values - this means:
+			//if they have underscores - store with underscores
+			//if they have spaces within single quotes - store with underscores
+			//if they have punctuation within single parens (including spaces) - store with single quotes maintained
 			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
 			SetTaxonLabel(i, NxsString::GetEscaped(tlabel).c_str());
+			
 			int j = 0;
 			bool firstAmbig = true;
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				if(i == 0)
 					SetOriginalDataNumber(j, *cit);
 				unsigned char datum = '\0';
-				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = 20;
-				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 20;
+				if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = maxNumStates;
+				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = maxNumStates;
 				else{
 					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
 					//need to deal with the possibility of multiple states represented in matrix
@@ -802,10 +904,45 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 						datum = CharToDatum('?');
 						}
 					}
-				SetMatrix( i, j++, datum );
+				if(i == 0 && charWeights.size() > 0)
+					SetCount(j, charWeights[*cit]);
+				SetMatrix( i, j, datum );
+				j++;
 				}
 			if(firstAmbig == false) outman.UserMessage("");
 			i++;
+			}
+		}
+	//read the same data into the alternate pattern sorting machinery, which only makes sense looping over tax within char
+	if(usePatternManager){
+		Pattern thisPat;
+		bool haveWeights = !charWeights.empty();
+		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
+			int tax = 0;
+			for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
+				if(charblock->IsActiveTaxon(origTaxIndex)){
+					unsigned char datum = '\0';
+					if(charblock->IsGapState(origTaxIndex, *cit) == true) datum = maxNumStates;
+					else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = maxNumStates;
+					else{
+						int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+
+						//need to deal with the possibility of multiple states represented in matrix
+						//just convert to full ambiguity
+						if(nstates == 1)
+							datum = CharToDatum(charblock->GetState(origTaxIndex, *cit, 0));
+						else{
+							outman.UserMessageNoCR("%d ", *cit+1);
+							datum = CharToDatum('?');
+							}
+						}
+					thisPat.AddChar(datum);
+					}
+				}
+			thisPat.siteNumbers.push_back(*cit);
+			thisPat.SetCount((haveWeights ? charWeights[*cit] : 1));
+			patman.AddPattern(thisPat);
+			thisPat.Reset();
 			}
 		}
 	}
