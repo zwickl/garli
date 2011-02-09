@@ -2960,7 +2960,17 @@ void Population::PerformSearch(){
 			if((prematureTermination == false && currentSearchRep == conf->searchReps) || (prematureTermination && storedTrees.size() > 0)){
 				if(storedTrees.size() > 0){//careful here, the trees in the storedTrees array don't have clas assigned
 					outman.UserMessage("Inferring internal state probabilities on best tree... saving to file %s.internalstates.log\n", conf->ofprefix.c_str());
-					storedTrees[best]->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
+					Individual *theInd;
+					Individual tempInd;
+					if(Tree::outgroup != NULL){
+						tempInd.DuplicateIndivWithoutCLAs(storedTrees[best]);
+						OutgroupRoot(&tempInd, -1);
+						theInd = &tempInd;
+						}
+					else
+						theInd = storedTrees[best];
+					//InferAllInternalStateProbs will deal with assigning clas, since neither the tree in storedTrees nor the potentially temp tree have them
+					theInd->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
 					if(prematureTermination && best == storedTrees.size() - 1)
 						outman.UserMessage("WARNING: Internal states inferred on tree from prematurely terminated search\n");
 					}
