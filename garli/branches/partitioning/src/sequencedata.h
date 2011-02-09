@@ -717,6 +717,7 @@ public:
 	void Delete(){
 		for(vector<SequenceData *>::iterator it = dataSubsets.begin();it != dataSubsets.end(); it++)
 			delete *it;
+		dataSubsets.clear();
 		}
 	int NTax() const {return nTax;}
 	int NumSubsets() const {return dataSubsets.size();}

@@ -18,8 +18,11 @@
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #define PROGRAM_NAME "GARLI-PART"
-#define MAJOR_VERSION 0.98
-#define MINOR_VERSION "r891"
+#define MAJOR_VERSION 0
+#define MINOR_VERSION 98
+//DON'T mess with the following 2 lines!.  They are auto substituted by svn.
+#define SVN_REV "$Rev$"
+#define SVN_DATE "$Date$"
 
 //allocation monitoring stuff from Paul, Mark and Dave
 #define WRITE_MEM_REPORT_TO_FILE
@@ -63,11 +66,47 @@ typedef pid_t pid_type;
 #include "mpi.h"
 #endif
 
+#ifdef CUDA_GPU
+#include "cudaman.h"
+CudaManager *cudaman;
+int cuda_device_number=0;
+#endif
+
 OutputManager outman;
 bool interactive;
  
 vector<ClaSpecifier> claSpecs;
 vector<DataSubsetInfo> dataSubInfo;
+//This is annoying, but the substituted rev and date from svn are in crappy format.
+//Get what we need from them
+//revision string looks like this: $Rev$
+std::string GetSvnRev(){
+	string temp = SVN_REV;
+	string ret;
+	for(int i=0;i<temp.length();i++){
+		char c = temp[i];
+		if(isdigit(c)) {
+			ret += c;
+			}
+		}
+	return ret;
+	}
+//date string looks like this: $Date$
+std::string GetSvnDate(){
+	string temp = SVN_DATE;
+	string ret;
+	int i=0;
+	int len = temp.length();
+	while(i < len && temp[i] != ',') i++;
+	i++;
+	while(i < len && !isdigit(temp[i])) i++;
+	while(i < len && temp[i] != ')') ret += temp[i++];
+	return ret;
+	}
+
+void OutputVersion(){
+	outman.UserMessage("%s Version %d.%d.%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
+	}
 
 int CheckRestartNumber(const string str){
 	int num=1;
@@ -81,28 +120,51 @@ int CheckRestartNumber(const string str){
 	}
 
 void UsageMessage(char *execName){
-#ifndef SUBROUTINE_GARLI	
-	outman.UserMessage("Usage: %s [OPTION] [config filename]", execName);
-	outman.UserMessage("Options:");
+#ifdef SUBROUTINE_GARLI
+	OutputVersion();
+	outman.UserMessage("This MPI version is for doing a large number of search replicates or bootstrap");
+	outman.UserMessage("replicates, each using the SAME config file.  The results will be exactly");
+ 	outman.UserMessage("identical to those obtained by executing the config file a comparable number");
+ 	outman.UserMessage("of times with the serial version of the program.");
+	outman.UserMessage("\nUsage: The syntax for launching MPI jobs varies between systems");
+	outman.UserMessage("Most likely it will look something like the following:");
+	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
+	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.");
+	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs\n");
+#elif defined (OLD_SUBROUTINE_GARLI)
+	OutputVersion();
+	outman.UserMessage("This MPI version is for doing a large number of independent jobs in batch, each");
+	outman.UserMessage("using a DIFFERENT config file.  This might be useful for analyzing a large");
+	outman.UserMessage("number of simulated datasets or for analyzing a single dataset under a variety");
+	outman.UserMessage("of models or search settings.  The results will be exactly the same as if each");
+	outman.UserMessage("config file were executed separately by a serial version of GARLI.");
+	outman.UserMessage("\nUsage: The syntax for launching MPI jobs varies between systems");
+	outman.UserMessage("Most likely it will look something like the following:");
+	outman.UserMessage("  mpirun [MPI OPTIONS] %s [# of provided config files]", execName);
+	outman.UserMessage("This version will expect config files named \"run0.conf\", \"run1.conf\", etc.");
+	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs\n");
+#else
+	outman.UserMessage    ("Usage: %s [OPTION] [config filename]", execName);
+	outman.UserMessage    ("Options:");
 	outman.UserMessage                 ("  -i, --interactive	interactive mode (allow and/or expect user feedback)");
-	if(interactive) outman.UserMessage ("        (interactive is the default for the version you are running)");
+	if(interactive) 
+		outman.UserMessage("                    (interactive is the default for the version you are running)");
 	outman.UserMessage                 ("  -b, --batch		batch mode (do not expect user input)");
-	if(!interactive) outman.UserMessage("        (batch is the default for the version you are running)");
+	if(!interactive) 
+		outman.UserMessage("                    (batch is the default for the version you are running)");
 	outman.UserMessage                 ("  -v, --version		print version information and exit");
 	outman.UserMessage                 ("  -h, --help		print this help and exit");
 	outman.UserMessage                 ("  -t			run internal tests (requires dataset and config file)");
 	outman.UserMessage                 ("  -V			validate: load config file and data, validate config file, data, starting trees"); 
 	outman.UserMessage                 ("				and constraint files, print required memory and selected model, then exit");
-	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"");
-#else
-	outman.UserMessage("Usage: The syntax for launching MPI jobs varies between systems");
-	outman.UserMessage("Most likely it will look something like the following:");
-	outman.UserMessage("  mpirun [MPI OPTIONS] %s -[# of times to execute config file]", execName);
-	outman.UserMessage("Specifying the number of times to execute the config file is mandatory.");
-	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
-	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs");
+#ifdef CUDA_GPU
+	outman.UserMessage    ("  --device d_number	use specified CUDA device");
+#endif
+	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"\n");
 #endif
 	}
+
 #ifdef BOINC
 int boinc_garli_main( int argc, char* argv[] );
 
@@ -120,7 +182,7 @@ int main( int argc, char* argv[] ){
 int boinc_garli_main( int argc, char* argv[] )	{
 	outman.SetNoOutput(true);
 
-#elif defined( SUBROUTINE_GARLI )
+#elif defined( SUBROUTINE_GARLI ) || defined(OLD_SUBROUTINE_GARLI)
 int SubGarliMain(int rank)	
 	{
 	int argc=1;
@@ -144,13 +206,17 @@ int main( int argc, char* argv[] )	{
 	#endif
 
 	string conf_name;
-#ifndef SUBROUTINE_GARLI
+
+	string svnRev = GetSvnRev();
+	string svnDate = GetSvnDate();
+
+#ifdef OLD_SUBROUTINE_GARLI
+	char name[12];
+	sprintf(name, "run%d.conf", rank);
+	conf_name = name;
+#elif defined(SUBROUTINE_GARLI)
 	conf_name = "garli.conf";
 #else
-//	char temp[100];
-//	sprintf(temp, "run%d.conf", rank);
-//	conf_name = temp;
-	//use the same config here too
 	conf_name = "garli.conf";
 #endif
 
@@ -184,7 +250,7 @@ int main( int argc, char* argv[] )	{
 #endif				
 					else if(argv[curarg][1]=='t') runTests = true;
 					else if(!strcmp(argv[curarg], "-v") || !_stricmp(argv[curarg], "--version")){
-						outman.UserMessage("%s Version %.2f.%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION);
+						OutputVersion();
 #ifdef SUBROUTINE_GARLI
 						outman.UserMessage("MPI run distributing version");
 #endif
@@ -203,10 +269,14 @@ int main( int argc, char* argv[] )	{
 						UsageMessage(argv[0]);
 						exit(0);
 						}
+
 					else if(!strcmp(argv[curarg], "-V"))
 						//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
 						//which is essentially a stripped down version of pop::SeedPopWithStartingTree
 						validateMode = true;
+#ifdef CUDA_GPU
+					else if(!_stricmp(argv[curarg], "--device")) cuda_device_number = atoi(argv[++curarg]);
+#endif
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						UsageMessage(argv[0]);
@@ -222,10 +292,9 @@ int main( int argc, char* argv[] )	{
 	if(Tree::random_p==false) Tree::ComputeRealCatalan();
 #endif
 
+		//population is defined here, but not allocated until much later
+		Population *pop = NULL;
 
-		//create the population object
-		Population pop;
-		//PARTITION
 		DataPartition dataPart;
 		DataPartition rawPart;
 		SequenceData *data = NULL;
@@ -296,37 +365,40 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 			
-			outman.UserMessage("Running BOINC GARLI-PART Version %.2f.%s (Partitioning Branch) (Nov 2010)\n", MAJOR_VERSION, MINOR_VERSION);
+			outman.UserMessage("Running BOINC %s Version %d.%d.%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
 			datafile = buffer;
 #else	//not BOINC
-			//set up the screen log file
-			if(confOK == true){
-				//changing this to always append to the .screen.log after a restart
+			if(confOK == true)
 				sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
-				//if(conf.restart == false) sprintf(temp_buf, "%s.screen.log", conf.ofprefix.c_str());
-				//else sprintf(temp_buf, "%s.restart%d.screen.log", conf.ofprefix.c_str(), CheckRestartNumber(conf.ofprefix));
-				}
-			else sprintf(temp_buf, "ERROR.log");
+			else
+				sprintf(temp_buf, "ERROR.log");
 
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
-	#ifdef SUBROUTINE_GARLI
-			//MPI search forking version
-			outman.UserMessage("Running GARLI-PART Version %.2f.%s (Partitioning Branch) (Nov 2010)\n", MAJOR_VERSION, MINOR_VERSION);
+
+			outman.UserMessage("Running %s Version %d.%d.%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
+
+#endif
+
+#ifdef SUBROUTINE_GARLI //MPI versions
 			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
+#endif
+#if defined(OPEN_MP)
+			outman.UserMessage("->OpenMP multithreaded version for multiple processors/cores<-");
+#elif !defined(SUBROUTINE_GARLI)
+			outman.UserMessage("->Single processor version<-\n");
+#endif
 
-	#else	//nonMPI version
-			outman.UserMessage("Running GARLI-PART Version %.2f.%s (Partitioning Branch) (Nov 2010)\n", MAJOR_VERSION, MINOR_VERSION);
-	#endif
+#ifdef SINGLE_PRECISION_FLOATS
+			outman.UserMessage("->Single precision floating point version<-\n");
+#endif
 
-#endif //end of BOINC / nonBOINC
-
-#ifdef OPEN_MP
-			outman.UserMessage("OpenMP multithreaded version for multiple processors/cores"); 
+#ifdef CUDA_GPU
+			outman.UserMessage("->CUDA GPU version<-\n");
 #endif
 			outman.UserMessage("###################################################");
 			outman.UserMessage("THIS IS A TESTING VERSION FOR PARTITIONED MODELS AND THE MKV MORPHOLOGY MODEL.");
@@ -355,12 +427,11 @@ int main( int argc, char* argv[] )	{
 #endif
 
 #ifdef NCL_NAME_AND_VERSION
-			outman.UserMessage("Using %s\n", NCL_NAME_AND_VERSION);
+			outman.UserMessage("Using %s", NCL_NAME_AND_VERSION);
 #endif
 
-#ifdef SINGLE_PRECISION_FLOATS
-			outman.UserMessage("Single precision floating point version\n");
-#endif
+			OutputImportantDefines();
+			outman.UserMessage("\n#######################################################");
 			outman.UserMessage("Reading config file %s", conf_name.c_str());
 			if(confOK == false) throw ErrorException("Error in config file...aborting");
 
@@ -378,7 +449,9 @@ int main( int argc, char* argv[] )	{
 			//read the datafile with the NCL-based GarliReader - should allow nexus, phylip and fasta
 			outman.UserMessage("###################################################\nREADING OF DATA");
 			GarliReader &reader = GarliReader::GetInstance();
-			pop.usedNCL = reader.ReadData(datafile.c_str(), *modSpecSet.GetModSpec(0));
+			bool usedNCL = reader.ReadData(datafile.c_str(), *modSpecSet.GetModSpec(0));
+			if(! usedNCL) 
+				throw ErrorException("There was a problem reading the data file.");
 			
 			//assuming a single taxa block
 			if(reader.GetNumTaxaBlocks() > 1) throw ErrorException("Expecting only one taxa block in datafile");
@@ -547,6 +620,8 @@ int main( int argc, char* argv[] )	{
 					else //all other data will be read into a DNA matrix and
 						//then converted if necessary
 						data = new NucleotideData();
+
+					data->SetUsePatternManager(conf.usePatternManager);
 					//if no charpart was specified, the second argument here will be empty
 					data->CreateMatrixFromNCL(effectiveMatrices[dataChunk].first, effectiveMatrices[dataChunk].second);
 
@@ -643,10 +718,6 @@ int main( int argc, char* argv[] )	{
 							outman.UserMessage("(chars%s)", chars.c_str());
 							}
 
-						//this accounts for the dummy character(s) stuck into each data subset
-						//for Mkv.  We don't want the screen output to include it.
-						int numCondPats = data->NumConditioningPatterns();
-
 						data->ProcessPatterns();
 
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();
@@ -675,13 +746,16 @@ int main( int argc, char* argv[] )	{
 				}
 	
 			outman.UserMessage("\n###################################################");
-			pop.Setup(&conf, &dataPart, &rawPart, 1, 0);
-			pop.SetOutputDetails();
+			//allocate the population
+			pop = new Population();
+			pop->usedNCL = usedNCL;
+			pop->Setup(&conf, &dataPart, &rawPart, 1, (validateMode == true ? -1 : 0));
+			pop->SetOutputDetails();
 
 			outman.UserMessage("STARTING RUN");
 			if(runTests){
 				outman.UserMessage("starting internal tests...");
-				pop.RunTests();
+					pop->RunTests();
 				outman.UserMessage("******Successfully completed tests.******");
 				return 0;
 				}
@@ -689,17 +763,18 @@ int main( int argc, char* argv[] )	{
 			if(validateMode){
 				//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
 				//which is essentially a stripped down version of pop::SeedPopWithStartingTree
-				pop.ValidateInput(1);
+					pop->ValidateInput(1);
 				outman.UserMessage("VALIDATION COMPLETE. Check output above for information and possible errors.");
 				}
-
+				//the runmodes are essentially a hidden way of causing different (often very different) program
+				//behavior at runtime.  not really for user consumption
 			else if(conf.runmode != 0){
 				if(conf.runmode == 1)
-					pop.ApplyNSwaps(10);
+						pop->ApplyNSwaps(10);
 				else if(conf.runmode == 7)
-					pop.VariableStartingTreeOptimization(false);
+						pop->VariableStartingTreeOptimization(false);
 				else if(conf.runmode == 9)
-					pop.VariableStartingTreeOptimization(true);
+						pop->VariableStartingTreeOptimization(true);
 				else if(conf.runmode == 8){
 #ifdef OPEN_MP
 					throw ErrorException("can't estimate site rates in openmp version!");
@@ -707,29 +782,35 @@ int main( int argc, char* argv[] )	{
 #ifndef ALLOW_SINGLE_SITE
 					throw ErrorException("the program must be compiled with ALLOW_SINGLE_SITE defined in defs.h to use site rate estimation (runmode = 8)!");
 #endif
-					pop.OptimizeSiteRates();
+					pop->OptimizeSiteRates();
 					}
 				else if(conf.runmode == 11){
-					pop.OptimizeInputAndWriteSitelikelihoods();
+					pop->OptimizeInputAndWriteSitelikelihoods();
 					}
 				else if(conf.runmode == 12){
-					pop.OptimizeInputAndWriteSitelikelihoodsAndTryRootings();
+					pop->OptimizeInputAndWriteSitelikelihoodsAndTryRootings();
 					}
 				else if(conf.runmode > 20){
-					pop.GenerateTreesOnly(conf.runmode);
+						pop->GenerateTreesOnly(conf.runmode);
 					}
-				else if(conf.runmode > 1)
-					pop.SwapToCompletion(conf.startOptPrec);
+					else if(conf.runmode > 1) //this is runmodes 2-6
+						pop->SwapToCompletion(conf.startOptPrec);
 				}
 			else{
-				if(pop.conf->restart) pop.ReadStateFiles();
+					//if no checkpoint files are actually found conf->restart will be set to zero
+					if(pop->conf->restart) pop->conf->restart = pop->ReadStateFiles();
 
-				pop.SetOutputDetails();
-				if(pop.conf->bootstrapReps == 0){//NOT bootstrapping
-					pop.PerformSearch();
+					pop->SetOutputDetails();
+					if(pop->conf->bootstrapReps == 0){//NOT bootstrapping
+						pop->PerformSearch();
+						}
+					else pop->Bootstrap();
+					pop->FinalizeOutputStreams(2);
 					}
-				else pop.Bootstrap();
-				pop.FinalizeOutputStreams(2);
+				dataPart.Delete();
+				if(pop != NULL){
+					delete pop;
+					pop = NULL;
 				}
 			}catch(ErrorException &err){
 				if(outman.IsLogSet() == false){
@@ -737,9 +818,11 @@ int main( int argc, char* argv[] )	{
 					if(interactive == false) UsageMessage(argv[0]);
 					}
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
-				pop.FinalizeOutputStreams(0);
-				pop.FinalizeOutputStreams(1);
-				pop.FinalizeOutputStreams(2);
+				if(pop != NULL){
+					pop->FinalizeOutputStreams(0);
+					pop->FinalizeOutputStreams(1);
+					pop->FinalizeOutputStreams(2);
+					}
 
 #ifdef MAC_FRONTEND
 				NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -771,8 +854,8 @@ int main( int argc, char* argv[] )	{
 			char filename[50];
 			#ifndef WIN32
 			int rank=0;
-			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-			sprintf(filename, "memecheck%d.txt", rank);
+	//		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+			sprintf(filename, "memcheck%d.txt", rank);
 			#else
 			strcpy(filename, "memcheck.txt");
 			#endif
