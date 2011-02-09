@@ -255,6 +255,11 @@ class Tree{
 		void CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, int modIndex, int dataIndex);
 		void CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, int modIndex, int dataIndex);
 		void CalcFullCLATerminalTerminalNState(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex);
+
+		//for all internal state recon
+		void GetStatewiseUnscaledPosteriorsPartialInternalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, int modIndex, int dataIndex);
+		void GetStatewiseUnscaledPosteriorsPartialTerminalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, int modIndex, int dataIndex);
+		int FillStatewiseUnscaledPosteriors(CondLikeArraySet *partialCLAset, CondLikeArraySet *childCLAset, TreeNode *child, FLOAT_TYPE blen1);
 /*		
 		void CalcFullCLATerminalTerminalOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr, const FLOAT_TYPE *Rpr, const char *Ldata, const char *Rdata, int modIndex, int dataIndex);
 		void CalcFullCLAInternalTerminalOrientedGap(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *data2, int modIndex, int dataIndex);

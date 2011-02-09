@@ -163,7 +163,7 @@ char *TreeNode::MakeNewick(char *s, bool internalNodes, bool branchLengths, bool
 	return s;
 	}
 
-void TreeNode::MakeNewick(string &outStr, const SequenceData *data, bool internalNodes, bool branchLengths, bool taxonNames /*=false*/, bool highPrec /*=false*/) const{
+void TreeNode::MakeNewick(string &outStr, const DataPartition *data, bool internalNodes, bool branchLengths, bool taxonNames /*=false*/, bool highPrec /*=false*/) const{
 	char s[500];
 	if(left){
 		if(internalNodes==true && nodeNum!=0){
@@ -226,7 +226,7 @@ void TreeNode::MakeNewickForSubtree(char *s) const{
 	*s++='\0';
 	}
 
-void TreeNode::MakeNewickForSubtree(string &s, const SequenceData *data, bool internalNodes, bool branchLengths, bool taxonNames, bool highPrec) const{
+void TreeNode::MakeNewickForSubtree(string &s, const DataPartition *data, bool internalNodes, bool branchLengths, bool taxonNames, bool highPrec) const{
 	assert(left);
 	s += '(';
 	left->MakeNewick(s, data, internalNodes, branchLengths, taxonNames, highPrec);

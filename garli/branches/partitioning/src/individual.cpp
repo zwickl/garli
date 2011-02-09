@@ -695,14 +695,17 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			if(modSpec->numRateCats > 1 && modSpec->IsNonsynonymousRateHet() == false && modSpec->IsFlexRateHet() == false) optAlpha = true;
 			if(modSpec->IsFlexRateHet()) optFlex = true;
 			if(modSpec->includeInvariantSites && modSpec->fixInvariantSites == false) optPinv = true;
-			if(modSpec->IsCodon()) optOmega = true;
+			if(modSpec->IsCodon() && !modSpec->fixOmega) optOmega = true;
 			if(modSpec->IsOrientedGap()) optInsDel = true;
 
 #ifdef MORE_DETERM_OPT
 			if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
 				optFreqs = true;
-			if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1))
-				optRelRates = true;
+		//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
+		if(modSpec->IsCodon() && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == true)
+			optFreqs = true;
+		if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1 || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()))
+			optRelRates = true;
 #endif
 
 			}
@@ -741,18 +744,24 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		assert(trueImprove >= -1.0);
 		if(trueImprove < ZERO_POINT_ZERO) trueImprove = ZERO_POINT_ZERO;
 
+		vector<FLOAT_TYPE> blens;
+		treeStruct->StoreBranchlengths(blens);
 		scaleOptImprove=treeStruct->OptimizeTreeScale(branchPrec);
-		//if some of the branch lengths are at the minimum or maximum boundaries the scale optimization
-		//can actually worsen the score.  This isn't particularly important during initial refinement,
-		//so just hide it to keep the user from thinking that there is something terribly wrong
-		if(scaleOptImprove < ZERO_POINT_ZERO) scaleOptImprove = ZERO_POINT_ZERO;
+		CalcFitness(0);
+		//if some of the branch lengths were at the minimum or maximum boundaries the scale optimization
+		//can actually worsen the score.  If so, return them to their original lengths.
+		if(scaleOptImprove < ZERO_POINT_ZERO){
+			treeStruct->RestoreBranchlengths(blens);
+			CalcFitness(0);
+			scaleOptImprove = ZERO_POINT_ZERO;
+			}
 
 		CalcFitness(0);
 		if(optModel){
 			for(int modnum = 0;modnum < modPart.NumModels();modnum++){
 				Model *mod = modPart.GetModel(modnum);
 				const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
-				if(modSpec->IsCodon())//optimize omega even if there is only 1
+				if(modSpec->IsCodon() && !modSpec->fixOmega)//optimize omega even if there is only 1
 					omegaOptImprove += treeStruct->OptimizeOmegaParameters(branchPrec, modnum);
 				else if(mod->NRateCats() > 1){
 					if(modSpec->IsFlexRateHet()){//Flex rates
@@ -778,7 +787,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 #ifdef MORE_DETERM_OPT
 				if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
 					freqOptImprove += treeStruct->OptimizeEquilibriumFreqs(branchPrec, modnum);
-				if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1))
+				if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1 || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()))
 					rateOptImprove += treeStruct->OptimizeRelativeNucRates(branchPrec, modnum);
 #endif
 				}

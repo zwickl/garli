@@ -67,12 +67,12 @@ class CondLikeArray{
 		CondLikeArray()
 			: nsites(0), nrates(0), nstates(0), arr(0), underflow_mult(0), rescaleRank(1){}
 		~CondLikeArray();
-		int NStates() {
+		int NStates() const {
 			return nstates;
 			}
-		int NChar() {return nsites;}
-		int NRateCats() {return nrates;}
-		int RequiredSize() {return nsites * nstates * nrates;}
+		int NChar() const {return nsites;}
+		int NRateCats() const {return nrates;}
+		int RequiredSize() const {return nsites * nstates * nrates;}
 		void Assign(FLOAT_TYPE *alloc, int * under) {arr = alloc; underflow_mult = under;}
 
 		void Allocate( int nk, int ns, int nr = 1 );
