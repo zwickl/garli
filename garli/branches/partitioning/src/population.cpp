@@ -379,6 +379,11 @@ void Population::CheckForIncompatibleConfigEntries(){
 	}
 
 void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *rawD, int nprocs, int r){
+	bool validateMode = false;
+	if(r < 0){
+		validateMode = true;
+		r = 0;
+		}
 	stopwatch.Start();
 
 	//most of the allocation occurs here or in children
@@ -479,9 +484,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		}
 		
 	const int MB = 1024 * 1024;
-//	int sites = curData->NChar();
 
-	//int claSizePerNode = (modSpec->nstates * modSpec->numRateCats * sites * sizeof(FLOAT_TYPE)) + (sites * sizeof(int));
 	int claSizePerNode = indiv[0].modPart.CalcRequiredCLAsize(dataPart);
 	int numNodesPerIndiv = dataPart->NTax()-2;
 	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
@@ -539,12 +542,14 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)));
 	outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB))-1);
 */
-	if(memLevel==-1) throw ErrorException("Not enough memory specified in config file (availablememory)!");
+	if(memLevel==-1 && !validateMode) 
+		throw ErrorException("Not enough memory specified in config file (availablememory)!");
 
 	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 	//if we do tons of recombination 
 	idealClas *= 2;
-	claMan=new ClaManager(dataPart->NTax()-2, numClas, idealClas, &indiv[0].modPart, dataPart);
+	if(!validateMode)
+		claMan=new ClaManager(dataPart->NTax()-2, numClas, idealClas, &indiv[0].modPart, dataPart);
 
 	//setup the bipartition statics
 	Bipartition::SetBipartitionStatics(dataPart->NTax());
