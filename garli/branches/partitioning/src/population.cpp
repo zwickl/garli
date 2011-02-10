@@ -2142,7 +2142,7 @@ void Population::BetterFinalOptimization(){
 			bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates, optInsDel;
 			optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = optInsDel = false;
 
-			if(modSpec->IsCodon())
+			if(modSpec->IsCodon() && ! modSpec->fixOmega)
 				optOmega = true;
 			else if(modSpec->numRateCats > 1 && !modSpec->IsCodon()){
 				if(modSpec->IsFlexRateHet())
