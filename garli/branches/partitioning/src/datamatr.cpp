@@ -801,7 +801,7 @@ void DataMatrix::ResizeCharacterNumberDependentVariables(int nCh) {
 	// delete data matrix and count and number arrays
 	if( matrix ) {
 		int j;
-		for( j = 0; j < nTax; j++ )
+		for( j = 0; j < nTaxAllocated; j++ )
 			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] has length nChar
 		MEM_DELETE_ARRAY(matrix); // matrix has length nTax
 	}
@@ -817,7 +817,7 @@ void DataMatrix::ResizeCharacterNumberDependentVariables(int nCh) {
 	// all counts are initially 1, and characters are numbered
 	// sequentially from 0 to nChar-1
 	if(nChar > 0 ) {
-		MEM_NEW_ARRAY(matrix,unsigned char*,nTax);
+		MEM_NEW_ARRAY(matrix,unsigned char*,nTaxAllocated);
 		MEM_NEW_ARRAY(count,int,nChar);
 		MEM_NEW_ARRAY(numStates,int,nChar);
 
@@ -825,7 +825,7 @@ void DataMatrix::ResizeCharacterNumberDependentVariables(int nCh) {
 			count[j] = 1;
 			numStates[j] = 1;
 		}
-		for( int i = 0; i < nTax; i++ ) {
+		for( int i = 0; i < nTaxAllocated; i++ ) {
 			matrix[i]=new unsigned char[nChar];
 			memset( matrix[i], 0xff, nChar*sizeof(unsigned char) );
 			}
