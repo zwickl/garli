@@ -445,7 +445,7 @@ void DataMatrix::OutputDataSummary() const{
 		}
 	else outman.UserMessage("\t  %d total characters.", total);
 
-	outman.UserMessage("\t  %d unique patterns in compressed data matrix.\n", NChar() - numConditioningPatterns);
+	outman.UserMessage("\t  %d unique patterns in compressed data matrix.", NChar() - numConditioningPatterns);
 	outman.flush();
 	}
 
@@ -470,6 +470,7 @@ void DataMatrix::ProcessPatterns() {
 		outman.UserMessage("\tPattern processing required %d second(s)", stoppy.SplitTime());
 	if(numCompares > 0)
 		outman.UserMessage("\t%d pattern comparisons were needed", numCompares);
+	outman.UserMessage("");
 	//outman.UserMessage("#######################################################");
 	}
 
