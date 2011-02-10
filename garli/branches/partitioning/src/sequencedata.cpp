@@ -940,7 +940,6 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 					thisPat.AddChar(datum);
 					}
 				}
-			thisPat.siteNumbers.push_back(*cit);
 			thisPat.siteNumbers.push_back(charNum++);
 			thisPat.SetCount((haveWeights ? charWeights[*cit] : 1));
 			patman.AddPattern(thisPat);
