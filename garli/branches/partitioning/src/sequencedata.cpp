@@ -898,10 +898,10 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 						datum = CharToDatum(charblock->GetState(origTaxIndex, *cit, 0));
 					else{
 						if(firstAmbig){
-							outman.UserMessageNoCR("Partially ambiguous characters of taxon %s converted to full ambiguity:\n\t", TaxonLabel(origTaxIndex));
+							outman.UserMessageNoCR("\tPart ambig. char's of taxon %s converted to full ambiguity:\n\t  char ", TaxonLabel(origTaxIndex));
 							firstAmbig = false;
 							}
-						outman.UserMessageNoCR("%d ", *cit+1);
+						outman.UserMessageNoCR(" %d ", *cit+1);
 						datum = CharToDatum('?');
 						}
 					}
@@ -1073,7 +1073,7 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 			consts.insert(num);
 		//the maxNumStates == 2 part here is so that the message is only output when reading the first standard data matrix
 		else if(ns == 0 && maxNumStates == 2)
-			missing.insert(num + 1);
+			missing.insert(num);
 		if(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS){
 			if(ns > 2){
 				throw ErrorException("More than two character states found in binary data (character %d)!", num + 1);  
@@ -1088,7 +1088,7 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 		}
 	if(missing.size() > 0){
 		string str = NxsSetReader::GetSetAsNexusString(missing);
-		outman.UserMessage("NOTE: entirely missing characters removed from matrix: %s", str.c_str());
+		outman.UserMessage("\tNOTE: entirely missing characters removed from matrix: %s", str.c_str());
 		}
 
 	//verify that we're not breaking the assumptions of these datatypes
@@ -1116,11 +1116,11 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 	//maxNumStates = 2 here is only so that the message is output when creating the first standard matrix
 	else if(consts.size() > 0 && !(datatype == BINARY) && maxNumStates == 2){
 		string c = NxsSetReader::GetSetAsNexusString(consts);
-		outman.UserMessage("WARNING - Constant characters found in standard data matrix (sites %s)", c.c_str());
-		outman.UserMessage("Currently these will be ignored because including them in the likelihood");
-		outman.UserMessage("calculations would require knowledge of how many states were possible for");
-		outman.UserMessage("those columns (i.e., 1 state was observed, but was that out of 2 possible,");
-		outman.UserMessage("or 3 or 4, etc)\n#####################################");
+		outman.UserMessage("\t****\n\tWARNING - Constant characters found in standard data matrix (sites %s)", c.c_str());
+		outman.UserMessage("\tCurrently these will be ignored because including them in the likelihood");
+		outman.UserMessage("\tcalculations would require knowledge of how many states were possible for");
+		outman.UserMessage("\tthose columns (i.e., 1 state was observed, but was that out of 2 possible,");
+		outman.UserMessage("\tor 3 or 4, etc)\n\t****");
 		}
 
 	if(realCharSet->size() == 0)
@@ -1231,10 +1231,10 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 						}
 					else{
 						if(firstAmbig){
-							outman.UserMessageNoCR("Partially ambiguous characters of taxon %s converted to full ambiguity:\n\t", TaxonLabel(origTaxIndex));
+							outman.UserMessageNoCR("\tPart ambig. char's of taxon %s converted to full ambiguity:\n\t  char ", TaxonLabel(origTaxIndex));
 							firstAmbig = false;
 							}
-						outman.UserMessageNoCR("%d ", *cit+1);
+						outman.UserMessageNoCR(" %d ", *cit+1);
 						datum = maxNumStates;
 						}
 					}
@@ -1425,10 +1425,10 @@ void OrientedGapData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, N
 						}
 					else{
 						if(firstAmbig){
-							outman.UserMessageNoCR("Partially ambiguous characters of taxon %s converted to full ambiguity:\n\t", TaxonLabel(origTaxIndex));
+							outman.UserMessageNoCR("\tPart ambig. char's of taxon %s converted to full ambiguity:\n\t  char ", TaxonLabel(origTaxIndex));
 							firstAmbig = false;
 							}
-						outman.UserMessageNoCR("%d ", *cit+1);
+						outman.UserMessageNoCR(" %d ", *cit+1);
 						datum = maxNumStates;
 						}
 					}

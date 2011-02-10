@@ -717,10 +717,10 @@ int main( int argc, char* argv[] )	{
 						dataPart.AddSubset(data);
 
 						if(modSpec->IsMkTypeModel()){
-							outman.UserMessage("Subset of data with %d states:", impliedMatrix);
+							outman.UserMessage("\tSubset of data with %d states:", impliedMatrix);
 							string chars;
 							data->GetStringOfOrigDataColumns(chars);
-							outman.UserMessage("(chars%s)", chars.c_str());
+							outman.UserMessage("\t  chars%s", chars.c_str());
 							}
 
 						data->ProcessPatterns();

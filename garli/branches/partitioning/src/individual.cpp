@@ -461,7 +461,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 			scratchT->Score();
 			FLOAT_TYPE start=scratchT->lnL;
 			scratchT->OptimizeAllBranches(optPrecision);
-			FLOAT_TYPE bimprove = scratchT->lnL - start;
+			FLOAT_TYPE bimprove = max(scratchT->lnL - start, 0.0);
 			outman.UserMessage("\nOptimizing branchlengths... improved %.3f lnL", bimprove);
 			}
 		}		
