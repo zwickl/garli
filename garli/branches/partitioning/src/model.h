@@ -536,6 +536,7 @@ public:
 		nstates = 61;//this might be overridden if a nonstandard code is set
 		numRateCats = 1;
 		fixRelativeRates=false;
+		fixOmega = false;
 		RemoveInvariantSites();
 		}
 
