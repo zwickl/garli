@@ -254,6 +254,13 @@ void PatternManager::NewCollapse(){
 			second++;
 			}
 		}
+	//this will zero the count of all missing pats, which will make them not get put into the uniquePatterns
+	//list in NewPack
+	for(list<Pattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
+		if((*pit).numStates == 0){
+			(*pit).count = 0;
+			}
+		}
 	}
 
 void PatternManager::NewSort(){
@@ -365,6 +372,12 @@ void PatternManager::FillNumberVector(vector<int> &nums) const{
 		nums.clear();
 		nums.resize(patterns.size());
 		}
+	
+	//this is necessary so that all missing patterns, which should already have been removed from
+	//uniquePatterns, will properly show up as -1 in the number array, since they will not be overwritten
+	//with other values below
+	for(vector<int>::iterator nit = nums.begin();nit != nums.end();nit++)
+		(*nit) = -1;
 
 	int p = 0;
 	for(list<Pattern>::const_iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
