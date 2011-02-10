@@ -799,6 +799,7 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 		//optionally also read into the alternative pattern manager, this is taxa loop inside char loop
 		bool haveWeights = !charWeights.empty();
 		Pattern thisPat;
+		int charNum = 0;
 		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 			int tax = 0;
 			for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
@@ -815,7 +816,7 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 					thisPat.AddChar(datum);
 					}
 				}
-			thisPat.siteNumbers.push_back(*cit);
+			thisPat.siteNumbers.push_back(charNum++);
 			thisPat.SetCount((haveWeights ? charWeights[*cit] : 1));
 			patman.AddPattern(thisPat);
 			thisPat.Reset();
@@ -917,6 +918,7 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 	if(usePatternManager){
 		Pattern thisPat;
 		bool haveWeights = !charWeights.empty();
+		int charNum = 0;
 		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 			int tax = 0;
 			for( int origTaxIndex = 0; origTaxIndex < numOrigTaxa; origTaxIndex++ ) {
@@ -932,7 +934,6 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 						if(nstates == 1)
 							datum = CharToDatum(charblock->GetState(origTaxIndex, *cit, 0));
 						else{
-							outman.UserMessageNoCR("%d ", *cit+1);
 							datum = CharToDatum('?');
 							}
 						}
@@ -940,6 +941,7 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 					}
 				}
 			thisPat.siteNumbers.push_back(*cit);
+			thisPat.siteNumbers.push_back(charNum++);
 			thisPat.SetCount((haveWeights ? charWeights[*cit] : 1));
 			patman.AddPattern(thisPat);
 			thisPat.Reset();
