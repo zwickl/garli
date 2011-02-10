@@ -134,12 +134,12 @@ if [ -d $TESTS_DIR/const ];then
 		#NEXUSvalidator gives a warning every time it reads a tree file
 		#without a taxa block.  So, shut it up initially and then if it
 		#fails let it output whatever error
-		$NEXUS_VAL $base*.tre 2> /dev/null
+		$NEXUS_VAL con.$base*.tre 2> /dev/null
 		if [ $? -eq 0 ]
 	    	then
 	    		echo TREEFILES PASS
 	    	else
-	    		$NEXUS_VAL $base*.tre
+	    		$NEXUS_VAL con.$base*.tre
 			if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
 				exit 1
 			fi
@@ -171,18 +171,18 @@ if [ -d $TESTS_DIR/output ];then
 	#without a taxa block.  So, shut it up initially and then if it
 	#fails let it output whatever error
 	data=`grep datafname $i | grep -o " data.*$"`
-	TESTNEX=test.$base.nex
+	TESTNEX=test.out.$base.nex
 	cp $data $TESTNEX
-	cat $base.best.tre | grep -iv nexus >> $TESTNEX
+	cat out.$base.best.tre | grep -iv nexus >> $TESTNEX
 
-	#$NEXUS_VAL $base.best.tre 2> /dev/null
+	#$NEXUS_VAL out.$base.best.tre 2> /dev/null
 	#$NEXUS_VAL $TESTNEX 2> /dev/null
 	$NEXUS_VAL $TESTNEX
 	if [ $? -eq 0 ]
 		then
 		echo "TREEFILES PASS"
 		else
-			#$NEXUS_VAL $base*.tre
+			#$NEXUS_VAL out.$base*.tre
 			$NEXUS_VAL $TESTNEX 2> /dev/null
 		if [[ ! $? -eq 0 && ! -n "$NO_EXIT_ON_ERR" ]];then
 			exit 1
