@@ -2093,6 +2093,8 @@ void Population::BetterFinalOptimization(){
 	Individual *optInd = &indiv[bestIndiv];
 	Tree *optTree = optInd->treeStruct;
 
+	adap->branchOptPrecision = min(adap->branchOptPrecision, 0.01);
+
 	do{
 		//during each pass we'll keep track of a few things
 		//  incr = total improvement this pass. this controls termination of opt
@@ -2250,7 +2252,7 @@ void Population::BetterFinalOptimization(){
 		optInd->CalcFitness(0);
 		
 		outString += ")";
-		goingToExit = !(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass + 1 < 10);
+		goingToExit = !(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass < 10);
 
 //		if(pass < 20 || (pass % 10 == 0) || goingToExit){
 //			if(pass > 20 && (goingToExit || (pass % 10 == 0)))
@@ -3027,11 +3029,10 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	ordered << "Tree\t-lnL\tSite\t-lnL\n";
 	ordered.close();
 
-	adap->branchOptPrecision = 0.01;
 	bestIndiv = 0;
 	//loop over the trees
 	for(int t = 1;t <= numTrees;t++){
-		this->currentSearchRep = t;
+		currentSearchRep = t;
 		if(!conf->scoreOnly)
 
 		SeedPopulationWithStartingTree(t);
@@ -3081,7 +3082,6 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 //	int numTrees = treesblock->GetNumTrees();
 //	assert(numTrees == 1);
 
-	adap->branchOptPrecision = 0.01;
 	bestIndiv = 0;
 
 	//start the sitelike file
