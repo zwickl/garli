@@ -5196,7 +5196,7 @@ void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *
 void Tree::OutputSiteDerivatives(int partNum, vector<double> &likes, vector<double> &d1s, vector<double> &d2s, const int *under1, const int *under2, ofstream &ordered, ofstream &packed){
 	const SequenceData *data = dataPart->GetSubset(partNum);
 
-	assert(likes.size() == data->NChar());;
+	assert(d1s.size() == data->NChar());;
 	ordered << "Partition subset " << partNum << "\nsite#\ttruelnL\td1\td2\tunder1\tunder2" << endl;
 	packed << "Partition subset " << partNum << "\npackedIndex\ttruelnL\td1\td2\tunder1\tunder2" << endl;
 	ordered.precision(10);
@@ -5207,7 +5207,7 @@ void Tree::OutputSiteDerivatives(int partNum, vector<double> &likes, vector<doub
 		if(col == -1)
 			ordered << site+1 << "\tgap\t-\t-\t-\t-";
 		else{
-			ordered << site+1 << "\t" << likes[col] << "\t" << d1s[col] << "\t" << d2s[col] << "\t" << under1[col];
+			ordered << site+1 << "\t" << (likes.size() > 0 ? likes[col] : 0.0) << "\t" << d1s[col] << "\t" << d2s[col] << "\t" << under1[col];
 			if(under2 != NULL)
 				ordered << "\t" << under2[col] << endl;
 			else
@@ -5215,7 +5215,7 @@ void Tree::OutputSiteDerivatives(int partNum, vector<double> &likes, vector<doub
 			}
 		}
 	for(int c = 0;c < data->NChar();c++){
-		packed << c << "\t" << likes[c] << "\t" << d1s[c] << "\t" << d2s[c] << "\t" << under1[c];
+		packed << c << "\t" << (likes.size() > 0 ? likes[c] : 0.0) << "\t" << d1s[c] << "\t" << d2s[c] << "\t" << under1[c];
 		if(under2 != NULL)
 			packed << "\t" << under2[c] << endl;
 		else

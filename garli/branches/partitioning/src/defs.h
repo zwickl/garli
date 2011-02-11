@@ -63,6 +63,7 @@
 #include "memchk.h"
 
 #define ADAPTIVE_BOUNDED_OPT
+#define ALT_NR_BAIL
 #define PUSH_TO_MIN_BLEN
 #define SUM_AA_REL_RATES
 #define NEW_BUMPING
@@ -109,6 +110,9 @@ typedef double MODEL_FLOAT;
 	#define DEF_MAX_BRLEN 100.0
 	#define DEF_STARTING_BRLEN 0.05
 	#define GARLI_FP_EPS DBL_EPSILON
+	#if !defined(LUMP_FREQ)
+		#define LUMP_FREQ 400
+	#endif
 #endif
 
 #define MAXPATH   		256
