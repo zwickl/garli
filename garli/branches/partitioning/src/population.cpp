@@ -2095,6 +2095,7 @@ void Population::BetterFinalOptimization(){
 
 	adap->branchOptPrecision = min(adap->branchOptPrecision, 0.01);
 
+	string blenS;
 	do{
 		//during each pass we'll keep track of a few things
 		//  incr = total improvement this pass. this controls termination of opt
@@ -2133,10 +2134,15 @@ void Population::BetterFinalOptimization(){
 		incr = trueImprove;
 
 		sprintf(temp, "(branch= %4.4f", blenOptImprove);
-		outString = temp;
+		blenS = temp;
 
 		optInd->CalcFitness(0);
 
+		//these strings will be overwritten each time one of the parameter types are optimized
+		//always with the sum total of improvement due to that param, be it over models, passes, etc.
+		//this means that each will only appear once, even in partitioned models
+		string omegaS, alphaS, flexS, pinvS, freqsS, relRatesS, insDelS, subsetS;
+		omegaS = alphaS = flexS = pinvS = freqsS = relRatesS = insDelS = subsetS = "";
 		for(int m = 0;m < indiv[bestIndiv].modPart.NumModels();m++){
 			Model *mod = indiv[bestIndiv].modPart.GetModel(m);
 			const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
@@ -2171,8 +2177,8 @@ void Population::BetterFinalOptimization(){
 				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 					paramOpt = ZERO_POINT_ZERO;
 				omegaOptImprove += paramOpt;
-				sprintf(temp, "  omega= %4.4f", paramOpt);
-				outString += temp;
+				sprintf(temp, "  omega= %4.4f", omegaOptImprove);
+				omegaS = temp;
 				incr += paramOpt;
 				}
 			if(optAlpha){
@@ -2180,8 +2186,8 @@ void Population::BetterFinalOptimization(){
 				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 					paramOpt = ZERO_POINT_ZERO;
 				alphaOptImprove += paramOpt;
-				sprintf(temp, "  alpha= %4.4f", paramOpt);
-				outString += temp;
+				sprintf(temp, "  alpha= %4.4f", alphaOptImprove);
+				alphaS = temp;
 				incr += paramOpt;
 				}
 			if(optFlex){
@@ -2196,8 +2202,8 @@ void Population::BetterFinalOptimization(){
 				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 					paramOpt = ZERO_POINT_ZERO;
 				flexOptImprove += paramOpt;
-				sprintf(temp, "  flex rates= %4.4f", paramOpt);
-				outString += temp;
+				sprintf(temp, "  flex rates= %4.4f", flexOptImprove);
+				flexS = temp;
 				incr += paramOpt;
 				}
 			if(optPinv){
@@ -2205,8 +2211,8 @@ void Population::BetterFinalOptimization(){
 				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 					paramOpt = ZERO_POINT_ZERO;
 				pinvOptImprove += paramOpt;
-				sprintf(temp, "  pinv= %4.4f", paramOpt);
-				outString += temp;
+				sprintf(temp, "  pinv= %4.4f", pinvOptImprove);
+				pinvS = temp;
 				incr += paramOpt;
 				}
 			if(optFreqs){
@@ -2214,8 +2220,8 @@ void Population::BetterFinalOptimization(){
 				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 					paramOpt = ZERO_POINT_ZERO;
 				freqOptImprove += paramOpt;
-				sprintf(temp, "  eq freqs= %4.4f", paramOpt);
-				outString += temp;
+				sprintf(temp, "  eq freqs= %4.4f", freqOptImprove);
+				freqsS = temp;
 				incr += paramOpt;
 				}
 			if(optRelRates){
@@ -2223,8 +2229,8 @@ void Population::BetterFinalOptimization(){
 				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 					paramOpt = ZERO_POINT_ZERO;
 				nucRateOptImprove += paramOpt;
-				sprintf(temp, "  rel rates= %4.4f", paramOpt);
-				outString += temp;
+				sprintf(temp, "  rel rates= %4.4f", nucRateOptImprove);
+				relRatesS = temp;
 				incr += paramOpt;
 				}
 			if(optInsDel){
@@ -2232,8 +2238,8 @@ void Population::BetterFinalOptimization(){
 				if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 					paramOpt = ZERO_POINT_ZERO;
 				insDelOptImprove += paramOpt;
-				sprintf(temp, "  ins/del rates= %4.4f", paramOpt);
-				outString += temp;
+				sprintf(temp, "  ins/del rates= %4.4f", insDelOptImprove);
+				insDelS = temp;
 				incr += paramOpt;
 				}
 			
@@ -2245,21 +2251,21 @@ void Population::BetterFinalOptimization(){
 			if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
 				paramOpt = ZERO_POINT_ZERO;
 			subRateOpt += paramOpt;
-			sprintf(temp, "  subset rates= %4.4f", paramOpt);
-			outString += temp;
+			sprintf(temp, "  subset rates= %4.4f", subRateOpt);
+			subsetS = temp;
 			paramOpt += subRateOpt;
 			}
 		optInd->CalcFitness(0);
 		
-		outString += ")";
+		outString = blenS + omegaS + alphaS + flexS + pinvS + freqsS + relRatesS + insDelS + subsetS;
 		goingToExit = !(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass < 10);
 
-//		if(pass < 20 || (pass % 10 == 0) || goingToExit){
-//			if(pass > 20 && (goingToExit || (pass % 10 == 0)))
-//				outman.UserMessage(" optimization up to ...");
-			outman.UserMessage("pass %-2d: %.4f   %s", pass, optInd->Fitness(), outString.c_str());
+		if(pass < 20 || (pass % 10 == 0) || goingToExit){
+			if(pass > 20 && (goingToExit || (pass % 10 == 0)))
+				outman.UserMessage(" optimization up to ...");
+			outman.UserMessage("pass %-2d: %.4f   %s)", pass, optInd->Fitness(), outString.c_str());
 			paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = subRateOpt = insDelOptImprove = ZERO_POINT_ZERO;
-//			}
+			}
 		pass++;
 		}while(!goingToExit);
 #ifdef PUSH_TO_MIN_BLEN
