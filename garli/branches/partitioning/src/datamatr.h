@@ -276,7 +276,7 @@ protected:
 		virtual ~DataMatrix();
 
 		// pure virtual functions - must override in derived class
-		virtual unsigned char	CharToDatum( char ch )					= 0;
+		virtual unsigned char	CharToDatum( char ch )	const			= 0;
 		virtual unsigned char CharToBitwiseRepresentation( char ch ) const= 0;
 		virtual char	DatumToChar( unsigned char d )	const           = 0;
 		virtual unsigned char	FirstState()		    const           = 0;
@@ -439,28 +439,7 @@ protected:
 		int MinScore(set<unsigned char> patt, int bound, unsigned char bits=15, int sc=0) const;
 		void GetStringOfOrigDataColumns(string &str) const;
 
-	public:	// exception classes
-#if defined( CPLUSPLUS_EXCEPTIONS )
-		class XBadState {
-			public:
-				XBadState( char c ) : ch(c) {}
-				char ch;
-		};
-#else
-      void Abort( char* msg )
-         { cerr << endl << "Error:" << msg << endl << "Program terminated." << endl; 
-         #ifdef POWERMAC_VERSION
-         	assert(0);
-         	cout<<"quit"<<endl;
-         	char c;
-         	cin>>c;
-         	throw 1;
-         #else
-         	exit(1); 
-         #endif
-         }
-      void BadState( char ch ) { char s[80]; sprintf(s, "Bad character state (%c)", ch); Abort(s); }
-      
+	public:	
       void ReserveOriginalCounts(){
       		if(origCounts==NULL) origCounts=new int[nChar];
       		for(int i=0;i<nChar;i++){
@@ -488,7 +467,6 @@ protected:
 	  void CountMissingCharsByColumn(vector<int> &vec);
 	  void MakeWeightSetString(NxsCharactersBlock &charblock, string &wtstring, string name);
       void MakeWeightSetString(std::string &wtstring, string name);
-#endif
 };
 
 #endif
