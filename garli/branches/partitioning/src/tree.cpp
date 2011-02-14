@@ -99,6 +99,9 @@ bool Tree::useOptBoundedForBlen;
 FLOAT_TYPE Tree::uniqueSwapPrecalc[500];
 FLOAT_TYPE Tree::distanceSwapPrecalc[1000];
 
+unsigned Tree::minimumPatsNucOpenMP;
+unsigned Tree::minimumPatsNStateOpenMP;
+
 //FLOAT_TYPE Tree::rescalePrecalcThresh[30];
 //FLOAT_TYPE Tree::rescalePrecalcMult[30];
 //int Tree::rescalePrecalcIncr[30];
@@ -263,6 +266,9 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 			}
 		outman.UserMessage("\n#######################################################");
 		}
+	
+	minimumPatsNucOpenMP = conf->minimumPatsNucOpenMP;
+	minimumPatsNStateOpenMP = conf->minimumPatsNStateOpenMP;
 	}
 		
 //this assumes that a tree string has been passed in with *s pointing to the first char of a blen
@@ -5249,20 +5255,26 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE siteL, totallnL = ZERO_POINT_ZERO, unscaledlnL = ZERO_POINT_ZERO;
-	FLOAT_TYPE logConditioningFactor = ZERO_POINT_ZERO;
-	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
-	
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<FLOAT_TYPE> siteLikes;
+	FLOAT_TYPE siteL, unscaledlnL, totallnL = ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO;
+
+	FLOAT_TYPE logConditioningFactor = ZERO_POINT_ZERO;
+	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
+
+	vector<FLOAT_TYPE> siteLikes(nchar);
 
 	if(siteToScore > 0) Ldat += siteToScore;
 
 	if(nRateCats == 1){
 #ifdef OMP_TERMSCORE_NSTATE
-		#pragma omp parallel for private(partial, Ldata, siteL) reduction(+ : totallnL)
+		bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
+		#ifdef LUMP_LIKES
+			#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, unscaledlnL) reduction(+ : totallnL, grandSumlnL)
+		#else
+			#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, unscaledlnL) reduction(+ : totallnL)
+		#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates];
@@ -5340,17 +5352,25 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 			else{//nothing needs to be done if the count for this site is 0
 				}
 			Ldata++;
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumlnL += totallnL;
+				totallnL = ZERO_POINT_ZERO;
+				}
+#endif
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL);
-			}
-		if(sitelikeLevel != 0){
-			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
+				siteLikes[i] = unscaledlnL;
 			}
 		}
 	else{//multiple rates
 		FLOAT_TYPE rateL;
 #ifdef OMP_TERMSCORE_NSTATE
-		#pragma omp parallel for private(partial, Ldata, siteL, rateL) reduction(+ : totallnL)
+	bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
+	#ifdef LUMP_LIKES
+		#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, rateL, unscaledlnL) reduction(+ : totallnL, grandSumlnL)
+	#else
+		#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, rateL, unscaledlnL) reduction(+ : totallnL)
+	#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
 			partial = &partialCLA->arr[i*nstates*nRateCats];
@@ -5433,13 +5453,22 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 #endif
 				}
 			Ldata++;
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumlnL += totallnL;
+				totallnL = ZERO_POINT_ZERO;
+				}
+#endif
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL);
-			}
-		if(sitelikeLevel != 0){
-			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
+				siteLikes[i] = unscaledlnL;
 			}
 		}
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
+		}
+#ifdef LUMP_LIKES
+	totallnL += grandSumlnL;
+#endif
 
 	delete []freqs;
 	return totallnL;
@@ -5465,7 +5494,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 
 	vector<FLOAT_TYPE> freqs(4);
 
-	vector<FLOAT_TYPE> siteLikes;
+	vector<FLOAT_TYPE> siteLikes(nchar);
 
 	bool allGapChar = true;
 	
@@ -5542,7 +5571,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 		else{//nothing needs to be done if the count for this site is 0
 			}
 		if(sitelikeLevel != 0)
-			siteLikes.push_back(unscaledlnL);
+			siteLikes[i] = unscaledlnL;
 		}
 	if(sitelikeLevel != 0){
 		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
@@ -5671,10 +5700,10 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	if(siteToScore > 0) Ldata = AdvanceDataPointer(Ldata, siteToScore);
 #endif
 
-	FLOAT_TYPE siteL, totallnL = ZERO_POINT_ZERO, unscaledlnL = ZERO_POINT_ZERO;
+	FLOAT_TYPE siteL, unscaledlnL, totallnL = ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 
-	vector<FLOAT_TYPE> siteLikes;
+	vector<FLOAT_TYPE> siteLikes(nchar);
 
 	for(int i=0;i<nchar;i++){
 #ifdef USE_COUNTS_IN_BOOT
@@ -5753,10 +5782,18 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 					}while (states-- > 0);
 				}
 			}
-
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumlnL += totallnL;
+			totallnL = ZERO_POINT_ZERO;
+			}
+#endif
 		if(sitelikeLevel != 0)
-			siteLikes.push_back(unscaledlnL);
+			siteLikes[i] = unscaledlnL;
 		}
+#ifdef LUMP_LIKES
+	totallnL += grandSumlnL;
+#endif
 	if(sitelikeLevel != 0){
 		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult, NULL);
 		}
@@ -5793,10 +5830,10 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	posix_madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE siteL, totallnL = ZERO_POINT_ZERO, unscaledlnL = ZERO_POINT_ZERO;
+	FLOAT_TYPE siteL, unscaledlnL, totallnL = ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 
-	vector<FLOAT_TYPE> siteLikes;
+	vector<FLOAT_TYPE> siteLikes(nchar);
 
 	for(int i=0;i<nchar;i++){
 #ifdef USE_COUNTS_IN_BOOT
@@ -5844,10 +5881,19 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 			CL1+=4*nRateCats;
 #endif
 			}
-
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumlnL += totallnL;
+			totallnL = ZERO_POINT_ZERO;
+			}
+#endif
 		if(sitelikeLevel != 0)
-			siteLikes.push_back(unscaledlnL);
+			siteLikes[i] = unscaledlnL;
 		}
+
+#ifdef LUMP_LIKES
+	totallnL += grandSumlnL;
+#endif
 	if(sitelikeLevel != 0){
 		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
 		}
@@ -5881,19 +5927,24 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE totallnL=ZERO_POINT_ZERO, siteL;
-	FLOAT_TYPE unscaledlnL;
-	FLOAT_TYPE logConditioningFactor = ZERO_POINT_ZERO;
-	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
-
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<FLOAT_TYPE> siteLikes;
+	FLOAT_TYPE siteL, unscaledlnL, totallnL = ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO;
+	
+	FLOAT_TYPE logConditioningFactor = ZERO_POINT_ZERO;
+	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
+
+	vector<FLOAT_TYPE> siteLikes(nchar);
 
 	if(nRateCats == 1){
 #ifdef OMP_INTSCORE_NSTATE
-	#pragma omp parallel for private(partial, CL1, siteL, unscaledlnL) reduction(+ : totallnL)
+		bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
+	#ifdef LUMP_LIKES
+		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, unscaledlnL) reduction(+ : totallnL, grandSumlnL)
+	#else
+		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, unscaledlnL) reduction(+ : totallnL)
+	#endif
 		for(int i=0;i<nchar;i++){
 			partial = &(partialCLA->arr[nstates*i]);
 			CL1		= &(childCLA->arr[nstates*i]);
@@ -5965,19 +6016,26 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				}
 			else{//nothing needs to be done if the count for this site is 0
 				}
-
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumlnL += totallnL;
+				totallnL = ZERO_POINT_ZERO;
+				}
+#endif
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL);
-			}
-		if(sitelikeLevel != 0){
-			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
+				siteLikes[i] = unscaledlnL;
 			}
 		}
 	else{
 		FLOAT_TYPE siteL, tempL, rateL;
 		
 #ifdef OMP_INTSCORE_NSTATE
-		#pragma omp parallel for private(partial, CL1, siteL, tempL, rateL) reduction(+ : totallnL)
+		bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
+	#ifdef LUMP_LIKES
+		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, tempL, rateL, unscaledlnL) reduction(+ : totallnL, grandSumlnL)
+	#else
+		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, tempL, rateL, unscaledlnL) reduction(+ : totallnL)
+	#endif
 		for(int i=0;i<nchar;i++){
 			partial = &(partialCLA->arr[nRateCats*nstates*i]);
 			CL1		= &(childCLA->arr[nRateCats*nstates*i]);
@@ -6052,13 +6110,21 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 				}
 			else{ //nothing needs to be done if the count of this site is 0
 				}
-
+#ifdef LUMP_LIKES
+			if((i + 1) % LUMP_FREQ == 0){
+				grandSumlnL += totallnL;
+				totallnL = ZERO_POINT_ZERO;
+				}
+#endif
 			if(sitelikeLevel != 0)
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 			}
-		if(sitelikeLevel != 0){
-			OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
-			}
+		}
+#ifdef LUMP_LIKES
+	totallnL += grandSumlnL;
+#endif
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
 		}
 
 	delete []freqs;
@@ -7237,7 +7303,7 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 	
 	if(nRateCats == 4){//the unrolled 4 rate version
 #ifdef OMP_INTINTCLA
-		#pragma omp parallel for private(dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
+		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
 		for(int i=0;i<nchar;i++){
 			int index=4*4*i;
 			dest = &(destCLA->arr[index]);
@@ -7338,7 +7404,7 @@ void Tree::CalcFullCLAInternalInternal(CondLikeArray *destCLA, const CondLikeArr
 		int r;
 #ifdef OMP_INTINTCLA
 		int index;
-		#pragma omp parallel for private(r, index, dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
+		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(r, index, dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
 		for(int i=0;i<nchar;i++) {
 			index=4*nRateCats*i;
 			dest = &(destCLA->arr[index]);
@@ -7412,7 +7478,7 @@ void Tree::CalcFullCLAInternalInternalNState(CondLikeArray *destCLA, const CondL
 #endif
 
 #ifdef OMP_INTINTCLA_NSTATE
-	#pragma omp parallel for private(dest, LCL, RCL, L1, R1)
+	#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(dest, LCL, RCL, L1, R1)
 	for(int i=0;i<nchar;i++){
 		dest = &(destCLA->arr[nRateCats * nstates * i]);
 		LCL = &(LCLA->arr[nRateCats * nstates * i]); 
@@ -7845,6 +7911,7 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 	const FLOAT_TYPE *CL=LCLA->arr;
 	const FLOAT_TYPE *CL1=CL;
 	const char *data2=dat2;
+	FLOAT_TYPE L1, L2, L3, L4;
 
 	const SequenceData *data = dataPart->GetSubset(dataIndex);
 	Model *mod = modPart->GetModel(modIndex);	
@@ -7864,7 +7931,7 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 
 	if(nRateCats==4){//unrolled 4 rate version
 #ifdef OMP_INTTERMCLA
-		#pragma omp parallel for private(dest, CL1, data2)
+		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(dest, CL1, data2, L1, L2, L3, L4)
 		for(int i=0;i<nchar;i++){
 			dest=&des[4*4*i];
 			CL1=&CL[4*4*i];
@@ -7878,27 +7945,58 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 			if(1){
 #endif
 				if(*data2 > -1){ //no ambiguity
-					dest[0] = ((pr1[0]*CL1[0]+pr1[1]*CL1[1])+(pr1[2]*CL1[2]+pr1[3]*CL1[3])) * pr2[*data2];
-					dest[1] = ((pr1[4]*CL1[0]+pr1[5]*CL1[1])+(pr1[6]*CL1[2]+pr1[7]*CL1[3])) * pr2[*data2+4];
-					dest[2] = ((pr1[8]*CL1[0]+pr1[9]*CL1[1])+(pr1[10]*CL1[2]+pr1[11]*CL1[3])) * pr2[*data2+8];
-					dest[3] = ((pr1[12]*CL1[0]+pr1[13]*CL1[1])+(pr1[14]*CL1[2]+pr1[15]*CL1[3])) * pr2[*data2+12];
-					
-					dest[4] = ((pr1[16]*CL1[4]+pr1[17]*CL1[5])+(pr1[18]*CL1[6]+pr1[19]*CL1[7])) * pr2[*data2+16];
-					dest[5] = ((pr1[20]*CL1[4]+pr1[21]*CL1[5])+(pr1[22]*CL1[6]+pr1[23]*CL1[7])) * pr2[*data2+4+16];
-					dest[6] = ((pr1[24]*CL1[4]+pr1[25]*CL1[5])+(pr1[26]*CL1[6]+pr1[27]*CL1[7])) * pr2[*data2+8+16];
-					dest[7] = ((pr1[28]*CL1[4]+pr1[29]*CL1[5])+(pr1[30]*CL1[6]+pr1[31]*CL1[7])) * pr2[*data2+12+16];
-				
-					dest[8] = ((pr1[32]*CL1[8]+pr1[33]*CL1[9])+(pr1[34]*CL1[10]+pr1[35]*CL1[11])) * pr2[*data2+32];
-					dest[9] = ((pr1[36]*CL1[8]+pr1[37]*CL1[9])+(pr1[38]*CL1[10]+pr1[39]*CL1[11])) * pr2[*data2+4+32];
-					dest[10] = ((pr1[40]*CL1[8]+pr1[41]*CL1[9])+(pr1[42]*CL1[10]+pr1[43]*CL1[11])) * pr2[*data2+8+32];
-					dest[11] = ((pr1[44]*CL1[8]+pr1[45]*CL1[9])+(pr1[46]*CL1[10]+pr1[47]*CL1[11])) * pr2[*data2+12+32];
-				
-					dest[12] = ((pr1[48]*CL1[12]+pr1[49]*CL1[13])+(pr1[50]*CL1[14]+pr1[51]*CL1[15])) * pr2[*data2+48];
-					dest[13] = ((pr1[52]*CL1[12]+pr1[53]*CL1[13])+(pr1[54]*CL1[14]+pr1[55]*CL1[15])) * pr2[*data2+4+48];
-					dest[14] = ((pr1[56]*CL1[12]+pr1[57]*CL1[13])+(pr1[58]*CL1[14]+pr1[59]*CL1[15])) * pr2[*data2+8+48];
-					dest[15] = ((pr1[60]*CL1[12]+pr1[61]*CL1[13])+(pr1[62]*CL1[14]+pr1[63]*CL1[15])) * pr2[*data2+12+48];
+					L1 = ((pr1[0]*CL1[0]+pr1[1]*CL1[1])+(pr1[2]*CL1[2]+pr1[3]*CL1[3]));
+					L2 = ((pr1[4]*CL1[0]+pr1[5]*CL1[1])+(pr1[6]*CL1[2]+pr1[7]*CL1[3]));
+					L3 = ((pr1[8]*CL1[0]+pr1[9]*CL1[1])+(pr1[10]*CL1[2]+pr1[11]*CL1[3]));
+					L4 = ((pr1[12]*CL1[0]+pr1[13]*CL1[1])+(pr1[14]*CL1[2]+pr1[15]*CL1[3]));
 
-					dest+=16;
+					dest[0] = L1 * pr2[*data2];
+					dest[1] = L2 * pr2[*data2+4];
+					dest[2] = L3 * pr2[*data2+8];
+					dest[3] = L4 * pr2[*data2+12];
+
+					dest+=4;
+					CL1+=4;
+
+					L1 = ((pr1[16]*CL1[0]+pr1[17]*CL1[1])+(pr1[18]*CL1[2]+pr1[19]*CL1[3]));
+					L2 = ((pr1[20]*CL1[0]+pr1[21]*CL1[1])+(pr1[22]*CL1[2]+pr1[23]*CL1[3]));
+					L3 = ((pr1[24]*CL1[0]+pr1[25]*CL1[1])+(pr1[26]*CL1[2]+pr1[27]*CL1[3]));
+					L4 = ((pr1[28]*CL1[0]+pr1[29]*CL1[1])+(pr1[30]*CL1[2]+pr1[31]*CL1[3]));
+
+					dest[0] = L1 * pr2[*data2+16];
+					dest[1] = L2 * pr2[*data2+4+16];
+					dest[2] = L3 * pr2[*data2+8+16];
+					dest[3] = L4 * pr2[*data2+12+16];
+
+					dest+=4;
+					CL1+=4;
+
+					L1 = ((pr1[32]*CL1[0]+pr1[33]*CL1[1])+(pr1[34]*CL1[2]+pr1[35]*CL1[3]));
+					L2 = ((pr1[36]*CL1[0]+pr1[37]*CL1[1])+(pr1[38]*CL1[2]+pr1[39]*CL1[3]));
+					L3 = ((pr1[40]*CL1[0]+pr1[41]*CL1[1])+(pr1[42]*CL1[2]+pr1[43]*CL1[3]));
+					L4 = ((pr1[44]*CL1[0]+pr1[45]*CL1[1])+(pr1[46]*CL1[2]+pr1[47]*CL1[3]));
+
+					dest[0] = L1 * pr2[*data2+32];
+					dest[1] = L2 * pr2[*data2+4+32];
+					dest[2] = L3 * pr2[*data2+8+32];
+					dest[3] = L4 * pr2[*data2+12+32];
+
+					dest+=4;
+					CL1+=4;
+
+					L1 = ((pr1[48]*CL1[0]+pr1[49]*CL1[1])+(pr1[50]*CL1[2]+pr1[51]*CL1[3]));
+					L2 = ((pr1[52]*CL1[0]+pr1[53]*CL1[1])+(pr1[54]*CL1[2]+pr1[55]*CL1[3]));
+					L3 = ((pr1[56]*CL1[0]+pr1[57]*CL1[1])+(pr1[58]*CL1[2]+pr1[59]*CL1[3]));
+					L4 = ((pr1[60]*CL1[0]+pr1[61]*CL1[1])+(pr1[62]*CL1[2]+pr1[63]*CL1[3]));
+
+
+					dest[0] = L1 * pr2[*data2+48];
+					dest[1] = L2 * pr2[*data2+4+48];
+					dest[2] = L3 * pr2[*data2+8+48];
+					dest[3] = L4 * pr2[*data2+12+48];
+
+					dest+=4;
+					CL1+=4;
 					data2++;
 					}
 				else if(*data2 == -4){//total ambiguity
@@ -7924,6 +8022,7 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 
 					dest+=16;
 					data2++;
+					CL1+=16;
 					}
 				else {//partial ambiguity
 					//first figure in the ambiguous terminal
@@ -7959,8 +8058,8 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 					*(dest++) *= ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
 					*(dest++) *= ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
 					*(dest++) *= ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
+					CL1+=16;
 					}
-				CL1+=16;
 #ifdef ALLOW_SINGLE_SITE
 				if(siteToScore > -1) break;
 #endif
@@ -7972,8 +8071,10 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 		}
 	else{//general N rate version
 #ifdef OMP_INTTERMCLA
-		#pragma omp parallel for private(dest, CL1, data2)
+		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(dest, CL1, data2, L1, L2, L3, L4)
 		for(int i=0;i<nchar;i++){
+//			if(i == 0)
+//				outman.UserMessage("inttermCNucNRate: %d", omp_get_num_threads());
 			dest=&des[4*nRateCats*i];
 			CL1=&CL[4*nRateCats*i];
 			data2=&dat2[ambigMap[i]];
@@ -7987,10 +8088,15 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 #endif
 				if(*data2 > -1){ //no ambiguity
 					for(int r=0;r<nRateCats;r++){
-						dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * pr2[(*data2)+16*r];
-						dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * pr2[(*data2+4)+16*r];
-						dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * pr2[(*data2+8)+16*r];
-						dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * pr2[(*data2+12)+16*r];
+						L1 = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
+						L2 = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
+						L3 = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
+						L4 = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
+						dest[0] = L1 * pr2[(*data2)+16*r];
+						dest[1] = L2 * pr2[(*data2+4)+16*r];
+						dest[2] = L3 * pr2[(*data2+8)+16*r];
+						dest[3] = L4 * pr2[(*data2+12)+16*r];
+
 						dest+=4;
 						}
 					data2++;
@@ -8068,7 +8174,7 @@ void Tree::CalcFullCLAInternalTerminalNState(CondLikeArray *destCLA, const CondL
 	if(siteToScore > 0) data2 += siteToScore;
 
 #ifdef OMP_INTTERMCLA_NSTATE
-	#pragma omp parallel for private(dest, CL1, data2)
+	#pragma omp parallel for if(nchar > minimumPatsNStateOpenMP) private(dest, CL1, data2)
 	for(int i=0;i<nchar;i++){
 		dest=&des[nRateCats*nstates*i];
 		CL1=&CL[nRateCats*nstates*i];

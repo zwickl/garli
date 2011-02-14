@@ -646,9 +646,6 @@ int main( int argc, char* argv[] )	{
 						}
 					else{//now we have a data matrix object created, already filtered for the correct sites or number of states
 						if(modSpec->IsMkTypeModel()){
-#ifdef OPEN_MP
-							throw ErrorException("Sorry, discrete Mk type models cannot currently be used with the OpenMP version");
-#endif
 							if(modSpec->IsGammaRateHet() || modSpec->IsFlexRateHet())
 								throw ErrorException("Sorry, rate heterogeneity cannot be used with Mk/Mkv models yet.\n\tSet ratehetmodel = none.");
 							if(actuallyUsedImpliedMatrixIndex > 0){
@@ -667,9 +664,6 @@ int main( int argc, char* argv[] )	{
 							modSpec->SetNStates(impliedMatrix);
 							}
 						else if(modSpec->IsOrientedGap()){
-#ifdef OPEN_MP
-							throw ErrorException("Sorry, oriented-gap models cannot currently be used with the OpenMP version");
-#endif
 							if(modSpec->IsGammaRateHet() || modSpec->IsFlexRateHet())
 								throw ErrorException("Sorry, rate heterogeneity cannot be used with gap models yet.\n\tSet ratehetmodel = none.");
 							if(modSpecSet.InferSubsetRates())
@@ -781,6 +775,7 @@ int main( int argc, char* argv[] )	{
 				else if(conf.runmode == 9)
 						pop->VariableStartingTreeOptimization(true);
 				else if(conf.runmode == 8){
+					throw ErrorException("Sorry, site rate estimation is not yet implemented in this version.");
 #ifdef OPEN_MP
 					throw ErrorException("can't estimate site rates in openmp version!");
 #endif

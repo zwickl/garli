@@ -2410,26 +2410,25 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE siteL;
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+
+	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 	FLOAT_TYPE D1a, D1c, D1g, D1t;
 	FLOAT_TYPE D2a, D2c, D2g, D2t;
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
-	FLOAT_TYPE totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO, unscaledlnL=ZERO_POINT_ZERO;
-	FLOAT_TYPE siteD1, siteD2;
+	FLOAT_TYPE unscaledlnL;
 
-	vector<double> siteLikes;
-
+	vector<double> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s;
-	vector<double> siteD2s;
+	vector<double> siteD1s(nchar);
+	vector<double> siteD2s(nchar);
 #endif
 
 #ifdef OMP_TERMDERIV
 	#ifdef LUMP_LIKES
-	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, Ldata, siteL) reduction(+ : tot1, tot2, totL, grandSumL)
+		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL, grandSumL)
 	#else
-	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, Ldata, siteL) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL)
 	#endif
 	for(int i=0;i<nchar;i++){
 		Ldata = &Ldat[ambigMap[i]];
@@ -2531,11 +2530,11 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			}
 #endif
 		if(sitelikeLevel != 0){
-			siteLikes.push_back(unscaledlnL);
+			siteLikes[i] = unscaledlnL;
 			}
 #ifdef OUTPUT_SITEDERIVS
-		siteD1s.push_back(siteD1);
-		siteD2s.push_back(siteD2);
+		siteD1s[i] = siteD1;
+		siteD2s[i] = siteD2;
 #endif
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
@@ -2594,9 +2593,9 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 	FLOAT_TYPE siteL, siteD1, siteD2;
-	FLOAT_TYPE unscaledlnL, grandSumL=ZERO_POINT_ZERO;
+	FLOAT_TYPE unscaledlnL;
 	
 	FLOAT_TYPE logLikeConditioningFactor = ZERO_POINT_ZERO;
 	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
@@ -2604,19 +2603,20 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	FLOAT_TYPE conditioningD2Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE probVariable = ZERO_POINT_ZERO;
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s;
-	vector<double> siteD2s;
+	vector<double> siteD1s(nchar);
+	vector<double> siteD2s(nchar);
 #endif
 
 	if(nRateCats == 1){
 
 	#ifdef OMP_TERMDERIV_NSTATE
+		bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
 		#ifdef LUMP_LIKES
-		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL, grandSumL)
+			#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL) reduction(+ : tot1, tot2, totL, grandSumL)
 		#else
-		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2) reduction(+ : tot1, tot2, totL)
+			#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL) reduction(+ : tot1, tot2, totL)
 		#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
@@ -2735,11 +2735,11 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				Ldata++;
 				}
 			if(sitelikeLevel != 0){
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 				}
 #ifdef OUTPUT_SITEDERIVS
-			siteD1s.push_back(siteD1);
-			siteD2s.push_back(siteD2);
+			siteD1s[i] = siteD1;
+			siteD2s[i] = siteD2);
 #endif
 #ifdef LUMP_LIKES
 			if((i + 1) % LUMP_FREQ == 0){
@@ -2860,29 +2860,30 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
-	FLOAT_TYPE grandSumL=ZERO_POINT_ZERO, unscaledlnL=ZERO_POINT_ZERO;
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE rateL, rateD1, rateD2;
+	FLOAT_TYPE unscaledlnL;
+	
 	FLOAT_TYPE logLikeConditioningFactor = ZERO_POINT_ZERO;
-
 	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
 	FLOAT_TYPE conditioningD1Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE conditioningD2Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE probVariable = ZERO_POINT_ZERO;
 
-	vector<double> siteLikes;
+	vector<double> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s;
-	vector<double> siteD2s;
+	vector<double> siteD1s(nchar);
+	vector<double> siteD2s(nchar);
 #endif
 
 #ifdef OMP_TERMDERIV_NSTATE
+		bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
 	#ifdef LUMP_LIKES
-	#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL, grandSumL)
+		#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2, unscaledlnL) reduction(+ : tot1, tot2, totL, grandSumL)
 	#else
-		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2, unscaledlnL) reduction(+ : tot1, tot2, totL)
 	#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
@@ -3004,11 +3005,11 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 				Ldata++;
 				}
 			if(sitelikeLevel != 0){
-				siteLikes.push_back(unscaledlnL);
+				siteLikes[i] = unscaledlnL;
 				}
 #ifdef OUTPUT_SITEDERIVS
-			siteD1s.push_back(siteD1);
-			siteD2s.push_back(siteD2);
+			siteD1s[i] = siteD1;
+			siteD2s[i] = siteD2;
 #endif
 #ifdef LUMP_LIKES
 			if((i + 1) % LUMP_FREQ == 0){
@@ -3059,28 +3060,30 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	FLOAT_TYPE freqs[4];
 	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
 
-	vector<double> siteLikes;
-#ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s;
-	vector<double> siteD2s;
-#endif
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 	posix_madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE La, Lc, Lg, Lt;
 	FLOAT_TYPE D1a, D1c, D1g, D1t;
 	FLOAT_TYPE D2a, D2c, D2g, D2t;
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
-	FLOAT_TYPE totL=ZERO_POINT_ZERO, grandSumL=ZERO_POINT_ZERO, unscaledlnL=ZERO_POINT_ZERO;
+	FLOAT_TYPE unscaledlnL=ZERO_POINT_ZERO;
+
+	vector<double> siteLikes(nchar);
+#ifdef OUTPUT_SITEDERIVS
+	vector<double> siteD1s(nchar);
+	vector<double> siteD2s(nchar);
+#endif
 
 #ifdef OMP_INTDERIV
 	#ifdef LUMP_LIKES
-	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, CL1, siteL) reduction(+ : tot1, tot2, totL, grandSumL)
+		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL, grandSumL)
 	#else
-	#pragma omp parallel for private(La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, partial, CL1, siteL) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL)
 	#endif
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[4*i*nRateCats]);
@@ -3149,8 +3152,8 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 			siteLikes[i] = unscaledlnL;
 			}
 #ifdef OUTPUT_SITEDERIVS
-		siteD1s.push_back(siteD1);
-		siteD2s.push_back(siteD2);
+		siteD1s[i] = siteD1;
+		siteD2s[i] = siteD2;
 #endif
 #ifdef LUMP_LIKES
 		if((i + 1) % LUMP_FREQ == 0){
@@ -3206,27 +3209,32 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
-
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO, grandSumL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
 	FLOAT_TYPE rateL, rateD1, rateD2;
 	FLOAT_TYPE unscaledlnL;
-	FLOAT_TYPE logLikeConditioningFactor = ZERO_POINT_ZERO;
 
+	FLOAT_TYPE logLikeConditioningFactor = ZERO_POINT_ZERO;
 	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
 	FLOAT_TYPE conditioningD1Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE conditioningD2Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE probVariable = ZERO_POINT_ZERO;
 
+	vector<double> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteLikes;
-	vector<double> siteD1s;
-	vector<double> siteD2s;
+	vector<double> siteD1s(nchar);
+	vector<double> siteD2s(nchar);
 #endif
 
 #ifdef OMP_INTDERIV_NSTATE
-	#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, rateL, rateD1, rateD2, partial, CL1, unscaledlnL) reduction(+ : tot1, tot2, totL)
+	bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
+	#ifdef LUMP_LIKES
+		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL, grandSumL)
+	#else
+		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL)
+	#endif	
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[nRateCats * nstates * i]);
 		CL1		= &(childCLA->arr[nRateCats * nstates * i]);
@@ -3266,7 +3274,7 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 				}
 
 			unscaledlnL=log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i];
-
+			
 			if(numCondPats > 0){
 				//CONDITIONING HERE HAS NEVER BEEN TESTED, SINCE NO STANDARD DATA AND RATE HET
 				assert(unscaledlnL < ZERO_POINT_ZERO);
@@ -3329,18 +3337,33 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 				totL += unscaledlnL * countit[i];
 				siteD1 /= siteL;
 				tot1 += countit[i] * siteD1;
-				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+				siteD2 = ((siteD2 / siteL) - siteD1*siteD1);
+				tot2 += countit[i] * siteD2;
 				assert(tot1 == tot1);
 				assert(tot2 == tot2);
 				}
 			}
-#ifndef OUTPUT_SITEDERIVS
+		if(sitelikeLevel != 0){
+			siteLikes[i] = unscaledlnL;
+			}
+#ifdef OUTPUT_SITEDERIVS
+		siteD1s[i] = siteD1;
+		siteD2s[i] = siteD2;
+#endif
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumL += totL;
+			totL = ZERO_POINT_ZERO;
+			}
 		}
+	totL += grandSumL;
 #else
-		siteLikes.push_back(unscaledlnL);
-		siteD1s.push_back(siteD1);
-		siteD2s.push_back((siteD2 / siteL) - siteD1*siteD1);
 		}
+#endif
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(dataIndex, siteLikes, childCLA->underflow_mult, partialCLA->underflow_mult);
+		}
+#ifdef OUTPUT_SITEDERIVS
 	ofstream ord("orderedSiteDerivs.log");
 	ofstream packed("packedSiteDerivs.log");
 	OutputSiteDerivatives(dataIndex, siteLikes, siteD1s, siteD2s, childCLA->underflow_mult, NULL, ord, packed);
@@ -3352,12 +3375,7 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	d2Tot = tot2;
 	lnL += totL;
 	delete []freqs;
-
-/*	double poo = lnL;
-	MakeAllNodesDirty();
-	Score();
-	assert(FloatingPointEquals(lnL, poo, 1e-8));
-*/	}
+	}
 
 void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the nstates^2 entries for the
@@ -3388,27 +3406,31 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
+	FLOAT_TYPE tot1=ZERO_POINT_ZERO, tot2=ZERO_POINT_ZERO, totL = ZERO_POINT_ZERO, grandSumL = ZERO_POINT_ZERO;//can't use d1Tot and d2Tot in OMP reduction because they are references
 
 	FLOAT_TYPE siteL, siteD1, siteD2;
 	FLOAT_TYPE tempL, tempD1, tempD2;
 	FLOAT_TYPE unscaledlnL;
-	FLOAT_TYPE logLikeConditioningFactor = ZERO_POINT_ZERO;
 
+	FLOAT_TYPE logLikeConditioningFactor = ZERO_POINT_ZERO;
 	FLOAT_TYPE conditioningLikeSum = ZERO_POINT_ZERO;
 	FLOAT_TYPE conditioningD1Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE conditioningD2Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE probVariable = ZERO_POINT_ZERO;
 
-
+	vector<double> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteLikes;
-	vector<double> siteD1s;
-	vector<double> siteD2s;
+	vector<double> siteD1s(nchar);
+	vector<double> siteD2s(nchar);
 #endif
 
 #ifdef OMP_INTDERIV_NSTATE
-#pragma omp parallel for private(siteL, siteD1, siteD2, tempL, tempD1, tempD2, partial, CL1) reduction(+ : tot1, tot2, totL)
+	bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
+	#ifdef LUMP_LIKES
+		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2) reduction(+ : tot1, tot2, totL, grandSumL)
+	#else
+		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2) reduction(+ : tot1, tot2, totL)
+	#endif
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[nstates*i]);
 		CL1		= &(childCLA->arr[nstates*i]);
@@ -3476,23 +3498,14 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 					}
 				else{ 
 					//condition the likelihood on variability
-/*					FLOAT_TYPE condlnL = unscaledlnL - MkvScaler;
-					assert(condlnL < ZERO_POINT_ZERO);
-					totL += condlnL * countit[i];
-*/
 					FLOAT_TYPE condlnL = unscaledlnL + logLikeConditioningFactor;
 					assert(condlnL < ZERO_POINT_ZERO);
 					totL += condlnL * countit[i];
 
 					//condition the first deriv
-					//FLOAT_TYPE condD1 = (siteD1 + ((siteL * constD1) / pV)) / siteL; 
-
 					FLOAT_TYPE condD1 = (siteD1 + ((siteL * conditioningD1Sum) / probVariable)) / siteL; 
 
 					//condition the second
-/*					FLOAT_TYPE t1 = pC - ONE_POINT_ZERO;
-					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (constD1 * constD1 - t1 * constD2))) / (siteL * siteL * t1 * t1);
-*/
 					FLOAT_TYPE t1 = conditioningLikeSum - ONE_POINT_ZERO;
 					FLOAT_TYPE condD2 = ((-siteD1 * siteD1 * t1 * t1) + siteL * ((t1 * t1 * siteD2) + siteL * (conditioningD1Sum * conditioningD1Sum - t1 * conditioningD2Sum))) / (siteL * siteL * t1 * t1);
 
@@ -3510,22 +3523,35 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 				totL += unscaledlnL * countit[i];
 				siteD1 /= siteL;
 				tot1 += countit[i] * siteD1;
-				tot2 += countit[i] * ((siteD2 / siteL) - siteD1*siteD1);
+				siteD2 = ((siteD2 / siteL) - siteD1*siteD1);
+				tot2 += countit[i] * siteD2;
 				assert(tot1 == tot1);
 				assert(tot2 == tot2);
 				}
 			partial += nstates;
 			CL1 += nstates;
 			}
-#ifndef OUTPUT_SITEDERIVS
+		if(sitelikeLevel != 0){
+			siteLikes[i] = unscaledlnL;
+			}
+#ifdef OUTPUT_SITEDERIVS
+		siteD1s[i] = siteD1;
+		siteD2s[i] = siteD2;
+#endif
+#ifdef LUMP_LIKES
+		if((i + 1) % LUMP_FREQ == 0){
+			grandSumL += totL;
+			totL = ZERO_POINT_ZERO;
+			}
 		}
+	totL += grandSumL;
 #else
-		//siteLikes.push_back(log(siteL) - partialCLA->underflow_mult[i] - childCLA->underflow_mult[i]);
-		siteLikes.push_back(unscaledlnL);
-		siteD1s.push_back(siteD1);
-		siteD2s.push_back(siteD2);
-		//siteD2s.push_back((siteD2 / siteL) - siteD1*siteD1);
 		}
+#endif
+	if(sitelikeLevel != 0){
+		OutputSiteLikelihoods(dataIndex, siteLikes, childCLA->underflow_mult, partialCLA->underflow_mult);
+		}
+#ifdef OUTPUT_SITEDERIVS
 	ofstream ord("orderedSiteDerivs.int.log");
 	ofstream packed("packedSiteDerivs.int.log");
 	OutputSiteDerivatives(dataIndex, siteLikes, siteD1s, siteD2s, partialCLA->underflow_mult, childCLA->underflow_mult, ord, packed);
@@ -3537,13 +3563,7 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	d2Tot = tot2;
 	lnL += totL;
 	delete []freqs;
-
-/*
-	double poo = lnL;
-	MakeAllNodesDirty();
-	Score();
-	assert(FloatingPointEquals(lnL, poo, 1e-8));
-*/	}
+	}
 
 void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, char *equiv, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the

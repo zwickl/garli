@@ -103,6 +103,9 @@ class Tree{
 		static FLOAT_TYPE rescalePrecalcMult[RESCALE_ARRAY_LENGTH];
 		static int rescalePrecalcIncr[RESCALE_ARRAY_LENGTH];
 
+		static unsigned minimumPatsNucOpenMP;
+		static unsigned minimumPatsNStateOpenMP;
+
 		static Bipartition *outgroup;
 
 		static int siteToScore;
