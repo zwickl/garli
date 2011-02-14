@@ -598,7 +598,7 @@ void CodonData::BaseFreqXPositionReport(){
 	outman.UserMessage(" all pos %10.5f%10.5f%10.5f%10.5f\n", empBaseFreqsAllPos[0], empBaseFreqsAllPos[1], empBaseFreqsAllPos[2], empBaseFreqsAllPos[3]);
 	}
 
-unsigned char NucleotideData::CharToDatum( char ch ){
+unsigned char NucleotideData::CharToDatum( char ch ) const{
 	unsigned char datum=0;
 	switch(ch){
 		case 'A' : datum=1; break;
@@ -641,7 +641,7 @@ unsigned char NucleotideData::CharToDatum( char ch ){
 	return datum;
 	}
 
-unsigned char AminoacidData::CharToDatum(char ch){
+unsigned char AminoacidData::CharToDatum(char ch) const{
 	char datum = 20;
 	switch(ch){
 		case'A'	: datum=	0	;break;

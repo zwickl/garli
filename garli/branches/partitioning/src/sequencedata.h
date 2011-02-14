@@ -40,7 +40,7 @@ public:
 protected:
 	FLOAT_TYPE *empStateFreqs;
 	// overrides of base class's virtual fuctions
-	virtual unsigned char CharToDatum( char ch ) = 0;
+	virtual unsigned char CharToDatum( char ch ) const = 0;
 	virtual unsigned char CharToBitwiseRepresentation( char ch ) const;
 	virtual char	DatumToChar( unsigned char d ) const;
 	virtual unsigned char	FirstState() const { return 0; }
@@ -57,7 +57,7 @@ public:
 	virtual void AddDummyRootToExistingMatrix();
 	};
 
-inline unsigned char SequenceData::CharToDatum( char ch ){
+inline unsigned char SequenceData::CharToDatum( char ch ) const{
 	unsigned char datum;
 
 	if( ch == 'A' || ch == 'a' )
@@ -74,7 +74,7 @@ inline unsigned char SequenceData::CharToDatum( char ch ){
 		datum = MISSING_DATA;
 	}
 	else
-		THROW_BADSTATE(ch);
+		throw ErrorException("Unknown character \"%c\" in SequenceData::CharToDatum", ch); 
 
 	return datum;
 }
@@ -166,7 +166,7 @@ public:
 #endif
 		}
 
-	unsigned char CharToDatum(char d);
+	unsigned char CharToDatum(char d) const;
 	void CalcEmpiricalFreqs();
 	void CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUnsignedSet &charset);
 	void MakeAmbigStrings();
@@ -634,7 +634,7 @@ public:
 	~CodonData(){}
 
 	void FillCodonMatrixFromDNA(const NucleotideData *);
-	unsigned char CharToDatum(char c) {
+	unsigned char CharToDatum(char c) const{
 		//this shouldn't be getting called, as it makes no sense for codon data
 		assert(0);
 		return 0;
@@ -697,7 +697,7 @@ public:
 		}
 	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code);
 	void CalcEmpiricalFreqs();
-	unsigned char CharToDatum(char d);
+	unsigned char CharToDatum(char d) const;
 	void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset);
 	};
 
@@ -874,8 +874,8 @@ class NStateData : public SequenceData{
 			}
 		void SetNumStates(int ns){maxNumStates = ns;}
 
-		virtual unsigned char CharToDatum(char d);
-		char DatumToChar( unsigned char d );
+		virtual unsigned char CharToDatum(char d) const;
+		virtual char DatumToChar( unsigned char d ) const;
 		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset);
 		void CalcEmpiricalFreqs(){
 			//BINARY - this might actually make sense for gap encoding
@@ -886,7 +886,7 @@ class NStateData : public SequenceData{
 		void DetermineConstantSites(){};
 	};
 
-inline unsigned char NStateData::CharToDatum( char ch ){
+inline unsigned char NStateData::CharToDatum( char ch ) const{
 	unsigned char datum;
 
 	if( ch == '0')
@@ -912,12 +912,12 @@ inline unsigned char NStateData::CharToDatum( char ch ){
 	else if( ch == '?')
 		datum = 99;
 	else
-      THROW_BADSTATE(ch);
+      throw ErrorException("Unknown character \"%c\" in NStateData::CharToDatum", ch); 
 
 	return datum;
 	}
 
-inline char NStateData::DatumToChar( unsigned char d ){
+inline char NStateData::DatumToChar( unsigned char d ) const{
 	//NSTATE - not sure how this should work, but it isn't that important anyway
 	
 	char ch = 'X';	// ambiguous
