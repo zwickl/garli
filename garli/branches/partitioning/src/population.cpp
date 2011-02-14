@@ -77,6 +77,7 @@ extern Profiler ProfEQVectors;
 
 extern OutputManager outman;
 extern bool interactive;
+bool swapBasedTerm = false;
 
 int memLevel;
 int calcCount=0;
@@ -103,8 +104,6 @@ int debug_mpi(const char* fmt, ...);
 int QuitNow();
 void InterruptMessage( int );
 void ClearDebugLogs();
-
-#define EPSILON          1e-8
 
 int askQuitNow = 0;
 
@@ -366,15 +365,20 @@ void Population::CheckForIncompatibleConfigEntries(){
 			ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
 			if(modSpec->fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
 			if(modSpec->includeInvariantSites == true && modSpec->fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
-			if(modSpec->Nst() > 1 && modSpec->fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
-			if(modSpec->numRateCats > 1 && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed or none!"));
+			if(modSpec->IsAminoAcid() == false && modSpec->Nst() > 1 && modSpec->fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
+			if((modSpec->numRateCats > 1 && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false && modSpec->IsCodon() == false) || (modSpec->IsCodon() && !modSpec->fixOmega)) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed, nonsynonymousfixed or none!"));
 			}
 		}
 
-	if(conf->inferInternalStateProbs && conf->bootstrapReps > 0) throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
+	if(conf->inferInternalStateProbs && conf->bootstrapReps > 0) 
+		throw(ErrorException("You cannont infer internal states during a bootstrap run!"));
+	if(conf->outputSitelikelihoods > 0 && conf->bootstrapReps > 0) 
+		throw(ErrorException("You cannont output site likelihoods during a bootstrap run!"));
+	if(conf->startOptPrec < conf->minOptPrec)
+		throw ErrorException("startoptprec must be equal to or greater than minoptprec");
 	for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
-		if((modSpecSet.GetModSpec(ms)->IsNStateV()  || modSpecSet.GetModSpec(ms)->IsOrderedNStateV()) && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
-			throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used if\n\tthe Mkv model (datatype = standardvariable) is used for any data.\n\tTry streefname = random.");
+		if((modSpecSet.GetModSpec(ms)->IsNStateV()  || modSpecSet.GetModSpec(ms)->IsOrderedNStateV() ||  modSpecSet.GetModSpec(ms)->IsOrientedGap()) && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
+			throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used if\n\tthe Mkv model (datatype = standardvariable) or gap model (datatype = indelmixturemodel)\n\tare used for any data.\n\tTry streefname = random.");
 		}
 	}
 
@@ -401,6 +405,12 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 
 	if(rank == 0) total_size = conf->nindivs + nprocs-1;
 	else total_size = conf->nindivs;
+	swapTermThreshold = conf->swapTermThreshold;
+	if(swapTermThreshold != 0)
+		//this is a global that Tree needs access to
+		swapBasedTerm = true;
+	else 
+		swapBasedTerm = false;
 
 	//set two model statics
 	Model::mutationShape = conf->gammaShapeModel;
@@ -740,10 +750,14 @@ void Population::RunTests(){
 #endif
 
 	if(conf->bootstrapReps > 0){
-		outman.UserMessage("bootstrap reweighting with seed %d", rnd.seed());
-		for(int d = 0;d < dataPart->NumSubsets();d++)
-			dataPart->GetSubset(d)->BootstrapReweight(0, conf->resampleProportion);
+		outman.UserMessage("\nBootstrap reweighting...");
+		//if this is the first rep
+		if(nextBootstrapSeed == 0)
+			nextBootstrapSeed = rnd.seed();
+		lastBootstrapSeed = nextBootstrapSeed;
+		nextBootstrapSeed = dataPart->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
 		}
+
 
 	//DEBUG
 //	Individual *ind0 = &newindiv[0];
@@ -1186,17 +1200,32 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		const ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
 		if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
 			//if no streefname file was specified, the param values should be in a garli block with the dataset
-			if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) 
+				throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) 
+				throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) 
+				throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) 
+				throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->IsCodon() && modSpec->fixOmega && !modSpec->gotOmegasFromFile) 
+				throw(ErrorException("rate het model set to nonsynonymousfixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 			}
 		else{
-			if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			if((modSpec->IsNucleotide() || modSpec->IsAminoAcid()) && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) 
+				throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) 
+				throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) 
+				throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) 
+				throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->IsCodon() && modSpec->fixOmega && !modSpec->gotOmegasFromFile) 
+				throw ErrorException("rate het model set to nonsynonymousfixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 			}
+		if(conf->modWeight == ZERO_POINT_ZERO)
+			if(modSpec->IsCodon() && modSpec->gotOmegasFromFile == false) 
+				throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
 		}
 		
 	assert(indiv[0].treeStruct != NULL);
@@ -1216,10 +1245,16 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	catch(UnscoreableException &ex){
 		throw ErrorException("Initial individual unscorable, perhaps due to poorness of starting tree.\n\tTry providing a tree if you previously tried random.");
 		}
-	
+
+	//check the current likelihood now to know how accurate we can expect them to be later
+#ifdef SINGLE_PRECISION_FLOATS
+	Tree::expectedPrecision = pow(10.0, - (double) ((int) FLT_DIG - ceil(log10(-indiv[0].Fitness()))));
+#else
+	Tree::expectedPrecision = pow(10.0, - (double) ((int) DBL_DIG - ceil(log10(-indiv[0].Fitness()))));
+#endif
+//	outman.UserMessage("expected likelihood precision = %.4e", Tree::expectedPrecision);
 
 	//if there are not mutable params in the model, remove any weight assigned to the model
-	//if(indiv[0].mod->NumMutatableParams() == 0) {
 	if(indiv[0].modPart.NumMutableParams() == 0) {
 		if((conf->bootstrapReps == 0 && currentSearchRep == 1) || (currentBootstrapRep == 1 && currentSearchRep == 1))
 			outman.UserMessage("NOTE: Model contains no mutable parameters!\nSetting model mutation weight to zero.\n");
@@ -1651,9 +1686,8 @@ void Population::Run(){
 
 	outman.UserMessageNoCR("%-8s %-14s %-8s  %-14s ", "gen", "current_lnL", "precision", "last_tree_imp");
 
-#ifdef SWAP_BASED_TERMINATION
-	outman.UserMessageNoCR("%-14s ", "swaps_on_cur");
-#endif
+	if(swapBasedTerm)
+		outman.UserMessageNoCR("%-14s ", "swaps_on_cur");
 
 	if(conf->reportRunProgress)
 		outman.UserMessageNoCR("%-14s %-14s", "rep_prop_done", "tot_prop_done");
@@ -1662,9 +1696,8 @@ void Population::Run(){
 
 	outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
 
-#ifdef SWAP_BASED_TERMINATION
+	if(swapBasedTerm)
 		outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
-#endif
 
 	if(conf->reportRunProgress)
 		outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
@@ -1677,12 +1710,12 @@ void Population::Run(){
 	gen++;
 	for (; gen < conf->stopgen+1; ++gen){
 		NextGeneration();
-#ifdef SWAP_BASED_TERMINATION
-		if(uniqueSwapTried){
-			lastUniqueSwap = gen;
-			uniqueSwapTried = false;
+		if(swapBasedTerm){
+			if(uniqueSwapTried){
+				lastUniqueSwap = gen;
+				uniqueSwapTried = false;
+				}
 			}
-#endif
 		keepTrack();
 		if(conf->outputMostlyUselessFiles) OutputFate();
 		if(conf->logevery > 0 && !(gen % conf->logevery)) OutputLog();
@@ -1695,21 +1728,17 @@ void Population::Run(){
 
 			outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
 
-#ifdef SWAP_BASED_TERMINATION
-			outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
-#endif
+			if(swapBasedTerm)
+				outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
+
 			if(conf->reportRunProgress)
 				outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
 
 			outman.UserMessage("");
 			
 			if(conf->outputMostlyUselessFiles){
-#ifdef DETAILED_SWAP_REPORT
 				swapLog << gen << "\t";
 				indiv[bestIndiv].treeStruct->attemptedSwaps.SwapReport(swapLog);
-#else
-				swapLog << gen << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique() << "\t" << indiv[bestIndiv].treeStruct->attemptedSwaps.GetTotal() << endl;
-#endif
 				}
 			}
 #ifndef BOINC
@@ -1816,20 +1845,42 @@ void Population::Run(){
 
 			UpdateFractionDone(2);
 
-			//termination conditions
-			if(conf->enforceTermConditions == true &&
-#ifdef SWAP_BASED_TERMINATION
-				(gen - lastUniqueSwap > 200 || (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, 1e-8)) &&
-#else
-				(gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, 1e-8)) &&
-#endif
-				(gen > adap->intervalsToStore * adap->intervalLength)
-				&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
-				&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, 1e-8) || adap->numPrecReductions==0)){
-				if(adap->topoMutateProb > ZERO_POINT_ZERO) outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
-				else outman.UserMessage("Reached termination condition!\n");
-				outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
-				break;
+			//automatic termination conditions
+			if(conf->enforceTermConditions == true){
+				if(swapBasedTerm && !FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
+					assert(swapTermThreshold != 0);
+					if(swapTermThreshold < 0 && (gen - lastUniqueSwap > abs(swapTermThreshold))){
+						break;
+						}
+					else {
+						if(swapTermThreshold > 0 && (gen - lastUniqueSwap > swapTermThreshold)
+						&& (gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
+						&& (gen > adap->intervalsToStore * adap->intervalLength)
+						&& adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh
+						&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)){
+							if(adap->topoMutateProb > ZERO_POINT_ZERO) 
+								outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
+							else 
+								outman.UserMessage("Reached termination condition!\n");
+							outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
+							outman.UserMessage("Last new topology swap at gen %d", lastUniqueSwap);
+							break;
+							}
+						}
+					}
+				else{
+					if((gen-max(lastTopoImprove, lastPrecisionReduction) > conf->lastTopoImproveThresh || FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0)))
+					&& (gen > adap->intervalsToStore * adap->intervalLength)
+					&& (adap->improveOverStoredIntervals < conf->improveOverStoredIntervalsThresh)
+					&& (FloatingPointEquals(adap->branchOptPrecision, adap->minOptPrecision, max(1.0e-8, GARLI_FP_EPS * 2.0)) || adap->numPrecReductions==0)){
+						if(adap->topoMutateProb > ZERO_POINT_ZERO) 
+							outman.UserMessage("Reached termination condition!\nlast topological improvement at gen %d", lastTopoImprove);
+						else 
+							outman.UserMessage("Reached termination condition!\n");
+						outman.UserMessage("Improvement over last %d gen = %.5f", adap->intervalsToStore*adap->intervalLength, adap->improveOverStoredIntervals);
+						break;
+						}
+					}
 				}
 
 #ifdef INCLUDE_PERTURBATION
@@ -2329,7 +2380,7 @@ void Population::BetterFinalOptimization(){
 	unsigned s = stopwatch.SplitTime();
 	prof << "Total Runtime: " << s << "\tnumgen: " << gen << "\tFinalScore: " << indiv[bestIndiv].Fitness() << "\n";
 	outman.SetOutputStream(prof);
-	indiv[bestIndiv].mod->OutputHumanReadableModelReportWithParams();
+	indiv[bestIndiv].modPart->OutputHumanReadableModelReportWithParams();
 
 	prof << "Function\t\tcalls\ttime\tTperC\t%runtime" << endl;
 	ProfIntInt.Report(prof, s);

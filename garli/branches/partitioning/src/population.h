@@ -342,6 +342,11 @@ private:
 	bool usedNCL;
 	bool startingTreeInNCL;
 	bool startingModelInNCL;
+	//this is the number of generations that the run must continue without finding
+	//a new better swap to terminate, on top of other stopping conditions, default=0
+	//if it is NEGATIVE, then abs(this) superseeds all other term cond and only this 
+	//must be met. set in conf with swaptermthreshold = #
+	int swapTermThreshold;
 
 	enum output_details {
 		DONT_OUTPUT = 0,
@@ -393,7 +398,7 @@ private:
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
 			userTermination(false), timeTermination(false), genTermination(false), currentBootstrapRep(0),
-			finishedRep(false), lastBootstrapSeed(0), nextBootstrapSeed(0), dataPart(NULL), rawPart(NULL)
+			finishedRep(false), lastBootstrapSeed(0), nextBootstrapSeed(0), dataPart(NULL), rawPart(NULL), swapTermThreshold(0)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
 #endif
