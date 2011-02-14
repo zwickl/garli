@@ -60,6 +60,14 @@ AC_FUNC_MALLOC
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([floor memmove memset pow sqrt strchr strdup strtol])
 
+# A few miscelaneous features, not of general interest
+AC_ARG_ENABLE(profiler, AC_HELP_STRING([--enable-profiler], [built in runtime profiler]),
+[AC_DEFINE([ENABLE_CUSTOM_PROFILER], [1], [profiler for assessing execution times])],
+[])
+
+AC_ARG_ENABLE(leak_detection, AC_HELP_STRING([--enable-leak-detection], [memory leak detection is turned on]),
+[AC_DEFINE([MONITORING_ALLOCATION], [1], [monitors all allocation/deallocation, writes report])],
+[])
 
 
 #--------------------------------------------------------------------------------------------------#
@@ -98,6 +106,15 @@ if test "$enable_openmp" = yes; then
 	AC_MSG_NOTICE([
 	   *** NOTE: compiling OpenMP multithreaded version
 	   ])
+fi
+
+# Compile BOINC version
+AC_ARG_ENABLE(boinc,
+        AC_HELP_STRING([--enable-boinc],[build BOINC version (requires BOINC library and api installation.  Building may require much fiddling.)]), , [enable_boinc=no])
+if test "$enable_boinc" = yes; then
+        AC_MSG_NOTICE([
+           *** NOTE: compiling BOINC version
+           ])
 fi
 
 # Mpi run forking version
@@ -151,6 +168,13 @@ if test  "$enable_openmp" = yes; then
 	fi
 fi
 
+#BOINC compilation
+if test  "$enable_boinc" = yes; then
+        CXXFLAGS="$CXXFLAGS -DBOINC"
+		LIBS="$LIBS -lpthread -lboinc -lboinc_api"
+fi
+
+#Compiler choice
 if test "$CC" = "icc" -o "$CC" = "icc" ; then
 #	Intel C compiler for Linux
 	if test "$enable_debugging" = no; then
@@ -216,10 +240,34 @@ fi
 
 CXXFLAGS="$CXXFLAGS $CXXFLAGS_OPTIM_SPEED"
 
+#Location of BOINC library and include files
+BOINC_INSTALL="/usr"
+AC_ARG_WITH(
+	[boinc],
+	AC_HELP_STRING(
+		[--with-boinc=DIR],
+		[Specify the root directory for the BOINC library (parent of the include/boinc and lib directories). Omit this flag to use a system level install of BOINC.]
+		),        
+	[
+	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
+		BOINC_INSTALL="$withval"
+	fi
+	])
+
+if test  "$enable_boinc" = yes; then
+	BOINC_INCL="$BOINC_INSTALL/include/boinc"
+	BOINC_LIB_DIR="$BOINC_INSTALL/lib"
+	if ! test -d "$BOINC_INSTALL" ; then
+		AC_MSG_ERROR([A BOINC library and api installation is required for building the BOINC version of GARLI. Expecting a directory called $BOINC_INCL and libboinc library files in $BOINC_LIB_DIR. Use the --with-boinc flag with configure to specify a location other than /usr/local, or verify that the specified location is correct.])
+	fi
+	CXXFLAGS="$CXXFLAGS -I$BOINC_INCL"
+	LDFLAGS="$LDFLAGS -L$BOINC_LIB_DIR"
+fi
 
 ################################################################################
-#	By default, use the bundled ncl code from source, 
-#		but let the --with-ncl argument override this.
+#	Require the builder to provide the --with-ncl argument,
+#	otherwise default to looking for a system level installation.
+#	ideally people should be using the build_garli.sh install script
 ################################################################################
 NCL_INC_DIR="/usr/local/include"
 NCL_LIB_DIR="/usr/local/lib"
@@ -238,6 +286,32 @@ AC_ARG_WITH(
 		NCL_BIN_DIR="$withval/bin"
 	fi
 	])
+
+####DJZ This was to look for an NCL install in other places, but 
+#I gave up on it because the user should either use the script
+#or know what they are doing.
+#if ! test -n "$WNCL" ; then
+#	echo WITH_NCL NOT SPECIFIED
+#	if test -d "$srcdir/ncl/" ; then
+#		echo FOUND NCL DIR
+#		nl=`ls -ld $srcdir/ncl*/ | wc -l`
+#		echo ###		
+#		echo $nl
+#		echo ###
+#		if ! test $nl = 1 ; then
+#			AC_MSG_ERROR([Multiple NCL directories found.])
+#		fi
+#		NCL_BASE=`ls -d $srcdir/ncl*/`
+#		NCL_INC_DIR="$NCL_BASE/include"
+#		NCL_LIB_DIR="$NCL_BASE/lib"
+#		echo NCL_INC_DIR $NCL_INC_DIR
+#	else
+#		echo NO NCL DIR FOUND	
+#	fi
+#else
+#	echo WITH_NCL SPECIFIED
+#fi
+###
 
 if ! test -d "$NCL_INC_DIR/ncl" ; then
 	AC_MSG_ERROR([NCL 2.1 or higher is a prerequisite for building Garli. Expecting a directory called $NCL_INC_DIR/ncl, verify that the argument to --with-ncl is correct.])
