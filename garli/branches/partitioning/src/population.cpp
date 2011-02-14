@@ -2380,7 +2380,7 @@ void Population::BetterFinalOptimization(){
 	unsigned s = stopwatch.SplitTime();
 	prof << "Total Runtime: " << s << "\tnumgen: " << gen << "\tFinalScore: " << indiv[bestIndiv].Fitness() << "\n";
 	outman.SetOutputStream(prof);
-	indiv[bestIndiv].modPart->OutputHumanReadableModelReportWithParams();
+	indiv[bestIndiv].modPart.OutputHumanReadableModelReportWithParams();
 
 	prof << "Function\t\tcalls\ttime\tTperC\t%runtime" << endl;
 	ProfIntInt.Report(prof, s);
@@ -2507,9 +2507,10 @@ void Population::FinalOptimization(){
 #else
 	prof << "Double precision\n";
 #endif
+	unsigned s = stopwatch.SplitTime();
 	prof << "Total Runtime: " << s << "\tnumgen: " << gen << "\tFinalScore: " << indiv[bestIndiv].Fitness() << "\n";
 	outman.SetOutputStream(prof);
-	OutputModelReport();
+	indiv[bestIndiv].modPart.OutputHumanReadableModelReportWithParams();
 
 	prof << "Function\t\tcalls\ttime\tTperC\t%runtime" << endl;
 	ProfIntInt.Report(prof, s);
