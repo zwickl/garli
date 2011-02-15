@@ -1325,6 +1325,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 		for(int rate=0;rate<NRateCats();rate++){
 			int model=0;
 			const unsigned rateOffset = nstates*rate;
+#pragma omp parallel for
 			for (int i = 0; i < nstates; i++){
 				for (int j = 0; j < nstates; j++){
 					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
@@ -1343,11 +1344,19 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 			if(modSpec->IsNonsynonymousRateHet())
 				model = rate;
 			const unsigned rateOffset = nstates*rate;
+#pragma omp parallel for
 			for (int i = 0; i < nstates; i++){
 				for (int j = 0; j < nstates; j++){
 					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
+					for (int k = 0; k < nstates; k++){ 
+						const MODEL_FLOAT x = eigvecs[model][i][k]*inveigvecs[model][k][j];
+						sum_p   += x*EigValexp[k+rateOffset];
+						}
+					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
 
-/*					
+/*					//This was an attempt to improve floating point accuracy by avoiding the summing
+					//of numbers with very different magnitudes.  It was somewhat helpful, but only
+					//necessary in odd cases and came with a horrible overhead
 					FLOAT_TYPE sum_pBig=ZERO_POINT_ZERO;
 					FLOAT_TYPE sum_pSmall=ZERO_POINT_ZERO;
 					FLOAT_TYPE sum_pBig2=ZERO_POINT_ZERO;
@@ -1374,11 +1383,6 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 					tot += (sum_pSmall2 + sum_pSmall);
 					sum_p = tot;
 */
-					for (int k = 0; k < nstates; k++){ 
-						const MODEL_FLOAT x = eigvecs[model][i][k]*inveigvecs[model][k][j];
-						sum_p   += x*EigValexp[k+rateOffset];
-						}
-					pmat[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
 					}
 				}
 			}
