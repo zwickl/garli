@@ -71,7 +71,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	siteWindowLength = 0;
 	siteWindowStride = 0;
 
-	minimumPatsNucOpenMP = 100;
+	minimumPatsNucOpenMP = 1000;
 	minimumPatsNStateOpenMP = 50;
 
 	usePatternManager = false;
