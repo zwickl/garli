@@ -2426,9 +2426,9 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 
 #ifdef OMP_TERMDERIV
 	#ifdef LUMP_LIKES
-		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL, grandSumL)
+		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL, grandSumL)
 	#else
-		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL)
 	#endif
 	for(int i=0;i<nchar;i++){
 		Ldata = &Ldat[ambigMap[i]];
@@ -2612,11 +2612,10 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	if(nRateCats == 1){
 
 	#ifdef OMP_TERMDERIV_NSTATE
-		bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
 		#ifdef LUMP_LIKES
-			#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL) reduction(+ : tot1, tot2, totL, grandSumL)
+			#pragma omp parallel for if(numCondPats == 0) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL) reduction(+ : tot1, tot2, totL, grandSumL)
 		#else
-			#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL) reduction(+ : tot1, tot2, totL)
+			#pragma omp parallel for if(numCondPats == 0) private(partial, Ldata, siteL, siteD1, siteD2, unscaledlnL) reduction(+ : tot1, tot2, totL)
 		#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
@@ -2879,11 +2878,10 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 #endif
 
 #ifdef OMP_TERMDERIV_NSTATE
-		bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
 	#ifdef LUMP_LIKES
-		#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2, unscaledlnL) reduction(+ : tot1, tot2, totL, grandSumL)
+		#pragma omp parallel for if(numCondPats == 0) private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2, unscaledlnL) reduction(+ : tot1, tot2, totL, grandSumL)
 	#else
-		#pragma omp parallel for if(useVec) private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2, unscaledlnL) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for if(numCondPats == 0) private(partial, Ldata, siteL, siteD1, siteD2, rateL, rateD1, rateD2, unscaledlnL) reduction(+ : tot1, tot2, totL)
 	#endif
 		for(int i=0;i<nchar;i++){
 			Ldata = &Ldat[i];
@@ -3081,9 +3079,9 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 
 #ifdef OMP_INTDERIV
 	#ifdef LUMP_LIKES
-		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL, grandSumL)
+		#pragma omp parallel for private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL, grandSumL)
 	#else
-		#pragma omp parallel for if(nchar > minimumPatsNucOpenMP) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL)
 	#endif
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[4*i*nRateCats]);
@@ -3229,11 +3227,10 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 #endif
 
 #ifdef OMP_INTDERIV_NSTATE
-	bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
 	#ifdef LUMP_LIKES
-		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL, grandSumL)
+		#pragma omp parallel for if(numCondPats == 0) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL, grandSumL)
 	#else
-		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for if(numCondPats == 0) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2, rateL, rateD1, rateD2) reduction(+ : tot1, tot2, totL)
 	#endif	
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[nRateCats * nstates * i]);
@@ -3425,11 +3422,10 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 #endif
 
 #ifdef OMP_INTDERIV_NSTATE
-	bool useVec = (nchar > minimumPatsNStateOpenMP && numCondPats == 0);
 	#ifdef LUMP_LIKES
-		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2) reduction(+ : tot1, tot2, totL, grandSumL)
+		#pragma omp parallel for if(numCondPats == 0) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2) reduction(+ : tot1, tot2, totL, grandSumL)
 	#else
-		#pragma omp parallel for if(useVec) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for if(numCondPats == 0) private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, tempL, tempD1, tempD2) reduction(+ : tot1, tot2, totL)
 	#endif
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[nstates*i]);
