@@ -3134,7 +3134,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 
 			siteD1 = (((D1a*freqs[0]+D1c*freqs[1]+D1g*freqs[2]+D1t*freqs[3])) / siteL);
 
-			unscaledlnL = log(siteL) - partialCLA->underflow_mult[i];
+			unscaledlnL = log(siteL) - childCLA->underflow_mult[i] - partialCLA->underflow_mult[i];
 			totL += unscaledlnL * countit[i];
 			tot1+= countit[i] * siteD1;			
 			siteD2=((D2a*freqs[0]+D2c*freqs[1]+D2g*freqs[2]+D2t*freqs[3]) / siteL) - (siteD1 * siteD1);
