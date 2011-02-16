@@ -359,10 +359,11 @@ void Population::CheckForIncompatibleConfigEntries(){
 		if(conf->linkModels && modSpecSet.GetModSpec(0)->IsEmpiricalStateFrequencies())
 			throw ErrorException("Sorry, empirical state frequencies can't be used with partitioned models when models are linked");
 		}
-	//if no model mutations will be performed, parameters cannot be estimated.
-	if(conf->modWeight == ZERO_POINT_ZERO){
-		for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
-			ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
+
+	for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
+		ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
+		//if no model mutations will be performed, parameters cannot be estimated.
+		if(conf->modWeight == ZERO_POINT_ZERO){
 			if(modSpec->fixStateFreqs == false) 
 				throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
 			if(modSpec->includeInvariantSites == true && modSpec->fixInvariantSites == false) 
@@ -371,11 +372,11 @@ void Population::CheckForIncompatibleConfigEntries(){
 				throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
 			if((modSpec->numRateCats > 1 && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false && modSpec->IsCodon() == false) || (modSpec->IsCodon() && !modSpec->fixOmega)) 
 				throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed, nonsynonymousfixed or none!"));
-			if((modSpec->IsNStateV()  || modSpec->IsOrderedNStateV() ||  modSpec->IsOrientedGap()) && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
-				throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used if\n\tthe Mkv model (datatype = standardvariable) or gap model (datatype = indelmixturemodel)\n\tare used for any data.\n\tTry streefname = random.");
-			if(conf->inferInternalStateProbs && ! (modSpec->IsNucleotide() || modSpec->IsAminoAcid() || modSpec->IsCodon()))
-				throw ErrorException("Sorry, internal states can currently only be inferred for nucleotide, amino acid and codon models");
 			}
+		if((modSpec->IsNStateV()  || modSpec->IsOrderedNStateV() ||  modSpec->IsOrientedGap()) && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
+			throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used if\n\tthe Mkv model (datatype = standardvariable) or gap model (datatype = indelmixturemodel)\n\tare used for any data.\n\tTry streefname = random.");
+		if(conf->inferInternalStateProbs && ! (modSpec->IsNucleotide() || modSpec->IsAminoAcid() || modSpec->IsCodon()))
+			throw ErrorException("Sorry, internal states can currently only be inferred for nucleotide, amino acid and codon models");
 		}
 
 	if(conf->inferInternalStateProbs && conf->bootstrapReps > 0) 
