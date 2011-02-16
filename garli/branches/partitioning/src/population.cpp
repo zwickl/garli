@@ -363,10 +363,18 @@ void Population::CheckForIncompatibleConfigEntries(){
 	if(conf->modWeight == ZERO_POINT_ZERO){
 		for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
 			ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
-			if(modSpec->fixStateFreqs == false) throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
-			if(modSpec->includeInvariantSites == true && modSpec->fixInvariantSites == false) throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
-			if(modSpec->IsAminoAcid() == false && modSpec->Nst() > 1 && modSpec->fixRelativeRates == false) throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
-			if((modSpec->numRateCats > 1 && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false && modSpec->IsCodon() == false) || (modSpec->IsCodon() && !modSpec->fixOmega)) throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed, nonsynonymousfixed or none!"));
+			if(modSpec->fixStateFreqs == false) 
+				throw(ErrorException("if model mutation weight is set to zero,\nstatefrequencies cannot be set to estimate!"));
+			if(modSpec->includeInvariantSites == true && modSpec->fixInvariantSites == false) 
+				throw(ErrorException("if model mutation weight is set to zero,\ninvariantsites cannot be set to estimate!"));
+			if(modSpec->IsAminoAcid() == false && modSpec->Nst() > 1 && modSpec->fixRelativeRates == false) 
+				throw(ErrorException("if model mutation weight is set to zero, ratematrix\nmust be fixed or 1rate!"));
+			if((modSpec->numRateCats > 1 && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false && modSpec->IsCodon() == false) || (modSpec->IsCodon() && !modSpec->fixOmega)) 
+				throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed, nonsynonymousfixed or none!"));
+			if((modSpec->IsNStateV()  || modSpec->IsOrderedNStateV() ||  modSpec->IsOrientedGap()) && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
+				throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used if\n\tthe Mkv model (datatype = standardvariable) or gap model (datatype = indelmixturemodel)\n\tare used for any data.\n\tTry streefname = random.");
+			if(conf->inferInternalStateProbs && ! (modSpec->IsNucleotide() || modSpec->IsAminoAcid() || modSpec->IsCodon()))
+				throw ErrorException("Sorry, internal states can currently only be inferred for nucleotide, amino acid and codon models");
 			}
 		}
 
@@ -376,10 +384,6 @@ void Population::CheckForIncompatibleConfigEntries(){
 		throw(ErrorException("You cannont output site likelihoods during a bootstrap run!"));
 	if(conf->startOptPrec < conf->minOptPrec)
 		throw ErrorException("startoptprec must be equal to or greater than minoptprec");
-	for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
-		if((modSpecSet.GetModSpec(ms)->IsNStateV()  || modSpecSet.GetModSpec(ms)->IsOrderedNStateV() ||  modSpecSet.GetModSpec(ms)->IsOrientedGap()) && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
-			throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used if\n\tthe Mkv model (datatype = standardvariable) or gap model (datatype = indelmixturemodel)\n\tare used for any data.\n\tTry streefname = random.");
-		}
 	}
 
 void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *rawD, int nprocs, int r){
@@ -3085,12 +3089,10 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	//loop over the trees
 	for(int t = 1;t <= numTrees;t++){
 		currentSearchRep = t;
-		if(!conf->scoreOnly)
-
-		SeedPopulationWithStartingTree(t);
-		bestIndiv = 0;
 		if(!conf->scoreOnly){
 			outman.UserMessage("Optimizing tree %d ...", t);
+			SeedPopulationWithStartingTree(t);
+			bestIndiv = 0;
 			BetterFinalOptimization();
 			}
 		else
