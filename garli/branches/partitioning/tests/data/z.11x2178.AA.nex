@@ -39,7 +39,7 @@ END;
 
 BEGIN ASSUMPTIONS;
 	TYPESET * UNTITLED   =  unord:  1 -  727;
-
+	wtset * equal = 1: 1-.;
 END;
 
 BEGIN CODONS;
