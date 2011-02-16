@@ -8061,6 +8061,13 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 				}
 			else{
 				data2 = AdvanceDataPointer(data2, 1);
+#ifdef OPEN_MP
+				//we need to advance these in the case of OMP if this func is NOT OMP enabled
+				//because sections of the CLAs corresponding to sites with count=0 are skipped
+				//over in OMP instead of being eliminated
+				dest += 16;
+				CL1 += 16;
+#endif
 				}
 			}
 		}
@@ -8124,6 +8131,13 @@ void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArr
 				}
 			else{
 				data2 = AdvanceDataPointer(data2, 1);
+#ifdef OPEN_MP
+				//we need to advance these in the case of OMP if this func is NOT OMP enabled
+				//because sections of the CLAs corresponding to sites with count=0 are skipped
+				//over in OMP instead of being eliminated
+				dest += 4 * nRateCats;
+				CL1 += 4 * nRateCats;
+#endif
 				}
 			}
 		}
