@@ -99,9 +99,6 @@ bool Tree::useOptBoundedForBlen;
 FLOAT_TYPE Tree::uniqueSwapPrecalc[500];
 FLOAT_TYPE Tree::distanceSwapPrecalc[1000];
 
-unsigned Tree::minimumPatsNucOpenMP;
-unsigned Tree::minimumPatsNStateOpenMP;
-
 //FLOAT_TYPE Tree::rescalePrecalcThresh[30];
 //FLOAT_TYPE Tree::rescalePrecalcMult[30];
 //int Tree::rescalePrecalcIncr[30];
@@ -266,9 +263,6 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 			}
 		outman.UserMessage("\n#######################################################");
 		}
-	
-	minimumPatsNucOpenMP = conf->minimumPatsNucOpenMP;
-	minimumPatsNStateOpenMP = conf->minimumPatsNStateOpenMP;
 	}
 		
 //this assumes that a tree string has been passed in with *s pointing to the first char of a blen
@@ -2156,7 +2150,6 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 //	if(maxDist != 1)
 //		sprRang.RemoveNodesOfDist(1); //remove branches equivalent to NNIs
 	
-#ifdef CONSTRAINTS
 	//now deal with constraints, if any
 	if(constraints.size() > 0){
 /*		int ok =0;
@@ -2206,7 +2199,6 @@ void Tree::GatherValidReconnectionNodes(int maxDist, TreeNode *cut, const TreeNo
 		else
 			outman.UserMessage("%d max range, %d attach, %d calls, %d ok, %d bad", maxDist, attach, calls, ok, bad);
 */		}
-#endif
 	}
 
 //same as the normal GatherValidReconnectionNodes, but fills ReconList passed in, not the normal tree one
@@ -2302,7 +2294,6 @@ void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNo
 		else it++;
 		}
 
-#ifdef CONSTRAINTS
 	//now deal with constraints, if any
 	if(constraints.size() > 0){
 		Bipartition scratch;
@@ -2319,7 +2310,6 @@ void Tree::GatherValidReconnectionNodes(ReconList &thisList, int maxDist, TreeNo
 			else return;
 			}
 		}
-#endif
 	}
 
 bool Tree::AssignWeightsToSwaps(TreeNode *cut){
@@ -3848,19 +3838,10 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 					assert(secChild->ambigMap[(*specs).dataIndex] != NULL);	
 					}
 
-				//it isn't always beneficial to call nuc IntTerm in the case of OMP, so avoid it if few pats
-				if(firstCLA==NULL){
-					if(dataPart->GetSubset((*specs).dataIndex)->NChar() < minimumPatsNucOpenMP)
+				if(firstCLA==NULL)
 						CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], firstChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 					else
-						CalcFullCLAInternalTerminalOpenMP(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], firstChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					}
-				else{
-					if(dataPart->GetSubset((*specs).dataIndex)->NChar() < minimumPatsNucOpenMP)
 						CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], secChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					else
-						CalcFullCLAInternalTerminalOpenMP(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], secChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					}
 				}
 	#else
 				if(firstCLA==NULL)
@@ -7907,248 +7888,6 @@ void Tree::CalcFullCLAOrientedGap(CondLikeArray *destCLA, const FLOAT_TYPE *Lpr,
 	}
 
 void Tree::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const unsigned *ambigMap, int modIndex, int dataIndex){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *des=destCLA->arr;
-	FLOAT_TYPE *dest=des;
-	const FLOAT_TYPE *CL=LCLA->arr;
-	const FLOAT_TYPE *CL1=CL;
-	const char *data2=dat2;
-	FLOAT_TYPE L1, L2, L3, L4;
-
-	const SequenceData *data = dataPart->GetSubset(dataIndex);
-	Model *mod = modPart->GetModel(modIndex);	
-
-	const int nchar = data->NChar();
-	const int nRateCats = mod->NRateCats();
-	const int *counts = data->GetCounts();
-
-#ifdef UNIX	
-	posix_madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
-	posix_madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);	
-#endif
-
-#ifdef ALLOW_SINGLE_SITE
-	if(siteToScore > 0) data2 = AdvanceDataPointer(data2, siteToScore);
-#endif
-
-	if(nRateCats==4){//unrolled 4 rate version
-		for(int i=0;i<nchar;i++){
-#ifdef USE_COUNTS_IN_BOOT
-			if(counts[i] > 0){
-#else
-			if(1){
-#endif
-				if(*data2 > -1){ //no ambiguity
-					L1 = ((pr1[0]*CL1[0]+pr1[1]*CL1[1])+(pr1[2]*CL1[2]+pr1[3]*CL1[3]));
-					L2 = ((pr1[4]*CL1[0]+pr1[5]*CL1[1])+(pr1[6]*CL1[2]+pr1[7]*CL1[3]));
-					L3 = ((pr1[8]*CL1[0]+pr1[9]*CL1[1])+(pr1[10]*CL1[2]+pr1[11]*CL1[3]));
-					L4 = ((pr1[12]*CL1[0]+pr1[13]*CL1[1])+(pr1[14]*CL1[2]+pr1[15]*CL1[3]));
-
-					dest[0] = L1 * pr2[*data2];
-					dest[1] = L2 * pr2[*data2+4];
-					dest[2] = L3 * pr2[*data2+8];
-					dest[3] = L4 * pr2[*data2+12];
-
-					dest+=4;
-					CL1+=4;
-
-					L1 = ((pr1[16]*CL1[0]+pr1[17]*CL1[1])+(pr1[18]*CL1[2]+pr1[19]*CL1[3]));
-					L2 = ((pr1[20]*CL1[0]+pr1[21]*CL1[1])+(pr1[22]*CL1[2]+pr1[23]*CL1[3]));
-					L3 = ((pr1[24]*CL1[0]+pr1[25]*CL1[1])+(pr1[26]*CL1[2]+pr1[27]*CL1[3]));
-					L4 = ((pr1[28]*CL1[0]+pr1[29]*CL1[1])+(pr1[30]*CL1[2]+pr1[31]*CL1[3]));
-
-					dest[0] = L1 * pr2[*data2+16];
-					dest[1] = L2 * pr2[*data2+4+16];
-					dest[2] = L3 * pr2[*data2+8+16];
-					dest[3] = L4 * pr2[*data2+12+16];
-
-					dest+=4;
-					CL1+=4;
-
-					L1 = ((pr1[32]*CL1[0]+pr1[33]*CL1[1])+(pr1[34]*CL1[2]+pr1[35]*CL1[3]));
-					L2 = ((pr1[36]*CL1[0]+pr1[37]*CL1[1])+(pr1[38]*CL1[2]+pr1[39]*CL1[3]));
-					L3 = ((pr1[40]*CL1[0]+pr1[41]*CL1[1])+(pr1[42]*CL1[2]+pr1[43]*CL1[3]));
-					L4 = ((pr1[44]*CL1[0]+pr1[45]*CL1[1])+(pr1[46]*CL1[2]+pr1[47]*CL1[3]));
-
-					dest[0] = L1 * pr2[*data2+32];
-					dest[1] = L2 * pr2[*data2+4+32];
-					dest[2] = L3 * pr2[*data2+8+32];
-					dest[3] = L4 * pr2[*data2+12+32];
-
-					dest+=4;
-					CL1+=4;
-
-					L1 = ((pr1[48]*CL1[0]+pr1[49]*CL1[1])+(pr1[50]*CL1[2]+pr1[51]*CL1[3]));
-					L2 = ((pr1[52]*CL1[0]+pr1[53]*CL1[1])+(pr1[54]*CL1[2]+pr1[55]*CL1[3]));
-					L3 = ((pr1[56]*CL1[0]+pr1[57]*CL1[1])+(pr1[58]*CL1[2]+pr1[59]*CL1[3]));
-					L4 = ((pr1[60]*CL1[0]+pr1[61]*CL1[1])+(pr1[62]*CL1[2]+pr1[63]*CL1[3]));
-
-
-					dest[0] = L1 * pr2[*data2+48];
-					dest[1] = L2 * pr2[*data2+4+48];
-					dest[2] = L3 * pr2[*data2+8+48];
-					dest[3] = L4 * pr2[*data2+12+48];
-
-					dest+=4;
-					CL1+=4;
-					data2++;
-					}
-				else if(*data2 == -4){//total ambiguity
-					dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-					dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-					dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-					dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
-					
-					dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
-					dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
-					dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
-					dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
-				
-					dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
-					dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
-					dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
-					dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
-				
-					dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
-					dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
-					dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
-					dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-
-					dest+=16;
-					data2++;
-					CL1+=16;
-					}
-				else {//partial ambiguity
-					//first figure in the ambiguous terminal
-					int nstates=-1 * *(data2++);
-					for(int j=0;j<16;j++) dest[j]=ZERO_POINT_ZERO;
-					for(int s=0;s<nstates;s++){
-						for(int r=0;r<4;r++){
-							*(dest+(r*4)) += pr2[(*data2)+16*r];
-							*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
-							*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
-							*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
-							}
-						data2++;
-						}
-					
-					//now add the internal child
-					*(dest++) *= ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-					*(dest++) *= ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-					*(dest++) *= ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-					*(dest++) *= ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
-					
-					*(dest++) *= ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
-					*(dest++) *= ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
-					*(dest++) *= ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
-					*(dest++) *= ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
-				
-					*(dest++) *= ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
-					*(dest++) *= ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
-					*(dest++) *= ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
-					*(dest++) *= ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
-				
-					*(dest++) *= ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
-					*(dest++) *= ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
-					*(dest++) *= ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
-					*(dest++) *= ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-					CL1+=16;
-					}
-#ifdef ALLOW_SINGLE_SITE
-				if(siteToScore > -1) break;
-#endif
-				}
-			else{
-				data2 = AdvanceDataPointer(data2, 1);
-#ifdef OPEN_MP
-				//we need to advance these in the case of OMP if this func is NOT OMP enabled
-				//because sections of the CLAs corresponding to sites with count=0 are skipped
-				//over in OMP instead of being eliminated
-				dest += 16;
-				CL1 += 16;
-#endif
-				}
-			}
-		}
-	else{//general N rate version
-		for(int i=0;i<nchar;i++){
-#ifdef USE_COUNTS_IN_BOOT
-			if(counts[i] > 0){
-#else
-			if(1){
-#endif
-				if(*data2 > -1){ //no ambiguity
-					for(int r=0;r<nRateCats;r++){
-						L1 = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
-						L2 = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
-						L3 = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
-						L4 = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
-						dest[0] = L1 * pr2[(*data2)+16*r];
-						dest[1] = L2 * pr2[(*data2+4)+16*r];
-						dest[2] = L3 * pr2[(*data2+8)+16*r];
-						dest[3] = L4 * pr2[(*data2+12)+16*r];
-
-						dest+=4;
-						}
-					data2++;
-					}
-				else if(*data2 == -4){//total ambiguity
-					for(int r=0;r<nRateCats;r++){
-						dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
-						dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
-						dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
-						dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
-						dest+=4;
-						}
-					data2++;
-					}
-				else {//partial ambiguity
-					//first figure in the ambiguous terminal
-					int nstates=-1 * *(data2++);
-					for(int q=0;q<4*nRateCats;q++) dest[q]=0;
-					for(int s=0;s<nstates;s++){
-						for(int r=0;r<nRateCats;r++){
-							*(dest+(r*4)) += pr2[(*data2)+16*r];
-							*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
-							*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
-							*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
-							}
-						data2++;
-						}
-					//now add the internal child
-					for(int r=0;r<nRateCats;r++){
-						*(dest++) *= ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
-						*(dest++) *= ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
-						*(dest++) *= ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
-						*(dest++) *= ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
-						}
-					}
-				CL1 += 4*nRateCats;
-#ifdef ALLOW_SINGLE_SITE
-				if(siteToScore > -1) break;
-#endif
-				}
-			else{
-				data2 = AdvanceDataPointer(data2, 1);
-#ifdef OPEN_MP
-				//we need to advance these in the case of OMP if this func is NOT OMP enabled
-				//because sections of the CLAs corresponding to sites with count=0 are skipped
-				//over in OMP instead of being eliminated
-				dest += 4 * nRateCats;
-				CL1 += 4 * nRateCats;
-#endif
-				}
-			}
-		}
-		
-	for(int i=0;i<nchar;i++)
-		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
-	
-	destCLA->rescaleRank=LCLA->rescaleRank+2;
-	} 
-
-void Tree::CalcFullCLAInternalTerminalOpenMP(CondLikeArray *destCLA, const CondLikeArray *LCLA, const FLOAT_TYPE *pr1, const FLOAT_TYPE *pr2, char *dat2, const unsigned *ambigMap, int modIndex, int dataIndex){
 	//this function assumes that the pmat is arranged with the 16 entries for the
 	//first rate, followed by 16 for the second, etc.
 	FLOAT_TYPE *des=destCLA->arr;

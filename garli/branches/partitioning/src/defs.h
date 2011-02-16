@@ -49,8 +49,6 @@
 #endif
 */
 
-#define MORE_DETERM_OPT
-
 #define USE_COUNTS_IN_BOOT
 
 //#undef OPT_DEBUG
@@ -67,7 +65,6 @@
 #define PUSH_TO_MIN_BLEN
 #define SUM_AA_REL_RATES
 #define NEW_BUMPING
-#define CONSTRAINTS
 #define STOCHASTIC_STARTING_BLENS
 #undef IGNORE_SMALL_TOPO_IMP
 #undef INCLUDE_PERTURBATION

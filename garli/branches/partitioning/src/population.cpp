@@ -764,52 +764,49 @@ void Population::RunTests(){
 //	Individual *ind1 = &newindiv[1];
 	Individual *ind0 = &indiv[0];
 	Individual *ind1 = &indiv[1];
+	Tree *tree0 = ind0->treeStruct;
+	Tree *tree1 = ind1->treeStruct;
 
 	//ind0->MakeRandomTree(data->NTax());
 	//ind0->MakeStepwiseTree(dataPart->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 	//ind0->treeStruct->modPart=&ind0->modPart;
 
 	//check that the score was correct coming out of MakeStepwiseTree
-	FLOAT_TYPE scr = ind0->treeStruct->lnL;
-	ind0->treeStruct->MakeAllNodesDirty();
+	FLOAT_TYPE scr = tree0->lnL;
+	tree0->MakeAllNodesDirty();
 	ind0->SetDirty();
 	ind0->CalcFitness(0);
 
 	//this only really tests for major scoring problems in the optimization functions
-	scr = ind0->treeStruct->lnL;
-	ind0->treeStruct->OptimizeAllBranches(adap->branchOptPrecision);
-	assert(ind0->treeStruct->lnL + 1.0e-6 > scr);
-	assert(ind0->treeStruct->lnL * 2 < scr);
+	scr = tree0->lnL;
+	tree0->OptimizeAllBranches(adap->branchOptPrecision);
+	assert(tree0->lnL + 1.0e-6 > scr);
+	assert(tree0->lnL * 2 < scr);
 
 #ifdef SINGLE_PRECISION_FLOATS
-	int sigFigs = ceil(log10(-ind0->treeStruct->lnL));
-	double eps = pow(10.0f, sigFigs-7) * 2.0;
+	int sigFigs = ceil(log10(-tree0->lnL));
+	double tol = pow(10.0f, sigFigs-7) * 2.0;
+#else
+	double tol = 0.001;
 #endif
 
 	//test rescaling
-	scr = ind0->treeStruct->lnL;
+	scr = tree0->lnL;
 	int r = Tree::rescaleEvery;
 	Tree::rescaleEvery = 2;
-	ind0->treeStruct->MakeAllNodesDirty();
+	tree0->MakeAllNodesDirty();
 	ind0->SetDirty();
 	ind0->CalcFitness(0);
-	#ifdef SINGLE_PRECISION_FLOATS
-	if(FloatingPointEquals(ind0->Fitness(), scr, eps) == false){
-		outman.UserMessage("Failed rescaling test: freq %d=%f, freq 2=%f", r, scr, ind0->Fitness());
-		assert(FloatingPointEquals(ind0->Fitness(), scr, eps));
+
+	if(FloatingPointEquals(ind0->Fitness(), scr, tol) == false){
+		throw ErrorException("Failed rescaling test: freq %d=%f, freq 2=%f", r, scr, ind0->Fitness());
 		}
-	#else
-	if(FloatingPointEquals(ind0->Fitness(), scr, 0.001) == false){
-		outman.UserMessage("Failed rescaling test: freq %d=%f, freq 2=%f", r, scr, ind0->Fitness());
-		assert(FloatingPointEquals(ind0->Fitness(), scr, 0.001));
-		}
-	#endif
 	
 	Tree::rescaleEvery = r;
 
-	ind1->treeStruct=new Tree();
-	ind1->CopySecByRearrangingNodesOfFirst(ind1->treeStruct, ind0);
-	ind1->treeStruct->modPart=&ind1->modPart;
+	tree1=new Tree();
+	ind1->CopySecByRearrangingNodesOfFirst(tree1, ind0);
+	tree1->modPart=&ind1->modPart;
 
 	ind0->SetDirty();
 	ind0->CalcFitness(0);
@@ -818,47 +815,49 @@ void Population::RunTests(){
 	ind1->CalcFitness(0);
 
 	assert(ind0->Fitness() == ind1->Fitness());
-	ind0->treeStruct->MakeAllNodesDirty();
-	ind1->treeStruct->MakeAllNodesDirty();
+	tree0->MakeAllNodesDirty();
+	tree1->MakeAllNodesDirty();
 
 	for(int i=0;i<100;i++){
-		ind0->treeStruct->RerootHere(ind0->treeStruct->GetRandomInternalNode());
-		ind1->treeStruct->RerootHere(ind1->treeStruct->GetRandomInternalNode());
+		tree0->RerootHere(tree0->GetRandomInternalNode());
+		tree1->RerootHere(tree1->GetRandomInternalNode());
 
-		ind0->treeStruct->CalcBipartitions(true);
-		ind1->treeStruct->CalcBipartitions(true);
+		tree0->CalcBipartitions(true);
+		tree1->CalcBipartitions(true);
 
 		//check rerooting and bipartition comparisons
-		assert(ind0->treeStruct->IdenticalTopologyAllowingRerooting(ind1->treeStruct->root));
+		assert(tree0->IdenticalTopologyAllowingRerooting(tree1->root));
 
 		ind0->SetDirty();
 		ind1->SetDirty();
 
 		//check minimal recalculation scoring (proper readjustment of CLAs during rerooting)
-		ind0->treeStruct->Score(ind0->treeStruct->GetRandomInternalNode());
-		ind1->treeStruct->Score(ind1->treeStruct->GetRandomInternalNode());
-#ifdef SINGLE_PRECISION_FLOATS
-		if(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps) == false){
-			outman.UserMessage("failed min recalc test: %f diff vs %f allowed",  ind0->treeStruct->lnL - ind1->treeStruct->lnL, eps);
-			assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps));
+		tree0->Score(tree0->GetRandomInternalNode());
+		tree1->Score(tree1->GetRandomInternalNode());
+
+		if(FloatingPointEquals(tree0->lnL, tree1->lnL, tol) == false){
+			throw ErrorException("failed min recalc test: %f diff vs %f allowed",  tree0->lnL - tree1->lnL, tol);
 			}
-#else
-		assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, 0.001));
-#endif
 
 		//check full rescoring from arbitrary nodes in the trees		
-		ind0->treeStruct->MakeAllNodesDirty();
-		ind1->treeStruct->MakeAllNodesDirty();
-		ind0->treeStruct->Score(ind0->treeStruct->GetRandomInternalNode());
-		ind1->treeStruct->Score(ind1->treeStruct->GetRandomInternalNode());
-#ifdef SINGLE_PRECISION_FLOATS
-		if(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps) == false){
-			outman.UserMessage("failed score at arbitrary node test: %f diff vs %f allowed",  ind0->treeStruct->lnL - ind1->treeStruct->lnL, eps);
-			assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, eps ));
+		tree0->MakeAllNodesDirty();
+		tree1->MakeAllNodesDirty();
+		tree0->Score(tree0->GetRandomInternalNode());
+		tree1->Score(tree1->GetRandomInternalNode());
+
+		if(FloatingPointEquals(tree0->lnL, tree1->lnL, tol) == false){
+			throw ErrorException("failed score at arbitrary node test: %f diff vs %f allowed",  tree0->lnL - tree1->lnL, tol);
 			}
-#else
-		assert(FloatingPointEquals(ind0->treeStruct->lnL, ind1->treeStruct->lnL, 0.001));
-#endif
+
+		//check that the derivative funcs are outputing the correct score
+		TreeNode *nd = tree0->allNodes[tree0->GetRandomNonRootNode()];
+		tree0->CalcDerivativesRateHet(nd->anc, nd);
+		nd = tree1->allNodes[tree1->GetRandomNonRootNode()];
+		tree1->CalcDerivativesRateHet(nd->anc, nd);
+
+		if(FloatingPointEquals(tree0->lnL, tree1->lnL, tol) == false){
+			throw ErrorException("failed derivative scoring test: %f diff vs %f allowed",  tree0->lnL - tree1->lnL, tol);
+			}
 		}
 	}
 
@@ -1793,7 +1792,6 @@ void Population::Run(){
 						}
 					if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
 						improve += bestTree->OptimizeBoundedParameter(modnum, adap->branchOptPrecision, mod->PropInvar(), 0, min(mod->PropInvar(), 1.0e-8), mod->maxPropInvar, &Model::SetPinv);
-#ifdef MORE_DETERM_OPT
 					if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false){
 						FLOAT_TYPE paramOpt = bestTree->OptimizeEquilibriumFreqs(adap->branchOptPrecision, modnum);
 						if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
@@ -1815,7 +1813,6 @@ void Population::Run(){
 						improve += paramOpt;
 						outman.DebugMessage("rel rates opt = %.4f", paramOpt);
 						}
-#endif
 					if(modSpec->IsOrientedGap()){
 						FLOAT_TYPE paramOpt = bestTree->OptimizeInsertDeleteRates(adap->branchOptPrecision, modnum);
 						if(paramOpt < ZERO_POINT_ZERO && paramOpt > -1e-8)//avoid printing very slightly negative values
@@ -1928,12 +1925,9 @@ void Population::Run(){
 	TurnOffSignalCatching();
 	//don't optimize if checkpointing is happening and the run was prematurely killed
 	if(conf->refineEnd  && !(conf->checkpoint && (timeTermination || userTermination)))
-#ifdef MORE_DETERM_OPT
 	//the version adapted from trunk 1.0 final opt
-		BetterFinalOptimization();
-#else
-		FinalOptimization();
-#endif
+	BetterFinalOptimization();
+
 	finishedRep = true;
 
 	gen = UINT_MAX;
