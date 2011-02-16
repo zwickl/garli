@@ -353,7 +353,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 
 	string wtsetName = dnaData->WeightsetName();
 	if(wtsetName.length() > 0)
-		throw ErrorException("Cannot use wtsets with DNA to Codon translation! Remove wtset \"%s\".", wtsetName.c_str());  
+		outman.UserMessage("NOTE: Cannot use default wtsets with DNA to Codon translation! Wtset \"%s\" ignored.", wtsetName.c_str());  
 
 	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
@@ -457,7 +457,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 
 	string wtsetName = dnaData->WeightsetName();
 	if(wtsetName.length() > 0)
-		throw ErrorException("Cannot use wtsets with DNA to Aminoacid translation! Remove wtset \"%s\" or do the translation yourself.", wtsetName.c_str());  
+		outman.UserMessage("NOTE: Cannot use default wtsets with DNA to Aminoacid translation! Wtset \"%s\" ignored.", wtsetName.c_str());  
 
 	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
