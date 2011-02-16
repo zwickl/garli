@@ -92,8 +92,6 @@ class GeneralGamlConfig{
 	unsigned outputSitelikelihoods;
 	bool reportRunProgress;
 	bool scoreOnly;
-	unsigned minimumPatsNucOpenMP;
-	unsigned minimumPatsNStateOpenMP;
 
 	//finishing the run
 	bool enforceTermConditions;

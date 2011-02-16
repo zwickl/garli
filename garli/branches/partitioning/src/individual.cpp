@@ -698,16 +698,13 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			if(modSpec->IsCodon() && !modSpec->fixOmega) optOmega = true;
 			if(modSpec->IsOrientedGap()) optInsDel = true;
 
-#ifdef MORE_DETERM_OPT
 			if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
 				optFreqs = true;
-		//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
-		if(modSpec->IsCodon() && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == true)
-			optFreqs = true;
-		if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1 || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()))
-			optRelRates = true;
-#endif
-
+			//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
+			if(modSpec->IsCodon() && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == true)
+				optFreqs = true;
+			if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1 || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()))
+				optRelRates = true;
 			}
 		if(modSpecSet.InferSubsetRates() && modSpecSet.NumSpecs() > 1)
 			optSubsetRates = true;
@@ -716,10 +713,8 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 	outman.UserMessageNoCR("optimizing: starting branch lengths");
 	if(optAlpha) outman.UserMessageNoCR(", alpha shape");
 	if(optPinv) outman.UserMessageNoCR(", prop. invar");
-#ifdef MORE_DETERM_OPT
 	if(optRelRates) outman.UserMessageNoCR(", rel rates");
 	if(optFreqs) outman.UserMessageNoCR(", eq freqs");
-#endif
 	if(optOmega) outman.UserMessageNoCR(", dN/dS (aka omega) parameters");
 	if(optInsDel){
 		outman.UserMessageNoCR(", ins rate");
@@ -784,12 +779,10 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 				if(modSpec->IsOrientedGap()){
 					insDelImprove += treeStruct->OptimizeInsertDeleteRates(branchPrec, modnum);
 					}
-#ifdef MORE_DETERM_OPT
 				if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
 					freqOptImprove += treeStruct->OptimizeEquilibriumFreqs(branchPrec, modnum);
 				if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1 || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()))
 					rateOptImprove += treeStruct->OptimizeRelativeNucRates(branchPrec, modnum);
-#endif
 				}
 			if(optSubsetRates){
 				subsetRateImprove += treeStruct->OptimizeSubsetRates(branchPrec);
@@ -801,10 +794,8 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		if(optOmega) outman.UserMessageNoCR(" omega=%6.2f", omegaOptImprove);
 		if(optAlpha) outman.UserMessageNoCR(" alpha=%6.2f", alphaOptImprove);
 
-#ifdef MORE_DETERM_OPT
 		if(optFreqs) outman.UserMessageNoCR(" freqs=%6.2f", freqOptImprove);
 		if(optRelRates) outman.UserMessageNoCR(" rel rates=%6.2f", rateOptImprove);
-#endif
 
 		if(optFlex) outman.UserMessageNoCR(" flex=%6.2f", flexOptImprove);
 		if(optPinv) outman.UserMessageNoCR(" pinv=%6.2f", pinvOptImprove);

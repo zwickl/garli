@@ -71,9 +71,6 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	siteWindowLength = 0;
 	siteWindowStride = 0;
 
-	minimumPatsNucOpenMP = 1000;
-	minimumPatsNStateOpenMP = 50;
-
 	usePatternManager = false;
 	rootAtBranchMidpoint = false;
 	useOptBoundedForBlen = false;
@@ -179,9 +176,6 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 
 	cr.GetBoolOption("rootatbranchmidpoint", rootAtBranchMidpoint, true);
 	cr.GetBoolOption("useoptboundedforblen", useOptBoundedForBlen, true);
-
-	cr.GetUnsignedOption("minimumpatsnucopenmp", minimumPatsNucOpenMP, true);
-	cr.GetUnsignedOption("minimumpatsnstateopenmp", minimumPatsNStateOpenMP, true);
 
 	//changed the wording of this from besttree to besttopology, to match outputeachbettertopology
 	//still allow besttree, since that is what I told Maddison, and I think has already been incorporated
