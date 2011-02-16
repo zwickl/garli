@@ -236,4 +236,5 @@ END;
 
 begin assumptions;
 exset * larfem = 1-45 74-82 85 86 105 108-112 114 116-.;
+wtset * equal = 1 : 1-.;
 end;
