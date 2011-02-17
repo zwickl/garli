@@ -24,8 +24,6 @@
 using std::string;
 using std::vector;
 
-#include "hashdefines.h"
-
 class ConfigReader;
 
 class ConfigModelSettings{

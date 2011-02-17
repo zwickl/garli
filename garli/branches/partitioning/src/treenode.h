@@ -29,9 +29,6 @@ using namespace std;
 #include "clamanager.h"
 #include "bipartition.h"
 
-/* GANESH included the following #includes */
-#include "hashdefines.h"
-
 class NucleotideData;
 class MFILE;
 

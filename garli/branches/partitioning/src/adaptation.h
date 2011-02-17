@@ -24,7 +24,6 @@
 using namespace std;
 
 #include "configoptions.h"
-#include "hashdefines.h"
 
 class MFILE;
 
