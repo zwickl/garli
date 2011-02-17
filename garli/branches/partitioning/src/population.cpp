@@ -1,5 +1,5 @@
-// GARLI version 0.96b8 source code
-// Copyright 2005-2008 Derrick J. Zwickl
+// GARLI version 2.0 source code
+// Copyright 2005-2011 Derrick J. Zwickl
 // email zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -2854,7 +2854,7 @@ void Population::PerformSearch(){
 			//This has to work somewhat differently for partitioning.  As far as the tree functions know we will always
 			//be in append mode for the sitelike output (negative sitelike value).  The pop will have to nuke any 
 			//existing file here the first time through and put in the header
-			indiv[bestIndiv].treeStruct->sitelikeLevel = -conf->outputSitelikelihoods;
+			indiv[bestIndiv].treeStruct->sitelikeLevel = -(int) conf->outputSitelikelihoods;
 
 			ofstream ordered;
 			indiv[bestIndiv].treeStruct->ofprefix = conf->ofprefix;
@@ -3085,6 +3085,7 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	ordered.close();
 
 	bestIndiv = 0;
+	conf->searchReps = numTrees;
 	//loop over the trees
 	for(int t = 1;t <= numTrees;t++){
 		currentSearchRep = t;
@@ -3124,7 +3125,8 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	}
 
 void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
-	log_output = fate_output = swaplog_output = problog_output = Population::DONT_OUTPUT;
+	log_output = fate_output = swaplog_output = treelog_output = problog_output = Population::DONT_OUTPUT;
+	//log_output = fate_output = swaplog_output = problog_output = Population::DONT_OUTPUT;
 	InitializeOutputStreams();	
 	//assert(Tree::someOrientedGap);
 	//find out how many trees we have
@@ -4219,8 +4221,6 @@ bool Population::OutgroupRoot(Individual *ind, int indnum){
 	}
 
 void Population::WriteTreeFile( const char* treefname, int indnum, bool collapse /*=false*/ ){
-	int k;
-
 	assert( treefname );
 	string filename = treefname;
 	filename += ".tre";
@@ -7413,7 +7413,6 @@ void Population::OptimizeSiteRates(){
 
 	const int lastConst=data->LastConstant();
 
-	FLOAT_TYPE siteRate;
 	typedef pair<FLOAT_TYPE, FLOAT_TYPE> float_pair;
 	float_pair rateAndScore;
 	vector<float_pair> allRates;

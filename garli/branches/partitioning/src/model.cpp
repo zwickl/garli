@@ -1,5 +1,5 @@
-// GARLI version 0.96b8 source code
-// Copyright 2005-2008 Derrick J. Zwickl
+// GARLI version 2.0 source code
+// Copyright 2005-2011 Derrick J. Zwickl
 // email: zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -1325,7 +1325,9 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 		for(int rate=0;rate<NRateCats();rate++){
 			int model=0;
 			const unsigned rateOffset = nstates*rate;
+#ifdef OPEN_MP
 #pragma omp parallel for
+#endif
 			for (int i = 0; i < nstates; i++){
 				for (int j = 0; j < nstates; j++){
 					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
@@ -1344,7 +1346,9 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 			if(modSpec->IsNonsynonymousRateHet())
 				model = rate;
 			const unsigned rateOffset = nstates*rate;
+#ifdef OPEN_MP
 #pragma omp parallel for
+#endif
 			for (int i = 0; i < nstates; i++){
 				for (int j = 0; j < nstates; j++){
 					MODEL_FLOAT sum_p=ZERO_POINT_ZERO;
@@ -4817,7 +4821,6 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 				if(space == string::npos)
 					throw ErrorException("Problem reading subset rate parameters from file.");
 				mod.erase(0, space + 1);
-				char temp[100];
 				vector<double> ssr;
 				NxsString val;
 				for(int m = 0;m < models.size();m++){

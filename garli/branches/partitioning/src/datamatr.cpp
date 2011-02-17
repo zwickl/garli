@@ -1,5 +1,5 @@
-// GARLI version 0.96b8 source code
-// Copyright 2005-2008 Derrick J. Zwickl
+// GARLI version 2.0 source code
+// Copyright 2005-2011 Derrick J. Zwickl
 // email: zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -708,7 +708,6 @@ int DataMatrix::PatternType( int k , unsigned int *stateCounts) const{
 // Summarize tallies number of constant, informative, and autapomorphic characters
 //
 void DataMatrix::Summarize(){
-	int i, k;
 	assert( nChar > 0 );
 
 	nMissing = nConstant = nInformative = nVarUninform = 0;
@@ -716,7 +715,7 @@ void DataMatrix::Summarize(){
    //this is just a scratch array to be used repeatedly in PatternType
    vector<unsigned int> s(maxNumStates);
 	
-	for( k = 0; k < nChar; k++ ) {
+	for(int k = 0; k < nChar; k++ ) {
 		int ptFlags = PatternType(k, &s[0]);
 		if( ptFlags == PT_MISSING )
 			nMissing += count[k];
