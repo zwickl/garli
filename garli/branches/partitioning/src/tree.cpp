@@ -361,19 +361,16 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			temp=temp->anc;
 			if(*(s+1)!='(') {
 				s++;
-			}
-			else {
-				numBranchesAdded--; // this ( will be encountered in two consecutive loops, so we decrement numBranchesAdded to avoid overcounting.
-			}
+				}
 			cont = true;
 			}
 		if(*s == '(' || isdigit(*s) || cont==true){
 			//here we're about to add a node of some sort
-			numBranchesAdded++;
 			if(*(s+1)=='('){//add an internal node
 				if(current >= numNodesTotal)
 					throw ErrorException("Problem reading tree description.  Extra taxa?");
 				temp=temp->AddDes(allNodes[current++]);
+				numBranchesAdded++;
 				numNodesAdded++;
 				s++;
 				}
@@ -383,15 +380,17 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 				//digits.  We'll have to look ahead to see what the next non-digit character is.  If it's
 				//a '(', we know we are adding a prenumbered internal
 				if(*s=='(') {
-					numBranchesAdded++;
 					s++;
 					}
 				int i=0;
 				bool term=true;
-				while(isdigit(*(s+i))) i++;
-				if(*(s+i) == '(') term=false;
+				while(isdigit(*(s+i))) 
+					i++;
+				if(*(s+i) == '(') 
+					term=false;
 				
-				if(term == false){//add an internal node with the nodenum specified in the string
+				//add an internal node with the nodenum specified in the string - this is my non-standard hack
+				if(term == false){
 					NxsString num;
 					num = *s;
 					while(isdigit(*(s+1))){
@@ -400,14 +399,15 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 						}
 					int internalnodeNum = atoi( num.c_str() );
 	                temp=temp->AddDes(allNodes[internalnodeNum]);
-	                numNodesAdded++;
+	               	numBranchesAdded++;
+					numNodesAdded++;
 	                s++;							
 					}
 				else{//add a terminal node
 					// read taxon name
-	                 NxsString name;
-	                 name = *s;
-	                 int taxonnodeNum;
+					NxsString name;
+					name = *s;
+					int taxonnodeNum;
 					if(numericalTaxa==true){
 						while(isdigit(*(s+1))){
 							assert(*s);
@@ -448,10 +448,12 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 						}
 					if(allNodes[taxonnodeNum]->attached == true)
 						throw ErrorException("Taxon \"%s\" seems to appear in the tree description twice!\nCheck the tree string.", name.c_str());
-					else
-	                temp=temp->AddDes(allNodes[taxonnodeNum]);
-	                numNodesAdded++;
-					numTipsAdded++;
+					else{
+						temp=temp->AddDes(allNodes[taxonnodeNum]);
+						numBranchesAdded++;
+						numNodesAdded++;
+						numTipsAdded++;
+						}
 	                s++;
 					while(*s == ' ' || *s == '\t') s++;;//eat any spaces here
 					
@@ -504,8 +506,11 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 		//else if(numNodesAdded == numNodesTotal - 3){
 		else if( dummyRoot->attached == false ){
 			//tree didn't have dummy in it, nor was it rooted.  Toss in anywhere
+			//(numNodesTotal - 1) is the "extra" node allocated for possibly unrooted
+			//trees, which will be elminated below
 			int connector = numNodesTotal - 2;
-			AddRandomNode(numTipsTotal, connector);
+			assert(allNodes[connector]->attached == false);
+			RandomlyAttachTip(numTipsTotal, connector);
 			}
 		else//the input tree must have had the dummy in it already
 			assert(dummyRoot->attached == true);
@@ -529,6 +534,9 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	if(allowPolytomies == false) root->CheckforPolytomies();
 	root->CheckTreeFormation();
 	bipartCond = DIRTY;
+	assert(numBranchesAdded == numNodesAdded - 1);
+	if(!allowMissingTaxa)
+		assert(numTipsAdded == numTipsTotal && numNodesAdded == numNodesTotal);
 	} 
 
 Tree::Tree(){
@@ -879,7 +887,7 @@ bool Tree::ArbitrarilyBifurcate(){
 	return polytomiesFound;
 	}
 
-void Tree::AddRandomNode(int nodenum , int &placeInAllNodes){
+void Tree::RandomlyAttachTip(int nodenum , int &placeInAllNodes){
 	
 	assert(nodenum>0 && nodenum<=numTipsTotal);  //should be adding a terminal
 	TreeNode* nd=allNodes[nodenum];
@@ -912,6 +920,7 @@ void Tree::AddRandomNode(int nodenum , int &placeInAllNodes){
 		//select a branch to break with the connector
 		int k = rnd.random_int( numBranchesAdded ) + 1;
 		TreeNode* otherDes = root->FindNode( k );
+		assert(otherDes);
 
 		// replace puts connection in the tree where otherDes had been
 		otherDes->SubstituteNodeWithRespectToAnc(connector);
@@ -926,7 +935,7 @@ void Tree::AddRandomNode(int nodenum , int &placeInAllNodes){
 	bipartCond = DIRTY;
 	}
 
-void Tree::AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition *mask){
+void Tree::RandomlyAttachTipWithConstraints(int nodenum, int &placeInAllNodes, Bipartition *mask){
 	//the trick here with the constraints is that only a subset of the taxa will be in the
 	//growing tree.  To properly determine bipartition comptability a mask consisting of only
 	//the present taxa will need to be used
@@ -2872,7 +2881,7 @@ bool Tree::SwapAllowedByConstraint(const Constraint &constr, TreeNode *cut, Reco
 			compat = constr.BipartitionIsCompatibleWithConstraint(proposed, &jointMask);
 			if(compat == false) return compat;
 
-			//6/23/09 This call was moved up one level, so that it MUST called in AddRandomNodeWithConstraints or GatherValidReconnectionNodes
+			//6/23/09 This call was moved up one level, so that it MUST called in RandomlyAttachTipWithConstraints or GatherValidReconnectionNodes
 			//before calling SwapAllowedByConstraint.  This saves a lot of work when looping over many constraints for a single swap
 			//that really only requires a single adjustment
 			//AdjustBipartsForSwap(cut->nodeNum, broken->nodeNum);
@@ -6207,7 +6216,7 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalNState(CondLikeArray *de
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, unscaledlnL, grandSumlnL=ZERO_POINT_ZERO;
+	FLOAT_TYPE totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO;
 
 	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
 	for(int i=0;i<nstates;i++) 
