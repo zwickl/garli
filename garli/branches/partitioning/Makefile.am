@@ -8,8 +8,7 @@ EXTRA_DIST = \
 	project \
 	doc \
 	tests\
-	ncl-2.1.15.tar.gz \
-	partition_Mk_Examples
+	ncl-2.1.15.tar.gz
 
 SUBDIRS = src tests
 
@@ -18,4 +17,3 @@ dist-hook:
 	find "$(distdir)/project" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
 	find "$(distdir)/example" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
 	find "$(distdir)/tests" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
-	find "$(distdir)/partition_Mk_Examples" -depth -name .svn -and -type d -and -exec rm -rf {} \; 
