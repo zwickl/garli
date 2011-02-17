@@ -255,7 +255,7 @@ void Individual::MakeRandomTree(int nTax){
 		for( int i = 0; i < n; i++ ) {
 			int pos = rnd.random_int( taxset.Size() );
 			int k = taxset[pos];
-			treeStruct->AddRandomNode(k, placeInAllNodes  );
+			treeStruct->RandomlyAttachTip(k, placeInAllNodes  );
 			taxset -= k;
 			}
 		}
@@ -265,7 +265,7 @@ void Individual::MakeRandomTree(int nTax){
 		for( int i = 0; i < n; i++ ) {
 			int pos = rnd.random_int( taxset.Size() );
 			int k = taxset[pos];
-			treeStruct->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
+			treeStruct->RandomlyAttachTipWithConstraints(k, placeInAllNodes, &mask );
 			taxset -= k;
 			}
 #ifndef NDEBUG
@@ -312,9 +312,9 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		int pos = rnd.random_int( taxset.Size() );
 		int k = taxset[pos];
 		if(treeStruct->constraints.empty())
-			scratchT->AddRandomNode(k, placeInAllNodes  );
+			scratchT->RandomlyAttachTip(k, placeInAllNodes  );
 		else
-			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
+			scratchT->RandomlyAttachTipWithConstraints(k, placeInAllNodes, &mask );
 		taxset -= k;
 		}
 	//use information on the similarity between sequences to choose first stepwise additions
@@ -333,7 +333,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 	//be careful because the taxa are indexed from 1->ntax
 	int pos = rnd.random_int( taxset.Size() );
 	int first = (taxset[pos]);
-	scratchT->AddRandomNode(first, placeInAllNodes  );
+	scratchT->RandomlyAttachTip(first, placeInAllNodes  );
 	taxset -= first;
 	
 	//add the furthest taxon to that
@@ -345,7 +345,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 			maxDist = pdist[first-1][sec-1];
 			}
 		}
-	scratchT->AddRandomNode(sec, placeInAllNodes  );
+	scratchT->RandomlyAttachTip(sec, placeInAllNodes  );
 	taxset -= sec;
 	//add the furthest taxon to that (which may in fact be close to first, but should not have a pdist = 0 to it)
 	int third = (first == 1 ? 2 : 1);
@@ -356,7 +356,7 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 			maxDist = pdist[sec-1][third-1];
 			}
 		}
-	scratchT->AddRandomNode(third, placeInAllNodes  );
+	scratchT->RandomlyAttachTip(third, placeInAllNodes  );
 	taxset -= third;
 */
 	CopySecByRearrangingNodesOfFirst(treeStruct, &scratchI, true);
@@ -369,9 +369,9 @@ void Individual::MakeStepwiseTree(int nTax, int attachesPerTaxon, FLOAT_TYPE opt
 		//add the node randomly - this is a little odd, but for the existing swap collecting machinery
 		//to work right, the taxon to be added needs to already be in the tree
 		if(treeStruct->constraints.empty())
-			scratchT->AddRandomNode(k, placeInAllNodes  );
+			scratchT->RandomlyAttachTip(k, placeInAllNodes  );
 		else
-			scratchT->AddRandomNodeWithConstraints(k, placeInAllNodes, &mask );
+			scratchT->RandomlyAttachTipWithConstraints(k, placeInAllNodes, &mask );
 		TreeNode *added = scratchT->allNodes[k];
 
 		scratchT->SweepDirtynessOverTree(added);

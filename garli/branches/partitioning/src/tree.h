@@ -142,8 +142,8 @@ class Tree{
 		~Tree();
 
 		//functions for manipulating and making trees
-		void AddRandomNode(int nodenum, int & );
-		void AddRandomNodeWithConstraints(int nodenum, int &placeInAllNodes, Bipartition *mask);
+		void RandomlyAttachTip(int nodenum, int & );
+		void RandomlyAttachTipWithConstraints(int nodenum, int &placeInAllNodes, Bipartition *mask);
 		void MakeTrifurcatingRoot(bool reducenodes, bool clasAssigned);
 		bool ArbitrarilyBifurcate();
 		void SortAllNodesArray();
