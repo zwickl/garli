@@ -30,7 +30,6 @@ using namespace std;
 #include "rng.h"
 #include "treenode.h"
 #include "clamanager.h"
-#include "hashdefines.h"
 #include "model.h"
 #include "sequencedata.h"
 #include "reconnode.h"

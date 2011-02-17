@@ -77,7 +77,7 @@ EXEC     = Garli-Part-0.97
 
 OBJECT_LIST =	condlike.o datamatr.o individual.o\
 		population.o rng.o set.o\
-		garlireader.o topologylist.o translatetable.o tree.o treenode.o\
+		garlireader.o translatetable.o tree.o treenode.o\
 		funcs.o	configreader.o configoptions.o\
 		bipartition.o model.o linalg.o adaptation.o sequencedata.o\
 		optimization.o
@@ -98,8 +98,8 @@ garlimain.o::
 
 condlike.o:      condlike.h defs.h
 configreader.o:  configreader.h defs.h
-configoptions.o: configoptions.h hashdefines.h  defs.h
-tree.o:          tree.h hashdefines.h funcs.h defs.h clamanager.h
+configoptions.o: configoptions.h defs.h
+tree.o:          tree.h funcs.h defs.h clamanager.h
 optimization.o:	 tree.h funcs.h defs.h
 population.o:    population.h clamanager.h defs.h
 individual.o:    individual.h clamanager.h defs.h
@@ -112,8 +112,7 @@ bipartition.o:   bipartition.h defs.h
 translatetable.o:translatetable.h defs.h
 set.o:           set.h defs.h
 rng.o:           rng.h defs.h
-topologylist.o:  topologylist.h defs.h
-adaptation.o:	 	 adaptation.h hashdefines.h defs.h
+adaptation.o:	 	 adaptation.h defs.h
 sequencedata.o:		 sequencedata.h defs.h
 garlireader.o:	garlireader.h defs.h
 
