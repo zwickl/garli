@@ -1,5 +1,5 @@
-// GARLI version 0.96b8 source code
-// Copyright 2005-2008 Derrick J. Zwickl
+// GARLI version 2.0 source code
+// Copyright 2005-2011 Derrick J. Zwickl
 // email: zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -18,8 +18,8 @@
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #define PROGRAM_NAME "GARLI-PART"
-#define MAJOR_VERSION 0
-#define MINOR_VERSION 98
+#define MAJOR_VERSION 2	
+#define MINOR_VERSION 0
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
 #define SVN_REV "$Rev$"
 #define SVN_DATE "$Date$"
@@ -399,17 +399,22 @@ int main( int argc, char* argv[] )	{
 #ifdef CUDA_GPU
 			outman.UserMessage("->CUDA GPU version<-\n");
 #endif
-			outman.UserMessage("###################################################");
-			outman.UserMessage("THIS IS A TESTING VERSION FOR PARTITIONED MODELS AND THE MKV MORPHOLOGY MODEL.");
-			outman.UserMessage("IT APPEARS TO BE WORKING PROPERLY, BUT PLEASE LET ME KNOW OF ANY PROBLEMS AT:");
-			outman.UserMessage("		          garli.support@gmail.com");
-			outman.UserMessage("        see this hidden page for details on partitioned usage:");
-			outman.UserMessage("      https://www.nescent.org/wg_garli/Partition_testing_version");
-			outman.UserMessage("       and this page for details on Mkv mophology model usage:");
-			outman.UserMessage("      https://www.nescent.org/wg_garli/Mkv_morphology_model");
-			outman.UserMessage("             CHECK WITH ME BEFORE PUBLISHING WITH IT");
-			outman.UserMessage("                         !!!!THANKS!!!!\n");
-			outman.UserMessage("###################################################");
+			outman.UserMessage("##############################################################");
+			outman.UserMessage(" This is GARLI 2.0, the first \"official\" release including ");
+			outman.UserMessage("          partitioned models.  It is a merging of"); 
+			outman.UserMessage("   official release 1.0 and beta version GARLI-PART 0.97");
+			outman.UserMessage("  Briefly, it includes models for nucleotides, amino acids,");
+			outman.UserMessage(" codons, and morphology-like characters, any of which can be ");
+			outman.UserMessage("  mixed together and applied to different subsets of data.\n"); 
+			outman.UserMessage("    General program usage is extensively documented here:");
+			outman.UserMessage("            http://www.nescent.org/wg_garli/");
+			outman.UserMessage("      see this page for details on partitioned usage:");
+			outman.UserMessage("  http://www.nescent.org/wg_garli/Partition_testing_version");
+			outman.UserMessage("   and this page for details on Mkv mophology model usage:");
+			outman.UserMessage("    http://www.nescent.org/wg_garli/Mkv_morphology_model");
+			outman.UserMessage("         PLEASE LET ME KNOW OF ANY PROBLEMS AT:");
+			outman.UserMessage("                garli.support@gmail.com");
+			outman.UserMessage("##############################################################");
 
 			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
