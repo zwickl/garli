@@ -66,6 +66,6 @@ Garli_LDADD =  $(LDADD) @GARLI_LIBS@
 
 install-exec-hook:
 	cd $(DESTDIR)$(bindir) && \
-	  mv -f Garli$(EXEEXT) Garli-Part-$(VERSION)$(EXEEXT) && \
-	  $(LN_S) Garli-Part-$(VERSION)$(EXEEXT) Garli$(EXEEXT)
+	  mv -f Garli$(EXEEXT) Garli-$(VERSION)$(EXEEXT) && \
+	  $(LN_S) Garli-$(VERSION)$(EXEEXT) Garli$(EXEEXT)
 
