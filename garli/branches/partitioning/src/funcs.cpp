@@ -80,12 +80,6 @@ void OutputImportantDefines(){
 	outman.DebugMessage("SWAP_BASED_TERMINATION");
 #endif
 
-#ifdef MORE_DETERM_PARAM_OPT
-	outman.DebugMessage("MORE_DETERM_PARAM_OPT = yes");
-#else
-	outman.DebugMessage("MORE_DETERM_PARAM_OPT = no");
-#endif
-
 #ifdef ADAPTIVE_BOUNDED_OPT
 	outman.DebugMessage("ADAPTIVE_BOUNDED_OPT = yes");
 #else
@@ -102,24 +96,6 @@ void OutputImportantDefines(){
 	outman.DebugMessage("DEBUG_MESSAGES = yes");
 #else
 	outman.DebugMessage("DEBUG_MESSAGES = no");
-#endif
-
-#ifdef BOUND_DIGITS
-	outman.DebugMessage("BOUND_DIGITS = %d", BOUND_DIGITS);
-#else
-	outman.DebugMessage("BOUND_DIGITS = default");
-#endif
-
-#ifdef OPT_BOUNDED_RESTORE
-	outman.DebugMessage("OPT_BOUNDED_RESTORE = yes");
-#else
-	outman.DebugMessage("OPT_BOUNDED_RESTORE = no");
-#endif
-
-#ifdef FINAL_RESTORE_BLENS
-	outman.DebugMessage("FINAL_RESTORE_BLENS = yes");
-#else
-	outman.DebugMessage("FINAL_RESTORE_BLENS = no");
 #endif
 
 	outman.DebugMessage("#####\n");

@@ -1,5 +1,5 @@
-// GARLI version 0.96b8 source code
-// Copyright 2005-2008 Derrick J. Zwickl
+// GARLI version 2.0 source code
+// Copyright 2005-2011 Derrick J. Zwickl
 // email: zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -361,7 +361,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			temp=temp->anc;
 			if(*(s+1)!='(') {
 				s++;
-				}
+			}
 			cont = true;
 			}
 		if(*s == '(' || isdigit(*s) || cont==true){
@@ -500,6 +500,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			//there will be no connector, and all connectors should already have been used.
 			assert(numNodesAdded == numNodesTotal - 2);
 			root->AddDes(dummyRoot);
+			numBranchesAdded++;
 			numNodesAdded++;
 			numTipsAdded++;
 			}
@@ -537,7 +538,7 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	assert(numBranchesAdded == numNodesAdded - 1);
 	if(!allowMissingTaxa)
 		assert(numTipsAdded == numTipsTotal && numNodesAdded == numNodesTotal);
-	} 
+	}  
 
 Tree::Tree(){
 	AllocateTree(false);
