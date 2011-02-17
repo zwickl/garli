@@ -18,7 +18,6 @@ noinst_HEADERS = \
 	errorexception.h \
 	funcs.h \
 	garlireader.h \
-	hashdefines.h \
 	individual.h \
 	linalg.h \
 	memchk.h \
@@ -33,7 +32,6 @@ noinst_HEADERS = \
 	set.h \
 	stopwatch.h \
 	threaddcls.h \
-	topologylist.h \
 	translatetable.h \
 	tree.h \
 	treenode.h \
@@ -58,7 +56,6 @@ Garli_SOURCES = \
 	rng.cpp \
 	sequencedata.cpp \
 	set.cpp \
-	topologylist.cpp \
 	translatetable.cpp \
 	tree.cpp \
 	treenode.cpp \
