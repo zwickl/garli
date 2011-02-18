@@ -2445,7 +2445,6 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 			if(*Ldata > -1){ //no ambiguity
 				for(int r=0;r<nRateCats;r++){
 					La  += prmat[(*Ldata)+16*r] * partial[0] * rateProb[r];
-					assert(La < 1.0);
 					D1a += d1mat[(*Ldata)+16*r] * partial[0] * rateProb[r];
 					D2a += d2mat[(*Ldata)+16*r] * partial[0] * rateProb[r];
 					Lc  += prmat[(*Ldata+4)+16*r] * partial[1]* rateProb[r];

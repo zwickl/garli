@@ -281,6 +281,7 @@ protected:
 		virtual char	DatumToChar( unsigned char d )	const           = 0;
 		virtual unsigned char	FirstState()		    const           = 0;
 		virtual unsigned char	LastState()		        const           = 0;
+		virtual void CalcEmpiricalFreqs() = 0;
 //		virtual FLOAT_TYPE	Freq( unsigned char, int = 0)	                        = 0;
 
 		// virtual functions - can override in derived class

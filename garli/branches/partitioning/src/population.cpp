@@ -456,9 +456,6 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		if(nuc != NULL)
 			nuc->MakeAmbigStrings();
 		}
-	
-	for(int ds = 0;ds < dataPart->NumSubsets();ds++)
-		dataPart->GetSubset(ds)->CalcEmpiricalFreqs();
 		
 	//allocate the treeString
 	//remember that we also encode internal node numbers sometimes
