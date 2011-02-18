@@ -4876,7 +4876,7 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int mod
 	if(nd->IsInternal()){
 		deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
 		if(claMan->IsDirty(nd->claIndexDown) == false){
-			const CondLikeArray *cla = claMan->GetCla(nd->claIndexDown)->theSets[0];
+			const CondLikeArray *cla = claMan->GetCla(nd->claIndexDown)->theSets[modIndex];
 			for(int i=0;i<nstates*rateCats;i++) 
 				deb << cla->arr[index+i] << "\t";
 			deb << cla->underflow_mult[site];
@@ -4886,7 +4886,7 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int mod
 	if(nd->IsInternal()){
 		deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
 		if(claMan->IsDirty(nd->claIndexUL) == false){
-			const CondLikeArray *cla = claMan->GetCla(nd->claIndexUL)->theSets[0];
+			const CondLikeArray *cla = claMan->GetCla(nd->claIndexUL)->theSets[modIndex];
 			for(int i=0;i<nstates*rateCats;i++) 
 				deb << cla->arr[index+i] << "\t";
 			deb << cla->underflow_mult[site];
@@ -4896,7 +4896,7 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int mod
 	if(nd->IsInternal()){
 		deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
 		if(claMan->IsDirty(nd->claIndexUR) == false){
-			const CondLikeArray *cla = claMan->GetCla(nd->claIndexUR)->theSets[0];
+			const CondLikeArray *cla = claMan->GetCla(nd->claIndexUR)->theSets[modIndex];
 			for(int i=0;i<nstates*rateCats;i++) 
 				deb << cla->arr[index+i] << "\t";
 			deb << cla->underflow_mult[site];

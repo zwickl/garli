@@ -112,9 +112,24 @@ void NucleotideData::CalcEmpiricalFreqs(){
 				}
 			}
 		}
-	
-	for(int j=0;j<4;j++)
+
+	bool allPresent = true;
+	for(int j=0;j<4;j++){
+		if((freqSumNoAmbig[j] + freqSumAmbig[j]) == 0.0){
+			outman.UserMessage("WARNING: Not all nucleotides are observed in this subset of data!\nYou may have partitioned too finely or are analyzing very strange data.\nBeware!!!");
+			allPresent = false;
+			break;
+			}
+		}
+	if(!allPresent){
+		for(int j=0;j<4;j++) 
+			freqSumNoAmbig[j] += ONE_POINT_ZERO;
+		nonAmbigTotal += 4.0;
+		}
+
+	for(int j=0;j<4;j++){
 		empStateFreqs[j] = (freqSumNoAmbig[j] + freqSumAmbig[j]) / (nonAmbigTotal + ambigTotal);
+		}
 
 	//now iterate to refine the emp freqs to account for partial ambiguity
 	if(ambigStates.size() > 0){

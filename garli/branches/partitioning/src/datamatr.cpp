@@ -461,6 +461,7 @@ void DataMatrix::ProcessPatterns() {
 		Collapse();
 		DetermineConstantSites();
 		}
+	CalcEmpiricalFreqs();
 	ReserveOriginalCounts();
 	OutputDataSummary();
 	int t = stoppy.SplitTime();
