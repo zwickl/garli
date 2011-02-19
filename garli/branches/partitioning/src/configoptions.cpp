@@ -208,7 +208,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 		settingsFound += cr.GetStringOption("datatype", configModSet.datatype, true);
 		settingsFound += cr.GetStringOption("geneticcode", configModSet.geneticCode, true);
 		if(settingsFound == -7)
-			throw ErrorException("No model descriptions found in config file.  Proper setup is either:\n\t1. Model settings found somewhere under [general] heading,\n\t   applying to all data subsets\n\t2. Separate model settings for each partition subset\n\t   found under different headings [model0], [model1]. etc");
+			throw ErrorException("No model descriptions found in config file.  Proper setup is either:\n\t1. Model settings found somewhere under [general] heading,\n\t   applying to all data subsets\n\t2. Separate model settings for each partition subset\n\t   found under different headings [model1], [model2]. etc");
 		configModelSets.push_back(configModSet);
 		}
 
@@ -315,7 +315,11 @@ bool GeneralGamlConfig::ReadPossibleModelPartition(ConfigReader &cr){
 		char modName[10];
 		sprintf(modName, "model%d", modelNum);
 		int found = cr.SetSection(modName);
-		if(found < 0){
+		//models need to appear consecuatively, but can start at 0 (old) or 1 (new)
+		if(modelNum == 0 && found < 0){
+			continue;
+			}
+		else if(found < 0){
 			cr.SetSection(origSection.c_str());
 			return foundAnyModels;
 			}

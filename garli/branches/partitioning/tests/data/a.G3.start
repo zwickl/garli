@@ -17,5 +17,5 @@ tree bestREP1 = [&U][!GarliScore -6240.261727][!GarliModel  e  0.05006  0.02522 
 end;
 
 begin garli;
-M0 a 0.43677 ;
+M1 a 0.43677 ;
 end;

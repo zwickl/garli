@@ -1132,10 +1132,10 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 	else if(consts.size() > 0 && !(datatype == BINARY) && maxNumStates == 2){
 		string c = NxsSetReader::GetSetAsNexusString(consts);
 		outman.UserMessage("\t****\n\tWARNING - Constant characters found in standard data matrix (sites %s)", c.c_str());
-		outman.UserMessage("\tCurrently these will be ignored because including them in the likelihood");
-		outman.UserMessage("\tcalculations would require knowledge of how many states were possible for");
-		outman.UserMessage("\tthose columns (i.e., 1 state was observed, but was that out of 2 possible,");
-		outman.UserMessage("\tor 3 or 4, etc)\n\t****");
+		outman.UserMessage("\tCurrently these will be ignored because including them in the");
+		outman.UserMessage("\tlikelihood calculations would require knowledge of how many states");
+		outman.UserMessage("\twere possible for those columns (i.e., 1 state was observed, but ");
+		outman.UserMessage("\twas that out of 2 possible, or 3 or 4, etc)\n\t****");
 		}
 
 	if(realCharSet->size() == 0)
