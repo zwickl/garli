@@ -366,9 +366,9 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
 
-	string wtsetName = dnaData->WeightsetName();
-	if(wtsetName.length() > 0)
-		outman.UserMessage("NOTE: Cannot use default wtsets with DNA to Codon translation! Wtset \"%s\" ignored.", wtsetName.c_str());  
+	string defWtsName = dnaData->WeightsetName();
+	if(defWtsName.length() > 0 && useDefaultWeightsets)
+		outman.UserMessage("NOTE: Cannot use default wtsets with DNA to Codon translation! Wtset \"%s\" ignored.", defWtsName.c_str());  
 
 	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
@@ -470,9 +470,9 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
 
-	string wtsetName = dnaData->WeightsetName();
-	if(wtsetName.length() > 0)
-		outman.UserMessage("NOTE: Cannot use default wtsets with DNA to Aminoacid translation! Wtset \"%s\" ignored.", wtsetName.c_str());  
+	string defWtsName = dnaData->WeightsetName();
+	if(defWtsName.length() > 0 && useDefaultWeightsets)
+		outman.UserMessage("NOTE: Cannot use default wtsets with DNA to Aminoacid translation! Wtset \"%s\" ignored.", defWtsName.c_str());  
 
 	nonZeroCharCount = nChar = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
@@ -1050,6 +1050,15 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 	int numOrigTaxa = charblock->GetNTax();
 	int numActiveTaxa = charblock->GetNumActiveTaxa();
 
+	//Not allowing wtsets here, mainly due to lazyness
+	if(useDefaultWeightsets){
+		vector<int> charWeights;
+		string defWtsName = GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
+		if(charWeights.size() > 0){
+			outman.UserMessage("NOTE: Default wtsets cannot currently be used with non-sequence data! Wtset \"%s\" ignored.", defWtsName.c_str()); 
+			}
+		}
+
 	if(charset.empty()){
 		//the charset was empty, implying that all characters in this block will go into a single matrix (actually, for nstate
 		//might be split anyway).  Create an effective charset that contains all of the characters, which will be filtered
@@ -1361,6 +1370,15 @@ void OrientedGapData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, N
 
 	int numOrigTaxa = charblock->GetNTax();
 	int numActiveTaxa = charblock->GetNumActiveTaxa();
+
+	//Not allowing wtsets here, mainly due to lazyness
+	if(useDefaultWeightsets){
+		vector<int> charWeights;
+		string defWtsName = GarliReader::GetDefaultIntWeightSet(charblock, charWeights);
+		if(charWeights.size() > 0){
+			outman.UserMessage("NOTE: Default wtsets cannot currently be used with non-sequence data! Wtset \"%s\" ignored.", defWtsName.c_str()); 
+			}
+		}
 
 	if(charset.empty()){
 		//the charset was empty, implying that all characters in this block will go into a single matrix (actually, for nstate
