@@ -736,7 +736,7 @@ public:
 	int BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 		int nextSeed = seedToUse;
 		for(int p = 0;p < NumSubsets();p++){
-			outman.UserMessage("\tSubset %d: Random seed for bootstrap reweighting: %d", p, nextSeed);
+			outman.UserMessage("\tSubset %d: Random seed for bootstrap reweighting: %d", p + 1, nextSeed);
 			SequenceData *curData = GetSubset(p);
 			nextSeed = curData->BootstrapReweight(nextSeed, resampleProportion);
 			}
@@ -780,7 +780,7 @@ public:
 			outputNames[BINARY_NOT_ALL_ZEROS]="Binary data, no constant state 0 chars";
 			}
 	void Report(){
-		outman.UserMessage("GARLI partition subset %d", garliSubsetNum+1);
+		outman.UserMessage("GARLI data subset %d", garliSubsetNum+1);
 		outman.UserMessage("\tCHARACTERS block #%d (\"%s\")", charblockNum+1, charblockName.c_str());
 		if(partitionSubsetNum >= 0) outman.UserMessage("\tCHARPARTITION subset #%d (\"%s\")", partitionSubsetNum+1, partitionSubsetName.c_str());
 		outman.UserMessage("\tData read as %s,\n\tmodeled as %s", outputNames[readAs].c_str(), outputNames[usedAs].c_str());

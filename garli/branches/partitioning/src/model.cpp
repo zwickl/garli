@@ -4800,7 +4800,10 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 				if(!num.IsALong())
 					throw ErrorException("Expecting a model number, found %s!", num.c_str());
 				int modNum = atoi(num.c_str());
-				if(modNum >= models.size())
+				int modIndex = modNum - 1;
+				if(modNum == 0)
+					throw ErrorException("Model numbers in param strings should begin with M1, not M0!", modNum);
+				if(modIndex >= models.size())
 					throw ErrorException("Model number appearing in param string (%d) is too large!", modNum);
 				mod.erase(0, space + 1);
 					
@@ -4814,7 +4817,7 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 					}
 				string thismod = mod.substr(0, end);
 				mod.erase(0, end);
-				GetModelSet(modNum)->GetModel(0)->ReadGarliFormattedModelString(thismod);
+				GetModelSet(modIndex)->GetModel(0)->ReadGarliFormattedModelString(thismod);
 				}
 			else if(start2 != string::npos){
 				size_t space = mod.find(" ");
@@ -4851,9 +4854,9 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 		}
 	catch(ErrorException &mess){
 		outman.UserMessage("\nERROR. There was a problem with the model specification string near this point:\n\"%s\"", mod.c_str());
-		outman.UserMessage("\nProper format for specification of model parameters in the partitioned\nversion is as follows. Neither subset rates nor all models are required to\nappear. Line breaks are ignored, but the string must be terminated with a \";\".\nThe first model is M0. Omit the <>'s in the following.");
-		outman.UserMessage("\n\nS <subset rate 0> <subset rate 1> <etc.>\nM<first model number> <garli formatted param string for model>\nM<second model number>  <garli formatted param string for model>\n <etc.> ;");
-		outman.UserMessage("\nExample for 3 models:\nS  0.551458  0.302705  2.145837\nM0 r 1.959444 2.571568 1.406484 1.406484 3.725263 e 0.310294 0.176855 0.297080 0.215771 a 0.410964\nM1 r 4.366321 7.061605 1.603498 7.061605 4.366321 e 0.269302 0.163670 0.160508 0.406520 a 0.361294\nM2 r 1.000000 4.908101 3.372480 0.457829 4.908101 e 0.156505 0.353697 0.287843 0.201954 a 4.098323 p 0.034152;");
+		outman.UserMessage("\nProper format for specification of model parameters in the partitioned\nversion is as follows. Neither subset rates nor all models are required to\nappear. Line breaks are ignored, but the string must be terminated with a \";\".\nThe first model is M1. Omit the <>'s in the following.");
+		outman.UserMessage("\n\nS <subset rate 1> <subset rate 2> <etc.>\nM<first model number> <garli formatted param string for model>\nM<second model number>  <garli formatted param string for model>\n <etc.> ;");
+		outman.UserMessage("\nExample for 3 models:\nS  0.551458  0.302705  2.145837\nM1 r 1.959444 2.571568 1.406484 1.406484 3.725263 e 0.310294 0.176855 0.297080 0.215771 a 0.410964\nM2 r 4.366321 7.061605 1.603498 7.061605 4.366321 e 0.269302 0.163670 0.160508 0.406520 a 0.361294\nM3 r 1.000000 4.908101 3.372480 0.457829 4.908101 e 0.156505 0.353697 0.287843 0.201954 a 4.098323 p 0.034152;");
 		outman.UserMessage("\nWhen there is only one model (i.e., unpartitioned analyses), the \"M0\" part\nthat indicates the model number need not appear.");
 		throw mess;
 		}
@@ -4869,7 +4872,7 @@ void ModelPartition::FillGarliFormattedModelStrings(string &s) const{
 			}
 		}
 	for(int m = 0;m < modSets.size(); m++){
-		sprintf(temp, " M%d" , m);
+		sprintf(temp, " M%d" , m + 1);
 		s += temp;
 		GetModelSet(m)->GetModel(0)->FillGarliFormattedModelString(s);
 		}

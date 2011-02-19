@@ -2596,7 +2596,7 @@ int Population::EvaluateStoredTrees(bool report){
 			outman.UserMessage("\nParameter estimates:");
 		for(int part = 0;part < storedTrees[0]->modPart.NumModels();part++){
 			if(storedTrees[0]->modPart.NumModels() > 1)
-				outman.UserMessage("\nPartition subset %d:", part);
+				outman.UserMessage("\nPartition model subset %d:", part + 1);
 			if(storedTrees[0]->modPart.GetModel(part)->GetMutableParameters()->size() > 0){
 				string s;
 				storedTrees[0]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, false);
@@ -2621,7 +2621,7 @@ int Population::EvaluateStoredTrees(bool report){
 		if(modSpecSet.InferSubsetRates()){
 			for(int d = 0;d < dataPart->NumSubsets();d++){
 				char oStr[10];
-				sprintf(oStr, "R(%d)", d);
+				sprintf(oStr, "R(%d)", d + 1);
 				sprintf(cStr, " %5s", oStr);
 				line += cStr;
 				}
@@ -4437,7 +4437,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 				//DEBUG
 				if(storedTrees[bestRep]->modPart.GetModel(m)->IsNucleotide()){
 					char mStr[20];
-					sprintf(mStr, "[M%d\n", m);
+					sprintf(mStr, "[M%d\n", m + 1);
 					outf << mStr;
 					storedTrees[bestRep]->modPart.GetModel(m)->OutputPaupBlockForModel(outf, name.c_str());
 					outf << "\n]\n";

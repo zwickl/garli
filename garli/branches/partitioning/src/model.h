@@ -2154,7 +2154,7 @@ public:
 		}
 	void OutputHumanReadableModelReportWithParams(){
 		for(int m = 0;m < NumModels();m++){
-			outman.UserMessage("Model %d", m);
+			outman.UserMessage("Model %d", m + 1);
 			models[m]->OutputHumanReadableModelReportWithParams();
 			}
 		if(modSpecSet.InferSubsetRates()){

@@ -5071,7 +5071,8 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 			//now map the posteriors of each packed state to the original char order
 			const SequenceData *data = dataPart->GetSubset((*c).dataIndex);
 			for(int s=0;s<data->GapsIncludedNChar();s++){
-				out << s+1 << "\t";
+				//out << s+1 << "\t";
+				out << data->OrigDataNumber(s) + 1 << "\t";
 				if(data->Number(s) > -1)
 					stateProbs[data->Number(s)].Output(out, *states);
 				else 
@@ -5174,7 +5175,7 @@ void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *
 			}
 		}
 	if(effectiveSitelikeLevel > 1){
-		packed << "Partition subset " << partNum << "\npackedIndex\ttruelnL\tunder1\tunder2" << endl;
+		packed << "Partition subset " << partNum + 1 << "\npackedIndex\ttruelnL\tunder1\tunder2" << endl;
 		for(int c = 0;c < data->NChar();c++){
 			packed << c << "\t" << likes[c] << "\t" << under1[c];
 			if(under2 != NULL)
@@ -5192,8 +5193,8 @@ void Tree::OutputSiteDerivatives(int partNum, vector<double> &likes, vector<doub
 	const SequenceData *data = dataPart->GetSubset(partNum);
 
 	assert(d1s.size() == data->NChar());;
-	ordered << "Partition subset " << partNum << "\nsite#\ttruelnL\td1\td2\tunder1\tunder2" << endl;
-	packed << "Partition subset " << partNum << "\npackedIndex\ttruelnL\td1\td2\tunder1\tunder2" << endl;
+	ordered << "Partition subset " << partNum + 1 << "\nsite#\ttruelnL\td1\td2\tunder1\tunder2" << endl;
+	packed << "Partition subset " << partNum + 1 << "\npackedIndex\ttruelnL\td1\td2\tunder1\tunder2" << endl;
 	ordered.precision(10);
 	packed.precision(10);
 	
