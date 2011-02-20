@@ -712,7 +712,7 @@ void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
 //this is mainly for debugging purposes, to ensure that we are able to make all trees or all trees 
 //compatible with any constraints
 void Population::GenerateTreesOnly(int nTrees){
-	SeedPopulationWithStartingTree(0);
+	SeedPopulationWithStartingTree(1);
 	InitializeOutputStreams();
 	if((_stricmp(conf->streefname.c_str(), "random") == 0)){
 		outman.UserMessageNoCR("Making random trees compatible with constraints... ");
@@ -742,7 +742,7 @@ void Population::GenerateTreesOnly(int nTrees){
 void Population::RunTests(){
 	//test a number of functions to ensure that any code changes haven't broken anything
 	//it assumes that Setup has been called
-	SeedPopulationWithStartingTree(0);
+	SeedPopulationWithStartingTree(1);
 //	InitializeOutputStreams();
 
 #ifdef NDEBUG
@@ -771,6 +771,13 @@ void Population::RunTests(){
 	//ind0->MakeStepwiseTree(dataPart->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
 	//ind0->treeStruct->modPart=&ind0->modPart;
 
+#ifdef SINGLE_PRECISION_FLOATS
+	int sigFigs = ceil(log10(-tree0->lnL));
+	double tol = pow(10.0f, sigFigs-7) * 2.0;
+#else
+	double tol = 0.001;
+#endif
+
 	//check that the score was correct coming out of MakeStepwiseTree
 	FLOAT_TYPE scr = tree0->lnL;
 	tree0->MakeAllNodesDirty();
@@ -780,15 +787,8 @@ void Population::RunTests(){
 	//this only really tests for major scoring problems in the optimization functions
 	scr = tree0->lnL;
 	tree0->OptimizeAllBranches(adap->branchOptPrecision);
-	assert(tree0->lnL + 1.0e-6 > scr);
+	assert(tree0->lnL + tol > scr);
 	assert(tree0->lnL * 2 < scr);
-
-#ifdef SINGLE_PRECISION_FLOATS
-	int sigFigs = ceil(log10(-tree0->lnL));
-	double tol = pow(10.0f, sigFigs-7) * 2.0;
-#else
-	double tol = 0.001;
-#endif
 
 	//test rescaling
 	scr = tree0->lnL;
@@ -1133,7 +1133,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
 				int treeNum = (rank+rep-1) % numTrees;
-				indiv[0].GetStartingTreeFromNCL(treesblock, (rank + rep - 1), dataPart->NTax());
+				indiv[0].GetStartingTreeFromNCL(treesblock, treeNum, dataPart->NTax());
 				outman.UserMessage("Obtained starting tree %d from Nexus", treeNum+1);
 				}
 			else throw ErrorException("Problem getting tree(s) from NCL!");

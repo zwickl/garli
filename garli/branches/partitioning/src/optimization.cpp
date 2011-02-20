@@ -1479,8 +1479,8 @@ if(nd->nodeNum == 8){
 		FLOAT_TYPE empD1, empD2;
 //		if(nd->nodeNum == 67 && nd->anc->nodeNum==96){// && nd->anc->nodeNum==12 && nd->next != NULL && nd->next->nodeNum==10){
 //			SetBranchLength(nd, 0.01);
-//			CalcEmpiricalDerivatives(nd, empD1, empD2);
-//			opt << empD1 << "\t" << empD2 << "\t" << nd->dlen + (-empD1/empD2) << "\t";
+			CalcEmpiricalDerivatives(nd, empD1, empD2);
+			opt << empD1 << "\t" << empD2 << "\t" << nd->dlen + (-empD1/empD2) << "\t";
 //			d1 = empD1;
 //			d2 = empD2;
 //			}
@@ -2646,6 +2646,8 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 					assert(0);
 					}
 				siteL *= rateProb[0]; //multiply by (1-pinv)
+				siteD1 *= rateProb[0];
+				siteD2 *= rateProb[0];
 				
 				if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 					siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]));
@@ -2737,7 +2739,7 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 				}
 #ifdef OUTPUT_SITEDERIVS
 			siteD1s[i] = siteD1;
-			siteD2s[i] = siteD2);
+			siteD2s[i] = siteD2;
 #endif
 #ifdef LUMP_LIKES
 			if((i + 1) % LUMP_FREQ == 0){
@@ -3068,6 +3070,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	FLOAT_TYPE La, Lc, Lg, Lt;
 	FLOAT_TYPE D1a, D1c, D1g, D1t;
 	FLOAT_TYPE D2a, D2c, D2g, D2t;
+	FLOAT_TYPE Ra, Rc, Rg, Rt;
 	FLOAT_TYPE unscaledlnL=ZERO_POINT_ZERO;
 
 	vector<double> siteLikes(nchar);
@@ -3078,9 +3081,9 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 
 #ifdef OMP_INTDERIV
 	#ifdef LUMP_LIKES
-		#pragma omp parallel for private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL, grandSumL)
+		#pragma omp parallel for private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, Ra, Rc, Rg, Rt) reduction(+ : tot1, tot2, totL, grandSumL)
 	#else
-		#pragma omp parallel for private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t) reduction(+ : tot1, tot2, totL)
+		#pragma omp parallel for private(partial, CL1, siteL, siteD1, siteD2, unscaledlnL, La, Lc, Lg, Lt, D1a, D1c, D1g, D1t, D2a, D2c, D2g, D2t, Ra, Rc, Rg, Rt) reduction(+ : tot1, tot2, totL)
 	#endif
 	for(int i=0;i<nchar;i++){
 		partial = &(partialCLA->arr[4*i*nRateCats]);
@@ -3096,6 +3099,28 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 			La=Lc=Lg=Lt=D1a=D1c=D1g=D1t=D2a=D2c=D2g=D2t=ZERO_POINT_ZERO;
 			for(int r=0;r<nRateCats;r++){
 				int rOff=r*16;
+
+/*				Ra = partial[0] * rateProb[r];
+				Rc = partial[1] * rateProb[r];
+				Rg = partial[2] * rateProb[r];
+				Rt = partial[3] * rateProb[r];
+
+				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * Ra;
+				Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * Rc;
+				Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * Rg;
+				Lt += ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3]) * Rt;
+				
+				D1a += ( d1mat[rOff ]*CL1[0]+d1mat[rOff + 1]*CL1[1]+d1mat[rOff + 2]*CL1[2]+d1mat[rOff + 3]*CL1[3]) * Ra;
+				D1c += ( d1mat[rOff + 4]*CL1[0]+d1mat[rOff + 5]*CL1[1]+d1mat[rOff + 6]*CL1[2]+d1mat[rOff + 7]*CL1[3]) * Rc;
+				D1g += ( d1mat[rOff + 8]*CL1[0]+d1mat[rOff + 9]*CL1[1]+d1mat[rOff + 10]*CL1[2]+d1mat[rOff + 11]*CL1[3]) * Rg;
+				D1t += ( d1mat[rOff + 12]*CL1[0]+d1mat[rOff + 13]*CL1[1]+d1mat[rOff + 14]*CL1[2]+d1mat[rOff + 15]*CL1[3]) * Rt;
+
+				D2a += ( d2mat[rOff ]*CL1[0]+d2mat[rOff + 1]*CL1[1]+d2mat[rOff + 2]*CL1[2]+d2mat[rOff + 3]*CL1[3]) * Ra;
+				D2c += ( d2mat[rOff + 4]*CL1[0]+d2mat[rOff + 5]*CL1[1]+d2mat[rOff + 6]*CL1[2]+d2mat[rOff + 7]*CL1[3]) * Rc;
+				D2g += ( d2mat[rOff + 8]*CL1[0]+d2mat[rOff + 9]*CL1[1]+d2mat[rOff + 10]*CL1[2]+d2mat[rOff + 11]*CL1[3]) * Rg;
+				D2t += ( d2mat[rOff + 12]*CL1[0]+d2mat[rOff + 13]*CL1[1]+d2mat[rOff + 14]*CL1[2]+d2mat[rOff + 15]*CL1[3]) * Rt;
+*/
+				
 				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
 				Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
 				Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
@@ -3110,7 +3135,7 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 				D2c += ( d2mat[rOff + 4]*CL1[0]+d2mat[rOff + 5]*CL1[1]+d2mat[rOff + 6]*CL1[2]+d2mat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
 				D2g += ( d2mat[rOff + 8]*CL1[0]+d2mat[rOff + 9]*CL1[1]+d2mat[rOff + 10]*CL1[2]+d2mat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
 				D2t += ( d2mat[rOff + 12]*CL1[0]+d2mat[rOff + 13]*CL1[1]+d2mat[rOff + 14]*CL1[2]+d2mat[rOff + 15]*CL1[3]) * partial[3] * rateProb[r];
-				
+
 				partial+=4;
 				CL1+=4;
 				}
@@ -3450,6 +3475,8 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 				siteD2 += tempD2 * partial[from] * freqs[from];
 				}
 			siteL *= rateProb[0]; //multiply by (1-pinv)
+			siteD1 *= rateProb[0];
+			siteD2 *= rateProb[0];
 
 			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
 				siteL += (prI*freqs[conStates[i]] * exp((FLOAT_TYPE)partialCLA->underflow_mult[i]) * exp((FLOAT_TYPE)childCLA->underflow_mult[i]));
@@ -3514,7 +3541,7 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 					siteD2 = condD2;
 					}
 				}
-			else if(unscaledlnL < ZERO_POINT_ZERO){
+			else if(unscaledlnL <= ZERO_POINT_ZERO){
 				totL += unscaledlnL * countit[i];
 				siteD1 /= siteL;
 				tot1 += countit[i] * siteD1;
@@ -3523,6 +3550,8 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 				assert(tot1 == tot1);
 				assert(tot2 == tot2);
 				}
+			else 
+				assert(0);
 			partial += nstates;
 			CL1 += nstates;
 			}
