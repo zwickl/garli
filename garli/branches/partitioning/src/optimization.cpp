@@ -3541,7 +3541,7 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 					siteD2 = condD2;
 					}
 				}
-			else if(unscaledlnL <= ZERO_POINT_ZERO){
+			else if(unscaledlnL < ZERO_POINT_ZERO){
 				totL += unscaledlnL * countit[i];
 				siteD1 /= siteL;
 				tot1 += countit[i] * siteD1;
@@ -3550,8 +3550,6 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 				assert(tot1 == tot1);
 				assert(tot2 == tot2);
 				}
-			else 
-				assert(0);
 			partial += nstates;
 			CL1 += nstates;
 			}
