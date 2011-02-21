@@ -274,7 +274,7 @@ public:
 
 class RateProportions:public BaseParameter{
 public:
-	RateProportions(FLOAT_TYPE **dv, int numE, int modnum):BaseParameter("Rate props", dv, RATEPROPS, numE, 1e-5, 0.999, modnum){};
+	RateProportions(FLOAT_TYPE **dv, int numE, int modnum):BaseParameter("Rate props", dv, RATEPROPS, numE, 1e-5, 0.999, modnum){maxv = 1.0 - (numE * minv);};
 	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
