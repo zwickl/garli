@@ -537,7 +537,9 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 	bipartCond = DIRTY;
 	assert(numBranchesAdded == numNodesAdded - 1);
 	if(!allowMissingTaxa)
-		assert(numTipsAdded == numTipsTotal && numNodesAdded == numNodesTotal);
+		assert(numTipsAdded == numTipsTotal);
+	if(!allowPolytomies)
+		assert(numNodesAdded == numNodesTotal);
 	}  
 
 Tree::Tree(){
