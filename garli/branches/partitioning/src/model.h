@@ -278,16 +278,25 @@ public:
 	void Mutator(FLOAT_TYPE mutationShape){
 		int rateToChange=int(rnd.uniform()*(numElements));
 		*vals[rateToChange] *= rnd.gamma( mutationShape );
-		if(*vals[rateToChange]>maxv) *vals[rateToChange]=maxv;		
+		if(*vals[rateToChange] > maxv) 
+			*vals[rateToChange] = maxv;		
+		if(*vals[rateToChange] < minv) 
+			*vals[rateToChange] = minv;
 
+		//This rescaling is pretty poor, and can result in rates ending up
+		//below or above the limits.  It should be followed up by a call of
+		//NormalizeSumConstrainedValues
 		FLOAT_TYPE newTot = 1.0 - *vals[rateToChange];
 		FLOAT_TYPE oldTot = 0.0;
 		for(int i=0;i<numElements;i++)
-			if(i != rateToChange) oldTot += *vals[i];
+			if(i != rateToChange) 
+				oldTot += *vals[i];
 		for(int i=0;i<numElements;i++)
-			if(i != rateToChange) *vals[i] *= newTot / oldTot;
+			if(i != rateToChange) 
+				*vals[i] *= newTot / oldTot;
 		newTot = 0.0;
-		for(int i=0;i<numElements;i++) newTot += *vals[i];
+		for(int i=0;i<numElements;i++) 
+			newTot += *vals[i];
 		assert(fabs(newTot - 1.0) < 0.0001);
 		}
 	};
