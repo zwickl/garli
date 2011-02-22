@@ -3450,6 +3450,8 @@ void Model::SetWAGAAFreqs(){
 	}
 
 int Model::PerformModelMutation(){
+	//the ModelPartition version of this is now being called
+	assert(0);
 	if(paramsToMutate.empty()) return 0;
 	BaseParameter *mut = SelectModelMutation();
 	assert(mut != NULL);
@@ -4742,7 +4744,8 @@ int ModelPartition::PerformModelMutation(){
 		//the non invariant rates need to be rescaled even if there is only 1
 		for(vector<int>::iterator mit = mut->modelsThatInclude.begin();mit != mut->modelsThatInclude.end();mit++){
 			*(models[*mit]->propInvar) = (*(models[*mit]->propInvar) > (models[*mit]->maxPropInvar) ? (models[*mit]->maxPropInvar) : *(models[*mit]->propInvar));
-			if(modSpecSet.GetModSpec(*mit)->IsFlexRateHet() == false) models[*mit]->AdjustRateProportions();
+			if(modSpecSet.GetModSpec(*mit)->IsFlexRateHet() == false) 
+				models[*mit]->AdjustRateProportions();
 			else models[*mit]->NormalizeRates();
 			}
 		retType=Individual::pinv;
@@ -4757,13 +4760,18 @@ int ModelPartition::PerformModelMutation(){
 			//flex rates and omega muts come through here
 
 			//enforce an ordering of the rate multipliers, so that they can't "cross" one another
-			if(models[*mit]->NRateCats() > 1) models[*mit]->CheckAndCorrectRateOrdering();
+			if(models[*mit]->NRateCats() > 1) 
+				models[*mit]->CheckAndCorrectRateOrdering();
 
 			if(modSpecSet.GetModSpec(*mit)->IsFlexRateHet() == true)
 				models[*mit]->NormalizeRates();
-			else if(modSpecSet.GetModSpec(*mit)->IsCodon())
+			else if(modSpecSet.GetModSpec(*mit)->IsCodon()){
+				//this normalization could really be taken care of in the mutator, but this general purpose
+				//function does a better job of enforcing minimum values
+				models[*mit]->NormalizeSumConstrainedValues(&models[*mit]->omegaProbs[0], models[*mit]->NRateCats(), ONE_POINT_ZERO, 1.0e-5, -1);
 				//eigen stuff needs to be recalced for changes to nonsynonymous rates
 				models[*mit]->eigenDirty = true;
+				}
 			}
 			retType=Individual::alpha;
 		}
