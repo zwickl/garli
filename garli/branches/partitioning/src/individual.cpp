@@ -788,7 +788,7 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 				subsetRateImprove += treeStruct->OptimizeSubsetRates(branchPrec);
 				}
 			}
-		improve=scaleOptImprove + trueImprove + alphaOptImprove + pinvOptImprove + flexOptImprove + omegaOptImprove + subsetRateImprove + insDelImprove;
+		improve=scaleOptImprove + trueImprove + alphaOptImprove + pinvOptImprove + flexOptImprove + omegaOptImprove + rateOptImprove + freqOptImprove + subsetRateImprove + insDelImprove;
 		outman.precision(8);
 		outman.UserMessageNoCR("pass%2d:+%9.3f (branch=%7.2f scale=%6.2f", i, improve, trueImprove, scaleOptImprove);
 		if(optOmega) outman.UserMessageNoCR(" omega=%6.2f", omegaOptImprove);

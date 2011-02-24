@@ -1187,7 +1187,8 @@ class Model{
 	void ReadGarliFormattedModelString(string &);
 	void OutputHumanReadableModelReportWithParams() const;
 	void FillModelOrHeaderStringForTable(string &s, bool m) const;
-	void OutputAminoAcidRMatrixArray(ostream &out);
+	void OutputAminoAcidRMatrixArray(ostream &out, int modNum, int treeNum);
+	void OutputAminoAcidRMatrixMessage(ostream &out);
 
 	void ReadBinaryFormattedModel(FILE *);
 	static void FillQMatLookup();

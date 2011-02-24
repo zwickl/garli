@@ -178,7 +178,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 	Tree::exp_starting_brlen = conf->startingBrlen;
 	
 	Tree::someOrientedGap = false;
-	for(vector<DataSubsetInfo>::iterator it = dataSubInfo.begin();it < dataSubInfo.end();it++){
+	for(vector<DataSubsetInfo>::iterator it = dataSubInfo.begin();it != dataSubInfo.end();it++){
 		if((*it).readAs == DataSubsetInfo::ORIENTEDGAP)
 			Tree::someOrientedGap = true;
 		}
