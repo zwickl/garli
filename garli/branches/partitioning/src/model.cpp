@@ -2283,28 +2283,8 @@ void Model::FillModelOrHeaderStringForTable(string &s, bool model) const{
 		s += cStr;
 		}
 	}
-void Model::OutputAminoAcidRMatrixArray(ostream &out){
-	//assert(el.size() == 400);
-	//first make a full 20x20 matrix
-	assert(modSpec->IsAminoAcid());
-	vector<FLOAT_TYPE> el(nstates * nstates, ZERO_POINT_ZERO);
-	vector<FLOAT_TYPE *>::iterator r = relNucRates.begin();
-	FLOAT_TYPE tot = ZERO_POINT_ZERO;
-	for(int from=0;from<nstates;from++){
-		for(int to=from;to<nstates;to++){
-			if(from == to)
-				el[from * nstates + to] = 0.0;
-			else{
-				el[from * nstates + to] = **r;
-				el[to * nstates + from] = **r;
-				tot += **r;
-				r++;
-				}
-			}
-		}
-	assert(r == relNucRates.end());
-	char str[100];
 
+void Model::OutputAminoAcidRMatrixMessage(ostream &out){
 	out << "Estimated AA rate matrices:" << endl;;
 	out << "NOTE THAT THIS FUNCTION IS FAIRLY EXPERIMENTAL, SO CHECK YOUR OUTPUT AND LET ME KNOW OF ANY PROBLEMS\n" << endl;;
 	out << "GARLI's order of AA's is alphabetically BY SINGLE LETTER CODE, i.e.:\n ACDEFGHIKLMNPQRSTVWY" << endl;
@@ -2331,14 +2311,39 @@ void Model::OutputAminoAcidRMatrixArray(ostream &out){
 	out << "by setting \"ratematrix = fixed\" in the configuration file, or it could be used as starting values for another run estimating" << endl;
 	out << "the full matrix by leaving \"ratematrix = estimate\".  The block itself could be put in the same file as a NEXUS" << endl;
 	out << "data matrix, or put in a file (which must start with #NEXUS) specified on the streefname line of the configuarion file.\n" << endl;
+	}
 
+void Model::OutputAminoAcidRMatrixArray(ostream &out, int modNum, int treeNum){
+	//assert(el.size() == 400);
+	//first make a full 20x20 matrix
+	assert(modSpec->IsAminoAcid());
+	vector<FLOAT_TYPE> el(nstates * nstates, ZERO_POINT_ZERO);
+	vector<FLOAT_TYPE *>::iterator r = relNucRates.begin();
+	FLOAT_TYPE tot = ZERO_POINT_ZERO;
+	for(int from=0;from<nstates;from++){
+		for(int to=from;to<nstates;to++){
+			if(from == to)
+				el[from * nstates + to] = 0.0;
+			else{
+				el[from * nstates + to] = **r;
+				el[to * nstates + from] = **r;
+				tot += **r;
+				r++;
+				}
+			}
+		}
+	assert(r == relNucRates.end());
+	char str[100];
+
+	out << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
 	out << "begin garli;" << endl;
+	out << "[Search replicate " << treeNum + 1 << " Model subset " << modNum + 1 << " ]" << endl;
 	out << "[this specifies an amino acid rate matrix, with AA's ordered alphabetically by SINGLE LETTER CODE]" << endl;
 	out << "[it is the above diagonal portion of the matrix, in order across each row]" << endl;
 	if(modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
 		out << "[below the rate matrix is a line begining with \"e\" that specifies the estimated AA frequencies in GARLI format]" << endl;
 
-	out << "r ";
+	out << "M" << modNum+1 << " r ";
 	
 	FLOAT_TYPE scaleTo = 100.0 * ((nstates * nstates) - nstates)/2.0;
 

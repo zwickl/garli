@@ -1561,7 +1561,7 @@ void Population::WritePopulationCheckpoint(OUTPUT_CLASS &out) {
 		}
 
 	//write any individuals that we may have stored from previous search reps
-	for(vector<Individual*>::iterator it = storedTrees.begin(); it < storedTrees.end() ; it++){
+	for(vector<Individual*>::iterator it = storedTrees.begin(); it != storedTrees.end() ; it++){
 		(*it)->modPart.WriteModelPartitionCheckpoint(out);
 		(*it)->treeStruct->OutputBinaryFormattedTree(out);
 		}
@@ -2538,6 +2538,7 @@ void Population::FinalOptimization(){
 	cout << "pmat calls " << pmatcalls << " time " << pmattime/(double)(ticspersec.QuadPart) << endl;
 */	}
 
+//figures out the best individual that has been stored and returns index, optionally summarizes the final trees/models that have been stored
 int Population::EvaluateStoredTrees(bool report){
 	double bestL=-FLT_MAX;
 	int bestRep;
@@ -2600,9 +2601,10 @@ int Population::EvaluateStoredTrees(bool report){
 		for(int part = 0;part < storedTrees[0]->modPart.NumModels();part++){
 			if(storedTrees[0]->modPart.NumModels() > 1)
 				outman.UserMessage("\nPartition model subset %d:", part + 1);
-			if(storedTrees[0]->modPart.GetModel(part)->GetMutableParameters()->size() > 0){
+			Model *tree0mod = storedTrees[0]->modPart.GetModel(part);
+			if(tree0mod->GetMutableParameters()->size() > 0){
 				string s;
-				storedTrees[0]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, false);
+				tree0mod->FillModelOrHeaderStringForTable(s, false);
 				outman.UserMessage("       %s", s.c_str());
 				for(unsigned i=0;i<storedTrees.size();i++){
 					storedTrees[i]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, true);
@@ -2642,6 +2644,33 @@ int Population::EvaluateStoredTrees(bool report){
 			outman.UserMessage("rep%2d: %s", i+1, line.c_str());
 			}
 		}
+
+	bool firstEstAArmat = true;
+	for(int part = 0;part < storedTrees[0]->modPart.NumModels();part++){
+		const Model *tree0mod = storedTrees[0]->modPart.GetModel(part);
+		const ModelSpecification *modSpec = tree0mod->GetCorrespondingSpec();
+
+		for(unsigned i=0;i<storedTrees.size();i++){
+			Model *treeImod = storedTrees[i]->modPart.GetModel(part);
+			if((modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()) && conf->bootstrapReps == 0){
+				string n = conf->ofprefix.c_str();
+				n += ".AArmatrix.dat";
+				ofstream mat;
+				if(firstEstAArmat){
+					mat.open(n.c_str());
+					treeImod->OutputAminoAcidRMatrixMessage(mat);
+					firstEstAArmat = false;
+					outman.UserMessage("Estimated amino acid rate matrix/matrices saved to %s.AArmatrix.dat", conf->ofprefix.c_str());
+					}
+				else
+					mat.open(n.c_str(), ios::app);
+				treeImod->OutputAminoAcidRMatrixArray(mat, part, i);
+				mat << endl;
+				mat.close();
+				}
+			}
+		}
+
 	return bestRep;
 	}
 
