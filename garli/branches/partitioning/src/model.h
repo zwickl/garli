@@ -1345,7 +1345,7 @@ class Model{
 		eigenDirty=true;
 		}
 
-	void SetFlexRates(FLOAT_TYPE *rates, FLOAT_TYPE *probs){
+	void SetFlexRates(FLOAT_TYPE *rates, FLOAT_TYPE *probs, bool renormalize){
 		if(modSpec->IsFlexRateHet() == false) throw ErrorException("Flex rate values specified in start file,\nbut ratehetmodel is not flex in conf file.");
 		for(int r=0;r<NRateCats();r++){
 			rateMults[r]=rates[r];
@@ -1364,8 +1364,10 @@ class Model{
 		if(!FloatingPointEquals(tot, ONE_POINT_ZERO, max(1.0e-3, GARLI_FP_EPS * 2.0)))
 			throw ErrorException("Specified Flex rate proportions don't add to 1.0!\n\tCorrect spec. is f rate1 prop1 rate2 prop2, etc.");
 		//make the proportions exactly 1
-		for(int r=0;r<NRateCats();r++)
-			rateProbs[r] /= tot;
+		if(renormalize){
+			for(int r=0;r<NRateCats();r++)
+				rateProbs[r] /= tot;
+			}
 		}
 
 	FLOAT_TYPE FlexRate(int which){
@@ -2093,12 +2095,13 @@ public:
 		subsetRates[which] = val;
 		NormalizeSubsetRates(which);
 		}
-	void SetSubsetRates(const vector<FLOAT_TYPE> vals){
+	void SetSubsetRates(const vector<FLOAT_TYPE> vals, bool renormalize){
 		assert(NumSubsetRates() == vals.size());
 		subsetRates.clear();
 		for(int i = 0;i < vals.size();i++)
 			subsetRates.push_back(vals[i]);
-		NormalizeSubsetRates();
+		if(renormalize)
+			NormalizeSubsetRates();
 		}
 
 	int PerformModelMutation();
