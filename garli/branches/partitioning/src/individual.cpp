@@ -623,6 +623,7 @@ void Individual::GetStartingConditionsFromFile(const char* fname, int rank, int 
 			outman.UserMessage("Obtained starting or fixed model parameter values from file %s", fname);
 			string m;
 			modPart.FillGarliFormattedModelStrings(m);
+			outman.UserMessage("This is the current full model string:");
 			outman.UserMessage("%s", m.c_str());
 			}
 		else{

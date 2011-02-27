@@ -2912,7 +2912,7 @@ void Model::ReadGarliFormattedModelString(string &modString){
 					throw ErrorException("Problem with flex rates specification in starting condition file");
 				probs[i]=(FLOAT_TYPE)atof(temp.c_str());
 				}		
-			SetFlexRates(rates, probs);
+			SetFlexRates(rates, probs, true);
 			NormalizeRates();
 			c=stf.get();
 			modSpec->gotFlexFromFile=true;
@@ -4852,7 +4852,7 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 						throw ErrorException("Problem reading subset rate parameters from file.  Expected a number, found %s.", val.c_str());
 					ssr.push_back(atof(val.c_str()));
 					}
-				SetSubsetRates(ssr);
+				SetSubsetRates(ssr, true);
 				}
 			else{
 				//if there is only one model and the M0 wasn't specified, then try to read it anyway
@@ -4915,7 +4915,7 @@ void ModelPartition::ReadModelPartitionCheckpoint(FILE *in) {
 			fread(dummy, sizeof(FLOAT_TYPE), 1, in);
 			rates.push_back(*dummy);
 			}
-		SetSubsetRates(rates);
+		SetSubsetRates(rates, false);
 		delete dummy;
 		}
 	for(int m = 0;m < modSets.size(); m++){

@@ -7198,7 +7198,7 @@ FLOAT_TYPE Tree::OptimizeSubsetRates(FLOAT_TYPE prec){
 	if(after < start){
 		if(!FloatingPointEquals(after, start, 1.0e-3))
 			outman.DebugMessage("##NOTE: SUBSET RATE OPT WORSENED SCORE##");
-		modPart->SetSubsetRates(initVals);
+		modPart->SetSubsetRates(initVals, false);
 		MakeAllNodesDirty();
 		Score();
 		after = lnL;
