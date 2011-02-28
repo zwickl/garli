@@ -425,6 +425,8 @@ inline int Tree::FindUnusedNode(int start){
 inline void Tree::AssignCLAsFromMaster(){
 	//remember that the root's down cla is actually the one that goes up 
 	//the middle des
+	if(claMan == NULL)
+		return;
 	assert(allNodes[0]->claIndexDown==-1);
 	allNodes[0]->claIndexDown=claMan->AssignClaHolder();
 	allNodes[0]->claIndexUL=claMan->AssignClaHolder();
