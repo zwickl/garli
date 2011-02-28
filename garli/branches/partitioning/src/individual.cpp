@@ -757,8 +757,10 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			for(int modnum = 0;modnum < modPart.NumModels();modnum++){
 				Model *mod = modPart.GetModel(modnum);
 				const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
-				if(modSpec->IsCodon() && !modSpec->fixOmega)//optimize omega even if there is only 1
-					omegaOptImprove += treeStruct->OptimizeOmegaParameters(branchPrec, modnum);
+				if(modSpec->IsCodon()){
+					if(!modSpec->fixOmega)
+						omegaOptImprove += treeStruct->OptimizeOmegaParameters(branchPrec, modnum);
+					}
 				else if(mod->NRateCats() > 1){
 					if(modSpec->IsFlexRateHet()){//Flex rates
 						//no longer doing alpha first, it was too hard to know if the flex rates had been partially optimized
