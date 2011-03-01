@@ -1103,11 +1103,13 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 				throw ErrorException("More than two character states found in binary data (character %d)!", num + 1);  
 				}
 			}
-		//In all cases zero-state characters are tossed.  If not binary data, toss any char with #states not equal to the 
-		//prespecified maxNumStates for this matrix.  For binary data accept all chars with > 0 states (because any with > 2
-		//should already have caused an error above)
-		if(ns == 0 || (ns != maxNumStates && !(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS))){
-			realCharSet->erase(num);
+		//If not binary data, toss any char with #states not equal to the prespecified maxNumStates for this matrix.  
+		//For binary data accept all chars with any number of states, because any with > 2 should already have caused 
+		//an error above, and any with zero will be ignored for calculations but will matter for formatting of SL output
+		if(!(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS)){
+			if(ns == 0 || ns != maxNumStates){
+				realCharSet->erase(num);
+				}
 			}
 		}
 	if(missing.size() > 0){

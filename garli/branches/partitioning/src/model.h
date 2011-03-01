@@ -969,6 +969,7 @@ public:
 		else if(_stricmp(str, "standardordered") == 0) SetOrderedNState();
 		else if(_stricmp(str, "mk") == 0) SetNState();
 		else if(_stricmp(str, "standardvariable") == 0) SetNStateV();
+		else if(_stricmp(str, "standardvariableordered") == 0) SetOrderedNStateV();
 		else if(_stricmp(str, "standardorderedvariable") == 0) SetOrderedNStateV();
 		else if(_stricmp(str, "mkv") == 0) SetNStateV();
 		else if(_stricmp(str, "indelmixturemodel") == 0) SetOrientedGap();
