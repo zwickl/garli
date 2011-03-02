@@ -139,6 +139,8 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 		return -1;
 	}
 	
+	cr.MakeAllSection();
+
 	int errors = 0;
 	errors += cr.SetSection("general");
 	if(errors < 0) throw ErrorException("Didn't find [general] section in config file\n     (this section heading is required)");
@@ -173,6 +175,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetUnsignedOption("windowlength", siteWindowLength, true);
 	cr.GetUnsignedOption("windowstride", siteWindowStride, true);
 	cr.GetBoolOption("usepatternmanager", usePatternManager, true);
+	cr.GetStringOption("parametervaluestring", parameterValueString, true);
 
 	cr.GetBoolOption("rootatbranchmidpoint", rootAtBranchMidpoint, true);
 	cr.GetBoolOption("useoptboundedforblen", useOptBoundedForBlen, true);

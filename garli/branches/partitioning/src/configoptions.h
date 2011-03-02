@@ -69,6 +69,7 @@ class GeneralGamlConfig{
 	bool usePatternManager;
 	bool rootAtBranchMidpoint;
 	bool useOptBoundedForBlen;
+	string parameterValueString;
 
 	//starting the run
 	int randseed;

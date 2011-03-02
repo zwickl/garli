@@ -258,19 +258,19 @@ int ConfigReader::GetStringOption(const char* _option, string& val, bool optiona
 	sit = sections.find(cur_section);
 	if (sit == sections.end())	// section doesn't exist, bomb out
 		rv = -2;
-	else	{
-		option = _option;
-		TrimWhiteSpace(option);
-		oit = sit->second.find(option);
-		if (oit == sit->second.end())	{	// option doesn't exist, bomb out
-			rv = -1;
-			if(!optional) throw ErrorException("could not find string configuration entry \"%s\"", option.c_str());
-		}
-		else	{	// option exists, get the value
-			val = oit->second;
-			rv = 0;
-		}
-	}
+			else	{
+				option = _option;
+				TrimWhiteSpace(option);
+				oit = sit->second.find(option);
+				if (oit == sit->second.end())	{	// option doesn't exist, bomb out
+					rv = -1;
+					if(!optional) throw ErrorException("could not find string configuration entry \"%s\"", option.c_str());
+				}
+				else	{	// option exists, get the value
+					val = oit->second;
+					rv = 0;
+				}
+			}
 
 	return rv;
 }
@@ -627,3 +627,14 @@ void ConfigReader::TrimWhiteSpace(string& str)	{
  		str.erase(str.length()-1, 1);
 
 }
+
+//this just takes master and general and combines them into a single "all" section
+//which will allow ignoring of section headings in general, but still deal with old
+//configs
+void ConfigReader::MakeAllSection(){
+	map<std::string, std::string> ops = sections["general"];
+	ops.insert(sections["master"].begin(), sections["master"].end());
+	string name="all";
+	sections.insert(make_pair<std::string, Options>(name, ops));
+	}
+
