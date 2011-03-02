@@ -522,9 +522,9 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	outman.UserMessage("\nFor this dataset:");
 	outman.UserMessage(" Mem level		availablememory setting");
 	outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNodeKB/(FLOAT_TYPE)KB)) * 1.25);
-	outman.UserMessage("  good			approx %.0f KB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
-	outman.UserMessage("  low			approx %.0f KB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
-	outman.UserMessage("  very low		approx %.0f KB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
+	outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
+	outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
+	outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
 	outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 );
 
 	outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
