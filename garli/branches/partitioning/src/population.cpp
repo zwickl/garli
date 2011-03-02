@@ -493,14 +493,13 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		memToUse=conf->megsClaMemory;
 		}
 		
-	const int MB = 1024 * 1024;
+	const int KB = 1024;
 
-	int claSizePerNode = indiv[0].modPart.CalcRequiredCLAsize(dataPart);
+	double claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
 	int numNodesPerIndiv = dataPart->NTax()-2;
-	int sizeOfIndiv = claSizePerNode * numNodesPerIndiv;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
-	int maxClas = (int)((memToUse*MB)/ claSizePerNode);
-	int numClas;
+	int maxClas = (int)((memToUse*KB)/ claSizePerNodeKB);
+	int numClas;	
 
 	int L0=(int) (numNodesPerIndiv * total_size * 2);//a downward and one upward set for each tree
 	int L1=(int) (numNodesPerIndiv * total_size + 2*total_size + numNodesPerIndiv); //at least a downward set and a full root set for every tree, plus one other set
@@ -522,15 +521,16 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	outman.precision(4);
 	outman.UserMessage("\nFor this dataset:");
 	outman.UserMessage(" Mem level		availablememory setting");
-	outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNode/(FLOAT_TYPE)MB)) * 1.25);
-	outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
-	outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
-	outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25);
-	outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)) * 1.25 );
+	outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNodeKB/(FLOAT_TYPE)KB)) * 1.25);
+	outman.UserMessage("  good			approx %.0f KB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
+	outman.UserMessage("  low			approx %.0f KB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
+	outman.UserMessage("  very low		approx %.0f KB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
+	outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 );
 
 	outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
 
-	outman.UserMessage("\nGarli will actually use approx. %.1f MB of memory", (1.0/0.8)*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB);
+	outman.UserMessage("\nGarli will actually use approx. %.1f MB of memory", (1.0/0.8)*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
+
 	if(memLevel == 0)
 		outman.UserMessage("**Your memory level is: great (you don't need to change anything)**");
 	else if(memLevel == 1)
@@ -1150,18 +1150,29 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	if(reader.FoundModelString()) 
 		startingModelInNCL = true;
 
-	if(startingModelInNCL){
+	if(startingModelInNCL || conf->parameterValueString.length() > 0){
 		//crap out if we already got some parameters above in an old style starting conditions file
 #ifndef SUBROUTINE_GARLI
 		if(modSpecSet.GotAnyParametersFromFile() && (currentSearchRep == 1 && (conf->bootstrapReps == 0 || currentBootstrapRep == 1)))
 			throw ErrorException("Found model parameters specified in a Nexus GARLI block with the dataset,\n\tand in the starting condition file (streefname).\n\tPlease use one or the other.");
 #endif
+		if(startingModelInNCL && conf->parameterValueString.length() > 0)
+			throw ErrorException("Found model parameters specified in the configuration file and in the dataset or starting condition file (streefname).\n\tPlease use one or the other.");
 		//model string from garli block, which could have come either in starting condition file
 		//or in file with Nexus dataset.  Cases 2, 4, 5, 7 and 8 come through here.
 
-		string modString = reader.GetModelString();
+		string modString;
+		if(startingModelInNCL)
+			modString = reader.GetModelString();
+		else
+			modString = conf->parameterValueString;
+
 		indiv[0].modPart.ReadGarliFormattedModelStrings(modString);
-		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
+
+		if(startingModelInNCL)
+			outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
+		else
+			outman.UserMessage("Obtained starting or fixed model parameter values from configuration file:");
 		}
 
 	//The model params should be set to their initial values by now, so report them
