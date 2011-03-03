@@ -371,8 +371,8 @@ void Population::CheckForIncompatibleConfigEntries(){
 			if((modSpec->numRateCats > 1 && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false && modSpec->IsCodon() == false) || (modSpec->IsCodon() && !modSpec->fixOmega)) 
 				throw(ErrorException("if model mutation weight is set to zero,\nratehetmodel must be set to gammafixed, nonsynonymousfixed or none!"));
 			}
-		if((modSpec->IsNStateV()  || modSpec->IsOrderedNStateV() ||  modSpec->IsOrientedGap()) && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
-			throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used if\n\tthe Mkv model (datatype = standardvariable) or gap model (datatype = indelmixturemodel)\n\tare used for any data.\n\tTry streefname = random.");
+		if((modSpec->IsNStateV() || modSpec->IsOrderedNStateV() || modSpec->IsBinaryNotAllZeros() || modSpec->IsOrientedGap()) && (_stricmp(conf->streefname.c_str(), "stepwise") == 0))
+			throw ErrorException("Sorry, stepwise addition starting trees currently cannot be used when\n\ta conditioned model (datatype = standardvariable,\n\tstandardvariableordered, binarynotallzeros or indelmixturemodel)\n\tis used for any data.\n\tTry streefname = random, or provide your own starting tree.");
 		if(conf->inferInternalStateProbs && ! (modSpec->IsNucleotide() || modSpec->IsAminoAcid() || modSpec->IsCodon()))
 			throw ErrorException("Sorry, internal states can currently only be inferred for nucleotide, amino acid and codon models");
 		}
@@ -3114,7 +3114,7 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	//find out how many trees we have
 	GarliReader & reader = GarliReader::GetInstance();
 	const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
-	if(treesblock == NULL)
+	if(treesblock == NULL || !strcmp(conf->streefname.c_str(), "random") || !strcmp(conf->streefname.c_str(), "stepwise"))
 		throw ErrorException("You must specify a treefile to use this runmode.");
 	int numTrees = treesblock->GetNumTrees();
 
