@@ -900,7 +900,7 @@ void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 	double mu = DeleteRate();
 	//If expMu is too small, then (1 - expMu) becomes one.  This is DBL_EPSILON (2.2204460492503131e-016), 
 	//but use FLT_EPSILON (1.1920928955078125e-007) to be safe. This is reached when (mu * blen) = ~16
-	double expMu = max(exp(-mu * blen), FLT_EPSILON);
+	double expMu = max(exp(-mu * blen), (double) FLT_EPSILON);
 
 	//very simple pmat
 	mat[0][0][0] = 1.0;					//remain in "will be inserted state"
