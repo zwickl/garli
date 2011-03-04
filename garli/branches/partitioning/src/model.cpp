@@ -898,7 +898,9 @@ void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 	
 	//deletion rate
 	double mu = DeleteRate();
-	double expMu  = exp(-mu * blen);
+	//If expMu is too small, then (1 - expMu) becomes one.  This is DBL_EPSILON (2.2204460492503131e-016), 
+	//but use FLT_EPSILON (1.1920928955078125e-007) to be safe. This is reached when (mu * blen) = ~16
+	double expMu = max(exp(-mu * blen), FLT_EPSILON);
 
 	//very simple pmat
 	mat[0][0][0] = 1.0;					//remain in "will be inserted state"
@@ -928,7 +930,8 @@ void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
 	mat[0][0][2] = 0.0;					//insert and del on same branch (should be 0?)
 #endif
 	mat[0][1][2] = 1.0 - expMu;			//deletion
-	mat[0][1][1] = 1.0 - mat[0][1][2];	//no deletion
+	//mat[0][1][1] = 1.0 - mat[0][1][2];	//no deletion
+	mat[0][1][1] = expMu;	//no deletion
 	mat[0][2][2] = 1.0;					//stay deleted (?)
 	
 	mat[0][1][0] = mat[0][2][0] =  mat[0][2][1] = ZERO_POINT_ZERO;
