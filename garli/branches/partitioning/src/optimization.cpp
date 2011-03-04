@@ -805,7 +805,8 @@ FLOAT_TYPE Tree::OptimizeBranchLength(FLOAT_TYPE optPrecision, TreeNode *nd, boo
 #endif
 		//the first argument here is the modnum, which doesn't matter for this hack way of optimizing blens 
 		//improve = OptimizeBoundedParameter(0, optPrecision, nd->dlen, -nd->nodeNum, min_brlen, max_brlen, &Model::SetBranchlengthDummy);
-		improve = OptimizeBoundedParameter(0, optPrecision, nd->dlen, -nd->nodeNum, max(nd->dlen * 0.1, min_brlen), min(nd->dlen * 10.0, max_brlen), &Model::SetBranchlengthDummy);
+		//bounds will be 1/10th of current blen or min_brlen on the low side, and 10x the current or 1e-4 if it is less than that 
+		improve = OptimizeBoundedParameter(0, optPrecision, nd->dlen, -nd->nodeNum, max(nd->dlen * 0.1, min_brlen), min(max(nd->dlen * 10.0, 1.0e-4), max_brlen), &Model::SetBranchlengthDummy);
 		//outman.UserMessage("%d\t%f -> %f", nd->nodeNum, before, nd->dlen);
 		}
 	else{
