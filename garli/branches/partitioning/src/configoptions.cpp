@@ -74,6 +74,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	usePatternManager = false;
 	rootAtBranchMidpoint = false;
 	useOptBoundedForBlen = false;
+	optimizeInputOnly = false;
 
 	//finishing the run
 	enforceTermConditions = true;
@@ -165,6 +166,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetUnsignedNonZeroOption("attachmentspertaxon", attachmentsPerTaxon, true);
 	cr.GetUnsignedOption("outputsitelikelihoods", outputSitelikelihoods, true);
 	cr.GetBoolOption("reportrunprogress", reportRunProgress, true);
+	cr.GetBoolOption("optimizeinputonly", optimizeInputOnly, true);
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);

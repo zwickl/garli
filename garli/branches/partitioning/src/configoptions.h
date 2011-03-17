@@ -70,6 +70,7 @@ class GeneralGamlConfig{
 	bool rootAtBranchMidpoint;
 	bool useOptBoundedForBlen;
 	string parameterValueString;
+	bool optimizeInputOnly;
 
 	//starting the run
 	int randseed;

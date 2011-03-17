@@ -16,7 +16,7 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
- 
+
 #define PROGRAM_NAME "GARLI-PART"
 #define MAJOR_VERSION 2	
 #define MINOR_VERSION 0
@@ -762,6 +762,9 @@ int main( int argc, char* argv[] )	{
 				outman.UserMessage("******Successfully completed tests.******");
 				return 0;
 				}
+
+			if(conf.optimizeInputOnly)
+				conf.runmode = 11;
 
 			if(validateMode){
 				//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
