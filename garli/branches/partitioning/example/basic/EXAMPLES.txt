@@ -1,11 +1,11 @@
 #################
-FOR PARTITIONED VERSION EXAMPLES SEE THE partition_Mk_Examples directory.
+FOR PARTITIONED VERSION EXAMPLES SEE THE partition directory.
 For documentation of the partitioned version see:
-http://www.nescent.org/wg_garli/Partition_testing_version
+http://www.nescent.org/wg_garli/Using_partitioned_models
 
 The following may also be helpful if you aren't familar with general GARLI usage.
 #################
-GARLI version 0.96 examples - May 2008
+GARLI version 2.0 examples - March 2011
 
 SAMPLE DATASETS:
 Rana 64 taxon rRNA frog dataset:
@@ -19,6 +19,7 @@ Zakon 11 taxon Na+ channel gene fish dataset:
 -This dataset is from Zakon, Lu, Zwickl and Hillis. 2006. Sodium channel genes and the evolution of diversity in communication signals of electric fishes: Convergent molecular evolution. Proc. Natl. Acad. Sci. USA. 103(10):3675-80.
 -This is a protein coding gene, aligned in proper reading frame
 -This single dataset file can be analyzed using nucleotide, amino acid and codon models with the garli.conf.nuc.test, garli.conf.AA.test and garli.conf.codon.test configuration files, respectively.
+-There is an example of how to use a custom AA model (the "LG" model in this case) with this dataset in configuration file garli.conf.AA.LGmodel and model file LGmodel.mod.
 
 Configuration files:
 -The program will look for a configuration file named garli.conf in the current working directory, unless a different filename is passed to it from the command line
@@ -27,7 +28,7 @@ Configuration files:
 -The garli.conf.XXX.test configuration files are meant for quick tests on the small 11 taxon dataset, and the settings contained are NOT good defaults for larger datasets.  See above.
 -See the manual or website for a general tutorial on using the program and the meaning of the configuration file entries
 
-// Copyright 2005-2008 Derrick J. Zwickl
+// Copyright 2005-2011 Derrick J. Zwickl
 // email: zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
