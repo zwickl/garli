@@ -93,21 +93,8 @@ public:
 			delete []rawAllocation;
 			delete []rawUnder;
 			}
-		void Allocate() {
-			unsigned size = 0, usize = 0;
-			for(vector<CondLikeArray *>::iterator cit = theSets.begin();cit != theSets.end();cit++){
-				size += (*cit)->RequiredSize();
-				usize += (*cit)->NChar();
-				}
-			rawAllocation = new FLOAT_TYPE[size];
-			rawUnder = new int[usize];
-			unsigned offset = 0, uoffset = 0;
-			for(vector<CondLikeArray *>::iterator cit = theSets.begin();cit != theSets.end();cit++){
-				(*cit)->Assign(&rawAllocation[offset], &rawUnder[uoffset]);
-				offset += (*cit)->RequiredSize();
-				uoffset += (*cit)->NChar();
-				}
-			}
+
+		void Allocate();
 		void AddCLA(CondLikeArray *cla ){
 			theSets.push_back(cla);
 			}

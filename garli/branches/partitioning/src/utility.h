@@ -78,17 +78,22 @@ template<typename T> T ***New3DArray(unsigned f , unsigned s , unsigned t)
 	{
 	assert(f > 0 && s > 0 && t> 0);
 	T ***temp;
-	temp = new T **[f];
-	*temp = new T *[f * s];
-	**temp = new T[f * s * t];
-	for (unsigned sIt = 1 ; sIt < s ; sIt++)
-		temp[0][sIt] = temp[0][sIt-1] + t ;
-	for (unsigned fIt = 1 ; fIt < f ; fIt ++)
-		{
-		temp[fIt] = temp[fIt -1] +  s ;
-		temp[fIt][0] = temp[fIt -1][0] + (s*t);
+	try{
+		temp = new T **[f];
+		*temp = new T *[f * s];
+		**temp = new T[f * s * t];
 		for (unsigned sIt = 1 ; sIt < s ; sIt++)
-			temp[fIt][sIt] = temp[fIt][sIt-1] + t ;
+			temp[0][sIt] = temp[0][sIt-1] + t ;
+		for (unsigned fIt = 1 ; fIt < f ; fIt ++)
+			{
+			temp[fIt] = temp[fIt -1] +  s ;
+			temp[fIt][0] = temp[fIt -1][0] + (s*t);
+			for (unsigned sIt = 1 ; sIt < s ; sIt++)
+				temp[fIt][sIt] = temp[fIt][sIt-1] + t ;
+			}
+		}
+	catch(std::bad_alloc){
+		throw ErrorException("Problem allocating 3D array (%d X %d X %d = %.2f MB). Out of mem?", f, s, t, (f * s * t * sizeof(T)) / (1024.0 * 1024.0));
 		}
 	return temp;
 	}
@@ -133,10 +138,15 @@ template<typename T> T **New2DArray(unsigned f , unsigned s)
 	{
 	assert(f > 0 && s > 0);
 	T **temp;
-	temp = new T *[f];
-	*temp = new T [f * s];
-	for (unsigned fIt = 1 ; fIt < f ; fIt ++)
-		temp[fIt] = temp[fIt -1] +  s ;
+	try{
+		temp = new T *[f];
+		*temp = new T [f * s];
+		for (unsigned fIt = 1 ; fIt < f ; fIt ++)
+			temp[fIt] = temp[fIt -1] +  s ;
+		}
+	catch(std::bad_alloc){
+		throw ErrorException("Problem allocating 2D array (%d X %d = %.2f MB). Out of mem?", f, s, (f * s * sizeof(T)) / (1024.0 * 1024.0));
+		}
 	return temp;
 	}
 

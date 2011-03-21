@@ -87,14 +87,14 @@ class ClaManager{
 		allClas=new CondLikeArraySet*[numClas];
 		claStack.reserve(numClas);
 		for(int i=numClas-1;i>=0;i--){
-			allClas[i]=new CondLikeArraySet;
-			//for(vector<Model *>::iterator modit = mods->models.begin();modit != mods->models.end();modit++){
-			//for(int m = 0;m < mods->NumModels();m++){
-			for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
-				const Model *thisMod = mods->GetModel((*specs).modelIndex);
-				CondLikeArray *thisCLA = new CondLikeArray(data->GetSubset((*specs).dataIndex)->NChar(), (thisMod->IsOrientedGap() ? 3: thisMod->NStates()), thisMod->NRateCats());
-				allClas[i]->AddCLA(thisCLA);
-				}
+				allClas[i]=new CondLikeArraySet;
+				//for(vector<Model *>::iterator modit = mods->models.begin();modit != mods->models.end();modit++){
+				//for(int m = 0;m < mods->NumModels();m++){
+				for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
+					const Model *thisMod = mods->GetModel((*specs).modelIndex);
+					CondLikeArray *thisCLA = new CondLikeArray(data->GetSubset((*specs).dataIndex)->NChar(), (thisMod->IsOrientedGap() ? 3: thisMod->NStates()), thisMod->NRateCats());
+					allClas[i]->AddCLA(thisCLA);
+					}
 			allClas[i]->Allocate();
 			claStack.push_back(allClas[i]);
 			}

@@ -196,13 +196,15 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetBoolOption("restart", restart, true);
 	cr.GetBoolOption("writecheckpoints", checkpoint, true);
 
-	//after changes to Population, this is now allowed
-//	if((restart || checkpoint) && collapseBranches)
-//		throw ErrorException("Sorry, the collapsebranches option can not currently be used with checkpointing");
-
 	cr.GetUnsignedNonZeroOption("searchreps", searchReps, true);
 	cr.GetUnsignedOption("runmode", runmode, true);
 	cr.GetBoolOption("scoreonly", scoreOnly, true);
+
+	//These three used to be in the [master] section, for no apparent reason. Now allowed in [general] 
+	//as well.  If in both, will be overridden by master
+	cr.GetUnsignedOption("bootstrapreps", bootstrapReps, true);
+	cr.GetPositiveNonZeroDoubleOption("resampleproportion", resampleProportion, true);
+	cr.GetBoolOption("inferinternalstateprobs", inferInternalStateProbs, true);
 
 	bool multipleModelsFound = ReadPossibleModelPartition(cr);
 
@@ -265,11 +267,10 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 
 	cr.GetUnsignedOption("bootstrapreps", bootstrapReps, true);
 	cr.GetPositiveNonZeroDoubleOption("resampleproportion", resampleProportion, true);
+	cr.GetBoolOption("inferinternalstateprobs", inferInternalStateProbs, true);
 #ifdef MPI_VERSION
 	if(bootstrapReps != 0) throw ErrorException("Sorry, Bootstrap not yet implemented in parallel GARLI!");
 #endif
-
-	cr.GetBoolOption("inferinternalstateprobs", inferInternalStateProbs, true);
 
 #ifdef MPI_VERSION
 	if(isMaster==false) errors += cr.GetDoubleOption("sendinterval", sendInterval);

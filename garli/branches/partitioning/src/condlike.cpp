@@ -71,50 +71,75 @@ void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	}
 
 
-	CondLikeArraySet* ClaManager::AssignFreeCla(){
-		#ifdef CLA_DEBUG
-		ofstream deb("cladebug.log", ios::app);
-		#endif
+CondLikeArraySet* ClaManager::AssignFreeCla(){
+	#ifdef CLA_DEBUG
+	ofstream deb("cladebug.log", ios::app);
+	#endif
 
-		if(claStack.empty() == true) RecycleClas();
-		
-		CondLikeArraySet *arr=claStack[claStack.size()-1];
-		
-		assert(arr != NULL);
-		claStack.pop_back();
-		if(numClas - (int)claStack.size() > maxUsed) maxUsed=numClas - (int)claStack.size();
-		
-		return arr;
-		}
+	if(claStack.empty() == true) RecycleClas();
+	
+	CondLikeArraySet *arr=claStack[claStack.size()-1];
+	
+	assert(arr != NULL);
+	claStack.pop_back();
+	if(numClas - (int)claStack.size() > maxUsed) maxUsed=numClas - (int)claStack.size();
+	
+	return arr;
+	}
 
-	void ClaManager::RecycleClas(){
-		int numReclaimed=0;
-		for(int i=0;i<numHolders;i++){
-			if(holders[i].theSet != NULL){
-				if(holders[i].GetReclaimLevel() == 2 && holders[i].tempReserved == false && holders[i].reserved == false){
-					claStack.push_back(holders[i].theSet);
-					holders[i].SetReclaimLevel(0);
-					holders[i].theSet=NULL;
-					numReclaimed++;
-					}
+void ClaManager::RecycleClas(){
+	int numReclaimed=0;
+	for(int i=0;i<numHolders;i++){
+		if(holders[i].theSet != NULL){
+			if(holders[i].GetReclaimLevel() == 2 && holders[i].tempReserved == false && holders[i].reserved == false){
+				claStack.push_back(holders[i].theSet);
+				holders[i].SetReclaimLevel(0);
+				holders[i].theSet=NULL;
+				numReclaimed++;
 				}
-			if(memLevel<2) if(numReclaimed>50) return;
 			}
-		if(numReclaimed>10) return;
-		for(int i=0;i<numHolders;i++){
-			if(holders[i].theSet != NULL){
-				if((holders[i].GetReclaimLevel() == 1 && holders[i].tempReserved == false && holders[i].reserved == false)){
-					claStack.push_back(holders[i].theSet);
-					holders[i].SetReclaimLevel(0);
-					holders[i].theSet=NULL;
-					numReclaimed++;
-					}
-				}
-			if(numReclaimed==20) return;
-			}
-		if(numReclaimed==0){
-			throw(2);
-			}
-		assert(numReclaimed > 0);
+		if(memLevel<2) if(numReclaimed>50) return;
 		}
+	if(numReclaimed>10) return;
+	for(int i=0;i<numHolders;i++){
+		if(holders[i].theSet != NULL){
+			if((holders[i].GetReclaimLevel() == 1 && holders[i].tempReserved == false && holders[i].reserved == false)){
+				claStack.push_back(holders[i].theSet);
+				holders[i].SetReclaimLevel(0);
+				holders[i].theSet=NULL;
+				numReclaimed++;
+				}
+			}
+		if(numReclaimed==20) return;
+		}
+	if(numReclaimed==0){
+		throw(2);
+		}
+	assert(numReclaimed > 0);
+	}
 
+void CondLikeArraySet::Allocate() {
+	unsigned size = 0, usize = 0;
+	for(vector<CondLikeArray *>::iterator cit = theSets.begin();cit != theSets.end();cit++){
+		size += (*cit)->RequiredSize();
+		usize += (*cit)->NChar();
+		}
+	try{
+		rawAllocation = new FLOAT_TYPE[size];
+		}
+	catch(std::bad_alloc){
+		throw ErrorException("Problem allocating cond. likelihood array (len = %d). Out of mem?", size);
+		}
+	try{
+		rawUnder = new int[usize];
+		}
+	catch(std::bad_alloc){
+		throw ErrorException("Problem allocating underflow multiplier array (len = %d). Out of mem?", usize);
+		}
+	unsigned offset = 0, uoffset = 0;
+	for(vector<CondLikeArray *>::iterator cit = theSets.begin();cit != theSets.end();cit++){
+		(*cit)->Assign(&rawAllocation[offset], &rawUnder[uoffset]);
+		offset += (*cit)->RequiredSize();
+		uoffset += (*cit)->NChar();
+		}
+	}
