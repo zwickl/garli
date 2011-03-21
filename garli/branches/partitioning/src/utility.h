@@ -33,6 +33,8 @@
 
 using namespace std;
 
+#include "errorexception.h"
+
 #define DBL_ALIGN 32
 
 template<typename T> T ***New3DArray(unsigned f , unsigned s , unsigned t);
@@ -93,7 +95,7 @@ template<typename T> T ***New3DArray(unsigned f , unsigned s , unsigned t)
 			}
 		}
 	catch(std::bad_alloc){
-		throw ErrorException("Problem allocating 3D array (%d X %d X %d = %.2f MB). Out of mem?", f, s, t, (f * s * t * sizeof(T)) / (1024.0 * 1024.0));
+		throw ErrorException::ErrorException("Problem allocating 3D array (%d X %d X %d = %.2f MB). Out of mem?", f, s, t, (f * s * t * sizeof(T)) / (1024.0 * 1024.0));
 		}
 	return temp;
 	}
@@ -145,7 +147,7 @@ template<typename T> T **New2DArray(unsigned f , unsigned s)
 			temp[fIt] = temp[fIt -1] +  s ;
 		}
 	catch(std::bad_alloc){
-		throw ErrorException("Problem allocating 2D array (%d X %d = %.2f MB). Out of mem?", f, s, (f * s * sizeof(T)) / (1024.0 * 1024.0));
+		throw ErrorException::ErrorException("Problem allocating 2D array (%d X %d = %.2f MB). Out of mem?", f, s, (f * s * sizeof(T)) / (1024.0 * 1024.0));
 		}
 	return temp;
 	}
