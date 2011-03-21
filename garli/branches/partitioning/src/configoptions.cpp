@@ -49,6 +49,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 
 	//starting the run
 	randseed = -1;
+	bootstrapSeed = -1;
 	streefname = "random";
 	refineStart = true;
 	refineEnd = true;
@@ -75,6 +76,8 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	rootAtBranchMidpoint = false;
 	useOptBoundedForBlen = false;
 	optimizeInputOnly = false;
+	//this should really not be necessary, but for some reason not explicitly initializing it was causing problems with icc
+	parameterValueString = "";
 
 	//finishing the run
 	enforceTermConditions = true;
@@ -156,6 +159,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	errors += cr.GetStringOption("streefname", streefname);
 	cr.GetStringOption("constraintfile", constraintfile, true);
 	errors += cr.GetIntNonZeroOption("randseed", randseed);
+	cr.GetIntNonZeroOption("bootstrapseed", bootstrapSeed, true);
 	errors += cr.GetBoolOption("refinestart", refineStart);
 	cr.GetBoolOption("refineend", refineEnd, true);
 	errors += cr.GetBoolOption("outputeachbettertopology", outputTreelog);

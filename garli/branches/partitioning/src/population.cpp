@@ -1167,7 +1167,8 @@ void Population::SeedPopulationWithStartingTree(int rep){
 		else
 			modString = conf->parameterValueString;
 
-		indiv[0].modPart.ReadGarliFormattedModelStrings(modString);
+		if(modString.length() > 0)
+			indiv[0].modPart.ReadGarliFormattedModelStrings(modString);
 
 		if(startingModelInNCL)
 			outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
@@ -2707,9 +2708,15 @@ void Population::Bootstrap(){
 #endif
 		if(conf->restart == false){
 			outman.UserMessage("\nBootstrap reweighting...");
-			//if this is the first rep
-			if(nextBootstrapSeed == 0)
-				nextBootstrapSeed = rnd.seed();
+			//if this is the first rep use the bootstrapseed if one was specified,
+			//or the current seed (which could have come from a specified randseed or could have been generated randomly)
+			if(nextBootstrapSeed == 0){
+				assert(currentBootstrapRep == 1);
+				if(conf->bootstrapSeed > 0)
+					nextBootstrapSeed = conf->bootstrapSeed;
+				else
+					nextBootstrapSeed = rnd.seed();
+				}
 			lastBootstrapSeed = nextBootstrapSeed;
 			nextBootstrapSeed = dataPart->BootstrapReweight(lastBootstrapSeed, conf->resampleProportion);
 			}

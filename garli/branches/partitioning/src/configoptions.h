@@ -74,6 +74,7 @@ class GeneralGamlConfig{
 
 	//starting the run
 	int randseed;
+	int bootstrapSeed;
 	string streefname;
 	bool refineStart;
 	bool refineEnd;
