@@ -1,17 +1,5 @@
-
-###########
-##NOTE#####
-This is the mk model and partitioned model version of GARLI, GARLI-PART 0.97
-The readme below is for a slightly older non-partitioned version, but most 
-of it should apply to the partitioned version as well.
-
-For documentation on this version see:
- http://www.nescent.org/wg_garli/Partition_testing_version
-
-You'll also find example files in the partition_Mk_Examples directory
-##########
-// GARLI Version 0.96b8 (May 2008)
-// Copyright 2005-2008 Derrick J. Zwickl
+// GARLI Version 2.0 (March 2011)
+// Copyright 2005-2011 Derrick J. Zwickl
 // email: zwickl@nescent.org
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -27,23 +15,82 @@ You'll also find example files in the partition_Mk_Examples directory
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-THIS IS A BETA VERSION - CHECK RESULTS CAREFULLY!  
 Please let me know of any problems, concerns or feedback (garli.support@gmail.com)
 
-GARLI version 0.96 is much exhanced and expanded relative to the previous
-version 0.951.  It should replace earlier versions, and should be backwards
-compatible with all configuration files and datasets that were used with the
-previous version.
+ This is GARLI 2.0, the first "official" release including 
+          partitioned models.  It is a merging of
+   official release 1.0 and beta version GARLI-PART 0.97
+  Briefly, it includes models for nucleotides, amino acids,
+ codons, and morphology-like characters, any of which can be 
+  mixed together and applied to different subsets of data.
 
-->See the manual or support website (http://www.nescent.org/wg_garli)
- for detailed information on using the program.
+Version 2.0 should replace earlier versions, and should be backwards compatible with all 
+configuration files and datasets that were used with the previous versions.
 
-->Example datasets and configuration files files can be found in the example folder
+->See the manual or support website (http://www.nescent.org/wg/garli) for detailed information on
+using the program.  For very basic usage see QuickStart.txt.
 
-->For compilation help see the INSTALL file.  The program now comes with a full
- configure script for *nix configuration and installation.
+->Example datasets and template configuration files files can be found in the example folder
 
-New in version 0.96
+->For compilation help see the INSTALL file.  Version 2.0 comes with an extremely easy build
+script, build_garli.sh, which should make compalation trivial on linux or OS X machines.
+
+Please note that these new features are NOT documented in the pdf manual in the "doc" directory.  
+The manual was accurate up through version 0.96, but I do not plan to maintain it, choosing instead 
+to update the support wiki at http://www.nescent.org/wg/garli.
+
+***New in version 2.0***
+
+1. Ability to use partitioned models, giving the ability to divide up data and apply independent
+   models to each.   See this page for details on partitioned usage 
+   http://www.nescent.org/wg/garli/Using_partitioned_models
+2. Ability to use the Mk/Mkv "morphology" models of Lewis, 2001.  This can be applied to discrete
+   data of any type with any number of states. http://www.nescent.org/wg/garli/Mkv_morphology_model
+3. Significant improvement in parameter optimization
+4. MANY minor improvements and new features.  See the website.
+
+***New in version 1.0***
+
+1. Ability to write sitewise log-likelihood values for all model types, in a format identical to 
+   PAUP*.  This can be read directly into a program like CONSEL to perform statistical comparisons 
+   of topologies such as the SH or AU tests. (outputsitelikelihoods = 1)
+2. Ability to collapse zero length branches at the end of any search, creating polytomies. This is
+   now turned on by default. This setting can affect bootstrap values, since zero-length branches in
+   a sense don't exist and probably shouldn't contribute to branch support values. It also tends to
+   make trees inferred from multiple searches more similar, since trees that only differ in arbitrary
+   resolutions of zero length branches are not truly different.  (collapsebranches = 1)
+3. Ability to infer full reversible amino acid rate matrices while doing a normal searching,
+   adding 189 free parameters.  This is probably not something of general utility unless you have
+   a very large dataset. (datatype = aminoacid or codon-aminoacid, ratematrix = estimate) 
+4. Ability to use user-specified amino acid rate matrices. This allows the use of any existing
+   amino acid matrix, regardless of whether GARLI implements them internally.  Amino acid matrices 
+   estimated by GARLI can also have their parameter values fixed for use in other analyses. Note 
+   however that GARLI's matrix input format differs from other programs. (ratematrix = fixed, 
+   provide matrix in a Nexus GARLI block in the datafile or in a starting conditions file.  See the
+   file "examples/LGmodel.mod" for an example.)
+5. Ability to infer internal state probabilities (ancestral states) for amino acid and codon models,
+   in addition to the previously implemented nucleotide models. (inferinternalstateprobs = 1)
+6. Substantial speed improvements for large constrained searches, especially backbone constraints
+7. MPI parallel runs can now be checkpointed, allowing entire sets of runs to be restarted.  Be sure
+   to read the wiki page detailing the MPI version (http://www.nescent.org/wg/garli/MPI_version)
+   to understand in what cases you might want to use this version.
+8. More rigorous error checking of input trees, constraints and parameter values. 
+9. Significant improvements to the precision of parameter optimization.  GARLI now puts 
+   significant effort into returning the very most optimal parameter values at the end of a search.
+   These should be as accurate as values returned by other programs such as PAUP* or PAML.  
+   Previously the estimated parameter values were nearly optimal, but sometimes not quite there.
+10. A "verification mode", which checks that a given configuration file and datafile are valid
+    for use with GARLI, without starting an actual analysis.  This can be useful, for example, in
+    verifying that all configuration and input is proper while on your local machine before sending
+    the input files to a computer cluster.  The output will also tell you how much memory GARLI
+    will be need to be allocated for the run, which might require adjustment of the 
+    "availablememory" setting in the configuration file (start GARLI with "-V").
+11. Much easier procedure for compiling of GARLI source code.
+12. Fixes to numerous rare bugs in version 0.96
+
+
+***New in version 0.96***
+
 1.Rigorous reading of Nexus datasets using Paul Lewis and Mark Holder's Nexus
  Class Library (NCL).
 2.Ability to read Nexus starting trees using NCL.

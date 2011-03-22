@@ -259,8 +259,9 @@ int main( int argc, char* argv[] )	{
 #ifdef SINGLE_PRECISION_FLOATS
 						outman.UserMessage("Single precision floating point version");
 #endif
-						outman.UserMessage("Partitioned/Mkv model testing version");
-						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2010");
+						outman.UserMessage("(DNA, AA, codon, morphology and partitioned models)");
+						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2011");
+						outman.UserMessage("http://www.nescent.org/wg/garli/");
 						outman.UserMessage("garli.support@gmail.com");
 						exit(0);
 						}
@@ -407,16 +408,16 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage(" codons, and morphology-like characters, any of which can be ");
 			outman.UserMessage("  mixed together and applied to different subsets of data.\n"); 
 			outman.UserMessage("    General program usage is extensively documented here:");
-			outman.UserMessage("            http://www.nescent.org/wg_garli/");
+			outman.UserMessage("            http://www.nescent.org/wg/garli/");
 			outman.UserMessage("      see this page for details on partitioned usage:");
-			outman.UserMessage("  http://www.nescent.org/wg_garli/Partition_testing_version");
+			outman.UserMessage("  http://www.nescent.org/wg/garli/Partition_testing_version");
 			outman.UserMessage("   and this page for details on Mkv mophology model usage:");
-			outman.UserMessage("    http://www.nescent.org/wg_garli/Mkv_morphology_model");
+			outman.UserMessage("    http://www.nescent.org/wg/garli/Mkv_morphology_model");
 			outman.UserMessage("         PLEASE LET ME KNOW OF ANY PROBLEMS AT:");
 			outman.UserMessage("                garli.support@gmail.com");
 			outman.UserMessage("##############################################################");
 
-			outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
+			//outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
 			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__); 
 
