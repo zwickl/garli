@@ -1,20 +1,30 @@
+Running GARLI-PART Version 2.0.1008 (17 Mar 2011)
+->Single processor version<-
 
-Running serial GARLI, version 0.96 Partitioning Branch r323 (Sept 2008)
+##############################################################
+ This is GARLI 2.0, the first "official" release including 
+          partitioned models.  It is a merging of
+   official release 1.0 and beta version GARLI-PART 0.97
+  Briefly, it includes models for nucleotides, amino acids,
+ codons, and morphology-like characters, any of which can be 
+  mixed together and applied to different subsets of data.
 
-###################################################
-THIS IS A TESTING VERSION FOR PARTITIONED MODELS.  IT APPEARS TO BE WORKING
-PROPERLY BUT PLEASE LET ME KNOW OF ANY PROBLEMS AT garli.support@gmail.com
-            see this hidden page for details on using it:
-      https://www.nescent.org/wg_garli/Partition_testing_version
-             CHECK WITH ME BEFORE PUBLISHING WITH IT
-                         !!!!THANKS!!!
-
-###################################################
+    General program usage is extensively documented here:
+            http://www.nescent.org/wg_garli/
+      see this page for details on partitioned usage:
+  http://www.nescent.org/wg_garli/Partition_testing_version
+   and this page for details on Mkv mophology model usage:
+    http://www.nescent.org/wg_garli/Mkv_morphology_model
+         PLEASE LET ME KNOW OF ANY PROBLEMS AT:
+                garli.support@gmail.com
+##############################################################
 This version has undergone much testing, but is still a BETA VERSION.
    - Please check results carefully! -
-Compiled Sep  3 2008 17:09:42 using GNU gcc compiler version 4.0.1
-Using NCL version 2.1.00
+Compiled Mar 21 2011 13:13:18 using Intel icc compiler version 9.10
+Using NCL version 2.1.10
 
+#######################################################
+Reading config file garli.conf
 ###################################################
 READING OF DATA
 Attempting to read data file in Nexus format (using NCL):
@@ -28,44 +38,47 @@ PARTITIONING OF DATA AND MODELS
 CHECK: DIFFERENT MODEL TYPES AND MODEL PARAMETERS APPLY
 	TO EACH DATA SUBSET (no linkage)
 
-GARLI partition subset 1
+GARLI data subset 1
 	CHARACTERS block #1 ("Untitled DATA Block 1")
 	CHARPARTITION subset #1 ("1stpos")
-	Data read as Nucleotide data, modeled as Nucleotide data
-
-	Summary of data or data subset:
-	   11 sequences.
+	Data read as Nucleotide data,
+	modeled as Nucleotide data
+	Summary of data:
+	  11 sequences.
 	  441 constant characters.
-	  189 parsimony-informative characters.
-	   96 autapomorphic characters.
+	  171 parsimony-informative characters.
+	  114 uninformative variable characters.
 	  726 total characters.
 	  238 unique patterns in compressed data matrix.
+	Pattern processing required < 1 second
 
-GARLI partition subset 2
+GARLI data subset 2
 	CHARACTERS block #1 ("Untitled DATA Block 1")
 	CHARPARTITION subset #2 ("2ndpos")
-	Data read as Nucleotide data, modeled as Nucleotide data
-
-	Summary of data or data subset:
-	   11 sequences.
+	Data read as Nucleotide data,
+	modeled as Nucleotide data
+	Summary of data:
+	  11 sequences.
 	  528 constant characters.
-	  103 parsimony-informative characters.
-	   95 autapomorphic characters.
+	  90 parsimony-informative characters.
+	  108 uninformative variable characters.
 	  726 total characters.
 	  158 unique patterns in compressed data matrix.
+	Pattern processing required < 1 second
 
-GARLI partition subset 3
+GARLI data subset 3
 	CHARACTERS block #1 ("Untitled DATA Block 1")
 	CHARPARTITION subset #3 ("3rdpos")
-	Data read as Nucleotide data, modeled as Nucleotide data
-
-	Summary of data or data subset:
-	   11 sequences.
+	Data read as Nucleotide data,
+	modeled as Nucleotide data
+	Summary of data:
+	  11 sequences.
 	  103 constant characters.
-	  539 parsimony-informative characters.
-	   84 autapomorphic characters.
+	  507 parsimony-informative characters.
+	  116 uninformative variable characters.
 	  726 total characters.
 	  549 unique patterns in compressed data matrix.
+	Pattern processing required < 1 second
 
 
 ###################################################
@@ -88,12 +101,15 @@ You specified that Garli should use at most 512.0 MB of memory.
 Garli will actually use approx. 16.1 MB of memory
 **Your memory level is: great (you don't need to change anything)**
 
-###################################################
+#######################################################
+Found outgroup specification:  1
+
+#######################################################
 STARTING RUN
 
 >>>Search rep 1 (of 5)<<<
 MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
-Model 0
+Model 1
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 2 3 4 ) 
@@ -110,7 +126,7 @@ Model 0
       0.8203	0.2500
       2.8944	0.2500
 
-Model 1
+Model 2
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 1 0 3 ) 
@@ -127,7 +143,7 @@ Model 1
       0.8203	0.2500
       2.8944	0.2500
 
-Model 2
+Model 3
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 3 1 0 ) 
@@ -149,205 +165,208 @@ Model 2
 
 Subset rate multipliers:
     1.00  1.00  1.00
-Starting with seed=60728
+Starting with seed=852004
 
 creating likelihood stepwise addition starting tree...
 number of taxa added:
  4  5  6 
-   Optimizing parameters...    improved  262.109 lnL
-   Optimizing branchlengths... improved   15.118 lnL
+Optimizing parameters... improved 284.867 lnL
+Optimizing branchlengths... improved 109.865 lnL
  7  8  9  10  11 
-Initial ln Likelihood: -13497.1423
-optimizing: starting branch lengths, alpha shape, prop. invar, subset rates...
-pass 1:+   36.385 (branch=   5.53 scale=  0.00 alpha=  5.21 pinv=  3.16 subset rates= 22.49)
-pass 2:+    0.845 (branch=   0.00 scale=  0.00 alpha=  0.00 pinv=  0.00 subset rates=  0.85)
-pass 3:+    0.000 (branch=   0.00 scale=  0.00 alpha=  0.00 pinv=  0.00 subset rates=  0.00)
-lnL after optimization: -13459.9118
-gen       current_lnL    precision last_tree_imp  
-0         -13459.9118    0.500     	0              
-100       -13425.5274    0.500     36      
-200       -13409.8884    0.500     36      
-300       -13403.6137    0.500     36      
-400       -13373.9286    0.500     36      
-500       -13350.8435    0.500     36      
-600       -13343.8660    0.500     36      
+Initial ln Likelihood: -13739.2722
+optimizing: starting branch lengths, alpha shape, prop. invar, rel rates, eq freqs, subset rates...
+pass 1:+  197.592 (branch=   5.99 scale=  0.00 alpha= 39.14 freqs= 25.16 rel rates= 71.09 pinv=  0.00 subset rates= 56.21)
+pass 2:+   93.534 (branch=  11.02 scale=  1.42 alpha=  7.20 freqs= 12.45 rel rates=  4.35 pinv=  0.79 subset rates= 56.30)
+pass 3:+   52.621 (branch=   5.01 scale=  1.30 alpha=  7.59 freqs=  1.02 rel rates=  1.79 pinv=  0.01 subset rates= 35.90)
+pass 4:+   16.507 (branch=   0.00 scale=  0.81 alpha=  0.95 freqs=  0.16 rel rates=  1.58 pinv=  0.01 subset rates= 13.00)
+pass 5:+    8.128 (branch=   0.68 scale=  0.00 alpha=  0.01 freqs=  0.20 rel rates=  1.99 pinv=  0.01 subset rates=  5.23)
+pass 6:+    0.727 (branch=   0.00 scale=  0.00 alpha=  0.01 freqs=  0.15 rel rates=  0.01 pinv=  0.01 subset rates=  0.54)
+pass 7:+    0.157 (branch=   0.00 scale=  0.00 alpha=  0.00 freqs=  0.13 rel rates=  0.01 pinv=  0.01 subset rates=  0.00)
+lnL after optimization: -13370.0055
+gen      current_lnL    precision  last_tree_imp  
+0        -13370.0055      0.500           0 
+100      -13318.7588      0.500          30 
+200      -13317.8640      0.500          30 
+300      -13317.3539      0.500          30 
+400      -13317.1124      0.500          30 
+500      -13316.9931      0.500          30 
+600      -13316.7533      0.500          30 
 Optimization precision reduced 
-   Optimizing parameters...    improved    0.802 lnL
-   Optimizing branchlengths... improved    1.206 lnL
-700       -13337.5127    0.402     36      
-800       -13328.1455    0.402     36      
-900       -13323.8991    0.402     36      
-1000      -13320.5630    0.402     36      
-1100      -13319.3847    0.402     36      
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
+   Optimizing parameters...    improved    0.052 lnL
    Optimizing branchlengths... improved    0.000 lnL
-1200      -13318.1296    0.304     36      
-1300      -13317.2359    0.304     36      
-1400      -13316.6700    0.304     36      
-1500      -13316.3939    0.304     36      
-1600      -13316.2883    0.304     36      
+700      -13316.5320      0.402          30 
+800      -13316.4480      0.402          30 
+900      -13316.4201      0.402          30 
+1000     -13316.3574      0.402          30 
+1100     -13316.2488      0.402          30 
 Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
+   Optimizing parameters...    improved    0.024 lnL
    Optimizing branchlengths... improved    0.000 lnL
-1700      -13316.1739    0.206     36      
-1800      -13316.1438    0.206     36      
-1900      -13316.1106    0.206     36      
-2000      -13316.0946    0.206     36      
-2100      -13316.0548    0.206     36      
+1200     -13316.1758      0.304          30 
+1300     -13316.1714      0.304          30 
+1400     -13316.0938      0.304          30 
+1500     -13316.0518      0.304          30 
+1600     -13315.9958      0.304          30 
 Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
+   Optimizing parameters...    improved    0.013 lnL
    Optimizing branchlengths... improved    0.000 lnL
-2200      -13316.0290    0.108     36      
-2300      -13316.0290    0.108     36      
-2400      -13316.0204    0.108     36      
-2500      -13315.9952    0.108     36      
-2600      -13315.9896    0.108     36      
+1700     -13315.9424      0.206          30 
+1800     -13315.9278      0.206          30 
+1900     -13315.8903      0.206          30 
+2000     -13315.8642      0.206          30 
+2100     -13315.8580      0.206          30 
 Optimization precision reduced 
-   Optimizing parameters...    improved    0.021 lnL
-   Optimizing branchlengths... improved    0.047 lnL
-2700      -13315.9404    0.010     36      
-2800      -13315.9403    0.010     36      
-2900      -13315.9403    0.010     36      
-3000      -13315.9399    0.010     36      
-3100      -13315.9186    0.010     36      
-3200      -13315.8738    0.010     36      
-3300      -13315.8704    0.010     36      
-3400      -13315.8633    0.010     36      
-3500      -13315.8580    0.010     36      
-3600      -13315.8533    0.010     36      
-3700      -13315.8472    0.010     36      
-3800      -13315.8371    0.010     36      
-3900      -13315.8314    0.010     36      
-4000      -13315.8293    0.010     36      
-4100      -13315.8224    0.010     36      
-4200      -13315.8222    0.010     36      
-4300      -13315.8214    0.010     36      
-4400      -13315.8181    0.010     36      
-4500      -13315.8181    0.010     36      
-4600      -13315.8170    0.010     36      
-4700      -13315.8158    0.010     36      
-4800      -13315.8157    0.010     36      
-4900      -13315.8147    0.010     36      
-5000      -13315.8147    0.010     36      
-5100      -13315.8136    0.010     36      
-5200      -13315.8132    0.010     36      
-5300      -13315.8129    0.010     36      
-5400      -13315.8124    0.010     36      
-5500      -13315.8097    0.010     36      
-5600      -13315.8097    0.010     36      
-5700      -13315.8097    0.010     36      
-5800      -13315.8067    0.010     36      
-5900      -13315.8061    0.010     36      
-6000      -13315.8061    0.010     36      
-6100      -13315.8061    0.010     36      
-6200      -13315.8061    0.010     36      
-6300      -13315.8044    0.010     36      
-6400      -13315.8041    0.010     36      
-6500      -13315.8040    0.010     36      
-6600      -13315.8039    0.010     36      
-6700      -13315.8038    0.010     36      
-6800      -13315.8038    0.010     36      
-6900      -13315.8038    0.010     36      
-7000      -13315.8037    0.010     36      
-7100      -13315.8036    0.010     36      
-7200      -13315.8034    0.010     36      
-7300      -13315.8034    0.010     36      
-7400      -13315.8034    0.010     36      
-7500      -13315.7987    0.010     36      
-7600      -13315.7986    0.010     36      
-7700      -13315.7986    0.010     36      
-7800      -13315.7981    0.010     36      
-7900      -13315.7979    0.010     36      
-8000      -13315.7979    0.010     36      
+   Optimizing parameters...    improved    0.003 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+2200     -13315.8540      0.108          30 
+2300     -13315.8529      0.108          30 
+2400     -13315.8461      0.108          30 
+2500     -13315.8458      0.108          30 
+2600     -13315.8453      0.108          30 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.001 lnL
+   Optimizing branchlengths... improved    0.017 lnL
+2700     -13315.8279      0.010          30 
+2800     -13315.8275      0.010          30 
+2900     -13315.8257      0.010          30 
+3000     -13315.8242      0.010          30 
+3100     -13315.8240      0.010          30 
+3200     -13315.8237      0.010          30 
+3300     -13315.8130      0.010          30 
+3400     -13315.8130      0.010          30 
+3500     -13315.8093      0.010          30 
+3600     -13315.8087      0.010          30 
+3700     -13315.8086      0.010          30 
+3800     -13315.8078      0.010          30 
+3900     -13315.8072      0.010          30 
+4000     -13315.8072      0.010          30 
+4100     -13315.8016      0.010          30 
+4200     -13315.8007      0.010          30 
+4300     -13315.7978      0.010          30 
+4400     -13315.7973      0.010          30 
+4500     -13315.7970      0.010          30 
+4600     -13315.7967      0.010          30 
+4700     -13315.7949      0.010          30 
+4800     -13315.7948      0.010          30 
+4900     -13315.7948      0.010          30 
+5000     -13315.7919      0.010          30 
+5100     -13315.7911      0.010          30 
+5200     -13315.7911      0.010          30 
+5300     -13315.7906      0.010          30 
+5400     -13315.7906      0.010          30 
+5500     -13315.7903      0.010          30 
+5600     -13315.7899      0.010          30 
+5700     -13315.7883      0.010          30 
+5800     -13315.7880      0.010          30 
+5900     -13315.7876      0.010          30 
+6000     -13315.7873      0.010          30 
+6100     -13315.7873      0.010          30 
+6200     -13315.7870      0.010          30 
+6300     -13315.7863      0.010          30 
+6400     -13315.7851      0.010          30 
+6500     -13315.7846      0.010          30 
+6600     -13315.7846      0.010          30 
+6700     -13315.7846      0.010          30 
+6800     -13315.7846      0.010          30 
+6900     -13315.7844      0.010          30 
+7000     -13315.7838      0.010          30 
+7100     -13315.7837      0.010          30 
+7200     -13315.7837      0.010          30 
+7300     -13315.7837      0.010          30 
+7400     -13315.7837      0.010          30 
+7500     -13315.7837      0.010          30 
+7600     -13315.7837      0.010          30 
+7700     -13315.7833      0.010          30 
 Reached termination condition!
-last topological improvement at gen 36
-Improvement over last 500 gen = 0.00074
-Current score = -13315.7979
-Performing final branch optimization...
-Subset rate optimization: 0.000000
-	pass 1 -13315.7929
-	pass 2 -13315.7893
-	pass 3 -13315.7893
-	pass 4 -13315.7856
-	pass 5 -13315.7832
-	pass 6 -13315.7827
-	pass 7 -13315.7823
-	pass 8 -13315.7822
-	pass 9 -13315.7822
-	pass 10 -13315.7821
-	pass 11 -13315.7821
-	pass 12 -13315.7821
-	pass 13 -13315.7821
-Final score = -13315.7821
-Time used so far = 0 hours, 1 minutes and 46 seconds
-finished
->>>Completed Search rep 1 (of 5)<<<
+last topological improvement at gen 30
+Improvement over last 500 gen = 0.00047
+Current score = -13315.7833
+Performing final optimizations...
+pass 1 : -13315.7830   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0001  subset rates= 0.0000)
+pass 2 : -13315.7827   (branch= 0.0000  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0001  subset rates= 0.0000)
+pass 3 : -13315.7772   (branch= 0.0054  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0001  subset rates= 0.0000)
+pass 4 : -13315.7748   (branch= 0.0024  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 5 : -13315.7740   (branch= 0.0007  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0001  subset rates= 0.0000)
+pass 6 : -13315.7729   (branch= 0.0011  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 7 : -13315.7726   (branch= 0.0002  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0001  subset rates= 0.0000)
+pass 8 : -13315.7725   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 9 : -13315.7723   (branch= 0.0001  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 10: -13315.7722   (branch= 0.0001  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 11: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 12: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 13: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 14: -13315.7721   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 15: -13315.7721   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 16: -13315.7721   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+Looking for minimum length branches...
+Final score = -13315.7721
+Time used so far = 0 hours, 1 minutes and 42 seconds
 
 MODEL REPORT - Parameter values are FINAL
-Model 0
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 2 3 4 ) 
-    AC = 1.966, AG = 2.567, AT = 1.409, CG = 1.409, CT = 3.724, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.3100 0.1764 0.2975 0.2160 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.4076
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0178	0.2500
-      0.1874	0.2500
-      0.7394	0.2500
-      3.0553	0.2500
-
 Model 1
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 1 0 3 ) 
-    AC = 4.380, AG = 7.081, AT = 1.608, CG = 7.081, CT = 4.380, GT = 1.000
+    User specified matrix type: ( 0 1 2 2 3 4 ) 
+    AC = 1.966, AG = 2.579, AT = 1.411, CG = 1.411, CT = 3.722, GT = 1.000
   Equilibrium State Frequencies: estimated
-    (ACGT) 0.2695 0.1637 0.1606 0.4062 
+    (ACGT) 0.3101 0.1767 0.2972 0.2160 
   Rate Heterogeneity Model:
     4 discrete gamma distributed rate categories, alpha param estimated
-      0.3610
+      0.4097
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0181	0.2500
+      0.1890	0.2500
+      0.7416	0.2500
+      3.0513	0.2500
+
+Model 2
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 1 0 3 ) 
+    AC = 4.380, AG = 7.085, AT = 1.609, CG = 7.085, CT = 4.380, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.2692 0.1636 0.1605 0.4067 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.3609
     Substitution rate categories under this model:
       rate	proportion
       0.0115	0.2500
-      0.1521	0.2500
-      0.6854	0.2500
-      3.1510	0.2500
+      0.1520	0.2500
+      0.6853	0.2500
+      3.1512	0.2500
 
-Model 2
+Model 3
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 3 1 0 ) 
-    AC = 1.000, AG = 4.911, AT = 3.371, CG = 0.455, CT = 4.911, GT = 1.000
+    AC = 1.000, AG = 4.936, AT = 3.391, CG = 0.457, CT = 4.936, GT = 1.000
   Equilibrium State Frequencies: estimated
-    (ACGT) 0.1568 0.3538 0.2879 0.2015 
+    (ACGT) 0.1565 0.3537 0.2877 0.2021 
   Rate Heterogeneity Model:
     4 discrete gamma distributed rate categories, alpha param estimated
-      4.0835
+      4.0142
     with an invariant (invariable) site category, proportion estimated
-      0.0339
+      0.0335
     Substitution rate categories under this model:
       rate	proportion
-      0.0000	0.0339
-      0.4589	0.2415
-      0.7780	0.2415
-      1.0844	0.2415
-      1.6787	0.2415
+      0.0000	0.0335
+      0.4551	0.2416
+      0.7757	0.2416
+      1.0844	0.2416
+      1.6848	0.2416
 
 Subset rate multipliers:
-   0.542 0.301 2.157
-
+    0.54  0.30  2.16
 NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
     No branches were short enough to be collapsed.
 
+>>>Completed Search rep 1 (of 5)<<<
+
 >>>Search rep 2 (of 5)<<<
 MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
-Model 0
+Model 1
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 2 3 4 ) 
@@ -364,7 +383,7 @@ Model 0
       0.8203	0.2500
       2.8944	0.2500
 
-Model 1
+Model 2
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 1 0 3 ) 
@@ -381,7 +400,7 @@ Model 1
       0.8203	0.2500
       2.8944	0.2500
 
-Model 2
+Model 3
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 3 1 0 ) 
@@ -403,146 +422,149 @@ Model 2
 
 Subset rate multipliers:
     1.00  1.00  1.00
-Starting with seed=2140042622
+Starting with seed=1163395386
 
 creating likelihood stepwise addition starting tree...
 number of taxa added:
  4  5  6 
-   Optimizing parameters...    improved  264.385 lnL
-   Optimizing branchlengths... improved   87.596 lnL
+Optimizing parameters... improved 251.052 lnL
+Optimizing branchlengths... improved 42.822 lnL
  7  8  9  10  11 
-Initial ln Likelihood: -13532.5744
-optimizing: starting branch lengths, alpha shape, prop. invar, subset rates...
-pass 1:+   77.989 (branch=   9.78 scale=  0.00 alpha= 26.25 pinv=  0.96 subset rates= 41.00)
-pass 2:+   10.210 (branch=   0.57 scale=  0.00 alpha=  1.96 pinv=  0.00 subset rates=  7.68)
-pass 3:+    0.000 (branch=   0.00 scale=  0.00 alpha=  0.00 pinv=  0.00 subset rates=  0.00)
-lnL after optimization: -13444.3756
-gen       current_lnL    precision last_tree_imp  
-0         -13444.3756    0.500     	0              
-100       -13434.0037    0.500     0       
-200       -13419.8234    0.500     0       
-300       -13409.7805    0.500     0       
-400       -13380.8115    0.500     0       
-500       -13359.6420    0.500     0       
+Initial ln Likelihood: -13708.2945
+optimizing: starting branch lengths, alpha shape, prop. invar, rel rates, eq freqs, subset rates...
+pass 1:+  195.142 (branch=   3.84 scale=  0.00 alpha= 39.93 freqs= 28.21 rel rates= 67.92 pinv=  0.00 subset rates= 55.24)
+pass 2:+   90.129 (branch=   9.79 scale=  1.73 alpha=  6.49 freqs= 11.51 rel rates=  4.22 pinv=  1.00 subset rates= 55.39)
+pass 3:+   50.181 (branch=   8.72 scale=  0.00 alpha=  4.95 freqs=  1.58 rel rates=  1.37 pinv=  0.01 subset rates= 33.53)
+pass 4:+   18.019 (branch=   1.73 scale=  0.71 alpha=  0.96 freqs=  0.15 rel rates=  2.28 pinv=  0.01 subset rates= 12.18)
+pass 5:+    5.247 (branch=   0.00 scale=  0.00 alpha=  0.01 freqs=  0.14 rel rates=  0.54 pinv=  0.01 subset rates=  4.54)
+pass 6:+    0.677 (branch=   0.00 scale=  0.00 alpha=  0.01 freqs=  0.64 rel rates=  0.01 pinv=  0.01 subset rates=  0.00)
+pass 7:+    0.077 (branch=   0.00 scale=  0.00 alpha=  0.01 freqs=  0.04 rel rates=  0.01 pinv=  0.01 subset rates=  0.00)
+lnL after optimization: -13348.8218
+gen      current_lnL    precision  last_tree_imp  
+0        -13348.8218      0.500           0 
+100      -13319.1023      0.500           3 
+200      -13318.5364      0.500           3 
+300      -13317.6152      0.500           3 
+400      -13317.5790      0.500           3 
+500      -13317.4175      0.500           3 
+600      -13317.3894      0.500           3 
 Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
-   Optimizing branchlengths... improved    1.390 lnL
-600       -13347.4239    0.402     0       
-700       -13337.7867    0.402     0       
-800       -13329.7532    0.402     0       
-900       -13325.8881    0.402     0       
-1000      -13322.3396    0.402     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
+   Optimizing parameters...    improved    0.627 lnL
    Optimizing branchlengths... improved    0.000 lnL
-1100      -13319.8116    0.304     0       
-1200      -13318.3907    0.304     0       
-1300      -13317.8788    0.304     0       
-1400      -13316.9492    0.304     0       
-1500      -13316.5591    0.304     0       
+700      -13316.5392      0.402           3 
+800      -13316.3891      0.402           3 
+900      -13316.3181      0.402           3 
+1000     -13316.1841      0.402           3 
+1100     -13316.1042      0.402           3 
 Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
+   Optimizing parameters...    improved    0.014 lnL
    Optimizing branchlengths... improved    0.000 lnL
-1600      -13316.3120    0.206     0       
-1700      -13316.2676    0.206     0       
-1800      -13316.2032    0.206     0       
-1900      -13316.1459    0.206     0       
-2000      -13316.0906    0.206     0       
+1200     -13316.0886      0.304           3 
+1300     -13316.0664      0.304           3 
+1400     -13316.0481      0.304           3 
+1500     -13316.0285      0.304           3 
+1600     -13315.9524      0.304           3 
 Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
+   Optimizing parameters...    improved    0.004 lnL
    Optimizing branchlengths... improved    0.000 lnL
-2100      -13316.0171    0.108     0       
-2200      -13315.9786    0.108     0       
-2300      -13315.8899    0.108     0       
-2400      -13315.8765    0.108     0       
-2500      -13315.8759    0.108     0       
+1700     -13315.9479      0.206           3 
+1800     -13315.9284      0.206           3 
+1900     -13315.8732      0.206           3 
+2000     -13315.8515      0.206           3 
+2100     -13315.8477      0.206           3 
 Optimization precision reduced 
-   Optimizing parameters...    improved    0.007 lnL
-   Optimizing branchlengths... improved    0.041 lnL
-2600      -13315.8345    0.010     0       
-2700      -13315.8345    0.010     0       
-2800      -13315.8340    0.010     0       
-2900      -13315.8317    0.010     0       
-3000      -13315.8312    0.010     0       
-3100      -13315.8233    0.010     0       
-3200      -13315.8232    0.010     0       
-3300      -13315.8232    0.010     0       
-3400      -13315.8152    0.010     0       
-3500      -13315.8140    0.010     0       
-3600      -13315.8137    0.010     0       
-3700      -13315.8101    0.010     0       
-3800      -13315.8091    0.010     0       
-3900      -13315.8091    0.010     0       
-4000      -13315.8089    0.010     0       
-4100      -13315.8088    0.010     0       
-4200      -13315.8088    0.010     0       
-4300      -13315.8067    0.010     0       
-4400      -13315.8018    0.010     0       
-4500      -13315.8005    0.010     0       
-4600      -13315.8003    0.010     0       
-4700      -13315.7993    0.010     0       
-4800      -13315.7993    0.010     0       
-4900      -13315.7985    0.010     0       
-5000      -13315.7981    0.010     0       
-5100      -13315.7976    0.010     0       
-5200      -13315.7952    0.010     0       
-5300      -13315.7947    0.010     0       
-5400      -13315.7947    0.010     0       
-5500      -13315.7916    0.010     0       
-5600      -13315.7913    0.010     0       
-5700      -13315.7910    0.010     0       
-5800      -13315.7910    0.010     0       
-5900      -13315.7910    0.010     0       
-6000      -13315.7907    0.010     0       
-6100      -13315.7907    0.010     0       
-6200      -13315.7907    0.010     0       
-6300      -13315.7904    0.010     0       
-6400      -13315.7901    0.010     0       
-6500      -13315.7901    0.010     0       
-6600      -13315.7886    0.010     0       
-6700      -13315.7880    0.010     0       
-6800      -13315.7880    0.010     0       
-6900      -13315.7879    0.010     0       
-7000      -13315.7876    0.010     0       
-7100      -13315.7855    0.010     0       
-7200      -13315.7843    0.010     0       
-7300      -13315.7842    0.010     0       
-7400      -13315.7842    0.010     0       
-7500      -13315.7842    0.010     0       
-7600      -13315.7842    0.010     0       
-7700      -13315.7842    0.010     0       
+   Optimizing parameters...    improved    0.002 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+2200     -13315.8461      0.108           3 
+2300     -13315.8265      0.108           3 
+2400     -13315.8118      0.108           3 
+2500     -13315.8107      0.108           3 
+2600     -13315.8043      0.108           3 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.001 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+2700     -13315.8013      0.010           3 
+2800     -13315.8000      0.010           3 
+2900     -13315.7998      0.010           3 
+3000     -13315.7995      0.010           3 
+3100     -13315.7995      0.010           3 
+3200     -13315.7993      0.010           3 
+3300     -13315.7975      0.010           3 
+3400     -13315.7975      0.010           3 
+3500     -13315.7973      0.010           3 
+3600     -13315.7973      0.010           3 
+3700     -13315.7972      0.010           3 
+3800     -13315.7972      0.010           3 
+3900     -13315.7972      0.010           3 
+4000     -13315.7906      0.010           3 
+4100     -13315.7905      0.010           3 
+4200     -13315.7903      0.010           3 
+4300     -13315.7901      0.010           3 
+4400     -13315.7901      0.010           3 
+4500     -13315.7901      0.010           3 
+4600     -13315.7901      0.010           3 
+4700     -13315.7901      0.010           3 
+4800     -13315.7901      0.010           3 
+4900     -13315.7900      0.010           3 
+5000     -13315.7900      0.010           3 
+5100     -13315.7899      0.010           3 
+5200     -13315.7899      0.010           3 
+5300     -13315.7899      0.010           3 
+5400     -13315.7899      0.010           3 
+5500     -13315.7899      0.010           3 
+5600     -13315.7899      0.010           3 
+5700     -13315.7899      0.010           3 
+5800     -13315.7889      0.010           3 
+5900     -13315.7889      0.010           3 
+6000     -13315.7889      0.010           3 
+6100     -13315.7889      0.010           3 
+6200     -13315.7889      0.010           3 
+6300     -13315.7884      0.010           3 
+6400     -13315.7884      0.010           3 
+6500     -13315.7884      0.010           3 
+6600     -13315.7873      0.010           3 
+6700     -13315.7873      0.010           3 
+6800     -13315.7873      0.010           3 
+6900     -13315.7870      0.010           3 
+7000     -13315.7870      0.010           3 
+7100     -13315.7870      0.010           3 
+7200     -13315.7869      0.010           3 
+7300     -13315.7866      0.010           3 
+7400     -13315.7836      0.010           3 
+7500     -13315.7836      0.010           3 
+7600     -13315.7836      0.010           3 
+7700     -13315.7836      0.010           3 
+7800     -13315.7836      0.010           3 
+7900     -13315.7836      0.010           3 
 Reached termination condition!
-last topological improvement at gen 0
-Improvement over last 500 gen = 0.00010
-Current score = -13315.7842
-Performing final branch optimization...
-Subset rate optimization: 0.000000
-	pass 1 -13315.7842
-	pass 2 -13315.7842
-	pass 3 -13315.7827
-	pass 4 -13315.7783
-	pass 5 -13315.7774
-	pass 6 -13315.7773
-	pass 7 -13315.7768
-	pass 8 -13315.7767
-	pass 9 -13315.7766
-	pass 10 -13315.7766
-	pass 11 -13315.7765
-	pass 12 -13315.7765
-	pass 13 -13315.7765
-Final score = -13315.7765
-Time used so far = 0 hours, 3 minutes and 26 seconds
-finished
->>>Completed Search rep 2 (of 5)<<<
+last topological improvement at gen 3
+Improvement over last 500 gen = 0.00001
+Current score = -13315.7836
+Performing final optimizations...
+pass 1 : -13315.7832   (branch= 0.0000  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0002  rel rates= 0.0001  subset rates= 0.0000)
+pass 2 : -13315.7829   (branch= 0.0000  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0001  subset rates= 0.0000)
+pass 3 : -13315.7783   (branch= 0.0043  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0001  subset rates= 0.0000)
+pass 4 : -13315.7757   (branch= 0.0025  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0001  subset rates= 0.0000)
+pass 5 : -13315.7732   (branch= 0.0024  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0001  subset rates= 0.0000)
+pass 6 : -13315.7728   (branch= 0.0003  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0001  subset rates= 0.0000)
+pass 7 : -13315.7726   (branch= 0.0002  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 8 : -13315.7726   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 9 : -13315.7725   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 10: -13315.7725   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 11: -13315.7724   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 12: -13315.7723   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0001)
+Looking for minimum length branches...
+Final score = -13315.7723
+Time used so far = 0 hours, 3 minutes and 27 seconds
 
 MODEL REPORT - Parameter values are FINAL
-Model 0
+Model 1
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 2 3 4 ) 
-    AC = 1.972, AG = 2.584, AT = 1.415, CG = 1.415, CT = 3.742, GT = 1.000
+    AC = 1.962, AG = 2.575, AT = 1.408, CG = 1.408, CT = 3.715, GT = 1.000
   Equilibrium State Frequencies: estimated
-    (ACGT) 0.3102 0.1764 0.2973 0.2160 
+    (ACGT) 0.3102 0.1767 0.2971 0.2160 
   Rate Heterogeneity Model:
     4 discrete gamma distributed rate categories, alpha param estimated
       0.4096
@@ -551,849 +573,878 @@ Model 0
       0.0181	0.2500
       0.1889	0.2500
       0.7415	0.2500
-      3.0514	0.2500
+      3.0515	0.2500
 
-Model 1
+Model 2
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 1 0 3 ) 
-    AC = 4.370, AG = 7.064, AT = 1.606, CG = 7.064, CT = 4.370, GT = 1.000
+    AC = 4.400, AG = 7.116, AT = 1.617, CG = 7.116, CT = 4.400, GT = 1.000
   Equilibrium State Frequencies: estimated
-    (ACGT) 0.2699 0.1636 0.1605 0.4060 
+    (ACGT) 0.2692 0.1636 0.1605 0.4067 
   Rate Heterogeneity Model:
     4 discrete gamma distributed rate categories, alpha param estimated
       0.3611
     Substitution rate categories under this model:
       rate	proportion
       0.0115	0.2500
-      0.1522	0.2500
-      0.6855	0.2500
-      3.1507	0.2500
+      0.1521	0.2500
+      0.6854	0.2500
+      3.1509	0.2500
 
-Model 2
+Model 3
   Number of states = 4 (nucleotide data)
   Nucleotide Relative Rate Matrix: 
     User specified matrix type: ( 0 1 2 3 1 0 ) 
-    AC = 1.000, AG = 4.936, AT = 3.387, CG = 0.456, CT = 4.936, GT = 1.000
+    AC = 1.000, AG = 4.938, AT = 3.393, CG = 0.457, CT = 4.938, GT = 1.000
   Equilibrium State Frequencies: estimated
-    (ACGT) 0.1563 0.3541 0.2873 0.2023 
+    (ACGT) 0.1565 0.3537 0.2877 0.2021 
   Rate Heterogeneity Model:
     4 discrete gamma distributed rate categories, alpha param estimated
-      3.9881
+      4.0160
     with an invariant (invariable) site category, proportion estimated
-      0.0332
+      0.0335
     Substitution rate categories under this model:
       rate	proportion
-      0.0000	0.0332
-      0.4537	0.2417
-      0.7748	0.2417
-      1.0844	0.2417
-      1.6871	0.2417
-
-Subset rate multipliers:
-   0.540 0.300 2.160
-
-NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
-    No branches were short enough to be collapsed.
-
->>>Search rep 3 (of 5)<<<
-MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
-Model 0
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 2 3 4 ) 
-    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.3157 0.1746 0.3004 0.2093 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.5000
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0334	0.2500
-      0.2519	0.2500
-      0.8203	0.2500
-      2.8944	0.2500
-
-Model 1
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 1 0 3 ) 
-    AC = 4.000, AG = 4.000, AT = 1.000, CG = 4.000, CT = 4.000, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.2703 0.1566 0.1628 0.4103 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.5000
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0334	0.2500
-      0.2519	0.2500
-      0.8203	0.2500
-      2.8944	0.2500
-
-Model 2
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 3 1 0 ) 
-    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.1460 0.3609 0.2915 0.2015 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.5000
-    with an invariant (invariable) site category, proportion estimated
-      0.0355
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0000	0.0355
-      0.0334	0.2411
-      0.2519	0.2411
-      0.8203	0.2411
-      2.8944	0.2411
-
-Subset rate multipliers:
-    1.00  1.00  1.00
-Starting with seed=1583181202
-
-creating likelihood stepwise addition starting tree...
-number of taxa added:
- 4  5  6 
-   Optimizing parameters...    improved  271.032 lnL
-   Optimizing branchlengths... improved    6.068 lnL
- 7  8  9  10  11 
-Initial ln Likelihood: -13480.8407
-optimizing: starting branch lengths, alpha shape, prop. invar, subset rates...
-pass 1:+   33.930 (branch=   3.53 scale=  1.13 alpha=  2.43 pinv=  2.51 subset rates= 24.33)
-pass 2:+    2.235 (branch=   0.49 scale=  0.00 alpha=  0.00 pinv=  0.00 subset rates=  1.75)
-pass 3:+    0.000 (branch=   0.00 scale=  0.00 alpha=  0.00 pinv=  0.00 subset rates=  0.00)
-lnL after optimization: -13444.6757
-gen       current_lnL    precision last_tree_imp  
-0         -13444.6757    0.500     	0              
-100       -13431.0396    0.500     0       
-200       -13415.4145    0.500     0       
-300       -13411.8654    0.500     0       
-400       -13381.4422    0.500     0       
-500       -13368.1729    0.500     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.790 lnL
-   Optimizing branchlengths... improved    1.329 lnL
-600       -13355.5771    0.402     0       
-700       -13344.7037    0.402     0       
-800       -13338.6447    0.402     0       
-900       -13332.3226    0.402     0       
-1000      -13327.5108    0.402     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.386 lnL
-   Optimizing branchlengths... improved    0.386 lnL
-1100      -13325.2008    0.304     0       
-1200      -13322.5638    0.304     0       
-1300      -13321.0844    0.304     0       
-1400      -13319.9340    0.304     0       
-1500      -13319.0741    0.304     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
-   Optimizing branchlengths... improved    0.000 lnL
-1600      -13317.7674    0.206     0       
-1700      -13316.9828    0.206     0       
-1800      -13316.6744    0.206     0       
-1900      -13316.5555    0.206     0       
-2000      -13316.4976    0.206     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
-   Optimizing branchlengths... improved    0.000 lnL
-2100      -13316.3343    0.108     0       
-2200      -13316.2586    0.108     0       
-2300      -13316.0954    0.108     0       
-2400      -13316.0744    0.108     0       
-2500      -13316.0076    0.108     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.078 lnL
-   Optimizing branchlengths... improved    0.092 lnL
-2600      -13315.9155    0.010     0       
-2700      -13315.8809    0.010     0       
-2800      -13315.8715    0.010     0       
-2900      -13315.8601    0.010     0       
-3000      -13315.8513    0.010     0       
-3100      -13315.8493    0.010     0       
-3200      -13315.8492    0.010     0       
-3300      -13315.8489    0.010     0       
-3400      -13315.8462    0.010     0       
-3500      -13315.8453    0.010     0       
-3600      -13315.8289    0.010     0       
-3700      -13315.8279    0.010     0       
-3800      -13315.8216    0.010     0       
-3900      -13315.8216    0.010     0       
-4000      -13315.8198    0.010     0       
-4100      -13315.8183    0.010     0       
-4200      -13315.8183    0.010     0       
-4300      -13315.8179    0.010     0       
-4400      -13315.8172    0.010     0       
-4500      -13315.8170    0.010     0       
-4600      -13315.8165    0.010     0       
-4700      -13315.8148    0.010     0       
-4800      -13315.8146    0.010     0       
-4900      -13315.8146    0.010     0       
-5000      -13315.8144    0.010     0       
-5100      -13315.8135    0.010     0       
-5200      -13315.8135    0.010     0       
-5300      -13315.8110    0.010     0       
-5400      -13315.8099    0.010     0       
-5500      -13315.8081    0.010     0       
-5600      -13315.8081    0.010     0       
-5700      -13315.8042    0.010     0       
-5800      -13315.8018    0.010     0       
-5900      -13315.8018    0.010     0       
-6000      -13315.8000    0.010     0       
-6100      -13315.8000    0.010     0       
-6200      -13315.7997    0.010     0       
-6300      -13315.7997    0.010     0       
-6400      -13315.7997    0.010     0       
-6500      -13315.7997    0.010     0       
-6600      -13315.7996    0.010     0       
-6700      -13315.7989    0.010     0       
-6800      -13315.7989    0.010     0       
-6900      -13315.7988    0.010     0       
-7000      -13315.7988    0.010     0       
-7100      -13315.7988    0.010     0       
-7200      -13315.7988    0.010     0       
-7300      -13315.7985    0.010     0       
-7400      -13315.7961    0.010     0       
-7500      -13315.7960    0.010     0       
-7600      -13315.7943    0.010     0       
-7700      -13315.7940    0.010     0       
-7800      -13315.7936    0.010     0       
-7900      -13315.7936    0.010     0       
-8000      -13315.7936    0.010     0       
-8100      -13315.7935    0.010     0       
-Reached termination condition!
-last topological improvement at gen 0
-Improvement over last 500 gen = 0.00086
-Current score = -13315.7935
-Performing final branch optimization...
-Subset rate optimization: 0.000000
-	pass 1 -13315.7880
-	pass 2 -13315.7840
-	pass 3 -13315.7784
-	pass 4 -13315.7784
-	pass 5 -13315.7779
-	pass 6 -13315.7768
-	pass 7 -13315.7765
-	pass 8 -13315.7763
-	pass 9 -13315.7762
-	pass 10 -13315.7762
-	pass 11 -13315.7762
-Final score = -13315.7762
-Time used so far = 0 hours, 5 minutes and 11 seconds
-finished
->>>Completed Search rep 3 (of 5)<<<
-
-MODEL REPORT - Parameter values are FINAL
-Model 0
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 2 3 4 ) 
-    AC = 1.969, AG = 2.580, AT = 1.412, CG = 1.412, CT = 3.725, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.3103 0.1764 0.2972 0.2161 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.4093
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0181	0.2500
-      0.1887	0.2500
-      0.7411	0.2500
-      3.0521	0.2500
-
-Model 1
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 1 0 3 ) 
-    AC = 4.384, AG = 7.102, AT = 1.610, CG = 7.102, CT = 4.384, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.2690 0.1635 0.1603 0.4072 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.3626
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0117	0.2500
-      0.1533	0.2500
-      0.6875	0.2500
-      3.1475	0.2500
-
-Model 2
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 3 1 0 ) 
-    AC = 1.000, AG = 4.916, AT = 3.371, CG = 0.454, CT = 4.916, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.1566 0.3531 0.2881 0.2022 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      4.0458
-    with an invariant (invariable) site category, proportion estimated
-      0.0337
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0000	0.0337
-      0.4569	0.2416
-      0.7768	0.2416
-      1.0844	0.2416
-      1.6820	0.2416
-
-Subset rate multipliers:
-   0.541 0.301 2.158
-
-NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
-    No branches were short enough to be collapsed.
-
->>>Search rep 4 (of 5)<<<
-MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
-Model 0
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 2 3 4 ) 
-    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.3157 0.1746 0.3004 0.2093 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.5000
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0334	0.2500
-      0.2519	0.2500
-      0.8203	0.2500
-      2.8944	0.2500
-
-Model 1
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 1 0 3 ) 
-    AC = 4.000, AG = 4.000, AT = 1.000, CG = 4.000, CT = 4.000, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.2703 0.1566 0.1628 0.4103 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.5000
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0334	0.2500
-      0.2519	0.2500
-      0.8203	0.2500
-      2.8944	0.2500
-
-Model 2
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 3 1 0 ) 
-    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.1460 0.3609 0.2915 0.2015 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.5000
-    with an invariant (invariable) site category, proportion estimated
-      0.0355
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0000	0.0355
-      0.0334	0.2411
-      0.2519	0.2411
-      0.8203	0.2411
-      2.8944	0.2411
-
-Subset rate multipliers:
-    1.00  1.00  1.00
-Starting with seed=20945652
-
-creating likelihood stepwise addition starting tree...
-number of taxa added:
- 4  5  6 
-   Optimizing parameters...    improved  269.315 lnL
-   Optimizing branchlengths... improved   70.201 lnL
- 7  8  9  10  11 
-Initial ln Likelihood: -13507.1858
-optimizing: starting branch lengths, alpha shape, prop. invar, subset rates...
-pass 1:+   47.335 (branch=   6.60 scale=  0.00 alpha= 17.06 pinv=  1.60 subset rates= 22.07)
-pass 2:+    2.303 (branch=   0.00 scale=  0.00 alpha=  0.89 pinv=  0.54 subset rates=  0.88)
-pass 3:+    1.994 (branch=   0.50 scale=  0.00 alpha=  1.49 pinv=  0.00 subset rates=  0.00)
-pass 4:+    0.000 (branch=   0.00 scale=  0.00 alpha=  0.00 pinv=  0.00 subset rates=  0.00)
-lnL after optimization: -13455.5541
-gen       current_lnL    precision last_tree_imp  
-0         -13455.5541    0.500     	0              
-100       -13428.8087    0.500     7       
-200       -13424.3364    0.500     7       
-300       -13413.9021    0.500     7       
-400       -13378.9118    0.500     7       
-500       -13362.9902    0.500     7       
-600       -13355.7586    0.500     7       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
-   Optimizing branchlengths... improved    1.365 lnL
-700       -13343.8399    0.402     7       
-800       -13335.8047    0.402     7       
-900       -13330.5512    0.402     7       
-1000      -13326.7255    0.402     7       
-1100      -13322.5311    0.402     7       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
-   Optimizing branchlengths... improved    0.000 lnL
-1200      -13321.2596    0.304     7       
-1300      -13319.9131    0.304     7       
-1400      -13319.0129    0.304     7       
-1500      -13317.9684    0.304     7       
-1600      -13317.0322    0.304     7       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
-   Optimizing branchlengths... improved    0.000 lnL
-1700      -13316.5846    0.206     7       
-1800      -13316.4848    0.206     7       
-1900      -13316.2174    0.206     7       
-2000      -13316.1232    0.206     7       
-2100      -13316.0932    0.206     7       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
-   Optimizing branchlengths... improved    0.000 lnL
-2200      -13316.0881    0.108     7       
-2300      -13316.0315    0.108     7       
-2400      -13316.0186    0.108     7       
-2500      -13316.0127    0.108     7       
-2600      -13316.0101    0.108     7       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.013 lnL
-   Optimizing branchlengths... improved    0.103 lnL
-2700      -13315.8950    0.010     7       
-2800      -13315.8942    0.010     7       
-2900      -13315.8820    0.010     7       
-3000      -13315.8795    0.010     7       
-3100      -13315.8779    0.010     7       
-3200      -13315.8637    0.010     7       
-3300      -13315.8612    0.010     7       
-3400      -13315.8609    0.010     7       
-3500      -13315.8509    0.010     7       
-3600      -13315.8509    0.010     7       
-3700      -13315.8455    0.010     7       
-3800      -13315.8413    0.010     7       
-3900      -13315.8347    0.010     7       
-4000      -13315.8320    0.010     7       
-4100      -13315.8314    0.010     7       
-4200      -13315.8309    0.010     7       
-4300      -13315.8298    0.010     7       
-4400      -13315.8215    0.010     7       
-4500      -13315.8213    0.010     7       
-4600      -13315.8213    0.010     7       
-4700      -13315.8209    0.010     7       
-4800      -13315.8209    0.010     7       
-4900      -13315.8206    0.010     7       
-5000      -13315.8205    0.010     7       
-5100      -13315.8204    0.010     7       
-5200      -13315.8193    0.010     7       
-5300      -13315.8192    0.010     7       
-5400      -13315.8189    0.010     7       
-5500      -13315.8189    0.010     7       
-5600      -13315.8189    0.010     7       
-5700      -13315.8179    0.010     7       
-5800      -13315.8177    0.010     7       
-5900      -13315.8129    0.010     7       
-6000      -13315.8095    0.010     7       
-6100      -13315.8093    0.010     7       
-6200      -13315.8093    0.010     7       
-6300      -13315.8014    0.010     7       
-6400      -13315.7961    0.010     7       
-6500      -13315.7961    0.010     7       
-6600      -13315.7951    0.010     7       
-6700      -13315.7951    0.010     7       
-6800      -13315.7951    0.010     7       
-6900      -13315.7951    0.010     7       
-7000      -13315.7951    0.010     7       
-7100      -13315.7951    0.010     7       
-7200      -13315.7950    0.010     7       
-7300      -13315.7950    0.010     7       
-7400      -13315.7950    0.010     7       
-7500      -13315.7950    0.010     7       
-7600      -13315.7950    0.010     7       
-7700      -13315.7950    0.010     7       
-Reached termination condition!
-last topological improvement at gen 7
-Improvement over last 500 gen = 0.00000
-Current score = -13315.7950
-Performing final branch optimization...
-Subset rate optimization: 0.000003
-Subset rate optimization: 0.000000
-	pass 1 -13315.7896
-	pass 2 -13315.7896
-	pass 3 -13315.7875
-	pass 4 -13315.7868
-	pass 5 -13315.7854
-	pass 6 -13315.7847
-	pass 7 -13315.7840
-	pass 8 -13315.7839
-	pass 9 -13315.7839
-	pass 10 -13315.7838
-	pass 11 -13315.7838
-Final score = -13315.7838
-Time used so far = 0 hours, 6 minutes and 50 seconds
-finished
->>>Completed Search rep 4 (of 5)<<<
-
-MODEL REPORT - Parameter values are FINAL
-Model 0
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 2 3 4 ) 
-    AC = 1.960, AG = 2.581, AT = 1.410, CG = 1.410, CT = 3.719, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.3106 0.1765 0.2971 0.2158 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.4071
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0177	0.2500
-      0.1870	0.2500
-      0.7388	0.2500
-      3.0564	0.2500
-
-Model 1
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 1 0 3 ) 
-    AC = 4.362, AG = 7.045, AT = 1.599, CG = 7.045, CT = 4.362, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.2695 0.1631 0.1606 0.4069 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.3611
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0115	0.2500
-      0.1522	0.2500
-      0.6855	0.2500
-      3.1508	0.2500
-
-Model 2
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 3 1 0 ) 
-    AC = 1.000, AG = 4.912, AT = 3.354, CG = 0.458, CT = 4.912, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.1571 0.3536 0.2867 0.2026 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      4.0450
-    with an invariant (invariable) site category, proportion estimated
-      0.0338
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0000	0.0338
-      0.4568	0.2415
-      0.7768	0.2415
-      1.0844	0.2415
-      1.6820	0.2415
-
-Subset rate multipliers:
-   0.541 0.301 2.158
-
-NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
-    No branches were short enough to be collapsed.
-
->>>Search rep 5 (of 5)<<<
-MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
-Model 0
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 2 3 4 ) 
-    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.3157 0.1746 0.3004 0.2093 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.5000
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0334	0.2500
-      0.2519	0.2500
-      0.8203	0.2500
-      2.8944	0.2500
-
-Model 1
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 1 0 3 ) 
-    AC = 4.000, AG = 4.000, AT = 1.000, CG = 4.000, CT = 4.000, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.2703 0.1566 0.1628 0.4103 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.5000
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0334	0.2500
-      0.2519	0.2500
-      0.8203	0.2500
-      2.8944	0.2500
-
-Model 2
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 3 1 0 ) 
-    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.1460 0.3609 0.2915 0.2015 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.5000
-    with an invariant (invariable) site category, proportion estimated
-      0.0355
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0000	0.0355
-      0.0334	0.2411
-      0.2519	0.2411
-      0.8203	0.2411
-      2.8944	0.2411
-
-Subset rate multipliers:
-    1.00  1.00  1.00
-Starting with seed=1683455277
-
-creating likelihood stepwise addition starting tree...
-number of taxa added:
- 4  5  6 
-   Optimizing parameters...    improved  342.456 lnL
-   Optimizing branchlengths... improved    4.793 lnL
- 7  8  9  10  11 
-Initial ln Likelihood: -13487.5087
-optimizing: starting branch lengths, alpha shape, prop. invar, subset rates...
-pass 1:+   40.760 (branch=   7.87 scale=  1.08 alpha= 11.95 pinv=  1.17 subset rates= 18.69)
-pass 2:+    2.648 (branch=   0.00 scale=  0.00 alpha=  2.65 pinv=  0.00 subset rates=  0.00)
-pass 3:+    0.000 (branch=   0.00 scale=  0.00 alpha=  0.00 pinv=  0.00 subset rates=  0.00)
-lnL after optimization: -13444.1002
-gen       current_lnL    precision last_tree_imp  
-0         -13444.1002    0.500     	0              
-100       -13429.6089    0.500     0       
-200       -13420.9169    0.500     0       
-300       -13413.9114    0.500     0       
-400       -13391.0827    0.500     0       
-500       -13376.1771    0.500     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    1.387 lnL
-   Optimizing branchlengths... improved    1.387 lnL
-600       -13356.4129    0.402     0       
-700       -13347.4679    0.402     0       
-800       -13343.2711    0.402     0       
-900       -13338.2258    0.402     0       
-1000      -13333.9873    0.402     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.557 lnL
-   Optimizing branchlengths... improved    0.557 lnL
-1100      -13328.8294    0.304     0       
-1200      -13325.2862    0.304     0       
-1300      -13321.4924    0.304     0       
-1400      -13320.2996    0.304     0       
-1500      -13318.9942    0.304     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
-   Optimizing branchlengths... improved    0.000 lnL
-1600      -13318.0243    0.206     0       
-1700      -13317.0968    0.206     0       
-1800      -13316.7888    0.206     0       
-1900      -13316.4949    0.206     0       
-2000      -13316.4205    0.206     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.000 lnL
-   Optimizing branchlengths... improved    0.000 lnL
-2100      -13316.2726    0.108     0       
-2200      -13316.2345    0.108     0       
-2300      -13316.1893    0.108     0       
-2400      -13316.1510    0.108     0       
-2500      -13316.0926    0.108     0       
-Optimization precision reduced 
-   Optimizing parameters...    improved    0.075 lnL
-   Optimizing branchlengths... improved    0.105 lnL
-2600      -13315.9788    0.010     0       
-2700      -13315.9692    0.010     0       
-2800      -13315.9574    0.010     0       
-2900      -13315.9339    0.010     0       
-3000      -13315.9028    0.010     0       
-3100      -13315.8785    0.010     0       
-3200      -13315.8544    0.010     0       
-3300      -13315.8508    0.010     0       
-3400      -13315.8499    0.010     0       
-3500      -13315.8499    0.010     0       
-3600      -13315.8454    0.010     0       
-3700      -13315.8450    0.010     0       
-3800      -13315.8385    0.010     0       
-3900      -13315.8385    0.010     0       
-4000      -13315.8381    0.010     0       
-4100      -13315.8263    0.010     0       
-4200      -13315.8222    0.010     0       
-4300      -13315.8218    0.010     0       
-4400      -13315.8171    0.010     0       
-4500      -13315.8161    0.010     0       
-4600      -13315.8161    0.010     0       
-4700      -13315.8099    0.010     0       
-4800      -13315.8080    0.010     0       
-4900      -13315.8057    0.010     0       
-5000      -13315.8053    0.010     0       
-5100      -13315.8049    0.010     0       
-5200      -13315.8043    0.010     0       
-5300      -13315.8038    0.010     0       
-5400      -13315.8038    0.010     0       
-5500      -13315.8029    0.010     0       
-5600      -13315.8029    0.010     0       
-5700      -13315.8029    0.010     0       
-5800      -13315.8029    0.010     0       
-5900      -13315.8027    0.010     0       
-6000      -13315.8027    0.010     0       
-6100      -13315.8026    0.010     0       
-6200      -13315.7981    0.010     0       
-6300      -13315.7978    0.010     0       
-6400      -13315.7945    0.010     0       
-6500      -13315.7945    0.010     0       
-6600      -13315.7938    0.010     0       
-6700      -13315.7936    0.010     0       
-6800      -13315.7936    0.010     0       
-6900      -13315.7928    0.010     0       
-7000      -13315.7925    0.010     0       
-7100      -13315.7925    0.010     0       
-7200      -13315.7919    0.010     0       
-7300      -13315.7918    0.010     0       
-7400      -13315.7918    0.010     0       
-7500      -13315.7917    0.010     0       
-7600      -13315.7917    0.010     0       
-Reached termination condition!
-last topological improvement at gen 0
-Improvement over last 500 gen = 0.00085
-Current score = -13315.7917
-Performing final branch optimization...
-Subset rate optimization: 0.000004
-Subset rate optimization: 0.000000
-	pass 1 -13315.7917
-	pass 2 -13315.7881
-	pass 3 -13315.7866
-	pass 4 -13315.7843
-	pass 5 -13315.7835
-	pass 6 -13315.7833
-	pass 7 -13315.7831
-	pass 8 -13315.7830
-	pass 9 -13315.7829
-	pass 10 -13315.7829
-	pass 11 -13315.7828
-Final score = -13315.7828
-Time used = 0 hours, 8 minutes and 28 seconds
-finished
->>>Completed Search rep 5 (of 5)<<<
-
-MODEL REPORT - Parameter values are FINAL
-Model 0
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 2 3 4 ) 
-    AC = 1.943, AG = 2.561, AT = 1.403, CG = 1.403, CT = 3.707, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.3114 0.1768 0.2965 0.2153 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.4091
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0181	0.2500
-      0.1885	0.2500
-      0.7410	0.2500
-      3.0524	0.2500
-
-Model 1
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 1 0 3 ) 
-    AC = 4.350, AG = 7.043, AT = 1.600, CG = 7.043, CT = 4.350, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.2696 0.1641 0.1604 0.4059 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      0.3622
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0117	0.2500
-      0.1530	0.2500
-      0.6869	0.2500
-      3.1484	0.2500
-
-Model 2
-  Number of states = 4 (nucleotide data)
-  Nucleotide Relative Rate Matrix: 
-    User specified matrix type: ( 0 1 2 3 1 0 ) 
-    AC = 1.000, AG = 4.912, AT = 3.361, CG = 0.455, CT = 4.912, GT = 1.000
-  Equilibrium State Frequencies: estimated
-    (ACGT) 0.1569 0.3536 0.2877 0.2018 
-  Rate Heterogeneity Model:
-    4 discrete gamma distributed rate categories, alpha param estimated
-      4.0158
-    with an invariant (invariable) site category, proportion estimated
-      0.0336
-    Substitution rate categories under this model:
-      rate	proportion
-      0.0000	0.0336
+      0.0000	0.0335
       0.4552	0.2416
       0.7758	0.2416
       1.0844	0.2416
       1.6846	0.2416
 
 Subset rate multipliers:
-   0.541 0.301 2.158
-
+    0.54  0.30  2.16
 NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
     No branches were short enough to be collapsed.
 
-Completed 5 replicate runs (of 5).
-Results:
+>>>Completed Search rep 2 (of 5)<<<
 
-NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
-     If any were collapsed, the following tests for whether the topologies from each search
-     replicate were identical may not be accurate.  Check the screen output above to see
-     if branches were actually collapsed, and if necessary compare the trees in another program.
-Replicate 1 : -13315.7821       
-Replicate 2 : -13315.7765        (same topology as 1)
-Replicate 3 : -13315.7762 (best) (same topology as 1)
-Replicate 4 : -13315.7838        (same topology as 1)
-Replicate 5 : -13315.7828        (same topology as 1)
+>>>Search rep 3 (of 5)<<<
+MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
+Model 1
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 2 3 4 ) 
+    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.3157 0.1746 0.3004 0.2093 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0334	0.2500
+      0.2519	0.2500
+      0.8203	0.2500
+      2.8944	0.2500
 
-Parameter estimates:
+Model 2
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 1 0 3 ) 
+    AC = 4.000, AG = 4.000, AT = 1.000, CG = 4.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.2703 0.1566 0.1628 0.4103 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0334	0.2500
+      0.2519	0.2500
+      0.8203	0.2500
+      2.8944	0.2500
 
-Partition subset 0:
-       r(AC) r(AG) r(AT) r(CG) r(CT) r(GT) pi(A) pi(C) pi(G) pi(T) alpha 
-rep 1:  1.97  2.57  1.41  1.41  3.72  1.00 0.310 0.176 0.298 0.216 0.408 
-rep 2:  1.97  2.58  1.41  1.41  3.74  1.00 0.310 0.176 0.297 0.216 0.410 
-rep 3:  1.97  2.58  1.41  1.41  3.73  1.00 0.310 0.176 0.297 0.216 0.409 
-rep 4:  1.96  2.58  1.41  1.41  3.72  1.00 0.311 0.176 0.297 0.216 0.407 
-rep 5:  1.94  2.56  1.40  1.40  3.71  1.00 0.311 0.177 0.296 0.215 0.409 
-
-Partition subset 1:
-       r(AC) r(AG) r(AT) r(CG) r(CT) r(GT) pi(A) pi(C) pi(G) pi(T) alpha 
-rep 1:  4.38  7.08  1.61  7.08  4.38  1.00 0.269 0.164 0.161 0.406 0.361 
-rep 2:  4.37  7.06  1.61  7.06  4.37  1.00 0.270 0.164 0.161 0.406 0.361 
-rep 3:  4.38  7.10  1.61  7.10  4.38  1.00 0.269 0.164 0.160 0.407 0.363 
-rep 4:  4.36  7.05  1.60  7.05  4.36  1.00 0.269 0.163 0.161 0.407 0.361 
-rep 5:  4.35  7.04  1.60  7.04  4.35  1.00 0.270 0.164 0.160 0.406 0.362 
-
-Partition subset 2:
-       r(AC) r(AG) r(AT) r(CG) r(CT) r(GT) pi(A) pi(C) pi(G) pi(T) alpha  pinv 
-rep 1:  1.00  4.91  3.37  0.46  4.91  1.00 0.157 0.354 0.288 0.201 4.084 0.034
-rep 2:  1.00  4.94  3.39  0.46  4.94  1.00 0.156 0.354 0.287 0.202 3.988 0.033
-rep 3:  1.00  4.92  3.37  0.45  4.92  1.00 0.157 0.353 0.288 0.202 4.046 0.034
-rep 4:  1.00  4.91  3.35  0.46  4.91  1.00 0.157 0.354 0.287 0.203 4.045 0.034
-rep 5:  1.00  4.91  3.36  0.45  4.91  1.00 0.157 0.354 0.288 0.202 4.016 0.034
+Model 3
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 3 1 0 ) 
+    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.1460 0.3609 0.2915 0.2015 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    with an invariant (invariable) site category, proportion estimated
+      0.0355
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0000	0.0355
+      0.0334	0.2411
+      0.2519	0.2411
+      0.8203	0.2411
+      2.8944	0.2411
 
 Subset rate multipliers:
-rep 1: 0.542  0.301  2.157 
-rep 2: 0.540  0.300  2.160 
-rep 3: 0.541  0.301  2.158 
-rep 4: 0.541  0.301  2.158 
-rep 5: 0.541  0.301  2.158 
+    1.00  1.00  1.00
+Starting with seed=1320446270
 
-Final result of the best scoring rep (#3) stored in 3diffModels.byCodonPos.best.tre
-Final results of all reps stored in 3diffModels.byCodonPos.best.all.tre
+creating likelihood stepwise addition starting tree...
+number of taxa added:
+ 4  5  6 
+Optimizing parameters... improved 182.213 lnL
+Optimizing branchlengths... improved 23.611 lnL
+ 7  8  9  10  11 
+Initial ln Likelihood: -13653.6032
+optimizing: starting branch lengths, alpha shape, prop. invar, rel rates, eq freqs, subset rates...
+pass 1:+  178.674 (branch=  11.12 scale=  0.00 alpha= 11.90 freqs= 26.62 rel rates= 64.15 pinv=  0.37 subset rates= 64.52)
+pass 2:+   86.362 (branch=   4.68 scale=  1.93 alpha=  5.43 freqs= 12.73 rel rates=  3.97 pinv=  0.01 subset rates= 57.60)
+pass 3:+   44.763 (branch=   3.77 scale=  0.92 alpha=  3.02 freqs=  0.93 rel rates=  2.17 pinv=  0.01 subset rates= 33.93)
+pass 4:+   17.413 (branch=   1.07 scale=  0.00 alpha=  0.66 freqs=  0.18 rel rates=  3.09 pinv=  0.01 subset rates= 12.39)
+pass 5:+    5.472 (branch=   0.00 scale=  0.00 alpha=  0.01 freqs=  0.17 rel rates=  0.63 pinv=  0.01 subset rates=  4.66)
+pass 6:+    0.158 (branch=   0.00 scale=  0.00 alpha=  0.00 freqs=  0.13 rel rates=  0.01 pinv=  0.01 subset rates=  0.00)
+lnL after optimization: -13320.7617
+gen      current_lnL    precision  last_tree_imp  
+0        -13320.7617      0.500           0 
+100      -13318.9005      0.500           0 
+200      -13318.2255      0.500           0 
+300      -13318.0181      0.500           0 
+400      -13317.3604      0.500           0 
+500      -13316.9407      0.500           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.061 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+600      -13316.6639      0.402           0 
+700      -13316.5914      0.402           0 
+800      -13316.5551      0.402           0 
+900      -13316.4227      0.402           0 
+1000     -13316.4019      0.402           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.025 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+1100     -13316.3551      0.304           0 
+1200     -13316.3373      0.304           0 
+1300     -13316.2828      0.304           0 
+1400     -13316.2796      0.304           0 
+1500     -13316.2045      0.304           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.014 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+1600     -13316.1466      0.206           0 
+1700     -13316.1059      0.206           0 
+1800     -13316.0999      0.206           0 
+1900     -13316.0997      0.206           0 
+2000     -13316.0620      0.206           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.121 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+2100     -13315.9412      0.108           0 
+2200     -13315.9384      0.108           0 
+2300     -13315.9384      0.108           0 
+2400     -13315.9007      0.108           0 
+2500     -13315.8810      0.108           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.034 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+2600     -13315.8424      0.010           0 
+2700     -13315.8416      0.010           0 
+2800     -13315.8416      0.010           0 
+2900     -13315.8294      0.010           0 
+3000     -13315.8285      0.010           0 
+3100     -13315.8282      0.010           0 
+3200     -13315.8272      0.010           0 
+3300     -13315.8240      0.010           0 
+3400     -13315.8209      0.010           0 
+3500     -13315.8195      0.010           0 
+3600     -13315.8173      0.010           0 
+3700     -13315.8173      0.010           0 
+3800     -13315.8158      0.010           0 
+3900     -13315.8157      0.010           0 
+4000     -13315.8122      0.010           0 
+4100     -13315.8112      0.010           0 
+4200     -13315.8112      0.010           0 
+4300     -13315.8112      0.010           0 
+4400     -13315.8112      0.010           0 
+4500     -13315.8112      0.010           0 
+4600     -13315.8083      0.010           0 
+4700     -13315.8075      0.010           0 
+4800     -13315.8070      0.010           0 
+4900     -13315.8070      0.010           0 
+5000     -13315.8070      0.010           0 
+5100     -13315.8070      0.010           0 
+5200     -13315.8067      0.010           0 
+5300     -13315.8067      0.010           0 
+5400     -13315.8059      0.010           0 
+5500     -13315.8058      0.010           0 
+5600     -13315.8040      0.010           0 
+5700     -13315.8026      0.010           0 
+5800     -13315.8026      0.010           0 
+5900     -13315.8026      0.010           0 
+6000     -13315.8024      0.010           0 
+6100     -13315.8015      0.010           0 
+6200     -13315.8010      0.010           0 
+6300     -13315.8010      0.010           0 
+6400     -13315.7996      0.010           0 
+6500     -13315.7993      0.010           0 
+6600     -13315.7993      0.010           0 
+6700     -13315.7964      0.010           0 
+6800     -13315.7926      0.010           0 
+6900     -13315.7926      0.010           0 
+7000     -13315.7925      0.010           0 
+7100     -13315.7925      0.010           0 
+7200     -13315.7925      0.010           0 
+7300     -13315.7925      0.010           0 
+7400     -13315.7925      0.010           0 
+7500     -13315.7924      0.010           0 
+7600     -13315.7922      0.010           0 
+Reached termination condition!
+last topological improvement at gen 0
+Improvement over last 500 gen = 0.00030
+Current score = -13315.7922
+Performing final optimizations...
+pass 1 : -13315.7848   (branch= 0.0069  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0003  rel rates= 0.0002  subset rates= 0.0000)
+pass 2 : -13315.7809   (branch= 0.0032  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0002  rel rates= 0.0001  subset rates= 0.0004)
+pass 3 : -13315.7772   (branch= 0.0034  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0002  rel rates= 0.0001  subset rates= 0.0000)
+pass 4 : -13315.7770   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0001  subset rates= 0.0000)
+pass 5 : -13315.7750   (branch= 0.0017  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0002  rel rates= 0.0001  subset rates= 0.0000)
+pass 6 : -13315.7737   (branch= 0.0009  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0001  subset rates= 0.0002)
+pass 7 : -13315.7730   (branch= 0.0006  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0001  subset rates= 0.0000)
+pass 8 : -13315.7727   (branch= 0.0001  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0001  subset rates= 0.0000)
+pass 9 : -13315.7724   (branch= 0.0002  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 10: -13315.7724   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 11: -13315.7723   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 12: -13315.7723   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 13: -13315.7723   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 14: -13315.7723   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 15: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 16: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+Looking for minimum length branches...
+Final score = -13315.7722
+Time used so far = 0 hours, 5 minutes and 27 seconds
+
+MODEL REPORT - Parameter values are FINAL
+Model 1
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 2 3 4 ) 
+    AC = 1.964, AG = 2.577, AT = 1.410, CG = 1.410, CT = 3.720, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.3101 0.1767 0.2972 0.2160 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.4098
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0181	0.2500
+      0.1890	0.2500
+      0.7416	0.2500
+      3.0512	0.2500
+
+Model 2
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 1 0 3 ) 
+    AC = 4.382, AG = 7.087, AT = 1.610, CG = 7.087, CT = 4.382, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.2692 0.1636 0.1605 0.4067 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.3609
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0115	0.2500
+      0.1520	0.2500
+      0.6853	0.2500
+      3.1512	0.2500
+
+Model 3
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 3 1 0 ) 
+    AC = 1.000, AG = 4.938, AT = 3.393, CG = 0.457, CT = 4.938, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.1565 0.3537 0.2877 0.2021 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      4.0078
+    with an invariant (invariable) site category, proportion estimated
+      0.0334
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0000	0.0334
+      0.4548	0.2416
+      0.7755	0.2416
+      1.0844	0.2416
+      1.6853	0.2416
+
+Subset rate multipliers:
+    0.54  0.30  2.16
+NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
+    No branches were short enough to be collapsed.
+
+>>>Completed Search rep 3 (of 5)<<<
+
+>>>Search rep 4 (of 5)<<<
+MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
+Model 1
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 2 3 4 ) 
+    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.3157 0.1746 0.3004 0.2093 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0334	0.2500
+      0.2519	0.2500
+      0.8203	0.2500
+      2.8944	0.2500
+
+Model 2
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 1 0 3 ) 
+    AC = 4.000, AG = 4.000, AT = 1.000, CG = 4.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.2703 0.1566 0.1628 0.4103 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0334	0.2500
+      0.2519	0.2500
+      0.8203	0.2500
+      2.8944	0.2500
+
+Model 3
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 3 1 0 ) 
+    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.1460 0.3609 0.2915 0.2015 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    with an invariant (invariable) site category, proportion estimated
+      0.0355
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0000	0.0355
+      0.0334	0.2411
+      0.2519	0.2411
+      0.8203	0.2411
+      2.8944	0.2411
+
+Subset rate multipliers:
+    1.00  1.00  1.00
+Starting with seed=490393635
+
+creating likelihood stepwise addition starting tree...
+number of taxa added:
+ 4  5  6 
+Optimizing parameters... improved 254.487 lnL
+Optimizing branchlengths... improved 50.375 lnL
+ 7  8  9  10  11 
+Initial ln Likelihood: -13796.1049
+optimizing: starting branch lengths, alpha shape, prop. invar, rel rates, eq freqs, subset rates...
+pass 1:+  200.360 (branch=  15.47 scale=  0.00 alpha= 26.67 freqs= 29.27 rel rates= 69.20 pinv=  0.96 subset rates= 58.78)
+pass 2:+   84.224 (branch=   7.28 scale=  1.63 alpha=  5.32 freqs= 13.47 rel rates=  3.51 pinv=  1.20 subset rates= 51.81)
+pass 3:+   47.400 (branch=   4.57 scale=  1.26 alpha=  5.73 freqs=  1.41 rel rates=  2.51 pinv=  0.01 subset rates= 31.92)
+pass 4:+   16.242 (branch=   1.20 scale=  0.50 alpha=  0.72 freqs=  0.16 rel rates=  1.54 pinv=  0.00 subset rates= 12.11)
+pass 5:+    5.048 (branch=   0.00 scale=  0.00 alpha=  0.01 freqs=  0.13 rel rates=  0.01 pinv=  0.00 subset rates=  4.90)
+pass 6:+    1.167 (branch=   0.00 scale=  0.00 alpha=  0.00 freqs=  0.11 rel rates=  0.58 pinv=  0.00 subset rates=  0.47)
+pass 7:+    0.096 (branch=   0.00 scale=  0.00 alpha=  0.00 freqs=  0.09 rel rates=  0.01 pinv=  0.00 subset rates=  0.00)
+lnL after optimization: -13441.5669
+gen      current_lnL    precision  last_tree_imp  
+0        -13441.5669      0.500           0 
+100      -13319.1751      0.500          27 
+200      -13318.6657      0.500          27 
+300      -13318.5942      0.500          27 
+400      -13318.5663      0.500          27 
+500      -13318.4781      0.500          27 
+600      -13318.2512      0.500          27 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.082 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+700      -13317.5316      0.402          27 
+800      -13317.2393      0.402          27 
+900      -13316.9226      0.402          27 
+1000     -13316.6411      0.402          27 
+1100     -13316.3656      0.402          27 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.045 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+1200     -13316.2876      0.304          27 
+1300     -13316.2215      0.304          27 
+1400     -13316.1849      0.304          27 
+1500     -13316.1600      0.304          27 
+1600     -13316.1287      0.304          27 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.027 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+1700     -13315.9846      0.206          27 
+1800     -13315.9797      0.206          27 
+1900     -13315.9603      0.206          27 
+2000     -13315.9509      0.206          27 
+2100     -13315.9348      0.206          27 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.009 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+2200     -13315.9119      0.108          27 
+2300     -13315.9083      0.108          27 
+2400     -13315.9054      0.108          27 
+2500     -13315.8826      0.108          27 
+2600     -13315.8815      0.108          27 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.014 lnL
+   Optimizing branchlengths... improved    0.021 lnL
+2700     -13315.8419      0.010          27 
+2800     -13315.8414      0.010          27 
+2900     -13315.8414      0.010          27 
+3000     -13315.8345      0.010          27 
+3100     -13315.8324      0.010          27 
+3200     -13315.8270      0.010          27 
+3300     -13315.8117      0.010          27 
+3400     -13315.8091      0.010          27 
+3500     -13315.8058      0.010          27 
+3600     -13315.8048      0.010          27 
+3700     -13315.8048      0.010          27 
+3800     -13315.8017      0.010          27 
+3900     -13315.8016      0.010          27 
+4000     -13315.8016      0.010          27 
+4100     -13315.8011      0.010          27 
+4200     -13315.8011      0.010          27 
+4300     -13315.8011      0.010          27 
+4400     -13315.8011      0.010          27 
+4500     -13315.7962      0.010          27 
+4600     -13315.7962      0.010          27 
+4700     -13315.7962      0.010          27 
+4800     -13315.7953      0.010          27 
+4900     -13315.7953      0.010          27 
+5000     -13315.7953      0.010          27 
+5100     -13315.7953      0.010          27 
+5200     -13315.7953      0.010          27 
+5300     -13315.7936      0.010          27 
+5400     -13315.7935      0.010          27 
+5500     -13315.7933      0.010          27 
+5600     -13315.7931      0.010          27 
+5700     -13315.7928      0.010          27 
+5800     -13315.7914      0.010          27 
+5900     -13315.7914      0.010          27 
+6000     -13315.7914      0.010          27 
+6100     -13315.7912      0.010          27 
+6200     -13315.7910      0.010          27 
+6300     -13315.7896      0.010          27 
+6400     -13315.7876      0.010          27 
+6500     -13315.7875      0.010          27 
+6600     -13315.7868      0.010          27 
+6700     -13315.7867      0.010          27 
+6800     -13315.7867      0.010          27 
+6900     -13315.7867      0.010          27 
+7000     -13315.7866      0.010          27 
+7100     -13315.7865      0.010          27 
+7200     -13315.7865      0.010          27 
+7300     -13315.7865      0.010          27 
+7400     -13315.7865      0.010          27 
+7500     -13315.7865      0.010          27 
+7600     -13315.7859      0.010          27 
+7700     -13315.7848      0.010          27 
+7800     -13315.7848      0.010          27 
+7900     -13315.7842      0.010          27 
+8000     -13315.7842      0.010          27 
+8100     -13315.7842      0.010          27 
+8200     -13315.7842      0.010          27 
+Reached termination condition!
+last topological improvement at gen 27
+Improvement over last 500 gen = 0.00063
+Current score = -13315.7842
+Performing final optimizations...
+pass 1 : -13315.7835   (branch= 0.0000  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0003  rel rates= 0.0002  subset rates= 0.0002)
+pass 2 : -13315.7829   (branch= 0.0000  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0003  rel rates= 0.0001  subset rates= 0.0001)
+pass 3 : -13315.7779   (branch= 0.0035  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0015  rel rates= 0.0000  subset rates= 0.0000)
+pass 4 : -13315.7760   (branch= 0.0014  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0002  rel rates= 0.0001  subset rates= 0.0000)
+pass 5 : -13315.7734   (branch= 0.0023  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0002  rel rates= 0.0000  subset rates= 0.0000)
+pass 6 : -13315.7730   (branch= 0.0000  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0003  rel rates= 0.0000  subset rates= 0.0000)
+pass 7 : -13315.7727   (branch= 0.0002  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0000  subset rates= 0.0000)
+pass 8 : -13315.7724   (branch= 0.0003  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 9 : -13315.7722   (branch= 0.0001  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 10: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 11: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+Looking for minimum length branches...
+Final score = -13315.7722
+Time used so far = 0 hours, 7 minutes and 46 seconds
+
+MODEL REPORT - Parameter values are FINAL
+Model 1
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 2 3 4 ) 
+    AC = 1.965, AG = 2.577, AT = 1.410, CG = 1.410, CT = 3.720, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.3102 0.1767 0.2972 0.2160 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.4097
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0181	0.2500
+      0.1889	0.2500
+      0.7415	0.2500
+      3.0514	0.2500
+
+Model 2
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 1 0 3 ) 
+    AC = 4.384, AG = 7.090, AT = 1.611, CG = 7.090, CT = 4.384, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.2692 0.1636 0.1605 0.4067 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.3609
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0115	0.2500
+      0.1520	0.2500
+      0.6852	0.2500
+      3.1513	0.2500
+
+Model 3
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 3 1 0 ) 
+    AC = 1.000, AG = 4.939, AT = 3.394, CG = 0.457, CT = 4.939, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.1565 0.3537 0.2877 0.2021 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      4.0115
+    with an invariant (invariable) site category, proportion estimated
+      0.0335
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0000	0.0335
+      0.4550	0.2416
+      0.7756	0.2416
+      1.0844	0.2416
+      1.6850	0.2416
+
+Subset rate multipliers:
+    0.54  0.30  2.16
+NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
+    No branches were short enough to be collapsed.
+
+>>>Completed Search rep 4 (of 5)<<<
+
+>>>Search rep 5 (of 5)<<<
+MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
+Model 1
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 2 3 4 ) 
+    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.3157 0.1746 0.3004 0.2093 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0334	0.2500
+      0.2519	0.2500
+      0.8203	0.2500
+      2.8944	0.2500
+
+Model 2
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 1 0 3 ) 
+    AC = 4.000, AG = 4.000, AT = 1.000, CG = 4.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.2703 0.1566 0.1628 0.4103 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0334	0.2500
+      0.2519	0.2500
+      0.8203	0.2500
+      2.8944	0.2500
+
+Model 3
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 3 1 0 ) 
+    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.1460 0.3609 0.2915 0.2015 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    with an invariant (invariable) site category, proportion estimated
+      0.0355
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0000	0.0355
+      0.0334	0.2411
+      0.2519	0.2411
+      0.8203	0.2411
+      2.8944	0.2411
+
+Subset rate multipliers:
+    1.00  1.00  1.00
+Starting with seed=1922346580
+
+creating likelihood stepwise addition starting tree...
+number of taxa added:
+ 4  5  6 
+Optimizing parameters... improved 198.984 lnL
+Optimizing branchlengths... improved 64.290 lnL
+ 7  8  9  10  11 
+Initial ln Likelihood: -13643.0835
+optimizing: starting branch lengths, alpha shape, prop. invar, rel rates, eq freqs, subset rates...
+pass 1:+  166.300 (branch=   6.38 scale=  1.32 alpha=  5.62 freqs= 26.48 rel rates= 65.82 pinv=  0.81 subset rates= 59.87)
+pass 2:+   86.601 (branch=   7.41 scale=  1.89 alpha=  5.35 freqs= 12.24 rel rates=  3.04 pinv=  0.66 subset rates= 56.01)
+pass 3:+   47.155 (branch=   5.78 scale=  0.66 alpha=  3.94 freqs=  0.98 rel rates=  2.37 pinv=  0.01 subset rates= 33.42)
+pass 4:+   17.442 (branch=   0.49 scale=  0.57 alpha=  0.74 freqs=  0.18 rel rates=  3.03 pinv=  0.02 subset rates= 12.41)
+pass 5:+    5.438 (branch=   0.00 scale=  0.00 alpha=  0.01 freqs=  0.17 rel rates=  0.56 pinv=  0.02 subset rates=  4.69)
+pass 6:+    0.155 (branch=   0.00 scale=  0.00 alpha=  0.00 freqs=  0.13 rel rates=  0.01 pinv=  0.01 subset rates=  0.00)
+lnL after optimization: -13319.9928
+gen      current_lnL    precision  last_tree_imp  
+0        -13319.9928      0.500           0 
+100      -13318.8931      0.500           0 
+200      -13318.1402      0.500           0 
+300      -13317.7489      0.500           0 
+400      -13317.4083      0.500           0 
+500      -13316.8158      0.500           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.067 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+600      -13316.5461      0.402           0 
+700      -13316.4355      0.402           0 
+800      -13316.3446      0.402           0 
+900      -13316.3035      0.402           0 
+1000     -13316.2369      0.402           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.035 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+1100     -13316.1538      0.304           0 
+1200     -13316.0789      0.304           0 
+1300     -13316.0516      0.304           0 
+1400     -13316.0267      0.304           0 
+1500     -13316.0232      0.304           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.020 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+1600     -13315.9865      0.206           0 
+1700     -13315.9675      0.206           0 
+1800     -13315.9224      0.206           0 
+1900     -13315.9215      0.206           0 
+2000     -13315.9196      0.206           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.006 lnL
+   Optimizing branchlengths... improved    0.000 lnL
+2100     -13315.9095      0.108           0 
+2200     -13315.9037      0.108           0 
+2300     -13315.8985      0.108           0 
+2400     -13315.8890      0.108           0 
+2500     -13315.8796      0.108           0 
+Optimization precision reduced 
+   Optimizing parameters...    improved    0.013 lnL
+   Optimizing branchlengths... improved    0.011 lnL
+2600     -13315.8524      0.010           0 
+2700     -13315.8419      0.010           0 
+2800     -13315.8399      0.010           0 
+2900     -13315.8380      0.010           0 
+3000     -13315.8310      0.010           0 
+3100     -13315.8292      0.010           0 
+3200     -13315.8292      0.010           0 
+3300     -13315.8290      0.010           0 
+3400     -13315.8288      0.010           0 
+3500     -13315.8260      0.010           0 
+3600     -13315.8255      0.010           0 
+3700     -13315.8253      0.010           0 
+3800     -13315.8209      0.010           0 
+3900     -13315.8209      0.010           0 
+4000     -13315.8207      0.010           0 
+4100     -13315.8207      0.010           0 
+4200     -13315.8176      0.010           0 
+4300     -13315.8130      0.010           0 
+4400     -13315.8127      0.010           0 
+4500     -13315.8122      0.010           0 
+4600     -13315.8122      0.010           0 
+4700     -13315.8089      0.010           0 
+4800     -13315.8080      0.010           0 
+4900     -13315.8080      0.010           0 
+5000     -13315.8080      0.010           0 
+5100     -13315.8080      0.010           0 
+5200     -13315.8080      0.010           0 
+5300     -13315.8080      0.010           0 
+5400     -13315.8076      0.010           0 
+5500     -13315.8076      0.010           0 
+5600     -13315.8071      0.010           0 
+5700     -13315.8071      0.010           0 
+5800     -13315.8071      0.010           0 
+5900     -13315.8071      0.010           0 
+6000     -13315.8066      0.010           0 
+6100     -13315.8063      0.010           0 
+6200     -13315.8063      0.010           0 
+6300     -13315.8049      0.010           0 
+6400     -13315.8048      0.010           0 
+6500     -13315.8048      0.010           0 
+6600     -13315.8046      0.010           0 
+6700     -13315.8023      0.010           0 
+6800     -13315.8017      0.010           0 
+6900     -13315.8017      0.010           0 
+7000     -13315.8016      0.010           0 
+7100     -13315.7993      0.010           0 
+7200     -13315.7991      0.010           0 
+7300     -13315.7991      0.010           0 
+7400     -13315.7941      0.010           0 
+7500     -13315.7939      0.010           0 
+7600     -13315.7927      0.010           0 
+7700     -13315.7923      0.010           0 
+7800     -13315.7923      0.010           0 
+7900     -13315.7921      0.010           0 
+8000     -13315.7921      0.010           0 
+8100     -13315.7921      0.010           0 
+Reached termination condition!
+last topological improvement at gen 0
+Improvement over last 500 gen = 0.00061
+Current score = -13315.7921
+Performing final optimizations...
+pass 1 : -13315.7914   (branch= 0.0000  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0003  rel rates= 0.0004  subset rates= 0.0000)
+pass 2 : -13315.7882   (branch= 0.0000  alpha= 0.0026  pinv= 0.0000  eq freqs= 0.0003  rel rates= 0.0002  subset rates= 0.0000)
+pass 3 : -13315.7851   (branch= 0.0013  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0017  rel rates= 0.0002  subset rates= 0.0000)
+pass 4 : -13315.7799   (branch= 0.0041  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0002  rel rates= 0.0008  subset rates= 0.0000)
+pass 5 : -13315.7758   (branch= 0.0020  alpha= 0.0004  pinv= 0.0000  eq freqs= 0.0010  rel rates= 0.0006  subset rates= 0.0001)
+pass 6 : -13315.7743   (branch= 0.0009  alpha= 0.0000  pinv= 0.0002  eq freqs= 0.0001  rel rates= 0.0001  subset rates= 0.0001)
+pass 7 : -13315.7735   (branch= 0.0003  alpha= 0.0001  pinv= 0.0000  eq freqs= 0.0001  rel rates= 0.0002  subset rates= 0.0000)
+pass 8 : -13315.7733   (branch= 0.0001  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0002  subset rates= 0.0000)
+pass 9 : -13315.7727   (branch= 0.0002  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0003  subset rates= 0.0000)
+pass 10: -13315.7726   (branch= 0.0001  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0001  subset rates= 0.0000)
+pass 11: -13315.7725   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0001  subset rates= 0.0000)
+pass 12: -13315.7724   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 13: -13315.7724   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 14: -13315.7724   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 15: -13315.7723   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 16: -13315.7723   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 17: -13315.7723   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 18: -13315.7723   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 19: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+pass 20: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+ optimization up to ...
+pass 21: -13315.7722   (branch= 0.0000  alpha= 0.0000  pinv= 0.0000  eq freqs= 0.0000  rel rates= 0.0000  subset rates= 0.0000)
+Looking for minimum length branches...
+Final score = -13315.7722
+Time used = 0 hours, 9 minutes and 50 seconds
+
+MODEL REPORT - Parameter values are FINAL
+Model 1
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 2 3 4 ) 
+    AC = 1.962, AG = 2.575, AT = 1.409, CG = 1.409, CT = 3.717, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.3102 0.1767 0.2971 0.2160 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.4097
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0181	0.2500
+      0.1890	0.2500
+      0.7416	0.2500
+      3.0513	0.2500
+
+Model 2
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 1 0 3 ) 
+    AC = 4.381, AG = 7.086, AT = 1.609, CG = 7.086, CT = 4.381, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.2692 0.1636 0.1605 0.4067 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.3612
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0115	0.2500
+      0.1522	0.2500
+      0.6856	0.2500
+      3.1507	0.2500
+
+Model 3
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix: 
+    User specified matrix type: ( 0 1 2 3 1 0 ) 
+    AC = 1.000, AG = 4.938, AT = 3.393, CG = 0.457, CT = 4.938, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.1565 0.3537 0.2877 0.2021 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      4.0171
+    with an invariant (invariable) site category, proportion estimated
+      0.0335
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0000	0.0335
+      0.4553	0.2416
+      0.7758	0.2416
+      1.0844	0.2416
+      1.6845	0.2416
+
+Subset rate multipliers:
+    0.54  0.30  2.16
+NOTE: Collapsing of minimum length branches was requested (collapsebranches = 1)
+    No branches were short enough to be collapsed.
+
+>>>Completed Search rep 5 (of 5)<<<
+
+#######################################################
+
+Completed 5 replicate search(es) (of 5).
+
+NOTE: Unless the following output indicates that search replicates found the
+	same topology, you should assume that they found different topologies.
+Results:
+Replicate 1 : -13315.7721 (best)
+Replicate 2 : -13315.7723        (same topology as 1)
+Replicate 3 : -13315.7722        (same topology as 1)
+Replicate 4 : -13315.7722        (same topology as 1)
+Replicate 5 : -13315.7722        (same topology as 1)
+
+Parameter estimates across search replicates:
+
+Partition model subset 1:
+         r(AC)  r(AG)  r(AT)  r(CG)  r(CT)  r(GT) pi(A) pi(C) pi(G) pi(T) alpha
+rep 1:   1.966  2.579  1.411  1.411  3.722      1 0.310 0.177 0.297 0.216 0.410
+rep 2:   1.962  2.575  1.408  1.408  3.715      1 0.310 0.177 0.297 0.216 0.410
+rep 3:   1.964  2.577   1.41   1.41   3.72      1 0.310 0.177 0.297 0.216 0.410
+rep 4:   1.965  2.577   1.41   1.41   3.72      1 0.310 0.177 0.297 0.216 0.410
+rep 5:   1.962  2.575  1.409  1.409  3.717      1 0.310 0.177 0.297 0.216 0.410
+
+Partition model subset 2:
+         r(AC)  r(AG)  r(AT)  r(CG)  r(CT)  r(GT) pi(A) pi(C) pi(G) pi(T) alpha
+rep 1:    4.38  7.085  1.609  7.085   4.38      1 0.269 0.164 0.160 0.407 0.361
+rep 2:     4.4  7.116  1.617  7.116    4.4      1 0.269 0.164 0.161 0.407 0.361
+rep 3:   4.382  7.087   1.61  7.087  4.382      1 0.269 0.164 0.160 0.407 0.361
+rep 4:   4.384   7.09  1.611   7.09  4.384      1 0.269 0.164 0.160 0.407 0.361
+rep 5:   4.381  7.086  1.609  7.086  4.381      1 0.269 0.164 0.161 0.407 0.361
+
+Partition model subset 3:
+         r(AC)  r(AG)  r(AT)  r(CG)  r(CT)  r(GT) pi(A) pi(C) pi(G) pi(T) alpha  pinv
+rep 1:       1  4.936  3.391 0.4568  4.936      1 0.157 0.354 0.288 0.202 4.014 0.034
+rep 2:       1  4.938  3.393 0.4572  4.938      1 0.157 0.354 0.288 0.202 4.016 0.034
+rep 3:       1  4.938  3.393 0.4569  4.938      1 0.157 0.354 0.288 0.202 4.008 0.033
+rep 4:       1  4.939  3.394 0.4572  4.939      1 0.157 0.354 0.288 0.202 4.011 0.033
+rep 5:       1  4.938  3.393 0.4572  4.938      1 0.157 0.354 0.288 0.202 4.017 0.034
+
+Treelengths and subset rate multipliers:
+          TL   R(1)  R(2)  R(3)
+rep 1:  1.693 0.541 0.300 2.159
+rep 2:  1.693 0.541 0.300 2.158
+rep 3:  1.693 0.541 0.300 2.159
+rep 4:  1.693 0.541 0.300 2.159
+rep 5:  1.693 0.541 0.301 2.158
+
+Saving final trees from all search reps to 3diffModels.byCodonPos.best.all.tre
+
+Saving final tree from best search rep (#1) to 3diffModels.byCodonPos.best.tre
+#######################################################
