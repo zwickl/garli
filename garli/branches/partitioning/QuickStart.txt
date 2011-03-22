@@ -22,10 +22,20 @@ A very short guide to using non-graphical versions of GARLI:
  contain a variety of information about the search itself as well
  as the details of the inferred tree and model of substition.
 
-You can find sample configuration files in the example directory,
-including one already named garli.conf that is all set up to analyze
-the included 64 taxon rana.nex dataset (this should take between
+To try it out on the included sample dataset, just copy the 
+program and execute it from the example/basic/ directory,
+without needing any other setup. This reads the garli.conf 
+file in that directory, which is set up to analyze the 
+included 64 taxon rana.nex dataset (this should take between
 10 and 30 minutes, depending on the speed of your computer).
+
+You can also find sample configuration files that you can alter
+for your data in the example/basic directory.
+
+Configuration of partitioned models is necessarily more complex,
+but examples and template configuration files appear in the
+example/partition directory.  See the support wiki listed below
+for lots more information.
 
 You can specify configuration files to use that are not named
 garli.conf by passing them on the command line:
@@ -37,7 +47,7 @@ make a shortcut in the directory (Windows) or make a symbolic
 to the executable in the directory (OS X or linux)
 
 For further details, see the GARLI Manual or visit the Garli
-support webpage: http://www.nescent.org/wg/garli
+Wiki support webpage: http://www.nescent.org/wg/garli
 
 Have fun, and let me know of any questions, problems or feedback:
 Derrick Zwickl
