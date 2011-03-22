@@ -3,7 +3,8 @@ FOR PARTITIONED VERSION EXAMPLES SEE THE partition directory.
 For documentation of the partitioned version see:
 http://www.nescent.org/wg_garli/Using_partitioned_models
 
-The following may also be helpful if you aren't familar with general GARLI usage.
+The following may also be helpful if you aren't familar with general GARLI usage:
+https://www.nescent.org/wg_garli/Main_Page
 #################
 GARLI version 2.0 examples - March 2011
 
