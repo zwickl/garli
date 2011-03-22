@@ -19,10 +19,17 @@ outputphyliptree = 0
 outputmostlyuselessfiles = 0
 writecheckpoints = 0
 restart = 0
+outgroup = 1
+resampleproportion = 1.0
+inferinternalstateprobs = 0
 outputsitelikelihoods = 0
+optimizeinputonly = 0
 collapsebranches = 1
-searchreps = 2
 
+searchreps = 2
+bootstrapreps = 0
+
+[model1]
 datatype = aminoacid
 ratematrix = jones
 statefrequencies = empirical
@@ -50,15 +57,9 @@ randsprweight = 0.3
 limsprweight =  0.6
 intervallength = 100
 intervalstostore = 5
-uniqueswapbias = 0.1
-distanceswapbias = 1.0
-
 limsprrange = 6
 meanbrlenmuts = 5
 gammashapebrlen = 1000
 gammashapemodel = 1000
-
-bootstrapreps = 0
-resampleproportion = 1.0
-inferinternalstateprobs = 0
-
+uniqueswapbias = 0.1
+distanceswapbias = 1.0
