@@ -2551,7 +2551,7 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, int s
 	bipartCond = DIRTY;
 
 //#ifdef EXTRA_ROOT_OPT
-	if(cut == dummyRoot){
+	if(createTopologyOnly == false && cut == dummyRoot){
 		//do some extra optimization when the root branch is moved, since it is a tough move to accept
 		outman.UserMessageNoCR("root move: %.4f ", lnL);
 		for(int modnum = 0;modnum < modPart->NumModels();modnum++){

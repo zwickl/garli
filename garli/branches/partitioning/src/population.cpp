@@ -3202,6 +3202,10 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 	SeedPopulationWithStartingTree(currentSearchRep);
 	bestIndiv = 0;
 
+	assert(indiv[0].treeStruct->dummyRoot);
+	//the number of branches on which the root could be attached
+	conf->searchReps = (dataPart->NTax() - 1) * 2 - 3;
+
 	double initIns = 0.05, initDel = 0.1;
 
 	for(int m = 0;m < indiv[0].modPart.NumModels();m++){
@@ -3278,7 +3282,7 @@ void Population::OptimizeInputAndWriteSitelikelihoodsAndTryRootings(){
 		//in BetterFinalOpt
 		gen = tnum;
 		//AppendTreeToTreeLog(0, 1);
-
+		
 		BetterFinalOptimization();
 
 		outman.UserMessage("%d\tnode\t%d\tlnL\t%f", tnum, (*broken).nodeNum, indiv1Tree->lnL);
