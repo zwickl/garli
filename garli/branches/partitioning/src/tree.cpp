@@ -2553,16 +2553,16 @@ int Tree::SPRMutate(int cutnum, ReconNode *broke, FLOAT_TYPE optPrecision, int s
 //#ifdef EXTRA_ROOT_OPT
 	if(createTopologyOnly == false && cut == dummyRoot){
 		//do some extra optimization when the root branch is moved, since it is a tough move to accept
-		outman.UserMessageNoCR("root move: %.4f ", lnL);
+		outman.DebugMessageNoCR("root move: %.4f ", lnL);
 		for(int modnum = 0;modnum < modPart->NumModels();modnum++){
 			const ModelSpecification *modSpec = modPart->GetModel(modnum)->GetCorrespondingSpec();
 			if(modSpec->IsOrientedGap()){
 				OptimizeInsertDeleteRates(optPrecision, modnum);
-				outman.UserMessageNoCR("-> %.4f ", lnL);
+				outman.DebugMessageNoCR("-> %.4f ", lnL);
 				OptimizeAllBranches(optPrecision);
 				}
 			}
-		outman.UserMessage("-> %.4f", lnL);
+		outman.DebugMessage("-> %.4f", lnL);
 		}
 //#endif
 	return 0;
