@@ -65,6 +65,7 @@ class GeneralGamlConfig{
 	string arbitraryString;
 	unsigned int siteWindowLength;
 	unsigned int siteWindowStride;
+	bool combineAdjacentIdenticalGapPatterns;
 
 	bool usePatternManager;
 	bool rootAtBranchMidpoint;

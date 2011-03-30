@@ -72,6 +72,8 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	siteWindowLength = 0;
 	siteWindowStride = 0;
 
+	combineAdjacentIdenticalGapPatterns = false;
+
 	usePatternManager = false;
 	rootAtBranchMidpoint = false;
 	useOptBoundedForBlen = false;
@@ -182,6 +184,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetUnsignedOption("windowstride", siteWindowStride, true);
 	cr.GetBoolOption("usepatternmanager", usePatternManager, true);
 	cr.GetStringOption("parametervaluestring", parameterValueString, true);
+	cr.GetBoolOption("combineadjacentidenticalgappatterns", combineAdjacentIdenticalGapPatterns, true);
 
 	cr.GetBoolOption("rootatbranchmidpoint", rootAtBranchMidpoint, true);
 	cr.GetBoolOption("useoptboundedforblen", useOptBoundedForBlen, true);

@@ -722,6 +722,12 @@ int main( int argc, char* argv[] )	{
 							outman.UserMessage("\t  chars%s", chars.c_str());
 							}
 
+						if(conf.combineAdjacentIdenticalGapPatterns && (modSpec->IsOrientedGap() || modSpec->IsBinaryNotAllZeros())){
+							if(conf.usePatternManager)
+								throw ErrorException("Sorry, the pattern manager can't be used with gap collapsing currently");
+							data->EliminateAdjacentIdenticalColumns();
+							}
+
 						data->ProcessPatterns();
 
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();

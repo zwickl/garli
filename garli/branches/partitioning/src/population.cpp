@@ -2622,6 +2622,10 @@ int Population::EvaluateStoredTrees(bool report){
 					storedTrees[i]->modPart.GetModel(part)->FillModelOrHeaderStringForTable(s, true);
 					outman.UserMessage("rep%2d: %s", i+1, s.c_str());
 					}
+				if(storedTrees[0]->modPart.GetModel(part)->GetModSpec()->IsOrientedGap()){
+					outman.UserMessage("\t **ins = proportion of columns that experienced an insertion");
+					outman.UserMessage("\t **del = deletion rate relative to nucleotide substitution rate");
+					}
 				}
 			else{
 				outman.UserMessage("\t Model contains no estimated parameters");
