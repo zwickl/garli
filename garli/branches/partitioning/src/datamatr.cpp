@@ -1124,6 +1124,34 @@ void DataMatrix::Collapse(){
 	}
 
 //
+// EliminateAdjacentIdenticalColumns sets the count of successive identical patterns
+// in the original alignment to zero (usually applied to gaps)
+// i.e., adjacent identical patterns count as only one observation
+//
+void DataMatrix::EliminateAdjacentIdenticalColumns(){
+	//this needs to happen here to know the number of state counts, but will be redone later
+	Summarize();
+	
+	int i = 0, j = 1;
+	assert(nonZeroCharCount == nChar);
+
+	int numCombined = 0;
+	while( i < NChar() ) {
+		//need to avoid subtracting zero state chars here (blank cols) since the will be removed already
+		while( numStates[i] != 0 && j < NChar() && ComparePatterns( i, j ) == 0 ) {
+			// pattern j same as pattern i
+			count[j] = 0;
+			//when columns are eliminated, remove them from the total number of characters
+			totalNChar--;
+			numCombined++;
+			j++;
+			}
+		i = j++;
+		}
+	outman.UserMessage("	***%d IDENTICAL ADJACENT CHARACTERS ELIMINATED***", numCombined);
+	}
+
+//
 //  BSort implements a simple bubblesort
 //
 void DataMatrix::BSort( int byCounts /* = 0 */ ){

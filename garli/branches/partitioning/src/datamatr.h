@@ -423,6 +423,7 @@ protected:
 		virtual int PatternType( int , unsigned int *) const;	// returns PT_XXXX constant indicating type of pattern
 		void Summarize();       // fills in nConstant, nInformative, and nAutapomorphic data members
 		virtual void Collapse();
+		void EliminateAdjacentIdenticalColumns();
 		virtual void Pack();
 		void NewMatrix(int nt, int nc);	// flushes old matrix, creates new one
 		void ResizeCharacterNumberDependentVariables(int nCh);
