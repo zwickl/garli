@@ -511,7 +511,17 @@ Tree::Tree(const char* s, bool numericalTaxa, bool allowPolytomies /*=false*/, b
 			//trees, which will be elminated below
 			int connector = numNodesTotal - 2;
 			assert(allNodes[connector]->attached == false);
+            if(constraints.size() == 0)
 			RandomlyAttachTip(numTipsTotal, connector);
+            else{
+                Bipartition mask;
+                vector<int> n;
+                for(int tax = 1;tax < numTipsTotal;tax++)
+                    n.push_back(tax);
+                mask.BipartFromNodenums(n);
+
+                RandomlyAttachTipWithConstraints(numTipsTotal, connector, &mask );
+                }
 			}
 		else//the input tree must have had the dummy in it already
 			assert(dummyRoot->attached == true);

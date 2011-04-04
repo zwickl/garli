@@ -693,11 +693,16 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 		for(int modnum = 0;modnum < modPart.NumModels();modnum++){
 			Model *mod = modPart.GetModel(modnum);
 			const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
-			if(modSpec->numRateCats > 1 && modSpec->IsNonsynonymousRateHet() == false && modSpec->IsFlexRateHet() == false) optAlpha = true;
-			if(modSpec->IsFlexRateHet()) optFlex = true;
-			if(modSpec->includeInvariantSites && modSpec->fixInvariantSites == false) optPinv = true;
-			if(modSpec->IsCodon() && !modSpec->fixOmega) optOmega = true;
-			if(modSpec->IsOrientedGap()) optInsDel = true;
+			if(modSpec->numRateCats > 1 && modSpec->IsNonsynonymousRateHet() == false && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false) 
+				optAlpha = true;
+			if(modSpec->IsFlexRateHet()) 
+				optFlex = true;
+			if(modSpec->includeInvariantSites && modSpec->fixInvariantSites == false) 
+				optPinv = true;
+			if(modSpec->IsCodon() && !modSpec->fixOmega) 
+				optOmega = true;
+			if(modSpec->IsOrientedGap()) 
+				optInsDel = true;
 
 			if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
 				optFreqs = true;
