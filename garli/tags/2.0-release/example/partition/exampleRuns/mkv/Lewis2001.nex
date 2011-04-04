@@ -1,0 +1,239 @@
+
+#NEXUS
+
+[
+Title: INCONGRUENCE BETWEEN MORPHOLOGICAL DATA SETS: AN EXAMPLE FROM THE
+EVOLUTION OF ENDOPARASITISM AMONG PARASITIC WASPS (HYMENOPTERA: BRACONIDAE)
+
+Authors: DONALD L. J. QUICKE AND ROBERT BELSHAW
+
+Journal: SYSTEMATIC BIOLOGY 48(3): 436-454
+
+Contents: THREE NEXUS FILES, IDENTICAL EXCEPT FOR DIFFERENT ALIGNMENTS OF
+ONE GENE 
+
+This represents:
+File 1: data file with 28S D2 2:1 gap to substitution cost alignment
+except all of the sequence data has been removed
+]
+
+BEGIN CHARACTERS;
+DIMENSIONS NEWTAXA NTAX=30 NCHAR=118;
+FORMAT labels MISSING=? SYMBOLS= "0 1 2 3 4 5";
+OPTIONS  MSTAXA=POLYMORPH [gap=newstate];
+[DJZ - removing eliminate command, adding assumptions block
+eliminate 1-45 74-82 85 86 105 108-112 114 116-.; [leaves female+larval character set]
+]
+CHARLABELS
+	[1]	antennsensilla	[2]	antBarlin	[3]	'm/f_ant='
+	[4]	Maxillary_palp	[5]	labial_palp
+	[6]	cyclostome	[7]	laciniaround	[8]
+	laciniashort	[9]	hypoclypset	[10]	occipital_carina
+	[11]	Prontal_dorsum	[12]	prepectal_carina	[13]
+	Notauli	[14]	scut_sulc	[15]	scutellum
+	[16]	propodeum	[17]	Central_areola	[18]
+	antenna_cleaner	[19]	tib	[20]	FWR
+	[21]	'2m-cu'	[22]	'1-SR+M'	[23]	R_to_margin
+	[24]	'FW1-SR'	[25]	'r-m'
+	[26]	'FW2-SR'	[27]	MCU	[28]	'FW_m-cu'
+	[29]	'FW2-M'	[30]	FWa
+	[31]	3CU1	[32]	'HW2-CU'	[33]	'HW_cu-a'
+	[34]	HW_submarginal	[35]	'HWm-cu'
+	[36]	secondary_hamuli	[37]	petiole	[38]	numspir
+	[39]	T2_spir	[40]	'T2-T3articulation'
+	[41]	'MT4-7_apodemes'	[42]	MT8sculpt	[43]	MS8
+	[44]	rectal_pads	[45] chromosomes
+	[46]	prongs	[47]	ovip_sheath	[48]	GAoverlap
+	[49]	ovip_dor_valve	[50]	ovip_shape
+	[51]	ovip_ridge	[52]	Ovip	[53]	sperone	[54]
+	DVsculp	[55]	rachies
+	[56]	egg_canal	[57]	ctenidia	[58]	ctenidia
+	[59]	valvillus	[60]	valvillus
+	[61]	valpos	[62]	lower_valve	[63]	lv_seal	[64]
+	no_serrations	[65]	spermatheca
+	[66]	venom_app	[67]	res_sculp	[68]	VGA
+	[69]	Res_Div	[70]	VGins
+	[71]	ven_gland	[72]	no_ins	[73]	ovarioles
+	[74]	cercifused	[75]	cerci_setae
+	[76]	articulated_cusp	[77]	basal_ring	[78]
+	aedeagus	[79]	vas_def	[80]	Testes
+	[81]	sperm	[82]	sperm_morphol	[83]	egg	[84]
+	synovigeny	[85]	yolky
+	[86]	teratocytes	[87]	teratocyte_origin	[88]
+	lar_processes	[89]	L1_mandib_shape	[90]	L1_A_spines
+	[91]	L1_T3_spines.2	[92]	l1spinsfused	[93]
+	l1spinesgroups	[94]	L1_sensilla	[95]	L1_labral_sensilla
+	[96]	lar_antenna	[97]	Larval_mandible	[98]	larmandib
+	[99]	Larv_spir	[100]	'l-spirac'
+	[101]	hypostspur	[102]	stipital	[103]	larEpist
+[104]	ringsclerite [105]	anal_vesicle
+	[106]	postvencomm	[107]	instars	[108]	Ovip_into_gang
+	[109]	idiobiont	[110]	ectopar
+	[111]	final_external_feeding	[112]	mummif	[113]	mum
+	[114]	pupate	[115]	emergence_hole
+	[116]	paralysis	[117]	host_feeding	[118]	hostaphid
+	;
+STATELABELS
+	1  scattered one_rank 2_ranks,
+	2  small_hole medium_hole entire,
+	3  unequal equal,
+	4  six five four three,
+	5  four three two one,
+	6  no yes,
+	7  one three,
+	8  one three,
+	9  no yes,
+	10  complete abs_dors completely_abs,
+	11  simple_or_two_lateral_pits dorsope_and_2_lt_pits,
+	12  present absent,
+	13  present absent,
+	14  crenulate_or_with_1_carina smooth,
+	15  with_posterior_cren_groove without_posterior_crenulated_gr,
+	16  areola_complete areola_incomplete,
+	17  large small,
+	19  pegs_absent present,
+	20  contig_with_parastigma lost,
+	21  pres absent,
+	22  present_complete present_but_incomplete totally_absent,
+	23  yes no,
+	24  present lost,
+	25  present absent,
+	26  present absent,
+	27  fully_sclerotized largely_absent,
+	28  present absent,
+	29  part_present absent,
+	30  present absent,
+	31  present absent,
+	32  present absent,
+	33  present absent,
+	34  present absent,
+	35  present absent,
+	36  on_spur_beyond_r on_spur_overlapping on_C+SC+R,
+	37  unfused fused,
+	38  seven six five,
+	39  in_notum in_laterotergite,
+	40  fixed flexible,
+	41  _ _ _ _ _ _ small 'long,_thin_processes',
+	42  smooth microsculpture,
+	43  pointed_anteriorly square_anteriorly,
+	44  six four two,
+	45  four five six seven eight more_than_8,
+	46  absent present,
+	47  pointed truncate,
+	48  not trans,
+	49  lumen_divided lumen_entire,
+	50  straightish strongly_curved,
+	51  dorsal_ridge_absent present,
+	52  simple nodus notch double_nodus,
+	53  absent present,
+	54  present_ctenid pres_setae abs,
+	55  not to_end,
+	56  closed_by_LVs closed_by_DV,
+	57  otherwise 'with_scale-like_combsctenidiact',
+	58  without_sock_seta with_sock_seta,
+	59  many two one none,
+	60  no_fringe fringe,
+	61  apical medial basal,
+	62  flaps_absent flaps_normal flaps_large,
+	63  fades_out scaly_and_detached,
+	64  <3 '=3' >3,
+	65  white black,
+	66  muscular not_so,
+	67  spiral not_spiral,
+	68  otherwise with_long_prim_duct_and_anterio,
+	69  undivided divided,
+	70  in_spiral_part not_in_spiral_part,
+	71  anterior medial posterior,
+	72  one two many,
+	73  one two 'three-seven' eight_or_more,
+	74  cerci_separate cerci_fused_fo_TIX,
+	75  _many five four three,
+	76  present fused,
+	77  wide_laterally unifomly_narrow produced_medially,
+	78  normal reduced,
+	79  posterior anterior,
+	80  fused_above_gut separate_or_fised_below,
+	81  long medium short,
+	82  normal abnormal_morphology,
+	83  ovoid 'lemon-shaped' with_long_process,
+	84  synovigenic proovigenic,
+	85  anhydropic hydropic,
+	87  from_polar_bodies from_delamination_of_serosa,
+	88  absent pair_below_tail,
+	89  sickle_and_narrow broad_base_with_hook_blade,
+	90  absent single_row multiple_rows,
+	91  present absent,
+	92  not_fused fused_and_branching,
+	93  not_grouped grouped,
+	94  without_group_of_3 with_group_of_3,
+	95  absent present,
+	96  papilliform disc absent,
+	97  toothed smooth,
+	98  cross_or_meet separate,
+	99  prothorax mesothorax,
+	100  divided undivided,
+	101  present absent,
+	102  simple paddle baloon,
+	103  present absent_or_v_reduced,
+	104  absent present,
+	105  absent present,
+	106  present absent,
+	107  five four three,
+	108  not yes,
+	109  idiobiont koinobiont,
+	110  ecto endo,
+	111  present absent,
+	112  no_mummy mummy,
+	113  pale always_black,
+	114  internal external,
+	115  A B,
+	116  permanent temporary none,
+	117  present absent,
+	118  not_aphid aphid,
+;
+                        [               11111111112   2   2  22222   2  23   3   3333333344444444445555555555666666666677777777778888888888   9  9999999999000000000  0111   1  1111 ]
+                        [ 123	4  5678901234567890   1   2  34567   8  90   1   2345678901234567890123456789012345678901234567890123456789   0  1234567890123456789  0123   4  5678 ]
+MATRIX                  [                                                                                                                                                            ]
+Aphidius_rhopalosiphi     120   2  1000001011101001   1   2  10011   0  01   1   1111210101012301?10121001103??0011000002101311011101111000   0  10101211?1111000101  1110   1  1211
+Aphidius_ervi             120   2  1000001011101001   1   2  10011   0  01   1   1111210101012101?10121001103??0011000002101311011101111000   0  101012111111100?101  1110   1  1211
+Diaeretiella_rapae        120 (23) 2000001011101001   1   2  10111   1  01   1   1111210101012201?10121?01?03??00?1000002101311011??11?1000   0  101012111111100?1?1  1110   1  1211
+Lysiplebus_confusus       120 (23) 300000101111?001   1   2  10111   1  01   1   1111210101012200?10121001?03??101100000??01311011??1111000   0  101011111111100?1?1  1110   1  1211
+Pauesia_unilachni         120   2  1000001011100001   1   2  10011   0  01   1   1111210100012200010?21?01?03???0110000?2?01311011??01?1?00   0  10100211?111100?1?1  1110   1  1211
+Pauesia_juniperorum       120   2  1000000001100001   1   2  10011   0  01 (01)  1111210100012201010??1?01?03???0110000???01311011??11?1?00   0  10100211?111100?1?1  1110   1  1211
+Binodoxys_acalephae       120   2  2000000011100001   1   2  10111   1  11   ?   1111210100112410?1100??01?0????0?10000?2?0111?0????11?1?01   0  00000211?102100?1?1  1110   1  0211
+Trioxys_pallidus          120   2  2000000011100001   1   2  10111   1  11   ?   1111210100112410111001001?03???00100000?101111011??11?1001   0  000002111102100?101  1110   1  0211
+Monoctonus_pseudoplatani  120   2  1000001011100001   1   2  10011   0  11   ?   1111210100112300110021?01?020200110100?2?001110????11?1?11   0  00000211?102100?111  1110   1  0111
+Praon_volucre             120   2  100000000111?001   1   1  10110 (01) 01 (01)  1101200100012000010021001003??20101100???10200111100111111   0  0101021?1110110?1?1  1110   0  ?211
+Praon_abjectum            120   2  100000000111?001   1 (12) 10110 (01) 01 (01)  1101200100012000010?21001003??20101100???10200111100111111   0  0101021?1110110?1?1  1110   0  ?211
+[
+Praon_dorsale             120   2  100000000111?001   1   1  10110 (01) 01   0   1101200100012000010021001003??20101100???10200111100111111   0  0101021?1110110?1?1  1110   0  ?211
+]
+Pseudopraon_mindariphagum 120   2  2000000001100001   1   2  10110   0  11   0   1101200100?1??00010?2?????0????0??1100????02001?????????1?   ?  ???????1????1?0???1  1110 (01) 0211
+Dyscritulus_planiceps     120   2  1000000001100001   1   2  10110   0  01   0   110120010001200001002???1?0???20?01000?00102001????01???11   0  010102111110110?1?1  1110   0  ?211
+Ephedrus_plagiator        121   2  2000001001100001   1   0  00000   0  01   0   1101200100012301010021001003??2020010002010111011?00111111   0  000102111110100?101  1111   1  0211
+Ephedrus_californicus     121   2  2000001001100001   1   0  00000   0  01   0   1101200100012301010021001003??20200100020101110111?0111111   0  000102101110100?101  1111   1  0211
+[
+Ephedrus_validus          121   2  2000001001100001   1   0  00000   0  01   0   1101200100012301010021001003??2020010002010111011??0111111   0  000102111110100?101  1111   1  0211
+Ephedrus_persicae         121   2  2000001001100001   1   0  00000   0  01 (01)  1101200100012301010021001003??2020010002010111011??0111111   0  000102101110100?101  1111   1  0211
+]
+Sathon_falcatus           211   1  101102011011?001   1   0  10100   0  00   0   1001001110001500011001201101121121110012010011011210111?00   2  1????20010001010101  100?   0  ?210
+Chelonus_sp.              010   1  001100000011?100   1   1  01000   0  00   0   1001102010001200010021201101111?11110012010011011210111100 (01) 0000?10010101010101  100?   0  ?210
+Cenocoelius_analis        010   0  0011000000101000   1   0  00000   0  00   0   1001100110011?000100212010001?11211100110300110112121???0?   ?  ?????100?01010????1  100?   0  ?2?0
+Eubazus_semirugosus       010   0  0011000000000000   1   0  01100   0  00   0   1001000110011?000100212010001?1101110012030011011210111?00   0  000??1001010101?101  100?   0  ?210
+Acampsis_alternipes       010   0  0011000000001100   1   0  00000   0  00   0   0001000110011?000100011010021011?111001?030011011??0110?00   2  100001001010101??11  100?   0  ?210
+Alysia_lucicola           100   0  0000020000100100   1   0  00000   0  01   0   10002001100115000000200?0012001010000102010012001000110?01 (12) 000??11100001000101  110?   1  ?110
+Aleiodes_coxalis          100   0  010000000011?001   1   0  00000   0  01   0   10010000100115000000000?0012101021000002010012000000000?01   2  1????1100000000?001  1111   1  ?110
+Heterospilus_prosopidis   100   0  0100100000100011   1   1  00000   0  01   0   1000200010001?00000030010012001020000112110012000000000?01   1  000??00000000001000  000?   0  ?000
+Hecabolus_sp.             100   0  010010000011?011   1   0  00000   0  01   0   1000200010001?00000030010012001020000112110012000000000?01   1  000??00000001001000  000?   0  ?0?0
+Bracon_sp.                100   1  010012010011?101   1   0  00000   0  01   0   1001200010011500000010010012001020000012210012000000000?01   2  1????00000000001000  000?   0  ?000
+Colastes_incertus         100   0  010000010011?001   1   0  00000   0  01   0   1000200010001?000000100100120010?000010?010012000000000?01   1  000??00000000001000  000?   0  ?000
+Rhyssalus_sp.             100   0  0100100000101000   1   0  00000   0  00   0   100020011000??000000100100110010?01110020100?100?000000?0?   ?  ?????0000000000??00  000?   0  ?000
+Histeromerus_mystacinus   110   0  010011011011?000 (01)  0  00000   0  00   0   1000100110002?00000000?1001101100011100201000000???0000?0?   ?  ?????0000000000??00  000?   0  ?010
+Xorides_praecatorius      010   1  0001000000000000   0   2  0???0   0  01   0   0001010000000?00000011000001001020000000020000010000000?0?   ?  ?????000?000000??00  000?   0  ?0?0
+Alomyia_debellator        010   1  000100001011?000   0   2  0???0   0  01   0   0001010000000?000100100000011010201100000?0000000000??0?0?   ?  ?????111001000????1  111?   1  ?2?0
+;
+END;
+
+begin assumptions;
+exset * larfem = 1-45 74-82 85 86 105 108-112 114 116-.;
+end;

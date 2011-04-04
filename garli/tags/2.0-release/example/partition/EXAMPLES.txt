@@ -1,0 +1,18 @@
+
+Included here are template config files and example analysis results for partitioned
+analyses.
+
+Looking at the .screen.log files in the example runs (especially the end) will
+give you a feeling for what the program is estimating and what the results
+will consist of.
+
+For the template config files, "large data" generally refers to alignments with
+more than about 50 sequences.  
+
+Note that to use the template configs you'd still need to specify the partitioning 
+of your data, which is done in the nexus file containing your alignment (sorry, 
+nexus format required for this).  See this page for help on doing this:
+
+http://www.nescent.org/wg_garli/Using_partitioned_models
+
+or look at the datafiles in the example runs directory.
