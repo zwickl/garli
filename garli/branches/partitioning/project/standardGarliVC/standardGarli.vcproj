@@ -40,7 +40,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;../../../../../../ncl-2.1/ncl&quot;;&quot;../../../../../../ncl-2.1&quot;"
+				AdditionalIncludeDirectories="$(NCL_INCL);$(NCL_INCL2)"
 				PreprocessorDefinitions="NCL_CONST_FUNCS;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -122,7 +122,7 @@
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="false"
 				WholeProgramOptimization="true"
-				AdditionalIncludeDirectories="&quot;../../../../../../ncl-2.1/ncl&quot;;&quot;../../../../../../ncl-2.1&quot;"
+				AdditionalIncludeDirectories="$(NCL_INCL);$(NCL_INCL2)"
 				PreprocessorDefinitions="NCL_CONST_FUNCS;WIN32;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
@@ -208,8 +208,8 @@
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="false"
 				WholeProgramOptimization="true"
-				AdditionalIncludeDirectories="../../../ncl-2.0/src"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
+				AdditionalIncludeDirectories="$(NCL_INCL);$(NCL_INCL2)"
+				PreprocessorDefinitions="NCL_CONST_FUNCS;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="false"
 				EnableEnhancedInstructionSet="0"
@@ -288,8 +288,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="../../../ncl-2.0/src"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
+				AdditionalIncludeDirectories="$(NCL_INCL);$(NCL_INCL2)"
+				PreprocessorDefinitions="NCL_CONST_FUNCS;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -508,10 +508,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\topologylist.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\src\translatetable.cpp"
 				>
 			</File>
@@ -570,10 +566,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\src\hashdefines.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\src\individual.h"
 				>
 			</File>
@@ -627,10 +619,6 @@
 			</File>
 			<File
 				RelativePath="..\..\src\threaddcls.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\src\topologylist.h"
 				>
 			</File>
 			<File
