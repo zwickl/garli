@@ -481,12 +481,15 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 
 	//instantiate the clamanager and figure out how much memory to snatch
 	FLOAT_TYPE memToUse;
+	//this gives a bit of leeway in normal runs, when total mem usage may get significantly higher than the actual CLA usage
+	//but not much is used when just scoring/optimizing one tree
+	FLOAT_TYPE memUsageMult = ((conf->scoreOnly || conf->optimizeInputOnly) ? 1.05 : 1.25);
 	outman.UserMessage("NOTE: Unlike many programs, the amount of system memory that Garli will\nuse can be controlled by the user.");
 	if(conf->availableMemory > 0){
 		outman.UserMessage("(This comes from the availablememory setting in the configuration file.");
 		outman.UserMessage("Availablememory should NOT be set to more than the actual amount of ");
 		outman.UserMessage("physical memory that your computer has installed)");
-		memToUse=(FLOAT_TYPE)0.8*conf->availableMemory;
+		memToUse=(FLOAT_TYPE)(1.0/memUsageMult)*conf->availableMemory;
 		}
 	else{
 		outman.UserMessage("\nMemory to be used for conditional likelihood arrays specified as %.1f MB", conf->megsClaMemory);
@@ -494,7 +497,6 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		}
 		
 	const int KB = 1024;
-
 	double claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
 	int numNodesPerIndiv = dataPart->NTax()-2;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
@@ -504,8 +506,15 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	int L0=(int) (numNodesPerIndiv * total_size * 2);//a downward and one upward set for each tree
 	int L1=(int) (numNodesPerIndiv * total_size + 2*total_size + numNodesPerIndiv); //at least a downward set and a full root set for every tree, plus one other set
 	int L2=(int) (numNodesPerIndiv * 2.0 + 2*total_size);//a downward set for the best, one other full set and enough for each root direction
-	int L3=(int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size);//one full set, enough to reserve at least all of the full internals of the 
-													 //best indiv and enough for each root
+	int L3;
+	if(conf->scoreOnly || conf->optimizeInputOnly){
+		L3=(int) (numNodesPerIndiv * 1.0 + 2);//one full set plus a few extra
+		}
+	else{
+		L3=(int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size);//one full set, enough to reserve at least all of the full internals of the 
+															 //best indiv and enough for each root
+		}
+
 	if(maxClas >= L0){
 		numClas = min(maxClas, idealClas);
 		memLevel = 0;		
@@ -521,26 +530,32 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	outman.precision(4);
 	outman.UserMessage("\nFor this dataset:");
 	outman.UserMessage(" Mem level		availablememory setting");
-	outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNodeKB/(FLOAT_TYPE)KB)) * 1.25);
-	outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
-	outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
-	outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
-	outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25 );
+	outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNodeKB/(FLOAT_TYPE)KB)) * memUsageMult);
+	outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
+	outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
+	outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
+	outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult );
+
+	if(conf->scoreOnly || conf->optimizeInputOnly){
+		outman.UserMessage("\nNOTE: Less memory is required when scoring or optimizing fixed trees.\n\tminimum of %.0f availablememory would be required to search\n", ceil(((int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size)) * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
+		}
 
 	outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
 
-	outman.UserMessage("\nGarli will actually use approx. %.1f MB of memory", (1.0/0.8)*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
+	outman.UserMessage("\nGarli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
 
-	if(memLevel == 0)
-		outman.UserMessage("**Your memory level is: great (you don't need to change anything)**");
-	else if(memLevel == 1)
-		outman.UserMessage("**Your memory level is: good (you don't need to change anything)**");
-	else if(memLevel == 2)
-		outman.UserMessage("**Your memory level is: low\n\t(you may want to increase the availablememory setting)**");
-	else if(memLevel == 3)
-		outman.UserMessage("**Your memory level is: very low\n\t(if possible, you should increase the availablememory setting)**");
-	else if(memLevel == -1)
-		outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
+	if( ! (conf->scoreOnly || conf->optimizeInputOnly)){
+		if(memLevel == 0)
+			outman.UserMessage("**Your memory level is: great (you don't need to change anything)**");
+		else if(memLevel == 1)
+			outman.UserMessage("**Your memory level is: good (you don't need to change anything)**");
+		else if(memLevel == 2)
+			outman.UserMessage("**Your memory level is: low\n\t(you may want to increase the availablememory setting)**");
+		else if(memLevel == 3)
+			outman.UserMessage("**Your memory level is: very low\n\t(if possible, you should increase the availablememory setting)**");
+		else if(memLevel == -1)
+			outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
+		}
 	outman.UserMessage("\n#######################################################");
 /*
 	outman.precision(4);

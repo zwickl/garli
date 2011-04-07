@@ -113,7 +113,7 @@ void ClaManager::RecycleClas(){
 		if(numReclaimed==20) return;
 		}
 	if(numReclaimed==0){
-		throw(2);
+		throw ErrorException("Ran out of conditional likelihood arrays. This should not really happen, but try increasing availablememory setting");
 		}
 	assert(numReclaimed > 0);
 	}
