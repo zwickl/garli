@@ -17,7 +17,7 @@
 //
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
-#define PROGRAM_NAME "GARLI-PART"
+#define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION 2	
 #define MINOR_VERSION 0
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
@@ -73,6 +73,7 @@ int cuda_device_number=0;
 
 OutputManager outman;
 bool interactive;
+bool is64bit = false;
  
 vector<ClaSpecifier> claSpecs;
 vector<DataSubsetInfo> dataSubInfo;
@@ -104,7 +105,10 @@ std::string GetSvnDate(){
 	}
 
 void OutputVersion(){
-	outman.UserMessage("%s Version %d.%d.%s", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
+	if(is64bit)
+		outman.UserMessage("%s Version %d.%d.%s (64-bit)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
+	else
+		outman.UserMessage("%s Version %d.%d.%s (32-bit)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
 	}
 
 int CheckRestartNumber(const string str){
@@ -203,6 +207,13 @@ int main( int argc, char* argv[] )	{
 	#ifdef MPI_VERSION
 		MPIMain(argc, argv);
 	#endif
+
+	//I'm not sure that this is dependable or portable, but it is only for screen output, so isn't that important
+	int ptrSize = sizeof(int *);
+	if(ptrSize == 8)
+		is64bit = true;
+	else
+		is64bit = false;
 
 	string conf_name;
 
@@ -388,10 +399,15 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
 #endif
 #if defined(OPEN_MP)
-			outman.UserMessage("->OpenMP multithreaded version for multiple processors/cores<-");
+			outman.UserMessageNoCR("->OpenMP multithreaded version for multiple processors/cores");
 #elif !defined(SUBROUTINE_GARLI)
-			outman.UserMessage("->Single processor version<-\n");
+			outman.UserMessageNoCR("->Single processor version");
 #endif
+
+			if(is64bit)
+				outman.UserMessage(" for 64-bit OS<-");
+			else
+				outman.UserMessage(" for 32-bit OS<-");
 
 #ifdef SINGLE_PRECISION_FLOATS
 			outman.UserMessage("->Single precision floating point version<-\n");
