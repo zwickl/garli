@@ -855,11 +855,21 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 	if(this->modSpec->IsOrientedGap()){
 		if(!(blen1 < ZERO_POINT_ZERO)){
 			CalcOrientedGapPmat(blen1, pmat1);
+#ifdef SINGLE_PRECISION_FLOATS
+			ChangeMatrixPrecision(nstates * nstates * modSpec->numRateCats, pmat1, fpmat1);
+			mat1 = **fpmat1;
+#else
 			mat1 = **pmat1;
+#endif
 			}
 		if(!(blen2 < ZERO_POINT_ZERO)){
 			CalcOrientedGapPmat(blen2, pmat2);
+#ifdef SINGLE_PRECISION_FLOATS
+			ChangeMatrixPrecision(nstates * nstates * modSpec->numRateCats, pmat2, fpmat2);
+			mat2 = **fpmat2;
+#else
 			mat2 = **pmat2;
+#endif
 			}
 		}
 	else{
@@ -892,7 +902,7 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 	
 	}
 
-void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
+void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, MODEL_FLOAT ***&mat){
 
 	//insertion proportion only figures in at scoring
 	
@@ -4855,7 +4865,7 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 				if(space == string::npos)
 					throw ErrorException("Problem reading subset rate parameters from file.");
 				mod.erase(0, space + 1);
-				vector<double> ssr;
+				vector<FLOAT_TYPE> ssr;
 				NxsString val;
 				for(int m = 0;m < models.size();m++){
 					space = mod.find(" ");
@@ -4912,7 +4922,7 @@ void ModelPartition::FillGarliFormattedModelStrings(string &s) const{
 void ModelPartition::WriteModelPartitionCheckpoint(OUTPUT_CLASS &out) const {
 	//subsetProportions are data dependent, not free variables, so don't need to write
 	if(NumModelSets() > 1){
-		double *dummy = new FLOAT_TYPE;	
+		FLOAT_TYPE *dummy = new FLOAT_TYPE;	
 		for(int s = 0;s < NumSubsetRates();s++){
 			*dummy = subsetRates[s];
 			out.WRITE_TO_FILE(dummy, sizeof(FLOAT_TYPE), 1);

@@ -652,7 +652,7 @@ int main( int argc, char* argv[] )	{
 					data->CreateMatrixFromNCL(effectiveMatrices[dataChunk].first, effectiveMatrices[dataChunk].second);
 
 #ifdef SINGLE_PRECISION_FLOATS
-					if(modSpec->NState() || modSpec->NStateV()) throw ErrorException("Sorry, Mk/Mkv type models have not yet been tested with single precision.");
+					if(modSpec->IsMkTypeModel() || modSpec->IsOrientedGap()) throw ErrorException("Sorry, Mk/Mkv type models have not yet been tested with single precision.");
 #endif
 				
 					if(data->NChar() == 0){

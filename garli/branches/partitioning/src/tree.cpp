@@ -5152,7 +5152,7 @@ FLOAT_TYPE Tree::CountClasInUse(){
 	return inUse;
 	}
 
-void Tree::OutputSiteLikelihoods(int partNum, vector<double> &likes, const int *under1, const int *under2){
+void Tree::OutputSiteLikelihoods(int partNum, vector<FLOAT_TYPE> &likes, const int *under1, const int *under2){
 	//output level 1 is user-level output, just site nums and site likes
 	//output level 2 is for debugging, includes underflow multipliers and output of site likes in packed order
 	const SequenceData *data = dataPart->GetSubset(partNum);
