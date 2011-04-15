@@ -1306,15 +1306,21 @@ void Population::SeedPopulationWithStartingTree(int rep){
 
 	globalBest=bestFitness=prevBestFitness=indiv[0].Fitness();
 
+	//don't bother allocating any further indivs if we will only use one
+	if(conf->optimizeInputOnly || conf->scoreOnly)
+		return;
+
 #ifndef INPUT_RECOMBINATION
 	for(unsigned i=1;i<total_size;i++){
-		if(indiv[i].treeStruct==NULL) indiv[i].treeStruct=new Tree();
+		if(indiv[i].treeStruct == NULL) 
+			indiv[i].treeStruct = new Tree();
 		indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
 		indiv[i].treeStruct->modPart=&indiv[i].modPart;
 		}
 #else
 	for(unsigned i=1;i<conf->nindivs;i++){
-		if(indiv[i].treeStruct==NULL) indiv[i].treeStruct=new Tree();
+		if(indiv[i].treeStruct == NULL) 
+			indiv[i].treeStruct = new Tree();
 		indiv[i].CopySecByRearrangingNodesOfFirst(indiv[i].treeStruct, &indiv[0]);
 		indiv[i].treeStruct->modPart=&indiv[i].modPart;
 		}
@@ -1865,6 +1871,8 @@ void Population::Run(){
 				if(bImp < ZERO_POINT_ZERO && bImp > -1e-4)//avoid printing very slightly negative values
 					bImp = ZERO_POINT_ZERO;
 				outman.UserMessage("   Optimizing branchlengths... improved %8.3f lnL", bImp);
+				//This is important so that new better topos can be properly identified in the next gen!
+				adap->lastgenscore = BestFitness();
 				}
 
 			UpdateFractionDone(2);
@@ -3141,7 +3149,7 @@ void Population::OptimizeInputAndWriteSitelikelihoods(){
 	GarliReader & reader = GarliReader::GetInstance();
 	const NxsTreesBlock *treesblock = reader.GetTreesBlock(reader.GetTaxaBlock(0), reader.GetNumTreesBlocks(reader.GetTaxaBlock(0)) - 1);
 	if(treesblock == NULL || !strcmp(conf->streefname.c_str(), "random") || !strcmp(conf->streefname.c_str(), "stepwise"))
-		throw ErrorException("You must specify a treefile to use this runmode.");
+		throw ErrorException("You must specify a nexus treefile to use this runmode.");
 	int numTrees = treesblock->GetNumTrees();
 
 	string oname = conf->ofprefix + ".sitelikes.log";
