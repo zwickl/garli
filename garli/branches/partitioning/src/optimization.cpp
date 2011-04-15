@@ -1480,8 +1480,8 @@ if(nd->nodeNum == 8){
 		FLOAT_TYPE empD1, empD2;
 //		if(nd->nodeNum == 67 && nd->anc->nodeNum==96){// && nd->anc->nodeNum==12 && nd->next != NULL && nd->next->nodeNum==10){
 //			SetBranchLength(nd, 0.01);
-			CalcEmpiricalDerivatives(nd, empD1, empD2);
-			opt << empD1 << "\t" << empD2 << "\t" << nd->dlen + (-empD1/empD2) << "\t";
+//			CalcEmpiricalDerivatives(nd, empD1, empD2);
+//			opt << empD1 << "\t" << empD2 << "\t" << nd->dlen + (-empD1/empD2) << "\t";
 //			d1 = empD1;
 //			d2 = empD2;
 //			}

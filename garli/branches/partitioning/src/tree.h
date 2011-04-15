@@ -45,7 +45,7 @@ class ModelPartition;
 class Individual;
 extern rng rnd;
 
-#define RESCALE_ARRAY_LENGTH 60
+#define RESCALE_ARRAY_LENGTH 90
 
 class Tree{
 	protected:
@@ -83,6 +83,8 @@ class Tree{
 		static FLOAT_TYPE distanceSwapBias;
 		static unsigned rescaleEvery;
 		static FLOAT_TYPE rescaleBelow;
+		static FLOAT_TYPE reduceRescaleBelow;
+		static FLOAT_TYPE bailOutBelow;
 		static list<TreeNode *> nodeOptVector;
 		
 		static bool useOptBoundedForBlen;
@@ -93,10 +95,6 @@ class Tree{
 		static FLOAT_TYPE uniqueSwapPrecalc[500];
 		static FLOAT_TYPE distanceSwapPrecalc[1000];
 		static FLOAT_TYPE expectedPrecision;
-//DEBUG		
-//		static FLOAT_TYPE rescalePrecalcThresh[30];
-//		static FLOAT_TYPE rescalePrecalcMult[30];
-//		static int rescalePrecalcIncr[30];
 
 		static FLOAT_TYPE rescalePrecalcThresh[RESCALE_ARRAY_LENGTH];
 		static FLOAT_TYPE rescalePrecalcMult[RESCALE_ARRAY_LENGTH];
