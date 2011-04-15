@@ -98,9 +98,12 @@ void ClaManager::RecycleClas(){
 				numReclaimed++;
 				}
 			}
-		if(memLevel<2) if(numReclaimed>50) return;
+		if(memLevel < 2) 
+			if(numReclaimed > 50) 
+				return;
 		}
-	if(numReclaimed>10) return;
+	if(numReclaimed > 10) 
+		return;
 	for(int i=0;i<numHolders;i++){
 		if(holders[i].theSet != NULL){
 			if((holders[i].GetReclaimLevel() == 1 && holders[i].tempReserved == false && holders[i].reserved == false)){
@@ -110,7 +113,8 @@ void ClaManager::RecycleClas(){
 				numReclaimed++;
 				}
 			}
-		if(numReclaimed==20) return;
+		if(numReclaimed == 20) 
+			return;
 		}
 	if(numReclaimed==0){
 		throw ErrorException("Ran out of conditional likelihood arrays. This should not really happen, but try increasing availablememory setting");

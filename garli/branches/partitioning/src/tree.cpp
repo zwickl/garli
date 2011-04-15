@@ -87,6 +87,8 @@ list<TreeNode *> Tree::nodeOptVector;
 const DataPartition *Tree::dataPart;
 unsigned Tree::rescaleEvery;
 FLOAT_TYPE Tree::rescaleBelow;
+FLOAT_TYPE Tree::reduceRescaleBelow;
+FLOAT_TYPE Tree::bailOutBelow;
 FLOAT_TYPE Tree::treeRejectionThreshold;
 vector<Constraint> Tree::constraints;
 AttemptedSwapList Tree::attemptedSwaps;
@@ -135,10 +137,13 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 #ifdef SINGLE_PRECISION_FLOATS
 	Tree::rescaleEvery = 6;
 	Tree::rescaleBelow = exp(-1.0f); //this is 0.368
+	Tree::reduceRescaleBelow = 1.0e-30; 
+	Tree::bailOutBelow = 1.0e-30; 
+	FLOAT_TYPE maxMult = 1.0 / bailOutBelow;
 	for(int i=0;i<30;i++){
 		Tree::rescalePrecalcIncr[i] = i*3 - (int) log(rescaleBelow);
 		Tree::rescalePrecalcThresh[i] = exp((FLOAT_TYPE)(-rescalePrecalcIncr[i]));
-		Tree::rescalePrecalcMult[i] =  exp((FLOAT_TYPE)(rescalePrecalcIncr[i]));
+		Tree::rescalePrecalcMult[i] =  max(exp((FLOAT_TYPE)(rescalePrecalcIncr[i])), maxMult);
 		}
 		
 	FLOAT_TYPE minVal = 1.0e-10f;
@@ -146,10 +151,13 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 #else
 	Tree::rescaleEvery=16;
 	Tree::rescaleBelow = exp(-24.0); //this is 1.026e-10
+	Tree::reduceRescaleBelow = 1.0e-190; 
+	Tree::bailOutBelow = 1.0e-250;
+	FLOAT_TYPE maxMult = 1.0 / bailOutBelow;
 	for(int i=0;i<RESCALE_ARRAY_LENGTH;i++){
 		Tree::rescalePrecalcIncr[i] = i*7 - (int) log(rescaleBelow);
 		Tree::rescalePrecalcThresh[i] = exp((FLOAT_TYPE)(-rescalePrecalcIncr[i]));
-		Tree::rescalePrecalcMult[i] =  exp((FLOAT_TYPE)(rescalePrecalcIncr[i]));
+		Tree::rescalePrecalcMult[i] =  min(exp((FLOAT_TYPE)(rescalePrecalcIncr[i])), maxMult);
 		}	
 		
 	FLOAT_TYPE minVal = 1.0e-20;
@@ -3302,35 +3310,27 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA, int dataIndex){
 					}
 	#endif
 #endif
-#ifdef SINGLE_PRECISION_FLOATS
-				assert(large1 < 1e5);
+
 				if(large1 < rescaleBelow){
-					if(large1 < 1e-30f){//DEBUG
-						outman.UserMessage("RESCALE REDUCED");
-						throw(1);
-						}
-					int index=0;
-					while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
-						index++;
-						}
-					int incr = Tree::rescalePrecalcIncr[index];
-					underflow_mult[i]+=incr;
-					FLOAT_TYPE mult=Tree::rescalePrecalcMult[index];
-					assert(large1 * mult < 1.0f);
-					assert(large1 * mult > 0.01f);
-					for(int r=0;r<nRateCats;r++){
-						for(int q=0;q<4;q++){
-							destination[r*4 + q]*=mult;
-							assert(destination[r*4 +q] == destination[r*4 +q]);
-							assert(destination[r*4 +q] < 1);
+					//we aren't rescaling enough
+					if(large1 < reduceRescaleBelow){
+						//but the frequency can be increased.  throw out of here, reduce the rescaleEvery and try scoring again
+						if(rescaleEvery > 2){
+							outman.UserMessage("WARNING: Increasing rescaling frequency (site = %d L = %g data = %d)", i, large1, dataIndex);
+							throw(1);
+							}
+						//uh oh, we must have already reduced rescale as far as possible, and it still isn't enough.  Bail out.
+						else if(large1 < bailOutBelow){
+							outman.UserMessage("Can't rescale sufficiently, exiting (site = %d L = %g data = %d)", i, large1, dataIndex);
+							outman.UserMessage("You might try providing a better starting tree, or checking the accuracy of your alignment");
+							throw(1);
+							}
+						//we can't rescale any more frequently, but we're not yet at critical levels
+						else{
+							outman.UserMessage("WARNING: Can't increase rescaling further (site = %d L = %g data = %d)", i, large1, dataIndex);
 							}
 						}
-					}
-#else	//double precison
-				if(large1< rescaleBelow){
-					if(large1 < 1e-190){
-						throw(1);
-						}
+						
 					int index = 0;
 					while(((index + 1) < RESCALE_ARRAY_LENGTH) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
 						index++;
@@ -3339,12 +3339,8 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA, int dataIndex){
 					underflow_mult[i]+=incr;
 					FLOAT_TYPE mult=Tree::rescalePrecalcMult[index];
 					assert(large1 * mult < 1.0);
-					assert(large1 * mult > 0.0008);
-		
-		/*			int incr=((int) -log(large1))+2;
-					underflow_mult[i]+=incr;
-					FLOAT_TYPE mult=exp((FLOAT_TYPE)incr);
-		*/			for(int r=0;r<nRateCats;r++){
+					
+					for(int r=0;r<nRateCats;r++){
 						for(int q=0;q<4;q++){
 							destination[r*4 + q]*=mult;
 							assert(destination[r*4 +q] == destination[r*4 +q]);
@@ -3352,7 +3348,6 @@ void Tree::RescaleRateHet(CondLikeArray *destCLA, int dataIndex){
 							}
 						}
 					}
-#endif //end of ifdef(SINGLE_PRECISION_FLOATS)
 
 				destination+= 4*nRateCats;
 	#ifdef ALLOW_SINGLE_SITE
@@ -3422,56 +3417,46 @@ void Tree::RescaleRateHetNState(CondLikeArray *destCLA, int dataIndex){
 				}
 #endif
 
-#ifdef SINGLE_PRECISION_FLOATS
-			assert(large1 < 1.0e10f);
-			if(large1< rescaleBelow){
-				if(large1 < 1e-30f){
-					outman.UserMessage("RESCALE REDUCED");
-					throw(1);
+			if(large1 < rescaleBelow){
+				//we aren't rescaling enough
+				if(large1 < reduceRescaleBelow){
+					 //but the frequency can be increased.  throw out of here, reduce the rescaleEvery and try scoring again
+					if(rescaleEvery > 2){
+						outman.UserMessage("WARNING: Increasing rescaling frequency (site = %d L = %g data = %d)", i, large1, dataIndex);
+						throw(1);
+						}
+					//uh oh, we must have already reduced rescale as far as possible, and it still isn't enough.  Bail out.
+					else if(large1 < bailOutBelow){
+						//poor blens can very rarely kill a gap model
+						if(someOrientedGap)
+							throw(UnscoreableException());
+						else{
+							outman.UserMessage("Can't rescale sufficiently, exiting (site = %d L = %g data = %d)", i, large1, dataIndex);
+							outman.UserMessage("You might try providing a better starting tree, or checking the accuracy of your alignment");
+							throw(1);
+							}
+						}
+					//we can't rescale any more frequently, but we're not yet at critical levels
+					else{
+						outman.UserMessage("WARNING: Can't increase rescaling further (site = %d L = %g data = %d)", i, large1, dataIndex);
+						}
 					}
-				int index=0;
-				while(((index + 1) < 30) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
+					
+				int index = 0;
+				while(((index + 1) < RESCALE_ARRAY_LENGTH) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
 					index++;
 					}
 				int incr = Tree::rescalePrecalcIncr[index];
 				underflow_mult[i]+=incr;
-				FLOAT_TYPE mult= Tree::rescalePrecalcMult[index];
-				assert(large1 * mult < 10.0f);
-				assert(large1 * mult > 0.01f);
+				FLOAT_TYPE mult=Tree::rescalePrecalcMult[index];
+				assert(large1 * mult < 1.0);
+
 				for(int q=0;q<nstates*nRateCats;q++){
 					destination[q]*=mult;
 					assert(destination[q] == destination[q]);
+					assert(destination[q] < 1.0e5);
 					}
 				}
-#else
-			assert(large1 < 1.0e15);
-			if(large1< rescaleBelow){
-				if(large1 < 1e-190){
-					//poor blens can very rarely kill a gap model
-					if(someOrientedGap)
-						throw(UnscoreableException());
-					else
-						throw(1);
-					}
-				else{
-					int index = 0;
-					while(((index + 1) < RESCALE_ARRAY_LENGTH) && (Tree::rescalePrecalcThresh[index + 1] > large1)){
-						index++;
-						}
-					int incr = Tree::rescalePrecalcIncr[index];
-					underflow_mult[i]+=incr;
-					FLOAT_TYPE mult=Tree::rescalePrecalcMult[index];
-					assert(large1 * mult < 1.0);
-					assert(large1 * mult > 0.0008);						
-
-					for(int q=0;q<nstates*nRateCats;q++){
-						destination[q]*=mult;
-						assert(destination[q] == destination[q]);
-						assert(destination[q] < 1.0e5);
-						}
-					}
-				}
-#endif
 			destination+= nstates*nRateCats;
 #ifdef ALLOW_SINGLE_SITE
 			if(siteToScore > -1) break;
@@ -3574,7 +3559,7 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool returnU
 			destCLA=GetClaUpLeft(nd, false);
 
 		UpdateCLAs(destCLA, LCLA, RCLA, Lchild, Rchild, blen1, blen2);
-		}
+				}
 	
 	if(direction==ROOT){
 		//at the root we need to include the contributions of 3 branches.  Check if we have a
@@ -4900,55 +4885,47 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int mod
 	int rateCats = modPart->GetModel(modIndex)->NRateCats();
 	int index=nstates * rateCats * site;
 
-	//this version outputs the indeces even for dirty clas
+	bool outputDirtyClas = false;
+
 	if(nd->IsInternal()){
-		deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
 		if(claMan->IsDirty(nd->claIndexDown) == false){
+			deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
 			const CondLikeArray *cla = claMan->GetCla(nd->claIndexDown)->theSets[modIndex];
 			for(int i=0;i<nstates*rateCats;i++) 
 				deb << cla->arr[index+i] << "\t";
 			deb << cla->underflow_mult[site];
+			deb <<"\n";
 			}
-		deb << "\n";
+		else if(outputDirtyClas){
+			deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\n";
+			}
 		}
 	if(nd->IsInternal()){
-		deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
 		if(claMan->IsDirty(nd->claIndexUL) == false){
+			deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
 			const CondLikeArray *cla = claMan->GetCla(nd->claIndexUL)->theSets[modIndex];
 			for(int i=0;i<nstates*rateCats;i++) 
 				deb << cla->arr[index+i] << "\t";
 			deb << cla->underflow_mult[site];
+			deb <<"\n";
 			}
-		deb <<"\n";
+		else if(outputDirtyClas){
+			deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\n";
+			}
 		}
 	if(nd->IsInternal()){
-		deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
 		if(claMan->IsDirty(nd->claIndexUR) == false){
+			deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
 			const CondLikeArray *cla = claMan->GetCla(nd->claIndexUR)->theSets[modIndex];
 			for(int i=0;i<nstates*rateCats;i++) 
 				deb << cla->arr[index+i] << "\t";
 			deb << cla->underflow_mult[site];
+			deb <<"\n";
 			}
-		deb <<"\n";
+		else if(outputDirtyClas){			
+			deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\n";
+			}
 		}
-
-	//this version only outputs clean clas
-/*	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexDown) == false){
-		deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
-		for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexDown)->arr[index+i] << "\t";
-		deb << claMan->GetCla(nd->claIndexDown)->underflow_mult[site] <<"\n";
-		}
-	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexUL) == false){
-		deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
-		for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexUL)->arr[index+i] << "\t";
-		deb << claMan->GetCla(nd->claIndexUL)->underflow_mult[site] <<"\n";
-		}
-	if(nd->IsInternal() && claMan->IsDirty(nd->claIndexUR) == false){
-		deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
-		for(int i=0;i<nstates*mod->NRateCats();i++) deb << claMan->GetCla(nd->claIndexUR)->arr[index+i] << "\t";
-		deb << claMan->GetCla(nd->claIndexUR)->underflow_mult[site] <<"\n";
-		}
-*/
 	if(nd->IsInternal())
 		OutputNthClaAcrossTree(deb, nd->left, site, modIndex);
 	if(nd->next!=NULL)
