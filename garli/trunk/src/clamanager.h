@@ -125,6 +125,7 @@ class ClaManager{
 	void FillHolder(int index, int dir); //sorry Mark
 
 	int GetReclaimLevel(int index);
+	void SetReclaimLevel(int index, int lvl);
 	int GetNumAssigned(int index) {return holders[index].numAssigned;}
 	void ReserveCla(int index, bool temp=true);
 	void ClearTempReservation(int index) {holders[index].tempReserved=false;}
@@ -162,6 +163,14 @@ class ClaManager{
 	inline int ClaManager::GetReclaimLevel(int index){
 		if(holders[index].theSet == NULL) return -1;
 		return holders[index].GetReclaimLevel();
+		}
+
+	inline void ClaManager::SetReclaimLevel(int index, int lvl){
+		assert(index > -1);
+		if(holders[index].theSet == NULL) 
+			assert(0);
+			//return;
+		holders[index].SetReclaimLevel(lvl);
 		}
 
 	inline void ClaManager::ReserveCla(int index, bool temp/*=true*/){
