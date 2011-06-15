@@ -1067,10 +1067,14 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 			charset.insert(i);
 		}
 
+
+	//deal with any exclusions
 	NxsUnsignedSet excluded = charblock->GetExcludedIndexSet();
 	NxsUnsignedSet *realCharSet = & charset;
 	NxsUnsignedSet charsetMinusExcluded;
 	if (!excluded.empty()) {
+		string exsetName = NxsSetReader::GetSetAsNexusString(excluded);
+		outman.UserMessage("Excluded characters: %s\n\t", exsetName.c_str());
 		set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
 		realCharSet = &charsetMinusExcluded;
 	}	
@@ -1089,9 +1093,12 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 
 	NxsUnsignedSet consts;
 	NxsUnsignedSet missing;
-	for(NxsUnsignedSet::iterator cit = realCharSet->begin(); cit != realCharSet->end();){
+	for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();){
 		unsigned num = *cit;
 		cit++;
+		//this gets the actual number of observed states, not including gaps or ?'s -,
+		//but, there are no gaps in standard data (or 0/1), so only options are #'s and ?'s
+		//ns = 1 are chars that are potentially constant (i.e., 0000, 1111, 000?, 111? etc)
 		int ns = charblock->GetObsNumStates(num, false);
 		if(ns == 1)
 			consts.insert(num);
@@ -1117,16 +1124,21 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 		outman.UserMessage("\tNOTE: entirely missing characters removed from matrix: %s", str.c_str());
 		}
 
-	//verify that we're not breaking the assumptions of these datatypes
+	//verify that we're not breaking the assumptions of these datatypes.  Anything entering here
+	//is potentially constant, ignoring the effect of ambiguity.  This is never ok with Mkv, because
+	//we don't know how many states the ? might resolve to.  With binary no zeros this is ok if
+	//there is ambiguity, in which case minStates == 1 and maxStates == 2
 	if(consts.size() > 0 && (datatype == ONLY_VARIABLE || datatype == BINARY_NOT_ALL_ZEROS)){
 		string c = NxsSetReader::GetSetAsNexusString(consts);
 		if(datatype == BINARY_NOT_ALL_ZEROS){
 			for(NxsUnsignedSet::iterator cit = consts.begin(); cit != consts.end();){
 				int num = *cit;
 				cit++;
-				std::set<NxsDiscreteStateCell> states = charblock->GetNamedStateSetOfColumn(num);
-				assert(states.size() == 1);
-				if(states.find(0) == states.end())
+				std::set<NxsDiscreteStateCell> minStates = charblock->GetNamedStateSetOfColumn(num);
+				std::set<NxsDiscreteStateCell> maxStates = charblock->GetMaximalStateSetOfColumn(num);
+				assert(minStates.size() == 1);
+				assert(maxStates.size() <= 2);
+				if(maxStates.find(1) != maxStates.end())
 					consts.erase(num);
 				}
 			if(consts.size() > 0){
@@ -1136,7 +1148,8 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 			}
 		else{
 			string c = NxsSetReader::GetSetAsNexusString(consts);
-			throw ErrorException("Constant characters are not allowed when using the Mkv\n\tmodel (as opposed to Mk), because it assumes that all\n\tcharacters are variable.  Change to datatype = standard\n\tor exclude them by adding this to your nexus datafile:\nbegin assumptions;\nexset * const = %s;\nend;", c.c_str());
+			string title = charblock->GetTitle();
+			throw ErrorException("Constant characters are not allowed when using the Mkv model\n\t(as opposed to Mk), because it assumes that all characters\n\tare variable.  Ambiguity does not count as a state.\n\tChange to datatype = standard or exclude them by adding this\n\tto your nexus datafile:\nbegin assumptions;\nlink characters='%s';\nexset * const = %s;\nend;", title.c_str(), c.c_str());
 			}
 		}
 	//maxNumStates = 2 here is only so that the message is output when creating the first standard matrix

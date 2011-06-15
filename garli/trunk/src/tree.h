@@ -45,7 +45,7 @@ class ModelPartition;
 class Individual;
 extern rng rnd;
 
-#define RESCALE_ARRAY_LENGTH 60
+#define RESCALE_ARRAY_LENGTH 90
 
 class Tree{
 	protected:
@@ -83,6 +83,8 @@ class Tree{
 		static FLOAT_TYPE distanceSwapBias;
 		static unsigned rescaleEvery;
 		static FLOAT_TYPE rescaleBelow;
+		static FLOAT_TYPE reduceRescaleBelow;
+		static FLOAT_TYPE bailOutBelow;
 		static list<TreeNode *> nodeOptVector;
 		
 		static bool useOptBoundedForBlen;
@@ -93,10 +95,6 @@ class Tree{
 		static FLOAT_TYPE uniqueSwapPrecalc[500];
 		static FLOAT_TYPE distanceSwapPrecalc[1000];
 		static FLOAT_TYPE expectedPrecision;
-//DEBUG		
-//		static FLOAT_TYPE rescalePrecalcThresh[30];
-//		static FLOAT_TYPE rescalePrecalcMult[30];
-//		static int rescalePrecalcIncr[30];
 
 		static FLOAT_TYPE rescalePrecalcThresh[RESCALE_ARRAY_LENGTH];
 		static FLOAT_TYPE rescalePrecalcMult[RESCALE_ARRAY_LENGTH];
@@ -346,7 +344,7 @@ class Tree{
 		void OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int modIndex);
 		void ClaReport(ofstream &cla);
 		FLOAT_TYPE CountClasInUse();
-		void OutputSiteLikelihoods(int partnum, vector<double> &likes, const int *under1, const int *under2);
+		void OutputSiteLikelihoods(int partnum, vector<FLOAT_TYPE> &likes, const int *under1, const int *under2);
 		void OutputSiteDerivatives(int partNum, vector<double> &likes, vector<double> &d1s, vector<double> &d2s, const int *under1, const int *under2, ofstream &ordered, ofstream &packed);
 		void CountNumReservedClas(int &, int &, int&);
 		void CheckClaAssignments(TreeNode *nd);
@@ -379,7 +377,7 @@ class Tree{
 		int NodeToNodeDistance(int num1, int num2);
 		int NodesToRoot(TreeNode *nd);
 		void SampleBlenCurve(TreeNode *nd, ofstream &out);
-		void CalcEmpiricalDerivatives(TreeNode *nd, double &D1, double &D2);
+		void CalcEmpiricalDerivatives(TreeNode *nd, FLOAT_TYPE &D1, FLOAT_TYPE &D2);
 		void SetDistanceBasedBranchLengthsAroundNode(TreeNode *nd);
 		void FindNearestTerminalUp(TreeNode *start, TreeNode *&, FLOAT_TYPE &dist);
 		void FindNearestTerminalsDown(TreeNode *start, TreeNode *from, TreeNode *&term1, TreeNode *&term2, FLOAT_TYPE &dist1, FLOAT_TYPE &dist2);
@@ -695,7 +693,7 @@ void Tree::TraceParameterLikelihood(ofstream &out, int which, FLOAT_TYPE prevVal
 template<class T>
 FLOAT_TYPE Tree::OptimizeBoundedParameter(FLOAT_TYPE optPrecision, FLOAT_TYPE prevVal, int which, FLOAT_TYPE lowBound, FLOAT_TYPE highBound, T *obj, void (T::*SetParam)(int, FLOAT_TYPE)){
 
-	FLOAT_TYPE epsilon = min(optPrecision, 1.0e-5);
+	FLOAT_TYPE epsilon = min(optPrecision, (FLOAT_TYPE) 1.0e-5);
 
 	assert(prevVal > lowBound - epsilon && prevVal < highBound + epsilon);
 

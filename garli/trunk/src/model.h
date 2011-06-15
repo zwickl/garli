@@ -1168,7 +1168,7 @@ class Model{
 	void CalcDerivativesOrientedGap(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
 	void OutputPmats(ofstream &deb);
 	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pr);
-	void CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat);
+	void CalcOrientedGapPmat(FLOAT_TYPE blen, MODEL_FLOAT ***&mat);
 	void UpdateQMat();
 	void UpdateQMatCodon();
 	void CalcSynonymousBranchlengthProportions(vector<FLOAT_TYPE> &results);
