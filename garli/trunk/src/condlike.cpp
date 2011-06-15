@@ -117,7 +117,12 @@ void ClaManager::RecycleClas(){
 			return;
 		}
 	if(numReclaimed==0){
-		throw ErrorException("Ran out of conditional likelihood arrays. This should not really happen, but try increasing availablememory setting");
+		//I changed this for some reason in r1030 (April 7, 2011, which means that it was in the 2.0 release) to the ErrorException, 
+		//which I should not have.  Throwing 2 will dirty the entire tree, which needs to happen in some cases when there are too many
+		//CLAs in use during blen opt and certain memlevels are in effect. The error throw was causing it to bail when it shouldn't have.  
+		//Reverting this June 15, 2011
+		throw(2);
+		//throw ErrorException("Ran out of conditional likelihood arrays. This should not really happen, but try increasing availablememory setting");
 		}
 	assert(numReclaimed > 0);
 	}

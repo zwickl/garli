@@ -1480,8 +1480,8 @@ if(nd->nodeNum == 8){
 		FLOAT_TYPE empD1, empD2;
 //		if(nd->nodeNum == 67 && nd->anc->nodeNum==96){// && nd->anc->nodeNum==12 && nd->next != NULL && nd->next->nodeNum==10){
 //			SetBranchLength(nd, 0.01);
-			CalcEmpiricalDerivatives(nd, empD1, empD2);
-			opt << empD1 << "\t" << empD2 << "\t" << nd->dlen + (-empD1/empD2) << "\t";
+//			CalcEmpiricalDerivatives(nd, empD1, empD2);
+//			opt << empD1 << "\t" << empD2 << "\t" << nd->dlen + (-empD1/empD2) << "\t";
 //			d1 = empD1;
 //			d2 = empD2;
 //			}
@@ -2419,10 +2419,10 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	FLOAT_TYPE D2a, D2c, D2g, D2t;
 	FLOAT_TYPE unscaledlnL;
 
-	vector<double> siteLikes(nchar);
+	vector<FLOAT_TYPE> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s(nchar);
-	vector<double> siteD2s(nchar);
+	vector<FLOAT_TYPE> siteD1s(nchar);
+	vector<FLOAT_TYPE> siteD2s(nchar);
 #endif
 
 #ifdef OMP_TERMDERIV
@@ -2603,10 +2603,10 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	FLOAT_TYPE conditioningD2Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE probVariable = ZERO_POINT_ZERO;
 
-	vector<double> siteLikes(nchar);
+	vector<FLOAT_TYPE> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s(nchar);
-	vector<double> siteD2s(nchar);
+	vector<FLOAT_TYPE> siteD1s(nchar);
+	vector<FLOAT_TYPE> siteD2s(nchar);
 #endif
 
 	if(nRateCats == 1){
@@ -2873,10 +2873,10 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 	FLOAT_TYPE conditioningD2Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE probVariable = ZERO_POINT_ZERO;
 
-	vector<double> siteLikes(nchar);
+	vector<FLOAT_TYPE> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s(nchar);
-	vector<double> siteD2s(nchar);
+	vector<FLOAT_TYPE> siteD1s(nchar);
+	vector<FLOAT_TYPE> siteD2s(nchar);
 #endif
 
 #ifdef OMP_TERMDERIV_NSTATE
@@ -3074,10 +3074,10 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	FLOAT_TYPE Ra, Rc, Rg, Rt;
 	FLOAT_TYPE unscaledlnL=ZERO_POINT_ZERO;
 
-	vector<double> siteLikes(nchar);
+	vector<FLOAT_TYPE> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s(nchar);
-	vector<double> siteD2s(nchar);
+	vector<FLOAT_TYPE> siteD1s(nchar);
+	vector<FLOAT_TYPE> siteD2s(nchar);
 #endif
 
 #ifdef OMP_INTDERIV
@@ -3245,10 +3245,10 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	FLOAT_TYPE conditioningD2Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE probVariable = ZERO_POINT_ZERO;
 
-	vector<double> siteLikes(nchar);
+	vector<FLOAT_TYPE> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s(nchar);
-	vector<double> siteD2s(nchar);
+	vector<FLOAT_TYPE> siteD1s(nchar);
+	vector<FLOAT_TYPE> siteD2s(nchar);
 #endif
 
 #ifdef OMP_INTDERIV_NSTATE
@@ -3440,10 +3440,10 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	FLOAT_TYPE conditioningD2Sum = ZERO_POINT_ZERO;
 	FLOAT_TYPE probVariable = ZERO_POINT_ZERO;
 
-	vector<double> siteLikes(nchar);
+	vector<FLOAT_TYPE> siteLikes(nchar);
 #ifdef OUTPUT_SITEDERIVS
-	vector<double> siteD1s(nchar);
-	vector<double> siteD2s(nchar);
+	vector<FLOAT_TYPE> siteD1s(nchar);
+	vector<FLOAT_TYPE> siteD2s(nchar);
 #endif
 
 #ifdef OMP_INTDERIV_NSTATE

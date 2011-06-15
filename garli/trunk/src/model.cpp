@@ -855,11 +855,21 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 	if(this->modSpec->IsOrientedGap()){
 		if(!(blen1 < ZERO_POINT_ZERO)){
 			CalcOrientedGapPmat(blen1, pmat1);
+#ifdef SINGLE_PRECISION_FLOATS
+			ChangeMatrixPrecision(nstates * nstates * modSpec->numRateCats, pmat1, fpmat1);
+			mat1 = **fpmat1;
+#else
 			mat1 = **pmat1;
+#endif
 			}
 		if(!(blen2 < ZERO_POINT_ZERO)){
 			CalcOrientedGapPmat(blen2, pmat2);
+#ifdef SINGLE_PRECISION_FLOATS
+			ChangeMatrixPrecision(nstates * nstates * modSpec->numRateCats, pmat2, fpmat2);
+			mat2 = **fpmat2;
+#else
 			mat2 = **pmat2;
+#endif
 			}
 		}
 	else{
@@ -892,7 +902,7 @@ void Model::CalcPmats(FLOAT_TYPE blen1, FLOAT_TYPE blen2, FLOAT_TYPE *&mat1, FLO
 	
 	}
 
-void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, FLOAT_TYPE ***&mat){
+void Model::CalcOrientedGapPmat(FLOAT_TYPE blen, MODEL_FLOAT ***&mat){
 
 	//insertion proportion only figures in at scoring
 	
@@ -4855,7 +4865,7 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 				if(space == string::npos)
 					throw ErrorException("Problem reading subset rate parameters from file.");
 				mod.erase(0, space + 1);
-				vector<double> ssr;
+				vector<FLOAT_TYPE> ssr;
 				NxsString val;
 				for(int m = 0;m < models.size();m++){
 					space = mod.find(" ");
@@ -4888,7 +4898,7 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 		outman.UserMessage("\nProper format for specification of model parameters in the partitioned\nversion is as follows. Neither subset rates nor all models are required to\nappear. Line breaks are ignored, but the string must be terminated with a \";\".\nThe first model is M1. Omit the <>'s in the following.");
 		outman.UserMessage("\n\nS <subset rate 1> <subset rate 2> <etc.>\nM<first model number> <garli formatted param string for model>\nM<second model number>  <garli formatted param string for model>\n <etc.> ;");
 		outman.UserMessage("\nExample for 3 models:\nS  0.551458  0.302705  2.145837\nM1 r 1.959444 2.571568 1.406484 1.406484 3.725263 e 0.310294 0.176855 0.297080 0.215771 a 0.410964\nM2 r 4.366321 7.061605 1.603498 7.061605 4.366321 e 0.269302 0.163670 0.160508 0.406520 a 0.361294\nM3 r 1.000000 4.908101 3.372480 0.457829 4.908101 e 0.156505 0.353697 0.287843 0.201954 a 4.098323 p 0.034152;");
-		outman.UserMessage("\nWhen there is only one model (i.e., unpartitioned analyses), the \"M0\" part\nthat indicates the model number need not appear.");
+		outman.UserMessage("\nWhen there is only one model (i.e., unpartitioned analyses), the \"M1\" part\nthat indicates the model number need not appear.");
 		throw mess;
 		}
 	}
@@ -4912,7 +4922,7 @@ void ModelPartition::FillGarliFormattedModelStrings(string &s) const{
 void ModelPartition::WriteModelPartitionCheckpoint(OUTPUT_CLASS &out) const {
 	//subsetProportions are data dependent, not free variables, so don't need to write
 	if(NumModelSets() > 1){
-		double *dummy = new FLOAT_TYPE;	
+		FLOAT_TYPE *dummy = new FLOAT_TYPE;	
 		for(int s = 0;s < NumSubsetRates();s++){
 			*dummy = subsetRates[s];
 			out.WRITE_TO_FILE(dummy, sizeof(FLOAT_TYPE), 1);
