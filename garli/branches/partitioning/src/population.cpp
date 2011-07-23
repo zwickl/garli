@@ -418,19 +418,17 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	//set two model statics
 	Model::mutationShape = conf->gammaShapeModel;
 
-	//PARTITION
-	//Model::SetCode(static_cast<CodonData*>(data)->GetCode());
-	//DEBUG - code won't be able to be static anymore in the future, since it might vary among model/partition subsets
-	//for now check for different codes (in a very convoluted way) and crap out if necessary
+	//check and warn if different codes have been selected for different subsets - this is experimental
 	for(vector<ClaSpecifier>::iterator c = claSpecs.begin();c != claSpecs.end();c++){
 		if(modSpecSet.GetModSpec((*c).modelIndex)->IsCodon()){
 			for(vector<ClaSpecifier>::iterator c2 = c+1;c2 != claSpecs.end();c2++){
 				if(modSpecSet.GetModSpec((*c2).modelIndex)->IsCodon()){
-					if(modSpecSet.GetModSpec((*c).modelIndex)->geneticCode != modSpecSet.GetModSpec((*c2).modelIndex)->geneticCode)
-						throw ErrorException("Sorry, partitioned models with multiple genetic codes are not yet implemented");
+					if(modSpecSet.GetModSpec((*c).modelIndex)->geneticCode != modSpecSet.GetModSpec((*c2).modelIndex)->geneticCode){
+						outman.UserMessage("\n################\nWARNING: Different genetic codes have been specified among partition subsets.");
+						outman.UserMessage("This is experimental - check your results carefully!!!\n################\n");
+						}
 					}
 				}
-			Model::SetCode(static_cast<CodonData*>(dataPart->GetSubset((*c).dataIndex))->GetCode());
 			}
 		}
 

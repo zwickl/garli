@@ -1120,8 +1120,12 @@ class Model{
 	MODEL_FLOAT ***deriv1, ***deriv2;
 
 	//this will be a little bigger than necessary with some codes, but dynamically allocating a static is a bit of a pain
-	static int qmatLookup[62*62];
-	static GeneticCode *code;
+	//Making these no longer static, to allow different codes for different
+	//partition subsets
+	//static int qmatLookup[62*62];
+	//static GeneticCode *code;
+	int qmatLookup[62*62];
+	GeneticCode *code;
 
 	public:
 //	static bool noPinvInModel;
@@ -1135,6 +1139,7 @@ class Model{
 	~Model();
 
 	Model(int num){
+        code = NULL;
 		stateFreqs.reserve(4);
 		relNucRates.reserve(6);
 		paramsToMutate.reserve(5);
@@ -1150,8 +1155,8 @@ class Model{
 	const vector<BaseParameter *> *GetMutableParameters(){return &paramsToMutate;}
 	int PerformModelMutation();
 	void CreateModelFromSpecification(int);
-	static void SetCode(GeneticCode *c){
-		Model::code = c;
+	void SetCode(GeneticCode *c){
+		code = c;
 		FillQMatLookup();
 		}
 	const ModelSpecification *GetCorrespondingSpec() const {return modSpec;}
@@ -1192,7 +1197,7 @@ class Model{
 	void OutputAminoAcidRMatrixMessage(ostream &out);
 
 	void ReadBinaryFormattedModel(FILE *);
-	static void FillQMatLookup();
+	void FillQMatLookup();
 	void SetJonesAAFreqs();
 	void SetMtMamAAFreqs();
 	void SetMtRevAAFreqs();
@@ -1248,7 +1253,7 @@ class Model{
 	FLOAT_TYPE IndelGamma(FLOAT_TYPE blen) const {return (DeleteRate() / (InsertRate() + DeleteRate()) * (1.0 - exp(-(InsertRate() + DeleteRate()) * blen)));}
 
 	//Setting things
-	void SetDefaultModelParameters(const SequenceData *data);
+	void SetDefaultModelParameters(SequenceData *data);
 	void SetRmat(FLOAT_TYPE *r, bool checkValidity, bool renormalize){
 		if(checkValidity == true && modSpec->IsAminoAcid() == false){
 			if(nst==1){
@@ -2030,7 +2035,7 @@ public:
 			(*modit)->ReadBinaryFormattedModel(in);
 			}
 		}
-	void SetDefaultModelSetParameters(const SequenceData *data){
+	void SetDefaultModelSetParameters(SequenceData *data){
 		for(vector<Model*>::iterator modit = mods.begin();modit != mods.end();modit++){
 			(*modit)->SetDefaultModelParameters(data);
 			}
