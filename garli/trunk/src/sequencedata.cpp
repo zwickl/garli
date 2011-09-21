@@ -451,7 +451,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 	
 	//copy matrix into alternative PatternManager for pattern sorting
 	if(usePatternManager){
-		Pattern thisPat;
+		SitePattern thisPat;
 		for(int cod=0;cod<nChar;cod++){
 			for(int tax=0;tax<NTax();tax++){
 				thisPat.AddChar(matrix[tax][cod]);
@@ -532,7 +532,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 
 	//copy matrix into alternative PatternManager for pattern sorting
 	if(usePatternManager){
-		Pattern thisPat;
+		SitePattern thisPat;
 		for(int cod=0;cod<nChar;cod++){
 			for(int tax=0;tax<NTax();tax++){
 				thisPat.AddChar(matrix[tax][cod]);
@@ -813,7 +813,7 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 	if(usePatternManager){
 		//optionally also read into the alternative pattern manager, this is taxa loop inside char loop
 		bool haveWeights = !charWeights.empty();
-		Pattern thisPat;
+		SitePattern thisPat;
 		int charNum = 0;
 		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 			int tax = 0;
@@ -931,7 +931,7 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 		}
 	//read the same data into the alternate pattern sorting machinery, which only makes sense looping over tax within char
 	if(usePatternManager){
-		Pattern thisPat;
+		SitePattern thisPat;
 		bool haveWeights = !charWeights.empty();
 		int charNum = 0;
 		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
