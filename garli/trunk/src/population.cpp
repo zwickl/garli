@@ -2400,7 +2400,53 @@ void Population::BetterFinalOptimization(){
 #ifdef ENABLE_CUSTOM_PROFILER
 	char fname[100];
 	sprintf(fname, "%s.profileresults.log", conf->ofprefix.c_str());
+#ifdef BOINC
+	char physical_name[100];
+	boinc_resolve_filename(fname, physical_name, sizeof(physical_name));
+	ofstream prof(physical_name);
+	//MFILE prof;
+	//prof.open(physical_name, "w");
+#else
 	ofstream prof(fname);
+#endif
+
+	/*
+//FROM WRITETREEFILE
+#ifdef BOINC
+	char physical_name[100];
+	boinc_resolve_filename(fname, physical_name, sizeof(physical_name));
+	MFILE outf;
+	outf.open(physical_name, "w");
+#else
+	ofstream outf;
+	outf.open( filename.c_str() );
+	outf.precision(8);
+#endif
+//...
+#ifdef BOINC
+	const char *s = trans.c_str();
+	outf.write(s, sizeof(char), trans.length());
+	s = str.c_str();
+	outf.write(s, sizeof(char), str.length());
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
+	size_t len = strlen(treeString);
+	outf.write(treeString, sizeof(char), len);
+	str = ";\nend;\n";
+	s = str.c_str();
+	outf.write(s, sizeof(char), str.length());
+#else
+	outf << trans;
+	outf << str;
+	outf.setf( ios::floatfield, ios::fixed );
+	outf.setf( ios::showpoint );
+	theInd->treeStruct->root->MakeNewick(treeString, false, true);
+	outf << treeString << ";\n";
+	outf << "end;\n";
+#endif	
+*/
+	char str[256];
+	sprintf(str, "dataset: %s\tstart:%s\n", conf->datafname.c_str(), conf->streefname.c_str());
+	
 	prof << "dataset: " << conf->datafname << "\t" << "start: " << conf->streefname << endl;
 	prof << "seed: " << conf->randseed << "\t" << "refine: " << (conf->refineStart == true) << endl;
 	prof << "start prec: " << conf->startOptPrec << "\t" << "final prec: " << adap->branchOptPrecision << endl;
