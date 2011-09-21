@@ -1646,7 +1646,8 @@ void Population::ReadPopulationCheckpoint(){
 	if(gen == UINT_MAX) finishedRep = true;
 
 	for(unsigned i=0;i<total_size;i++){
-		for(int m = 0;m < indiv[i].modPart.NumModelSets();m++){
+		assert(modSpecSet.NumSpecs() == indiv[i].modPart.NumModelSets());
+		for(int m = 0;m < modSpecSet.NumSpecs();m++){
 			//it would make more sense to have this happen at a lower level, but the data are needed
 			indiv[i].modPart.GetModelSet(m)->SetDefaultModelSetParameters(dataPart->GetSubset(m));
 			}
@@ -1665,7 +1666,7 @@ void Population::ReadPopulationCheckpoint(){
 	//remember that currentSearchRep starts at 1
 	for(int i=1;i<(finishedRep == false ? currentSearchRep : currentSearchRep+1);i++){
 		Individual *ind = new Individual;
-		for(int m = 0;m < indiv[i].modPart.NumModelSets();m++){
+		for(int m = 0;m < modSpecSet.NumSpecs();m++){
 			//it would make more sense to have this happen at a lower level, but the data are needed
 			ind->modPart.GetModelSet(m)->SetDefaultModelSetParameters(dataPart->GetSubset(m));
 			}
