@@ -1,0 +1,44 @@
+#NEXUS 
+
+Begin trees;  [Treefile saved Fri Aug 13 17:03:40 2010]
+[!
+>Data file = /home/zwickl/googleCodeRepo/branches/partitioning/tests/gettingScores/data/L2001.30x52.nex
+>
+>Processing TREES block from file "mkv.search.best.tre":
+>   Keeping: trees from file (replacing trees in memory)
+>   1 tree read from file
+]
+	Translate
+		1 Aphidius_rhopalosiphi,
+		2 Aphidius_ervi,
+		3 Diaeretiella_rapae,
+		4 Lysiplebus_confusus,
+		5 Pauesia_unilachni,
+		6 Pauesia_juniperorum,
+		7 Binodoxys_acalephae,
+		8 Trioxys_pallidus,
+		9 Monoctonus_pseudoplatani,
+		10 Praon_volucre,
+		11 Praon_abjectum,
+		12 Pseudopraon_mindariphagum,
+		13 Dyscritulus_planiceps,
+		14 Ephedrus_plagiator,
+		15 Ephedrus_californicus,
+		16 Sathon_falcatus,
+		17 Chelonus_sp.,
+		18 Cenocoelius_analis,
+		19 Eubazus_semirugosus,
+		20 Acampsis_alternipes,
+		21 Alysia_lucicola,
+		22 Aleiodes_coxalis,
+		23 Heterospilus_prosopidis,
+		24 Hecabolus_sp.,
+		25 Bracon_sp.,
+		26 Colastes_incertus,
+		27 Rhyssalus_sp.,
+		28 Histeromerus_mystacinus,
+		29 Xorides_praecatorius,
+		30 Alomyia_debellator
+		;
+tree PAUP_1 = [&U] (1,(2,(3,(4,((5,((7,8),(9,(((((10,13),11),12),(((16,17),((18,19),20)),(21,((((22,25),((27,28),(29,30))),(23,24)),26)))),(14,15))))),6)))));
+End;
