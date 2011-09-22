@@ -45,7 +45,7 @@ typedef FLOAT_TYPE** DblPtrPtr;
 #  define THROW_BADSTATE(a) BadState(a)
 #endif
 
-class Pattern{
+class SitePattern{
 public:
 	int count;
 	int origCount;
@@ -62,8 +62,8 @@ public:
 		INFORMATIVE = 4
 		}type;
 
-	Pattern(){Reset();}
-	Pattern(const Pattern &rhs){
+	SitePattern(){Reset();}
+	SitePattern(const SitePattern &rhs){
 		Reset();
 		siteNumbers = rhs.siteNumbers;
 		stateVec = rhs.stateVec;
@@ -72,7 +72,7 @@ public:
 		numStates = rhs.numStates;
 		constStates = rhs.constStates;
 		}
-	~Pattern(){
+	~SitePattern(){
 		stateVec.clear();
 		siteNumbers.clear();
 		}
@@ -88,9 +88,9 @@ public:
 		maxNumStates = ns;
 		}
 
-	//bool PatternLessThan(const Pattern &lhs, const Pattern &rhs) const;
-	bool operator==(const Pattern &rhs) const;
-	bool operator<(const Pattern &rhs) const;
+	//bool PatternLessThan(const SitePattern &lhs, const SitePattern &rhs) const;
+	bool operator==(const SitePattern &rhs) const;
+	bool operator<(const SitePattern &rhs) const;
 	void AddChar(const unsigned char c){
 		stateVec.push_back(c);
 		}
@@ -117,8 +117,8 @@ class PatternManager{
 	
 	int lastConstant;				//lastConstant
 	bool compressed;				//dense
-	list<Pattern> patterns;
-	list<Pattern> uniquePatterns;
+	list<SitePattern> patterns;
+	list<SitePattern> uniquePatterns;
 	vector<int> constStates;
 
 	~PatternManager(){
@@ -136,8 +136,8 @@ public:
 		Reset();
 		numTax = nt;
 		maxNumStates = max;
-		Pattern::maxNumStates = max;
-		Pattern::numTax = nt;
+		SitePattern::maxNumStates = max;
+		SitePattern::numTax = nt;
 		}
 	void Reset(){
 		numTax = maxNumStates = totNumChars = numNonMissingChars = numUniquePats = numMissingChars = numConstantChars = numInformativeChars = lastConstant = numUninformVariableChars = 0;
@@ -146,7 +146,7 @@ public:
 		uniquePatterns.clear();
 		constStates.clear();
 		}
-	void AddPattern(const Pattern &add){
+	void AddPattern(const SitePattern &add){
 		patterns.push_back(add);
 		}
 	//these are named along the lines of the old DataMatrix members
