@@ -128,7 +128,7 @@ void CondLikeArraySet::Allocate() {
 		rawAllocation = new FLOAT_TYPE[size];
 		}
 	catch(std::bad_alloc){
-		throw ErrorException("Problem allocating cond. likelihood array (len = %d). Out of mem?", size);
+		throw ErrorException("Problem allocating cond. likelihood array (len = %d). Out of mem?\n\tNote: to use > 4GB of memory, you will need a 64-bit version of GARLI.", size);
 		}
 	try{
 		rawUnder = new int[usize];
