@@ -44,12 +44,12 @@ extern OutputManager outman;
 
 bool my_pair_compare(pair<int, int> fir, pair<int,int> sec) {return fir.second < sec.second;}
 
-int Pattern::numTax;
-int Pattern::maxNumStates;
+int SitePattern::numTax;
+int SitePattern::maxNumStates;
 
 int		numCompares;
 
-bool Pattern::operator<(const Pattern &rhs) const{
+bool SitePattern::operator<(const SitePattern &rhs) const{
 	//zero state sites (all missing) will now be shuffled to the start (previously the end) and removed later
 	//potentially constant sites always need to come just after that
 	//sorting will first be by number of states (fast), then by the state vectors (slow)
@@ -71,15 +71,15 @@ bool Pattern::operator<(const Pattern &rhs) const{
 	return false;
 	}
 
-bool Pattern::operator==(const Pattern &rhs) const{
+bool SitePattern::operator==(const SitePattern &rhs) const{
 	return (stateVec == rhs.stateVec);
 	}
 
 
 //CalcPatternTypeAndNumStates determines whether pattern a is constant, informative, or missing
 //The passed in vector is used as scratch, and is assumed to already be of size maxNumStates
-//This ALSO has the side effect of filling in the Pattern::numStates field, which is necessary for sorting.
-int Pattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts ){
+//This ALSO has the side effect of filling in the SitePattern::numStates field, which is necessary for sorting.
+int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts ){
 	bool ambig = false;	//any total or partial ambiguity
 	int nStates = 0;
 	bool informative = false;
@@ -209,7 +209,7 @@ int Pattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts ){
 	}
 
 //this is used for determining informative sites when there is partial ambiguity
-int Pattern::MinScore(set<unsigned char> patt, int bound, unsigned char bits/*=15*/, int prevSc/*=0*/) const{
+int SitePattern::MinScore(set<unsigned char> patt, int bound, unsigned char bits/*=15*/, int prevSc/*=0*/) const{
 	if(patt.size() == 0) return 0;
 	int min_sc_this_lvl = 9999;
 	int curr_sc_this_lvl = 9999;
@@ -241,8 +241,8 @@ int Pattern::MinScore(set<unsigned char> patt, int bound, unsigned char bits/*=1
 //Patterns that are assigned zero counts here will be removed in Pack(), but will still contribute to the totalNChar, except
 //for those with zero states (= missing)
 void PatternManager::NewCollapse(){
-	list<Pattern>::iterator first;
-	list<Pattern>::iterator second  = patterns.begin();
+	list<SitePattern>::iterator first;
+	list<SitePattern>::iterator second  = patterns.begin();
 
 	while(second != patterns.end()){
 		first = second++;
@@ -256,7 +256,7 @@ void PatternManager::NewCollapse(){
 		}
 	//this will zero the count of all missing pats, which will make them not get put into the uniquePatterns
 	//list in NewPack
-	for(list<Pattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
+	for(list<SitePattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
 		if((*pit).numStates == 0){
 			(*pit).count = 0;
 			}
@@ -266,7 +266,7 @@ void PatternManager::NewCollapse(){
 void PatternManager::NewSort(){
 	numCompares = 0;
 
-	//this is the stl list sort function, using Pattern::operator<
+	//this is the stl list sort function, using SitePattern::operator<
 	patterns.sort();
 
 	//outman.UserMessage("%d pattern comparisons were needed", numCompares);
@@ -274,7 +274,7 @@ void PatternManager::NewSort(){
 
 // This version of pack copies unique patterns from the patterns list into the uniquePatterns list
 void PatternManager::NewPack(){
-	for(list<Pattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
+	for(list<SitePattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
 		if(pit->numStates > 0){
 			if(pit->count > 0){ 
 				uniquePatterns.push_back(*pit);
@@ -306,16 +306,16 @@ void PatternManager::CalcPatternTypesAndNumStates(){
 
 	numMissingChars = numConstantChars = numInformativeChars = numUninformVariableChars = 0;
 
-	for(list<Pattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
+	for(list<SitePattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
 		int t = pit->CalcPatternTypeAndNumStates(s);
-		if( t == Pattern::MISSING )
+		if( t == SitePattern::MISSING )
 			numMissingChars++;
-		else if( t == Pattern::CONSTANT )
+		else if( t == SitePattern::CONSTANT )
 			numConstantChars += pit->count;
-		else if( t == Pattern::INFORMATIVE )
+		else if( t == SitePattern::INFORMATIVE )
 			numInformativeChars += pit->count;
 		else{
-			assert(t == Pattern::UNINFORM_VARIABLE);
+			assert(t == SitePattern::UNINFORM_VARIABLE);
 			numUninformVariableChars += pit->count;
 			}
 		}
@@ -327,7 +327,7 @@ void PatternManager::CalcPatternTypesAndNumStates(){
 void PatternManager::NewDetermineConstantSites(){
 	assert(compressed);
 	lastConstant=-1;
-	list<Pattern>::iterator pat = uniquePatterns.begin();
+	list<SitePattern>::iterator pat = uniquePatterns.begin();
 	assert(pat->numStates > 0);
 	while(pat != uniquePatterns.end() && pat->numStates == 1){
 		lastConstant++;
@@ -380,7 +380,7 @@ void PatternManager::FillNumberVector(vector<int> &nums) const{
 		(*nit) = -1;
 
 	int p = 0;
-	for(list<Pattern>::const_iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
+	for(list<SitePattern>::const_iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
 		for(vector<int>::const_iterator nit = (*pit).siteNumbers.begin(); nit != (*pit).siteNumbers.end();nit++)
 			nums[*nit] = p;
 		p++;
@@ -389,31 +389,31 @@ void PatternManager::FillNumberVector(vector<int> &nums) const{
 
 void PatternManager::FillCountVector(vector<int> &counts) const{
 	counts.clear();
-	for(list<Pattern>::const_iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
+	for(list<SitePattern>::const_iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
 		counts.push_back((*pit).count);
 		}
 	}
 
 void PatternManager::FillNumStatesVector(vector<int> &ns) const{
 	ns.clear();
-	for(list<Pattern>::const_iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
+	for(list<SitePattern>::const_iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
 		ns.push_back((*pit).numStates);
 		}
 	}
 
 void PatternManager::FillConstStatesVector(vector<int> &cs) const{
 	int c = 0;
-	for(list<Pattern>::const_iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
+	for(list<SitePattern>::const_iterator pit = uniquePatterns.begin();pit != uniquePatterns.end();pit++){
 		cs.push_back((*pit).constStates);
 		c++;
 		}
 	}
 
-//Takes the data out of the Pattern list and copies into the DataMatrix 2d matrix
+//Takes the data out of the SitePattern list and copies into the DataMatrix 2d matrix
 void PatternManager::FillTaxaXCharMatrix(unsigned char **mat) const{
 	for(int t = 0;t < numTax;t++){
 		int c = 0;
-		for(list<Pattern>::const_iterator cit = uniquePatterns.begin();cit != uniquePatterns.end();cit++){
+		for(list<SitePattern>::const_iterator cit = uniquePatterns.begin();cit != uniquePatterns.end();cit++){
 			mat[t][c++] = (*cit).stateVec[t];
 			}
 		}
