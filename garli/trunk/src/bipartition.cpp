@@ -231,7 +231,7 @@ bool Bipartition::OldIsCompatibleWithBipartitionWithMask(const Bipartition &bip,
 			}
 		}
 	if(compat==true && ((((~rep[i] & bip.rep[i]) & mask.rep[i]) & partialBlockMask) == 0)) 
-	return true;
+		return true;
 	//~A & ~B
 	compat=true;
 	for(i=0;i<nBlocks-1;i++){
