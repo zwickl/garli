@@ -297,7 +297,7 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 	{
 		int i;
 		if(!mask){
-		for(i=0;i<nBlocks-1;i++){
+			for(i=0;i<nBlocks-1;i++){
 				if(rep[i] & rhs.rep[i]){
 					return true;
 					}
@@ -306,7 +306,7 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 				return true;
 			}
 #ifdef _BETTER_BIPART
-			else{
+		else{
 			unsigned sum = 0;
 			for(i=0;i<nBlocks-1;i++){
 				sum |= ((rep[i] & rhs.rep[i]) & mask->rep[i]);
@@ -319,11 +319,11 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 			}
 #else
 		else{
-		for(i=0;i<nBlocks-1;i++){
+			for(i=0;i<nBlocks-1;i++){
 				if((rep[i] & rhs.rep[i]) & mask->rep[i]){
 					return true;
+					}
 				}
-			}
 			if(((rep[i] & rhs.rep[i]) & (mask->rep[i] & partialBlockMask)))
 				return true;
 			}
@@ -334,7 +334,7 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 	bool HasIntersectionWithComplement(const Bipartition &rhs, const Bipartition *mask) const{
 		int i;
 		if(!mask){
-		for(i=0;i<nBlocks-1;i++){
+			for(i=0;i<nBlocks-1;i++){
 				if(rep[i] & ~rhs.rep[i]){
 					return true;
 					}
@@ -343,7 +343,7 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 				return true;
 			}
 #ifdef _BETTER_BIPART
-			else{
+		else{
 			unsigned sum = 0;
 			for(i=0;i<nBlocks-1;i++){
 				sum |= ((rep[i] & ~rhs.rep[i]) & mask->rep[i]); 
@@ -355,7 +355,7 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 			}
 #else
 		else{
-		for(i=0;i<nBlocks-1;i++){
+			for(i=0;i<nBlocks-1;i++){
 				if((rep[i] & ~rhs.rep[i]) & mask->rep[i]){
 					return true;
 					}
@@ -370,7 +370,7 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 	bool ComplementHasIntersection(const Bipartition &rhs, const Bipartition *mask) const{
 		int i;
 		if(!mask){
-		for(i=0;i<nBlocks-1;i++){
+			for(i=0;i<nBlocks-1;i++){
 				if(~rep[i] & rhs.rep[i]){
 					return true;
 					}
@@ -379,7 +379,7 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 				return true;
 			}
 #ifdef _BETTER_BIPART
-			else{
+		else{
 			unsigned sum = 0;
 			for(i=0;i<nBlocks-1;i++){
 				sum |= ((~rep[i] & rhs.rep[i]) & mask->rep[i]); 
@@ -391,22 +391,22 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 			}
 #else
 		else{
-		for(i=0;i<nBlocks-1;i++){
+			for(i=0;i<nBlocks-1;i++){
 				if((~rep[i] & rhs.rep[i]) & mask->rep[i]){
 					return true;
 					}
 				}
 			if(((~rep[i] & rhs.rep[i]) & (mask->rep[i] & partialBlockMask)))
 				return true;
-				}
+			}
 #endif
 		return false;
-			}
+		}
 
 	bool ComplementHasIntersectionWithComplement(const Bipartition &rhs, const Bipartition *mask) const{
 		int i;
 		if(!mask){
-		for(i=0;i<nBlocks-1;i++){
+			for(i=0;i<nBlocks-1;i++){
 				if(~rep[i] & ~rhs.rep[i]){
 					return true;
 					}
@@ -415,7 +415,7 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 				return true;
 			}
 #ifdef _BETTER_BIPART
-			else{
+		else{
 			unsigned sum = 0;
 			for(i=0;i<nBlocks-1;i++){
 				sum |= ((~rep[i] & ~rhs.rep[i]) & mask->rep[i]); 
@@ -427,11 +427,11 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 			}
 #else
 		else{
-		for(i=0;i<nBlocks-1;i++){
+			for(i=0;i<nBlocks-1;i++){
 				if((~rep[i] & ~rhs.rep[i]) & mask->rep[i]){
 					return true;
+					}
 				}
-			}
 			if(((~rep[i] & ~rhs.rep[i]) & (mask->rep[i] & partialBlockMask)))
 				return true;
 			}
@@ -443,7 +443,7 @@ bool HasIntersection(const Bipartition &rhs, const Bipartition *mask) const
 		//To be consistent with a negative bipartition (constraint) neither the bipartition
 		//or its complement can BE the constraint bipartition
 		if(this->EqualsEquals(bip)==false && this->ComplementEqualsEquals(bip)==false) return true;
- 		else return false;
+		else return false;
 		}
 
 	bool IsCompatibleWithNegativeBipartitionWithMask(const Bipartition &bip, const Bipartition &mask) const{
