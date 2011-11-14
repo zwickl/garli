@@ -1435,6 +1435,10 @@ void Population::WriteStateFiles(){
 		}	
 	}
 */
+
+//#define OLD_CHECK
+
+#ifdef OLD_CHECK
 void Population::WriteStateFiles(){
 	char name[100];
 
@@ -1478,6 +1482,73 @@ void Population::WriteStateFiles(){
 		sout.close();
 		}
 	}
+
+#else
+void Population::WriteStateFiles(){
+	char aname[128];
+	char pname[128];
+	char sname[128];
+
+	sprintf(aname, "%s.adap.check", conf->ofprefix.c_str());
+	sprintf(pname, "%s.pop.check", conf->ofprefix.c_str());
+	sprintf(sname, "%s.swaps.check", conf->ofprefix.c_str());
+
+	//1. write the adaptation info checkpoint in binary format
+	//2. write the state of the population, including the seed, generation, elapsed time,
+	//	 lastTopoImprove and specifications of the current individuals
+	//3. if we are keeping track of swaps, write a checkpoint for that
+#ifdef BOINC
+	//The BOINC provided MFILE class handily allows writing to it before it is actually
+	//open and attached to any file.  It buffers the information, and flushes it upon closing
+	//of the file.  This is good, because all of the checkpoint information can be gathered
+	//and then written all at once, making it less likely that the checkpoint will be corrupted 
+	//by the program being terminated mid-checkpoint 
+	MFILE aout;
+	MFILE pout;
+	MFILE sout;
+
+	adap->WriteToCheckpoint(aout);
+	WritePopulationCheckpoint(pout);
+
+	if(conf->uniqueSwapBias != ONE_POINT_ZERO)
+		Tree::attemptedSwaps.WriteSwapCheckpoint(sout);
+	
+	char aphysical_name[512];
+	char pphysical_name[512];
+	char sphysical_name[512];
+	boinc_resolve_filename(aname, aphysical_name, sizeof(aphysical_name));
+	boinc_resolve_filename(pname, pphysical_name, sizeof(pphysical_name));
+	boinc_resolve_filename(sname, sphysical_name, sizeof(sphysical_name));
+
+	aout.open(aphysical_name, "wb");
+	aout.close();
+
+	pout.open(pphysical_name, "wb");
+	pout.close();
+
+	if(conf->uniqueSwapBias != ONE_POINT_ZERO){
+		sout.open(sphysical_name, "wb");
+		sout.close();
+		}
+#else
+	//it would be nice to be able to do something like what is done for BOINC above (buffering output and
+	//then writing all at once), maybe with a stringstream, but I couldn't get that to work
+	ofstream aout(aname, ios::out | ios::binary);
+	adap->WriteToCheckpoint(aout);
+	aout.close();
+	
+	ofstream pout(pname, ios::out | ios::binary);
+	WritePopulationCheckpoint(pout);
+	pout.close();
+
+	if(conf->uniqueSwapBias != ONE_POINT_ZERO){
+		ofstream sout(sname, ios::out | ios::binary);
+		Tree::attemptedSwaps.WriteSwapCheckpoint(sout);
+		sout.close();
+		}
+#endif
+	}
+#endif
 
 //Returns whether or not checkpoints were actually found and read
 bool Population::ReadStateFiles(){
