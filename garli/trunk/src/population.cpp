@@ -3212,6 +3212,14 @@ void Population::PerformSearch(){
 		if(conf->inferInternalStateProbs == true){
 			//don't infer internals states unless at least one rep successfully completed
 			if((prematureTermination == false && currentSearchRep == conf->searchReps) || (prematureTermination && storedTrees.size() > 0)){
+				//this is important to ensure that there are enough free clas for a temp set to be allocated,
+				//since recycling won't happen in this usage (it could if implemented, but I don't see the benefit)
+				for(int i = 0;i < total_size;i++){
+					if(indiv[i].treeStruct != NULL)
+						indiv[i].treeStruct->MakeAllNodesDirty();
+					if(newindiv[i].treeStruct != NULL)
+						newindiv[i].treeStruct->MakeAllNodesDirty();
+					}
 				if(storedTrees.size() > 0){//careful here, the trees in the storedTrees array don't have clas assigned
 					outman.UserMessage("Inferring internal state probabilities on best tree... saving to file %s.internalstates.log\n", conf->ofprefix.c_str());
 					Individual *theInd;
