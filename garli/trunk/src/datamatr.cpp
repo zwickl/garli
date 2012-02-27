@@ -749,59 +749,65 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 		for( i = 0; i < nTaxAllocated; i++ )
 			MEM_DELETE_ARRAY(taxonLabel[i]); // taxonLabel[i] is of length strlen(taxonLabel[i])+1
 		MEM_DELETE_ARRAY(taxonLabel); // taxonLabel is of length nTax
-	}
+		}
 
 	// create new array of taxon label pointers
 	if( taxa > 0 ) {
 		MEM_NEW_ARRAY(taxonLabel,char*,taxa + extraTax);
 		for( int i = 0; i < taxa + extraTax; i++ )
 			taxonLabel[i] = NULL;
-	}
+		}
 
 	// delete data matrix and count and number arrays
 	if( matrix ) {
 		int j;
-	//	for( j = 0; j < nChar; j++ )
 		for( j = 0; j < taxa + extraTax; j++ )
 			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] has length nChar
 		MEM_DELETE_ARRAY(matrix); // matrix has length nTax
-	}
+		}
 
-	if( count ) {
-		MEM_DELETE_ARRAY(count); //count has length nChar
-	}
-	if( numStates ) {
-		MEM_DELETE_ARRAY(numStates); // numStates has length nChar
-	}
+	if(usePatternManager == false){
+		if( count ) {
+			MEM_DELETE_ARRAY(count); //count has length nChar
+			}
+		if( numStates ) {
+			MEM_DELETE_ARRAY(numStates); // numStates has length nChar
+			}
+		}
+	//yarg - this is used even when usePatMan == true, when converting from nuc to AA matrix
 	if( number ) {
-                MEM_DELETE_ARRAY(number); // number has length nChar
-        }
+		MEM_DELETE_ARRAY(number); // number has length nChar
+		}
 	if( origDataNumber ) {
-                MEM_DELETE_ARRAY(origDataNumber); // origDataNumber has length nChar
-        }
+		MEM_DELETE_ARRAY(origDataNumber); // origDataNumber has length nChar
+		}
 	// create new data matrix, and new count and number arrays
 	// all counts are initially 1, and characters are numbered
 	// sequentially from 0 to nChar-1
 	if( taxa > 0 && sites > 0 ) {
 		MEM_NEW_ARRAY(matrix,unsigned char*,taxa + extraTax);
-		MEM_NEW_ARRAY(count,int,sites);
-		MEM_NEW_ARRAY(numStates,int,sites);
 		MEM_NEW_ARRAY(number,int,sites);
 		MEM_NEW_ARRAY(origDataNumber,int,sites);
-
 		for( int j = 0; j < sites; j++ ) {
-			count[j] = 1;
-			numStates[j] = 1;
 			number[j] = j;
 			origDataNumber[j] = j;
-		}
+			}
+		if(usePatternManager == false){
+			MEM_NEW_ARRAY(count,int,sites);
+			MEM_NEW_ARRAY(numStates,int,sites);
+
+			for( int j = 0; j < sites; j++ ) {
+				count[j] = 1;
+				numStates[j] = 1;
+				}
+			}
 		for( int i = 0; i < taxa + extraTax; i++ ) {
 			matrix[i]=new unsigned char[sites];
 			//MEM_NEW_ARRAY(matrix[i],unsigned char,sites);
 			//memset( matrix[i], 0xff, taxa*sizeof(unsigned char) );
 			memset( matrix[i], 0xff, sites*sizeof(unsigned char) );
 			}
-	}
+		}
 
 	// set dimension variables to new values
 	nTax = taxa;
@@ -849,7 +855,9 @@ void DataMatrix::ResizeCharacterNumberDependentVariables(int nCh) {
 	nonZeroCharCount = gapsIncludedNChar = totalNChar = nChar;
 	}
 
+//deprecated
 DataMatrix& DataMatrix::operator =(const DataMatrix& d){
+	assert(0);
 	NewMatrix( d.NTax(), d.NChar() );
 
 	int i, j;
@@ -1723,14 +1731,30 @@ int DataMatrix::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 	int originalSeed = rnd.seed();
 	rnd.set_seed(seedToUse);
 
+	//This is a little dumb, but since there are parallel counts and origCounts variables depending on whether the new PatternManager
+	//is being used, need to alias them so that the remainder of this function works unchanged
+	const int *origCountsAlias;
+	if(newOrigCounts.size() > 0){
+		origCountsAlias = &newOrigCounts[0];
+		}
+	else
+		origCountsAlias = origCounts;
+
+	int *countsAlias;
+	if(newCount.size() > 0){
+		countsAlias = &newCount[0];
+		}
+	else
+		countsAlias = count;
+
 	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
 	
 	FLOAT_TYPE p=0.0;
-	cumProbs[0]=(FLOAT_TYPE) origCounts[0] / ((FLOAT_TYPE) totalNChar);
-	count[0] = 0;
+	cumProbs[0]=(FLOAT_TYPE) origCountsAlias[0] / ((FLOAT_TYPE) totalNChar);
+	countsAlias[0] = 0;
 	for(int i = 1;i < nChar;i++){
-		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar);
-		count[i] = 0;
+		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCountsAlias[i] / ((FLOAT_TYPE) totalNChar);
+		countsAlias[i] = 0;
 		}
 	cumProbs[nChar - 1] = 1.0;
 
@@ -1744,21 +1768,22 @@ int DataMatrix::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 	for(int c=0;c<numToSample;c++){
 		FLOAT_TYPE p=rnd.uniform();
 		int pat=0; 
-		while(p > cumProbs[pat]) pat++;
-		count[pat]++;
+		while(p > cumProbs[pat]) 
+			pat++;
+		countsAlias[pat]++;
 		}
 /*
 	for(int i = 0;i < nChar;i++)
-		deb << i << "\t" << origCounts[i] << "\t" << count[i] <<  endl;
+		deb << i << "\t" << origCountsAlias[i] << "\t" << countsAlias[i] <<  endl;
 */
 	//take a count of the number of chars that were actually resampled
 	nonZeroCharCount = 0;
 	int numZero = 0;
 	int totCounts = 0;
 	for(int d=0;d<nChar;d++){
-		if(count[d] > 0) {
+		if(countsAlias[d] > 0) {
 			nonZeroCharCount++;
-			totCounts += count[d];
+			totCounts += countsAlias[d];
 			}
 		else 
 			numZero++;

@@ -376,7 +376,8 @@ protected:
 
 		void CopyNamesFromOtherMatrix(const DataMatrix *dat){
 			assert(taxonLabel);
-			for(int t=0;t<nTax;t++) SetTaxonLabel(t, dat->TaxonLabel(t));
+			for(int t=0;t<nTax;t++) 
+				SetTaxonLabel(t, dat->TaxonLabel(t));
 			}
 
 		void BeginNexusTreesBlock(ofstream &treeout) const;
@@ -443,22 +444,28 @@ protected:
 
 	public:	
       void ReserveOriginalCounts(){
-      		if(origCounts==NULL) origCounts=new int[nChar];
-      		for(int i=0;i<nChar;i++){
-				if(newCount.size() > 0){
-					assert(newCount.size() > i);
-					origCounts[i] = newCount[i];
-					}
-				else
-					origCounts[i] = count[i];
-      			}
-      		}
+		if(usePatternManager == false){
+			if(origCounts == NULL) 
+				origCounts = new int[nChar];
+			}
+		else
+			assert(newOrigCounts.size() == 0);
+  		for(int i=0;i<nChar;i++){
+			if(newCount.size() > 0){
+				assert(newCount.size() > i);
+				newOrigCounts.push_back(newCount[i]);
+				}
+			else
+				origCounts[i] = count[i];
+  			}
+  		}
       void RestoreOriginalCounts(){
-			if(origCounts==NULL) return;
+			if(origCounts == NULL) 
+				return;
       		for(int i=0;i<nChar;i++){
 				if(newCount.size() > 0){
 					assert(newCount.size() > i);
-					newCount[i] = origCounts[i];
+					newCount[i] = newOrigCounts[i];
 					}
 				else
       				count[i] = origCounts[i];
