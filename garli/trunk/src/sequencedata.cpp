@@ -1318,21 +1318,37 @@ int NStateData::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 	int originalSeed = rnd.seed();
 	rnd.set_seed(seedToUse);
 
+	//This is a little dumb, but since there are parallel counts and origCounts variables depending on whether the new PatternManager
+	//is being used, need to alias them so that the remainder of this function works unchanged
+	const int *origCountsAlias;
+	if(newOrigCounts.size() > 0){
+		origCountsAlias = &newOrigCounts[0];
+		}
+	else
+		origCountsAlias = origCounts;
+
+	int *countsAlias;
+	if(newCount.size() > 0){
+		countsAlias = &newCount[0];
+		}
+	else
+		countsAlias = count;
+
 	//for nstate data this will include the conditioning chars, but they will
 	//have a resample prob of zero
 	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
 	
-	assert(origCounts[0] > 0 && origCounts[1] > 0);
+	assert(origCountsAlias[0] > 0 && origCountsAlias[1] > 0);
 
 	for(int i = 0;i < numConditioningPatterns;i++)
 		cumProbs[i] = ZERO_POINT_ZERO;
-	cumProbs[numConditioningPatterns]=(FLOAT_TYPE) origCounts[numConditioningPatterns] / ((FLOAT_TYPE) totalNChar - numConditioningPatterns);
+	cumProbs[numConditioningPatterns]=(FLOAT_TYPE) origCountsAlias[numConditioningPatterns] / ((FLOAT_TYPE) totalNChar - numConditioningPatterns);
 	for(int i=numConditioningPatterns + 1;i<nChar;i++){
-		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCounts[i] / ((FLOAT_TYPE) totalNChar - numConditioningPatterns);
-		assert(origCounts[i] > 0);
+		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCountsAlias[i] / ((FLOAT_TYPE) totalNChar - numConditioningPatterns);
+		assert(origCountsAlias[i] > 0);
 		}
 	for(int q=numConditioningPatterns;q<nChar;q++) 
-		count[q]=0;
+		countsAlias[q]=0;
 	assert(FloatingPointEquals(cumProbs[nChar-1], ONE_POINT_ZERO, 1e-6));
 	cumProbs[nChar-1] = ONE_POINT_ZERO;
 		
@@ -1346,26 +1362,26 @@ int NStateData::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 		FLOAT_TYPE p=rnd.uniform();
 		int pat=0; 
 		while(p > cumProbs[pat]) pat++;
-		count[pat]++;
+		countsAlias[pat]++;
 		}
 /*
 	for(int i = 0;i < nChar;i++)
-		deb << i << "\t" << cumProbs[i] << "\t" << origCounts[i] << "\t" << count[i] <<  endl;
+		deb << i << "\t" << cumProbs[i] << "\t" << origCountsAlias[i] << "\t" << countsAlias[i] <<  endl;
 */
 	//take a count of the number of chars that were actually resampled
 	nonZeroCharCount = 0;
 	int numZero = 0;
 	int totCounts = 0;
 	for(int d = numConditioningPatterns;d < nChar;d++){
-		if(count[d] > 0) {
+		if(countsAlias[d] > 0) {
 			nonZeroCharCount++;
-			totCounts += count[d];
+			totCounts += countsAlias[d];
 			}
 		else 
 			numZero++;
 		}
 	if(datatype == ONLY_VARIABLE) 
-		assert(count[0] == 1);
+		assert(countsAlias[0] == 1);
 	assert(totCounts == totalNChar);
 	assert(nonZeroCharCount + numZero == nChar - numConditioningPatterns);
 
