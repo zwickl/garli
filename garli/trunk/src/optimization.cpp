@@ -1530,6 +1530,10 @@ if(nd->nodeNum == 8){
 #else
 				if(FloatingPointEquals(nd->dlen, min_brlen, 1.0e-8)){
 //DEBUG
+					if(lnL < initialL - pow(10.0, -6.0+ceil(log10(-lnL)))){
+						outman.DebugMessage("Score worsened by %.6f, restoring blen, exiting", initialL - lnL);
+						SetBranchLength(nd, v_onEntry);
+						}
 					assert(lnL >= initialL - pow(10.0, -6.0+ceil(log10(-lnL))));
 					#ifdef OPT_DEBUG
 					opt << "already at min, return\n"; 
