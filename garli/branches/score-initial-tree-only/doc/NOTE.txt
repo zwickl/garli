@@ -1,0 +1,4 @@
+
+DOCUMENTATION FOR THE PARTITIONED VERSION IS AVAILABLE AT
+http://www.nescent.org/wg_garli/Partition_testing_version
+
