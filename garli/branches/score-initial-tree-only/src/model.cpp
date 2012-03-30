@@ -1471,6 +1471,9 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 		SetMaxPinv(ZERO_POINT_ZERO);
 		}
 	else{
+#		ifdef SCORE_INITIAL_ONLY
+            if (modSpec->fixInvariantSites == false) { //@MTH added if
+#		endif
 		//if there are no constant sites, warn user that Pinv should not be used
 		//if(data->NConstant() == 0) throw(ErrorException("This dataset contains no constant characters!\nInference of the proportion of invariant sites is therefore meaningless.\nPlease set invariantsites to \"none\""));
 		if(data->NConstant() == 0){
@@ -1487,6 +1490,9 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 				NormalizeRates();
 			else AdjustRateProportions();
 			}
+#		ifdef SCORE_INITIAL_ONLY
+			} //@MTH added to close the if and brace that he added above
+#		endif
 		}
 	eigenDirty = true;
 	}
@@ -2901,6 +2907,14 @@ void Model::ReadGarliFormattedModelString(string &modString){
 				throw(ErrorException("Problem reading proportion of invariant sites parameter from file.\nExamine file and check manual for format.\n"));
 			FLOAT_TYPE p=(FLOAT_TYPE)atof(temp.c_str());
 			SetPinv(p, true);
+#			ifdef SCORE_INITIAL_ONLY
+				//@ this section by MTH in for "scoreOnlyGarli"
+				SetMaxPinv(p); 
+				if(modSpec->IsFlexRateHet()) 
+					NormalizeRates(); 
+				else 
+					AdjustRateProportions();
+#			endif 
 			c=stf.get();
 			modSpec->gotPinvFromFile=true;
 			}
