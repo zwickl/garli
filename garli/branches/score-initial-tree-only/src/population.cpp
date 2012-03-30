@@ -1264,6 +1264,11 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	if(!indiv[0].treeStruct->rootWithDummy)
 		indiv[0].treeStruct->CheckBalance();
 	indiv[0].treeStruct->modPart=&indiv[0].modPart;
+
+#   ifdef SCORE_INITIAL_ONLY
+        indiv[0].treeStruct->ofprefix = conf->ofprefix;  //@MTH
+        indiv[0].treeStruct->sitelikeLevel =  conf->outputSitelikelihoods ;//@MTH
+#   endif
 	
 	try{
 		indiv[0].CalcFitness(0);
