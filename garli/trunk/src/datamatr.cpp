@@ -1135,7 +1135,7 @@ void DataMatrix::Collapse(){
 // EliminateAdjacentIdenticalColumns sets the count of successive identical patterns
 // in the original alignment to zero (usually applied to gaps)
 // i.e., adjacent identical patterns count as only one observation
-//
+// 5/17/12 Ooops, changed to only do this for non-constant columns
 void DataMatrix::EliminateAdjacentIdenticalColumns(){
 	//this needs to happen here to know the number of state counts, but will be redone later
 	Summarize();
@@ -1146,7 +1146,8 @@ void DataMatrix::EliminateAdjacentIdenticalColumns(){
 	int numCombined = 0;
 	while( i < NChar() ) {
 		//need to avoid subtracting zero state chars here (blank cols) since the will be removed already
-		while( numStates[i] != 0 && j < NChar() && ComparePatterns( i, j ) == 0 ) {
+		//oops, and one state characters, since we don't want to collapse all present columns
+		while( numStates[i] > 1 && j < NChar() && ComparePatterns( i, j ) == 0 ) {
 			// pattern j same as pattern i
 			count[j] = 0;
 			//when columns are eliminated, remove them from the total number of characters
