@@ -40,9 +40,6 @@ FLOAT_TYPE PointNormal (FLOAT_TYPE prob);
 FLOAT_TYPE IncompleteGamma (FLOAT_TYPE x, FLOAT_TYPE alpha, FLOAT_TYPE LnGamma_alpha);
 FLOAT_TYPE PointChi2 (FLOAT_TYPE prob, FLOAT_TYPE v);
 
-GeneticCode *Model::code = NULL;
-int Model::qmatLookup[62*62];
-
 Model::~Model(){
 	if(stateFreqs.empty() == false){
 		for(int i=0;i<(int)stateFreqs.size();i++)
@@ -439,7 +436,7 @@ void Model::UpdateQMatCodon(){
 //	double composition[61]={0.12, 0.484, 0.12, 0.484, 0.0727, 0.0727, 0.0727, 0.0727, 0.236, 0.516, 0.236, 0.516, 0, 0, 0, 0, 0.324, 0.211, 0.324, 0.211, 0.142, 0.142, 0.142, 0.142, 0.236, 0.236, 0.236, 0.236, 0, 0, 0, 0, 0.335, 0.502, 0.335, 0.502, 0, 0, 0, 0, 0.269, 0.269, 0.269, 0.269, 0, 0, 0, 0, 0.0727, 0.0727, 0.516, 0.516, 0.516, 0.516, 1, 0.0473, 1, 0, 0, 0, 0};
 //	double polarity[61]={0.79, 0.827, 0.79, 0.827, 0.457, 0.457, 0.457, 0.457, 0.691, 0.531, 0.691, 0.531, 0.037, 0.037, 0.0988, 0.037, 0.691, 0.679, 0.691, 0.679, 0.383, 0.383, 0.383, 0.383, 0.691, 0.691, 0.691, 0.691, 0, 0, 0, 0, 0.914, 1, 0.914, 1, 0.395, 0.395, 0.395, 0.395, 0.506, 0.506, 0.506, 0.506, 0.123, 0.123, 0.123, 0.123, 0.16, 0.16, 0.531, 0.531, 0.531, 0.531, 0.0741, 0.0617, 0.0741, 0, 0, 0, 0};
 //	double molvol[61]={0.695, 0.317, 0.695, 0.317, 0.347, 0.347, 0.347, 0.347, 0.725, 0.647, 0.725, 0.647, 0.647, 0.647, 0.611, 0.647, 0.491, 0.557, 0.491, 0.557, 0.177, 0.177, 0.177, 0.177, 0.725, 0.725, 0.725, 0.725, 0.647, 0.647, 0.647, 0.647, 0.479, 0.305, 0.479, 0.305, 0.168, 0.168, 0.168, 0.168, 0, 0, 0, 0, 0.485, 0.485, 0.485, 0.485, 0.796, 0.796, 0.647, 0.647, 0.647, 0.647, 0.311, 1, 0.311, 0.647, 0.772, 0.647, 0.772};
-	
+	assert(code != NULL);
 	for(int w=0;w<NRateCats();w++){
 		for(int i=0;i<nstates;i++){
 			for(int j=0;j<nstates;j++){
@@ -1438,7 +1435,7 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 		}
 	}
 
-void Model::SetDefaultModelParameters(const SequenceData *data){
+void Model::SetDefaultModelParameters(SequenceData *data){
 	//some of these depend on having read the data already
 	//also note that this resets the values in the case of 
 	//bootstrapping.  Any of this could be overridden by
@@ -1454,6 +1451,12 @@ void Model::SetDefaultModelParameters(const SequenceData *data){
 			}
 		DiscreteGamma(rateMults, rateProbs, *alpha);
 		}
+
+    //this is a somewhat odd place to do this, but ends up making the most sense
+    if(modSpec->IsCodon()){
+        if(code == NULL)
+            SetCode(static_cast<CodonData*>(data)->GetCode());
+        }
 
 	if((modSpec->IsEqualStateFrequencies() == false && (modSpec->IsCodon() && modSpec->IsUserSpecifiedStateFrequencies()) == false && modSpec->IsPrecaledAAFreqs() == false)
 		|| (modSpec->IsF3x4StateFrequencies() || modSpec->IsF1x4StateFrequencies())){
@@ -1574,6 +1577,9 @@ void Model::CopyModel(const Model *from){
 	assert(stateFreqs[0] != NULL);
 
 	if(modSpec->IsCodon()){
+		//code = from->code;
+        if(code == NULL)
+            SetCode(from->code);
 		for(int i=0;i<omegas.size();i++)
 			*omegas[i]=*(from->omegas[i]);
 		for(int i=0;i<omegaProbs.size();i++)
@@ -3346,7 +3352,10 @@ void Model::CreateModelFromSpecification(int modnum){
 		o->SetWeight(2);
 		paramsToMutate.push_back(o);
 */
-		UpdateQMatCodon();
+        //this is hopefully not needed here (and can't be here now that
+		//the genetic code is not static), since the code has yet to be set
+        //it will be updated later
+		//UpdateQMatCodon();
 		}
 
 	eigenDirty=true;
