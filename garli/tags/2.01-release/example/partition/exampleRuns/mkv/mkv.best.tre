@@ -1,0 +1,36 @@
+#NEXUS
+
+begin trees;
+translate
+ 1 Aphidius_rhopalosiphi,
+ 2 Aphidius_ervi,
+ 3 Diaeretiella_rapae,
+ 4 Lysiplebus_confusus,
+ 5 Pauesia_unilachni,
+ 6 Pauesia_juniperorum,
+ 7 Binodoxys_acalephae,
+ 8 Trioxys_pallidus,
+ 9 Monoctonus_pseudoplatani,
+ 10 Praon_volucre,
+ 11 Praon_abjectum,
+ 12 Pseudopraon_mindariphagum,
+ 13 Dyscritulus_planiceps,
+ 14 Ephedrus_plagiator,
+ 15 Ephedrus_californicus,
+ 16 Sathon_falcatus,
+ 17 Chelonus_sp.,
+ 18 Cenocoelius_analis,
+ 19 Eubazus_semirugosus,
+ 20 Acampsis_alternipes,
+ 21 Alysia_lucicola,
+ 22 Aleiodes_coxalis,
+ 23 Heterospilus_prosopidis,
+ 24 Hecabolus_sp.,
+ 25 Bracon_sp.,
+ 26 Colastes_incertus,
+ 27 Rhyssalus_sp.,
+ 28 Histeromerus_mystacinus,
+ 29 Xorides_praecatorius,
+ 30 Alomyia_debellator;
+tree bestREP3 = [&U][!GarliScore -472.390577][!GarliModel  M1 e  0.50000  0.50000   M2 e  0.33333  0.33333  0.33333   M3 e  0.25000  0.25000  0.25000  0.25000  ]((((7:0.00000001,8:0.00000001):0.11236048,(((12:0.00000001,10:0.00000001,11:0.00000001,13:0.03088157):0.08988849,(((20:0.13825439,(18:0.08204068,19:0.00000001):0.00123999):0.08527720,(16:0.20500271,17:0.00000001):0.02298487):0.35721979,(((((30:0.27621511,29:0.00946667):0.13454604,(28:0.06286195,27:0.00000001):0.09631244):0.02630013,25:0.04771927,22:0.12958639):0.06564011,26:0.00000001,(24:0.02076360,23:0.00000001):0.06578090):0.25273699,21:0.00000001):0.37026723):0.12499145,(15:0.01994165,14:0.00000001):0.06218053):0.29756654,9:0.03257892):0.03967214):0.22041684,5:0.02831043):0.02007330,6:0.00000001,(4:0.06854944,3:0.00000001,1:0.00000001,2:0.00000001):0.02384508);
+end;
