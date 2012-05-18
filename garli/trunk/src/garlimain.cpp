@@ -18,8 +18,8 @@
 //	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #define PROGRAM_NAME "GARLI"
-#define MAJOR_VERSION 2	
-#define MINOR_VERSION 0
+#define MAJOR_VERSION "2"
+#define MINOR_VERSION "01"
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
 #define SVN_REV "$Rev$"
 #define SVN_DATE "$Date$"
@@ -106,9 +106,9 @@ std::string GetSvnDate(){
 
 void OutputVersion(){
 	if(is64bit)
-		outman.UserMessage("%s Version %d.%d.%s (64-bit)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
+		outman.UserMessage("%s Version %s.%s.%s (64-bit)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
 	else
-		outman.UserMessage("%s Version %d.%d.%s (32-bit)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
+		outman.UserMessage("%s Version %s.%s.%s (32-bit)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, GetSvnRev().c_str());
 	}
 
 int CheckRestartNumber(const string str){
@@ -376,7 +376,7 @@ int main( int argc, char* argv[] )	{
 			else 
 				outman.SetLogFile(temp_buf);
 			
-			outman.UserMessage("Running BOINC %s Version %d.%d.%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running BOINC %s Version %s.%s.%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
 			if(confOK && conf.restart == true) outman.UserMessage("Found BOINC checkpoint files.  Restarting....\n");
 
 			boinc_resolve_filename(datafile.c_str(), buffer, 2048);
@@ -390,7 +390,7 @@ int main( int argc, char* argv[] )	{
 			if(conf.restart) outman.SetLogFileForAppend(temp_buf);
 			else outman.SetLogFile(temp_buf);
 
-			outman.UserMessage("Running %s Version %d.%d.%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
+			outman.UserMessage("Running %s Version %s.%s.%s (%s)", PROGRAM_NAME, MAJOR_VERSION, MINOR_VERSION, svnRev.c_str(), svnDate.c_str());
 
 #endif
 
