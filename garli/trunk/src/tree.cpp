@@ -5529,10 +5529,14 @@ FLOAT_TYPE Tree::GetScorePartialTerminalOrientedGap(const CondLikeArray *partial
 				//the full term here for each branch would be 
 				//(blen / TL) - (1.0 - expMu) / (mu * TL);
 				//or (blen - (1.0 - expMu) / mu)) / TL
-				for(int i = 1;i < numTipsTotal - 1;i++){
-					double expMu = exp(-mu * allNodes[i]->dlen);
-					//the TL would appear in the denominator of both of the following terms
-					sum += (allNodes[i]->dlen - (1.0 - expMu) / mu);
+				//for(int i = 1;i < numTipsTotal - 1;i++){
+				for(int i = 1;i < numNodesTotal;i++){
+                    //skip the dummy root branch
+                    if(allNodes[i] != dummyRoot){
+                        double expMu = exp(-mu * allNodes[i]->dlen);
+                        //the TL would appear in the denominator of both of the following terms
+                        sum += (allNodes[i]->dlen - (1.0 - expMu) / mu);
+                        }
 					}
 				//the oneInsertProportion needs to appear here because this single branch ins->del scenario
 				//is only relavent for the class with one insert 
