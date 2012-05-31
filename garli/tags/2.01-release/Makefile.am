@@ -8,7 +8,7 @@ EXTRA_DIST = \
 	project \
 	doc \
 	tests\
-	ncl-2.1.17.tar.gz
+	ncl-2.1.18.tar.gz
 
 SUBDIRS = src tests
 
