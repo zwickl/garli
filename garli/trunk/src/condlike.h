@@ -46,6 +46,7 @@
 #define __CONDLIKE_H
 
 #include <vector>
+#include <stddef.h>
 using namespace std;
 
 #include "defs.h"
