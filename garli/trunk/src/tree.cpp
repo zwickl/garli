@@ -1754,7 +1754,8 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 
 void Tree::FillAllSwapsList(ReconList *cuts, int reconLim){
 	CalcBipartitions(true);
-	for(int i=1;i<numNodesTotal;i++) cuts[i].clear();
+	for(int i=1;i<numNodesTotal;i++)
+		cuts[i].clear();
 	for(int i=1;i<numNodesTotal;i++){
 		GatherValidReconnectionNodes(cuts[i], reconLim, allNodes[i], NULL);
 		}
@@ -5250,8 +5251,9 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
-	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
+	vector<FLOAT_TYPE> freqs(nstates);
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 	FLOAT_TYPE siteL, unscaledlnL, totallnL = ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO;
 
@@ -5463,7 +5465,6 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 	totallnL += grandSumlnL;
 #endif
 
-	delete []freqs;
 	return totallnL;
 	}
 
@@ -5687,7 +5688,8 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 	const FLOAT_TYPE prI=mod->PropInvar();
 
 	FLOAT_TYPE freqs[4];
-	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+	for(int i=0;i<4;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
@@ -5710,34 +5712,35 @@ FLOAT_TYPE Tree::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,
 #endif
 			La=Lc=Lg=Lt=ZERO_POINT_ZERO;
 			if(*Ldata > -1){ //no ambiguity
-				for(int i=0;i<nRateCats;i++){
-					La  += prmat[(*Ldata)+16*i] * partial[0] * rateProb[i];
-					Lc  += prmat[(*Ldata+4)+16*i] * partial[1] * rateProb[i];
-					Lg  += prmat[(*Ldata+8)+16*i] * partial[2] * rateProb[i];
-					Lt  += prmat[(*Ldata+12)+16*i] * partial[3] * rateProb[i];
+				for(int rate=0;rate<nRateCats;rate++){
+					La  += prmat[(*Ldata)+16*rate] * partial[0] * rateProb[rate];
+					Lc  += prmat[(*Ldata+4)+16*rate] * partial[1] * rateProb[rate];
+					Lg  += prmat[(*Ldata+8)+16*rate] * partial[2] * rateProb[rate];
+					Lt  += prmat[(*Ldata+12)+16*rate] * partial[3] * rateProb[rate];
 					partial += 4;
 					}
 				Ldata++;
 				}
 				
 			else if(*Ldata == -4){ //total ambiguity
-				for(int i=0;i<nRateCats;i++){
-					La += partial[0] * rateProb[i];
-					Lc += partial[1] * rateProb[i];
-					Lg += partial[2] * rateProb[i];
-					Lt += partial[3] * rateProb[i];
+				for(int rate=0;rate<nRateCats;rate++){
+					La += partial[0] * rateProb[rate];
+					Lc += partial[1] * rateProb[rate];
+					Lg += partial[2] * rateProb[rate];
+					Lt += partial[3] * rateProb[rate];
 					partial += 4;
 					}
 				Ldata++;
 				}
 			else{ //partial ambiguity
 				char nstates=-1 * *(Ldata++);
-				for(int i=0;i<nstates;i++){
-					for(int i=0;i<nRateCats;i++){
-						La += prmat[(*Ldata)+16*i]  * partial[4*i] * rateProb[i];
-						Lc += prmat[(*Ldata+4)+16*i] * partial[1+4*i] * rateProb[i];
-						Lg += prmat[(*Ldata+8)+16*i]* partial[2+4*i] * rateProb[i];
-						Lt += prmat[(*Ldata+12)+16*i]* partial[3+4*i] * rateProb[i];
+				//this doesn't actually index anything, just counter
+				for(int s=0;s<nstates;s++){
+					for(int rate=0;rate<nRateCats;rate++){
+						La += prmat[(*Ldata)+16*rate]  * partial[4*rate] * rateProb[rate];
+						Lc += prmat[(*Ldata+4)+16*rate] * partial[1+4*rate] * rateProb[rate];
+						Lg += prmat[(*Ldata+8)+16*rate]* partial[2+4*rate] * rateProb[rate];
+						Lt += prmat[(*Ldata+12)+16*rate]* partial[3+4*rate] * rateProb[rate];
 						}
 					Ldata++;
 					}
@@ -5819,7 +5822,8 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 	const int *conBases=data->GetConstStates();
 
 	FLOAT_TYPE freqs[4];
-	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+	for(int i=0;i<4;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 
 #ifdef UNIX
@@ -5839,12 +5843,12 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 		if(1){
 #endif
 			La=Lc=Lg=Lt=ZERO_POINT_ZERO;
-			for(int r=0;r<nRateCats;r++){
-				int rOff=r*16;
-				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
-				Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
-				Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
-				Lt += ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3]) * partial[3] * rateProb[r];
+			for(int rate=0;rate<nRateCats;rate++){
+				int rOff=rate*16;
+				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0] * rateProb[rate];
+				Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1] * rateProb[rate];
+				Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * partial[2] * rateProb[rate];
+				Lt += ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3]) * partial[3] * rateProb[rate];
 				partial+=4;
 				CL1+=4;
 				}
@@ -5860,7 +5864,7 @@ FLOAT_TYPE Tree::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA,
 					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot*exp((FLOAT_TYPE)underflow_mult1[i]+underflow_mult2[i])));
 				}
 			else
-				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));	
+				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
 			
 			unscaledlnL = (log(siteL) - underflow_mult1[i] - underflow_mult2[i]);
 			totallnL += (countit[i] * unscaledlnL);
@@ -5924,8 +5928,9 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
-	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
+	vector<FLOAT_TYPE> freqs(nstates);
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 	FLOAT_TYPE siteL, unscaledlnL, totallnL = ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO;
 	
@@ -6122,7 +6127,6 @@ FLOAT_TYPE Tree::GetScorePartialInternalNState(const CondLikeArray *partialCLA, 
 		OutputSiteLikelihoods(dataIndex, siteLikes, underflow_mult1, underflow_mult2);
 		}
 
-	delete []freqs;
 	return totallnL;
 	}
 
@@ -6152,7 +6156,7 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialInternalNState(CondLikeArray *de
 	posix_madvise((void*)CL1, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
 #endif
 
-	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
+	vector<FLOAT_TYPE> freqs(nstates);
 	for(int i=0;i<nstates;i++) 
 		freqs[i]=mod->StateFreq(i);
 
@@ -6201,7 +6205,6 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialInternalNState(CondLikeArray *de
 			}
 		dest += nstates;
 		}
-	delete []freqs;
 	}
 
 void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalNState(CondLikeArray *destCLA, const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const char *Ldata, int modIndex, int dataIndex){
@@ -6229,7 +6232,7 @@ void Tree::GetStatewiseUnscaledPosteriorsPartialTerminalNState(CondLikeArray *de
 
 	FLOAT_TYPE totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO;
 
-	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
+	vector<FLOAT_TYPE> freqs(nstates);
 	for(int i=0;i<nstates;i++) 
 		freqs[i]=mod->StateFreq(i);
 

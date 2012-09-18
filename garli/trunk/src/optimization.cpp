@@ -2409,7 +2409,8 @@ void Tree::GetDerivsPartialTerminal(const CondLikeArray *partialCLA, const FLOAT
 	const FLOAT_TYPE prI=mod->PropInvar();
 
 	FLOAT_TYPE freqs[4];
-	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+	for(int i=0;i<4;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
@@ -2590,8 +2591,9 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	const FLOAT_TYPE prI=mod->PropInvar();
 	const int numCondPats = data->NumConditioningPatterns();
 
-	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
-	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
+	vector<FLOAT_TYPE> freqs(nstates);
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
@@ -2836,7 +2838,6 @@ void Tree::GetDerivsPartialTerminalNState(const CondLikeArray *partialCLA, const
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL += totL;
-	delete []freqs;
 	}
 
 void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, const char *Ldat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex){
@@ -2858,8 +2859,9 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 	const FLOAT_TYPE prI=mod->PropInvar();
 	const int numCondPats = data->NumConditioningPatterns();
 
-	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
-	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
+	vector<FLOAT_TYPE> freqs(nstates);
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
@@ -3039,7 +3041,6 @@ void Tree::GetDerivsPartialTerminalNStateRateHet(const CondLikeArray *partialCLA
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL += totL;
-	delete []freqs;
 	}
 
 void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex){
@@ -3062,7 +3063,8 @@ void Tree::GetDerivsPartialInternal(const CondLikeArray *partialCLA, const CondL
 	const FLOAT_TYPE prI=mod->PropInvar();	
 
 	FLOAT_TYPE freqs[4];
-	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+	for(int i=0;i<4;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
@@ -3228,8 +3230,9 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	const FLOAT_TYPE prI=mod->PropInvar();	
 	const int numCondPats = data->NumConditioningPatterns();
 
-	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
-	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
+	vector<FLOAT_TYPE> freqs(nstates);
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
@@ -3400,7 +3403,6 @@ void Tree::GetDerivsPartialInternalNStateRateHet(const CondLikeArray *partialCLA
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL += totL;
-	delete []freqs;
 	}
 
 void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, int modIndex, int dataIndex){
@@ -3424,8 +3426,9 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	const FLOAT_TYPE prI=mod->PropInvar();
 	const int numCondPats = data->NumConditioningPatterns();
 
-	FLOAT_TYPE *freqs = new FLOAT_TYPE[nstates];
-	for(int i=0;i<nstates;i++) freqs[i]=mod->StateFreq(i);
+	vector<FLOAT_TYPE> freqs(nstates);
+	for(int i=0;i<nstates;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 #ifdef UNIX
 	posix_madvise((void*)partial, nchar*nstates*nRateCats*sizeof(FLOAT_TYPE), POSIX_MADV_SEQUENTIAL);
@@ -3589,7 +3592,6 @@ void Tree::GetDerivsPartialInternalNState(const CondLikeArray *partialCLA, const
 	d1Tot = tot1;
 	d2Tot = tot2;
 	lnL += totL;
-	delete []freqs;
 	}
 
 void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, const FLOAT_TYPE *prmat, const FLOAT_TYPE *d1mat, const FLOAT_TYPE *d2mat, FLOAT_TYPE &d1Tot, FLOAT_TYPE &d2Tot, char *equiv, int modIndex, int dataIndex){
@@ -3632,7 +3634,8 @@ void Tree::GetDerivsPartialInternalEQUIV(const CondLikeArray *partialCLA, const 
 	const FLOAT_TYPE prI=mod->PropInvar();	
 
 	FLOAT_TYPE freqs[4];
-	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
+	for(int i=0;i<4;i++) 
+		freqs[i]=mod->StateFreq(i);
 
 	int rOff =0;
 	for(int i=0;i<nchar;i++){
