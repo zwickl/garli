@@ -1,0 +1,118 @@
+#NOTE THIS IS AN OLD AND CRAPPY MAKEFILE  
+#SEE THE INSTALL FILE FOR COMPILATION INSTRUCTIONS AND DO NOT USE
+#THIS UNLESS YOU HAVE TO
+
+#GARLI version 0.97 makefile
+
+#NOTE - this is from the poor make system of version 0.951 and earlier.  The configure
+#	script mechanism should now be used instead if possible
+
+#to use, follow steps 1, 2 and optionally 3
+
+#(1) choose one of these compile types
+#options are:
+#gcc_any		gnu compiler gcc, any architecture
+#gcc_osx_universal	gcc on OSX to make a universal binary
+#xlc_ppc970		ibm compiler for Power PC 970 architecture
+#icc_any		Intel compiler icc (commercial). \
+			icc code is much faster on intel hardware
+
+COMPILE_TYPE = gcc_any
+
+
+#(2) these need to be adjusted to the correct path to a compiled
+#copy of Paul Lewis's Nexus Class Library
+#(NCL is available here: http://hydrodictyon.eeb.uconn.edu/ncl)
+#See the NCL documentation for details on compiling it.
+#Note that you may be able to safely ignore some errors during
+#NCL compilation (Garli only needs the static library libncl.a)
+NCL_INCLUDES = ../../ncl-2.0/src
+LIB_NCL = ../../ncl-2.0/src/libncl.a
+
+
+#(3)set this to yes to compile a version that uses MPI to fork
+#multiple serial runs across processors (using the same config)
+#This is an advanced option and should generally be = no unless
+#you know what you are doing
+MPI_RUN_SPLITTER = no
+
+#gcc: gnu compiler 
+	#linux or OSX binary that will work on the machine type that it is compiled on
+ifeq ($(COMPILE_TYPE),gcc_any)
+	CC = g++
+	CC_FLAGS = -O3 -fstrict-aliasing -fomit-frame-pointer -funroll-loops \
+		 -fsigned-char -DNDEBUG -DUNIX  -I$(NCL_INCLUDES)
+
+endif
+
+#gcc: gnu compiler 
+	#OSX universal binary (may only compile on intel machines)
+ifeq ($(COMPILE_TYPE),gcc_osx_universal)
+	CC = g++
+	CC_FLAGS = -O3 -fstrict-aliasing -arch i386 -arch ppc -fomit-frame-pointer \
+		 -funroll-loops -DUNIX -DNDEBUG -include defs.h -I$(NCL_INCLUDES)
+endif
+
+#icc: intel compiler, any machine type
+ifeq ($(COMPILE_TYPE),icc_any)
+	CC = icpc
+	CC_FLAGS =  -O2 -ip -fno-alias -DUNIX -DNDEBUG -I$(NCL_INCLUDES)
+endif
+
+#xlc: IBM compiler, PowerPC 970 processor
+ifeq ($(COMPILE_TYPE),xlc_ppc970)
+	CC = xlC
+	CC_FLAGS = -qsourcetype=c++ -qarch=ppc970 -qtune=ppc970 -qenablevmx \
+		-qaltivec -q64 -O3 -qalias=ansi -qunroll=yes -qchars=signed \
+		-qinclude=defs.h -I$(NCL_INCLUDES) -DUNIX -DNDEBUG
+endif
+
+ifeq ($(MPI_RUN_SPLITTER), yes)
+	CC = mpicxx
+	CC_FLAGS += -DSUBROUTINE_GARLI
+endif
+
+
+EXEC     = Garli-Part-0.97
+
+OBJECT_LIST =	condlike.o datamatr.o individual.o\
+		population.o rng.o set.o\
+		garlireader.o translatetable.o tree.o treenode.o\
+		funcs.o	configreader.o configoptions.o\
+		bipartition.o model.o linalg.o adaptation.o sequencedata.o\
+		optimization.o
+
+ifeq ($(MPI_RUN_SPLITTER), yes)
+	OBJECT_LIST += mpitrick.o
+endif
+
+Garli-Part-0.97 : $(OBJECT_LIST) garlimain.o
+	$(CC) $(CC_FLAGS) -v -o $(EXEC) $(OBJECT_LIST) $(LIB_NCL) garlimain.o
+
+#this forces garlimain.cpp to always be recompiled, which ensures that the
+#"compiled on XXX" message will be current
+garlimain.o::
+	$(CC) $(CC_FLAGS) -c -I. garlimain.cpp
+.cpp.o: 
+	$(CC) -c $(CC_FLAGS)  -I.  $*.cpp
+
+condlike.o:      condlike.h defs.h
+configreader.o:  configreader.h defs.h
+configoptions.o: configoptions.h defs.h
+tree.o:          tree.h funcs.h defs.h clamanager.h
+optimization.o:	 tree.h funcs.h defs.h
+population.o:    population.h clamanager.h defs.h
+individual.o:    individual.h clamanager.h defs.h
+datamatr.o:      datamatr.h defs.h
+model.o:         model.h defs.h
+funcs.o:         funcs.h defs.h
+linalg.o:        linalg.h defs.h
+treenode.o:      treenode.h defs.h
+bipartition.o:   bipartition.h defs.h
+translatetable.o:translatetable.h defs.h
+set.o:           set.h defs.h
+rng.o:           rng.h defs.h
+adaptation.o:	 	 adaptation.h defs.h
+sequencedata.o:		 sequencedata.h defs.h
+garlireader.o:	garlireader.h defs.h
+
