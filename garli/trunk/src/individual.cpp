@@ -712,7 +712,11 @@ void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
 			if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1 || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()))
 				optRelRates = true;
 			}
-		if(modSpecSet.InferSubsetRates() && modSpecSet.NumSpecs() > 1)
+		//oops, bug fixed 10/2/12 - subset rates weren't getting opt in linked models
+		//modSpecSet.inferSubsetRates is already getting set only if conf.inferSubsetRates
+		//is true and there are multiple matrices, but not necessarily multiple models
+		//if(modSpecSet.InferSubsetRates() && modSpecSet.NumSpecs() > 1)
+		if(modSpecSet.InferSubsetRates())
 			optSubsetRates = true;
 		}
 
