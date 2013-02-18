@@ -4876,7 +4876,7 @@ void ModelPartition::ReadGarliFormattedModelStrings(string &modstr){
 				mod.erase(0, space + 1);
 				vector<FLOAT_TYPE> ssr;
 				NxsString val;
-				for(int m = 0;m < models.size();m++){
+				for(int m = 0;m < NumSubsetRates();m++){
 					space = mod.find(" ");
 					if(space == string::npos){
 						if(mod.length() == 0){
