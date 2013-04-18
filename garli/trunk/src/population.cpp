@@ -1991,8 +1991,9 @@ void Population::Run(){
 			}
 
 #ifndef BOINC
-			//non-BOINC checkpointing
-		if(conf->checkpoint==true && ((gen % conf->saveevery) == 0)) WriteStateFiles();
+		//non-BOINC checkpointing
+		if(conf->checkpoint == true && conf->scoreOnly == false && conf->optimizeInputOnly == false && ((gen % conf->saveevery) == 0)) 
+			WriteStateFiles();
 #endif
 
 #ifdef BOINC 
@@ -2962,11 +2963,13 @@ void Population::PerformSearch(){
 			SeedPopulationWithStartingTree(currentSearchRep);
 			UpdateFractionDone(1);
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
-			if(conf->checkpoint) WriteStateFiles();
+			if(conf->checkpoint) 
+				WriteStateFiles();
 			}
 		else{
 			adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(conf);
-			if(currentSearchRep > conf->searchReps) throw ErrorException("rep number in checkpoint (%d) is larger than total rep specified in config (%d)", currentSearchRep, conf->searchReps);
+			if(currentSearchRep > conf->searchReps) 
+				throw ErrorException("rep number in checkpoint (%d) is larger than total rep specified in config (%d)", currentSearchRep, conf->searchReps);
 			outman.UserMessage("%s generation %d, seed %d, best lnL %.3f", s.c_str(), gen, rnd.init_seed(), indiv[bestIndiv].Fitness());
 			}
 
