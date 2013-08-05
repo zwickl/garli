@@ -751,9 +751,17 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 	const NxsUnsignedSet *realCharSet = & charset;
 	NxsUnsignedSet charsetMinusExcluded;
 	if (!excluded.empty()) {
-		string exsetName = NxsSetReader::GetSetAsNexusString(excluded);
-		outman.UserMessage("Excluded characters: %s\n\t", exsetName.c_str());
+		int origSize = charset.size();
 		set_difference(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(charsetMinusExcluded, charsetMinusExcluded.begin()));
+		//only output a message about excluded characters if there is actually an intersection of the exset with the
+		//characters in this subset.  Otherwise multiple subsets in a partition will report the same exclusions.
+		//Also, if there are a ton of excluded chars, truncate the message.
+		if(charsetMinusExcluded.size() != origSize){
+			NxsUnsignedSet actuallyExcluded;
+			set_intersection(charset.begin(), charset.end(), excluded.begin(), excluded.end(), inserter(actuallyExcluded, actuallyExcluded.begin()));
+			NxsString exstr = NxsString(NxsSetReader::GetSetAsNexusString(actuallyExcluded).c_str()).ShortenTo(500);
+			outman.UserMessage("\tExcluded character numbers:%s\n\t", exstr.c_str());
+			}
 		realCharSet = &charsetMinusExcluded;
 	}
 
