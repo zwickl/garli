@@ -170,6 +170,7 @@ class Tree{
 		void DeterministicSwapperByDist(Individual *source, double optPrecision, int range, bool furthestFirst);
 		void DeterministicSwapperByCut(Individual *source, double optPrecision, int range, bool furthestFirst);
 		void DeterministicSwapperRandom(Individual *source, double optPrecision, int range);
+		void GenerateTopologiesAtSprDistance(Individual *source, double optPrecision, int range);
 		void GatherValidReconnectionNodes(ReconList &list, int maxDist, TreeNode *cut, const TreeNode *subtreeNode, Bipartition *partialMask=NULL);
 		void GatherValidReconnectionNodes(int maxRange, TreeNode *cut, const TreeNode *subtreeNode, Bipartition *partialMask=NULL);
 		void FillAllSwapsList(ReconList *cuts, int reconLim);
