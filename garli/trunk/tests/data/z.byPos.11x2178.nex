@@ -30,3 +30,7 @@ charset 3rd = 3-2178\3;
 
 charpartition byPos = 1stpos:1st, 2ndpos:2nd, 3rdpos:3rd;
 end;
+
+begin assumptions;
+exset * test = 4 5 6;
+end;
