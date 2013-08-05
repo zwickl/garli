@@ -710,6 +710,8 @@ void Population::SwapToCompletion(FLOAT_TYPE optPrecision){
 		indiv[0].treeStruct->DeterministicSwapperByDist(&indiv[0], optPrecision, conf->limSPRrange, true);
 	else if(conf->runmode == 6)
 		indiv[0].treeStruct->DeterministicSwapperByCut(&indiv[0], optPrecision, conf->limSPRrange, true);
+	else if(conf->runmode == 13)
+		indiv[0].treeStruct->GenerateTopologiesAtSprDistance(&indiv[0], optPrecision, conf->limSPRrange);
 
 	bestIndiv = 0;
 	FinalOptimization();

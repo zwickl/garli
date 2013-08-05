@@ -1517,15 +1517,19 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 	dataPart->BeginNexusTreesBlock(better);
 
 #ifdef OUTPUT_ALL
-	if(furthestFirst) sprintf(str, "determAllCutR.%d.%f.tre", range, optPrecision);
-	else sprintf(str, "determAllCut.%d.%f.tre", range, optPrecision);	
+	if(furthestFirst) 
+		sprintf(str, "determAllCutR.%d.%f.tre", range, optPrecision);
+	else 
+		sprintf(str, "determAllCut.%d.%f.tre", range, optPrecision);	
 	
 	ofstream all(str);
 	dataPart->BeginNexusTreesBlock(all);
 #endif
 
-	if(furthestFirst) sprintf(str, "determCutR%d.%f.log", range, optPrecision);
-	else sprintf(str, "determCut%d.%f.log", range, optPrecision);
+	if(furthestFirst) 
+		sprintf(str, "determCutR%d.%f.log", range, optPrecision);
+	else 
+		sprintf(str, "determCut%d.%f.log", range, optPrecision);
 	FILE *log = fopen(str, "w");
 	
 	//allocate a treeString
@@ -1546,7 +1550,8 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 		cut=tempIndiv.treeStruct->allNodes[c];
 		tempIndiv.treeStruct->GatherValidReconnectionNodes(range, cut, NULL);
 		tempIndiv.treeStruct->sprRang.SortByDist();
-		if(furthestFirst) tempIndiv.treeStruct->sprRang.Reverse();
+		if(furthestFirst) 
+			tempIndiv.treeStruct->sprRang.Reverse();
 
 		for(list<ReconNode>::iterator b = tempIndiv.treeStruct->sprRang.begin();b != tempIndiv.treeStruct->sprRang.end();b++){
 			ReconNode *broken = &(*b);
@@ -1562,7 +1567,8 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 
 			if(unique){
 				swapNum++;
-				if(swapNum %100 == 0) fprintf(log, "%d\t%d\t%f\n", swapNum, acceptedSwaps, lnL);
+				if(swapNum %100 == 0) 
+					fprintf(log, "%d\t%d\t%f\n", swapNum, acceptedSwaps, lnL);
 				if(broken->withinCutSubtree == true){
 					tempIndiv.treeStruct->ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
 					}
@@ -1594,7 +1600,8 @@ void Tree::DeterministicSwapperByCut(Individual *source, double optPrecision, in
 				}
 			}
 		c++;
-		if(c == numNodesTotal) c = 1;
+		if(c == numNodesTotal) 
+			c = 1;
 		if(newBest == true){
 			startC = c;
 			newBest = false;
@@ -1637,23 +1644,29 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 	outman.UserMessage("starting score:%f", tempIndiv.treeStruct->lnL);
 
 	char str[50];
-	if(furthestFirst) sprintf(str, "determImpsDistR.%d.%f.tre", range, optPrecision);
-	else sprintf(str, "determImpsDist.%d.%f.tre", range, optPrecision);
+	if(furthestFirst) 
+		sprintf(str, "determImpsDistR.%d.%f.tre", range, optPrecision);
+	else 
+		sprintf(str, "determImpsDist.%d.%f.tre", range, optPrecision);
 
 	ofstream better(str);
 	better.precision(9);
 	dataPart->BeginNexusTreesBlock(better);
 
 #ifdef OUTPUT_ALL
-	if(furthestFirst) sprintf(str, "determAllDistR.%d.%f.tre", range, optPrecision);
-	else sprintf(str, "determAllDist.%d.%f.tre", range, optPrecision);	
+	if(furthestFirst) 
+		sprintf(str, "determAllDistR.%d.%f.tre", range, optPrecision);
+	else 
+		sprintf(str, "determAllDist.%d.%f.tre", range, optPrecision);	
 	
 	ofstream all(str);
 	dataPart->BeginNexusTreesBlock(all);
 #endif
 
-	if(furthestFirst) sprintf(str, "determDistR%d.%f.log", range, optPrecision);
-	else sprintf(str, "determDist%d.%f.log", range, optPrecision);
+	if(furthestFirst) 
+		sprintf(str, "determDistR%d.%f.log", range, optPrecision);
+	else 
+		sprintf(str, "determDist%d.%f.log", range, optPrecision);
 	FILE *log = fopen(str, "w");
 	
 	//allocate a treeString
@@ -1735,7 +1748,8 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 		else if(c == startC){
 			if(furthestFirst) 
 				currentDist--;
-			else currentDist++;
+			else 
+				currentDist++;
 			outman.UserMessage("dist = %d", currentDist);
 			}
 		}while(currentDist <= range && currentDist > 0);
@@ -1754,8 +1768,10 @@ void Tree::DeterministicSwapperByDist(Individual *source, double optPrecision, i
 
 void Tree::FillAllSwapsList(ReconList *cuts, int reconLim){
 	CalcBipartitions(true);
-	for(int i=1;i<numNodesTotal;i++)
+
+	for(int i=1;i<numNodesTotal;i++) 
 		cuts[i].clear();
+
 	for(int i=1;i<numNodesTotal;i++){
 		GatherValidReconnectionNodes(cuts[i], reconLim, allNodes[i], NULL);
 		}
@@ -1971,6 +1987,95 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 			}
 		}
 */	}
+
+void Tree::GenerateTopologiesAtSprDistance(Individual *source, FLOAT_TYPE optPrecision, int range){
+
+	TreeNode *cut;
+	int swapNum=0;
+	
+	Individual tempIndiv;
+	tempIndiv.treeStruct=new Tree();
+	
+	tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source);
+
+	//ensure that the starting tree is optimal up to the required precision
+	FLOAT_TYPE imp = 999.9;
+	do{
+		imp = tempIndiv.treeStruct->OptimizeAllBranches(optPrecision);
+		}while(imp > 0.0);
+
+	outman.UserMessage("starting score:%f", tempIndiv.treeStruct->lnL);
+
+	char str[50];
+
+	sprintf(str, "allswaps.SPR%d.tre", range);	
+	ofstream all(str);
+	dataPart->BeginNexusTreesBlock(all);
+
+	sprintf(str, "allswaps.SPR%d.log", range);
+	FILE *log = fopen(str, "w");
+
+	//allocate a treeString
+	double taxsize=log10((double) ((double)dataPart->NTax())*dataPart->NTax()*2);
+	int stringSize=(int)((dataPart->NTax()*2)*(10+DEF_PRECISION));
+	char *treeString=new char[stringSize];
+	stringSize--;
+	treeString[stringSize]='\0';
+	//bool newBest=false;
+
+	int acceptedSwaps = 0;
+
+	tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+	all << "tree start = [&U][" << lnL << "]" << treeString << ";" << endl;	
+
+	for(int cutnum=1;cutnum<numNodesTotal;cutnum++){
+		int swapsOnCurrent=0;
+		TreeNode *cut = tempIndiv.treeStruct->allNodes[cutnum];
+
+		tempIndiv.treeStruct->CalcBipartitions(true);
+		tempIndiv.treeStruct->GatherValidReconnectionNodes(range, cut, NULL);
+
+		//tempIndiv.treeStruct->FillAllSwapsList(range);
+		ReconList *cutSwapList = &tempIndiv.treeStruct->sprRang;
+		for(listIt b=cutSwapList->begin();b!=cutSwapList->end();b++){
+			//listIt b = cut.NthElement(rnd.random_int(cuts[c].size()));
+			ReconNode *broken = &(*b);
+			
+			//log the swap about to be performed.  Although this func goes through the swaps in order,
+			//there will be duplication because of the way that NNIs are performed.  Two different cut
+			//nodes can be reconnected with an NNI such that the same topology results
+			bool unique=false;
+			Bipartition proposed;
+			CalcBipartitions(true);
+			proposed.FillWithXORComplement(*(cut->bipart), *(tempIndiv.treeStruct->allNodes[broken->nodeNum]->bipart));
+			unique = attemptedSwaps.AddSwap(proposed, cut->nodeNum, broken->nodeNum, broken->reconDist);
+
+			if(unique){
+				swapNum++;
+				swapsOnCurrent++;
+				if(broken->withinCutSubtree == true){
+					tempIndiv.treeStruct->ReorientSubtreeSPRMutate(cut->nodeNum, broken, optPrecision);
+					}
+				else{
+					tempIndiv.treeStruct->SPRMutate(cut->nodeNum, broken, optPrecision, 0);
+					}
+				tempIndiv.treeStruct->root->MakeNewick(treeString, false, true);
+				all << "tree " << cutnum << "." << b->nodeNum << "." << b->reconDist << "." << swapsOnCurrent << " = [&U][" << lnL << "]" << treeString << ";" << endl;	
+				
+				tempIndiv.CopySecByRearrangingNodesOfFirst(tempIndiv.treeStruct, source, true);
+				}
+			else{
+				if(broken->reconDist != 1) 
+					throw ErrorException("nonunique swap > NNI found! %d %d %d", cutnum, b->nodeNum, b->reconDist);
+				}
+			//if(swapNum %100 == 0) 
+			fprintf(log, "%d\t%d\t%f\n", swapNum, acceptedSwaps, lnL);
+			}
+		}
+	
+	//outman.UserMessage("%d swaps before completion", swapsOnCurrent);
+	all << "end;" << endl;
+	}
 
 //this function now returns the reconnection distance, with it being negative if its a
 //subtree reorientation swap
