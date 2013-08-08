@@ -2007,10 +2007,18 @@ void Population::Run(){
 #endif
 		if(stopwatch.SplitTime() > conf->stoptime){
 			outman.UserMessage("NOTE: ****Specified time limit (%d seconds) reached...", conf->stoptime);
+			//Time termination can be used a sort of "pause" along with checkpointing.  Checkpoints may be
+			//written very infrequently though (large saveevery), so spit one out now.
+			//Always do this in BOINC mode.	
+#ifndef BOINC
+			if(conf->checkpoint)
+#endif
+				WriteStateFiles();	
 			timeTermination = true;
 			break;
 			}
 		if(gen == conf->stopgen){
+			//stopgen is essentially a stopping condition, treated just like the flexible automated criterion.
 			outman.UserMessage("NOTE: ****Specified generation limit (%d) reached...", conf->stopgen);
 			genTermination = true;
 			}
@@ -2033,8 +2041,8 @@ void Population::Run(){
 	TurnOffSignalCatching();
 	//don't optimize if checkpointing is happening and the run was prematurely killed
 	if(conf->refineEnd  && !(conf->checkpoint && (timeTermination || userTermination)))
-	//the version adapted from trunk 1.0 final opt
-	BetterFinalOptimization();
+		//the version adapted from trunk 1.0 final opt
+		BetterFinalOptimization();
 
 	finishedRep = true;
 
