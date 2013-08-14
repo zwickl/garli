@@ -19,6 +19,7 @@
 #define ERROREXCEPTION
 
 #include <stdarg.h>
+#include <cstring>
 #include <cassert>
 #include <ostream>
 #include "outputman.h"
