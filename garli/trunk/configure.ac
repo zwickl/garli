@@ -163,8 +163,10 @@ fi
 if test  "$enable_openmp" = yes; then
 	if test "$CC" = "icc"; then
 		CXXFLAGS="$CXXFLAGS -openmp"
+	elif test "$CC" = "gcc"; then
+		CXXFLAGS="$CXXFLAGS -fopenmp"
 	else
-		AC_MSG_ERROR([the --enable-openmp option can only be used with the intel compiler (CC=icc)])
+		AC_MSG_ERROR([the --enable-openmp option can only be used with the intel compiler and newer versions of gcc (CC=icc or CC=gcc)])
 	fi
 fi
 
