@@ -32,6 +32,10 @@
 #include <conio.h>
 #endif
 
+#ifdef MPI_VERSION
+#include "mpi.h"
+#endif
+
 #include "defs.h"
 #include "population.h"
 #include "individual.h"
@@ -40,7 +44,6 @@
 #include "garlireader.h"
 
 #include "funcs.h"
-#include "mpifuncs.h"
 #include "tree.h"
 #include "errorexception.h"
 #include "outputman.h"
@@ -59,10 +62,6 @@ typedef pid_t pid_type;
 #ifdef MAC_FRONTEND
 #import <Foundation/Foundation.h>
 #import "MFEInterfaceClient.h"
-#endif
-
-#ifdef MPI_VERSION
-#include "mpi.h"
 #endif
 
 #ifdef CUDA_GPU

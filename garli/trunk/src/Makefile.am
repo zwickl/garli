@@ -3,8 +3,8 @@ AM_LDFLAGS  = @LDFLAGS@
  
 bin_PROGRAMS = Garli
 
-EXTRA_DIST = mpitrick.cpp \
-	threadfunc.cpp
+EXTRA_DIST = threadfunc.cpp \
+	mpifuncs.cpp 
 
 noinst_HEADERS = \
 	adaptation.h \
@@ -50,7 +50,6 @@ Garli_SOURCES = \
 	individual.cpp \
 	linalg.cpp \
 	model.cpp \
-	mpifuncs.cpp \
 	optimization.cpp \
 	population.cpp \
 	rng.cpp \
