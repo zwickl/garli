@@ -17,12 +17,12 @@
 
 #if defined(SUBROUTINE_GARLI) || defined(OLD_SUBROUTINE_GARLI)
 
+#include "mpi.h"
 #include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
 #include "defs.h"
 #include "string.h"
-#include "mpi.h"
 #include <time.h>
 #include "funcs.h"
 #include "outputman.h"
