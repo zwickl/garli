@@ -83,5 +83,5 @@ fi
 echo "BUILDING GARLI ..."
 make || exit
 make install || exit
-cp ${nclv}/installed/bin/NEXUSgapcode bin/
+cp ${nclv}/example/gapcode/NEXUSgapcode bin/
 
