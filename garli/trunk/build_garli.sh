@@ -12,8 +12,10 @@ then
                 	echo "***DELETE THE ncl-svn DIRECTORY TO GET THE LATEST NCL SOURCE***"
 		else
 	                echo "***CHECKING OUT NCL LIBRARY SOURCE VIA SUBVERSION***"
-			svn co http://ncl.svn.sourceforge.net/svnroot/ncl/branches/v2.1 ncl-svn || exit
-                fi
+			#9/3/13 - Looks like the ncl repo path moved
+            #svn co http://ncl.svn.sourceforge.net/svnroot/ncl/branches/v2.1 ncl-svn || exit
+			svn co http://svn.code.sf.net/p/ncl/code/branches/v2.1 ncl-svn || exit
+        fi
 		nclv="ncl-svn"
                 cd ${nclv} || exit
                 sh bootstrap.sh || exit
