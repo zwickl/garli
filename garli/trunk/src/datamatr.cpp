@@ -320,6 +320,9 @@ void PatternManager::CalcPatternTypesAndNumStates(){
 			}
 		}
 	numNonMissingChars = totNumChars - numMissingChars;
+	if( numNonMissingChars == 0 ){
+		throw ErrorException("Matrix is made up entirely of missing characters (?, -, or N)!");
+		}
 	}
 
 //note where all of the constant sites are, and what state they are.
@@ -728,6 +731,9 @@ void DataMatrix::Summarize(){
 			assert(ptFlags & PT_VARIABLE);
 			nVarUninform += count[k];
 			}
+		}
+	if( nConstant + nInformative + nVarUninform == 0 ){
+		throw ErrorException("Matrix is made up entirely of missing characters (?, -, or N)!");
 		}
 	}
 
