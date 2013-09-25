@@ -1533,6 +1533,12 @@ if(nd->nodeNum == 8){
 					if(lnL < initialL - pow(10.0, -6.0+ceil(log10(-lnL)))){
 						outman.DebugMessage("Score worsened by %.6f, restoring blen, exiting", initialL - lnL);
 						SetBranchLength(nd, v_onEntry);
+						//9/25/13 There was a dumb bug here where even if the blen was reset a positive 
+ 						//improvement could be returned.  This code only gets executed very infrequently, 
+ 						//and the bug only caused issues under very specific and even more rare conditions.
+ 						//e.g., when only this branch was in the optimize queue
+						totalEstImprove = ZERO_POINT_ZERO;
+						Score();
 						}
 					assert(lnL >= initialL - pow(10.0, -6.0+ceil(log10(-lnL))));
 					#ifdef OPT_DEBUG
