@@ -67,6 +67,10 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	runmode = 0;
 	scoreOnly = false;
 	
+#ifdef BOINC
+	boincWorkDivision = false;
+#endif
+
 	attachmentsPerTaxon = 50;
 
 	siteWindowLength = 0;
@@ -208,6 +212,10 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetUnsignedOption("bootstrapreps", bootstrapReps, true);
 	cr.GetPositiveNonZeroDoubleOption("resampleproportion", resampleProportion, true);
 	cr.GetBoolOption("inferinternalstateprobs", inferInternalStateProbs, true);
+
+#ifdef BOINC
+	cr.GetBoolOption("boincworkdivision", boincWorkDivision, true);
+#endif
 
 	bool multipleModelsFound = ReadPossibleModelPartition(cr);
 
