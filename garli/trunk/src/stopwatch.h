@@ -38,10 +38,15 @@ class Stopwatch	{
 			}
 		void Start()	{
 			time(&start_time);
+			this_execution_start_time = start_time;
 			}		
 		int SplitTime()	{
 			time(&end_time);
 			return (int)(end_time - start_time);		
+			}
+		int ThisExecutionSplitTime()	{
+			time(&end_time);
+			return (int)(end_time - this_execution_start_time);		
 			}
 		//this is for restarting
 		void AddPreviousTime(time_t t){
@@ -53,10 +58,15 @@ class Stopwatch	{
 			}
 		void Start()	{
 			gettimeofday(&start_time, NULL);
+			this_execution_start_time = start_time;
 			}		
 		int SplitTime()	{
 			gettimeofday(&end_time, NULL);
 			return end_time.tv_sec - start_time.tv_sec;
+			}
+		int ThisExecutionSplitTime()	{
+			gettimeofday(&end_time, NULL);
+			return end_time.tv_sec - this_execution_start_time.tv_sec;
 			}
 		//this is for restarting
 		void AddPreviousTime(int t){
@@ -67,9 +77,15 @@ class Stopwatch	{
 
 	private:
 		#ifndef UNIX
+		//these are with respect to the entire run, summing across any possible restarts from checkpoint
 		time_t start_time, end_time;
+		//this is the time at which the binary was most recently started, possibly as a restart from checkpoint
+		//this can be used to interpret stoptime as a time since invocation, rather than the total amount of time
+		//used by the search, summed across restarts
+		time_t this_execution_start_time;
 		#else
-		timeval start_time, end_time;
+		timeval start_time, restart_time, end_time;
+		timeval this_execution_start_time;
 		#endif
 
 };
