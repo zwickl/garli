@@ -1551,6 +1551,7 @@ void Population::WriteStateFiles(){
 		sout.open(sphysical_name, "wb");
 		sout.close();
 		}
+	boinc_checkpoint_completed();
 #else
 	//it would be nice to be able to do something like what is done for BOINC above (buffering output and
 	//then writing all at once), maybe with a stringstream, but I couldn't get that to work
@@ -1714,7 +1715,8 @@ void Population::ReadPopulationCheckpoint(){
 		assert(s == nextBootstrapSeed);
 		}
 
-	if(gen == UINT_MAX) finishedRep = true;
+	if(gen == UINT_MAX) 
+		finishedRep = true;
 
 	for(unsigned i=0;i<total_size;i++){
 		assert(modSpecSet.NumSpecs() == indiv[i].modPart.NumModelSets());
@@ -1760,6 +1762,36 @@ void Population::ReadPopulationCheckpoint(){
 		throw ErrorException("Problem reading checkpoint files.  Scores of stored trees don't match calculated scores.");
 	CalcAverageFitness();
 	globalBest = bestFitness;
+	}
+
+//Depending on the generation, output to various files during the GA search
+void Population::WriteGenerationOutput(){
+	if(conf->outputMostlyUselessFiles) 
+		OutputFate();
+	if(conf->logevery > 0 && !(gen % conf->logevery)) 
+		OutputLog();
+	if(conf->saveevery > 0 && !(gen % conf->saveevery)){
+		if(best_output & WRITE_CONTINUOUS){
+			string outname = besttreefile;
+			outname += ".current";
+			WriteTreeFile( outname.c_str(), -1);
+			}
+
+		outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
+
+		if(swapBasedTerm)
+			outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
+
+		if(conf->reportRunProgress)
+			outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
+
+		outman.UserMessage("");
+		
+		if(conf->outputMostlyUselessFiles){
+			swapLog << gen << "\t";
+			indiv[bestIndiv].treeStruct->attemptedSwaps.SwapReport(swapLog);
+			}
+		}
 	}
 
 void Population::Run(){
@@ -1809,42 +1841,15 @@ void Population::Run(){
 	outman.UserMessage("");
 
 	OutputLog();
-	if(conf->outputMostlyUselessFiles) OutputFate();	
+	if(conf->outputMostlyUselessFiles) 
+		OutputFate();	
 
 	gen++;
 	for (; gen < conf->stopgen+1; ++gen){
 		NextGeneration();
-		if(swapBasedTerm){
-			if(uniqueSwapTried){
-				lastUniqueSwap = gen;
-				uniqueSwapTried = false;
-				}
-			}
-		keepTrack();
-		if(conf->outputMostlyUselessFiles) OutputFate();
-		if(conf->logevery > 0 && !(gen % conf->logevery)) OutputLog();
-		if(conf->saveevery > 0 && !(gen % conf->saveevery)){
-			if(best_output & WRITE_CONTINUOUS){
-				string outname = besttreefile;
-				outname += ".current";
-				WriteTreeFile( outname.c_str(), -1);
-				}
 
-			outman.UserMessageNoCR("%-8d %-14.4f   %-9.3f  %6d ", gen, BestFitness(), adap->branchOptPrecision, lastTopoImprove);
-
-			if(swapBasedTerm)
-				outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
-
-			if(conf->reportRunProgress)
-				outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
-
-			outman.UserMessage("");
+		WriteGenerationOutput();
 			
-			if(conf->outputMostlyUselessFiles){
-				swapLog << gen << "\t";
-				indiv[bestIndiv].treeStruct->attemptedSwaps.SwapReport(swapLog);
-				}
-			}
 #ifndef BOINC
 		userTermination = CheckForUserSignal();
 		if(userTermination){
@@ -2002,8 +2007,6 @@ void Population::Run(){
 //BOINC checkpointing can occur whenever the BOINC client wants it to
 		if(boinc_time_to_checkpoint()){
 			WriteStateFiles();
-			boinc_checkpoint_completed();
-			}
 #endif
 		if(stopwatch.SplitTime() > conf->stoptime){
 			outman.UserMessage("NOTE: ****Specified time limit (%d seconds) reached...", conf->stoptime);
@@ -2937,7 +2940,8 @@ void Population::Bootstrap(){
 //and then calling Run().  It can be called either directly from main(), or 
 //from Bootstrap()
 void Population::PerformSearch(){
-	if(conf->restart == false) currentSearchRep = 1;
+	if(conf->restart == false) 
+		currentSearchRep = 1;
 	else{
 		outman.UserMessage("\nRestarting from checkpoint...");
 		if(finishedRep == true){
@@ -2969,7 +2973,8 @@ void Population::PerformSearch(){
 			//the fraction done is set to 1% here, indicating the this rep is ready to go
 			//if we restarted, the fraction should already have been set when reading the state files
 			UpdateFractionDone(0);
-			if(s.length() > 0) outman.UserMessage("\n>>>%s<<<", s.c_str());
+			if(s.length() > 0) 
+				outman.UserMessage("\n>>>%s<<<", s.c_str());
 			SeedPopulationWithStartingTree(currentSearchRep);
 			UpdateFractionDone(1);
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
