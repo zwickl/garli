@@ -288,6 +288,10 @@ private:
 					//the case of the parallel master
 	unsigned ntopos;
 
+	//this indicates that we've exited the generation loop in Run(), but if 
+	//finishedRep is false that means that we still have to do final opt.
+	bool finishedGenerations;
+
 	FLOAT_TYPE bestFitness;
 	FLOAT_TYPE prevBestFitness;
 	FLOAT_TYPE tot_fraction_done;
@@ -398,7 +402,8 @@ private:
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
 			userTermination(false), timeTermination(false), genTermination(false), currentBootstrapRep(0),
-			finishedRep(false), lastBootstrapSeed(0), nextBootstrapSeed(0), dataPart(NULL), rawPart(NULL), swapTermThreshold(0)
+			finishedRep(false), lastBootstrapSeed(0), nextBootstrapSeed(0), dataPart(NULL), rawPart(NULL), swapTermThreshold(0),
+			finishedGenerations(false)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
 #endif
@@ -525,6 +530,7 @@ private:
 		void FinishBootstrapRep(const Individual *ind, int rep);
 		void UpdateTreeModels();
 		
+		void WriteGenerationOutput();
 		void OutputFate();
 		void OutputLog();
 		void OutputModelReport();

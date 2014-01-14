@@ -652,6 +652,7 @@ void Population::Reset(){
 	//move on to another it should be false
 	conf->restart = false;
 	finishedRep = false;
+	finishedGenerations = false;
 	genTermination = false;
 	bestFitness = prevBestFitness = -(FLT_MAX);
 
@@ -1551,6 +1552,7 @@ void Population::WriteStateFiles(){
 		sout.open(sphysical_name, "wb");
 		sout.close();
 		}
+
 	boinc_checkpoint_completed();
 #else
 	//it would be nice to be able to do something like what is done for BOINC above (buffering output and
@@ -1846,6 +1848,10 @@ void Population::Run(){
 
 	gen++;
 	for (; gen < conf->stopgen+1; ++gen){
+		//this is set true if the generation loop was exited normally but final optimization was not done
+		if(finishedGenerations)
+			break;
+
 		NextGeneration();
 
 		WriteGenerationOutput();
@@ -2001,14 +2007,12 @@ void Population::Run(){
 		//non-BOINC checkpointing
 		if(conf->checkpoint == true && conf->scoreOnly == false && conf->optimizeInputOnly == false && ((gen % conf->saveevery) == 0)) 
 			WriteStateFiles();
-#endif
-
-#ifdef BOINC 
-//BOINC checkpointing can occur whenever the BOINC client wants it to
-		if(boinc_time_to_checkpoint()){
+#else
+		//BOINC checkpointing can occur whenever the BOINC client wants it to
+		if(boinc_time_to_checkpoint())
 			WriteStateFiles();
 #endif
-		if(stopwatch.SplitTime() > conf->stoptime){
+		if(stopwatch.ThisExecutionSplitTime() > conf->stoptime){
 			outman.UserMessage("NOTE: ****Specified time limit (%d seconds) reached...", conf->stoptime);
 			//Time termination can be used a sort of "pause" along with checkpointing.  Checkpoints may be
 			//written very infrequently though (large saveevery), so spit one out now.
@@ -2042,6 +2046,30 @@ void Population::Run(){
 	UpdateFractionDone(3);
 	//Allow killing during FinalOpt
 	TurnOffSignalCatching();
+
+	//this will indicate that we've finished the loop over generations through automatic means
+	//and that we are just before finalOpt (i.e., finishedGenerations is true but finishedRep is
+	//false).  This will be critical for restarting from a checkpoint written just before finalOpt
+	if(! (timeTermination || userTermination))
+		finishedGenerations = true;
+
+	//checkpoint immediately before final opt
+	if(! (timeTermination || userTermination)){
+#ifndef BOINC
+		//non-BOINC checkpointing
+		if(conf->checkpoint && ! (conf->scoreOnly || conf->optimizeInputOnly)) 
+			WriteStateFiles();
+#else
+		WriteStateFiles();
+		if(conf->boincWorkDivision){
+			outman.UserMessage("\nNOTE: Terminating run before final optimization and");
+			outman.UserMessage("writing checkpoint because running in BOINC mode and");
+			outman.UserMessage("boincworkdivision configuration entry was set.");
+			exit(0);
+			}
+#endif
+		}
+
 	//don't optimize if checkpointing is happening and the run was prematurely killed
 	if(conf->refineEnd  && !(conf->checkpoint && (timeTermination || userTermination)))
 		//the version adapted from trunk 1.0 final opt
@@ -2978,8 +3006,18 @@ void Population::PerformSearch(){
 			SeedPopulationWithStartingTree(currentSearchRep);
 			UpdateFractionDone(1);
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
+#ifdef BOINC
+			WriteStateFiles();
+			if(conf->boincWorkDivision){
+				outman.UserMessage("\nNOTE: Terminating run after initial optimization and");
+				outman.UserMessage("writing checkpoint because running in BOINC mode and");
+				outman.UserMessage("boincworkdivision configuration entry was set.");
+				exit(0);
+				}
+#else
 			if(conf->checkpoint) 
 				WriteStateFiles();
+#endif
 			}
 		else{
 			adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(conf);
