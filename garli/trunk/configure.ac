@@ -173,7 +173,7 @@ fi
 #BOINC compilation
 if test  "$enable_boinc" = yes; then
         CXXFLAGS="$CXXFLAGS -DBOINC"
-		LIBS="$LIBS -lpthread -lboinc -lboinc_api"
+		LIBS="$LIBS -lpthread -lboinc_api -lboinc"
 fi
 
 #Compiler choice
