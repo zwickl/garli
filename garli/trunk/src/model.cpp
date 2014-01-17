@@ -3598,11 +3598,13 @@ void Model::OutputBinaryFormattedModel(OUTPUT_CLASS &out) const{
 
 void Model::OutputBinaryFormattedModel(OUTPUT_CLASS &out) const{
 	FLOAT_TYPE *r = new FLOAT_TYPE;
-	if(modSpec->IsAminoAcid() == false || modSpec->IsUserSpecifiedRateMatrix() || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()){
+	// 1/17/14 The assert here was diallowing non-sequence data to be checkpointed.  Don't recall that being intentional, and tests run fine.
+	// Added check of number of rates to avoid section entirely in non-sequence case
+	if(NumRelRates() > 0 && (modSpec->IsAminoAcid() == false || modSpec->IsUserSpecifiedRateMatrix() || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix())){
 		if(modSpec->IsAminoAcid())
 			assert(NumRelRates() == 190 || NumRelRates() == 210);
-		else
-			assert(NumRelRates() == 6);
+//		else
+//			assert(NumRelRates() == 6);
 		for(int i=0;i<NumRelRates();i++){
 			*r = Rates(i);
 			out.WRITE_TO_FILE(r, sizeof(FLOAT_TYPE), 1);
@@ -3651,11 +3653,13 @@ void Model::OutputBinaryFormattedModel(OUTPUT_CLASS &out) const{
 	}
 
 void Model::ReadBinaryFormattedModel(FILE *in){
-	if(modSpec->IsAminoAcid() == false || modSpec->IsUserSpecifiedRateMatrix() || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()){
+	// 1/17/14 The assert here was diallowing non-sequence data to be checkpointed.  Don't recall that being intentional, and tests run fine.
+	// Added check of number of rates to avoid section entirely in non-sequence case
+	if(NumRelRates() > 0 && (modSpec->IsAminoAcid() == false || modSpec->IsUserSpecifiedRateMatrix() || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix())){
 		if(modSpec->IsAminoAcid())
 			assert(NumRelRates() == 190 || NumRelRates() == 210);
-		else
-			assert(NumRelRates() == 6);
+//		else
+//			assert(NumRelRates() == 6);
 		FLOAT_TYPE *r = new FLOAT_TYPE[NumRelRates()];
 		for(int i=0;i<NumRelRates();i++){
 			assert(ferror(in) == false);
