@@ -78,7 +78,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 
 	combineAdjacentIdenticalGapPatterns = false;
 
-	usePatternManager = false;
+	usePatternManager = true;
 	rootAtBranchMidpoint = false;
 	useOptBoundedForBlen = false;
 	optimizeInputOnly = false;
