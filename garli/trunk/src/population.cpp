@@ -2065,7 +2065,9 @@ void Population::Run(){
 			outman.UserMessage("\nNOTE: Terminating run before final optimization and");
 			outman.UserMessage("writing checkpoint because running in BOINC mode and");
 			outman.UserMessage("boincworkdivision configuration entry was set.");
-			exit(0);
+			//no easy way to get out of here cleanly by returning, just going to use exit()
+			boinc_finish(0);
+			std::exit(0);
 			}
 #endif
 		}
@@ -3012,7 +3014,7 @@ void Population::PerformSearch(){
 				outman.UserMessage("\nNOTE: Terminating run after initial optimization and");
 				outman.UserMessage("writing checkpoint because running in BOINC mode and");
 				outman.UserMessage("boincworkdivision configuration entry was set.");
-				exit(0);
+				return;
 				}
 #else
 			if(conf->checkpoint) 
@@ -3046,7 +3048,7 @@ void Population::PerformSearch(){
 			outman.UserMessage("(set restart = 1 in the config file).  IF YOU WANT TO USE THE");
 			outman.UserMessage("PARTIAL OUTPUT FILES WITHOUT RESTARTING YOU WILL NEED TO MANUALLY");
 			outman.UserMessage("ADD \"end;\" TO THE TREE FILES.\n");
-			exit(0);
+			return;
 			}
 
 		outman.UserMessage("");

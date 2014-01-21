@@ -177,8 +177,10 @@ int main( int argc, char* argv[] ){
 		return retval;
 		}
 	retval = boinc_garli_main( argc, argv );
-	if(retval) boinc_finish(retval);
-	else boinc_finish(0);
+	if(retval) 
+		boinc_finish(retval);
+	else 
+		boinc_finish(0);
 	}
 
 int boinc_garli_main( int argc, char* argv[] )	{
@@ -273,11 +275,11 @@ int main( int argc, char* argv[] )	{
 						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2011");
 						outman.UserMessage("http://www.nescent.org/wg/garli/");
 						outman.UserMessage("garli.support@gmail.com");
-						exit(0);
+						return 0;
 						}
 					else if(!_stricmp(argv[curarg], "-h") || !_stricmp(argv[curarg], "--help")){
 						UsageMessage(argv[0]);
-						exit(0);
+						return 0;
 						}
 
 					else if(!strcmp(argv[curarg], "-V"))
@@ -290,7 +292,7 @@ int main( int argc, char* argv[] )	{
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						UsageMessage(argv[0]);
-						exit(0);
+						return 0;
 						}
 					}
 				//if anything else appears, we'll assume that it's a config file
@@ -827,13 +829,15 @@ int main( int argc, char* argv[] )	{
 				}
 			else{
 					//if no checkpoint files are actually found conf->restart will be set to zero
-					if(pop->conf->restart) pop->conf->restart = pop->ReadStateFiles();
+					if(pop->conf->restart) 
+						pop->conf->restart = pop->ReadStateFiles();
 
 					pop->SetOutputDetails();
 					if(pop->conf->bootstrapReps == 0){//NOT bootstrapping
 						pop->PerformSearch();
 						}
-					else pop->Bootstrap();
+					else 
+						pop->Bootstrap();
 					pop->FinalizeOutputStreams(2);
 					}
 				dataPart.Delete();
