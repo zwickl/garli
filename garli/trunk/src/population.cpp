@@ -2047,14 +2047,15 @@ void Population::Run(){
 	//Allow killing during FinalOpt
 	TurnOffSignalCatching();
 
-	//this will indicate that we've finished the loop over generations through automatic means
-	//and that we are just before finalOpt (i.e., finishedGenerations is true but finishedRep is
-	//false).  This will be critical for restarting from a checkpoint written just before finalOpt
-	if(! (timeTermination || userTermination))
-		finishedGenerations = true;
+	//checkpoint immediately before final opt, if finishedGenerations isn't set, which will
+	//indicate that we've already written and restarted from a checkpoint written here
+	if(!(finishedGenerations || timeTermination || userTermination)){
+		//this will indicate that we've finished the loop over generations through automatic means
+		//and that we are just before finalOpt (i.e., finishedGenerations is true but finishedRep is
+		//false).  This will be critical for restarting from a checkpoint written just before finalOpt
+		if(!(timeTermination || userTermination))
+			finishedGenerations = true;
 
-	//checkpoint immediately before final opt
-	if(! (timeTermination || userTermination)){
 #ifndef BOINC
 		//non-BOINC checkpointing
 		if(conf->checkpoint && ! (conf->scoreOnly || conf->optimizeInputOnly)) 
