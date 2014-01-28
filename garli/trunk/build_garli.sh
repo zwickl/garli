@@ -2,32 +2,38 @@
 
 if [ $# -gt 0 ]
 then
-        if [ "$1" = "--ncl-svn" ]
+        if [ "$1" = "--ncl-svn" -o "$1" = "--ncl-sourceforge" ]
+        #if [ "$1" = "--ncl-svn" ]
         then
-		shift # this shifts the first cmd line argument out so that the rest can be passed to GARLI configure
-		if [ -d ncl-svn ]
-		then
-                	echo "***NCL LIBRARY SOURCE FROM SUBVERSION ALREADY EXISTS***"
-                	echo "***CURRENT COPY WILL BE USED AS-IS.  UPDATE IT MANUALLY OR***"
-                	echo "***DELETE THE ncl-svn DIRECTORY TO GET THE LATEST NCL SOURCE***"
-		else
-	                echo "***CHECKING OUT NCL LIBRARY SOURCE VIA SUBVERSION***"
-			#9/3/13 - Looks like the ncl repo path moved
-            #svn co http://ncl.svn.sourceforge.net/svnroot/ncl/branches/v2.1 ncl-svn || exit
-			svn co http://svn.code.sf.net/p/ncl/code/branches/v2.1 ncl-svn || exit
-        fi
-		nclv="ncl-svn"
-                cd ${nclv} || exit
-                sh bootstrap.sh || exit
-                cd ..
+            shift # this shifts the first cmd line argument out so that the rest can be passed to GARLI configure
+            if [ -d ncl-svn ]
+            then
+                echo "***NCL LIBRARY SOURCE FROM SUBVERSION ALREADY EXISTS***"
+                echo "***CURRENT COPY WILL BE USED AS-IS.  UPDATE IT MANUALLY OR***"
+                echo "***DELETE THE ncl-svn DIRECTORY TO GET THE LATEST NCL SOURCE***"
+            else
+                echo "***CHECKING OUT NCL LIBRARY SOURCE VIA SUBVERSION***"
+                if ["$1" = "--ncl-svn" ];then
+                    svn co https://github.com/mtholder/ncl ncl-svn || exit
+                else
+                    svn co http://svn.code.sf.net/p/ncl/code/branches/v2.1 ncl-svn || exit
+                fi
+            fi
+            nclv="ncl-svn"
+            cd ${nclv} || exit
+            sh bootstrap.sh || exit
+            cd ..
         elif [ "$1" = "-h" ] || [ "$1" = "--help" ]
-	then
+        then
                 echo "Usage ./$0 [--svn-ncl] [-h] [arguments to GALRI configure script]"
-                echo "     --ncl-svn   Check out current NCL source via anonymous svn, build NCL, then GARLI"
-                echo "     --ncl-dist  Automatically build NCL from a ncl-2.1.xx.tar.gz distribution"
-                echo "                 in this directory, then build GARLI (default)"
-                echo "  -h --help      Output this help and exit"
-                echo "  [other args]   Other arguments are passed to GARLI's configure invocation"
+                echo "     --ncl-svn            Check out current NCL v2.1 source from github repo via anonymous svn, build NCL, then GARLI"
+                echo "                              (prefer over ncl-sourceforge)"
+                echo "     --ncl-sourceforge    Check out current NCL v2.1 source from sourceforge repo via anonymous svn,"
+                echo "                              build NCL, then GARLI"
+                echo "     --ncl-dist           Automatically build NCL from a ncl-2.1.xx.tar.gz distribution"
+                echo "                              in this directory, then build GARLI (default)"
+                echo "  -h --help               Output this help and exit"
+                echo "  [other args]            Other arguments are passed to GARLI's configure invocation"
                 echo
                 exit
         fi
