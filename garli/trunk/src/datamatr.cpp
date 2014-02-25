@@ -249,7 +249,8 @@ void PatternManager::NewCollapse(){
 		while(second != patterns.end() && (*first == *second)){
 			(*first).count += (*second).count;
 			(*first).siteNumbers.insert((*first).siteNumbers.end(), (*second).siteNumbers.begin(), (*second).siteNumbers.end());
-			assert((*first).count == (*first).siteNumbers.size());
+			//if a wtset was used, this definitely doesn't need to be the case
+			//assert((*first).count == (*first).siteNumbers.size());
 			(*second).count = 0;
 			second++;
 			}
@@ -264,12 +265,8 @@ void PatternManager::NewCollapse(){
 	}
 
 void PatternManager::NewSort(){
-	numCompares = 0;
-
 	//this is the stl list sort function, using SitePattern::operator<
 	patterns.sort();
-
-	//outman.UserMessage("%d pattern comparisons were needed", numCompares);
 	}
 
 // This version of pack copies unique patterns from the patterns list into the uniquePatterns list
@@ -289,7 +286,6 @@ void PatternManager::NewPack(){
 //up to the point when the compressed matrix can be copied back into 
 //this will only be used for nuc/AA/codon data
 void PatternManager::ProcessPatterns(){
-	totNumChars = patterns.size();
 	CalcPatternTypesAndNumStates();
 	NewSort();
 	NewCollapse();
@@ -304,12 +300,16 @@ void PatternManager::CalcPatternTypesAndNumStates(){
 	//this is just a scratch array to be used repeatedly in PatternType	
 	vector<unsigned int> s(maxNumStates);
 
-	numMissingChars = numConstantChars = numInformativeChars = numUninformVariableChars = 0;
+	numMissingChars = numConstantChars = numInformativeChars = numUninformVariableChars = totNumChars = 0;
 
 	for(list<SitePattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
 		int t = pit->CalcPatternTypeAndNumStates(s);
+		//Fixed bug - It is important to calculate totNumChars here from counts of the  
+		//the generally unpacked data, because it could effectively be partially packed
+		//due to the use of a wtset
+		totNumChars += pit->count;
 		if( t == SitePattern::MISSING )
-			numMissingChars++;
+			numMissingChars += pit->count;
 		else if( t == SitePattern::CONSTANT )
 			numConstantChars += pit->count;
 		else if( t == SitePattern::INFORMATIVE )
@@ -468,6 +468,7 @@ void DataMatrix::ProcessPatterns() {
 	ReserveOriginalCounts();
 	OutputDataSummary();
 	int t = stoppy.SplitTime();
+	/*There isn't much point in outputting all of this clutter
 	if(t == 0)
 		outman.UserMessage("\tPattern processing required < 1 second");
 	else
@@ -475,7 +476,7 @@ void DataMatrix::ProcessPatterns() {
 	if(numCompares > 0)
 		outman.UserMessage("\t%d pattern comparisons were needed", numCompares);
 	outman.UserMessage("");
-	//outman.UserMessage("#######################################################");
+	*/
 	}
 
 //this pulls all of the processed data back out of the patman into the old fields of DataMatrix
@@ -714,13 +715,17 @@ int DataMatrix::PatternType( int k , unsigned int *stateCounts) const{
 void DataMatrix::Summarize(){
 	assert( nChar > 0 );
 
-	nMissing = nConstant = nInformative = nVarUninform = 0;
+	nMissing = nConstant = nInformative = nVarUninform = totalNChar = 0;
 
    //this is just a scratch array to be used repeatedly in PatternType
    vector<unsigned int> s(maxNumStates);
 	
 	for(int k = 0; k < nChar; k++ ) {
 		int ptFlags = PatternType(k, &s[0]);
+		//Fixed bug - It is important to calculate totNumChars here from counts of the  
+		//the generally unpacked data, because it could effectively be partially packed
+		//due to the use of a wtset
+		totalNChar += count[k];
 		if( ptFlags == PT_MISSING )
 			nMissing += count[k];
 		else if( ptFlags & PT_CONSTANT )

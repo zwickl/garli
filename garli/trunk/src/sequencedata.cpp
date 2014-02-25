@@ -765,7 +765,6 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 		realCharSet = &charsetMinusExcluded;
 	}
 
-	int numOrigChar = charset.size();
 	int numActiveChar = realCharSet->size();
 
 	if(numActiveChar == 0){
@@ -782,6 +781,11 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 		if(charWeights.size() > 0){
 			assert(charWeights.size() == charblock->GetNumChar());
 			outman.UserMessage("\tFound wtset \"%s\" with data, applying...", wtsetName.c_str());
+			for(int i = 0;i < charWeights.size();i++){
+				if(charWeights[i] == 0){
+					throw ErrorException("Sorry, wtsets including sites with zero weight are not allowed in GARLI.\nTry using an exset to exclude the site.");
+					}
+				}
 			}
 		}
 
@@ -874,7 +878,6 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 		realCharSet = &charsetMinusExcluded;
 	}	
 
-	int numOrigChar = charset.size();
 	int numActiveChar = realCharSet->size();
 
 	if(numActiveChar == 0){
@@ -891,6 +894,11 @@ void AminoacidData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nxs
 		if(charWeights.size() > 0){
 			assert(charWeights.size() == charblock->GetNumChar());
 			outman.UserMessage("\tFound wtset \"%s\" with data, applying...", wtsetName.c_str());
+			for(int i = 0;i < charWeights.size();i++){
+				if(charWeights[i] == 0){
+					throw ErrorException("Sorry, wtsets including sites with zero weight are not allowed in GARLI.\nTry using an exset to exclude the site.");
+					}
+				}
 			}
 		}
 
@@ -1087,7 +1095,6 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 		realCharSet = &charsetMinusExcluded;
 	}	
 
-	int numOrigChar = charset.size();
 	int numActiveChar = realCharSet->size();
 
 	if(numActiveChar == 0){
@@ -1435,7 +1442,6 @@ void OrientedGapData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, N
 		realCharSet = &charsetMinusExcluded;
 	}	
 
-	int numOrigChar = charset.size();
 	int numActiveChar = realCharSet->size();
 
 	if(numActiveChar == 0){
