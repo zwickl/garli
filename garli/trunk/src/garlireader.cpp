@@ -325,7 +325,8 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &mSpec
 		list<FormatPair> formatsToTry;
 		NxsString name;
 		if(FileIsFasta(filename)){
-			if(mSpec.IsAminoAcid()){
+			//IsAminoAcid() returns true with codon-aminoacid datatype
+			if(mSpec.IsAminoAcid() && mSpec.IsCodonAminoAcid() == false){
 				formatsToTry.push_back(FormatPair(FASTA_AA_FORMAT, "Fasta amino acid"));
 				}
 			else{
