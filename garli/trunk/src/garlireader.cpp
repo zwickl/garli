@@ -336,7 +336,8 @@ bool GarliReader::ReadData(const char* filename, const ModelSpecification &mSpec
 				}
 			}
 		else{//otherwise assume phylip format
-			if(mSpec.IsAminoAcid()){
+			//IsAminoAcid() returns true with codon-aminoacid datatype
+			if(mSpec.IsAminoAcid() && mSpec.IsCodonAminoAcid() == false){
 				formatsToTry.push_back(FormatPair(RELAXED_PHYLIP_AA_FORMAT, "relaxed Phylip amino acid"));
 				formatsToTry.push_back(FormatPair(INTERLEAVED_RELAXED_PHYLIP_AA_FORMAT, "interleaved relaxed Phylip amino acid"));
 				formatsToTry.push_back(FormatPair(PHYLIP_AA_FORMAT, "strict Phylip amino acid"));
