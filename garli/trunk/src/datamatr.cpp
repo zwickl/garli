@@ -1134,8 +1134,9 @@ void DataMatrix::Collapse(){
 	while(numStates[q]==0){
 		for(i=0;i<gapsIncludedNChar;i++) if(number[i]==q) number[i]=-1;
 		count[q--]=0;
+		//NO, this is now done in Summarize()!!
 		//when all missing columns are deleted, remove them from the total number of characters
-		totalNChar--;
+		//totalNChar--;
 		}
 	
 	Pack();
