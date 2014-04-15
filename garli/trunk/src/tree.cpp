@@ -5181,7 +5181,7 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 			
 			//now map the posteriors of each packed state to the original char order
 			const SequenceData *data = dataPart->GetSubset((*c).dataIndex);
-			for(int s=0;s<data->GapsIncludedNChar();s++){
+			for(int s=data->NumConditioningPatterns();s<data->GapsIncludedNChar() + data->NumConditioningPatterns();s++){
 				//out << s+1 << "\t";
 				out << data->OrigDataNumber(s) + 1 << "\t";
 				if(data->Number(s) > -1)
@@ -5265,12 +5265,13 @@ void Tree::OutputSiteLikelihoods(int partNum, vector<FLOAT_TYPE> &likes, const i
 	
 	int startPat = (effectiveSitelikeLevel > 1 ? 0 : data->NumConditioningPatterns());
 
-	for(int site = startPat;site < data->GapsIncludedNChar();site++){
+	for(int site = startPat;site < data->GapsIncludedNChar() + data->NumConditioningPatterns();site++){
 		int col = data->Number(site);
 		int origCol = data->OrigDataNumber(site);
 		if(col == -1){
 			ordered << "\t\t" << origCol + 1 << "\t-";
-			if(effectiveSitelikeLevel > 1) ordered << "\t-\t-";
+			if(effectiveSitelikeLevel > 1) 
+				ordered << "\t-\t-";
 			ordered << "\n";
 			}
 		else{
@@ -5309,7 +5310,7 @@ void Tree::OutputSiteDerivatives(int partNum, vector<double> &likes, vector<doub
 	ordered.precision(10);
 	packed.precision(10);
 	
-	for(int site = 0;site < data->GapsIncludedNChar();site++){
+	for(int site = 0;site < data->GapsIncludedNChar() + data->NumConditioningPatterns();site++){
 		int col = data->Number(site);
 		if(col == -1)
 			ordered << site+1 << "\tgap\t-\t-\t-\t-";

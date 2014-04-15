@@ -238,7 +238,7 @@ int SitePattern::MinScore(set<unsigned char> patt, int bound, unsigned char bits
 	}
 
 //Collapse merges like patterns, transfering over the counts and site numbers represented by each sucessive identical column.
-//Patterns that are assigned zero counts here will be removed in Pack(), but will still contribute to the totalNChar, except
+//Patterns that are assigned zero counts here will be removed in Pack(), but will still contribute to the numNonMissingRealSitesInOrigMatrix, except
 //for those with zero states (= missing)
 void PatternManager::NewCollapse(){
 	list<SitePattern>::iterator first;
@@ -278,7 +278,7 @@ void PatternManager::NewPack(){
 				}
 			}
 		}
-	numUniquePats = uniquePatterns.size();
+	pman_numPatterns = uniquePatterns.size();
 	compressed = true;
 	}
 
@@ -296,31 +296,35 @@ void PatternManager::ProcessPatterns(){
 //it would really make more sense to do this after packing, but the number of states
 //is needed in pattern comparison in sorting.  This also does what Summarize used to, 
 //filling the counts of various types of patterns
+//THIS DOES NOT CURRENTLY SUPPORT CONDITIONING PATTERNS!
 void PatternManager::CalcPatternTypesAndNumStates(){
 	//this is just a scratch array to be used repeatedly in PatternType	
 	vector<unsigned int> s(maxNumStates);
 
-	numMissingChars = numConstantChars = numInformativeChars = numUninformVariableChars = totNumChars = 0;
+	pman_numMissingChars = pman_numConstantChars = pman_numInformativeChars = pman_numUninformVariableChars = pman_numNonMissingRealCountsInOrigMatrix = 0;
 
+	pman_numRealSitesInOrigMatrix = patterns.size();
 	for(list<SitePattern>::iterator pit = patterns.begin();pit != patterns.end();pit++){
 		int t = pit->CalcPatternTypeAndNumStates(s);
-		//Fixed bug - It is important to calculate totNumChars here from counts of the  
-		//the generally unpacked data, because it could effectively be partially packed
-		//due to the use of a wtset
-		totNumChars += pit->count;
+		//Fixed 2 bugs - It is important to calculate numNonMissingRealCountsInOrigMatrix here from counts of the  
+		//the generally unpacked data, because it could effectively be partially packed due to the use of a wtset, 
+		//but also need to keep separate track of the number of columns in the orig matrix with numRealSitesInOrigMatrix
+		if( t != SitePattern::MISSING )
+			pman_numNonMissingRealCountsInOrigMatrix += pit->count;
+
 		if( t == SitePattern::MISSING )
-			numMissingChars += pit->count;
+			pman_numMissingChars += pit->count;
 		else if( t == SitePattern::CONSTANT )
-			numConstantChars += pit->count;
+			pman_numConstantChars += pit->count;
 		else if( t == SitePattern::INFORMATIVE )
-			numInformativeChars += pit->count;
+			pman_numInformativeChars += pit->count;
 		else{
 			assert(t == SitePattern::UNINFORM_VARIABLE);
-			numUninformVariableChars += pit->count;
+			pman_numUninformVariableChars += pit->count;
 			}
 		}
-	numNonMissingChars = totNumChars - numMissingChars;
-	if( numNonMissingChars == 0 ){
+	pman_numNonMissingChars = pman_numRealSitesInOrigMatrix - pman_numMissingChars;
+	if( pman_numNonMissingChars == 0 ){
 		throw ErrorException("Matrix is made up entirely of missing characters (?, -, or N)!");
 		}
 	}
@@ -422,16 +426,17 @@ void PatternManager::FillTaxaXCharMatrix(unsigned char **mat) const{
 		}
 	}
 
-void PatternManager::FillIntegerValues(int &nMissing, int &nConstant, int &nVarUninform, int &nInformative, int &lastConst, int &gapsIncludedNChar, int &totNChar, int &NChar) const {
-	gapsIncludedNChar = totNumChars;
-	totNChar = numNonMissingChars;
-	NChar = numUniquePats;
+void PatternManager::FillIntegerValues(int &_nMissing, int &_nConstant, int &_nVarUninform, int &_nInformative, int &_lastConst, int &_numRealSitesInOrigMatrix, int &_numNonMissingRealCountsInOrigMatrix, int &_numNonMissingRealSitesInOrigMatrix, int &_numPatterns) const {
+	_numRealSitesInOrigMatrix = pman_numRealSitesInOrigMatrix;
+	_numNonMissingRealCountsInOrigMatrix = pman_numNonMissingRealCountsInOrigMatrix;
+	_numNonMissingRealSitesInOrigMatrix = pman_numNonMissingChars;
+	_numPatterns = pman_numPatterns;
 
-	nMissing = numMissingChars;
-	nConstant = numConstantChars;
-	nVarUninform = numUninformVariableChars;
-	nInformative = numInformativeChars;
-	lastConst = lastConstant;
+	_nMissing = pman_numMissingChars;
+	_nConstant = pman_numConstantChars;
+	_nVarUninform = pman_numUninformVariableChars;
+	_nInformative = pman_numInformativeChars;
+	_lastConst = lastConstant;
 	}
 
 void DataMatrix::OutputDataSummary() const{
@@ -444,9 +449,12 @@ void DataMatrix::OutputDataSummary() const{
 	int total = NConstant() + NInformative() + NVarUninform() - numConditioningPatterns;
 	if(NMissing() > 0){
 		outman.UserMessage("\t  %d characters were completely missing or ambiguous (removed).", NMissing());
-		outman.UserMessage("\t  %d total characters (%d before removing empty columns).", total, GapsIncludedNChar() - numConditioningPatterns);
+		//outman.UserMessage("\t  %d total characters (%d before removing empty columns).", total, GapsIncludedNChar() - numConditioningPatterns);
+		outman.UserMessage("\t  %d total characters (%d before removing empty columns).", total, numNonMissingRealCountsInOrigMatrix + NMissing());
 		}
 	else outman.UserMessage("\t  %d total characters.", total);
+
+	assert(total == numNonMissingRealCountsInOrigMatrix);
 
 	outman.UserMessage("\t  %d unique patterns in compressed data matrix.", NChar() - numConditioningPatterns);
 	outman.flush();
@@ -486,17 +494,17 @@ void DataMatrix::GetDataFromPatternManager(){
 	patman.FillCountVector(newCount);
 	patman.FillNumStatesVector(newNumStates);
 	patman.FillConstStatesVector(newConstStates);
-	patman.FillIntegerValues(nMissing, nConstant, nVarUninform, nInformative, lastConstant, gapsIncludedNChar, totalNChar, nChar);
+	patman.FillIntegerValues(numMissingChars, numConstantChars, numVariableUninformChars, numInformativeChars, lastConstant, numRealSitesInOrigMatrix, numNonMissingRealCountsInOrigMatrix, numNonMissingRealSitesInOrigMatrix, numPatterns);
 	patman.FillTaxaXCharMatrix(matrix);
 	if(patman.compressed)
 		dense = 1;
 	}
 
 DataMatrix::~DataMatrix(){
-	if( count ) MEM_DELETE_ARRAY(count); // count is of length nChar
-	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates is of length nChar
-	if( number ) MEM_DELETE_ARRAY(number); // number is of length nChar
-	if( origDataNumber ) MEM_DELETE_ARRAY(origDataNumber); // origDataNumber is of length nChar
+	if( count ) MEM_DELETE_ARRAY(count); // count is of length numPatterns
+	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates is of length numPatterns
+	if( number ) MEM_DELETE_ARRAY(number); // number is of length numPatterns
+	if( origDataNumber ) MEM_DELETE_ARRAY(origDataNumber); // origDataNumber is of length numPatterns
 	if( taxonLabel ) {
 		for( int j = 0; j < nTaxAllocated; j++ )
 			MEM_DELETE_ARRAY( taxonLabel[j] ); // taxonLabel[j] is of length strlen(taxonLabel[j])+1
@@ -504,7 +512,7 @@ DataMatrix::~DataMatrix(){
 	}
 	if( matrix ) {
 		for( int j = 0; j < nTaxAllocated; j++ )
-			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] is of length nChar
+			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] is of length numPatterns
 		MEM_DELETE_ARRAY(matrix); // matrix is of length nTax
 	}
 	if(constStates!=NULL) delete []constStates;
@@ -579,8 +587,8 @@ int DataMatrix::MinScore(set<unsigned char> patt, int bound, unsigned char bits/
 //it used to try to determine autapomorphies, although not correctly
 //
 int DataMatrix::PatternType( int k , unsigned int *stateCounts) const{
-	assert(k < nChar);
-	if( k >= nChar )
+	assert(k < numPatterns);
+	if( k >= numPatterns )
 		return 0;
 	int retval;
 
@@ -713,31 +721,34 @@ int DataMatrix::PatternType( int k , unsigned int *stateCounts) const{
 // Summarize tallies number of constant, informative, and autapomorphic characters
 //
 void DataMatrix::Summarize(){
-	assert( nChar > 0 );
+	assert( numPatterns > 0 );
 
-	nMissing = nConstant = nInformative = nVarUninform = totalNChar = 0;
+	numMissingChars = numConstantChars = numInformativeChars = numVariableUninformChars = numNonMissingRealCountsInOrigMatrix = 0;
 
-   //this is just a scratch array to be used repeatedly in PatternType
-   vector<unsigned int> s(maxNumStates);
+    //this is just a scratch array to be used repeatedly in PatternType
+    vector<unsigned int> s(maxNumStates);
 	
-	for(int k = 0; k < nChar; k++ ) {
+	numRealSitesInOrigMatrix = numPatterns - numConditioningPatterns;
+	for(int k = 0; k < numPatterns; k++ ) {
 		int ptFlags = PatternType(k, &s[0]);
-		//Fixed bug - It is important to calculate totNumChars here from counts of the  
-		//the generally unpacked data, because it could effectively be partially packed
-		//due to the use of a wtset
-		totalNChar += count[k];
+		//Fixed 2 bugs - It is important to calculate numNonMissingRealCountsInOrigMatrix here from counts of the  
+		//the generally unpacked data, because it could effectively be partially packed due to the use of a wtset, 
+		//but also need to keep separate track of the number of columns in the orig matrix with numRealSitesInOrigMatrix
+		if( ptFlags != PT_MISSING && k >= numConditioningPatterns)
+			numNonMissingRealCountsInOrigMatrix += count[k];
 		if( ptFlags == PT_MISSING )
-			nMissing += count[k];
+			numMissingChars += count[k];
 		else if( ptFlags & PT_CONSTANT )
-			nConstant += count[k];
+			numConstantChars += count[k];
 		else if( ptFlags & PT_INFORMATIVE )
-			nInformative += count[k];
+			numInformativeChars += count[k];
 		else{
 			assert(ptFlags & PT_VARIABLE);
-			nVarUninform += count[k];
+			numVariableUninformChars += count[k];
 			}
 		}
-	if( nConstant + nInformative + nVarUninform == 0 ){
+	numNonMissingRealSitesInOrigMatrix = numRealSitesInOrigMatrix - numMissingChars;
+	if( numConstantChars + numInformativeChars + numVariableUninformChars == 0 ){
 		throw ErrorException("Matrix is made up entirely of missing characters (?, -, or N)!");
 		}
 	}
@@ -773,34 +784,36 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 	if( matrix ) {
 		int j;
 		for( j = 0; j < taxa + extraTax; j++ )
-			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] has length nChar
+			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] has length numPatterns
 		MEM_DELETE_ARRAY(matrix); // matrix has length nTax
 		}
 
 	if(usePatternManager == false){
 		if( count ) {
-			MEM_DELETE_ARRAY(count); //count has length nChar
+			MEM_DELETE_ARRAY(count); //count has length numPatterns
 			}
 		if( numStates ) {
-			MEM_DELETE_ARRAY(numStates); // numStates has length nChar
+			MEM_DELETE_ARRAY(numStates); // numStates has length numPatterns
 			}
 		}
 	//yarg - this is used even when usePatMan == true, when converting from nuc to AA matrix
 	if( number ) {
-		MEM_DELETE_ARRAY(number); // number has length nChar
+		MEM_DELETE_ARRAY(number); // number has length numPatterns
 		}
 	if( origDataNumber ) {
-		MEM_DELETE_ARRAY(origDataNumber); // origDataNumber has length nChar
+		MEM_DELETE_ARRAY(origDataNumber); // origDataNumber has length numPatterns
 		}
 	// create new data matrix, and new count and number arrays
 	// all counts are initially 1, and characters are numbered
-	// sequentially from 0 to nChar-1
+	// sequentially from 0 to numPatterns-1
 	if( taxa > 0 && sites > 0 ) {
 		MEM_NEW_ARRAY(matrix,unsigned char*,taxa + extraTax);
 		MEM_NEW_ARRAY(number,int,sites);
 		MEM_NEW_ARRAY(origDataNumber,int,sites);
 		for( int j = 0; j < sites; j++ ) {
 			number[j] = j;
+			//number[j] = ( j < numConditioningPatterns ? -1 : j - numConditioningPatterns);
+			//in the case of conditioning patterns or partitioning this will be updated later anyway
 			origDataNumber[j] = j;
 			}
 		if(usePatternManager == false){
@@ -823,47 +836,52 @@ void DataMatrix::NewMatrix( int taxa, int sites )
 	// set dimension variables to new values
 	nTax = taxa;
 	nTaxAllocated = nTax + extraTax;
-	nonZeroCharCount = gapsIncludedNChar = totalNChar = nChar = sites;
+	//these will likely be updated later
+	numRealSitesInOrigMatrix = numNonMissingRealSitesInOrigMatrix = sites - numConditioningPatterns;
+	nonZeroCharCount = numPatterns = sites;
 	}
 
 void DataMatrix::ResizeCharacterNumberDependentVariables(int nCh) {
-	nChar = nCh;
+	//ONLY CALL THIS BEFORE GETTING DATA FROM PATMAN, OTHERWISE SOME VARIABLES
+	//WILL BE WRONG!!!
+	numPatterns = nCh;
 
 	// delete data matrix and count and number arrays
 	if( matrix ) {
 		int j;
 		for( j = 0; j < nTaxAllocated; j++ )
-			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] has length nChar
+			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] has length numPatterns
 		MEM_DELETE_ARRAY(matrix); // matrix has length nTax
 	}
 
 	if( count ) {
-		MEM_DELETE_ARRAY(count); //count has length nChar
+		MEM_DELETE_ARRAY(count); //count has length numPatterns
 	}
 	if( numStates ) {
-		MEM_DELETE_ARRAY(numStates); // numStates has length nChar
+		MEM_DELETE_ARRAY(numStates); // numStates has length numPatterns
 	}
 
 	// create new data matrix, and new count and number arrays
 	// all counts are initially 1, and characters are numbered
-	// sequentially from 0 to nChar-1
-	if(nChar > 0 ) {
+	// sequentially from 0 to numPatterns-1
+	if( numPatterns > 0 ) {
 		MEM_NEW_ARRAY(matrix,unsigned char*,nTaxAllocated);
-		MEM_NEW_ARRAY(count,int,nChar);
-		MEM_NEW_ARRAY(numStates,int,nChar);
+		MEM_NEW_ARRAY(count,int,numPatterns);
+		MEM_NEW_ARRAY(numStates,int,numPatterns);
 
-		for( int j = 0; j < nChar; j++ ) {
+		for( int j = 0; j < numPatterns; j++ ) {
 			count[j] = 1;
 			numStates[j] = 1;
 		}
 		for( int i = 0; i < nTaxAllocated; i++ ) {
-			matrix[i]=new unsigned char[nChar];
-			memset( matrix[i], 0xff, nChar*sizeof(unsigned char) );
+			matrix[i]=new unsigned char[numPatterns];
+			memset( matrix[i], 0xff, numPatterns*sizeof(unsigned char) );
 			}
 		}
 
-	// set dimension variables to new values, which might be updated elsewhere
-	nonZeroCharCount = gapsIncludedNChar = totalNChar = nChar;
+	//set dimension variables to new values, which actually MUST be updated elsewhere to be correct
+	//see note at top of func
+	nonZeroCharCount = numRealSitesInOrigMatrix = numNonMissingRealSitesInOrigMatrix = numPatterns;
 	}
 
 //deprecated
@@ -876,7 +894,7 @@ DataMatrix& DataMatrix::operator =(const DataMatrix& d){
 		SetTaxonLabel(i, d.TaxonLabel(i) );
 	}
 
-	for( j = 0; j < nChar; j++ ) {
+	for( j = 0; j < numPatterns; j++ ) {
 		SetCount(j, d.Count(j) );
 		origCounts[j] = d.origCounts[j];
 		number[j] = d.Number(j);
@@ -884,7 +902,7 @@ DataMatrix& DataMatrix::operator =(const DataMatrix& d){
 	}
 
 	for( i = 0; i < nTax; i++ ) {
-		for( j = 0; j < nChar; j++ )
+		for( j = 0; j < numPatterns; j++ )
 			SetMatrix(i, j, d.Matrix(i, j));
 	}
 
@@ -899,7 +917,7 @@ void DataMatrix::Pack(){
 	int i, j, newNChar = 0;
 
 	// determine dimensions of new matrix
-	for( j = 0; j < nChar; j++ ) {
+	for( j = 0; j < numPatterns; j++ ) {
 		if( count[j] )
 			newNChar++;
 	}
@@ -907,7 +925,7 @@ void DataMatrix::Pack(){
 	//DEBUG - something was going wrong and causing crashes in some cases (only AA's?) when a new matrix
 	//was created with the same dimensions as the original.  Haven't figured out why yet, 
 	//but this avoids the crash at least.
-	if(newNChar == nChar){
+	if(newNChar == numPatterns){
 		dense = true;
 		return;
 		}
@@ -925,7 +943,7 @@ void DataMatrix::Pack(){
 
 
 	i = 0;
-	for( j = 0; j < nChar; j++ ) {
+	for( j = 0; j < numPatterns; j++ ) {
 		if( count[j] ) {
 			for( int k = 0; k < nTax; k++ )
 				newMatrix[k][i] = matrix[k][j];
@@ -934,18 +952,18 @@ void DataMatrix::Pack(){
 			i++;
 			}
 		else{//as we remove columns, shift all the greater numbers over
-			for(int c=0;c<gapsIncludedNChar;c++){
+			for(int c=0;c < numPatterns;c++){
 				if(number[c] >= i) number[c]--;
 				}
 			}
 		}
 
 	// delete old matrix and count arrays
-	if( count ) MEM_DELETE_ARRAY(count); // count has length nChar
-	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates has length nChar
+	if( count ) MEM_DELETE_ARRAY(count); // count has length numPatterns
+	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates has length numPatterns
 	if( matrix ) {
 		for( i = 0; i < nTaxAllocated; i++ )
-			MEM_DELETE_ARRAY(matrix[i]); // matrix[i] has length nChar
+			MEM_DELETE_ARRAY(matrix[i]); // matrix[i] has length numPatterns
 		MEM_DELETE_ARRAY(matrix); // matrix has length nTax
         }
 
@@ -953,8 +971,8 @@ void DataMatrix::Pack(){
 	count = newCount;
 	numStates = newNumStates;
 	matrix = newMatrix;
-	nChar = newNChar;
-	nonZeroCharCount = nChar;
+	numPatterns = newNChar;
+	nonZeroCharCount = numPatterns;
 	}
 
 
@@ -1016,9 +1034,11 @@ void DataMatrix::SwapCharacters( int i, int j ){
 	numStates[j]=s;
 
 	//and the number
-	for(int c=0;c<gapsIncludedNChar;c++){
-		if(number[c] == i) number[c]=j;
-		else if(number[c] == j) number[c]=i;
+	for(int c=0;c<numRealSitesInOrigMatrix + numConditioningPatterns;c++){
+		if(number[c] == i) 
+			number[c] = j;
+		else if(number[c] == j) 
+			number[c] = i;
 		}
 	}
 
@@ -1116,11 +1136,11 @@ int DataMatrix::ComparePatterns( const int i, const int j ) const{
 //
 void DataMatrix::Collapse(){
 	int i = 0, j = 1;
-	assert(nonZeroCharCount == nChar);
+	assert(nonZeroCharCount == numPatterns);
 	Sort();
 
-	while( i < NChar() ) {
-		while( j < NChar() && ComparePatterns( i, j ) == 0 ) {
+	while( i < numPatterns ) {
+		while( j < numPatterns && ComparePatterns( i, j ) == 0 ) {
 			// pattern j same as pattern i
 			count[i] += count[j];
 			count[j] = 0;
@@ -1130,17 +1150,22 @@ void DataMatrix::Collapse(){
 		}
 		
 	//DJZ 10/28/03 get rid of all missing patterns	
-	int q=nChar-1;
-	while(numStates[q]==0){
-		for(i=0;i<gapsIncludedNChar;i++) if(number[i]==q) number[i]=-1;
+	int q=numPatterns-1;
+	while(numStates[q] == 0){
+		//This sets the number to -1 for an all missing site, indicating that none of the packed
+		//matrix columns corresponds to it
+		for(i = 0;i < numPatterns;i++){ 
+			if(number[i]==q) 
+				number[i]=-1;
+			}
 		count[q--]=0;
 		//NO, this is now done in Summarize()!!
 		//when all missing columns are deleted, remove them from the total number of characters
-		//totalNChar--;
+		//numNonMissingRealSitesInOrigMatrix--;
 		}
 	
 	Pack();
-	assert(nonZeroCharCount == nChar);
+	assert(nonZeroCharCount == numPatterns);
 	}
 
 //
@@ -1153,7 +1178,7 @@ void DataMatrix::EliminateAdjacentIdenticalColumns(){
 	Summarize();
 	
 	int i = 0, j = 1;
-	assert(nonZeroCharCount == nChar);
+	assert(nonZeroCharCount == numPatterns);
 
 	int numCombined = 0;
 	while( i < NChar() ) {
@@ -1163,7 +1188,7 @@ void DataMatrix::EliminateAdjacentIdenticalColumns(){
 			// pattern j same as pattern i
 			count[j] = 0;
 			//when columns are eliminated, remove them from the total number of characters
-			totalNChar--;
+			numNonMissingRealSitesInOrigMatrix--;
 			numCombined++;
 			j++;
 			}
@@ -1177,8 +1202,8 @@ void DataMatrix::EliminateAdjacentIdenticalColumns(){
 //
 void DataMatrix::BSort( int byCounts /* = 0 */ ){
 	int swap, k;
-	for( int i = 0; i < nChar-1; i++ ) {
-		for( int j = i+1; j < nChar; j++ ) {
+	for( int i = 0; i < numPatterns-1; i++ ) {
+		for( int j = i+1; j < numPatterns; j++ ) {
 			if( byCounts )
 				swap = ( count[i] < count[j] ? 1 : 0 );
 			else
@@ -1208,7 +1233,7 @@ void DataMatrix::DebugSaveQSortState( int top, int bottom, int ii, int jj, int x
 	qsf << endl << title << endl;
 
 	int i, j;
-	for( j = 0; j < nChar; j++ )
+	for( j = 0; j < numPatterns; j++ )
 	{
 		qsf << setw(6) << j << "  ";
 		for( i = 0; i < nTax; i++ )
@@ -1447,12 +1472,12 @@ int DataMatrix::ReadPhylip( const char* infname){
 		if(i != num_chars) throw ErrorException("problem reading pattern counts");
 		else dense = 1;
 		//DJZ 9-13-06
-		//It is very important to properly set the totalNChar variable now
+		//It is very important to properly set the numNonMissingRealSitesInOrigMatrix variable now
 		//to be the sum of the counts, otherwise bootstrapping after reading
 		//a .cond file will give wrong resampling!!!!!
-		totalNChar=0;
+		numNonMissingRealSitesInOrigMatrix=0;
 		for(int i=0;i<num_chars;i++){
-			totalNChar += count[i];
+			numNonMissingRealSitesInOrigMatrix += count[i];
 			}
 		}
 
@@ -1544,7 +1569,7 @@ void DataMatrix::DumpCounts( const char* s )
 	ofstream tmpf( "tmpfile.txt", ios::out | ios::app );
    tmpf << endl << endl;
    if(s) { tmpf << s << endl; }
-   for( int j = 0; j < nChar; j++ ) {
+   for( int j = 0; j < numPatterns; j++ ) {
       tmpf << j << "  " << Count(j) << endl;
    }
    tmpf << endl;
@@ -1584,7 +1609,7 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 	}
 
 	nchar_total = 0;
-	for( j = 0; j < nChar; j++ )
+	for( j = 0; j < numPatterns; j++ )
 		nchar_total += Count(j);
 
 	nxsf << "#nexus" << endl << endl;
@@ -1597,7 +1622,7 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 		nxsf << TaxonLabel(i) << "  ";
 		nxsf << " [" << TaxonColor(i) << "]  ";
 
-		for( j = 0; j < nChar; j++ ) {
+		for( j = 0; j < numPatterns; j++ ) {
 			for( k = 0; k < Count(j); k++ ) {
 				nxsf << DatumToChar( Matrix( i, j ) );
 			}
@@ -1633,21 +1658,21 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 	if( !outf ) throw ErrorException("Error: could not open file \"%s\"", newpath);
 
 /*	nchar_total = 0;
-	for( j = 0; j < nChar; j++ ) {
+	for( j = 0; j < numPatterns; j++ ) {
 		int k = PatternType(j);
 		if( (k & PT_CONSTANT) && !InvarCharsExpected() ) continue;
 		nchar_total++;
 	}
 */
 
-	outf << "#NEXUS\nbegin data;\ndimensions ntax=" <<nTax << " nchar=" << nChar << ";\n";
+	outf << "#NEXUS\nbegin data;\ndimensions ntax=" <<nTax << " nchar=" << numPatterns << ";\n";
 	outf << "format datatype=dna missing=? gap=-;\n";
 	outf << "matrix" << endl;
 
-	//outf << nTax << "  " << nChar << endl;
+	//outf << nTax << "  " << numPatterns << endl;
 	for( i = 0; i < nTax; i++ ) {
 		outf << TaxonLabel(i) << "  ";
-		for( j = 0; j < nChar; j++ ) {
+		for( j = 0; j < numPatterns; j++ ) {
 //			int k = PatternType(j);
 //			if( (k & PT_CONSTANT) && !InvarCharsExpected() ) continue;
 			outf << DatumToChar( Matrix( i, j ) );
@@ -1665,7 +1690,7 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 	return 1;
 
 	// save a line containing the counts for each character
-	for( j = 0; j < nChar; j++ ) {
+	for( j = 0; j < numPatterns; j++ ) {
 //		int k = PatternType(j);
 //		if( (k & PT_CONSTANT) && !InvarCharsExpected() ) continue;
 		outf << Count(j) << ' ';
@@ -1673,7 +1698,7 @@ int DataMatrix::Save( const char* path, char* newfname /* = 0 */, char*
 	outf << endl;
 
 	// save a line containing the number of states for each character
-	for( j = 0; j < nChar; j++ ) {
+	for( j = 0; j < numPatterns; j++ ) {
 //		int k = PatternType(j);
 //		if( (k & PT_CONSTANT) && !InvarCharsExpected() ) continue;
 		outf << NumStates(j) << ' ';
@@ -1705,9 +1730,9 @@ void DataMatrix::WriteCollapsedData(){
 	}
 	
 void DataMatrix::ExplicitDestructor()	{
-	if( count ) MEM_DELETE_ARRAY(count); // count is of length nChar
-	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates is of length nChar
-	if( number ) MEM_DELETE_ARRAY(number); // number is of length nChar
+	if( count ) MEM_DELETE_ARRAY(count); // count is of length numPatterns
+	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates is of length numPatterns
+	if( number ) MEM_DELETE_ARRAY(number); // number is of length numPatterns
 	if( taxonLabel ) {
 		int j;
 		for( j = 0; j < nTaxAllocated; j++ )
@@ -1717,7 +1742,7 @@ void DataMatrix::ExplicitDestructor()	{
 	if( matrix ) {
 		int j;
 		for( j = 0; j < nTax; j++ )
-			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] is of length nChar
+			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] is of length numPatterns
 		MEM_DELETE_ARRAY(matrix); // matrix is of length nTax
 		}
 	memset(this, 0, sizeof(DataMatrix));
@@ -1725,7 +1750,7 @@ void DataMatrix::ExplicitDestructor()	{
 
 
 void DataMatrix::Reweight(FLOAT_TYPE prob){
-	for(int i=0;i<nChar;i++){
+	for(int i=0;i<numPatterns;i++){
 		FLOAT_TYPE r=rnd.uniform();
 		if(r * 2.0 < prob) count[i]++;
 		else if(r < prob) count[i]--;
@@ -1760,23 +1785,24 @@ int DataMatrix::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 	else
 		countsAlias = count;
 
-	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
+	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[numPatterns];
 	
 	FLOAT_TYPE p=0.0;
-	cumProbs[0]=(FLOAT_TYPE) origCountsAlias[0] / ((FLOAT_TYPE) totalNChar);
+	cumProbs[0]=(FLOAT_TYPE) origCountsAlias[0] / ((FLOAT_TYPE) numNonMissingRealCountsInOrigMatrix);
+
 	countsAlias[0] = 0;
-	for(int i = 1;i < nChar;i++){
-		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCountsAlias[i] / ((FLOAT_TYPE) totalNChar);
+	for(int i = 1;i < numPatterns;i++){
+		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCountsAlias[i] / ((FLOAT_TYPE) numNonMissingRealCountsInOrigMatrix);
 		countsAlias[i] = 0;
 		}
-	cumProbs[nChar - 1] = 1.0;
+	cumProbs[numPatterns - 1] = 1.0;
 
 	//ofstream deb("counts.log", ios::app);
 	//ofstream deb("counts.log");
 
 	//round to nearest int
-	int numToSample = (int) (((FLOAT_TYPE)totalNChar * resampleProportion) + 0.5);
-	if(numToSample != totalNChar) outman.UserMessage("Resampling %d characters (%.2f%%).\n", numToSample, resampleProportion*100);
+	int numToSample = (int) (((FLOAT_TYPE)numNonMissingRealCountsInOrigMatrix * resampleProportion) + 0.5);
+	if(numToSample != numNonMissingRealCountsInOrigMatrix) outman.UserMessage("Resampling %d characters (%.2f%%).\n", numToSample, resampleProportion*100);
 
 	for(int c=0;c<numToSample;c++){
 		FLOAT_TYPE p=rnd.uniform();
@@ -1786,14 +1812,14 @@ int DataMatrix::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 		countsAlias[pat]++;
 		}
 /*
-	for(int i = 0;i < nChar;i++)
+	for(int i = 0;i < numPatterns;i++)
 		deb << i << "\t" << origCountsAlias[i] << "\t" << countsAlias[i] <<  endl;
 */
 	//take a count of the number of chars that were actually resampled
 	nonZeroCharCount = 0;
 	int numZero = 0;
 	int totCounts = 0;
-	for(int d=0;d<nChar;d++){
+	for(int d=0;d<numPatterns;d++){
 		if(countsAlias[d] > 0) {
 			nonZeroCharCount++;
 			totCounts += countsAlias[d];
@@ -1802,8 +1828,8 @@ int DataMatrix::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 			numZero++;
 		}
 	delete []cumProbs;
-	assert(totCounts == totalNChar);
-	assert(nonZeroCharCount + numZero == nChar);
+	assert(totCounts == numNonMissingRealCountsInOrigMatrix);
+	assert(nonZeroCharCount + numZero == numPatterns);
 
 	int nextSeed = rnd.seed();
 	rnd.set_seed(originalSeed);
@@ -1835,13 +1861,13 @@ void DataMatrix::GetStringOfOrigDataColumns(string &str) const{
 	//note that GetSetAsNexusString takes zero offset indeces and converts them to
 	//char nums, ie adds 1 to each
 	NxsUnsignedSet chars;
-	for(int c = numConditioningPatterns;c < GapsIncludedNChar();c++)
+	for(int c = numConditioningPatterns;c < numRealSitesInOrigMatrix + numConditioningPatterns;c++)
 		chars.insert(origDataNumber[c]);
 	str = NxsSetReader::GetSetAsNexusString(chars);
 	}
 
 void DataMatrix::CountMissingCharsByColumn(vector<int> &vec){
-	for(int c = 0;c < nChar;c++){
+	for(int c = 0;c < numPatterns;c++){
 		int missing = 0;
 		for(int t = 0;t < nTax;t++){
 			if(Matrix(t, c) == fullyAmbigChar) 
@@ -1891,7 +1917,7 @@ void DataMatrix::MakeWeightSetString(std::string &wtstring, string name){
 	
 	NxsUnsignedSet dummy;
 	//the charset was empty, implying that all characters in this block will go into a single matrix
-	for(int i = 0;i < nChar;i++)
+	for(int i = 0;i < numPatterns;i++)
 		dummy.insert(i);
 
 	for(int countNum = 0;dummy.size() > 0;countNum++){
