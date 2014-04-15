@@ -42,7 +42,7 @@ void SequenceData::AddDummyRootToExistingMatrix(){
 
 	nTax++;
 	SetTaxonLabel( nTax - 1, "ROOT");
-	for(int c = 0;c < nChar;c++){	
+	for(int c = 0;c < numPatterns;c++){	
 		SetMatrix( nTax - 1, c, maxNumStates);
 		}
 	}
@@ -53,7 +53,7 @@ void NucleotideData::AddDummyRootToExistingMatrix(){
 
 	nTax++;
 	SetTaxonLabel( nTax - 1, "ROOT");
-	for(int c = 0;c < nChar;c++){	
+	for(int c = 0;c < numPatterns;c++){	
 		SetMatrix( nTax - 1, c, 15);
 		}
 	}
@@ -197,7 +197,7 @@ void AminoacidData::CalcEmpiricalFreqs(){
 	//for codons and aminoacids this will assume no ambiguity
 	
 	for( int i = 0; i < NTax(); i++ ) {
-		for( int j = 0; j < nChar; j++ ) {
+		for( int j = 0; j < numPatterns; j++ ) {
 			char thischar= matrix[i][j];
 
 			if(thischar != maxNumStates){
@@ -248,7 +248,7 @@ void CodonData::CalcEmpiricalFreqs(){
 	//for codons and aminoacids this will assume no ambiguity
 	
 	for( int i = 0; i < NTax(); i++ ) {
-		for( int j = 0; j < nChar; j++ ) {
+		for( int j = 0; j < numPatterns; j++ ) {
 			char thischar= matrix[i][j];
 
 			if(thischar != maxNumStates){
@@ -370,10 +370,10 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 	if(defWtsName.length() > 0 && useDefaultWeightsets)
 		outman.UserMessage("NOTE: Cannot use default wtsets with DNA to Codon translation! Wtset \"%s\" ignored.", defWtsName.c_str());  
 
-	nonZeroCharCount = nChar = dnaData->NChar()/3;
+	nonZeroCharCount = numPatterns = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
 	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon datatype specified, but number of nucleotides not divisible by 3!");  
-	NewMatrix(nTax, nChar);
+	NewMatrix(nTax, numPatterns);
 	patman.Initialize(nTax, maxNumStates);
 
 	//this will just map from the bitwise format to the index format (A, C, G, T = 0, 1, 2, 3)
@@ -391,7 +391,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 	int tax=0, thisCodonNum;
 	for(int tax=0;tax<NTax();tax++){
 		bool firstAmbig = true;
-		for(int cod=0;cod<nChar;cod++){
+		for(int cod=0;cod<numPatterns;cod++){
 			short p1 = dnaData->Matrix(tax, cod*3);
 			short p2 = dnaData->Matrix(tax, cod*3+1);
 			short p3 = dnaData->Matrix(tax, cod*3+2);
@@ -452,7 +452,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 	//copy matrix into alternative PatternManager for pattern sorting
 	if(usePatternManager){
 		SitePattern thisPat;
-		for(int cod=0;cod<nChar;cod++){
+		for(int cod=0;cod<numPatterns;cod++){
 			for(int tax=0;tax<NTax();tax++){
 				thisPat.AddChar(matrix[tax][cod]);
 				}
@@ -474,10 +474,10 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 	if(defWtsName.length() > 0 && useDefaultWeightsets)
 		outman.UserMessage("NOTE: Cannot use default wtsets with DNA to Aminoacid translation! Wtset \"%s\" ignored.", defWtsName.c_str());  
 
-	nonZeroCharCount = nChar = dnaData->NChar()/3;
+	nonZeroCharCount = numPatterns = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
 	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon to Aminoacid translation specified, but number of nucleotides not divisible by 3!");  
-	NewMatrix(nTax, nChar);
+	NewMatrix(nTax, numPatterns);
 	patman.Initialize(nTax, maxNumStates);
 
 	//this will just map from the bitwise format to the index format (A, C, G, T = 0, 1, 2, 3)
@@ -487,7 +487,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 	int tax=0, thisCodonNum;
 	for(int tax=0;tax<NTax();tax++){
 		bool firstAmbig = true;
-		for(int cod=0;cod<nChar;cod++){
+		for(int cod=0;cod<numPatterns;cod++){
 			short p1 = dnaData->Matrix(tax, cod*3);
 			short p2 = dnaData->Matrix(tax, cod*3+1);
 			short p3 = dnaData->Matrix(tax, cod*3+2);
@@ -533,7 +533,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 	//copy matrix into alternative PatternManager for pattern sorting
 	if(usePatternManager){
 		SitePattern thisPat;
-		for(int cod=0;cod<nChar;cod++){
+		for(int cod=0;cod<numPatterns;cod++){
 			for(int tax=0;tax<NTax();tax++){
 				thisPat.AddChar(matrix[tax][cod]);
 				}
@@ -1235,9 +1235,12 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 			NxsString tlabel = charblock->GetTaxonLabel(origTaxIndex);
 			SetTaxonLabel(effectiveTax, NxsString::GetEscaped(tlabel).c_str());
 			
+			//this accounts for conditioning patterns
 			int effectiveChar = 0;
-			//add the dummy constant character(s).  This will be one of each possible constant
+			//For each taxon, add the dummy constant character(s).  This will be one of each possible constant
 			//state, except for BINARY_NOT_ALL_ZEROS, where it will be only state 0
+			//Since there is no correspondence btwn these characters and the original alignments, the origDataNumber
+			//is -1
 			if(numConditioningPatterns > 0){
 				for(int s = 0; s < (datatype == BINARY_NOT_ALL_ZEROS ? 1 : maxNumStates); s ++){
 					if(effectiveTax == 0)
@@ -1294,7 +1297,8 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 					}
 				SetMatrix( effectiveTax, effectiveChar++, datum);
 				}
-			if(firstAmbig == false) outman.UserMessage("");
+			if(firstAmbig == false) 
+				outman.UserMessage("");
 			effectiveTax++;
 			}
 		}
@@ -1302,7 +1306,7 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 #ifndef NDEBUG
 	bool found;
 	if(recodeSkipped){
-		for(int c = numConditioningPatterns;c < nChar;c++){
+		for(int c = numConditioningPatterns;c < numPatterns;c++){
 			for(int s = 0;s < maxNumStates;s++){
 				found = false;
 				for(int t = 0;t < nTax;t++){
@@ -1351,27 +1355,27 @@ int NStateData::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 
 	//for nstate data this will include the conditioning chars, but they will
 	//have a resample prob of zero
-	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[nChar];
+	FLOAT_TYPE *cumProbs = new FLOAT_TYPE[numPatterns];
 	
 	assert(origCountsAlias[0] > 0 && origCountsAlias[1] > 0);
 
 	for(int i = 0;i < numConditioningPatterns;i++)
 		cumProbs[i] = ZERO_POINT_ZERO;
-	cumProbs[numConditioningPatterns]=(FLOAT_TYPE) origCountsAlias[numConditioningPatterns] / ((FLOAT_TYPE) totalNChar - numConditioningPatterns);
-	for(int i=numConditioningPatterns + 1;i<nChar;i++){
-		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCountsAlias[i] / ((FLOAT_TYPE) totalNChar - numConditioningPatterns);
+	cumProbs[numConditioningPatterns]=(FLOAT_TYPE) origCountsAlias[numConditioningPatterns] / ((FLOAT_TYPE) numNonMissingRealCountsInOrigMatrix);
+	for(int i=numConditioningPatterns + 1;i<numPatterns;i++){
+		cumProbs[i] = cumProbs[i-1] + (FLOAT_TYPE) origCountsAlias[i] / ((FLOAT_TYPE) numNonMissingRealCountsInOrigMatrix);
 		assert(origCountsAlias[i] > 0);
 		}
-	for(int q=numConditioningPatterns;q<nChar;q++) 
+	for(int q=numConditioningPatterns;q<numPatterns;q++) 
 		countsAlias[q]=0;
-	assert(FloatingPointEquals(cumProbs[nChar-1], ONE_POINT_ZERO, 1e-6));
-	cumProbs[nChar-1] = ONE_POINT_ZERO;
+	assert(FloatingPointEquals(cumProbs[numPatterns-1], ONE_POINT_ZERO, 1e-6));
+	cumProbs[numPatterns-1] = ONE_POINT_ZERO;
 		
 	//ofstream deb("counts.log", ios::app);
 
 	//round to nearest int
-	int numToSample = (int) (((FLOAT_TYPE)totalNChar * resampleProportion) + 0.5);
-	if(numToSample != totalNChar) outman.UserMessage("Resampling %d characters (%.2f%%).\n", numToSample, resampleProportion*100);
+	int numToSample = (int) (((FLOAT_TYPE)numNonMissingRealCountsInOrigMatrix * resampleProportion) + 0.5);
+	if(numToSample != numNonMissingRealCountsInOrigMatrix) outman.UserMessage("Resampling %d characters (%.2f%%).\n", numToSample, resampleProportion*100);
 
 	for(int c=0;c<numToSample;c++){
 		FLOAT_TYPE p=rnd.uniform();
@@ -1380,14 +1384,14 @@ int NStateData::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 		countsAlias[pat]++;
 		}
 /*
-	for(int i = 0;i < nChar;i++)
+	for(int i = 0;i < numPatterns;i++)
 		deb << i << "\t" << cumProbs[i] << "\t" << origCountsAlias[i] << "\t" << countsAlias[i] <<  endl;
 */
 	//take a count of the number of chars that were actually resampled
 	nonZeroCharCount = 0;
 	int numZero = 0;
 	int totCounts = 0;
-	for(int d = numConditioningPatterns;d < nChar;d++){
+	for(int d = numConditioningPatterns;d < numPatterns;d++){
 		if(countsAlias[d] > 0) {
 			nonZeroCharCount++;
 			totCounts += countsAlias[d];
@@ -1397,8 +1401,8 @@ int NStateData::BootstrapReweight(int seedToUse, FLOAT_TYPE resampleProportion){
 		}
 	if(datatype == ONLY_VARIABLE) 
 		assert(countsAlias[0] == 1);
-	assert(totCounts == totalNChar);
-	assert(nonZeroCharCount + numZero == nChar - numConditioningPatterns);
+	assert(totCounts == numNonMissingRealCountsInOrigMatrix);
+	assert(nonZeroCharCount + numZero == numPatterns - numConditioningPatterns);
 
 	delete []cumProbs;
 	int nextSeed = rnd.seed();

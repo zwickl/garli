@@ -3095,6 +3095,10 @@ void Population::PerformSearch(){
 		//output site likelihoods if requested
 		if(conf->outputSitelikelihoods > 0){
 			outman.UserMessage("Saving site likelihoods to file %s.sitelikes.log ...", conf->ofprefix.c_str());
+			for( int set = 0;set < dataPart->NumSubsets();set++){ 
+				if( dataPart->GetSubset(set)->DidUseDefaultWeightsets() == true)
+					outman.UserMessage("WARNING: Site likelihoods are being output when wtset %s is in effect.\n Sites with weight > 1 will only be output once!", dataPart->GetSubset(set)->WeightsetName().c_str());
+				}
 			
 			if( (userTermination || timeTermination || genTermination) ){
 				outman.UserMessage("WARNING: Site likelihoods being output on prematurely terminated search ...");

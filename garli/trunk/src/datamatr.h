@@ -101,22 +101,28 @@ public:
 	int MinScore(set<unsigned char> patt, int bound, unsigned char bits=15, int prevSc=0) const;
 	};
 
+//An alternate and several order of magnitude faster means of packing data.  The functionality is really the
+//same as that in DataMatrix functions, it just uses better classes and STL sorting.  To keep from changing lots of
+//code, even if this is used the results are copied back into their usual locations in DataMatrix.
+//Also need to keep around DataMatrix packing for certain types of data.
+//THIS DOES NOT CURRENTLY SUPPORT CONDITIONING PATTERNS, NOR IS IS CURRENTLY USED FOR NON-SEQUENCE DATA
 class PatternManager{
 	friend class DataMatrix;
 
 	int numTax;
 	int maxNumStates;
-	int numUniquePats;				//NChar
+	int pman_numPatterns;				//this is the CURRENT number of patterns, so will change during packing
 
-	int totNumChars;				//gapsIncludedNChar
-	int numNonMissingChars;			//totalNChar
-	int numMissingChars;			//nMissing
-	int numConstantChars;			//nConstant
-	int numInformativeChars;		//nInformative
-	int numUninformVariableChars;	//nVarUninform
+	int pman_numRealSitesInOrigMatrix;				
+	int pman_numNonMissingRealCountsInOrigMatrix;				
+	int pman_numNonMissingChars;			
+	int pman_numMissingChars;			
+	int pman_numConstantChars;			
+	int pman_numInformativeChars;		
+	int pman_numUninformVariableChars;	
 	
-	int lastConstant;				//lastConstant
-	bool compressed;				//dense
+	int lastConstant;					
+	bool compressed;					//dense
 	list<SitePattern> patterns;
 	list<SitePattern> uniquePatterns;
 	vector<int> constStates;
@@ -140,7 +146,7 @@ public:
 		SitePattern::numTax = nt;
 		}
 	void Reset(){
-		numTax = maxNumStates = totNumChars = numNonMissingChars = numUniquePats = numMissingChars = numConstantChars = numInformativeChars = lastConstant = numUninformVariableChars = 0;
+		numTax = maxNumStates = pman_numRealSitesInOrigMatrix = pman_numNonMissingChars = pman_numPatterns = pman_numMissingChars = pman_numConstantChars = pman_numInformativeChars = lastConstant = pman_numUninformVariableChars = 0;
 		compressed = false;
 		patterns.clear();
 		uniquePatterns.clear();
@@ -164,25 +170,54 @@ public:
 	void FillNumStatesVector(vector<int> &ns) const;
 	void FillCountVector(vector<int> &counts) const;
 	void FillConstStatesVector(vector<int> &cs) const;
-	void FillIntegerValues(int &nMissing, int &nConstant, int &nVarUninform, int &nInformative, int &lastConstant, int &gapsIncludedNChar, int &totNChar, int &NChar) const;
+	void FillIntegerValues(int &numMissingChars, int &numConstantChars, int &numVariableUninformChars, int &numInformativeChars, int &lastConstant, int &numRealSitesInOrigMatrix, int &numNonMissingRealCountsInOrigMatrix, int &totNChar, int &NChar) const;
 	};
 
 // Note: the class below has pure virtual member functions
 class DataMatrix{
 protected:
+	//This currently all becomes a bit of a nightmare when there are conditioning patterns included in the matrix, a la mkv.
+	//Some of the below include those counts (numConstantChars, numPatterns), but many don't (anything with OrigMatrix in the name)
 	int		nTax;
-	int		nTaxAllocated;//allocate more than nTax to allow for the addition of dummy taxa
-							//this will only be used during allocating and deallocation
-							//if a dummy taxon is created then nTax will be incremented
-	int		nChar;     //after compression
-	int		totalNChar; //columns in matrix, with all missing columns removed
-	int 	gapsIncludedNChar; //the actual number of columns in the data matrix read in
-								//only used when outputting something relative to input alignment
-	int		dense;		//whether the data has been sorted and identical patterns combined
-	int		nonZeroCharCount;	//this is the number of character patterns that have non-zero
-								//counts after bootstrap resampling.  Zero count characters can
-								//be avoided in the conditional likelihood calcs, but how this
-								//is done varies depending on the context
+	int		nTaxAllocated;			//allocate more than nTax to allow for the addition of dummy taxa
+									//this will only be used during allocating and deallocation
+									//if a dummy taxon is created then nTax will be incremented
+	
+	int		numPatterns;			//This is the size of the *CURRENT* *INTERNAL* representation of a datamatrix.
+									//Thus, depending on when during the data pattern processing procedure, it may be
+									//the same size as the true matrix, include zero count sites, or only consist of unique
+									//patterns.  After processing it will be the number of unique patterns that are
+									//looped over in likelihood calculations, so is the most frequently used size value.
+									//It DOES always include conditioning patterns.
+
+	unsigned numConditioningPatterns;	//Extra dummy characters added to the start of the matrix (currently all constant)
+										//In terms of packing and processing, they aren't treated differently, and it is
+										//REQUIRED that they will pack and appear as the first N characters in the matrix.
+										//They are also the first N characters in the matrix BEFORE packing as well.
+
+	int 	numRealSitesInOrigMatrix;	//The actual number of columns in the data matrix read in, WITHOUT excluded chars
+										//or conditioning patterns, but with all missing.  This is mainly for outputting 
+										//things with reference to the orig matrix.
+
+	int		numNonMissingRealSitesInOrigMatrix;	//as numRealSitesInOrigMatrix, with all missing columns removed
+
+	int 	numNonMissingRealCountsInOrigMatrix;	//The actual number of effective characters in the data matrix read in.
+													//Will differ from numRealSitesInOrigMatrix in that all missing columns aren't
+													//included, and because of any wtsets.  Does not contain missing or conditioning patterns
+													//This is critically used in bootstrap resampling.
+
+	int		nonZeroCharCount;		//this is the number of character patterns that have non-zero
+									//counts after bootstrap resampling.  Zero count characters can
+									//be avoided in the conditional likelihood calcs, but how this
+									//is done varies depending on the context
+									//only used when outputting something relative to input alignment
+	
+	int		numMissingChars;
+	int		numConstantChars;
+	int		numInformativeChars;
+	int		numVariableUninformChars;
+
+	int		dense;					//whether the data has been sorted and identical patterns combined
 	
 	unsigned char**         matrix;
 	PatternManager patman;
@@ -224,14 +259,9 @@ protected:
 	vector<string> newTaxonLabel;
 
 	char**          taxonLabel;
-	int		nMissing;
-	int		nConstant;
-	int		nInformative;
-	int		nVarUninform;
-	int 	lastConstant;//DJZ
+	int 	lastConstant;
 	int 	*constStates;//the state (or states) that a constant site contains
 	unsigned char fullyAmbigChar;
-	unsigned numConditioningPatterns;
 
 	protected:
 		int*	numStates;
@@ -258,17 +288,17 @@ protected:
 		};
 
 	public:
-		DataMatrix() : dense(0), nTax(0), nChar(0), matrix(0), count(0),
+		DataMatrix() : dense(0), nTax(0), numPatterns(0), matrix(0), count(0),
 			number(0), taxonLabel(0), numStates(0),
-			nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
+			numMissingChars(0), numConstantChars(0), numInformativeChars(0), numVariableUninformChars(0),
 			lastConstant(-1), constStates(0), origCounts(0),
 			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(false),
 			nTaxAllocated(0), origDataNumber(0), numConditioningPatterns(0)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
-			: nTax(ntax), nChar(nchar), dense(0), matrix(0), count(0),
+			: nTax(ntax), numPatterns(nchar), dense(0), matrix(0), count(0),
 			number(0), taxonLabel(0), numStates(0),
-			nMissing(0), nConstant(0), nInformative(0), nVarUninform(0),
+			numMissingChars(0), numConstantChars(0), numInformativeChars(0), numVariableUninformChars(0),
 			lastConstant(-1), constStates(0), origCounts(0),
 			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(false),
 			nTaxAllocated(0), origDataNumber(0), numConditioningPatterns(0)
@@ -288,7 +318,7 @@ protected:
 		virtual FLOAT_TYPE	TransitionProb( int /*i*/, int /*j*/
 			, int /*site*/, FLOAT_TYPE /*brlen*/) { return 0.0; }
 		virtual int NumStates(int j) const
-			{ return ( numStates && (j < nChar) ? numStates[j] : 0 ); }
+			{ return ( numStates && (j < numPatterns) ? numStates[j] : 0 ); }
 
 		void SetUsePatternManager(bool tf) {usePatternManager = tf;}
 		bool GetUsePatternManager() const {return usePatternManager;}
@@ -309,10 +339,10 @@ protected:
 		int NTax() const { return nTax; }
 		void SetNTax(int ntax) { nTax = ntax; }
 
-		virtual int NChar() const { return nChar; }
-		int TotalNChar() const { return totalNChar; }
-		int GapsIncludedNChar() const { return gapsIncludedNChar; }
-		void SetNChar(int nchar) { nChar = nchar; }
+		virtual int NChar() const { return numPatterns; }
+		int TotalNChar() const { return numNonMissingRealSitesInOrigMatrix; }
+		int GapsIncludedNChar() const { return numRealSitesInOrigMatrix; }
+		void SetNChar(int nchar) { numPatterns = nchar; }
 		unsigned NumConditioningPatterns() const{return numConditioningPatterns;}
 
 		int BootstrappedNChar() {return nonZeroCharCount;} 
@@ -324,18 +354,22 @@ protected:
 		int Number(int j) const{
 			if(newNumber.size() > 0)
 				return newNumber[j];
-			return ( number && (j < gapsIncludedNChar) ? number[j] : 0 );
+			assert(j < numRealSitesInOrigMatrix + numConditioningPatterns);
+			return number[j];
 			}
 
 		//argument here is column number from uncompressed subset
 		//return val is column from original full matrix before partitioning
-		int OrigDataNumber(int j) const
-			{ return ( origDataNumber && (j < gapsIncludedNChar) ? origDataNumber[j] : 0 ); }
+		int OrigDataNumber(int j) const{
+			assert(j < numRealSitesInOrigMatrix + numConditioningPatterns);
+			return origDataNumber[j];
+			}
 
 		virtual int Count(int j) const{ 
 			if(newCount.size() > 0)
 				return newCount[j];
-			return ( count && (j < nChar) ? count[j] : 0 ); 
+			assert(j < numPatterns);
+			return count[j];
 			}
 		virtual int CountByOrigIndex(int j) const{ 
 			if(newCount.size() > 0)
@@ -343,7 +377,8 @@ protected:
 					assert(newCount.size() > j);
 					return newCount[newNumber[j]];
 					}
-			return ( count && (j < nChar) ? count[number[j]] : 0 ); 
+			assert(j < numRealSitesInOrigMatrix + numConditioningPatterns);
+			return count[number[j]];
 			}
 		virtual const int *GetCounts() const {
 			if(newCount.size() > 0)
@@ -361,11 +396,11 @@ protected:
 				newCount[j] = c;
 				}
 			else
-				if( count && (j < nChar) ) 
+				if( count && (j < numPatterns) ) 
 					count[j] = c; 
 			}
 		void SetNumStates(int j, int c){ 
-			if( numStates && (j < nChar) ) numStates[j] = c;
+			if( numStates && (j < numPatterns) ) numStates[j] = c;
 			}
 		const char* TaxonLabel(int i) const{
 			return ( taxonLabel && (i < nTax) ? taxonLabel[i] : 0 );
@@ -390,7 +425,7 @@ protected:
 			assert( i >= 0 );
 			assert( i < nTax );
 			assert( j >= 0 );
-			assert( j < nChar );
+			assert( j < numPatterns );
 			return (unsigned char)matrix[i][j];
 			}
 
@@ -401,19 +436,19 @@ protected:
 			return matrix[i];
 		}
 		virtual void SetMatrix( int i, int j, unsigned char c){
-			if(matrix && (i < nTax) && (j < nChar))
+			if(matrix && (i < nTax) && (j < numPatterns))
 				matrix[i][j] = c;
 			}
 		void SetOriginalDataNumber(const int subsetMatColumn, const int origMatColumn){
 			origDataNumber[subsetMatColumn] = origMatColumn;			
 			}
 
-		int MatrixExists() const { return ( matrix && nTax>0 && nChar>0 ? 1 : 0 ); }
-		int NMissing() const { return nMissing; }
-		int NConstant() const { return nConstant; }
+		int MatrixExists() const { return ( matrix && nTax>0 && numPatterns>0 ? 1 : 0 ); }
+		int NMissing() const { return numMissingChars; }
+		int NConstant() const { return numConstantChars; }
 		int LastConstant() const {return lastConstant;}
-		int NInformative() const { return nInformative; }
-		int NVarUninform() const { return nVarUninform; }
+		int NInformative() const { return numInformativeChars; }
+		int NVarUninform() const { return numVariableUninformChars; }
 
 		DataMatrix& operator =(const DataMatrix&);
 
@@ -422,7 +457,7 @@ protected:
 			QSort( 0, NChar()-1 );
 			}
 		virtual int PatternType( int , unsigned int *) const;	// returns PT_XXXX constant indicating type of pattern
-		void Summarize();       // fills in nConstant, nInformative, and nAutapomorphic data members
+		void Summarize();       // fills in numConstantChars, numInformativeChars, and numVariableUninformChars data members
 		virtual void Collapse();
 		void EliminateAdjacentIdenticalColumns();
 		virtual void Pack();
@@ -446,11 +481,11 @@ protected:
       void ReserveOriginalCounts(){
 		if(usePatternManager == false){
 			if(origCounts == NULL) 
-				origCounts = new int[nChar];
+				origCounts = new int[numPatterns];
 			}
 		else
 			assert(newOrigCounts.size() == 0);
-  		for(int i=0;i<nChar;i++){
+  		for(int i=0;i<numPatterns;i++){
 			if(newCount.size() > 0){
 				assert(newCount.size() > i);
 				newOrigCounts.push_back(newCount[i]);
@@ -462,7 +497,7 @@ protected:
       void RestoreOriginalCounts(){
 			if(origCounts == NULL) 
 				return;
-      		for(int i=0;i<nChar;i++){
+      		for(int i=0;i<numPatterns;i++){
 				if(newCount.size() > 0){
 					assert(newCount.size() > i);
 					newCount[i] = newOrigCounts[i];
