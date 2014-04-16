@@ -607,7 +607,7 @@ public:
 		fullyAmbigChar = maxNumStates;
 		}
 
-	CodonData(const NucleotideData *dat, int genCode) : SequenceData(){
+	CodonData(const NucleotideData *dat, int genCode, bool ignoreStops=false) : SequenceData(){
 		assert(dat->Dense() == false);
 		if(genCode == GeneticCode::STANDARD){
 			code.SetStandardCode();
@@ -625,7 +625,7 @@ public:
 			throw ErrorException("Sorry, only the standard, vert mito and invert mito codes can be used with codon models");
 			}
 		usePatternManager = dat->GetUsePatternManager();
-		FillCodonMatrixFromDNA(dat);
+		FillCodonMatrixFromDNA(dat, ignoreStops);
 		CopyNamesFromOtherMatrix(dat);
 		empType = NOT_EMPIRICAL;
 		fullyAmbigChar = maxNumStates;
@@ -633,7 +633,7 @@ public:
 
 	~CodonData(){}
 
-	void FillCodonMatrixFromDNA(const NucleotideData *);
+	void FillCodonMatrixFromDNA(const NucleotideData *, bool ignoreStops);
 	unsigned char CharToDatum(char c) const{
 		//this shouldn't be getting called, as it makes no sense for codon data
 		assert(0);
@@ -669,7 +669,7 @@ public:
 		fullyAmbigChar = maxNumStates;
 		}
 
-	AminoacidData(const NucleotideData *dat, int genCode) : SequenceData(){
+	AminoacidData(const NucleotideData *dat, int genCode, bool ignoreStops=false) : SequenceData(){
 		maxNumStates = 20;
 		GeneticCode c;
 		if(genCode == GeneticCode::STANDARD) c.SetStandardCode();
@@ -691,11 +691,11 @@ public:
 			maxNumStates = 21;	
 			}
 		usePatternManager = dat->GetUsePatternManager();
-		FillAminoacidMatrixFromDNA(dat, &c);
+		FillAminoacidMatrixFromDNA(dat, &c, ignoreStops);
 		CopyNamesFromOtherMatrix(dat);
 		fullyAmbigChar = maxNumStates;
 		}
-	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code);
+	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code, bool ignoreStops);
 	void CalcEmpiricalFreqs();
 	unsigned char CharToDatum(char d) const;
 	void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset);

@@ -361,7 +361,7 @@ void NucleotideData::MakeAmbigStrings(){
 		}
 	}
 
-void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
+void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData, bool ignoreStops){
 	//first we need to convert the nucleotide data to codons numbered 0-60 or 61 and assign them back to the terminals
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
@@ -430,7 +430,12 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 					c += b[pos1];
 					c += b[pos2];
 					c += b[pos3];
-					throw ErrorException("stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+					if(ignoreStops == true){
+						outman.UserMessage("Warning: stop codon %s found at codon site %d (nuc site %d) in taxon %s.\n\tTreating as missing data because ignorestopcodons = 1 is set in configuration file.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+						thisCodonNum=64;
+						}
+					else
+						throw ErrorException("Stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.\nBe sure that your alignment is properly in frame, or set ignorestopcodons = 1 in the\n[general] section of your configuration file to treat as missing.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
 					}
 				}
 
@@ -465,7 +470,7 @@ void CodonData::FillCodonMatrixFromDNA(const NucleotideData *dnaData){
 		}
 	}
 
-void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, GeneticCode *code){
+void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, GeneticCode *code, bool ignoreStops){
 	//first we need to convert the nucleotide data to codons, and then translate the codons to AA's
 	//codons are ordered AAA, AAC, AAG, AAT, ACA, ... TTT
 	short pos1, pos2, pos3;
@@ -520,7 +525,12 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 					c += b[pos1];
 					c += b[pos2];
 					c += b[pos3];
-					throw ErrorException("stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+					if(ignoreStops == true){
+						outman.UserMessage("Warning: stop codon %s found at codon site %d (nuc site %d) in taxon %s.\n\tTreating as missing data because ignorestopcodons = 1 is set in configuration file.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+						thisCodonNum=64;
+						}
+					else
+						throw ErrorException("Stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.\nBe sure that your alignment is properly in frame, or set ignorestopcodons = 1 in the\n[general] section of your configuration file to treat as missing.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
 					}
 				}
 			else prot = maxNumStates;

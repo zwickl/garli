@@ -709,7 +709,7 @@ int main( int argc, char* argv[] )	{
 							const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
 							CodonData *dat;
 							if(nuc != NULL)
-								dat = new CodonData(nuc, modSpec->geneticCode);
+								dat = new CodonData(nuc, modSpec->geneticCode, conf.ignoreStopCodons);
 							else throw ErrorException("Attempted to create codon matrix from non-nucleotide data");
 
 							//this probably shouldn't go here, but...
@@ -724,7 +724,7 @@ int main( int argc, char* argv[] )	{
 							const NucleotideData *nuc = dynamic_cast<NucleotideData *>(data);
 							AminoacidData *dat;
 							if(nuc != NULL)
-								dat = new AminoacidData(nuc, modSpec->geneticCode);
+								dat = new AminoacidData(nuc, modSpec->geneticCode, conf.ignoreStopCodons);
 							else throw ErrorException("Attempted to translate to amino acids from non-nucleotide data");
 
 							data = dat;

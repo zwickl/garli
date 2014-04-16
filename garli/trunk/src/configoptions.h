@@ -95,6 +95,8 @@ class GeneralGamlConfig{
 	bool reportRunProgress;
 	bool scoreOnly;
 
+	bool ignoreStopCodons;
+
 	//finishing the run
 	bool enforceTermConditions;
 	unsigned lastTopoImproveThresh;
