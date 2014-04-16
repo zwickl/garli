@@ -67,6 +67,8 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	runmode = 0;
 	scoreOnly = false;
 	
+	ignoreStopCodons = false;
+
 #ifdef BOINC
 	boincWorkDivision = false;
 #endif
@@ -177,6 +179,8 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetUnsignedOption("outputsitelikelihoods", outputSitelikelihoods, true);
 	cr.GetBoolOption("reportrunprogress", reportRunProgress, true);
 	cr.GetBoolOption("optimizeinputonly", optimizeInputOnly, true);
+
+	cr.GetBoolOption("ignorestopcodons", ignoreStopCodons, true);
 
 	cr.GetBoolOption("outputmostlyuselessfiles", outputMostlyUselessFiles, true);
 	cr.GetBoolOption("outputphyliptree", outputPhylipTree, true);
