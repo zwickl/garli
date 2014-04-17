@@ -481,60 +481,90 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 
 	nonZeroCharCount = numPatterns = dnaData->NChar()/3;
 	nTax = dnaData->NTax();
-	if(dnaData->NChar() % 3 != 0) throw ErrorException("Codon to Aminoacid translation specified, but number of nucleotides not divisible by 3!");  
+	if(dnaData->NChar() % 3 != 0)
+		throw ErrorException("Codon to Aminoacid translation specified, but number of nucleotides not divisible by 3!");  
 	NewMatrix(nTax, numPatterns);
 	patman.Initialize(nTax, maxNumStates);
 
-	//this will just map from the bitwise format to the index format (A, C, G, T = 0, 1, 2, 3)
-	//partial ambiguity is mapped to total ambiguity currently
-	short bitwiseToIndexFormat[16] = {15,0,1,15,2,15,15,15,3,15,15,15,15,15,15,15};
-	
 	int tax=0, thisCodonNum;
 	for(int tax=0;tax<NTax();tax++){
 		bool firstAmbig = true;
-		for(int cod=0;cod<numPatterns;cod++){
-			short p1 = dnaData->Matrix(tax, cod*3);
-			short p2 = dnaData->Matrix(tax, cod*3+1);
-			short p3 = dnaData->Matrix(tax, cod*3+2);
-
-			pos1 = bitwiseToIndexFormat[p1];
-			pos2 = bitwiseToIndexFormat[p2];
-			pos3 = bitwiseToIndexFormat[p3];
+		for(int cod = 0;cod < numPatterns;cod++){
+			int posArr[3] = {dnaData->Matrix(tax, cod*3), dnaData->Matrix(tax, cod*3+1), dnaData->Matrix(tax, cod*3+2)};
 			
-			thisCodonNum=(pos1)*16 + (pos2)*4 + pos3;
-			
-			if(pos1==15||pos2==15||pos3==15){//check for gaps
-				if(pos1+pos2+pos3 != 45){
-					//warn about gaps or ambiguity in codons
-					if(firstAmbig){
-						outman.UserMessageNoCR("Gaps or ambiguity codes found within codon for taxon %s.\n\tAminoacids coded as missing for that taxon: ", dnaData->TaxonLabel(tax));
-						firstAmbig = false;
-						}
-					outman.UserMessageNoCR("%d ", cod+1);
+			int prot = -1;
+			if(posArr[0] + posArr[1] + posArr[0] == 45)
+				//all positions missing
+				prot = maxNumStates;
+			else{
+				//All this determines what possible codons any ambiguity could resolve to, and whether those codons encode
+				//the same protein.  If so, use that protein.  If not, treat as N.
+				vector< vector<int> > allPos;
+				allPos.push_back(vector<int>());
+				allPos.push_back(vector<int>());
+				allPos.push_back(vector<int>());
+				
+				for(int pos = 0;pos < 3;pos++){
+					if(posArr[pos] & 1)
+						allPos[pos].push_back(0);
+					if(posArr[pos] & 2)
+						allPos[pos].push_back(1);
+					if(posArr[pos] & 4)
+						allPos[pos].push_back(2);
+					if(posArr[pos] & 8)
+						allPos[pos].push_back(3);
 					}
-				thisCodonNum=64;
-				}
-
-			char prot;
-			//note that a return code of 20 (or 21 for the two serine model) from the codon lookup indicates a stop codon, but a protein code of 20 generally means total ambiguity
-			if(thisCodonNum != 64){
-				prot = code->CodonLookup(thisCodonNum);
-				if(prot == maxNumStates){
-					string c;
-					char b[4]={'A','C','G','T'};
-					c += b[pos1];
-					c += b[pos2];
-					c += b[pos3];
-					if(ignoreStops == true){
-						outman.UserMessage("Warning: stop codon %s found at codon site %d (nuc site %d) in taxon %s.\n\tTreating as missing data because ignorestopcodons = 1 is set in configuration file.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
-						thisCodonNum=64;
+				
+				bool breaker = false;
+				for(vector<int>::iterator fit = allPos[0].begin();fit != allPos[0].end();fit++){
+					for(vector<int>::iterator sit = allPos[1].begin();sit != allPos[1].end();sit++){
+						for(vector<int>::iterator tit = allPos[2].begin();tit != allPos[2].end();tit++){
+							int thisCodonResolution = (*fit)*16 + (*sit)*4 + *tit;
+							
+							//note that a return code of 20 (or 21 for the two serine model) from the codon lookup indicates a stop codon, but a protein code of 20 generally means total ambiguity
+							int thisResolutionProt = code->CodonLookup(thisCodonResolution);
+				
+							if(thisResolutionProt == maxNumStates){
+								string c;
+								char b[4]={'A','C','G','T'};
+								c += b[*fit];
+								c += b[*sit];
+								c += b[*tit];
+								if(ignoreStops == true){
+									outman.UserMessage("Warning: stop codon %s found at codon site %d (nuc site %d) in taxon %s.\n\tTreating as missing data because ignorestopcodons = 1 is set in configuration file.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+									prot = thisResolutionProt;
+									breaker = true;
+									break;
+									}
+								else
+									throw ErrorException("Stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.\nBe sure that your alignment is properly in frame, or set ignorestopcodons = 1 in the\n[general] section of your configuration file to treat as missing.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+								}
+							else if(prot < 0)
+								//translating the first (or only) codon resolution to amino acid 
+								prot = thisResolutionProt;
+							
+							else if(thisResolutionProt != prot){
+								//another resolution codes for a different AA
+								prot = maxNumStates;
+								if(firstAmbig){
+									outman.UserMessageNoCR("Gaps or ambiguity codes found within codon for taxon %s.\n\tResolutions of ambiguity do not encode a single aminoacid.\n\tAminoacids coded as missing for that taxon: ", dnaData->TaxonLabel(tax));
+									firstAmbig = false;
+									}
+								outman.UserMessageNoCR("%d ", cod+1);
+								breaker = true;
+								break;
+								}
+							else{
+								outman.DebugMessage("Gaps or ambiguity codes found within codon at codon site %d (nuc site %d)\n\tfor taxon %s.\n\tResolutions of ambiguity encode a single aminoacid.", cod+1, cod*3+1, dnaData->TaxonLabel(tax));
+								}
+							}
+						if(breaker)
+							break;
 						}
-					else
-						throw ErrorException("Stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.\nBe sure that your alignment is properly in frame, or set ignorestopcodons = 1 in the\n[general] section of your configuration file to treat as missing.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+					if(breaker)
+						break;
 					}
 				}
-			else prot = maxNumStates;
-
 			matrix[tax][cod] = prot;
 			}
 		if(firstAmbig == false) outman.UserMessage("");
