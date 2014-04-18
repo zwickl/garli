@@ -1,11 +1,11 @@
 #!/bin/sh
 
+
 if [ $# -gt 0 ]
 then
         if [ "$1" = "--ncl-svn" -o "$1" = "--ncl-sourceforge" ]
         #if [ "$1" = "--ncl-svn" ]
         then
-            shift # this shifts the first cmd line argument out so that the rest can be passed to GARLI configure
             if [ -d ncl-svn ]
             then
                 echo "***NCL LIBRARY SOURCE FROM SUBVERSION ALREADY EXISTS***"
@@ -13,12 +13,13 @@ then
                 echo "***DELETE THE ncl-svn DIRECTORY TO GET THE LATEST NCL SOURCE***"
             else
                 echo "***CHECKING OUT NCL LIBRARY SOURCE VIA SUBVERSION***"
-                if ["$1" = "--ncl-svn" ];then
-                    svn co https://github.com/mtholder/ncl ncl-svn || exit
+                if [ "$1" = "--ncl-svn" ];then
+                    svn co https://github.com/mtholder/ncl/trunk ncl-svn || exit
                 else
                     svn co http://svn.code.sf.net/p/ncl/code/branches/v2.1 ncl-svn || exit
                 fi
             fi
+            shift # this shifts the first cmd line argument out so that the rest can be passed to GARLI configure
             nclv="ncl-svn"
             cd ${nclv} || exit
             sh bootstrap.sh || exit
