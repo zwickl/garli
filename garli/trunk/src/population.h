@@ -292,6 +292,12 @@ private:
 	//finishedRep is false that means that we still have to do final opt.
 	bool finishedGenerations;
 
+	//These start at 0, are set to 1 when optimization starts, and when each pass ends they increment.  When a refine
+	//phase finishes it is set to -1.  Mainly important to report % done in boincWordDivision mode, but could in theory
+	//be adapted to checkpointing during initial/final optimization.  
+	int initialRefinePass;
+	int finalRefinePass;
+
 	FLOAT_TYPE bestFitness;
 	FLOAT_TYPE prevBestFitness;
 	FLOAT_TYPE tot_fraction_done;
@@ -330,7 +336,7 @@ private:
 	bool userTermination;
 	//specified stoptime was reached.  Use of this really isn't recommended
 	bool timeTermination;
-	//specified stoptime was reached.  Note that this is PER REP, so it can be reset.
+	//specified stopgen was reached.  Note that this is PER REP, so it can be reset.
 	//the other term types cannot
 	bool genTermination;
 	bool finishedRep;//when a single search replicate is finished (not a bootstrap rep)
@@ -403,7 +409,7 @@ private:
 			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
 			userTermination(false), timeTermination(false), genTermination(false), currentBootstrapRep(0),
 			finishedRep(false), lastBootstrapSeed(0), nextBootstrapSeed(0), dataPart(NULL), rawPart(NULL), swapTermThreshold(0),
-			finishedGenerations(false)
+			finishedGenerations(false), initialRefinePass(0), finalRefinePass(0)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
 #endif
@@ -548,6 +554,7 @@ private:
 		void FindLostClas();
 		void FinalOptimization();
 		void BetterFinalOptimization();
+		void InitialOptimization(Individual *ind, bool optModel, FLOAT_TYPE branchPrec);
 		void ResetMemLevel(int numNodesPerIndiv, int numClas);
 		void SetNewBestIndiv(int indivIndex);
 		void LogNewBestFromRemote(FLOAT_TYPE, int);
@@ -558,5 +565,18 @@ private:
 		string TerminationWarningMessage(){
 			return string("\nNOTE: ***Search was terminated before full auto-termination condition was reached!\nLikelihood scores, topologies and model estimates obtained may not be fully optimal!***\n");
 			}
+		bool ShouldCheckpoint(bool checkGeneration) const{
+#ifndef BOINC
+			//non-BOINC checkpointing
+			if(conf->checkpoint == true && conf->scoreOnly == false && conf->optimizeInputOnly == false && (checkGeneration == false || (gen % conf->saveevery) == 0)) 
+				return true;
+#else
+			//BOINC checkpointing can occur whenever the BOINC client wants it to
+			if(boinc_time_to_checkpoint())
+				return true;
+#endif
+			return false;
+			}
+
 	};
 #endif

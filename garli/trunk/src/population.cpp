@@ -1300,7 +1300,10 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	if(conf->refineStart==true && !conf->scoreOnly){
 		//12/26/07 now only passing the first argument here ("optModel") as false if no model muts are used
 		//if single parameters are fixed that will be checked in the Refine function itself
-		indiv[0].RefineStartingConditions(adap->modWeight != ZERO_POINT_ZERO, adap->branchOptPrecision);
+		//5/15/14 Moved the initial refinement phase to the Population level, which makes more sense and
+		//mirrors the final optimization behavior
+		//indiv[0].RefineStartingConditions(adap->modWeight != ZERO_POINT_ZERO, adap->branchOptPrecision);
+		InitialOptimization(&indiv[0], adap->modWeight != ZERO_POINT_ZERO, adap->branchOptPrecision);
 		indiv[0].CalcFitness(0);
 		outman.UserMessage("lnL after optimization: %.4f", indiv[0].Fitness());
 		}	
@@ -1337,6 +1340,155 @@ void Population::SeedPopulationWithStartingTree(int rep){
 #endif
 
 	CalcAverageFitness();
+	}
+
+//Copied almost exactly from Individual::RefineStartingConditions.  For various reasons it is easier 
+//to have it at the population level.
+void Population::InitialOptimization(Individual *ind, bool optModel, FLOAT_TYPE branchPrec){
+	bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates, optSubsetRates;
+	optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = optSubsetRates = false;
+
+	bool optInsDel = false;
+
+	ModelPartition &modPart = ind->modPart;
+	Tree *treeStruct = ind->treeStruct;
+
+	if(optModel){
+		for(int modnum = 0;modnum < modPart.NumModels();modnum++){
+			Model *mod = modPart.GetModel(modnum);
+			const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
+			if(modSpec->numRateCats > 1 && modSpec->IsNonsynonymousRateHet() == false && modSpec->IsFlexRateHet() == false && modSpec->fixAlpha == false) 
+				optAlpha = true;
+			if(modSpec->IsFlexRateHet()) 
+				optFlex = true;
+			if(modSpec->includeInvariantSites && modSpec->fixInvariantSites == false) 
+				optPinv = true;
+			if(modSpec->IsCodon() && !modSpec->fixOmega) 
+				optOmega = true;
+			if(modSpec->IsOrientedGap()) 
+				optInsDel = true;
+
+			if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
+				optFreqs = true;
+			//this is the case of forced freq optimization with codon models.  For everything to work they must be set as both not fixed but empirical
+			if(modSpec->IsCodon() && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == true)
+				optFreqs = true;
+			if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1 || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()))
+				optRelRates = true;
+			}
+		//oops, bug fixed 10/2/12 - subset rates weren't getting opt in linked models
+		//modSpecSet.inferSubsetRates is already getting set only if conf.inferSubsetRates
+		//is true and there are multiple matrices, but not necessarily multiple models
+		//if(modSpecSet.InferSubsetRates() && modSpecSet.NumSpecs() > 1)
+		if(modSpecSet.InferSubsetRates())
+			optSubsetRates = true;
+		}
+
+	outman.UserMessageNoCR("optimizing: starting branch lengths");
+	if(optAlpha) outman.UserMessageNoCR(", alpha shape");
+	if(optPinv) outman.UserMessageNoCR(", prop. invar");
+	if(optRelRates) outman.UserMessageNoCR(", rel rates");
+	if(optFreqs) outman.UserMessageNoCR(", eq freqs");
+	if(optOmega) outman.UserMessageNoCR(", dN/dS (aka omega) parameters");
+	if(optInsDel){
+		outman.UserMessageNoCR(", ins rate");
+		outman.UserMessageNoCR(", del rate");
+		}
+	if(optSubsetRates) outman.UserMessageNoCR(", subset rates");
+	outman.UserMessage("...");
+	FLOAT_TYPE improve=(FLOAT_TYPE)999.9;
+	ind->CalcFitness(0);
+
+	assert(initialRefinePass < 1);
+	for(initialRefinePass = 1;improve > branchPrec;initialRefinePass++){
+		FLOAT_TYPE alphaOptImprove=0.0, pinvOptImprove = 0.0, omegaOptImprove = 0.0, flexOptImprove = 0.0, optImprove=0.0, scaleOptImprove=0.0, subsetRateImprove=0.0, rateOptImprove=0.0;
+		FLOAT_TYPE freqOptImprove=0.0, insDelImprove = 0.0;
+		
+		ind->CalcFitness(0);
+		FLOAT_TYPE passStart = ind->Fitness();
+		
+		optImprove=treeStruct->OptimizeAllBranches(branchPrec);
+		ind->CalcFitness(0);
+
+		FLOAT_TYPE trueImprove = ind->Fitness() - passStart;
+		assert(trueImprove >= -1.0);
+		if(trueImprove < ZERO_POINT_ZERO) trueImprove = ZERO_POINT_ZERO;
+
+		vector<FLOAT_TYPE> blens;
+		treeStruct->StoreBranchlengths(blens);
+		scaleOptImprove=treeStruct->OptimizeTreeScale(branchPrec);
+		ind->CalcFitness(0);
+		//if some of the branch lengths were at the minimum or maximum boundaries the scale optimization
+		//can actually worsen the score.  If so, return them to their original lengths.
+		if(scaleOptImprove < ZERO_POINT_ZERO){
+			treeStruct->RestoreBranchlengths(blens);
+			ind->CalcFitness(0);
+			scaleOptImprove = ZERO_POINT_ZERO;
+			}
+
+		ind->CalcFitness(0);
+		if(optModel){
+			for(int modnum = 0;modnum < modPart.NumModels();modnum++){
+				Model *mod = modPart.GetModel(modnum);
+				const ModelSpecification *modSpec = mod->GetCorrespondingSpec();
+				if(modSpec->IsCodon()){
+					if(!modSpec->fixOmega)
+						omegaOptImprove += treeStruct->OptimizeOmegaParameters(branchPrec, modnum);
+					}
+				else if(mod->NRateCats() > 1){
+					if(modSpec->IsFlexRateHet()){//Flex rates
+						//no longer doing alpha first, it was too hard to know if the flex rates had been partially optimized
+						//already during making of a stepwise tree
+						//if(i == 1) rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
+						//if(i == 1 && modSpec.gotFlexFromFile==false) rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 1.0e-8, 999.9, &Model::SetAlpha);
+						flexOptImprove += treeStruct->OptimizeFlexRates(branchPrec, modnum);
+						}
+					else if(modSpec->fixAlpha == false){//normal gamma
+						//rateOptImprove = treeStruct->OptimizeAlpha(branchPrec);
+						//do NOT let alpha go too low here - on bad or random starting trees the branch lengths get crazy long
+						//rateOptImprove = treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 1.0e-8, 999.9, &Model::SetAlpha);
+						//alphaOptImprove += treeStruct->OptimizeBoundedParameter(branchPrec, mod->Alpha(), 0, 0.05, 999.9, modnum, &Model::SetAlpha);
+						alphaOptImprove += treeStruct->OptimizeBoundedParameter(modnum, branchPrec, mod->Alpha(), 0, 0.05, 999.9, &Model::SetAlpha);
+						}
+					}
+				if(modSpec->includeInvariantSites && !modSpec->fixInvariantSites)
+					pinvOptImprove += treeStruct->OptimizeBoundedParameter(modnum, branchPrec, mod->PropInvar(), 0, 1.0e-8, mod->maxPropInvar, &Model::SetPinv);
+				if(modSpec->IsOrientedGap()){
+					insDelImprove += treeStruct->OptimizeInsertDeleteRates(branchPrec, modnum);
+					}
+				if(modSpec->IsCodon() == false && modSpec->fixStateFreqs == false && modSpec->IsEqualStateFrequencies() == false && modSpec->IsEmpiricalStateFrequencies() == false)
+					freqOptImprove += treeStruct->OptimizeEquilibriumFreqs(branchPrec, modnum);
+				if(modSpec->fixRelativeRates == false && (modSpec->Nst() > 1 || modSpec->IsEstimateAAMatrix() || modSpec->IsTwoSerineRateMatrix()))
+					rateOptImprove += treeStruct->OptimizeRelativeNucRates(branchPrec, modnum);
+				}
+			if(optSubsetRates){
+				subsetRateImprove += treeStruct->OptimizeSubsetRates(branchPrec);
+				}
+			}
+		improve=scaleOptImprove + trueImprove + alphaOptImprove + pinvOptImprove + flexOptImprove + omegaOptImprove + rateOptImprove + freqOptImprove + subsetRateImprove + insDelImprove;
+		outman.precision(8);
+		outman.UserMessageNoCR("pass%2d:+%9.3f (branch=%7.2f scale=%6.2f", initialRefinePass, improve, trueImprove, scaleOptImprove);
+		if(optOmega) outman.UserMessageNoCR(" omega=%6.2f", omegaOptImprove);
+		if(optAlpha) outman.UserMessageNoCR(" alpha=%6.2f", alphaOptImprove);
+
+		if(optFreqs) outman.UserMessageNoCR(" freqs=%6.2f", freqOptImprove);
+		if(optRelRates) outman.UserMessageNoCR(" rel rates=%6.2f", rateOptImprove);
+
+		if(optFlex) outman.UserMessageNoCR(" flex=%6.2f", flexOptImprove);
+		if(optPinv) outman.UserMessageNoCR(" pinv=%6.2f", pinvOptImprove);
+		if(optInsDel){
+			outman.UserMessageNoCR(" ins/del=%6.2f", insDelImprove);
+			}
+		if(optSubsetRates) outman.UserMessageNoCR(" subset rates=%6.2f", subsetRateImprove);
+		outman.UserMessageNoCR(")");
+		
+		UpdateFractionDone(0);
+		if(conf->reportRunProgress)
+			outman.UserMessageNoCR(" %14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
+		outman.UserMessage("");
+		}
+	initialRefinePass = -1;
+	treeStruct->nodeOptVector.clear();
 	}
 
 /* This is deprecated in favor of model based function
@@ -2061,7 +2213,7 @@ void Population::Run(){
 		if(conf->checkpoint && ! (conf->scoreOnly || conf->optimizeInputOnly)) 
 			WriteStateFiles();
 #else
-		WriteStateFiles();
+			WriteStateFiles();
 		if(conf->boincWorkDivision){
 			outman.UserMessage("\nNOTE: Terminating run before final optimization and");
 			outman.UserMessage("writing checkpoint because running in BOINC mode and");
@@ -2109,7 +2261,7 @@ void Population::UpdateFractionDone(int phase){
 	//reduction - while reductions are happening : firstBreak - secondBreak
 	//terminal - remaining gens after min prec reached : secondBreak - thirdBreak
 	//final - final opt : after thirdBreak
-
+	
 	FLOAT_TYPE new_fract = 0.01;
 	FLOAT_TYPE current_fract = rep_fraction_done;
 	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
@@ -2236,7 +2388,7 @@ void Population::UpdateFractionDone(int phase){
 		int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
 		FLOAT_TYPE repFract = 1.0 / totSearches;
 		t_fraction_done = (curSearch - 1) * repFract + (repFract * rep_fraction_done);
-		assert(t_fraction_done >= tot_fraction_done);
+		assert(t_fraction_done + 0.0001 >= tot_fraction_done);
 		}
 	tot_fraction_done = t_fraction_done;
 	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
@@ -2606,6 +2758,9 @@ void Population::BetterFinalOptimization(){
 
 //this is the original partitioned final opt
 void Population::FinalOptimization(){
+	//DEPRECATED in favor of BetterFinalOptimization
+	assert(0);
+
 	outman.setf(ios::fixed);
 	outman.precision(5);
 	outman.UserMessage("Current score = %.4f", BestFitness());
@@ -3010,7 +3165,7 @@ void Population::PerformSearch(){
 			UpdateFractionDone(1);
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
 #ifdef BOINC
-			WriteStateFiles();
+				WriteStateFiles();
 			if(conf->boincWorkDivision){
 				outman.UserMessage("\nNOTE: Terminating run after initial optimization and");
 				outman.UserMessage("writing checkpoint because running in BOINC mode and");
