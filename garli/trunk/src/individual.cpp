@@ -684,6 +684,8 @@ void Individual::GetStartingTreeFromNCL(const NxsTreesBlock *treesblock, int ran
 	}
 
 void Individual::RefineStartingConditions(bool optModel, FLOAT_TYPE branchPrec){
+	//This has been deprecated in favor of Population::InitialOptimization, which is essentially the same code
+	assert(0);
 	bool optOmega, optAlpha, optFlex, optPinv, optFreqs, optRelRates, optSubsetRates;
 	optOmega = optAlpha = optFlex = optPinv = optFreqs = optRelRates = optSubsetRates = false;
 
