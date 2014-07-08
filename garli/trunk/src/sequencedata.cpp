@@ -1233,8 +1233,8 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 
 	NewMatrix( numActiveTaxa, realCharSet->size() + numConditioningPatterns);
 
-	map<int, int> nclStateIndexToGarliState;
-	vector< map<int, int> > stateMaps;
+	map<NxsDiscreteStateCell, int> nclStateIndexToGarliState;
+	vector< map<NxsDiscreteStateCell, int> > stateMaps;
 
 	bool recodeSkipped = false;
 	if(modeltype == UNORDERED && !(datatype == BINARY || datatype == BINARY_NOT_ALL_ZEROS))
@@ -1254,7 +1254,7 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 			set<NxsDiscreteStateCell> stateSet = charblock->GetNamedStateSetOfColumn(*cit);
 			int myIndex = 0;
 			for(set<NxsDiscreteStateCell>::iterator sit = stateSet.begin();sit != stateSet.end();sit++){
-				nclStateIndexToGarliState.insert(pair<int, int>(*sit, myIndex++));
+				nclStateIndexToGarliState.insert(pair<NxsDiscreteStateCell, int>(*sit, myIndex++));
 				}
 			stateMaps.push_back(nclStateIndexToGarliState);
 			nclStateIndexToGarliState.clear();
@@ -1320,7 +1320,7 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 					//need to deal with the possibility of multiple states represented in matrix
 					//just convert to full ambiguity
 					if(nstates == 1){
-						int nclIndex = charblock->GetStateIndex(origTaxIndex, *cit, 0);
+						NxsDiscreteStateCell nclIndex = charblock->GetStateIndex(origTaxIndex, *cit, 0);
 						if(recodeSkipped)
 							datum = stateMaps[effectiveChar][nclIndex];
 						else 
