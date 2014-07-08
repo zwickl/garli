@@ -1251,9 +1251,9 @@ void NStateData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, NxsUns
 				stateMaps.push_back(nclStateIndexToGarliState);
 
 		for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){
-			set<int> stateSet = charblock->GetNamedStateSetOfColumn(*cit);
+			set<NxsDiscreteStateCell> stateSet = charblock->GetNamedStateSetOfColumn(*cit);
 			int myIndex = 0;
-			for(set<int>::iterator sit = stateSet.begin();sit != stateSet.end();sit++){
+			for(set<NxsDiscreteStateCell>::iterator sit = stateSet.begin();sit != stateSet.end();sit++){
 				nclStateIndexToGarliState.insert(pair<int, int>(*sit, myIndex++));
 				}
 			stateMaps.push_back(nclStateIndexToGarliState);
