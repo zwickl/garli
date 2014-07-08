@@ -1192,36 +1192,6 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			outman.UserMessage("Obtained starting or fixed model parameter values from configuration file:");
 		}
 
-	//The model params should be set to their initial values by now, so report them
-	if(conf->bootstrapReps == 0 || (currentBootstrapRep == 1 && currentSearchRep == 1)){
-		outman.UserMessage("MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)");
-		indiv[0].modPart.OutputHumanReadableModelReportWithParams();
-		}
-
-	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
-
-	//A random tree specified, or a starting file was specified but contained no tree
-	if(_stricmp(conf->streefname.c_str(), "stepwise") == 0){
-		if(Tree::constraints.empty()) outman.UserMessage("creating likelihood stepwise addition starting tree...");
-		else outman.UserMessage("creating likelihood stepwise addition starting tree (compatible with constraints)...");
-		//5/20/08 If we're making a stepwise tree, we depend on the extern globalBest being zero to keep the optimization
-		//during the stepwise creation to be localized to just the three branches (the radius optimization only happens if
-		//the lnL of created tree is within a threshold of the global best).  Having global best = zero effectively turns
-		//off all radius opt.  There was a bug here because it wasn't getting reset before starting search reps after the 
-		//first.  This caused the stepwise to be slow, and to not be reproducible when the seed from a rep > 1 was specified
-		//as the initial seed for a new run
-		globalBest = ZERO_POINT_ZERO;
-		//DEBUG - haven't worked this out with the rooted tree yet, since the fake root needs to be in the tree before it is scored
-		assert(!indiv[0].treeStruct->rootWithDummy);
-		indiv[0].MakeStepwiseTree(dataPart->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
-		}
-	else if(_stricmp(conf->streefname.c_str(), "random") == 0 || indiv[0].treeStruct == NULL){
-		if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
-		else outman.UserMessage("creating random starting tree (compatible with constraints)...");
-		indiv[0].MakeRandomTree(dataPart->NTax());
-		indiv[0].SetDirty();
-		}
-		
 	//Here we'll error out if something was fixed but didn't appear
 	for(int ms = 0;ms < modSpecSet.NumSpecs();ms++){
 		const ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
@@ -1254,7 +1224,37 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			if(modSpec->IsCodon() && modSpec->gotOmegasFromFile == false) 
 				throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
 		}
-		
+
+	//The model params should be set to their initial values by now, so report them
+	if(conf->bootstrapReps == 0 || (currentBootstrapRep == 1 && currentSearchRep == 1)){
+		outman.UserMessage("MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)");
+		indiv[0].modPart.OutputHumanReadableModelReportWithParams();
+		}
+
+	outman.UserMessage("Starting with seed=%d\n", rnd.seed());
+
+	//A random tree specified, or a starting file was specified but contained no tree
+	if(_stricmp(conf->streefname.c_str(), "stepwise") == 0){
+		if(Tree::constraints.empty()) outman.UserMessage("creating likelihood stepwise addition starting tree...");
+		else outman.UserMessage("creating likelihood stepwise addition starting tree (compatible with constraints)...");
+		//5/20/08 If we're making a stepwise tree, we depend on the extern globalBest being zero to keep the optimization
+		//during the stepwise creation to be localized to just the three branches (the radius optimization only happens if
+		//the lnL of created tree is within a threshold of the global best).  Having global best = zero effectively turns
+		//off all radius opt.  There was a bug here because it wasn't getting reset before starting search reps after the 
+		//first.  This caused the stepwise to be slow, and to not be reproducible when the seed from a rep > 1 was specified
+		//as the initial seed for a new run
+		globalBest = ZERO_POINT_ZERO;
+		//DEBUG - haven't worked this out with the rooted tree yet, since the fake root needs to be in the tree before it is scored
+		assert(!indiv[0].treeStruct->rootWithDummy);
+		indiv[0].MakeStepwiseTree(dataPart->NTax(), conf->attachmentsPerTaxon, adap->branchOptPrecision);
+		}
+	else if(_stricmp(conf->streefname.c_str(), "random") == 0 || indiv[0].treeStruct == NULL){
+		if(Tree::constraints.empty()) outman.UserMessage("creating random starting tree...");
+		else outman.UserMessage("creating random starting tree (compatible with constraints)...");
+		indiv[0].MakeRandomTree(dataPart->NTax());
+		indiv[0].SetDirty();
+		}
+
 	assert(indiv[0].treeStruct != NULL);
 	bool foundPolytomies = indiv[0].treeStruct->ArbitrarilyBifurcate();
 	if(foundPolytomies) outman.UserMessage("WARNING: Polytomies found in start tree.  These were arbitrarily resolved.");
