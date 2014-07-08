@@ -466,6 +466,7 @@ void DataMatrix::ProcessPatterns() {
 	if(usePatternManager){
 		patman.ProcessPatterns();
 		GetDataFromPatternManager();
+		patman.Reset();
 		}
 	else{
 		Summarize();
