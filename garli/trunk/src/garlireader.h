@@ -192,6 +192,9 @@ class GarliReader
 		//this removes and deallocates everything in the reader and gets it ready
 		//for further reading
 		void ClearContent();
+		//delete only the characters blocks, which can take a substantial amount of memory, and aren't needed after
+		//Garli's matrices are created
+		void DeleteCharacterBlocksFromFactories();
 		bool ReadData(const char* filename, const ModelSpecification &modspec);
 		const NxsCharactersBlock *CheckBlocksAndGetCorrectCharblock(const ModelSpecification &modspec) const;
 		static string GetDefaultIntWeightSet(const NxsCharactersBlock *charblock, vector<int> &wset);

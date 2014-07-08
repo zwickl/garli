@@ -226,6 +226,16 @@ void GarliReader::ExitingBlock(
 	outman.UserMessage(mess);
 	}
 
+//Delete only the characters blocks, which can take a substantial amount of memory, and aren't needed after
+//Garli's matrices are created
+void GarliReader::DeleteCharacterBlocksFromFactories()
+	{
+	for(vector<NxsCharactersBlock *>::iterator cit = charactersBlockVec.begin();cit != charactersBlockVec.end();cit++){
+		RemoveBlockFromUsedBlockList(*cit);
+		delete *cit;
+		}
+	}
+
 //This used to be the FactoryDefaults function, but was changes to be consistent with
 //the higher level functions in PublicReader.  It clears out/resets everything that 
 //was in the reader AND gets the reader ready to do further reading - thus it is
