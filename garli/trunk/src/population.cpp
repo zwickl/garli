@@ -2214,10 +2214,9 @@ void Population::Run(){
 			WriteStateFiles();
 #else
 			WriteStateFiles();
-		if(conf->boincWorkDivision){
-			outman.UserMessage("\nNOTE: Terminating run before final optimization and");
-			outman.UserMessage("writing checkpoint because running in BOINC mode and");
-			outman.UserMessage("boincworkdivision configuration entry was set.");
+		if(conf->workPhaseDivision){
+			outman.UserMessage("\nNOTE: Writing checkpoint and terminating run before final optimization");
+			outman.UserMessage("because workphasedivision configuration entry was set.");
 			//no easy way to get out of here cleanly by returning, just going to use exit()
 			boinc_finish(0);
 			std::exit(0);
@@ -3166,10 +3165,9 @@ void Population::PerformSearch(){
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
 #ifdef BOINC
 				WriteStateFiles();
-			if(conf->boincWorkDivision){
-				outman.UserMessage("\nNOTE: Terminating run after initial optimization and");
-				outman.UserMessage("writing checkpoint because running in BOINC mode and");
-				outman.UserMessage("boincworkdivision configuration entry was set.");
+			if(conf->workPhaseDivision){
+				outman.UserMessage("\nNOTE: Writing checkpoint and terminating run after initial optimization");
+				outman.UserMessage("because workphasedivision configuration entry was set.");
 				return;
 				}
 #else
