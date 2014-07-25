@@ -107,9 +107,7 @@ class GeneralGamlConfig{
 
 	unsigned attachmentsPerTaxon;
 
-#ifdef BOINC
-	bool boincWorkDivision;
-#endif
+	bool workPhaseDivision;
 
 	//this holds descriptions of models, possible > 1 in the case of partitioning
 

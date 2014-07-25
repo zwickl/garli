@@ -69,9 +69,7 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	
 	ignoreStopCodons = false;
 
-#ifdef BOINC
-	boincWorkDivision = false;
-#endif
+	workPhaseDivision = false;
 
 	attachmentsPerTaxon = 50;
 
@@ -217,9 +215,7 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetPositiveNonZeroDoubleOption("resampleproportion", resampleProportion, true);
 	cr.GetBoolOption("inferinternalstateprobs", inferInternalStateProbs, true);
 
-#ifdef BOINC
-	cr.GetBoolOption("boincworkdivision", boincWorkDivision, true);
-#endif
+	cr.GetBoolOption("workphasedivision", workPhaseDivision, true);
 
 	bool multipleModelsFound = ReadPossibleModelPartition(cr);
 
