@@ -2006,7 +2006,15 @@ void Population::Run(){
 
 		NextGeneration();
 
-		WriteGenerationOutput();
+		if(swapBasedTerm){
+			if(uniqueSwapTried){
+				lastUniqueSwap = gen;
+				uniqueSwapTried = false;
+				}
+			}
+		keepTrack();
+		
+        WriteGenerationOutput();
 			
 #ifndef BOINC
 		userTermination = CheckForUserSignal();
