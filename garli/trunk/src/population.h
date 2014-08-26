@@ -291,6 +291,8 @@ private:
 	//this indicates that we've exited the generation loop in Run(), but if 
 	//finishedRep is false that means that we still have to do final opt.
 	bool finishedGenerations;
+	//when a single search replicate is finished (not a bootstrap rep)
+	bool finishedRep;
 
 	//These start at 0, are set to 1 when optimization starts, and when each pass ends they increment.  When a refine
 	//phase finishes it is set to -1.  Mainly important to report % done in boincWordDivision mode, but could in theory
@@ -334,12 +336,17 @@ private:
 
 	//if the user killed the run
 	bool userTermination;
-	//specified stoptime was reached.  Use of this really isn't recommended
+	//specified stoptime FOR THIS EXECUTION was reached.  
 	bool timeTermination;
 	//specified stopgen was reached.  Note that this is PER REP, so it can be reset.
-	//the other term types cannot
 	bool genTermination;
-	bool finishedRep;//when a single search replicate is finished (not a bootstrap rep)
+	//termination due to workphasedivision setting, i.e. after initial opt, before final opt
+	//and immediately after final opt
+	bool workPhaseTermination;
+	//This just means that the run was restarted but the checkpoint indicated that the run had
+	//actually finished.  The flag mainly ensures that output files are not finalized multiple 
+	//times (e.g., end; written to tree files)
+	bool restartedAfterTermination;
 
 	vector<Tree *> unusedTrees;
 	//trees that are being stored for some reason, for example the
@@ -373,7 +380,7 @@ private:
 		FINALIZE_REPSET_TERM = 256,
 		FINALIZE_FULL_TERM = 512,
 		FINALIZE_PREMATURE = 1024,
-		
+
 		WARN_PREMATURE = 2048,
 		NEWNAME_PER_REP = 4096
 		};
@@ -407,8 +414,8 @@ private:
 			prevBestFitness(-(FLT_MAX)),indiv(NULL), newindiv(NULL),
 			cumfit(NULL), gen(0), paraMan(NULL), subtreeDefNumber(0), claMan(NULL), 
 			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
-			userTermination(false), timeTermination(false), genTermination(false), currentBootstrapRep(0),
-			finishedRep(false), lastBootstrapSeed(0), nextBootstrapSeed(0), dataPart(NULL), rawPart(NULL), swapTermThreshold(0),
+			userTermination(false), timeTermination(false), genTermination(false), workPhaseTermination(false), restartedAfterTermination(false),
+			currentBootstrapRep(0), finishedRep(false), lastBootstrapSeed(0), nextBootstrapSeed(0), dataPart(NULL), rawPart(NULL), swapTermThreshold(0),
 			finishedGenerations(false), initialRefinePass(0), finalRefinePass(0)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
@@ -463,6 +470,7 @@ private:
 		void FindTreeStructsForNextGeneration();
 		void PerformMutation(int indNum);
 		void UpdateFractionDone(int phase);
+		FLOAT_TYPE GenerationFractionDone();
 		bool OutgroupRoot(Individual *ind, int indnum);
 		void LoadNexusStartingConditions();
 		void VariableStartingTreeOptimization(bool reducing);
