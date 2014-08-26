@@ -383,6 +383,9 @@ void Population::CheckForIncompatibleConfigEntries(){
 		throw(ErrorException("You cannont output site likelihoods during a bootstrap run!"));
 	if(conf->startOptPrec < conf->minOptPrec)
 		throw ErrorException("startoptprec must be equal to or greater than minoptprec");
+
+	if(!conf->checkpoint && conf->workPhaseDivision)
+		throw ErrorException("workphasedivision mode only makes sense if checkpoints are written (writecheckpoints = 1)");
 	}
 
 void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *rawD, int nprocs, int r){
@@ -640,7 +643,8 @@ void Population::LoadNexusStartingConditions(){
 		if(startingTreeInNCL == false && reader.FoundModelString() == false)
 			throw ErrorException("No nexus trees block or Garli block was found in file %s,\n     which was specified as the source of starting model and/or tree", conf->streefname.c_str());
 		}
-	if(reader.FoundModelString()) startingModelInNCL = true;
+	if(reader.FoundModelString()) 
+		startingModelInNCL = true;
 	}
 
 //return population more or less to what it looked like just after Setup()
@@ -655,6 +659,7 @@ void Population::Reset(){
 	finishedGenerations = false;
 	genTermination = false;
 	bestFitness = prevBestFitness = -(FLT_MAX);
+	initialRefinePass = finalRefinePass = 0;
 
 	for(unsigned i=0;i<total_size;i++){
 		if(indiv[i].treeStruct != NULL){
@@ -1224,7 +1229,7 @@ void Population::SeedPopulationWithStartingTree(int rep){
 			if(modSpec->IsCodon() && modSpec->gotOmegasFromFile == false) 
 				throw(ErrorException("sorry, to turn off model mutations you must provide omega values in a codon model.\nSet modweight to > 0.0 or provide omega values."));
 		}
-
+		
 	//The model params should be set to their initial values by now, so report them
 	if(conf->bootstrapReps == 0 || (currentBootstrapRep == 1 && currentSearchRep == 1)){
 		outman.UserMessage("MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)");
@@ -1482,7 +1487,7 @@ void Population::InitialOptimization(Individual *ind, bool optModel, FLOAT_TYPE 
 		if(optSubsetRates) outman.UserMessageNoCR(" subset rates=%6.2f", subsetRateImprove);
 		outman.UserMessageNoCR(")");
 		
-		UpdateFractionDone(0);
+		UpdateFractionDone(1);
 		if(conf->reportRunProgress)
 			outman.UserMessageNoCR(" %14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
 		outman.UserMessage("");
@@ -1755,6 +1760,9 @@ bool Population::ReadStateFiles(){
 	//Read the population checkpoint
 	ReadPopulationCheckpoint();
 
+	//need to reset these here, although really only because asserts check that the values never decrease
+	rep_fraction_done = tot_fraction_done = 0.0;
+
 #ifdef BOINC
 	boinc_fraction_done(tot_fraction_done);
 #endif
@@ -1767,7 +1775,8 @@ bool Population::ReadStateFiles(){
 		boinc_resolve_filename(name, physical_name, sizeof(physical_name));
 		sin = boinc_fopen(physical_name, "rb");
 #else
-		if(FileExists(name) == false) throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", name));
+		if(FileExists(name) == false) 
+			throw(ErrorException("Could not find checkpoint file %s!\nEither the previous run was not writing checkpoints (checkpoint = 0),\nthe file was moved/deleted or the ofprefix setting\nin the config file was changed.", name));
 		sin = fopen(name, "rb");
 #endif
 		Tree::attemptedSwaps.ReadBinarySwapCheckpoint(sin);
@@ -1869,9 +1878,6 @@ void Population::ReadPopulationCheckpoint(){
 		assert(s == nextBootstrapSeed);
 		}
 
-	if(gen == UINT_MAX) 
-		finishedRep = true;
-
 	for(unsigned i=0;i<total_size;i++){
 		assert(modSpecSet.NumSpecs() == indiv[i].modPart.NumModelSets());
 		for(int m = 0;m < modSpecSet.NumSpecs();m++){
@@ -1955,7 +1961,6 @@ void Population::Run(){
 #ifdef VARIABLE_OPTIMIZATION
 //	var << "type\tdist\tinitlnL\tnoBail.01\tnoBail.5\t3B.01\t3B.5\tdef.01\tdefdef\n";
 #endif
-
 /*	if(conf->restart == false){
 		if(conf->bootstrapReps == 0) outman.UserMessage("Running Genetic Algorithm with initial seed=%d", rnd.init_seed());
 		}
@@ -1989,6 +1994,8 @@ void Population::Run(){
 	if(swapBasedTerm)
 		outman.UserMessageNoCR("%14d ", indiv[bestIndiv].treeStruct->attemptedSwaps.GetUnique());
 
+	if(finishedGenerations == false)
+		UpdateFractionDone(2);
 	if(conf->reportRunProgress)
 		outman.UserMessageNoCR("%14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
 
@@ -2005,7 +2012,7 @@ void Population::Run(){
 			break;
 
 		NextGeneration();
-
+		UpdateFractionDone(2);
 		if(swapBasedTerm){
 			if(uniqueSwapTried){
 				lastUniqueSwap = gen;
@@ -2118,8 +2125,6 @@ void Population::Run(){
 				adap->lastgenscore = BestFitness();
 				}
 
-			UpdateFractionDone(2);
-
 			//automatic termination conditions
 			if(conf->enforceTermConditions == true){
 				if(swapBasedTerm && !FloatingPointEquals(adap->topoMutateProb, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
@@ -2163,15 +2168,9 @@ void Population::Run(){
 #endif
 			}
 
-#ifndef BOINC
-		//non-BOINC checkpointing
-		if(conf->checkpoint == true && conf->scoreOnly == false && conf->optimizeInputOnly == false && ((gen % conf->saveevery) == 0)) 
+		if(ShouldCheckpoint(true) == true)
 			WriteStateFiles();
-#else
-		//BOINC checkpointing can occur whenever the BOINC client wants it to
-		if(boinc_time_to_checkpoint())
-			WriteStateFiles();
-#endif
+
 		if(stopwatch.ThisExecutionSplitTime() > conf->stoptime){
 			outman.UserMessage("NOTE: ****Specified time limit (%d seconds) reached...", conf->stoptime);
 			//Time termination can be used a sort of "pause" along with checkpointing.  Checkpoints may be
@@ -2202,8 +2201,6 @@ void Population::Run(){
 			}
 #endif
 		}
-
-	UpdateFractionDone(3);
 	//Allow killing during FinalOpt
 	TurnOffSignalCatching();
 
@@ -2218,190 +2215,238 @@ void Population::Run(){
 
 #ifndef BOINC
 		//non-BOINC checkpointing
-		if(conf->checkpoint && ! (conf->scoreOnly || conf->optimizeInputOnly)) 
-			WriteStateFiles();
-#else
+		if(ShouldCheckpoint(false))
+#endif
 			WriteStateFiles();
 		if(conf->workPhaseDivision){
-			outman.UserMessage("\nNOTE: Writing checkpoint and terminating run before final optimization");
+			//second workphasedivision exit
+			WriteStateFiles();
+			outman.UserMessage("\nNOTE: Terminating run before final optimization and writing checkpoint");
 			outman.UserMessage("because workphasedivision configuration entry was set.");
-			//no easy way to get out of here cleanly by returning, just going to use exit()
-			boinc_finish(0);
-			std::exit(0);
+			workPhaseTermination = true;
+			return;
 			}
-#endif
 		}
 
 	//don't optimize if checkpointing is happening and the run was prematurely killed
-	if(conf->refineEnd  && !(conf->checkpoint && (timeTermination || userTermination)))
-		//the version adapted from trunk 1.0 final opt
+	if(conf->refineEnd && !(conf->checkpoint && (timeTermination || userTermination))){
+		UpdateFractionDone(3);
 		BetterFinalOptimization();
-
-	finishedRep = true;
-
-	gen = UINT_MAX;
-	OutputLog();
+		finishedRep = true;
+		//finishedRep must be true for the following two functions to output correctly
+		OutputLog();
+		if(conf->outputTreelog && treeLog.is_open())
+			AppendTreeToTreeLog(-1);
+		}
 
 	//outman.UserMessage("Maximum # clas used = %d out of %d", claMan->MaxUsedClas(), claMan->NumClas());
-	
-//	if(conf->bootstrapReps==0) outman.UserMessage("finished");
-	
 	//outman.UserMessage("%d conditional likelihood calculations\n%d branch optimization passes", calcCount, optCalcs);
 	UpdateFractionDone(4);
 	}
 
-//This was the revised version from the trunk
-void Population::UpdateFractionDone(int phase){
-	//update the proportion done.  This is mainly for BOINC, but might be used elsewhere.
-	//The algorithm used to determine the progress is fairly arbitrary
-	//CAREFUL about multiple reps/bootstrap reps.  The stored fraction_done is for this
-	//replicate, so it needs to be manually prorated for the expected number of reps
 
-	//if a positive value is passed in it will be set FOR THIS REP and the auto calculations won't be done
-	//this passing in should only happen before the run actually begins (set to 1% at the end of Pop::Setup)
-	//or when FinalOptimization is about to be called (set to 95%)
-
-	//periods:
-	//started - data has been read and everything allocated (1%)
-	//initial - before generations actually start (pop seeding and refinement) : 1% - initialBreak
-	//pre-reduction - before first precision reduction : initialBreak - firstBreak
-	//reduction - while reductions are happening : firstBreak - secondBreak
-	//terminal - remaining gens after min prec reached : secondBreak - thirdBreak
-	//final - final opt : after thirdBreak
-	
-	FLOAT_TYPE new_fract = 0.01;
-	FLOAT_TYPE current_fract = rep_fraction_done;
-	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
-
+FLOAT_TYPE Population::GenerationFractionDone(){
+	//This just pulls out some complicated (and ad hoc) code out of UpdateFractionDone that assigns a proportion done 
+	//to a point during the search (generation) phase of a run.
 	bool willReduce = (FloatingPointEquals(adap->startOptPrecision, adap->minOptPrecision, 1e-6) == false) 
 		&& (adap->numPrecReductions > 0);
-	//the 0.45 here is for rounding purposes.  Don't want to round down if precReductionFactor ends up being slightly more than the diff due to floating point rep
+	//the 0.45 here is for rounding purposes.  Don't want to round down if precReductionFactor ends up being 
+	//slightly more than the diff due to floating point rep
 	int reduction_number = willReduce ? (int) (0.45 + ((adap->startOptPrecision - adap->branchOptPrecision) / adap->precReductionFactor)) : 0;
 	int remaining_reductions = willReduce ? adap->numPrecReductions - reduction_number : 0;
-	
-	FLOAT_TYPE minFract = min(current_fract, max((double) stopwatch.SplitTime() / conf->stoptime, (double) gen / conf->stopgen));
-	FLOAT_TYPE startPoint, initialBreak, firstBreak, secondBreak, thirdBreak, t_fraction_done;
-	
 	double evalInterval = (adap->intervalLength * adap->intervalsToStore);
-	
-	startPoint = 0.01;
-	initialBreak = 0.05;
-	thirdBreak = 0.95;
 
-	if(!conf->enforceTermConditions){
-		//proportion done is just this
-		FLOAT_TYPE timeFract = (FLOAT_TYPE) stopwatch.SplitTime() / conf->stoptime;
+	FLOAT_TYPE genProportionDone = 0.0;
 
-		FLOAT_TYPE repGenFract = (FLOAT_TYPE) gen / conf->stopgen;
-		int totSearches = conf->searchReps * (conf->bootstrapReps > 0 ? conf->bootstrapReps : 1);
-		int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
-		FLOAT_TYPE perRep = 1.0 / totSearches;
-		FLOAT_TYPE totGenFract = (curSearch - 1) * perRep + repGenFract * perRep;
+	//these should add up to one
+	const FLOAT_TYPE preReduceSplit = 0.2;
+	const FLOAT_TYPE duringReduceSplit = 0.5;
+	const FLOAT_TYPE postReduceSplit = 0.3;
 
-		t_fraction_done = max(timeFract, totGenFract);
-		//this can't really be calculated in the time limited case, but it doesn't really matter since it isn't output
-		rep_fraction_done = t_fraction_done / 2.0;
+	if(willReduce && remaining_reductions == adap->numPrecReductions){
+		//We've done a decent number of gen, but haven't yet reduced the prec.  This will be linear until the minimum
+		//possible number of generations before a prec reduction could happen have passed, thereafter it will be asymptotic
+		FLOAT_TYPE linearProportion = 0.5;
+		if(gen <= evalInterval)
+			genProportionDone = preReduceSplit * linearProportion * (gen / evalInterval);
+		else
+			genProportionDone = preReduceSplit * (linearProportion + (1.0 - linearProportion) * (1.0 - (evalInterval / (FLOAT_TYPE) gen)));
 		}
-	else {
-		if(willReduce){
-			//let the period between gen 0 and the first reduction be larger for larger datasets
-			firstBreak = 0.15 + min(0.1, 0.01 * (dataPart->NTax() / 50));
-			//figure out what proportion of the run the reduction period is vs the final period before termination (minimally)
-			double minPhase2 = (adap->numPrecReductions - 1) * evalInterval;
-			//since the final portion will be slower per gen because of the lower prec, downweight the reduction phase further
-			FLOAT_TYPE p = 0.9 * (minPhase2 / (double) (minPhase2 + conf->lastTopoImproveThresh));
-			secondBreak = firstBreak + (thirdBreak - firstBreak) * p;
-			}
-		else{
-			initialBreak = firstBreak = secondBreak = 0.10;
-			}
 
-		if(phase == 0){
-			//reading of the data and memory allocation are done, but not much else
-			new_fract = startPoint;
-			}
-		else if(phase == 1){
-			//the population has been seeding and is at gen 0
-			new_fract = initialBreak;
-			}
-		else if(phase == 2){
-			//the normal generation cycle has started.
-			//The function will now start doing its own calculations of the fraction done.
-			if(willReduce && remaining_reductions == adap->numPrecReductions){
-				//we've done a decent number of gen, but haven't yet reduced the prec
-
-				//this will be linear to "split" proportion of the way to the first break, when the minimum possible
-				//number of generations before a prec reduction could happen have passed
-				//then it will be asymptotic toward the first break
-				FLOAT_TYPE split = 0.5;
-				FLOAT_TYPE remainingFract = (firstBreak - initialBreak);
-				if(gen <= evalInterval){
-					new_fract = initialBreak + (split * remainingFract * (gen / evalInterval));
-					}
-				else{
-					new_fract = initialBreak + (split * remainingFract) + (1.0 - split) * remainingFract * (1.0 - (evalInterval / (FLOAT_TYPE) gen));
-					}
-				}
-	
-			else if(willReduce && remaining_reductions > 0){
-				//divide the rest of the way up to the second break evenly among the precision reductions
-				FLOAT_TYPE perReduction = (secondBreak - firstBreak) / ((FLOAT_TYPE) adap->numPrecReductions - 1.0);
-				//again, linear to "split" proportion, then asymptotic
-				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
-				FLOAT_TYPE split = 0.5;
-				if(sinceLastReduction <= evalInterval){
-					new_fract = firstBreak + ((reduction_number - 1) * perReduction) + (split * perReduction * ((FLOAT_TYPE) sinceLastReduction / evalInterval));
-					}
-				else{
-					new_fract = firstBreak + ((reduction_number - 1) * perReduction) + (split * perReduction) + (1.0 - split) * perReduction * (1.0 - (evalInterval / (FLOAT_TYPE) sinceLastReduction));
-					}
-				}
-	
-			else if(remaining_reductions == 0){
-				//this is linear to "split" proportion until we get past the absolute minimum point that the run could have finished
-				FLOAT_TYPE remainingFract = thirdBreak - secondBreak;
-				FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
-				//the chance of going over the minimum # gen in the last phase is small with lower # of taxa, which makes for a big jump
-				//in proportion because the asymptotic phase isn't entered at all.  Scale the proportion where the asymp phase starts
-				//with the # of taxa
-				double split = max(0.5, 0.9 - 0.10 * (dataPart->NTax() / 50));
-				if(sinceLastReduction <=  conf->lastTopoImproveThresh){
-					new_fract = secondBreak + remainingFract * split * (sinceLastReduction / (FLOAT_TYPE) conf->lastTopoImproveThresh);
-					}
-				//thereafter it is conservatively asymtotic
-				else{
-					assert( (1.0 - (conf->lastTopoImproveThresh / (FLOAT_TYPE) sinceLastReduction)) >= 0.0);
-					new_fract = secondBreak + remainingFract * split + remainingFract * (1 - split) * min(1.0, (1.0 - (conf->lastTopoImproveThresh / (FLOAT_TYPE) sinceLastReduction)));
-					}
-				}
-			}
-		else if(phase == 3){
-			//the generations are over, and we're ready for final optimization
-			new_fract = thirdBreak;
-			}
-		else{
-			//we're fully done
-			assert(phase == 4);
-			new_fract = 1.0;
-			}
-
-		if(phase != 0 && !(new_fract >= current_fract)){
-			outman.DebugMessage("new_fract less than current_fract: %.4f vs %.4f", new_fract, current_fract);
-			}
-		rep_fraction_done = new_fract;
-
-		//now figure out the total proportion done from the amount of this rep that is done and the current rep #
-		int totSearches = conf->searchReps * (conf->bootstrapReps > 0 ? conf->bootstrapReps : 1);
-		int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
-		FLOAT_TYPE repFract = 1.0 / totSearches;
-		t_fraction_done = (curSearch - 1) * repFract + (repFract * rep_fraction_done);
-		assert(t_fraction_done + 0.0001 >= tot_fraction_done);
+	else if(willReduce && remaining_reductions > 0){
+		//during reduction phase - divide evenly among the precision reductions
+		FLOAT_TYPE perReduction = duringReduceSplit / ((FLOAT_TYPE) adap->numPrecReductions - 1.0);
+		//between one reduction and the next, linear, then asymptotic
+		FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
+		FLOAT_TYPE linearProportion = 0.5;
+		genProportionDone = preReduceSplit + (perReduction * (reduction_number - 1));
+		if(sinceLastReduction <= evalInterval)
+			//genProportionDone +=((reduction_number - 1) * perReduction) + (duringReduceSplit * perReduction * ((FLOAT_TYPE) sinceLastReduction / evalInterval));
+			genProportionDone += perReduction * linearProportion * ((FLOAT_TYPE) sinceLastReduction / evalInterval);
+		else
+			//genProportionDone += ((reduction_number - 1) * perReduction) + (duringReduceSplit * perReduction) + (1.0 - duringReduceSplit) * perReduction * (1.0 - (evalInterval / (FLOAT_TYPE) sinceLastReduction));
+			genProportionDone += perReduction * (linearProportion + (1.0 - linearProportion) * (1.0 - (evalInterval / (FLOAT_TYPE) sinceLastReduction)));
 		}
-	tot_fraction_done = t_fraction_done;
-	assert(rep_fraction_done <= 1.0 && tot_fraction_done <= 1.0);
+
+	else if(remaining_reductions == 0){
+		//this is linear until we get past the absolute minimum point that the run could have finished
+		FLOAT_TYPE sinceLastReduction = gen - lastPrecisionReduction;
+		//the chance of going over the minimum # gen in the last phase is small with lower # of taxa, which makes for a big jump
+		//in proportion because the asymptotic phase isn't entered at all.  Scale the proportion where the asymp phase starts
+		//with the # of taxa
+		double linearProportion = max(0.5, 0.9 - 0.10 * (dataPart->NTax() / 50.0));
+		genProportionDone = preReduceSplit + duringReduceSplit;
+		if(sinceLastReduction <= conf->lastTopoImproveThresh){
+			genProportionDone += postReduceSplit * linearProportion * (sinceLastReduction / (FLOAT_TYPE) conf->lastTopoImproveThresh);
+			}
+		//thereafter it is conservatively asymptotic
+		else{
+			assert( (1.0 - (conf->lastTopoImproveThresh / (FLOAT_TYPE) sinceLastReduction)) >= 0.0);
+			genProportionDone += postReduceSplit * (linearProportion + (1.0 - linearProportion) * min(1.0, (1.0 - (conf->lastTopoImproveThresh / (FLOAT_TYPE) sinceLastReduction))));
+			}
+		}
+
+	assert(genProportionDone >= 0.0 && genProportionDone <= 1.0);
+	return genProportionDone;
+	}
+
+void Population::UpdateFractionDone(int phase){
+#ifndef BOINC
+	if(!conf->reportRunProgress)
+		return;
+#endif
+
+	//Update the proportion done.  This is mainly for BOINC, but might be used elsewhere.
+	//
+	//-This uses the "search phase" and other info to automatically determine the progress using a fairly arbitrary algorithm.
+	//-The fractions done are members of Population (rep_fraction_done and tot_fraction_done), so values will be maintained
+	//	until updated, and stored in checkpoints.
+	//-The fractions should never reduce during the course of a run, or after restarting from checkpoint.
+	//-It is generally not clear when various phases will end, so the intent is to have a portion of each phase increase the
+	//	fraction linearly, and then switch to an assymptotic approach to some value.
+	//-The searchphasedivision setting complicates things a bit.  In this case the run terms immediately after initial opt,
+	//	and immediately before final opt.  During the generation cycle it will generally be time limited, but doesn't need 
+	//	to be.  During each of those phases it will be assumed that the whole fraction done refers to just that phase, and 
+	//	that upon restarting from checkpoint the fraction done will reset, as opposed to continuing from the previous value.
+
+	//phases:
+	//0 - data has been read and everything allocated OR a search has just started a new replicate
+	//1 - during initial optimization, based on optimization pass
+	//2 - during generation cycle, this can be difficult, because no real a priori way to know if run will (or is intended to)
+	//		stop due to stoptime, stopgen or auto termination.  So, will use the max of those.
+	//		The calculations for fraction done assuming autotermination also define these phases:
+	//			pre-reduction - before first precision reduction
+	//			reduction - while reductions are happening
+	//			terminal - remaining gens after min prec reached
+	//3 - final opt, based on optimization pass
+	//4 - a replicate is entirely done
+
+	//Called from:
+	//0 - if not restart at start of loop over reps in PerformSearch (reset rep_fraction_done)
+	//1
+
+
+	FLOAT_TYPE afterSetup = 0.05;
+	FLOAT_TYPE beforeTerm = 0.95;
+	FLOAT_TYPE workDuration = beforeTerm - afterSetup;
+
+	//under normal conditions, these should add up to 1.0, and divide workDuration into sub-intervals
+	FLOAT_TYPE initialOptProportionOfWork = -1.0;
+	FLOAT_TYPE finalOptProportionOfWork = -1.0;
+	FLOAT_TYPE genProportionOfWork = -1.0;
+
+	if(conf->workPhaseDivision){
+		//because in this mode it stops right after initial opt, and starts right before final
+		initialOptProportionOfWork = finalOptProportionOfWork = genProportionOfWork = 1.0;
+		}
+	else{
+		initialOptProportionOfWork = 0.15;
+		finalOptProportionOfWork = 0.15;
+		genProportionOfWork = 1.0 - initialOptProportionOfWork - finalOptProportionOfWork;
+		}
+
+	FLOAT_TYPE newFract = -1.0;
+	FLOAT_TYPE newRepFract = -1.0;
+
+	if(phase == 0){
+		//This will reset for the start of a new rep.  The fraction of completion contibuted by previous finished reps
+		//will be included below.
+		//newFract = afterSetup;
+		rep_fraction_done = newRepFract = 0.0;
+		}
+	else if(phase == 1){
+		//during initial optimization
+		FLOAT_TYPE linearUntilPass = 10;
+		FLOAT_TYPE linearProportion = 0.5;
+		if(initialRefinePass < 0) //this means that initial opt has completed
+			newRepFract = initialOptProportionOfWork;
+		else if(initialRefinePass <= linearUntilPass)
+			newRepFract = initialOptProportionOfWork * linearProportion * min(1.0, (initialRefinePass / linearUntilPass));
+		else
+			newRepFract = initialOptProportionOfWork * (linearProportion + (1.0 - linearProportion) * max(0.0, 1.0 - linearUntilPass / (FLOAT_TYPE) initialRefinePass));
+		}
+	else if(phase == 2){
+		//during generations
+		newRepFract = conf->workPhaseDivision == true ? 0.0 : initialOptProportionOfWork;
+		//No real way of knowing what will cause termination of this run.  Choose the max.
+		//In the case of time term it will "reset" upon a restart from checkpoint, which might
+		//cause odd changes in the fraction done in some cases, but whatever. 
+		FLOAT_TYPE timeFract = min(1.0, (FLOAT_TYPE) stopwatch.ThisExecutionSplitTime() / conf->stoptime);
+		FLOAT_TYPE genLimitFract = min(1.0, (FLOAT_TYPE) gen / conf->stopgen);
+		FLOAT_TYPE genFract = conf->enforceTermConditions ? GenerationFractionDone() : 0.0;
+		
+		//An odd case can happen here, where the generation phase is nearly done (giving high fraction done) 
+		//but a run is likely to be time limited, and after a restart the generation fraction calculation 
+		//will still be very high.  That would make the fraction done immediately upon restart to be very high
+		//and to just hang there for a long time.  So, to be conservative downweight the generation fraction if the 
+		//stoptime is < 5 hr.
+		if(conf->stoptime < 5 * 60 * 60)
+			newRepFract += genProportionOfWork * max(max(timeFract, genLimitFract), genFract * 0.5);
+		else
+			newRepFract += genProportionOfWork * max(max(timeFract, genLimitFract), genFract);
+		}
+	else if(phase == 3){
+		//during final optimization
+		FLOAT_TYPE linearUntilPass = 20;
+		FLOAT_TYPE linearProportion = 0.5;
+		newRepFract = conf->workPhaseDivision == true ? 0.0 : initialOptProportionOfWork + genProportionOfWork;
+		if(finalRefinePass <= linearUntilPass)
+			newRepFract += finalOptProportionOfWork * linearProportion * min(1.0, finalRefinePass / linearUntilPass);
+		else
+			newRepFract += finalOptProportionOfWork * (linearProportion + (1.0 - linearProportion) * max(0.0, 1.0 - linearUntilPass / finalRefinePass));
+		}
+	else if(phase == 4){
+		newRepFract = 1.0;
+		}
+
+	//outman.DebugMessage("newrep, oldrep: %f, %f, %d", newRepFract, rep_fraction_done, phase);
+	assert(newRepFract >= 0.0 && newRepFract <= 1.0);
+	assert(newRepFract + 0.00001 >= rep_fraction_done);
+
+	//Now, prorate the newRepFract, which corresponds to the work portion of a rep and ranges from 0.0 to 1.0
+	if(newFract < 0.0){
+		//In searchphasereduction, don't prorate, since each segment makes up its own 0-1 fraction
+		if(conf->workPhaseDivision)
+			newFract = afterSetup + workDuration * newRepFract;
+		else{
+			int totSearches = conf->searchReps * (conf->bootstrapReps > 0 ? conf->bootstrapReps : 1);
+			int curSearch = currentSearchRep + (currentBootstrapRep > 0 ? currentBootstrapRep - 1 : 0) * conf->searchReps;
+			FLOAT_TYPE perRepProportion = 1.0 / totSearches;
+			FLOAT_TYPE completedRepProportion = (curSearch - 1.0) * perRepProportion;
+			newFract = afterSetup + workDuration * (completedRepProportion + (newRepFract * perRepProportion));
+			}
+		}
+
+	//outman.DebugMessage("newtot, oldtot: %f, %f, %d", newFract, tot_fraction_done, phase);
+	assert(newFract >= 0.0 && newFract <= 1.0);
+	assert(newFract + 0.00001 >= tot_fraction_done);
+	rep_fraction_done = newRepFract;
+	tot_fraction_done = newFract;
+
 #ifdef BOINC
 	boinc_fraction_done(tot_fraction_done);
 #endif
+	//outman.DebugMessage("newrep, newtot: %f, %f, %d", rep_fraction_done, tot_fraction_done, phase);
 	}
 
 //this is a final opt adapted from final opt of trunk version 1.0
@@ -2432,14 +2477,16 @@ void Population::BetterFinalOptimization(){
 	[[MFEInterfaceClient sharedClient] didBeginBranchOptimization];
 	[pool release];
 #endif
-	int pass=1;
 	FLOAT_TYPE incr;
+
+	assert(finalRefinePass < 1);
+	finalRefinePass = 1;
 
 	double freqOptImprove, nucRateOptImprove, pinvOptImprove, alphaOptImprove, omegaOptImprove, flexOptImprove, subRateOpt, insDelOptImprove;
 	double paramOpt, blenOptImprove;
 	paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = subRateOpt = insDelOptImprove = ZERO_POINT_ZERO;
 
-	FLOAT_TYPE precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
+	FLOAT_TYPE precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, finalRefinePass), (FLOAT_TYPE)1e-10);
 	FLOAT_TYPE paramPrecThisPass = max(adap->branchOptPrecision*0.1, 0.01);
 	bool optAnyModel = FloatingPointEquals(conf->modWeight, ZERO_POINT_ZERO, 1e-8) == false;
 	bool goingToExit;
@@ -2456,7 +2503,7 @@ void Population::BetterFinalOptimization(){
 		//  summed improvement for each param/blens since last output.  If not outputting
 		//    every pass it won't be zeroed and so will accumulate.  The output string
 		//    will be constructed each pass, but only output sometimes
-		precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, pass), (FLOAT_TYPE)1e-10);
+		precThisPass = max(adap->branchOptPrecision * pow(ZERO_POINT_FIVE, finalRefinePass), (FLOAT_TYPE)1e-10);
 		paramPrecThisPass = max(precThisPass, 1e-5);
 
 		string outString;
@@ -2615,16 +2662,22 @@ void Population::BetterFinalOptimization(){
 		optInd->CalcFitness(0);
 		
 		outString = blenS + omegaS + alphaS + flexS + pinvS + freqsS + relRatesS + insDelS + subsetS;
-		goingToExit = !(incr > 1.0e-5 || precThisPass > 1.0e-4 || pass < 10);
+		goingToExit = !(incr > 1.0e-5 || precThisPass > 1.0e-4 || finalRefinePass < 10);
 
-		if(pass < 20 || (pass % 10 == 0) || goingToExit){
-			if(pass > 20 && (goingToExit || (pass % 10 == 0)))
+		UpdateFractionDone(3);
+		if(finalRefinePass < 20 || (finalRefinePass % 10 == 0) || goingToExit){
+			if(finalRefinePass > 20 && (goingToExit || (finalRefinePass % 10 == 0)))
 				outman.UserMessage(" optimization up to ...");
-			outman.UserMessage("pass %-2d: %.4f   %s)", pass, optInd->Fitness(), outString.c_str());
+			outman.UserMessageNoCR("pass %-2d: %.4f   %s)", finalRefinePass, optInd->Fitness(), outString.c_str());
+			if(conf->reportRunProgress)
+				outman.UserMessageNoCR(" %14.2f %14.2f", 0.01 * (int) ceil(rep_fraction_done * 100), 0.01 * (int) ceil(tot_fraction_done * 100));
+			outman.UserMessage("");
 			paramOpt = blenOptImprove = freqOptImprove = nucRateOptImprove = pinvOptImprove = alphaOptImprove = omegaOptImprove = flexOptImprove = subRateOpt = insDelOptImprove = ZERO_POINT_ZERO;
 			}
-		pass++;
+
+		finalRefinePass++;
 		}while(!goingToExit);
+	finalRefinePass = -1;
 #ifdef PUSH_TO_MIN_BLEN
 	double init = indiv[bestIndiv].treeStruct->lnL;
 	int num = indiv[bestIndiv].treeStruct->PushBranchlengthsToMin();
@@ -2844,11 +2897,7 @@ void Population::FinalOptimization(){
 #endif	
 
 	outman.unsetf(ios::fixed);
-	finishedRep = true;
 	
-	if(conf->outputTreelog && treeLog.is_open())
-		AppendTreeToTreeLog(-1);
-
 #ifdef ENABLE_CUSTOM_PROFILER
 	char fname[100];
 	sprintf(fname, "%s.profileresults.log", conf->ofprefix.c_str());
@@ -3048,7 +3097,8 @@ void Population::ClearStoredTrees(){
 void Population::Bootstrap(){
 
 	//if we're not restarting
-	if(conf->restart == false) currentBootstrapRep=1;
+	if(conf->restart == false) 
+		currentBootstrapRep = 1;
 
 	for( ;currentBootstrapRep<=conf->bootstrapReps;currentBootstrapRep++){
 #ifdef MAC_FRONTEND
@@ -3072,6 +3122,11 @@ void Population::Bootstrap(){
 			}
 		
 		PerformSearch();
+		//In workphasedivision mode we could have gotten here because PerformSearch returned early after initial
+		//optimization, before final optimzation or after final optimization.  
+		//if(workPhaseTermination && !(currentSearchRep == conf->searchReps && (conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps)))
+		if(workPhaseTermination)
+			break;
 		Reset();
 		
 		if(!userTermination && !timeTermination){
@@ -3083,7 +3138,8 @@ void Population::Bootstrap(){
 #endif		
 			}
 		else {
-			outman.UserMessage("abandoning bootstrap rep %d.... terminating\n", currentBootstrapRep);
+			if(userTermination)
+				outman.UserMessage("abandoning bootstrap rep %d.... terminating\n", currentBootstrapRep);
 			break;
 			}
 		}
@@ -3133,7 +3189,7 @@ void Population::Bootstrap(){
 //and then calling Run().  It can be called either directly from main(), or 
 //from Bootstrap()
 void Population::PerformSearch(){
-	if(conf->restart == false) 
+	if(conf->restart == false)
 		currentSearchRep = 1;
 	else{
 		outman.UserMessage("\nRestarting from checkpoint...");
@@ -3141,49 +3197,65 @@ void Population::PerformSearch(){
 			//if we've restarted but the last checkpoint written apparently represents 
 			//the state of the population immediately after the completion of a replicate
 			currentSearchRep++;
-			if(currentSearchRep > conf->searchReps && (conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps)) 
+			if(currentSearchRep > conf->searchReps && (conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps)){
 				outman.UserMessage("The checkpoint loaded indicates that this run already completed.\nTo start a new run set restart to 0 and change the output\nfile prefix (ofprefix).");
+				restartedAfterTermination = true;
+				return;
+				}
 			else{//we need to initialize the output here, while the population still knows that this was a restart (before calling Reset)
 				InitializeOutputStreams();
 				Reset();
 				}
 			}
+		else
+			InitializeOutputStreams();
 		}
 
 	for(;currentSearchRep<=conf->searchReps;currentSearchRep++){
 		string s;
-		if(conf->restart == false && currentSearchRep > 1){
-			Reset();
-			//this just changes what the rng has stored as the init seed ix0, for output purposes
-			rnd.set_seed(rnd.seed());
+		if(conf->restart == false){
+			//this will reset the rep_fraction_done at the start of each rep
+			UpdateFractionDone(0);
+			if(currentSearchRep > 1){
+				Reset();
+				//this just changes what the rng has stored as the init seed ix0, for output purposes
+				rnd.set_seed(rnd.seed());
+				}
 			}
 		
 		//ensure that the user can ctrl-c kill the program during creation of each stepwise addition tree
 		TurnOffSignalCatching();
 
 		GetRepNums(s);
+
 		if(conf->restart == false){
 			//the fraction done is set to 1% here, indicating the this rep is ready to go
 			//if we restarted, the fraction should already have been set when reading the state files
-			UpdateFractionDone(0);
 			if(s.length() > 0) 
 				outman.UserMessage("\n>>>%s<<<", s.c_str());
 			SeedPopulationWithStartingTree(currentSearchRep);
-			UpdateFractionDone(1);
+			//can't initialize output until after the pop is seeded, unless restarting (which happens above)
+			InitializeOutputStreams();
 			//write a checkpoint, since the refinement (and maybe making a stepwise tree) could have taken a good while
-#ifdef BOINC
+#ifndef BOINC
+			//non-BOINC checkpointing
+			if(ShouldCheckpoint(false) == true)
+#endif
 				WriteStateFiles();
 			if(conf->workPhaseDivision){
-				outman.UserMessage("\nNOTE: Writing checkpoint and terminating run after initial optimization");
-				outman.UserMessage("because workphasedivision configuration entry was set.");
-				return;
-				}
-#else
-			if(conf->checkpoint) 
 				WriteStateFiles();
-#endif
+				//first workphasedivision exit point
+				outman.UserMessage("\nNOTE: Terminating run after initial optimization and");
+				outman.UserMessage("writing checkpoint because running in BOINC mode and");
+				outman.UserMessage("workphasedivision configuration entry was set.");
+				workPhaseTermination = true;
+				UpdateFractionDone(4);
+				break;
+				}
+			UpdateFractionDone(1);
 			}
 		else{
+			//in this case the progress should have been read from checkpoint and will maintain that value going forward
 			adap->SetChangeableVariablesFromConfAfterReadingCheckpoint(conf);
 			if(currentSearchRep > conf->searchReps) 
 				throw ErrorException("rep number in checkpoint (%d) is larger than total rep specified in config (%d)", currentSearchRep, conf->searchReps);
@@ -3194,23 +3266,28 @@ void Population::PerformSearch(){
 		//Start catching Ctrl-C's
 		TurnOnSignalCatching();
 #endif				
-		InitializeOutputStreams();
 		if(!conf->scoreOnly)
 			Run();
 
 		//for most purposes, these two types of termination are premature and treated identically
 		//gen termination is treated as normal termination besides some warnings
-		bool prematureTermination = (userTermination || timeTermination);
+		//bool prematureTermination = (userTermination || timeTermination);
+		bool prematureTermination = conf->checkpoint ? genTermination : (genTermination | timeTermination || userTermination);
 
 		//if we're checkpointing and terminated prematurely just bail without doing anything else
-		if(prematureTermination && conf->checkpoint){
-			outman.UserMessage("\nNOTE: A CHECKPOINTED RUN (writecheckpoints = 1) WAS PREMATURELY");
-			outman.UserMessage("TERMINATED.  OUTPUT FILES (tree files, etc.) WILL NOT BE" ); 
-			outman.UserMessage("FINALIZED SO THAT THE RUN CAN BE RESTARTED WHERE IT LEFT OFF");
-			outman.UserMessage("(set restart = 1 in the config file).  IF YOU WANT TO USE THE");
-			outman.UserMessage("PARTIAL OUTPUT FILES WITHOUT RESTARTING YOU WILL NEED TO MANUALLY");
-			outman.UserMessage("ADD \"end;\" TO THE TREE FILES.\n");
-			return;
+		if(conf->checkpoint && (userTermination || timeTermination || workPhaseTermination)){
+#ifndef BOINC
+			if(!workPhaseTermination){
+				outman.UserMessage("\nNOTE: A CHECKPOINTED RUN (writecheckpoints = 1) WAS PREMATURELY");
+				outman.UserMessage("TERMINATED.  OUTPUT FILES (tree files, etc.) WILL NOT BE" ); 
+				outman.UserMessage("FINALIZED SO THAT THE RUN CAN BE RESTARTED WHERE IT LEFT OFF");
+				outman.UserMessage("(set restart = 1 in the config file).  IF YOU WANT TO USE THE");
+				outman.UserMessage("PARTIAL OUTPUT FILES WITHOUT RESTARTING YOU WILL NEED TO MANUALLY");
+				outman.UserMessage("ADD \"end;\" TO THE TREE FILES.\n");
+				}
+#endif
+			UpdateFractionDone(4);
+			break;
 			}
 
 		outman.UserMessage("");
@@ -3360,7 +3437,6 @@ void Population::PerformSearch(){
 			( (prematureTermination) && (storedTrees.size() > 1) && (all_best_output & WRITE_PREMATURE))){
 			if(storedTrees.size() > 0){
 				if(prematureTermination || currentSearchRep == conf->searchReps)//message only if last
-					//outman.UserMessage("Final results of all reps stored in %s.all.tre", besttreefile.c_str());
 					outman.UserMessage("\nSaving final trees from all search reps to %s.all.tre", besttreefile.c_str());
 				WriteStoredTrees(besttreefile.c_str());
 				}
@@ -3374,7 +3450,6 @@ void Population::PerformSearch(){
 			( (! prematureTermination) && (currentSearchRep == conf->searchReps) && (best_output & WRITE_REPSET_TERM)) ||
 			( (prematureTermination) && (best_output & WRITE_PREMATURE))){
 			//the first two options here write trees from the storedTrees array, the last writes the best from the current population
-			//outman.UserMessage("\nFinal result of the best scoring rep (#%d) stored in %s.tre", best + 1, besttreefile.c_str());
 			outman.UserMessage("\nSaving final tree from best search rep (#%d) to %s.tre", best + 1, besttreefile.c_str());
 			if(conf->searchReps > 1 && storedTrees.size() > 0){
 				WriteTreeFile(besttreefile.c_str(), best, conf->collapseBranches);
@@ -3475,13 +3550,21 @@ void Population::PerformSearch(){
 			break;
 
 #ifndef BOINC
-		if(conf->checkpoint)
+		if(ShouldCheckpoint(false) == true || conf->workPhaseDivision )
 #endif
-		//write a checkpoint that will indicate that the rep is done and results have been written to file
-		//the gen will be UINT_MAX, as it is after a rep has terminated, which will tell the function that reads
-		//the checkpoint to set finishedrep = true.  This automatically happens in the BOINC case
+			//write a checkpoint that will indicate that the rep is done and results have been written to file
+			//the gen will be UINT_MAX, as it is after a rep has terminated, which will tell the function that reads
+			//the checkpoint to set finishedrep = true.  This automatically happens in the BOINC case
 			WriteStateFiles();
 
+		if(conf->workPhaseDivision && !(currentSearchRep == conf->searchReps && (conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps))){
+			//third workphasedivision exit point - if this is the end of the whole run, don't do this.
+			outman.UserMessage("\nNOTE: Terminating run after final optimization and writing checkpoint");
+			outman.UserMessage("because workphasedivision configuration entry was set.");
+			workPhaseTermination = true;
+			UpdateFractionDone(4);
+			break;
+			}
 		//this needs to be set here so that the population is reset at the top of this loop before the next rep
 		conf->restart = false;
 		}
@@ -4542,7 +4625,8 @@ paupf.close();
 //if indNum is -1, then the bestIndiv from the pop is used
 void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	
-	if(treeLog.is_open() == false || conf->outputTreelog==false) return;
+	if(treeLog.is_open() == false || conf->outputTreelog==false) 
+		return;
 
 	const Individual *ind;
 	int i = (indNum >= 0 ? indNum : bestIndiv);
@@ -4570,7 +4654,7 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	else
 		theInd = ind;
 
-	if(gen == UINT_MAX)
+	if(finishedRep)
 		treeLog << "  tree final= [&U] [" << theInd->Fitness() << "][ ";
 	else 
 		treeLog << "  tree gen" << gen <<  "= [&U] [" << theInd->Fitness() << "\tmut=" << mutType << "][ ";
@@ -5164,7 +5248,7 @@ int Population::GetSpecifiedModels(FLOAT_TYPE** model_string, int n, int* indiv_
 
 void Population::OutputLog()	{
 	//log << gen << "\t" << bestFitness << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision << endl;
-	if(gen < UINT_MAX) {
+	if(!finishedRep) {
 		log << gen << "\t" << BestFitness() << "\t" << stopwatch.SplitTime() << "\t" << adap->branchOptPrecision;
 		if(conf->reportRunProgress)
 			log << "\t" << 0.01 * (int) ceil(rep_fraction_done * 100) << "\t" << 0.01 * (int) ceil(tot_fraction_done * 100);
@@ -6784,11 +6868,12 @@ void Population::SetOutputDetails(){
 		FINALIZE_REPSET_TERM = 256,
 		FINALIZE_FULL_TERM = 512,
 		FINALIZE_PREMATURE = 1024,
-		
+
 		WARN_PREMATURE = 2048,
 		NEWNAME_PER_REP = 4096
 	*/
-	//not restarted
+	//not restarted from checkpoint
+	//-replace all files that will be output
 	if(conf->restart == false){
 		screen_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WARN_PREMATURE);
 		log_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WARN_PREMATURE);
@@ -6800,24 +6885,24 @@ void Population::SetOutputDetails(){
 		//not bootstrap
 		if(conf->bootstrapReps == 0){
 			bootlog_output = (output_details) (DONT_OUTPUT);
-#ifndef BOINC
-			
+			best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
 			if(conf->outputCurrentBestTopology) 
-				best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
-			else
-				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
-#else
-			best_output = (output_details) (REPLACE | WRITE_REPSET_TERM);
-#endif	
+				best_output = (output_details) (best_output | WRITE_CONTINUOUS);
+
 			//normal 1 rep
 			if(conf->searchReps == 1){
 				all_best_output = (output_details) DONT_OUTPUT;
-				treelog_output = (output_details) (conf->outputTreelog ? (REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
+				treelog_output = (output_details) (conf->outputTreelog ? 
+					(REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) 
+					: DONT_OUTPUT);
 				}
 			//normal multirep run
 			else if(conf->searchReps > 1){
 				all_best_output = (output_details) (REPLACE | WRITE_REP_TERM | WRITE_PREMATURE | WARN_PREMATURE);
-				treelog_output = (output_details) (conf->outputTreelog ? (REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
+				//treelog_output = (output_details) (conf->outputTreelog ? (REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
+				treelog_output = (output_details) (conf->outputTreelog ? 
+					(REPLACE | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) 
+					: DONT_OUTPUT);
 				}
 			if(conf->scoreOnly)
 				log_output = treelog_output = fate_output = problog_output = swaplog_output = (output_details) DONT_OUTPUT;
@@ -6826,6 +6911,8 @@ void Population::SetOutputDetails(){
 		else {
 			best_output = all_best_output = treelog_output = (output_details) DONT_OUTPUT;
 			//bootstrap, 1 OR multiple search reps per bootstrap rep
+			//bootlog_output = (output_details) (REPLACE | WRITE_REPSET_TERM | FINALIZE_FULL_TERM | FINALIZE_PREMATURE);
+			//WORK - should this include WRITE)PREMATURE?
 			bootlog_output = (output_details) (REPLACE | WRITE_REPSET_TERM | FINALIZE_FULL_TERM | FINALIZE_PREMATURE);
 			}
 		}
@@ -6839,45 +6926,27 @@ void Population::SetOutputDetails(){
 		//restarted, not bootstrap
 		if(conf->bootstrapReps == 0){
 			bootlog_output = (output_details) (DONT_OUTPUT);
-#ifndef BOINC
-			if(conf->outputCurrentBestTopology)
-				best_output = (output_details) (REPLACE | WRITE_CONTINUOUS | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
-			else 
-				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
-#else
-				best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WARN_PREMATURE);
-#endif
+			best_output = (output_details) (REPLACE | WRITE_REPSET_TERM | WRITE_PREMATURE | WARN_PREMATURE);
+			if(conf->outputCurrentBestTopology) 
+				best_output = (output_details) (best_output | WRITE_CONTINUOUS);
+
 			//restarted 1 rep search
 			if(conf->searchReps == 1){
 				all_best_output = (output_details) DONT_OUTPUT;
-#ifndef BOINC
-				//4/18/08 - changing this to append to treelog on restart
-				//treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
-				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) : DONT_OUTPUT);
-#else
-				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM ) : DONT_OUTPUT);
-#endif
+				treelog_output = (output_details) (conf->outputTreelog ? 
+					(APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE) 
+					: DONT_OUTPUT);
 				}
 			//restarted multirep run
 			else if(conf->bootstrapReps == 0 && conf->searchReps > 1){
 				all_best_output = (output_details) (REPLACE | WRITE_REP_TERM | WARN_PREMATURE);
-#ifndef BOINC
-				//4/18/08 - changing this to append to treelog on restart
-				//treelog_output = (output_details) (conf->outputTreelog ? (NEWNAME | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
-				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) : DONT_OUTPUT);
-#else
-				treelog_output = (output_details) (conf->outputTreelog ? (APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM | NEWNAME_PER_REP) : DONT_OUTPUT);
-#endif
+				treelog_output = (output_details) (conf->outputTreelog ? 
+					(APPEND | WRITE_CONTINUOUS | FINALIZE_REP_TERM | FINALIZE_PREMATURE | WARN_PREMATURE | NEWNAME_PER_REP) 
+					: DONT_OUTPUT);
 				}
 			}
 		else {//restarted bootstrap, 1 OR multiple search reps per bootstrap rep
-#ifndef BOINC
-			//4/18/08 - just going to append here too
-			//bootlog_output = (output_details) (NEWNAME | WRITE_REPSET_TERM | FINALIZE_FULL_TERM | FINALIZE_PREMATURE);
 			bootlog_output = (output_details) (APPEND | WRITE_REPSET_TERM | FINALIZE_FULL_TERM | FINALIZE_PREMATURE);
-#else
-			bootlog_output = (output_details) (APPEND | WRITE_REPSET_TERM | FINALIZE_FULL_TERM);
-#endif
 			best_output = all_best_output = treelog_output = (output_details) DONT_OUTPUT;
 			}
 		}
@@ -6981,8 +7050,11 @@ void Population::InitializeOutputStreams(){
 		if(conf->restart == false)
 			log << "random seed = " << rnd.init_seed() << "\n";
 		else{
-			if(finishedRep ==false) 
-				log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
+			if(finishedRep == false) 
+				if(finishedGenerations == true)
+					log << "Restarting run before final optimization " << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
+				else
+					log << "Restarting run at generation " << gen << ", seed " << rnd.init_seed() << ", best lnL " << indiv[bestIndiv].Fitness() << endl;
 			else
 				log << "Restarting from checkpoint...\n";
 			}
@@ -7197,7 +7269,11 @@ void Population::FinalizeOutputStreams(int type){
 		fullTerm = 2
 	*/
 
-	bool prematureTermination = (userTermination || timeTermination);
+	//things should already have been finalized at the end of the previous execution
+	if(restartedAfterTermination)
+		return;
+
+	bool prematureTermination = conf->checkpoint ? genTermination : (genTermination | userTermination);
 
 	if(prematureTermination == true && type == 0){
 		if(log_output & WARN_PREMATURE)
@@ -7206,6 +7282,10 @@ void Population::FinalizeOutputStreams(int type){
 			if(treeLog.is_open()) 
 				treeLog << TerminationWarningMessage().c_str() << endl;
 		}
+
+	//in these cases the termination is essentially a pause, so don't finalize or write anything
+	if(workPhaseTermination || timeTermination || (conf->checkpoint && userTermination))
+		return;
 
 	bool repTerm, repsetTerm, fullTerm;
 	if(prematureTermination){
@@ -7231,46 +7311,42 @@ void Population::FinalizeOutputStreams(int type){
 
 	//if(((conf->bootstrapReps == 0 || currentBootstrapRep == conf->bootstrapReps) && (currentSearchRep == conf->searchReps)) || prematureTermination == true){
 	if(log.is_open()){
-		if(prematureTermination && (log_output & FINALIZE_PREMATURE)) log.close();
-		else if((!prematureTermination) && (
-			   (repTerm && (log_output & FINALIZE_REP_TERM))
-			|| (repsetTerm && (log_output & FINALIZE_REPSET_TERM))
-			|| (fullTerm && (log_output & FINALIZE_FULL_TERM)))
-			) log.close();
+		if((prematureTermination && (log_output & FINALIZE_PREMATURE)) ||
+			(!prematureTermination &&
+			   ((repTerm && (log_output & FINALIZE_REP_TERM)) || (repsetTerm && (log_output & FINALIZE_REPSET_TERM)) || (fullTerm && (log_output & FINALIZE_FULL_TERM))))
+			) 
+			log.close();
 		}
 
 	if(fate.is_open()){
-		if(prematureTermination && (fate_output & FINALIZE_PREMATURE)) fate.close();
-		else if((!prematureTermination) && (
-			   (repTerm && (fate_output & FINALIZE_REP_TERM))
-			|| (repsetTerm && (fate_output & FINALIZE_REPSET_TERM))
-			|| (fullTerm && (fate_output & FINALIZE_FULL_TERM)))
-			) fate.close();
+		if((prematureTermination && (fate_output & FINALIZE_PREMATURE)) ||
+			(!prematureTermination && 
+			   ((repTerm && (fate_output & FINALIZE_REP_TERM)) || (repsetTerm && (fate_output & FINALIZE_REPSET_TERM)) || (fullTerm && (fate_output & FINALIZE_FULL_TERM))))
+			) 
+			fate.close();
 		}
 
 	if(probLog.is_open()){
-		if(prematureTermination && (problog_output & FINALIZE_PREMATURE)) probLog.close();
-		else if((!prematureTermination) && (
-			   (repTerm && (problog_output & FINALIZE_REP_TERM))
-			|| (repsetTerm && (problog_output & FINALIZE_REPSET_TERM))
-			|| (fullTerm && (problog_output & FINALIZE_FULL_TERM)))
-			) probLog.close();
+		if((prematureTermination && (problog_output & FINALIZE_PREMATURE)) ||
+			(!prematureTermination && 
+				((repTerm && (problog_output & FINALIZE_REP_TERM)) || (repsetTerm && (problog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (problog_output & FINALIZE_FULL_TERM))))
+			)
+			probLog.close();
 		}
 
 	if(swapLog.is_open()){
-		if(prematureTermination && (swaplog_output & FINALIZE_PREMATURE)) swapLog.close();
-		else if((!prematureTermination) && (
-			   (repTerm && (swaplog_output & FINALIZE_REP_TERM))
-			|| (repsetTerm && (swaplog_output & FINALIZE_REPSET_TERM))
-			|| (fullTerm && (swaplog_output & FINALIZE_FULL_TERM)))
-			) swapLog.close();
+		if((prematureTermination && (swaplog_output & FINALIZE_PREMATURE)) || 
+			(!prematureTermination &&
+				((repTerm && (swaplog_output & FINALIZE_REP_TERM)) || (repsetTerm && (swaplog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (swaplog_output & FINALIZE_FULL_TERM))))
+			)
+			swapLog.close();
 		}
 
 	if(treeLog.is_open()){
 		if((prematureTermination && (treelog_output & FINALIZE_PREMATURE)) ||
-			((prematureTermination == false) &&
-				( (repTerm && (treelog_output & FINALIZE_REP_TERM)) || (repsetTerm && (treelog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (treelog_output & FINALIZE_FULL_TERM)) )
-				)){
+			(!prematureTermination &&
+				((repTerm && (treelog_output & FINALIZE_REP_TERM)) || (repsetTerm && (treelog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (treelog_output & FINALIZE_FULL_TERM))))
+			){
 			treeLog << "end;\n";
 			treeLog.close();
 			}
@@ -7278,19 +7354,20 @@ void Population::FinalizeOutputStreams(int type){
 
 	if(bootLog.is_open()){
 		if((prematureTermination && (bootlog_output & FINALIZE_PREMATURE)) ||
-			((prematureTermination == false) && 
-			   ( (repTerm && (bootlog_output & FINALIZE_REP_TERM)) || (repsetTerm && (bootlog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (bootlog_output & FINALIZE_FULL_TERM)) )
-				)){
+			(!prematureTermination && 
+			   ((repTerm && (bootlog_output & FINALIZE_REP_TERM)) || (repsetTerm && (bootlog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (bootlog_output & FINALIZE_FULL_TERM))))
+			){
 			bootLog << "end;\n";
 			bootLog.close();
 			}
 		}
 
 	if(bootLogPhylip.is_open()){
-		if(prematureTermination && (bootlog_output & FINALIZE_PREMATURE)) bootLogPhylip.close();
-		else if((prematureTermination == false) && 
-			   ( (repTerm && (bootlog_output & FINALIZE_REP_TERM)) || (repsetTerm && (bootlog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (bootlog_output & FINALIZE_FULL_TERM)) )
-				) bootLogPhylip.close();
+		if((prematureTermination && (bootlog_output & FINALIZE_PREMATURE)) ||
+			(!prematureTermination && 
+			   ((repTerm && (bootlog_output & FINALIZE_REP_TERM)) || (repsetTerm && (bootlog_output & FINALIZE_REPSET_TERM)) || (fullTerm && (bootlog_output & FINALIZE_FULL_TERM))))
+			)
+			bootLogPhylip.close();
 		}
 
 	#ifdef DEBUG_SCORES
