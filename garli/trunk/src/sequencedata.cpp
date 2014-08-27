@@ -488,11 +488,13 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 
 	int tax=0, thisCodonNum;
 	for(int tax=0;tax<NTax();tax++){
-		bool firstAmbig = true;
+		vector<int> treatedAsMissing;
 		for(int cod = 0;cod < numPatterns;cod++){
 			int posArr[3] = {dnaData->Matrix(tax, cod*3), dnaData->Matrix(tax, cod*3+1), dnaData->Matrix(tax, cod*3+2)};
 			
 			int prot = -1;
+			bool breaker;
+			string stopString;
 			if(posArr[0] + posArr[1] + posArr[0] == 45)
 				//all positions missing
 				prot = maxNumStates;
@@ -515,7 +517,8 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 						allPos[pos].push_back(3);
 					}
 				
-				bool breaker = false;
+				breaker = false;
+				stopString.clear();
 				for(vector<int>::iterator fit = allPos[0].begin();fit != allPos[0].end();fit++){
 					for(vector<int>::iterator sit = allPos[1].begin();sit != allPos[1].end();sit++){
 						for(vector<int>::iterator tit = allPos[2].begin();tit != allPos[2].end();tit++){
@@ -525,19 +528,17 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 							int thisResolutionProt = code->CodonLookup(thisCodonResolution);
 				
 							if(thisResolutionProt == maxNumStates){
-								string c;
 								char b[4]={'A','C','G','T'};
-								c += b[*fit];
-								c += b[*sit];
-								c += b[*tit];
+								stopString += b[*fit];
+								stopString += b[*sit];
+								stopString += b[*tit];
 								if(ignoreStops == true){
-									outman.UserMessage("Warning: stop codon %s found at codon site %d (nuc site %d) in taxon %s.\n\tTreating as missing data because ignorestopcodons = 1 is set in configuration file.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
-									prot = thisResolutionProt;
+									outman.UserMessage("Warning: stop codon %s found at codon site %d (nuc site %d) in taxon %s.\n\tTreating as missing data because ignorestopcodons = 1 is set in configuration file.", stopString.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+									treatedAsMissing.push_back(cod+1);
+									prot = maxNumStates;
 									breaker = true;
 									break;
 									}
-								else
-									throw ErrorException("Stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.\nBe sure that your alignment is properly in frame, or set ignorestopcodons = 1 in the\n[general] section of your configuration file to treat as missing.", c.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
 								}
 							else if(prot < 0)
 								//translating the first (or only) codon resolution to amino acid 
@@ -546,11 +547,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 							else if(thisResolutionProt != prot){
 								//another resolution codes for a different AA
 								prot = maxNumStates;
-								if(firstAmbig){
-									outman.UserMessageNoCR("Gaps or ambiguity codes found within codon for taxon %s.\n\tResolutions of ambiguity do not encode a single aminoacid.\n\tAminoacids coded as missing for that taxon: ", dnaData->TaxonLabel(tax));
-									firstAmbig = false;
-									}
-								outman.UserMessageNoCR("%d ", cod+1);
+								treatedAsMissing.push_back(cod+1);
 								breaker = true;
 								break;
 								}
@@ -565,9 +562,28 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 						break;
 					}
 				}
+			if(stopString.length() > 0 && breaker == false){
+				//Some resolution of ambiguity resulted in a stop. If stops are being ignored, breaker would have been set above and this would already have been treated as missing.
+				if(prot < 0){
+					//Unambiguous stop found
+					throw ErrorException("Stop codon %s found at codon site %d (nuc site %d) in taxon %s.  Bailing out.\nBe sure that your alignment is properly in frame, or set ignorestopcodons = 1 in the\n[general] section of your configuration file to treat as missing.", stopString.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+					}
+				else{
+					//Could be a stop, but some ambiguity resolution results in a valid AA.  Treat as missing.
+					outman.UserMessage("Warning: a resolution of ambiguity results in a stop codon at codon site %d (nuc site %d) in taxon %s.\n\tTreating site as missing data.", stopString.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+					prot = maxNumStates;
+					treatedAsMissing.push_back(cod+1);
+					}
+				}
+
 			matrix[tax][cod] = prot;
 			}
-		if(firstAmbig == false) outman.UserMessage("");
+		if(treatedAsMissing.size() > 0){
+			outman.UserMessageNoCR("Some sites treated as missing data for taxon %s due to ambiguity in translation.\n\tAminoacids coded as missing for that taxon: ", dnaData->TaxonLabel(tax));
+			for(vector<int>::iterator vit = treatedAsMissing.begin();vit != treatedAsMissing.end();vit++)
+				outman.UserMessageNoCR("%d ", *vit);
+			outman.UserMessage("\n");
+			}
 		}	
 
 	//copy matrix into alternative PatternManager for pattern sorting
