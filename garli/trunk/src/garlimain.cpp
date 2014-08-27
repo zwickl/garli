@@ -765,7 +765,7 @@ int main( int argc, char* argv[] )	{
 							modSpecSet.SetInferSubsetRates(true);
 				}
 			
-			//this depends on the fact that an extra taxon slot was allocated by not yet used
+			//this depends on the fact that an extra taxon slot was allocated but not yet used
 			if(modSpecSet.AnyOrientedGap()){
 				NxsTaxaBlock *tax = reader.GetTaxaBlock(0);
 				if(!tax->IsAlreadyDefined("ROOT"))
@@ -773,6 +773,9 @@ int main( int argc, char* argv[] )	{
 				}
 	
 			outman.UserMessage("\n###################################################");
+			//could deallocate the storage in the NCL reader here, which saves a bit of memory but isn't critical
+			//reader.DeleteCharacterBlocksFromFactories();
+			
 			//allocate the population
 			pop = new Population();
 			pop->usedNCL = usedNCL;
@@ -836,7 +839,8 @@ int main( int argc, char* argv[] )	{
 					if(pop->conf->bootstrapReps == 0){//NOT bootstrapping
 						pop->PerformSearch();
 						}
-					else 
+					else
+						//Bootstrap() in turn calls PerformSearch for each boot rep
 						pop->Bootstrap();
 					pop->FinalizeOutputStreams(2);
 					}
