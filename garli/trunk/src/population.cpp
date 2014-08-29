@@ -4667,7 +4667,8 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 
 void Population::FinishBootstrapRep(const Individual *ind, int rep){
 
-	if(bootLog.is_open() == false) return;
+	if(bootLog.is_open() == false) 
+		return;
 
 	int num = 0;
 	Individual tempInd;
@@ -4693,9 +4694,8 @@ void Population::FinishBootstrapRep(const Individual *ind, int rep){
 	theInd->treeStruct->root->MakeNewick(treeString, false, true);
 	bootLog << modstr.c_str() << "] " << treeString << ";" << endl;
 
-	if(conf->outputPhylipTree == true){
+	if(conf->outputPhylipTree)
 		WritePhylipTree(bootLogPhylip);
-		}
 	}
 
 bool Population::OutgroupRoot(Individual *ind, int indnum){
@@ -7273,9 +7273,9 @@ void Population::FinalizeOutputStreams(int type){
 	if(restartedAfterTermination)
 		return;
 
-	bool prematureTermination = conf->checkpoint ? genTermination : (genTermination | userTermination);
+	bool prematureTermination = conf->checkpoint ? genTermination : (genTermination | timeTermination | userTermination);
 
-	if(prematureTermination == true && type == 0){
+	if(prematureTermination && type == 0){
 		if(log_output & WARN_PREMATURE)
 			log << TerminationWarningMessage().c_str() << endl;
 		if(treelog_output & WARN_PREMATURE)
@@ -7284,7 +7284,7 @@ void Population::FinalizeOutputStreams(int type){
 		}
 
 	//in these cases the termination is essentially a pause, so don't finalize or write anything
-	if(workPhaseTermination || timeTermination || (conf->checkpoint && userTermination))
+	if(workPhaseTermination || (conf->checkpoint && (timeTermination || userTermination)))
 		return;
 
 	bool repTerm, repsetTerm, fullTerm;
