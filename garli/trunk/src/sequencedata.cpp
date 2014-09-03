@@ -570,7 +570,7 @@ void AminoacidData::FillAminoacidMatrixFromDNA(const NucleotideData *dnaData, Ge
 					}
 				else{
 					//Could be a stop, but some ambiguity resolution results in a valid AA.  Treat as missing.
-					outman.UserMessage("Warning: a resolution of ambiguity results in a stop codon at codon site %d (nuc site %d) in taxon %s.\n\tTreating site as missing data.", stopString.c_str(), cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
+					outman.UserMessage("Warning: a resolution of ambiguity results in a stop codon at codon site %d (nuc site %d) in taxon %s.\n\tTreating site as missing data.", cod+1, cod*3+1,  dnaData->TaxonLabel(tax));
 					prot = maxNumStates;
 					treatedAsMissing.push_back(cod+1);
 					}
