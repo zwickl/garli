@@ -146,12 +146,13 @@ public:
 	StateFrequencies(FLOAT_TYPE **dv, int numE, int modnum):BaseParameter("Base frequencies", dv, STATEFREQS, numE, 1e-4, 0.999, modnum){};
 
 	void Mutator(FLOAT_TYPE mutationShape){
-		int freqToChange=int(rnd.uniform()*numElements);
+		int freqToChange;
 		FLOAT_TYPE newFreq;
 		FLOAT_TYPE rescaleBy;
 		bool ok;
 		do{
 			ok = true;
+			freqToChange = int(rnd.uniform()*numElements);
 			newFreq =*vals[freqToChange] * rnd.gamma( mutationShape );
 			rescaleBy = (FLOAT_TYPE)((1.0-newFreq)/(1.0-*vals[freqToChange]));
 			if(newFreq  > maxv)
@@ -160,15 +161,15 @@ public:
 				ok = false;
 			//all of this checking should almost never be necessary, but if the rescaling after
 			//changing one rate would push one of the others over a boundary, just draw another
-			//multiplier
+			//freqToChange and multiplier
 			else{
 				for(int b=0;b<numElements;b++){
 					assert( *vals[b] >= 1e-4);
 					if(b!=freqToChange){
-						if(*vals[b] * rescaleBy > maxv)
+						if(*vals[b] * rescaleBy > maxv || *vals[b] * rescaleBy < minv){
 							ok = false;
-						if(*vals[b] * rescaleBy < minv)
-							ok = false;
+							break;
+							}
 						}
 					}
 				}
