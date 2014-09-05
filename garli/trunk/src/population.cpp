@@ -3245,9 +3245,8 @@ void Population::PerformSearch(){
 			if(conf->workPhaseDivision){
 				WriteStateFiles();
 				//first workphasedivision exit point
-				outman.UserMessage("\nNOTE: Terminating run after initial optimization and");
-				outman.UserMessage("writing checkpoint because running in BOINC mode and");
-				outman.UserMessage("workphasedivision configuration entry was set.");
+				outman.UserMessage("\nNOTE: Terminating run after initial optimization and writing");
+				outman.UserMessage("checkpoint because workphasedivision configuration entry was set.");
 				workPhaseTermination = true;
 				UpdateFractionDone(4);
 				break;
