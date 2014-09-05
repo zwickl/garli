@@ -19,7 +19,7 @@
 
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION "2"
-#define MINOR_VERSION "01"
+#define MINOR_VERSION "1"
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
 #define SVN_REV "$Rev$"
 #define SVN_DATE "$Date$"
@@ -418,23 +418,18 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("->CUDA GPU version<-\n");
 #endif
 			outman.UserMessage("##############################################################");
-			outman.UserMessage(" This is GARLI 2.0, the first \"official\" release including ");
-			outman.UserMessage("          partitioned models.  It is a merging of"); 
-			outman.UserMessage("   official release 1.0 and beta version GARLI-PART 0.97");
-			outman.UserMessage("  Briefly, it includes models for nucleotides, amino acids,");
-			outman.UserMessage(" codons, and morphology-like characters, any of which can be ");
-			outman.UserMessage("  mixed together and applied to different subsets of data.\n"); 
-			outman.UserMessage("    General program usage is extensively documented here:");
+			outman.UserMessage(" This is GARLI 2.1: maximum likelihood phylogenetic inference");
+			outman.UserMessage(" using nucleotide, amino acid, codon and morphology-like data,");
+			outman.UserMessage("             as well as partitioned models.");
+			outman.UserMessage("   General program usage is extensively documented here:");
 			outman.UserMessage("            http://www.nescent.org/wg/garli/");
-			outman.UserMessage("      see this page for details on partitioned usage:");
-			outman.UserMessage("  http://www.nescent.org/wg/garli/Partition_testing_version");
+			outman.UserMessage("   See this page for details on partitioned model usage:");
+			outman.UserMessage("  http://www.nescent.org/wg_garli/Using_partitioned_models");
 			outman.UserMessage("   and this page for details on Mkv mophology model usage:");
-			outman.UserMessage("    http://www.nescent.org/wg/garli/Mkv_morphology_model");
+			outman.UserMessage("    http://www.nescent.org/wg_garli/Mkv_morphology_model");
 			outman.UserMessage("         PLEASE LET ME KNOW OF ANY PROBLEMS AT:");
 			outman.UserMessage("                garli.support@gmail.com");
 			outman.UserMessage("##############################################################");
-
-			//outman.UserMessage("This version has undergone much testing, but is still a BETA VERSION.\n   - Please check results carefully! -");
 
 			outman.UserMessageNoCR("Compiled %s %s", __DATE__, __TIME__); 
 
