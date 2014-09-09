@@ -143,7 +143,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, const DataPartition *data, const G
 	for(int i=0;i<30;i++){
 		Tree::rescalePrecalcIncr[i] = i*3 - (int) log(rescaleBelow);
 		Tree::rescalePrecalcThresh[i] = exp((FLOAT_TYPE)(-rescalePrecalcIncr[i]));
-		Tree::rescalePrecalcMult[i] =  max(exp((FLOAT_TYPE)(rescalePrecalcIncr[i])), maxMult);
+		Tree::rescalePrecalcMult[i] =  min(exp((FLOAT_TYPE)(rescalePrecalcIncr[i])), maxMult);
 		}
 		
 	FLOAT_TYPE minVal = 1.0e-10f;
@@ -1988,7 +1988,7 @@ void Tree::DeterministicSwapperRandom(Individual *source, double optPrecision, i
 		}
 */	}
 
-void Tree::GenerateTopologiesAtSprDistance(Individual *source, FLOAT_TYPE optPrecision, int range){
+void Tree::GenerateTopologiesAtSprDistance(Individual *source, double optPrecision, int range){
 
 	TreeNode *cut;
 	int swapNum=0;
