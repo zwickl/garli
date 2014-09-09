@@ -2,7 +2,7 @@
 # This file was written by hand (by mth using PAUP's configure.ac and http://autotoolset.sourceforge.net/tutorial.html as guides).
 
 AC_PREREQ(2.59)
-AC_INIT([Garli], [2.01], [garli_support@gmail.com])
+AC_INIT([Garli], [2.1], [garli.support@gmail.com])
 
 AC_CONFIG_SRCDIR([src/garlimain.cpp])
 AC_CONFIG_HEADER([config.h])
