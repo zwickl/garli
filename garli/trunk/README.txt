@@ -1,6 +1,6 @@
-// GARLI Version 2.0 (March 2011)
-// Copyright 2005-2011 Derrick J. Zwickl
-// email: zwickl@nescent.org
+// GARLI Version 2.1 (September 2014)
+// Copyright 2005-2014 Derrick J. Zwickl
+// email: garli.support@gmail.com
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -17,27 +17,32 @@
 
 Please let me know of any problems, concerns or feedback (garli.support@gmail.com)
 
- This is GARLI 2.0, the first "official" release including 
-          partitioned models.  It is a merging of
-   official release 1.0 and beta version GARLI-PART 0.97
-  Briefly, it includes models for nucleotides, amino acids,
- codons, and morphology-like characters, any of which can be 
-  mixed together and applied to different subsets of data.
+GARLI version 2.1 is a minor update to version 2.0.
+Versions >= 2.0 include models for nucleotides, amino acids,
+odons, and morphology-like characters, any of which can be 
+mixed together and applied to different subsets of data.
 
-Version 2.0 should replace earlier versions, and should be backwards compatible with all 
+Version 2.X should replace earlier versions, and should be backwards compatible with all 
 configuration files and datasets that were used with the previous versions.
 
-->See the manual or support website (http://www.nescent.org/wg/garli) for detailed information on
+->See the support website (http://www.nescent.org/wg/garli) for detailed information on
 using the program.  For very basic usage see QuickStart.txt.
 
 ->Example datasets and template configuration files files can be found in the example folder
 
-->For compilation help see the INSTALL file.  Version 2.0 comes with an extremely easy build
+->For compilation help see the INSTALL file.  Versions >= 2.0 comes with an extremely easy build
 script, build_garli.sh, which should make compalation trivial on linux or OS X machines.
 
-Please note that these new features are NOT documented in the pdf manual in the "doc" directory.  
-The manual was accurate up through version 0.96, but I do not plan to maintain it, choosing instead 
-to update the support wiki at http://www.nescent.org/wg/garli.
+***New in version 2.1***
+1. MUCH faster parsing of very long alignments.  e.g., alignments millions of nucleotides in 
+   length should be read thousands of times faster.
+2. Lower memory usage with very large alignments.
+3. Added ignorestopcodons entry to ignore stops rather than error out.
+4. Better translation to amino acid characters in codon-aminoacid models. Codons containing ambiguity 
+   are no longer discarded if all resolutions of the ambiguity translate to the same amino acid.
+5. Ability to read and use NEXUS wtsets to specify character counts.
+6. Many changes in BOINC mode.
+7. Fixes to minor/rare bugs.
 
 ***New in version 2.0***
 
@@ -87,7 +92,6 @@ to update the support wiki at http://www.nescent.org/wg/garli.
     "availablememory" setting in the configuration file (start GARLI with "-V").
 11. Much easier procedure for compiling of GARLI source code.
 12. Fixes to numerous rare bugs in version 0.96
-
 
 ***New in version 0.96***
 
