@@ -1,0 +1,205 @@
+Running GARLI Version 2.01.1067 (18 May 2012)
+->Single processor version for 64-bit OS<-
+##############################################################
+ This is GARLI 2.0, the first "official" release including 
+          partitioned models.  It is a merging of
+   official release 1.0 and beta version GARLI-PART 0.97
+  Briefly, it includes models for nucleotides, amino acids,
+ codons, and morphology-like characters, any of which can be 
+  mixed together and applied to different subsets of data.
+
+    General program usage is extensively documented here:
+            http://www.nescent.org/wg/garli/
+      see this page for details on partitioned usage:
+  http://www.nescent.org/wg/garli/Partition_testing_version
+   and this page for details on Mkv mophology model usage:
+    http://www.nescent.org/wg/garli/Mkv_morphology_model
+         PLEASE LET ME KNOW OF ANY PROBLEMS AT:
+                garli.support@gmail.com
+##############################################################
+Compiled Jul  2 2012 15:52:18 using GNU gcc compiler version 4.2.1
+Using NCL version 2.1.17
+
+#######################################################
+Reading config file garli.conf
+###################################################
+READING OF DATA
+Attempting to read data file in Nexus format (using NCL):
+	dnaPlusGapCoding.nex ...
+Reading TAXA block... successful
+Reading CHARACTERS block... found dna data... successful
+Reading CHARACTERS block... found standard data... successful
+Reading SETS block... successful
+
+###################################################
+PARTITIONING OF DATA AND MODELS
+
+CHECK: DIFFERENT MODEL TYPES AND MODEL PARAMETERS APPLY
+	TO EACH DATA SUBSET (no linkage)
+
+GARLI data subset 1
+	CHARACTERS block #1 ("Untitled DATA Block 1GapsAsMissing")
+	CHARPARTITION subset #1 ("1")
+	Data read as Nucleotide data,
+	modeled as Nucleotide data
+	Summary of data:
+	  64 sequences.
+	  687 constant characters.
+	  338 parsimony-informative characters.
+	  44 uninformative variable characters.
+	  2 characters were completely missing or ambiguous (removed).
+	  1069 total characters (1071 before removing empty columns).
+	  787 unique patterns in compressed data matrix.
+	Pattern processing required < 1 second
+
+GARLI data subset 2
+	CHARACTERS block #1 ("Untitled DATA Block 1GapsAsMissing")
+	CHARPARTITION subset #2 ("2")
+	Data read as Nucleotide data,
+	modeled as Nucleotide data
+	Summary of data:
+	  64 sequences.
+	  687 constant characters.
+	  341 parsimony-informative characters.
+	  39 uninformative variable characters.
+	  3 characters were completely missing or ambiguous (removed).
+	  1067 total characters (1070 before removing empty columns).
+	  800 unique patterns in compressed data matrix.
+	Pattern processing required < 1 second
+
+GARLI data subset 3
+	CHARACTERS block #1 ("Untitled DATA Block 1GapsAsMissing")
+	CHARPARTITION subset #3 ("3")
+	Data read as Nucleotide data,
+	modeled as Nucleotide data
+	Summary of data:
+	  64 sequences.
+	  666 constant characters.
+	  346 parsimony-informative characters.
+	  54 uninformative variable characters.
+	  4 characters were completely missing or ambiguous (removed).
+	  1066 total characters (1070 before removing empty columns).
+	  799 unique patterns in compressed data matrix.
+	Pattern processing required < 1 second
+
+GARLI data subset 4
+	CHARACTERS block #2 ("Untitled DATA Block 1GapsAsBinary")
+	Data read as Standard k-state data, variable only,
+	modeled as Standard k-state data, variable only
+	NOTE: entirely missing characters removed from matrix:  736 792 1244 1644 1645 1993-1995 2195
+	Subset of data with 2 states:
+	  chars 1-735 737-791 793-1243 1245-1643 1646-1992 1996-2194 2196-2723
+	Summary of data:
+	  64 sequences.
+	  0 constant characters.
+	  1530 parsimony-informative characters.
+	  1184 uninformative variable characters.
+	  2714 total characters.
+	  768 unique patterns in compressed data matrix.
+	Pattern processing required < 1 second
+
+
+###################################################
+NOTE: Unlike many programs, the amount of system memory that Garli will
+use can be controlled by the user.
+(This comes from the availablememory setting in the configuration file.
+Availablememory should NOT be set to more than the actual amount of 
+physical memory that your computer has installed)
+
+For this dataset:
+ Mem level		availablememory setting
+  great			    >= 196 MB
+  good			approx 195 MB to 126 MB
+  low			approx 125 MB to 52 MB
+  very low		approx 52 MB to 40 MB
+the minimum required availablememory is 40 MB
+
+You specified that Garli should use at most 512.0 MB of memory.
+
+Garli will actually use approx. 293.0 MB of memory
+**Your memory level is: great (you don't need to change anything)**
+
+#######################################################
+Found outgroup specification:  1
+
+#######################################################
+STARTING RUN
+
+>>>Search rep 1 (of 2)<<<
+MODEL REPORT - Parameters are at their INITIAL values (not yet optimized)
+Model 1
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix:     6 rates 
+    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.3211 0.2053 0.1693 0.3043 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    with an invariant (invariable) site category, proportion estimated
+      0.1607
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0000	0.1607
+      0.0334	0.2098
+      0.2519	0.2098
+      0.8203	0.2098
+      2.8944	0.2098
+
+Model 2
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix:     6 rates 
+    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.3490 0.2203 0.1345 0.2962 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    with an invariant (invariable) site category, proportion estimated
+      0.1610
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0000	0.1610
+      0.0334	0.2098
+      0.2519	0.2098
+      0.8203	0.2098
+      2.8944	0.2098
+
+Model 3
+  Number of states = 4 (nucleotide data)
+  Nucleotide Relative Rate Matrix:     6 rates 
+    AC = 1.000, AG = 4.000, AT = 1.000, CG = 1.000, CT = 4.000, GT = 1.000
+  Equilibrium State Frequencies: estimated
+    (ACGT) 0.3516 0.2003 0.1525 0.2956 
+  Rate Heterogeneity Model:
+    4 discrete gamma distributed rate categories, alpha param estimated
+      0.5000
+    with an invariant (invariable) site category, proportion estimated
+      0.1562
+    Substitution rate categories under this model:
+      rate	proportion
+      0.0000	0.1562
+      0.0334	0.2110
+      0.2519	0.2110
+      0.8203	0.2110
+      2.8944	0.2110
+
+Model 4
+  Number of states = 2 (standard data)
+  Character change matrix:
+    One rate (symmetric one rate Mkv model)
+  Equilibrium State Frequencies: equal (0.50, fixed)
+  Rate Heterogeneity Model:
+    no rate heterogeneity
+
+Subset rate multipliers:
+    1.00  1.00  1.00  1.00
+Starting with seed=558821
+
+creating random starting tree...
+Initial ln Likelihood: -130238.3436
+optimizing: starting branch lengths, alpha shape, prop. invar, rel rates, eq freqs, subset rates...
+pass 1:+23019.697 (branch=20315.82 scale=171.66 alpha=920.61 freqs=166.50 rel rates=112.55 pinv=545.55 subset rates=787.00)
+pass 2:+ 3142.907 (branch=2540.85 scale=  1.40 alpha=173.03 freqs= 16.15 rel rates= 15.76 pinv=257.52 subset rates=138.20)
+pass 3:+  835.620 (branch= 380.39 scale=  8.60 alpha=272.65 freqs=  5.15 rel rates= 18.80 pinv= 82.85 subset rates= 67.19)
+pass 4:+  340.762 (branch= 189.10 scale= 12.96 alpha= 33.80 freqs=  6.94 rel rates= 10.24 pinv=  0.00 subset rates= 87.73)
