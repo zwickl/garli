@@ -1,4 +1,4 @@
-GARLI Version 0.96 COMPILATION/INSTALLATION INSTRUCTIONS:
+GARLI COMPILATION/INSTALLATION INSTRUCTIONS:
 
 NOTE: For Windows and Mac OS X machines you should not need to 
 compile the program manually, and it is recommended that you 
@@ -9,7 +9,6 @@ problems, please email garli.support@gmail.com)
 ------
 
 EXTRA EASY COMPILATION INSTRUCTIONS (USE OF THIS IS RECOMMENDED!):
-(added Sept. 2008)
 If this is a version with the NCL source code bundled (there
 will be an ncl-2.1.xx.tar.gz file in the same directory as this
 file), then you should be able to very easily do a default
@@ -54,11 +53,18 @@ or doesn't meet your needs)
 
 ####BUILDING NCL####
 To make and install GARLI, you first need to have a compiled
-copy of the Nexus Class Library by Paul Lewis and Mark Holder.
-The NCL source can be obtained via the Sourceforge project page:
-http://sourceforge.net/projects/ncl/
-or can be obtained by anonymous svn:
-svn co http://ncl.svn.sourceforge.net/svnroot/ncl/trunk/
+copy of the Nexus Class Library version 2.1 by Paul Lewis and Mark Holder.
+
+The newest version of NCL 2.1 is available here:
+http://github.com/mtholder/ncl
+and can be checked out via anonymous svn or git:
+svn co https://github.com/mtholder/ncl
+or
+git clone https://github.com/mtholder/ncl
+
+Use of the trunk github version of NCL is recommended, but a slightly older
+version is also available here:
+http://sourceforge.net/projects/ncl/files/NCL/
 
 VERY IMPORTANT:
 -NCL version 2.1 or better is required to compile GARLI.
@@ -121,7 +127,7 @@ You can similarly pass extra CXXFLAGS or LDFLAGS:
 env CXXFLAGS=<your flags> LDFLAGS=<your flags> ./configure ... etc
 ------
 
-Making an OS X Universal binary:
+Making an OS X Universal binary (this may not work with newer versions of OS X):
 To do this you first need to build the NCL static library with multiple architectures.
 Configure NCL like this (all on one line):
 
@@ -137,8 +143,8 @@ env CXXFLAGS="-arch ppc -arch i386" LDFLAGS="-arch ppc -arch i386" \
 
 Other options that can be passed to configure:
 --enable-openmp
-(build the multithreaded openMP version - only available with Intel compiler,
-so be sure to set CC=icc and CXX=icpc)
+(build the multithreaded openMP version - available with the proprietary Intel compiler,
+(CC=icc and CXX=icpc), or newer versions of gcc
 
 --enable-mpi
 (build the MPI run distributing version.  It should automatically determine

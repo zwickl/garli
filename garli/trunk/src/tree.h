@@ -1,6 +1,6 @@
-// GARLI version 0.96b8 source code
-// Copyright 2005-2008 Derrick J. Zwickl
-// email: zwickl@nescent.org
+// GARLI version 2.1 source code
+// Copyright 2005-2014 Derrick J. Zwickl
+// email: garli.support@gmail.com
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
