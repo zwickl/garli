@@ -5,7 +5,7 @@ EXTRA_DIST = \
 	README.txt \
 	QuickStart.txt \
 	example \
-	project \
+	project/standardGarliVC \
 	doc \
 	tests\
 	ncl-2.1.19.tar.gz
