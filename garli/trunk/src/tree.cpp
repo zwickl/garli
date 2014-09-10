@@ -1,6 +1,6 @@
-// GARLI version 2.0 source code
-// Copyright 2005-2011 Derrick J. Zwickl
-// email: zwickl@nescent.org
+// GARLI version 2.1 source code
+// Copyright 2005-2014 Derrick J. Zwickl
+// email: garli.support@gmail.com
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -7045,6 +7045,7 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum){
 	FLOAT_TYPE rateImprove=ZERO_POINT_ZERO;
 	FLOAT_TYPE minVal = 1.0e-5;
 	int i=0;
+	FLOAT_TYPE scoreOnEntry = lnL;
 
 	const ModelSpecification *modSpec = modSpecSet.GetModSpec(modnum);
 	Model *mod = modPart->GetModel(modnum);
@@ -7171,6 +7172,23 @@ FLOAT_TYPE Tree::OptimizeRelativeNucRates(FLOAT_TYPE prec, int modnum){
 			*/
 #endif
 			}
+		FLOAT_TYPE currDiff = lnL - scoreOnEntry;
+		outman.UserMessage("summed improve %.8f actual diff %.8f, %.8f, %.8f", rateImprove, currDiff, scoreOnEntry, lnL);
+		if(currDiff < rateImprove && currDiff >= 0.0)
+			rateImprove = currDiff;
+		
+		string modstr;
+		modPart->FillGarliFormattedModelStrings(modstr);
+		ofstream modlog("models.log", ios::app);
+		modlog << lnL << "\t" << modstr.c_str() << "\t";
+
+		char treeString[5000];
+		modlog.setf( ios::floatfield, ios::fixed );
+		modlog.setf( ios::showpoint );
+		root->MakeNewick(treeString, false, true);
+		modlog << treeString << ";\n";
+
+		modlog.close();
 		}
 	return rateImprove;
 	}
