@@ -8,6 +8,6 @@
 set -x
 aclocal -I config || exit
 autoheader || exit
-automake || exit
+automake --add-missing || exit
 autoconf
 
