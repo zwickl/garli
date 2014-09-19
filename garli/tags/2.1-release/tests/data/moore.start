@@ -1,0 +1,122 @@
+#NEXUS 
+
+Begin trees;  [Treefile saved Wed Feb 16 13:33:03 2011]
+[!
+>Data file = /home/zwickl/googleCodeRepo/branches/clean-partitioning/tests/moore86x30.nex
+>Heuristic search settings:
+>  Optimality criterion = parsimony
+>    Character-status summary:
+>      Of 30 total characters:
+>        All characters are of type 'unord'
+>        All characters have equal weight
+>        6 characters are constant
+>        5 variable characters are parsimony-uninformative
+>        Number of parsimony-informative characters = 19
+>    Gaps are treated as "missing"
+>  Starting tree(s) obtained via stepwise addition
+>  Addition sequence: simple (reference taxon = Acorus)
+>  Number of trees held at each step during stepwise addition = 1
+>  Branch-swapping algorithm: tree-bisection-reconnection (TBR)
+>  Steepest descent option not in effect
+>  Initial 'MaxTrees' setting = 100
+>  Zero-length branches not collapsed
+>  'MulTrees' option not in effect; only 1 tree will be saved
+>  Topological constraints not enforced
+>  Trees are unrooted
+>
+>Heuristic search completed
+>   Total number of rearrangements tried = 433936
+>   Score of best tree(s) found = 93
+>   Number of trees retained = 1
+>   Time used = <1 sec (CPU time = 0.06 sec)
+]
+	Translate
+		1 Acorus,
+		2 Amborella,
+		3 Anethum,
+		4 Antirrhinum,
+		5 Arabidopsis,
+		6 Atropa,
+		7 Aucuba,
+		8 Berberidopsis,
+		9 Brassica,
+		10 Bulnesia,
+		11 Buxus,
+		12 Calycanthus,
+		13 Ceratophyllum,
+		14 Chloranthus,
+		15 Citrus,
+		16 Coffea,
+		17 Cornus,
+		18 Cucumis,
+		19 Cuscuta,
+		20 Cycas,
+		21 Daucus,
+		22 Dillenia,
+		23 Dioscorea,
+		24 Drimys,
+		25 Ehretia,
+		26 Elaeis,
+		27 Epifagus,
+		28 Eucalyptus,
+		29 Euonymus,
+		30 Ficus,
+		31 Ginkgo,
+		32 Glycine,
+		33 Gossypium,
+		34 Gunnera,
+		35 Helianthus,
+		36 Heuchera,
+		37 Ilex,
+		38 Illicium,
+		39 Ipomoea,
+		40 Jasminum,
+		41 Lactuca,
+		42 Lemna,
+		43 Liquidambar,
+		44 Liriodendron,
+		45 Lonicera,
+		46 Lotus,
+		47 Manihot,
+		48 Medicago,
+		49 Meliosma,
+		50 Morus,
+		51 Musa,
+		52 Nandina,
+		53 Nelumbo,
+		54 Nerium,
+		55 Nicotiana,
+		56 Nuphar,
+		57 Nymphaea,
+		58 Oenothera,
+		59 Oryza,
+		60 Oxalis,
+		61 Panax,
+		62 Passiflora,
+		63 Pelargonium,
+		64 Phalaenopsis,
+		65 Phaseolus,
+		66 Phoradendron,
+		67 Pinus,
+		68 Piper,
+		69 Platanus,
+		70 Plumbago,
+		71 Populus,
+		72 Quercus,
+		73 Ranunculus,
+		74 Rhododendron,
+		75 Scaevola,
+		76 Solanum_lycopersicum,
+		77 Spinacia,
+		78 Staphylea,
+		79 Trachelium,
+		80 Triticum,
+		81 Trochodendron,
+		82 Typha,
+		83 Vitis,
+		84 Ximenia,
+		85 Yucca,
+		86 Zea
+		;
+tree PAUP_1 = [&U] (1,(((((((((((((((((((((((((((((((((((((((((2,3,34),(((((((((4,19,27,6),7),16),25),55),76),32),70),78)),(((8,22),36),43)),10),11),14),((((15,(35,41)),71),(29,47)),60)),(((17,(39,54)),48),52)),(((18,42),46),(56,57))),24),26),28),((30,50),(((37,68),(65,84)),73))),38),44),(12,51)),((5,9),(13,33))),20),(((53,(64,66)),77),85)),69),72),81),83),23),31),40),45),49),21),58),59),61),62),63),67),74),75),79),80),82),86));
+End;
