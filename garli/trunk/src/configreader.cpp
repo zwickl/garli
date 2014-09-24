@@ -635,6 +635,6 @@ void ConfigReader::MakeAllSection(){
 	map<std::string, std::string> ops = sections["general"];
 	ops.insert(sections["master"].begin(), sections["master"].end());
 	string name="all";
-	sections.insert(make_pair<std::string, Options>(name, ops));
+	sections.insert(pair<std::string, Options>(name, ops));
 	}
 
