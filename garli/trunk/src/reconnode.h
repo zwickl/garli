@@ -22,6 +22,7 @@
 
 #include <list>
 #include <algorithm>
+#include <functional>
 #include "rng.h"
 #ifdef UNIX
 #include "unistd.h"

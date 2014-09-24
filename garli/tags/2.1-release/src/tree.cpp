@@ -8492,7 +8492,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 #endif
 
 	if(FloatingPointEquals(lnL, ZERO_POINT_ZERO, max(1.0e-8, GARLI_FP_EPS * 2.0))){
-		return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, ZERO_POINT_ZERO);
+		return pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, ZERO_POINT_ZERO);
 		}
 
 	int pass=1;
@@ -8523,7 +8523,8 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 			Score();
 			FLOAT_TYPE s = lnL/siteCount;
 			ScaleWholeTree(1.0/1.1);
-			if(fabs(prev - s) < max(1.0e-8, GARLI_FP_EPS * 2.0)) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, prev);
+			if(fabs(prev - s) < max(1.0e-8, GARLI_FP_EPS * 2.0)) 
+				return pair<FLOAT_TYPE, FLOAT_TYPE>(-ONE_POINT_ZERO, prev);
 			}
 
 		scale=ONE_POINT_ZERO + incr;
@@ -8543,7 +8544,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 		if(estImprove < optPrecision && d2 < ZERO_POINT_ZERO){
 			ScaleWholeTree(ONE_POINT_ZERO/effectiveScale);
 			//cout << pass << endl;
-			return make_pair<FLOAT_TYPE, FLOAT_TYPE>(effectiveScale, prev);
+			return pair<FLOAT_TYPE, FLOAT_TYPE>(effectiveScale, prev);
 			}
 		
 		if(d2 < ZERO_POINT_ZERO){
@@ -8572,13 +8573,14 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::OptimizeSingleSiteTreeScale(FLOAT_TYPE optPre
 
 		scale=t;
 		effectiveScale *= scale;
-		if(effectiveScale > 100.0) return make_pair<FLOAT_TYPE, FLOAT_TYPE>(100.0, prev);
+		if(effectiveScale > 100.0) 
+			return pair<FLOAT_TYPE, FLOAT_TYPE>(100.0, prev);
 		ScaleWholeTree(scale);
 		if(effectiveScale < 1e-4){
 			//The rate is essentially zero.  Invariant sites should be getting caught 
 			//before even calling this func, so this probably won't be visited
 			ScaleWholeTree(1.0/effectiveScale);
-			return make_pair<FLOAT_TYPE, FLOAT_TYPE>(effectiveScale, prev);
+			return pair<FLOAT_TYPE, FLOAT_TYPE>(effectiveScale, prev);
 			}
 		
 		Score();
