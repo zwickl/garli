@@ -93,7 +93,7 @@ int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts 
 	//ambiguous characters (currently only allowed for nuc data)
 	unsigned char full_ambig = (maxNumStates == 4 ? 15 : maxNumStates);
 	if(maxNumStates == 4){
-		for(vector<unsigned char>::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
+		for(StateVector::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
 			unsigned char c = *sit;
 			if(c != full_ambig && (c & (c - 1))){
 				ambig = true;
@@ -105,7 +105,7 @@ int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts 
 			}
 		}
 	else {
-		for(vector<unsigned char>::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
+		for(StateVector::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
 			unsigned char c = *sit;
 			if(c != full_ambig){
 				stateCounts[c]++;
@@ -146,7 +146,7 @@ int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts 
 		//if partial ambiguity is allowed (only for nuc data currently)
 		multiset<unsigned char> pat;
 		unsigned char conStates = 15;
-		for(vector<unsigned char>::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
+		for(StateVector::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
 			unsigned char c = *sit;
 			pat.insert(c);
 			conStates &= c;
