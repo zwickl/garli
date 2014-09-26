@@ -45,6 +45,12 @@ typedef FLOAT_TYPE** DblPtrPtr;
 #  define THROW_BADSTATE(a) BadState(a)
 #endif
 
+typedef pair<int, int> IdenticalColumnPair;
+typedef pair<int, int> ColumnRange;
+typedef pair<ColumnRange, ColumnRange> IdenticalColumnRange;
+
+typedef vector<unsigned int> StateVector;
+
 class SitePattern{
 public:
 	int count;
@@ -53,7 +59,7 @@ public:
 	int constStates;
 	static int numTax;
 	static int maxNumStates;
-	vector<unsigned char> stateVec;
+	StateVector stateVec;
 	vector<int> siteNumbers;
 	enum patternType{
 		MISSING = 1,
@@ -127,6 +133,9 @@ class PatternManager{
 	list<SitePattern> uniquePatterns;
 	vector<int> constStates;
 
+	PatternManager() {Reset();}
+	PatternManager(const PatternManager &other) {Reset();numTax = other.numTax;maxNumStates = other.maxNumStates;}
+
 	~PatternManager(){
 		patterns.clear();
 		uniquePatterns.clear();
@@ -171,6 +180,8 @@ public:
 	void FillCountVector(vector<int> &counts) const;
 	void FillConstStatesVector(vector<int> &cs) const;
 	void FillIntegerValues(int &numMissingChars, int &numConstantChars, int &numVariableUninformChars, int &numInformativeChars, int &lastConstant, int &numRealSitesInOrigMatrix, int &numNonMissingRealCountsInOrigMatrix, int &totNChar, int &NChar) const;
+
+	vector<IdenticalColumnRange> FindIdenticalAlignmentColumns(const PatternManager &other) const;
 	};
 
 // Note: the class below has pure virtual member functions
@@ -292,7 +303,7 @@ protected:
 			number(0), taxonLabel(0), numStates(0),
 			numMissingChars(0), numConstantChars(0), numInformativeChars(0), numVariableUninformChars(0),
 			lastConstant(-1), constStates(0), origCounts(0),
-			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(false),
+			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(true),
 			nTaxAllocated(0), origDataNumber(0), numConditioningPatterns(0)
 			{ memset( info, 0x00, 80 ); }
 		DataMatrix( int ntax, int nchar )
@@ -300,7 +311,7 @@ protected:
 			number(0), taxonLabel(0), numStates(0),
 			numMissingChars(0), numConstantChars(0), numInformativeChars(0), numVariableUninformChars(0),
 			lastConstant(-1), constStates(0), origCounts(0),
-			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(false),
+			fullyAmbigChar(15), useDefaultWeightsets(true), usePatternManager(true),
 			nTaxAllocated(0), origDataNumber(0), numConditioningPatterns(0)
 			{ memset( info, 0x00, 80 ); NewMatrix(ntax, nchar); }
 		virtual ~DataMatrix();
@@ -322,6 +333,7 @@ protected:
 
 		void SetUsePatternManager(bool tf) {usePatternManager = tf;}
 		bool GetUsePatternManager() const {return usePatternManager;}
+		const PatternManager &GetPatternManager() const {return patman;};
 		void ProcessPatterns();
 		void OutputDataSummary() const;
 
@@ -511,6 +523,8 @@ protected:
 	  void CountMissingCharsByColumn(vector<int> &vec);
 	  void MakeWeightSetString(NxsCharactersBlock &charblock, string &wtstring, string name);
       void MakeWeightSetString(std::string &wtstring, string name);
+
+	  void CreateMatrixFromOtherMatrix(const DataMatrix &other, int startIndex, int endIndex);
 };
 
 #endif
