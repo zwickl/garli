@@ -379,7 +379,6 @@ public:
 
 	bool fixStateFreqs;
 	bool fixRelativeRates;
-	string arbitraryRateMatrixString;
 
 //	bool fixSubstitutionRates;
 	//bool flexRates;
@@ -460,6 +459,8 @@ public:
 		INVERTMITOTWOSERINE = 5
 		}geneticCode;	
 
+	string arbitraryRateMatrixString;
+
 	ModelSpecification(){
 		nstates=4;
 		//this is the default model
@@ -471,6 +472,12 @@ public:
 		gotRmatFromFile = gotStateFreqsFromFile = gotAlphaFromFile = gotFlexFromFile = gotPinvFromFile = gotOmegasFromFile = gotInsertFromFile = gotDeleteFromFile = false;
 		geneticCode=STANDARD;
 		isSetup = false;
+		}
+
+	ModelSpecification(const ModelSpecification &other){
+		intptr_t scalarSize = (intptr_t) &geneticCode - (intptr_t) this + sizeof(geneticCode);
+		memcpy(this, &other, scalarSize);
+		arbitraryRateMatrixString = other.arbitraryRateMatrixString;
 		}
 
 	bool IsCodon() const {return datatype == CODON;}
@@ -1045,6 +1052,10 @@ public:
 		ModelSpecification * mod = new ModelSpecification;
 		mod->SetupModSpec(conf);
 		modSpecs.push_back(mod);
+		}
+	void AddModSpec(const ModelSpecification &spec){
+		ModelSpecification *newSpec = new ModelSpecification(spec);
+		modSpecs.push_back(newSpec);
 		}
 	ModelSpecification *GetModSpec(int num) const{
 		if(num > -1 == false || num >= modSpecs.size()) 
