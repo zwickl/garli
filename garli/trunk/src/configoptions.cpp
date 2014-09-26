@@ -71,6 +71,8 @@ GeneralGamlConfig::GeneralGamlConfig(){
 
 	workPhaseDivision = false;
 
+	alternateAlignmentMode = "none";
+
 	attachmentsPerTaxon = 50;
 
 	siteWindowLength = 0;
@@ -191,6 +193,8 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	cr.GetBoolOption("usepatternmanager", usePatternManager, true);
 	cr.GetStringOption("parametervaluestring", parameterValueString, true);
 	cr.GetBoolOption("combineadjacentidenticalgappatterns", combineAdjacentIdenticalGapPatterns, true);
+
+	cr.GetStringOption("alternatealignmentmode", alternateAlignmentMode, true);
 
 	cr.GetBoolOption("rootatbranchmidpoint", rootAtBranchMidpoint, true);
 	cr.GetBoolOption("useoptboundedforblen", useOptBoundedForBlen, true);
