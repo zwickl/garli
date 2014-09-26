@@ -55,6 +55,12 @@ public:
 		for(int i=0;i<maxNumStates;i++) f[i]=empStateFreqs[i];
 		}
 	virtual void AddDummyRootToExistingMatrix();
+
+	virtual bool IsNucleotide() const {return false;}
+	virtual bool IsCodon() const {return false;}
+	virtual bool IsAminoAcid() const {return false;}
+	virtual bool IsNState() const {return false;}
+	virtual bool IsOrientedGap() const {return false;}
 	};
 
 inline unsigned char SequenceData::CharToDatum( char ch ) const{
@@ -165,6 +171,7 @@ public:
 			delete [](*delit);
 #endif
 		}
+	bool IsNucleotide() const {return true;}
 
 	unsigned char CharToDatum(char d) const;
 	void CalcEmpiricalFreqs();
@@ -632,6 +639,7 @@ public:
 		}
 
 	~CodonData(){}
+	bool IsCodon() const {return true;}
 
 	void FillCodonMatrixFromDNA(const NucleotideData *, bool ignoreStops);
 	unsigned char CharToDatum(char c) const{
@@ -695,6 +703,7 @@ public:
 		CopyNamesFromOtherMatrix(dat);
 		fullyAmbigChar = maxNumStates;
 		}
+	bool IsAminoAcid() const {return true;}
 	void FillAminoacidMatrixFromDNA(const NucleotideData *dat, GeneticCode *code, bool ignoreStops);
 	void CalcEmpiricalFreqs();
 	unsigned char CharToDatum(char d) const;
@@ -711,7 +720,8 @@ public:
 		nTax = sub->NTax();
 		}
 	SequenceData *GetSubset(int num) const{
-		if(num < 0 || (num < dataSubsets.size()) == false) throw ErrorException("Tried to access invalid subset number");
+		if(num < 0 || (num < dataSubsets.size()) == false) 
+			throw ErrorException("Tried to access invalid subset number");
 		return dataSubsets[num];
 		}
 	void Delete(){
@@ -872,6 +882,7 @@ class NStateData : public SequenceData{
 				modeltype = UNORDERED;
 			maxNumStates = ns;
 			}
+		bool IsNState() const {return true;}
 		void SetNumStates(int ns){maxNumStates = ns;}
 
 		virtual unsigned char CharToDatum(char d) const;
@@ -943,6 +954,7 @@ class OrientedGapData : public NStateData{
 		OrientedGapData(int ns, bool isMkv) : NStateData(){
 			assert(0);
 			}
+		bool IsOrientedGap() const {return true;}
 		void SetNumStates(int ns){maxNumStates = ns;}
 
 		virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset);
