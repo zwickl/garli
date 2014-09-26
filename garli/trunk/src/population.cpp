@@ -1001,7 +1001,7 @@ void Population::ValidateInput(int rep){
 			int numTrees = treesblock->GetNumTrees();
 			if(numTrees > 0){
 				int treeNum = (rank+rep-1) % numTrees;
-				indiv[0].GetStartingTreeFromNCL(treesblock, (rank + rep - 1), dataPart->NTax());
+				indiv[0].GetStartingTreeFromNCL(treesblock, treeNum, dataPart->NTax());
 				outman.UserMessage("Obtained starting tree %d from Nexus", treeNum+1);
 				}
 			else throw ErrorException("Problem getting tree(s) from NCL!");
@@ -1015,19 +1015,33 @@ void Population::ValidateInput(int rep){
 		indiv[0].SetDirty();
 		}
 
-	if(reader.FoundModelString()) startingModelInNCL = true;
-	if(startingModelInNCL){
+	if(reader.FoundModelString()) 
+		startingModelInNCL = true;
+
+	if(startingModelInNCL || conf->parameterValueString.length() > 0){
 		//crap out if we already got some parameters above in an old style starting conditions file
 #ifndef SUBROUTINE_GARLI
 		if(modSpecSet.GotAnyParametersFromFile() && (currentSearchRep == 1 && (conf->bootstrapReps == 0 || currentBootstrapRep == 1)))
 			throw ErrorException("Found model parameters specified in a Nexus GARLI block with the dataset,\n\tand in the starting condition file (streefname).\n\tPlease use one or the other.");
 #endif
+		if(startingModelInNCL && conf->parameterValueString.length() > 0)
+			throw ErrorException("Found model parameters specified in the configuration file and in the dataset or starting condition file (streefname).\n\tPlease use one or the other.");
 		//model string from garli block, which could have come either in starting condition file
 		//or in file with Nexus dataset.  Cases 2, 4, 5, 7 and 8 come through here.
 
-		string modString = reader.GetModelString();
-		indiv[0].modPart.ReadGarliFormattedModelStrings(modString);
-		outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
+		string modString;
+		if(startingModelInNCL)
+			modString = reader.GetModelString();
+		else
+			modString = conf->parameterValueString;
+
+		if(modString.length() > 0)
+			indiv[0].modPart.ReadGarliFormattedModelStrings(modString);
+
+		if(startingModelInNCL)
+			outman.UserMessage("Obtained starting or fixed model parameter values from Nexus:");
+		else
+			outman.UserMessage("Obtained starting or fixed model parameter values from configuration file:");
 		}
 
 	//The model params should be set to their initial values by now, so report them
@@ -1043,16 +1057,28 @@ void Population::ValidateInput(int rep){
 		const ModelSpecification *modSpec = modSpecSet.GetModSpec(ms);
 		if((_stricmp(conf->streefname.c_str(), "random") == 0) || (_stricmp(conf->streefname.c_str(), "stepwise") == 0)){
 			//if no streefname file was specified, the param values should be in a garli block with the dataset
-			if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
-			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) 
+				throw(ErrorException("state frequencies specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) 
+				throw(ErrorException("alpha parameter specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) 
+				throw(ErrorException("proportion of invariant sites specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) 
+				throw(ErrorException("relative rate matrix specified as fixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
+			else if(modSpec->IsCodon() && modSpec->fixOmega && !modSpec->gotOmegasFromFile) 
+				throw(ErrorException("rate het model set to nonsynonymousfixed, but no\n\tGarli block found in %s!!" , conf->datafname.c_str()));
 			}
 		else{
-			if(modSpec->IsNucleotide() && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
-			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			if((modSpec->IsNucleotide() || modSpec->IsAminoAcid()) && modSpec->IsUserSpecifiedStateFrequencies() && !modSpec->gotStateFreqsFromFile) 
+				throw ErrorException("state frequencies specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->fixAlpha && !modSpec->gotAlphaFromFile) 
+				throw ErrorException("alpha parameter specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->fixInvariantSites && !modSpec->gotPinvFromFile) 
+				throw ErrorException("proportion of invariant sites specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->IsUserSpecifiedRateMatrix() && !modSpec->gotRmatFromFile) 
+				throw ErrorException("relative rate matrix specified as fixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
+			else if(modSpec->IsCodon() && modSpec->fixOmega && !modSpec->gotOmegasFromFile) 
+				throw ErrorException("rate het model set to nonsynonymousfixed, but no\n\tparameter values found in %s or %s!", conf->streefname.c_str(), conf->datafname.c_str());
 			}
 		}
 
@@ -7920,9 +7946,8 @@ void Population::OptimizeSiteRates(){
 	vector<float_pair> allRates;
 
 	for(int i=0;i<data->NChar();i++){
-		//PARTITION
-		//if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].mod->StateFreq((data->GetConstStates())[i]));
-		if(i <= lastConst) rateAndScore = make_pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].modPart.GetModel(0)->StateFreq((data->GetConstStates())[i]));
+		if(i <= lastConst) 
+			rateAndScore = pair<FLOAT_TYPE, FLOAT_TYPE>(ZERO_POINT_ZERO, indiv[0].modPart.GetModel(0)->StateFreq((data->GetConstStates())[i]));
 		else{
 			indiv[0].treeStruct->MakeAllNodesDirty();
 			Tree::siteToScore = i;
