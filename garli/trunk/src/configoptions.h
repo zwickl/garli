@@ -109,6 +109,8 @@ class GeneralGamlConfig{
 
 	bool workPhaseDivision;
 
+	string alternateAlignmentMode;
+
 	//this holds descriptions of models, possible > 1 in the case of partitioning
 
 /*
