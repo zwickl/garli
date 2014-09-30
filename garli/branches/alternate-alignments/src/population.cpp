@@ -422,11 +422,12 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	Model::mutationShape = conf->gammaShapeModel;
 
 	//check and warn if different codes have been selected for different subsets - this is experimental
-	for(vector<ClaSpecifier>::iterator c = claSpecs.begin();c != claSpecs.end();c++){
-		if(modSpecSet.GetModSpec((*c).modelIndex)->IsCodon()){
-			for(vector<ClaSpecifier>::iterator c2 = c+1;c2 != claSpecs.end();c2++){
-				if(modSpecSet.GetModSpec((*c2).modelIndex)->IsCodon()){
-					if(modSpecSet.GetModSpec((*c).modelIndex)->geneticCode != modSpecSet.GetModSpec((*c2).modelIndex)->geneticCode){
+	for(vector<ClaSpecifierSet>::const_iterator c = claSpecSets.begin();c != claSpecSets.end();c++){
+		if(modSpecSet.GetModSpec((*c).claSpecs[0].modelIndex)->IsCodon()){
+			//for(vector<ClaSpecifier>::const_iterator c2 = c+1;c2 != claSpecs.end();c2++){
+			for(vector<ClaSpecifierSet>::const_iterator c2 = c+1;c2 != claSpecSets.end();c2++){
+				if(modSpecSet.GetModSpec((*c2).claSpecs[0].modelIndex)->IsCodon()){
+					if(modSpecSet.GetModSpec((*c).claSpecs[0].modelIndex)->geneticCode != modSpecSet.GetModSpec((*c2).claSpecs[0].modelIndex)->geneticCode){
 						outman.UserMessage("\n################\nWARNING: Different genetic codes have been specified among partition subsets.");
 						outman.UserMessage("This is experimental - check your results carefully!!!\n################\n");
 						}
@@ -935,10 +936,10 @@ void Population::ValidateInput(int rep){
 	//shouldn't be problematic.  Note that the other data dependent model thing is empirical base freqs, but that will be disallowed
 	//elsewhere when there is linkage.
 	FLOAT_TYPE maxPinv = ZERO_POINT_ZERO;
-	for(vector<ClaSpecifier>::iterator c = claSpecs.begin();c != claSpecs.end();c++){
+	for(vector<ClaSpecifierSet>::const_iterator c = claSpecSets.begin();c != claSpecSets.end();c++){
 		for(int m = 0;m < indiv[0].modPart.NumModels();m++){
-			if((*c).modelIndex == m){
-				indiv[0].modPart.GetModel(m)->SetDefaultModelParameters(dataPart->GetSubset((*c).dataIndex));
+			if((*c).claSpecs[0].modelIndex == m){
+				indiv[0].modPart.GetModel(m)->SetDefaultModelParameters(dataPart->GetSubset((*c).claSpecs[0].dataIndex));
 				if(indiv[0].modPart.GetModel(m)->MaxPinv() > maxPinv) maxPinv = indiv[0].modPart.GetModel(m)->MaxPinv();
 				}
 			}
@@ -1114,10 +1115,10 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	//shouldn't be problematic.  Note that the other data dependent model thing is empirical base freqs, but that will be disallowed
 	//elsewhere when there is linkage.
 	FLOAT_TYPE maxPinv = ZERO_POINT_ZERO;
-	for(vector<ClaSpecifier>::iterator c = claSpecs.begin();c != claSpecs.end();c++){
+	for(vector<ClaSpecifierSet>::iterator c = claSpecSets.begin();c != claSpecSets.end();c++){
 		for(int m = 0;m < indiv[0].modPart.NumModels();m++){
-			if((*c).modelIndex == m){
-				indiv[0].modPart.GetModel(m)->SetDefaultModelParameters(dataPart->GetSubset((*c).dataIndex));
+			if((*c).claSpecs[0].modelIndex == m){
+				indiv[0].modPart.GetModel(m)->SetDefaultModelParameters(dataPart->GetSubset((*c).claSpecs[0].dataIndex));
 				if(indiv[0].modPart.GetModel(m)->MaxPinv() > maxPinv) maxPinv = indiv[0].modPart.GetModel(m)->MaxPinv();
 				}
 			}

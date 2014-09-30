@@ -1119,64 +1119,67 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 
 	//zero out lnL here, since the looping over the various models below will just add to it
 	lnL = ZERO_POINT_ZERO;
-	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
-		Model *mod = modPart->GetModel((*specs).modelIndex);
-		
-		ProfModDeriv.Start();
-		mod->CalcDerivatives(nd2->dlen * modPart->SubsetRate((*specs).dataIndex), prmat, deriv1, deriv2);
-		ProfModDeriv.Stop();
-		claOne = setOne->GetCLA((*specs).claIndex);
-		if(setTwo != NULL)
-			claTwo = setTwo->GetCLA((*specs).claIndex);
+	for(vector<ClaSpecifierSet>::const_iterator specSet = claSpecSets.begin();specSet != claSpecSets.end();specSet++){
+		//something special would need to be done here if analytical derivs were used with adding of likelihoods (i.e., > 1 spec per set)
+		assert((*specSet).claSpecs.size() == 1);
+		for(vector<ClaSpecifier>::const_iterator specs = (*specSet).claSpecs.begin();specs != (*specSet).claSpecs.end();specs++){
+			Model *mod = modPart->GetModel((*specs).modelIndex);
+			
+			ProfModDeriv.Start();
+			mod->CalcDerivatives(nd2->dlen * modPart->SubsetRate((*specs).dataIndex), prmat, deriv1, deriv2);
+			ProfModDeriv.Stop();
+			claOne = setOne->GetCLA((*specs).claIndex);
+			if(setTwo != NULL)
+				claTwo = setTwo->GetCLA((*specs).claIndex);
 
-		bool isNucleotide = mod->IsNucleotide();
+			bool isNucleotide = mod->IsNucleotide();
 
-		if(nd2->left == NULL){
-			char *childData=nd2->tipData[(*specs).dataIndex];
-			ProfTermDeriv.Start();
+			if(nd2->left == NULL){
+				char *childData=nd2->tipData[(*specs).dataIndex];
+				ProfTermDeriv.Start();
 
-			if(isNucleotide == false){
-				if(mod->NRateCats() > 1)
-					GetDerivsPartialTerminalNStateRateHet(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
-				else
-					GetDerivsPartialTerminalNState(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
+				if(isNucleotide == false){
+					if(mod->NRateCats() > 1)
+						GetDerivsPartialTerminalNStateRateHet(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
+					else
+						GetDerivsPartialTerminalNState(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
+					}
+				else {
+		#ifdef OPEN_MP	
+					assert(nd2->ambigMap.size() > (*specs).dataIndex);
+					assert(nd2->ambigMap[(*specs).dataIndex] != NULL);
+				
+					GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex, nd2->ambigMap[(*specs).dataIndex]);
+		#else
+					GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
+		#endif
+					}
+				assert(d1 == d1);
+				ProfTermDeriv.Stop();
 				}
 			else {
-	#ifdef OPEN_MP	
-				assert(nd2->ambigMap.size() > (*specs).dataIndex);
-				assert(nd2->ambigMap[(*specs).dataIndex] != NULL);
-			
-				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex, nd2->ambigMap[(*specs).dataIndex]);
-//				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, modIndex, nd2->ambigMap, (*specs).modelIndex, (*specs).dataIndex);
-	#else
-				GetDerivsPartialTerminal(claOne, **prmat, **deriv1, **deriv2, childData, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
-	#endif
+				ProfIntDeriv.Start();
+		#ifdef EQUIV_CALCS
+				GetDerivsPartialInternalEQUIV(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, nd2->tipData, (*specs).modelIndex, (*specs).dataIndex);
+		#else
+				if(isNucleotide == false){
+					if(mod->NRateCats() > 1)
+						GetDerivsPartialInternalNStateRateHet(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
+					else
+						GetDerivsPartialInternalNState(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
+					}
+				else
+					GetDerivsPartialInternal(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
+		#endif
+				ProfIntDeriv.Stop();
 				}
 			assert(d1 == d1);
-			ProfTermDeriv.Stop();
+			//account for the different rate scaling factors here
+	//		d1tot += d1 ;
+	//		d2tot += d2;
+			d1tot += d1 * modPart->SubsetRate((*specs).dataIndex);
+			d2tot += d2 * modPart->SubsetRate((*specs).dataIndex) * modPart->SubsetRate((*specs).dataIndex);
 			}
-		else {
-			ProfIntDeriv.Start();
-	#ifdef EQUIV_CALCS
-			GetDerivsPartialInternalEQUIV(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, nd2->tipData, (*specs).modelIndex, (*specs).dataIndex);
-	#else
-			if(isNucleotide == false){
-				if(mod->NRateCats() > 1)
-					GetDerivsPartialInternalNStateRateHet(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
-				else
-					GetDerivsPartialInternalNState(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
-				}
-			else
-				GetDerivsPartialInternal(claOne, claTwo, **prmat, **deriv1, **deriv2, d1, d2, (*specs).modelIndex, (*specs).dataIndex);
-	#endif
-			ProfIntDeriv.Stop();
-			}
-		assert(d1 == d1);
-		//account for the different rate scaling factors here
-//		d1tot += d1 ;
-//		d2tot += d2;
-		d1tot += d1 * modPart->SubsetRate((*specs).dataIndex);
-		d2tot += d2 * modPart->SubsetRate((*specs).dataIndex) * modPart->SubsetRate((*specs).dataIndex);
 		}
 
 	assert(d1 == d1);

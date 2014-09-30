@@ -614,26 +614,28 @@ void Tree::AllocateTree(bool withExtraNode){
 
 void Tree::AssignDataToTips(){
 	//TODO FOR MIXING - this assumes that 1 data subset = one cla
-	for(int c = 0;c < claSpecs.size();c++){
-		SequenceData *curData = dataPart->GetSubset(c);
-		for(int t=1;t<=dataPart->NTax();t++){
-			//if(isNucleotide){
-			if(modSpecSet.GetModSpec(claSpecs[c].modelIndex)->IsNucleotide()){
-				//allNodes[t]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1);
-				allNodes[t]->tipData.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1));
+	for(int s = 0;s < claSpecSets.size();s++){
+		for(int c = 0;c < claSpecSets[s].claSpecs.size();c++){
+			SequenceData *curData = dataPart->GetSubset(claSpecSets[s].claSpecs[c].dataIndex);
+			for(int t=1;t<=dataPart->NTax();t++){
+				//if(isNucleotide){
+				if(modSpecSet.GetModSpec(claSpecSets[s].claSpecs[c].modelIndex)->IsNucleotide()){
+					//allNodes[t]->tipData=static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1);
+					allNodes[t]->tipData.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigString(t-1));
 #ifdef OPEN_MP
-				//allNodes[t]->ambigMap=static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1);
-				allNodes[t]->ambigMap.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1));
+					//allNodes[t]->ambigMap=static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1);
+					allNodes[t]->ambigMap.push_back(static_cast<const NucleotideData *>(curData)->GetAmbigToCharMap(t-1));
 #endif
-				}
-			else{
-				//allNodes[t]->tipData=(char *)(curData)->GetRow(t-1);
-				allNodes[t]->tipData.push_back((char *)(curData)->GetRow(t-1));
-	#ifdef OPEN_MP
-				//even though there is no ambig map for non-nuc data, we need to put a dummy into the vector
-				//so that the data index matches up with the correct element in the vector
-				allNodes[t]->ambigMap.push_back(NULL);
-	#endif
+					}
+				else{
+					//allNodes[t]->tipData=(char *)(curData)->GetRow(t-1);
+					allNodes[t]->tipData.push_back((char *)(curData)->GetRow(t-1));
+		#ifdef OPEN_MP
+					//even though there is no ambig map for non-nuc data, we need to put a dummy into the vector
+					//so that the data index matches up with the correct element in the vector
+					allNodes[t]->ambigMap.push_back(NULL);
+		#endif
+					}
 				}
 			}
 		}
@@ -3796,6 +3798,30 @@ int Tree::ConditionalLikelihoodRateHet(int direction, TreeNode* nd, bool returnU
 	return -1;
 	}
 
+double LikelihoodSumFromLogLikelihoods(vector<double> logLikes){
+	if(logLikes.size() > 1){
+		//find the maximum
+		double maxlnL = -DBL_MAX;
+		for(vector<double>::iterator logLike = logLikes.begin();logLike != logLikes.end();logLike++)
+			maxlnL = max(maxlnL, *logLike);
+		
+		//rescale each subset likelihood with the maximum subset log likelihood (make it closer to 0) 
+		//such that it can be exponentiated without underflowing.  maxlnL is just a convenient factor
+		//to rescale by.
+		double rescaledLike = 0.0;
+		for(vector<double>::iterator logLike = logLikes.begin();logLike != logLikes.end();logLike++){
+			double rescaledlnL = *logLike - maxlnL;
+			//If the rescaled log likelihood is still this small it won't appreciably affect the likelihood
+			///The term contributed by the subset with the max likelihood will be exp(0) = 1
+			if(rescaledlnL > -100.0)
+				rescaledLike += exp(rescaledlnL);
+			}
+		return (maxlnL + log(rescaledLike));
+		}
+	else
+		return logLikes[0];
+	}
+
 void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *childCLAset, TreeNode *child, FLOAT_TYPE blen1){
 
 	FLOAT_TYPE *Rprmat = NULL, *Lprmat = NULL;
@@ -3809,41 +3835,45 @@ void Tree::GetTotalScore(CondLikeArraySet *partialCLAset, CondLikeArraySet *chil
 	//this is done in PerformSearch.  This function IS responsible for resetting the sitelike level and turning off
 	//sitelike output for future scorings.
 
-	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
-		Model *mod = modPart->GetModel((*specs).modelIndex);
-		if(! mod->IsOrientedGap())//we don't actually use a pmat with final scoring in gap model, so no need to calc it here
-			mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
+	for(vector<ClaSpecifierSet>::const_iterator specSet = claSpecSets.begin();specSet != claSpecSets.end();specSet++){
+		vector<double> setlnL;
+		for(vector<ClaSpecifier>::const_iterator specs = (*specSet).claSpecs.begin();specs != (*specSet).claSpecs.end();specs++){
+			Model *mod = modPart->GetModel((*specs).modelIndex);
+			if(! mod->IsOrientedGap())//we don't actually use a pmat with final scoring in gap model, so no need to calc it here
+				mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
 
-		partialCLA = partialCLAset->GetCLA((*specs).claIndex);
+			partialCLA = partialCLAset->GetCLA((*specs).claIndex);
 
-		bool isNucleotide = mod->IsNucleotide();
-		if(childCLAset != NULL)
-			childCLA = childCLAset->GetCLA((*specs).claIndex);
+			bool isNucleotide = mod->IsNucleotide();
+			if(childCLAset != NULL)
+				childCLA = childCLAset->GetCLA((*specs).claIndex);
 
-		if(childCLA!=NULL){//if child is internal
-			//when doing oriented gap we assume that the tree must be rooted, thus the child must be the dummy tip
-			assert(! mod->IsOrientedGap());
-			ProfScoreInt.Start();
-			if(isNucleotide)
-				modlnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
-			else
-				modlnL = GetScorePartialInternalNState(partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
-				
-			ProfScoreInt.Stop();
-			}	
-		else{
-			ProfScoreTerm.Start();
-			if(isNucleotide)
-				modlnL = GetScorePartialTerminalRateHet(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-			else if(mod->IsOrientedGap()){
-				modlnL = GetScorePartialTerminalOrientedGap(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+			if(childCLA!=NULL){//if child is internal
+				//when doing oriented gap we assume that the tree must be rooted, thus the child must be the dummy tip
+				assert(! mod->IsOrientedGap());
+				ProfScoreInt.Start();
+				if(isNucleotide)
+					modlnL = GetScorePartialInternalRateHet(partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
+				else
+					modlnL = GetScorePartialInternalNState(partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
+					
+				ProfScoreInt.Stop();
+				}	
+			else{
+				ProfScoreTerm.Start();
+				if(isNucleotide)
+					modlnL = GetScorePartialTerminalRateHet(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+				else if(mod->IsOrientedGap()){
+					modlnL = GetScorePartialTerminalOrientedGap(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+					}
+				else
+					modlnL = GetScorePartialTerminalNState(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+
+				ProfScoreTerm.Stop();
 				}
-			else
-				modlnL = GetScorePartialTerminalNState(partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-
-			ProfScoreTerm.Stop();
+			setlnL.push_back(modlnL);
 			}
-		lnL += modlnL;
+		lnL += LikelihoodSumFromLogLikelihoods(setlnL);
 		}
 	//sitelike output is non-persistent, so clear it out here
 	sitelikeLevel = 0;
@@ -3863,24 +3893,26 @@ int Tree::FillStatewiseUnscaledPosteriors(CondLikeArraySet *partialCLAset, CondL
 	CondLikeArraySet *destCLAset = claMan->GetCla(posteriorClaIndex);
 	//note that the NState functions are used here for both nuc and other datatypes
 
-	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
-		Model *mod = modPart->GetModel((*specs).modelIndex);
-		ModelSpecification *modSpec = modSpecSet.GetModSpec((*specs).modelIndex);
+	for(vector<ClaSpecifierSet>::const_iterator specSet = claSpecSets.begin();specSet != claSpecSets.end();specSet++){
+		for(vector<ClaSpecifier>::const_iterator specs = (*specSet).claSpecs.begin();specs != (*specSet).claSpecs.end();specs++){
+			Model *mod = modPart->GetModel((*specs).modelIndex);
+			ModelSpecification *modSpec = modSpecSet.GetModSpec((*specs).modelIndex);
 
-		assert( modSpec->IsNucleotide() || modSpec->IsAminoAcid() || modSpec->IsCodon() );
-		mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
+			assert( modSpec->IsNucleotide() || modSpec->IsAminoAcid() || modSpec->IsCodon() );
+			mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), -1.0, Lprmat, Rprmat);
 
-		partialCLA = partialCLAset->GetCLA((*specs).claIndex);
-		destCLA = destCLAset->GetCLA((*specs).claIndex);
+			partialCLA = partialCLAset->GetCLA((*specs).claIndex);
+			destCLA = destCLAset->GetCLA((*specs).claIndex);
 
-		if(childCLAset != NULL)
-			childCLA = childCLAset->GetCLA((*specs).claIndex);
+			if(childCLAset != NULL)
+				childCLA = childCLAset->GetCLA((*specs).claIndex);
 
-		if(childCLA!=NULL){//if child is internal
-			GetStatewiseUnscaledPosteriorsPartialInternalNState(destCLA, partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
-			}	
-		else{
-			GetStatewiseUnscaledPosteriorsPartialTerminalNState(destCLA, partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+			if(childCLA!=NULL){//if child is internal
+				GetStatewiseUnscaledPosteriorsPartialInternalNState(destCLA, partialCLA, childCLA, &Lprmat[0], (*specs).modelIndex, (*specs).dataIndex);
+				}	
+			else{
+				GetStatewiseUnscaledPosteriorsPartialTerminalNState(destCLA, partialCLA, &Lprmat[0], child->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+				}
 			}
 		}
 	return posteriorClaIndex;
@@ -3891,95 +3923,97 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 	FLOAT_TYPE *Rprmat = NULL, *Lprmat = NULL;
 	CondLikeArray *destCLA=NULL, *firstCLA=NULL, *secCLA=NULL;
 
-	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
-		Model *mod = modPart->GetModel((*specs).modelIndex);
-		mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), blen2 * modPart->SubsetRate((*specs).dataIndex), Lprmat, Rprmat);
+	for(vector<ClaSpecifierSet>::const_iterator specSet = claSpecSets.begin();specSet != claSpecSets.end();specSet++){
+		for(vector<ClaSpecifier>::const_iterator specs = (*specSet).claSpecs.begin();specs != (*specSet).claSpecs.end();specs++){
+			Model *mod = modPart->GetModel((*specs).modelIndex);
+			mod->CalcPmats(blen1 * modPart->SubsetRate((*specs).dataIndex), blen2 * modPart->SubsetRate((*specs).dataIndex), Lprmat, Rprmat);
 
-		destCLA = destCLAset->GetCLA((*specs).claIndex);
+			destCLA = destCLAset->GetCLA((*specs).claIndex);
 
-		bool isNucleotide = mod->IsNucleotide();
-		if(firstCLAset != NULL)
-			firstCLA = firstCLAset->GetCLA((*specs).claIndex);
-		if(secCLAset != NULL)
-			secCLA = secCLAset->GetCLA((*specs).claIndex);
+			bool isNucleotide = mod->IsNucleotide();
+			if(firstCLAset != NULL)
+				firstCLA = firstCLAset->GetCLA((*specs).claIndex);
+			if(secCLAset != NULL)
+				secCLA = secCLAset->GetCLA((*specs).claIndex);
 
-		if(firstCLAset!=NULL && secCLAset!=NULL){
-			//two internal children
-			ProfIntInt.Start();
+			if(firstCLAset!=NULL && secCLAset!=NULL){
+				//two internal children
+				ProfIntInt.Start();
 
-			if(isNucleotide)
-				CalcFullCLAInternalInternal(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], (*specs).modelIndex, (*specs).dataIndex);
-			else if(mod->IsOrientedGap())
-				CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], firstCLA, secCLA, NULL, NULL, (*specs).modelIndex, (*specs).dataIndex);
-			else
-				CalcFullCLAInternalInternalNState(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], (*specs).modelIndex, (*specs).dataIndex);
-				
-			ProfIntInt.Stop();
-			}
-
-		else if(firstCLAset==NULL && secCLAset==NULL){
-			//two terminal children
-			ProfTermTerm.Start();
-			if(isNucleotide)
-				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-			else if(mod->IsOrientedGap())
-				CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, NULL, firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-			else
-				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-			ProfTermTerm.Stop();
-			}
-
-		else{
-			//one terminal, one internal
-			ProfIntTerm.Start();
-
-			if(isNucleotide == false){
-				if(mod->IsOrientedGap()){
-					if(firstCLAset==NULL)
-						CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, secCLA, firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
-					else
-						CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], firstCLA, NULL, NULL, secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					}
-				else{
-					if(firstCLAset==NULL)
-						CalcFullCLAInternalTerminalNState(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					else 
-						CalcFullCLAInternalTerminalNState(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					}
+				if(isNucleotide)
+					CalcFullCLAInternalInternal(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], (*specs).modelIndex, (*specs).dataIndex);
+				else if(mod->IsOrientedGap())
+					CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], firstCLA, secCLA, NULL, NULL, (*specs).modelIndex, (*specs).dataIndex);
+				else
+					CalcFullCLAInternalInternalNState(destCLA, firstCLA, secCLA, &Lprmat[0], &Rprmat[0], (*specs).modelIndex, (*specs).dataIndex);
+					
+				ProfIntInt.Stop();
 				}
+
+			else if(firstCLAset==NULL && secCLAset==NULL){
+				//two terminal children
+				ProfTermTerm.Start();
+				if(isNucleotide)
+					CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+				else if(mod->IsOrientedGap())
+					CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, NULL, firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+				else
+					CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+				ProfTermTerm.Stop();
+				}
+
 			else{
-	#ifdef OPEN_MP
-				if(firstCLA==NULL){
-					assert(firstChild->ambigMap.size() > (*specs).dataIndex);
-					assert(firstChild->ambigMap[(*specs).dataIndex] != NULL);					
+				//one terminal, one internal
+				ProfIntTerm.Start();
+
+				if(isNucleotide == false){
+					if(mod->IsOrientedGap()){
+						if(firstCLAset==NULL)
+							CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, secCLA, firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
+						else
+							CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], firstCLA, NULL, NULL, secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+						}
+					else{
+						if(firstCLAset==NULL)
+							CalcFullCLAInternalTerminalNState(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+						else 
+							CalcFullCLAInternalTerminalNState(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+						}
 					}
 				else{
-					assert(secChild->ambigMap.size() > (*specs).dataIndex);
-					assert(secChild->ambigMap[(*specs).dataIndex] != NULL);	
+		#ifdef OPEN_MP
+					if(firstCLA==NULL){
+						assert(firstChild->ambigMap.size() > (*specs).dataIndex);
+						assert(firstChild->ambigMap[(*specs).dataIndex] != NULL);					
+						}
+					else{
+						assert(secChild->ambigMap.size() > (*specs).dataIndex);
+						assert(secChild->ambigMap[(*specs).dataIndex] != NULL);	
+						}
+
+					if(firstCLA==NULL)
+							CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], firstChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+						else
+							CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], secChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 					}
-
-				if(firstCLA==NULL)
-						CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], firstChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					else
-						CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], secChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+		#else
+					if(firstCLA==NULL)
+						CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
+					else 
+						CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
+					}
+		#endif
+				ProfIntTerm.Stop();
 				}
-	#else
-				if(firstCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
-				else 
-					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
-				}
-	#endif
-			ProfIntTerm.Stop();
-			}
-		if(destCLA->rescaleRank >= rescaleEvery){
-			ProfRescale.Start();
-			if(isNucleotide)
-				RescaleRateHet(destCLA, (*specs).dataIndex);
-			else
-				RescaleRateHetNState(destCLA, (*specs).dataIndex);
+			if(destCLA->rescaleRank >= rescaleEvery){
+				ProfRescale.Start();
+				if(isNucleotide)
+					RescaleRateHet(destCLA, (*specs).dataIndex);
+				else
+					RescaleRateHetNState(destCLA, (*specs).dataIndex);
 
-			ProfRescale.Stop();
+				ProfRescale.Stop();
+				}
 			}
 		}
 	}
@@ -5157,46 +5191,48 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 		nd->MakeNewickForSubtree(subtreeString, dataPart, false, false, true);	
 		out << subtreeString.c_str() << endl;
 
-		for(vector<ClaSpecifier>::iterator c = claSpecs.begin() ; c != claSpecs.end() ; c++){
-			const CondLikeArray *thisCLA = CLAset->GetCLA((*c).claIndex);
-			const ModelSpecification *modSpec = modSpecSet.GetModSpec((*c).modelIndex);
-			
-			vector<InternalState> stateProbs;
-			InferStatesFromCla(stateProbs, thisCLA->arr, thisCLA->NChar(), thisCLA->NStates());
+		for(vector<ClaSpecifierSet>::const_iterator specSet = claSpecSets.begin();specSet != claSpecSets.end();specSet++){
+			for(vector<ClaSpecifier>::const_iterator c = (*specSet).claSpecs.begin();c != (*specSet).claSpecs.end();c++){
+				const CondLikeArray *thisCLA = CLAset->GetCLA((*c).claIndex);
+				const ModelSpecification *modSpec = modSpecSet.GetModSpec((*c).modelIndex);
+				
+				vector<InternalState> stateProbs;
+				InferStatesFromCla(stateProbs, thisCLA->arr, thisCLA->NChar(), thisCLA->NStates());
 
-			//this just maps the indecies used in the clas to actual states
-			StateSet *states;
-			if(modSpec->IsNucleotide())
-				states = new StateSet(4);
-			else if(modSpec->IsAminoAcid()){
-				if(modSpec->IsTwoSerineRateMatrix())
-					states = new StateSet(21);
+				//this just maps the indecies used in the clas to actual states
+				StateSet *states;
+				if(modSpec->IsNucleotide())
+					states = new StateSet(4);
+				else if(modSpec->IsAminoAcid()){
+					if(modSpec->IsTwoSerineRateMatrix())
+						states = new StateSet(21);
+					else
+						states = new StateSet(20);
+					}
 				else
-					states = new StateSet(20);
-				}
-			else
-				states = new StateSet(modPart->GetModel((*c).modelIndex)->GetGeneticCode());
+					states = new StateSet(modPart->GetModel((*c).modelIndex)->GetGeneticCode());
 
-			states->OutputInternalStateHeader(out);
-			
-			//now map the posteriors of each packed state to the original char order
-			const SequenceData *data = dataPart->GetSubset((*c).dataIndex);
-			for(int s=data->NumConditioningPatterns();s<data->GapsIncludedNChar() + data->NumConditioningPatterns();s++){
-				//out << s+1 << "\t";
-				out << data->OrigDataNumber(s) + 1 << "\t";
-				if(data->Number(s) > -1)
-					stateProbs[data->Number(s)].Output(out, *states);
-				else 
-					out << "Entirely uninformative character (gaps,N's or ?'s)\n";
+				states->OutputInternalStateHeader(out);
+				
+				//now map the posteriors of each packed state to the original char order
+				const SequenceData *data = dataPart->GetSubset((*c).dataIndex);
+				for(int s=data->NumConditioningPatterns();s<data->GapsIncludedNChar() + data->NumConditioningPatterns();s++){
+					//out << s+1 << "\t";
+					out << data->OrigDataNumber(s) + 1 << "\t";
+					if(data->Number(s) > -1)
+						stateProbs[data->Number(s)].Output(out, *states);
+					else 
+						out << "Entirely uninformative character (gaps,N's or ?'s)\n";
+					}
+				
+				//return the cla that we used temporarily
+				claMan->ClearTempReservation(wholeTreeIndex);
+				claMan->DecrementCla(wholeTreeIndex);
+				delete states;
 				}
-			
-			//return the cla that we used temporarily
-			claMan->ClearTempReservation(wholeTreeIndex);
-			claMan->DecrementCla(wholeTreeIndex);
-			delete states;
-			}
 			}
 		}
+	}
 
 void Tree::ClaReport(ofstream &cla){
 	int totDown=0;
