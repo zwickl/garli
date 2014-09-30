@@ -591,29 +591,29 @@ int main( int argc, char* argv[] )	{
 					throw ErrorException("Model linkage cannot be used with Mk/Mkv models (nor does it\n\tneed to be, since there are no estimated parameters).\n\tSet linkmodels = 0");
 
 				//defaults here are NUCLEOTIDE, so make changes as necessary
+				DataSubsetInfo *dsi = &dataSubInfo[dataChunk];
 				if(modSpec->IsCodon()) 
-					dataSubInfo[dataChunk].usedAs = DataSubsetInfo::CODON;
+					dsi->usedAs = DataSubsetInfo::CODON;
 				else if(modSpec->IsCodonAminoAcid())
-					dataSubInfo[dataChunk].usedAs = DataSubsetInfo::AMINOACID;
+					dsi->usedAs = DataSubsetInfo::AMINOACID;
 				else if(modSpec->IsAminoAcid())
-					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::AMINOACID;
+					dsi->readAs = dsi->usedAs = DataSubsetInfo::AMINOACID;
 				else if(modSpec->IsNState())
-					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATE;
+					dsi->readAs = dsi->usedAs = DataSubsetInfo::NSTATE;
 				else if(modSpec->IsNStateV())
-
-					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::NSTATEV;
+					dsi->readAs = dsi->usedAs = DataSubsetInfo::NSTATEV;
 				else if(modSpec->IsOrderedNState())
-					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORDNSTATE;
+					dsi->readAs = dsi->usedAs = DataSubsetInfo::ORDNSTATE;
 				else if(modSpec->IsOrderedNStateV())
-					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORDNSTATEV;
+					dsi->readAs = dsi->usedAs = DataSubsetInfo::ORDNSTATEV;
 				else if(modSpec->IsOrientedGap())
-					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::ORIENTEDGAP;
+					dsi->readAs = dsi->usedAs = DataSubsetInfo::ORIENTEDGAP;
 				else if(modSpec->IsBinaryNotAllZeros())
-					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::BINARY_NOT_ALL_ZEROS;
+					dsi->readAs = dsi->usedAs = DataSubsetInfo::BINARY_NOT_ALL_ZEROS;
 				else if(modSpec->IsBinary())
-					dataSubInfo[dataChunk].readAs = dataSubInfo[dataChunk].usedAs = DataSubsetInfo::BINARY;
+					dsi->readAs = dsi->usedAs = DataSubsetInfo::BINARY;
 
-				dataSubInfo[dataChunk].Report();
+				dsi->Report();
 				//outman.UserMessage("");
 
 				// Create the data object
@@ -626,7 +626,7 @@ int main( int argc, char* argv[] )	{
 					if(modSpec->IsMkTypeModel() && !modSpec->IsOrientedGap()){
 						bool isOrdered = (modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV());
 						bool isBinary = modSpec->IsBinary() || modSpec->IsBinaryNotAllZeros();
-						bool isConditioned =  (modSpec->IsNStateV() || modSpec->IsOrderedNStateV() || modSpec->IsBinaryNotAllZeros());
+					bool isConditioned =  (modSpec->IsNStateV() || modSpec->IsOrderedNStateV() || modSpec->IsBinaryNotAllZeros());
 						//data = new NStateData(impliedMatrix, (modSpec->IsNStateV() || modSpec->IsOrderedNStateV()), (modSpec->IsOrderedNState() || modSpec->IsOrderedNStateV()));
 						data = new NStateData(impliedMatrix, isOrdered, isBinary, isConditioned);
 						}
@@ -740,7 +740,8 @@ int main( int argc, char* argv[] )	{
 							data->EliminateAdjacentIdenticalColumns();
 							}
 
-						data->ProcessPatterns();
+						if(!strcmp(conf.alternateAlignmentMode.c_str(), "none"))
+							data->ProcessPatterns();
 
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].totalCharacters = data->TotalNChar();
 						dataSubInfo[dataChunk + actuallyUsedImpliedMatrixIndex].uniqueCharacters = data->NChar();
@@ -767,6 +768,84 @@ int main( int argc, char* argv[] )	{
 					dataPart.AddDummyRoots();
 				}
 	
+			//Alignment comparison and splitting
+			if(strcmp(conf.alternateAlignmentMode.c_str(), "none")){
+				if(dataPart.NumSubsets() != 2)
+					throw ErrorException("Provide exactly 2 alignments for alignment splitting modes");
+
+				const SequenceData *first = dataPart.GetSubset(0);
+				const SequenceData *sec = dataPart.GetSubset(1);
+				
+				if( !(first->IsNucleotide() && sec->IsNucleotide()) )
+					throw ErrorException("Only nucleotide models are implemented for alignment spliting modes");
+
+				vector<IdenticalColumnRange> identRanges = first->GetPatternManager().FindIdenticalAlignmentColumns(sec->GetPatternManager());
+				if(!strcmp(conf.alternateAlignmentMode.c_str(), "identical") && identRanges.size() == 0)
+					throw ErrorException("No identical alignment regions found!");
+
+				assert(modSpecSet.NumSpecs() == 1);
+				claSpecSets.clear();
+				dataSubInfo.clear();
+
+				vector<SequenceData *> newMats;
+
+				//add the shared identical regions once
+				for(vector<IdenticalColumnRange>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++){
+					NucleotideData *split = new NucleotideData();
+					split->CreateMatrixFromOtherMatrix(*first, (*pit).first.first, (*pit).first.second);
+					split->ProcessPatterns();
+					newMats.push_back(split);
+					claSpecSets.push_back(ClaSpecifierSet(claSpecSets.size(), 0, claSpecSets.size()));
+					DataSubsetInfo subInfo = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split)", dataSubInfo.size(), "identical subset", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
+					subInfo.totalCharacters = split->TotalNChar();
+					subInfo.uniqueCharacters = split->NChar();
+					subInfo.Report();
+					dataSubInfo.push_back(subInfo);
+					}
+				//add the alignment regions that are comparable (bounded by identical regions or alignment ends), indicating that their likelihoods 
+				//should be summed
+				if(!strcmp(conf.alternateAlignmentMode.c_str(), "alternate")){
+					int regionStart1 = 0;
+					int regionStart2 = 0;
+					for(vector<IdenticalColumnRange>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++){
+						NucleotideData *split1 = new NucleotideData();
+						split1->CreateMatrixFromOtherMatrix(*first, regionStart1, (*pit).first.first - 1);
+						regionStart1 = (*pit).first.second + 1;
+
+						split1->ProcessPatterns();
+						newMats.push_back(split1);
+						ClaSpecifierSet specSet(dataSubInfo.size(), 0, dataSubInfo.size());
+						DataSubsetInfo subInfo = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split1)", dataSubInfo.size(), "alt subset1", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
+						subInfo.totalCharacters = split1->TotalNChar();
+						subInfo.uniqueCharacters = split1->NChar();
+						subInfo.Report();
+						dataSubInfo.push_back(subInfo);
+
+						NucleotideData *split2 = new NucleotideData();
+						split2->CreateMatrixFromOtherMatrix(*sec, regionStart2, (*pit).second.first - 1);
+						regionStart2 = (*pit).second.second + 1;
+
+						split2->ProcessPatterns();
+						newMats.push_back(split2);
+						specSet.AddSpec(dataSubInfo.size(), 0, dataSubInfo.size());
+						DataSubsetInfo subInfo2 = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split2)", dataSubInfo.size(), "alt subset2", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
+						subInfo2.totalCharacters = split2->TotalNChar();
+						subInfo2.uniqueCharacters = split2->NChar();
+						subInfo2.Report();
+						dataSubInfo.push_back(subInfo2);
+
+						claSpecSets.push_back(specSet);
+						}
+					}
+
+				dataPart.Delete();
+				for(vector<SequenceData *>::iterator sit = newMats.begin();sit != newMats.end();sit++)
+					dataPart.AddSubset(*sit);
+
+				//don't do this with these models
+				modSpecSet.SetInferSubsetRates(false);
+				}
+
 			outman.UserMessage("\n###################################################");
 			//could deallocate the storage in the NCL reader here, which saves a bit of memory but isn't critical
 			//reader.DeleteCharacterBlocksFromFactories();
