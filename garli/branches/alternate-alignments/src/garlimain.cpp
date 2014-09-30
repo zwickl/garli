@@ -808,9 +808,40 @@ int main( int argc, char* argv[] )	{
 					int regionStart1 = 0;
 					int regionStart2 = 0;
 					for(vector<IdenticalColumnRange>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++){
+						if((*pit).first.first > 0){
+							NucleotideData *split1 = new NucleotideData();
+							split1->CreateMatrixFromOtherMatrix(*first, regionStart1, (*pit).first.first - 1);
+							regionStart1 = (*pit).first.second + 1;
+
+							split1->ProcessPatterns();
+							newMats.push_back(split1);
+							ClaSpecifierSet specSet(dataSubInfo.size(), 0, dataSubInfo.size());
+							DataSubsetInfo subInfo = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split1)", dataSubInfo.size(), "alt subset1", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
+							subInfo.totalCharacters = split1->TotalNChar();
+							subInfo.uniqueCharacters = split1->NChar();
+							subInfo.Report();
+							dataSubInfo.push_back(subInfo);
+
+							NucleotideData *split2 = new NucleotideData();
+							split2->CreateMatrixFromOtherMatrix(*sec, regionStart2, (*pit).second.first - 1);
+							regionStart2 = (*pit).second.second + 1;
+
+							split2->ProcessPatterns();
+							newMats.push_back(split2);
+							specSet.AddSpec(dataSubInfo.size(), 0, dataSubInfo.size());
+							DataSubsetInfo subInfo2 = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split2)", dataSubInfo.size(), "alt subset2", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
+							subInfo2.totalCharacters = split2->TotalNChar();
+							subInfo2.uniqueCharacters = split2->NChar();
+							subInfo2.Report();
+							dataSubInfo.push_back(subInfo2);
+
+							claSpecSets.push_back(specSet);
+							}
+						}
+					//get the last alt segment, if the final base is not included in a matching section
+					if(regionStart1 != first->NChar()){
 						NucleotideData *split1 = new NucleotideData();
-						split1->CreateMatrixFromOtherMatrix(*first, regionStart1, (*pit).first.first - 1);
-						regionStart1 = (*pit).first.second + 1;
+						split1->CreateMatrixFromOtherMatrix(*first, regionStart1, first->NChar() - 1);
 
 						split1->ProcessPatterns();
 						newMats.push_back(split1);
@@ -822,8 +853,7 @@ int main( int argc, char* argv[] )	{
 						dataSubInfo.push_back(subInfo);
 
 						NucleotideData *split2 = new NucleotideData();
-						split2->CreateMatrixFromOtherMatrix(*sec, regionStart2, (*pit).second.first - 1);
-						regionStart2 = (*pit).second.second + 1;
+						split2->CreateMatrixFromOtherMatrix(*sec, regionStart2, sec->NChar() - 1);
 
 						split2->ProcessPatterns();
 						newMats.push_back(split2);
