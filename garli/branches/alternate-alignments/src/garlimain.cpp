@@ -74,7 +74,7 @@ OutputManager outman;
 bool interactive;
 bool is64bit = false;
  
-vector<ClaSpecifier> claSpecs;
+vector<ClaSpecifierSet> claSpecSets;
 vector<DataSubsetInfo> dataSubInfo;
 //This is annoying, but the substituted rev and date from svn are in crappy format.
 //Get what we need from them
@@ -197,7 +197,7 @@ int SubGarliMain(int rank)
 	reader.ClearContent();
 	//ditto for these other globals
 	modSpecSet.Delete();	
-	claSpecs.clear();
+	claSpecSets.clear();
 	dataSubInfo.clear();
 #else
 int main( int argc, char* argv[] )	{
@@ -570,7 +570,7 @@ int main( int argc, char* argv[] )	{
 					if(conf.linkModels){//linkage means that all clas/matrices point to the same model/modSpec
 						//EXCEPT in the case of Mk type data with different numbers of states.  That is taken 
 						//care of below.
-						claSpecs.push_back(ClaSpecifier(dataChunk,0,dataChunk));
+						claSpecSets.push_back(ClaSpecifierSet(dataChunk,0,dataChunk));
 						modSpec = modSpecSet.GetModSpec(0);
 						}
 					else{//models are not linked ...
@@ -579,13 +579,13 @@ int main( int argc, char* argv[] )	{
 						else{ //each has its own description in the config
 							modSpecSet.AddModSpec(conf.configModelSets[dataChunk]);
 							}
-						claSpecs.push_back(ClaSpecifier(nextMatrixNum, nextMatrixNum, nextMatrixNum));
+						claSpecSets.push_back(ClaSpecifierSet(nextMatrixNum, nextMatrixNum, nextMatrixNum));
 						modSpec = modSpecSet.GetModSpec(nextMatrixNum);
 						}
 					}
 				else{ //if this is the first model, it must correspond to the first modSpec
 					modSpec = modSpecSet.GetModSpec(0);
-					claSpecs.push_back(ClaSpecifier(0,0,0));
+					claSpecSets.push_back(ClaSpecifierSet(0,0,0));
 					}
 				if(conf.linkModels && (modSpec->IsMkTypeModel() || modSpec->IsOrientedGap()))
 					throw ErrorException("Model linkage cannot be used with Mk/Mkv models (nor does it\n\tneed to be, since there are no estimated parameters).\n\tSet linkmodels = 0");
@@ -668,7 +668,7 @@ int main( int argc, char* argv[] )	{
 							if(actuallyUsedImpliedMatrixIndex > 0){
 								//the specs are being added as we read and create subsets, so we can add them for the implied matrices
 								//as we go
-								claSpecs.push_back(ClaSpecifier(nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex));
+								claSpecSets.push_back(ClaSpecifierSet(nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex));
 								//clone the current datasubset info, which applies to all of the implied matrices within this effective matrix
 								dataSubInfo.push_back(dataSubInfo[dataChunk]);
 								//also clone the modspec.  This isn't really necessary (or good) except that the number of states is stored by the modspecs
@@ -688,7 +688,7 @@ int main( int argc, char* argv[] )	{
 							if(actuallyUsedImpliedMatrixIndex > 0){
 								//the specs are being added as we read and create subsets, so we can add them for the implied matrices
 								//as we go
-								claSpecs.push_back(ClaSpecifier(nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex));
+								claSpecSets.push_back(ClaSpecifierSet(nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex, nextMatrixNum + actuallyUsedImpliedMatrixIndex));
 								//clone the current datasubset info, which applies to all of the implied matrices within this effective matrix
 								dataSubInfo.push_back(dataSubInfo[dataChunk]);
 								//also clone the modspec.  This isn't really necessary (or good) except that the number of states is stored by the modspecs

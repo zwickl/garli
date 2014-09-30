@@ -4714,11 +4714,13 @@ double ModelPartition::CalcRequiredCLAsizeKB(const DataPartition *dat){
 	unsigned size = 0;
 	double size2 = 0;
 	double KB = 1024;
-	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
-		const Model *thisMod = GetModel((*specs).modelIndex);
-		size2 += (dat->GetSubset((*specs).dataIndex)->NChar() / KB) * (thisMod->NStates() * thisMod->NRateCats() * sizeof(FLOAT_TYPE) + sizeof(int));
-		size += (thisMod->NStates() * thisMod->NRateCats() * dat->GetSubset((*specs).dataIndex)->NChar()) * sizeof(FLOAT_TYPE);
-		size += dat->GetSubset((*specs).dataIndex)->NChar() * sizeof(int);
+	for(vector<ClaSpecifierSet>::const_iterator specSet = claSpecSets.begin();specSet != claSpecSets.end();specSet++){
+		for(vector<ClaSpecifier>::const_iterator specs = (*specSet).claSpecs.begin();specs != (*specSet).claSpecs.end();specs++){
+			const Model *thisMod = GetModel((*specs).modelIndex);
+			size2 += (dat->GetSubset((*specs).dataIndex)->NChar() / KB) * (thisMod->NStates() * thisMod->NRateCats() * sizeof(FLOAT_TYPE) + sizeof(int));
+			size += (thisMod->NStates() * thisMod->NRateCats() * dat->GetSubset((*specs).dataIndex)->NChar()) * sizeof(FLOAT_TYPE);
+			size += dat->GetSubset((*specs).dataIndex)->NChar() * sizeof(int);
+			}
 		}
 	assert(size2 * 1024 == size);
 	return size2;
@@ -4727,10 +4729,12 @@ double ModelPartition::CalcRequiredCLAsizeKB(const DataPartition *dat){
 //this is the size in BYTES not elements
 unsigned ModelPartition::CalcRequiredCLAsize(const DataPartition *dat){
 	unsigned size = 0;
-	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
-		const Model *thisMod = GetModel((*specs).modelIndex);
-		size += (thisMod->NStates() * thisMod->NRateCats() * dat->GetSubset((*specs).dataIndex)->NChar()) * sizeof(FLOAT_TYPE);
-		size += dat->GetSubset((*specs).dataIndex)->NChar() * sizeof(int);
+	for(vector<ClaSpecifierSet>::const_iterator specSet = claSpecSets.begin();specSet != claSpecSets.end();specSet++){
+		for(vector<ClaSpecifier>::const_iterator specs = (*specSet).claSpecs.begin();specs != (*specSet).claSpecs.end();specs++){
+			const Model *thisMod = GetModel((*specs).modelIndex);
+			size += (thisMod->NStates() * thisMod->NRateCats() * dat->GetSubset((*specs).dataIndex)->NChar()) * sizeof(FLOAT_TYPE);
+			size += dat->GetSubset((*specs).dataIndex)->NChar() * sizeof(int);
+			}
 		}
 	return size;
 	}

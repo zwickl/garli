@@ -41,7 +41,23 @@ class ClaSpecifier{
 	ClaSpecifier(int c, int m, int d):claIndex(c), modelIndex(m), dataIndex(d){};
 	};
 
-extern vector<ClaSpecifier> claSpecs;
+//There will only be > 1 ClaSpecifier per ClaSpecifierSet if we're doing summing of alterative likelihoods.
+//The constructor takes the arguments of a ClaSpecifier to cause the least disruption to previous code.
+class ClaSpecifierSet{
+	public:
+	vector<ClaSpecifier> claSpecs;
+	ClaSpecifierSet(int c, int m, int d){
+		claSpecs.push_back(ClaSpecifier(c, m, d));
+		}
+	void AddSpec(ClaSpecifier c) {
+		claSpecs.push_back(c);
+		}
+	void AddSpec(int c, int m, int d) {
+		claSpecs.push_back(ClaSpecifier(c, m, d));
+		}
+	};
+
+extern vector<ClaSpecifierSet> claSpecSets;
 
 class ClaManager{
 	int numNodes;//the number of nodes in each tree
@@ -59,42 +75,20 @@ class ClaManager{
 	vector<int> holderStack;
 	
 	public:	
-	//PARTITION	
-	//ClaManager(int nnod, int nClas, int nHolders, int nchar, int nrates) : numNodes(nnod), numClas(nClas), numHolders(nHolders), numRates(nrates){
-/*	ClaManager(int nnod, int numClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numHolders(nHolders){
-		maxUsed=0;
-		allClas=new CondLikeArraySet*[numClas];
-		claStack.reserve(numClas);
-		for(int i=numClas-1;i>=0;i--){
-			allClas[i]=new CondLikeArraySet;
-			//for(vector<Model *>::iterator modit = mods->models.begin();modit != mods->models.end();modit++){
-			for(int m = 0;m < mods->NumModels();m++){
-				const Model *thisMod = mods->GetModel(m);
-				CondLikeArray *thisCLA = new CondLikeArray(data->GetSubset(thisMod->dataIndex)->NChar(), thisMod->NStates(), thisMod->NRateCats(), thisMod->dataIndex);
-				allClas[i]->AddCLA(thisCLA);
-				allClas[i]->Allocate();
-				}
-			claStack.push_back(allClas[i]);
-			}
-		holders = new CondLikeArrayHolder[numHolders];
-		holderStack.reserve(numHolders);
-		for(int i=numHolders-1;i>=0;i--)
-			holderStack.push_back(i);
-		}
-*/
+
 	ClaManager(int nnod, int nClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numClas(nClas), numHolders(nHolders){
 		maxUsed=0;
 		allClas=new CondLikeArraySet*[numClas];
 		claStack.reserve(numClas);
 		for(int i=numClas-1;i>=0;i--){
-				allClas[i]=new CondLikeArraySet;
-				//for(vector<Model *>::iterator modit = mods->models.begin();modit != mods->models.end();modit++){
-				//for(int m = 0;m < mods->NumModels();m++){
-				for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
+			allClas[i]=new CondLikeArraySet;
+			for(vector<ClaSpecifierSet>::const_iterator specSet = claSpecSets.begin();specSet != claSpecSets.end();specSet++){
+				for(vector<ClaSpecifier>::const_iterator specs = (*specSet).claSpecs.begin();specs != (*specSet).claSpecs.end();specs++){
 					const Model *thisMod = mods->GetModel((*specs).modelIndex);
 					CondLikeArray *thisCLA = new CondLikeArray(data->GetSubset((*specs).dataIndex)->NChar(), (thisMod->IsOrientedGap() ? 3: thisMod->NStates()), thisMod->NRateCats());
 					allClas[i]->AddCLA(thisCLA);
 					}
+				}
 			allClas[i]->Allocate();
 			claStack.push_back(allClas[i]);
 			}
