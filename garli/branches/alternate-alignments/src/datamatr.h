@@ -50,7 +50,8 @@ typedef pair<int, int> ColumnRange;
 typedef pair<ColumnRange, ColumnRange> IdenticalColumnRange;
 
 //this needs to be int, not unsigned int, for identification of identical align columns
-typedef vector<int> StateVector;
+typedef int SitePatternState;
+typedef vector<SitePatternState> StateVector;
 
 class SitePattern{
 public:
@@ -98,14 +99,14 @@ public:
 	//bool PatternLessThan(const SitePattern &lhs, const SitePattern &rhs) const;
 	bool operator==(const SitePattern &rhs) const;
 	bool operator<(const SitePattern &rhs) const;
-	void AddChar(const unsigned char c){
+	void AddChar(const SitePatternState c){
 		stateVec.push_back(c);
 		}
 	void SetCount(int c) {
 		count = origCount = c;
 		}
 	int CalcPatternTypeAndNumStates(vector<unsigned int> &stateCounts);
-	int MinScore(set<unsigned char> patt, int bound, unsigned char bits=15, int prevSc=0) const;
+	int MinScore(set<SitePatternState> patt, int bound, unsigned char bits=15, int prevSc=0) const;
 	};
 
 //An alternate and several order of magnitude faster means of packing data.  The functionality is really the

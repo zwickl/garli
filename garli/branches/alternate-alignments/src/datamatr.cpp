@@ -91,10 +91,10 @@ int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts 
 
 	//count the number of times each state occurs, and whether there are any partially
 	//ambiguous characters (currently only allowed for nuc data)
-	unsigned char full_ambig = (maxNumStates == 4 ? 15 : maxNumStates);
+	SitePatternState full_ambig = (maxNumStates == 4 ? 15 : maxNumStates);
 	if(maxNumStates == 4){
 		for(StateVector::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
-			unsigned char c = *sit;
+			SitePatternState c = *sit;
 			if(c != full_ambig && (c & (c - 1))){
 				ambig = true;
 				break;
@@ -106,7 +106,7 @@ int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts 
 		}
 	else {
 		for(StateVector::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
-			unsigned char c = *sit;
+			SitePatternState c = *sit;
 			if(c != full_ambig){
 				stateCounts[c]++;
 				}
@@ -144,10 +144,10 @@ int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts 
 		assert(maxNumStates == 4);
 		//this very convoluted scheme (worked out by Mark) must be used to determine informativeness
 		//if partial ambiguity is allowed (only for nuc data currently)
-		multiset<unsigned char> pat;
-		unsigned char conStates = 15;
+		multiset<SitePatternState> pat;
+		SitePatternState conStates = 15;
 		for(StateVector::iterator sit = stateVec.begin();sit != stateVec.end();sit++){
-			unsigned char c = *sit;
+			SitePatternState c = *sit;
 			pat.insert(c);
 			conStates &= c;
 			}
@@ -163,7 +163,7 @@ int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts 
 			vector< pair<int, int> > stateScores;
 			for(unsigned state=0;state < 4;state++){
 				int sc = 0;
-				for(multiset<unsigned char>::iterator it=pat.begin();it != pat.end();it++){
+				for(multiset<SitePatternState>::iterator it=pat.begin();it != pat.end();it++){
 					if(!((*it) & (1 << state))){
 						sc++;
 						}
@@ -173,8 +173,8 @@ int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts 
 			sort(stateScores.begin(), stateScores.end(), my_pair_compare);
 			int minStar = stateScores[0].second;
 			if(minStar > 1){
-				set<unsigned char> uPat;
-				for(multiset<unsigned char>::iterator it=pat.begin();it != pat.end();it++)
+				set<SitePatternState> uPat;
+				for(multiset<SitePatternState>::iterator it=pat.begin();it != pat.end();it++)
 					uPat.insert(*it);
 				int minScore = MinScore(uPat, minStar);
 				if(minScore < minStar){
@@ -209,15 +209,15 @@ int SitePattern::CalcPatternTypeAndNumStates( vector<unsigned int> &stateCounts 
 	}
 
 //this is used for determining informative sites when there is partial ambiguity
-int SitePattern::MinScore(set<unsigned char> patt, int bound, unsigned char bits/*=15*/, int prevSc/*=0*/) const{
+int SitePattern::MinScore(set<SitePatternState> patt, int bound, unsigned char bits/*=15*/, int prevSc/*=0*/) const{
 	if(patt.size() == 0) return 0;
 	int min_sc_this_lvl = 9999;
 	int curr_sc_this_lvl = 9999;
 	for(unsigned s2 = 0;s2 < 4;s2++){
 		unsigned char thisBit = (1 << s2);
 		if(bits & thisBit){
-			set<unsigned char> remaining;
-			for(set<unsigned char>::iterator it=patt.begin();it != patt.end();it++){
+			set<SitePatternState> remaining;
+			for(set<SitePatternState>::iterator it=patt.begin();it != patt.end();it++){
 				if(!(*it & thisBit)) remaining.insert(*it);
 				}
 			if(remaining.size() > 0){
