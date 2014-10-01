@@ -811,7 +811,6 @@ int main( int argc, char* argv[] )	{
 						if((*pit).first.first > 0){
 							NucleotideData *split1 = new NucleotideData();
 							split1->CreateMatrixFromOtherMatrix(*first, regionStart1, (*pit).first.first - 1);
-							regionStart1 = (*pit).first.second + 1;
 
 							split1->ProcessPatterns();
 							newMats.push_back(split1);
@@ -824,7 +823,6 @@ int main( int argc, char* argv[] )	{
 
 							NucleotideData *split2 = new NucleotideData();
 							split2->CreateMatrixFromOtherMatrix(*sec, regionStart2, (*pit).second.first - 1);
-							regionStart2 = (*pit).second.second + 1;
 
 							split2->ProcessPatterns();
 							newMats.push_back(split2);
@@ -837,6 +835,8 @@ int main( int argc, char* argv[] )	{
 
 							claSpecSets.push_back(specSet);
 							}
+						regionStart1 = (*pit).first.second + 1;
+						regionStart2 = (*pit).second.second + 1;
 						}
 					//get the last alt segment, if the final base is not included in a matching section
 					if(regionStart1 != first->NChar()){
