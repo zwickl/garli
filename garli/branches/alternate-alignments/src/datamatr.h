@@ -49,7 +49,8 @@ typedef pair<int, int> IdenticalColumnPair;
 typedef pair<int, int> ColumnRange;
 typedef pair<ColumnRange, ColumnRange> IdenticalColumnRange;
 
-typedef vector<unsigned int> StateVector;
+//this needs to be int, not unsigned int, for identification of identical align columns
+typedef vector<int> StateVector;
 
 class SitePattern{
 public:
