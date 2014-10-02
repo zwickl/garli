@@ -30,6 +30,18 @@ class fmtflags;
 
 #define BUFFER_LENGTH 500
 
+//Default behavior here is to output all UserMessage calls to cout, and if SetLogFile or SetLogFileForAppend are called
+//then the exact same messages are output to the filenames specified in those calls.
+//flow is 
+//UserMessage{
+//	construct message from printf style spec
+//	call Print or PrintNoCR
+//		use << to output to streams	
+//
+//SetNoOutput sets the noOutput flag, which nixes output to defaultOut, but NOT logOut
+//
+//debugOut is by default set to the same as logOut, unless SetDebugStream is called
+
 class OutputManager{
 	char message[BUFFER_LENGTH+1];
 	ostream *defaultOut;
@@ -43,7 +55,7 @@ class OutputManager{
 			noOutput = false;
 			log = false;
 			defaultOut = &cout;
-			debugOut = &cout;
+			debugOut = NULL;
 			}
 			
 		~OutputManager(){
@@ -70,6 +82,7 @@ class OutputManager{
 				logOut.clear();
 				}
 			logOut.open(logname);
+			debugOut = &logOut;
 			}
 		
 		void SetLogFileForAppend(const char *logname){
@@ -79,6 +92,7 @@ class OutputManager{
 				logOut.clear();
 				}
 			logOut.open(logname, ios::app);
+			debugOut = &logOut;
 			}
 
 		void CloseLogFile(){
@@ -123,11 +137,10 @@ class OutputManager{
 
 		void UserMessage(const char *fmt, ...){
 			va_list vl;
-			
-			va_start(vl, fmt);
-			int len = vsnprintf(message, BUFFER_LENGTH, fmt, vl);
-			va_end(vl);
+			int len;
 
+			va_start(vl, fmt); len = vsnprintf(message, BUFFER_LENGTH, fmt, vl); va_end(vl);
+			
 			if(len > -1 && len < BUFFER_LENGTH){
 				Print(*defaultOut);
 				}
@@ -136,22 +149,19 @@ class OutputManager{
 				if(len > -1){//on unix systems vsnprintf returns the required length.  There is some
 					//some ambiguity about whether it includes the null termination or not, but
 					//the number passed to vsnprintf should definitely include it.
-						
 					longmessage = new char[len+2];
-					va_start(vl, fmt);
-					vsnprintf(longmessage, len+1, fmt, vl);
-					va_end(vl);
+					va_start(vl, fmt); vsnprintf(longmessage, len+1, fmt, vl); va_end(vl);
 					}
 				else{
 #if defined(_MSC_VER)
 					//on windows a negative value means that the length wasn't engough
-					int len2 = BUFFER_LENGTH * 2;
-					longmessage = new char[len2+1];
+					len = BUFFER_LENGTH * 2;
+					longmessage = new char[len+1];
 					va_start(vl, fmt);
-					while(vsnprintf(longmessage, len2, fmt, vl) < 0){
+					while(vsnprintf(longmessage, len, fmt, vl) < 0){
 						delete []longmessage;
-						len2 *= 2;
-						longmessage = new char[len2+1];
+						len *= 2;
+						longmessage = new char[len+1];
 						va_end(vl);
 						va_start(vl, fmt);
 						}
@@ -159,7 +169,8 @@ class OutputManager{
 #else
 					//otherwise negative means a formatting error
 					Print(*defaultOut, "(problem formatting some program output...)");
-					if(longmessage) delete []longmessage;
+					if(longmessage) 
+						delete []longmessage;
 					return;
 #endif
 					}
@@ -171,10 +182,9 @@ class OutputManager{
 
 		void UserMessageNoCR(const char *fmt, ...){
 			va_list vl;
+			int len;
 
-			va_start(vl, fmt);	
-			int len = vsnprintf(message, BUFFER_LENGTH, fmt, vl);
-			va_end(vl);
+			va_start(vl, fmt); len = vsnprintf(message, BUFFER_LENGTH, fmt, vl); va_end(vl);
 
 			if(len > -1 && len < BUFFER_LENGTH){
 				PrintNoCR(*defaultOut);
@@ -185,20 +195,18 @@ class OutputManager{
 					//some ambiguity about whether it includes the null termination or not, but
 					//the number passed to vsnprintf should definitely include it.
 					longmessage = new char[len+2];
-					va_start(vl, fmt);
-					vsnprintf(longmessage, len+1, fmt, vl);
-					va_end(vl);
+					va_start(vl, fmt); vsnprintf(longmessage, len+1, fmt, vl); va_end(vl);
 					}
 				else{
 #if defined(_MSC_VER)
 					//on windows a negative value means that the length wasn't engough
-					int len2 = BUFFER_LENGTH * 2;
-					longmessage = new char[len2+1];
+					len = BUFFER_LENGTH * 2;
+					longmessage = new char[len+1];
 					va_start(vl, fmt);
-					while(vsnprintf(longmessage, len2, fmt, vl) < 0){
+					while(vsnprintf(longmessage, len, fmt, vl) < 0){
 						delete []longmessage;
-						len2 *= 2;
-						longmessage = new char[len2+1];
+						len *= 2;
+						longmessage = new char[len+1];
 						va_end(vl);
 						va_start(vl, fmt);
 						}
@@ -218,36 +226,36 @@ class OutputManager{
 
 		void DebugMessage(const char *fmt, ...){
 #ifdef DEBUG_MESSAGES
+			if(!debugOut) 
+				return;
+
 			va_list vl;
+			int len;
 			
-			va_start(vl, fmt);
-			int len = vsnprintf(message, BUFFER_LENGTH, fmt, vl);
-			va_end(vl);
+			va_start(vl, fmt); len = vsnprintf(message, BUFFER_LENGTH, fmt, vl); va_end(vl);
 
 			if(len > -1 && len < BUFFER_LENGTH){
-				Print(*debugOut);
+				//Print(*debugOut);
+				*debugOut << message << endl;
 				}
 			else{//default buffer is not long enough or there was an error
 				char *longmessage = NULL;
 				if(len > -1){//on unix systems vsnprintf returns the required length.  There is some
 					//some ambiguity about whether it includes the null termination or not, but
 					//the number passed to vsnprintf should definitely include it.
-						
 					longmessage = new char[len+2];
-					va_start(vl, fmt);
-					vsnprintf(longmessage, len+1, fmt, vl);
-					va_end(vl);
+					va_start(vl, fmt); vsnprintf(longmessage, len+1, fmt, vl); va_end(vl);
 					}
 				else{
 #if defined(_MSC_VER)
 					//on windows a negative value means that the length wasn't engough
-					int len2 = BUFFER_LENGTH * 2;
-					longmessage = new char[len2+1];
+					len = BUFFER_LENGTH * 2;
+					longmessage = new char[len+1];
 					va_start(vl, fmt);
-					while(vsnprintf(longmessage, len2, fmt, vl) < 0){
+					while(vsnprintf(longmessage, len, fmt, vl) < 0){
 						delete []longmessage;
-						len2 *= 2;
-						longmessage = new char[len2+1];
+						len *= 2;
+						longmessage = new char[len+1];
 						va_end(vl);
 						va_start(vl, fmt);
 						}
@@ -255,11 +263,13 @@ class OutputManager{
 #else
 					//otherwise negative means a formatting error
 					Print(*defaultOut, "(problem formatting some program output...)");
-					if(longmessage) delete []longmessage;
+					if(longmessage) 
+						delete []longmessage;
 					return;
 #endif
 					}
-				Print(*debugOut, longmessage);
+				//Print(*debugOut, longmessage);
+				*debugOut << longmessage << endl;
 				if(longmessage) 
 					delete []longmessage;
 				}
@@ -268,14 +278,17 @@ class OutputManager{
 
 		void DebugMessageNoCR(const char *fmt, ...){
 #ifdef DEBUG_MESSAGES
-			va_list vl;
+			if(!debugOut) 
+				return;
 
-			va_start(vl, fmt);	
-			int len = vsnprintf(message, BUFFER_LENGTH, fmt, vl);
-			va_end(vl);
+			va_list vl;
+			int len;
+
+			va_start(vl, fmt); len = vsnprintf(message, BUFFER_LENGTH, fmt, vl); va_end(vl);
 
 			if(len > -1 && len < BUFFER_LENGTH){
-				PrintNoCR(*debugOut);
+				//PrintNoCR(*debugOut);
+				*debugOut << message;
 				}
 			else{//default buffer is not long enough or there was an error
 				char *longmessage = NULL;
@@ -283,20 +296,18 @@ class OutputManager{
 					//some ambiguity about whether it includes the null termination or not, but
 					//the number passed to vsnprintf should definitely include it.
 					longmessage = new char[len+2];
-					va_start(vl, fmt);
-					vsnprintf(longmessage, len+1, fmt, vl);
-					va_end(vl);
+					va_start(vl, fmt); vsnprintf(longmessage, len+1, fmt, vl); va_end(vl);
 					}
 				else{
 #if defined(_MSC_VER)
 					//on windows a negative value means that the length wasn't engough
-					int len2 = BUFFER_LENGTH * 2;
-					longmessage = new char[len2+1];
+					len = BUFFER_LENGTH * 2;
+					longmessage = new char[len+1];
 					va_start(vl, fmt);
-					while(vsnprintf(longmessage, len2, fmt, vl) < 0){
+					while(vsnprintf(longmessage, len, fmt, vl) < 0){
 						delete []longmessage;
-						len2 *= 2;
-						longmessage = new char[len2+1];
+						len *= 2;
+						longmessage = new char[len+1];
 						va_end(vl);
 						va_start(vl, fmt);
 						}
@@ -304,25 +315,19 @@ class OutputManager{
 #else
 					//otherwise negative means a formatting error
 					Print(*defaultOut, "(problem formatting some program output...)");
-					if(longmessage) delete []longmessage;
+					if(longmessage) 
+						delete []longmessage;
 					return;
 #endif
 					}
-				PrintNoCR(*debugOut, longmessage);
+				//PrintNoCR(*debugOut, longmessage);
+				*debugOut << longmessage;
 				if(longmessage) 
 					delete []longmessage;
 				}
 #endif
 			}
 
-/*		void UserMessageNoCR(const char *fmt, ...){
-			va_list vl;
-			va_start(vl, fmt);
-			vsprintf(message, fmt, vl);
-			va_end(vl);
-			PrintNoCR(*defaultOut);
-			}
-*/
 		void UserMessage(const string &mess){
 			Print(*defaultOut, mess);
 			}
