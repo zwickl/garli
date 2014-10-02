@@ -34,49 +34,46 @@ class OutputManager{
 	char message[BUFFER_LENGTH+1];
 	ostream *defaultOut;
 	ofstream logOut;
+	ostream *debugOut;
 	bool noOutput;
 	bool log;
 
 	public:
 		OutputManager(){
-			noOutput=false;
-			log=false;
-			defaultOut=&cout;
+			noOutput = false;
+			log = false;
+			defaultOut = &cout;
+			debugOut = &cout;
 			}
 			
 		~OutputManager(){
-			if(log==true) logOut.close();
+			if(log) 
+				logOut.close();
 			}
 
 		bool IsLogSet(){
-			return (log == true);
+			return log;
 			}
 
 		void SetOutputStream(ostream &out){
-			defaultOut=&out;
+			defaultOut = &out;
+			}
+
+		void SetDebugStream(ostream &out){
+			debugOut = &out;
 			}
 
 		void SetLogFile(const char *logname){
-			log=true;
+			log = true;
 			if(logOut.is_open()){
 				logOut.close();
 				logOut.clear();
 				}
 			logOut.open(logname);
 			}
-
-		ofstream *GetLogStream(){
-			if(log == true) return &logOut;
-			else return NULL;
-			}
-
-		ostream *GetOutputStream(){
-			if(noOutput) return NULL;
-			else return defaultOut;
-			}
-
+		
 		void SetLogFileForAppend(const char *logname){
-			log=true;
+			log = true;
 			if(logOut.is_open()){
 				logOut.close();
 				logOut.clear();
@@ -88,23 +85,40 @@ class OutputManager{
 			logOut.close();
 			}
 
+		ofstream *GetLogStream(){
+			if(log) 
+				return &logOut;
+			else 
+				return NULL;
+			}
+
+		ostream *GetOutputStream(){
+			if(noOutput) 
+				return NULL;
+			else 
+				return defaultOut;
+			}
+
 		void SetNoOutput(bool o){
-			noOutput=o;	
+			noOutput = o;	
 			}
 
 		void precision(const int p){
 			defaultOut->precision(p);
-			if(log==true) logOut.precision(p);
+			if(log) 
+				logOut.precision(p);
 			}
 
 		void setf(const std::ios_base::fmtflags &flags){
 			defaultOut->setf(flags);
-			if(log==true) logOut.setf(flags);				
+			if(log) 
+				logOut.setf(flags);				
 			}
 
 		void unsetf(const std::ios_base::fmtflags &flags){
 			defaultOut->unsetf(flags);
-			if(log==true) logOut.unsetf(flags);				
+			if(log) 
+				logOut.unsetf(flags);				
 			}
 
 		void UserMessage(const char *fmt, ...){
@@ -150,7 +164,8 @@ class OutputManager{
 #endif
 					}
 				Print(*defaultOut, longmessage);
-				if(longmessage) delete []longmessage;
+				if(longmessage) 
+					delete []longmessage;
 				}
 			}
 
@@ -196,7 +211,8 @@ class OutputManager{
 #endif
 					}
 				PrintNoCR(*defaultOut, longmessage);
-				if(longmessage) delete []longmessage;
+				if(longmessage) 
+					delete []longmessage;
 				}
 			}
 
@@ -209,7 +225,7 @@ class OutputManager{
 			va_end(vl);
 
 			if(len > -1 && len < BUFFER_LENGTH){
-				Print(*defaultOut);
+				Print(*debugOut);
 				}
 			else{//default buffer is not long enough or there was an error
 				char *longmessage = NULL;
@@ -243,8 +259,9 @@ class OutputManager{
 					return;
 #endif
 					}
-				Print(*defaultOut, longmessage);
-				if(longmessage) delete []longmessage;
+				Print(*debugOut, longmessage);
+				if(longmessage) 
+					delete []longmessage;
 				}
 #endif
 			}
@@ -258,7 +275,7 @@ class OutputManager{
 			va_end(vl);
 
 			if(len > -1 && len < BUFFER_LENGTH){
-				PrintNoCR(*defaultOut);
+				PrintNoCR(*debugOut);
 				}
 			else{//default buffer is not long enough or there was an error
 				char *longmessage = NULL;
@@ -291,8 +308,9 @@ class OutputManager{
 					return;
 #endif
 					}
-				PrintNoCR(*defaultOut, longmessage);
-				if(longmessage) delete []longmessage;
+				PrintNoCR(*debugOut, longmessage);
+				if(longmessage) 
+					delete []longmessage;
 				}
 #endif
 			}
@@ -314,28 +332,38 @@ class OutputManager{
 			}
 
 		void flush(){
-			if(noOutput == false) defaultOut->flush();
-			if(log==true) logOut.flush();	
+			if(!noOutput) 
+				defaultOut->flush();
+			if(log) 
+				logOut.flush();	
 			}
 
 		void Print(ostream &out){
-			if(noOutput == false) out << message << endl;
-			if(log==true) logOut << message << endl;
+			if(!noOutput) 
+				out << message << endl;
+			if(log)
+				logOut << message << endl;
 			}
 
 		void PrintNoCR(ostream &out){
-			if(noOutput == false) out << message;
-			if(log==true) logOut << message;
+			if(!noOutput) 
+				out << message;
+			if(log) 
+				logOut << message;
 			}
 
 		void Print(ostream &out, const string &mess){
-			if(noOutput == false) out << mess << endl;
-			if(log==true) logOut << mess << endl;
+			if(!noOutput) 
+				out << mess << endl;
+			if(log) 
+				logOut << mess << endl;
 			}
 
 		void PrintNoCR(ostream &out, const string &mess){
-			if(noOutput == false) out << mess;
-			if(log==true) logOut << mess;
+			if(!noOutput) 
+				out << mess;
+			if(log) 
+				logOut << mess;
 			}
 	};
 	
