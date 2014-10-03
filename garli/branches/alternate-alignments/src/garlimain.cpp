@@ -770,25 +770,31 @@ int main( int argc, char* argv[] )	{
 	
 			//Alignment comparison and splitting
 			if(strcmp(conf.alternateAlignmentMode.c_str(), "none")){
+				outman.UserMessage("\nDetecting identical alignment regions ...");
+
 				if(dataPart.NumSubsets() != 2)
 					throw ErrorException("Provide exactly 2 alignments for alignment splitting modes");
 
-				const SequenceData *first = dataPart.GetSubset(0);
-				const SequenceData *sec = dataPart.GetSubset(1);
+				if(modSpecSet.NumSpecs() != 1)
+					throw ErrorException("Model linking must be used with alignment splitting modes (linkmodels = 1)");
+
+				if(modSpecSet.InferSubsetRates())
+					throw ErrorException("Subset rates cannot be inferred in alignment splitting modes (subsetspecificrates = 0)");
+
+				SequenceData *first = dataPart.GetSubset(0);
+				SequenceData *sec = dataPart.GetSubset(1);
 				
 				if( !(first->IsNucleotide() && sec->IsNucleotide()) )
 					throw ErrorException("Only nucleotide models are implemented for alignment spliting modes");
 
-				outman.UserMessage("Detecting identical alignment regions ...");
+				if(first->ContainsAllMissingColumns() || sec->ContainsAllMissingColumns())
+					throw ErrorException("Alignment contains entirely missing columns (-, N or ?),\nwhich is not allowed in alignment splitting mode.");
+
+				//find the identical column ranges
 				vector<IdenticalColumnRange> identRanges = first->GetPatternManager().FindIdenticalAlignmentColumns(sec->GetPatternManager());
+
 				if(!strcmp(conf.alternateAlignmentMode.c_str(), "identical") && identRanges.size() == 0)
 					throw ErrorException("No identical alignment regions found!");
-
-				assert(modSpecSet.NumSpecs() == 1);
-				claSpecSets.clear();
-				dataSubInfo.clear();
-
-				vector<SequenceData *> newMats;
 
 				int identicalColumns = 0;
 				outman.UserMessage("\nIdentical alignment regions found:");
@@ -797,21 +803,29 @@ int main( int argc, char* argv[] )	{
 					outman.UserMessage("\t%5d - %5d\t\t%5d - %5d", (*pit).first.first, (*pit).first.second, (*pit).second.first, (*pit).second.second);
 					identicalColumns += (*pit).first.second - (*pit).first.first + 1;
 					}
-				outman.UserMessage("\t(%d total identical columns)\n", identicalColumns);				
+				outman.UserMessage("\t(%d total identical columns)\n", identicalColumns);
+
+				outman.UserMessage("Creating subset containing all identical columns");
+
+				claSpecSets.clear();
+				dataSubInfo.clear();
+				vector<SequenceData *> newMats;
 
 				//add the shared identical regions once
-				for(vector<IdenticalColumnRange>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++){
-					NucleotideData *split = new NucleotideData();
-					split->CreateMatrixFromOtherMatrix(*first, (*pit).first.first, (*pit).first.second);
-					split->ProcessPatterns();
-					newMats.push_back(split);
-					claSpecSets.push_back(ClaSpecifierSet(claSpecSets.size(), 0, claSpecSets.size()));
-					DataSubsetInfo subInfo = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split)", dataSubInfo.size(), "identical subset", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
-					subInfo.totalCharacters = split->TotalNChar();
-					subInfo.uniqueCharacters = split->NChar();
-					subInfo.Report();
-					dataSubInfo.push_back(subInfo);
-					}
+				vector<ColumnRange> ranges;
+				for(vector<IdenticalColumnRange>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++)
+					ranges.push_back((*pit).first);
+				
+				NucleotideData *split = new NucleotideData();
+				split->CreateMatrixFromOtherMatrix(*first, ranges);
+				split->ProcessPatterns();
+				newMats.push_back(split);
+				claSpecSets.push_back(ClaSpecifierSet(claSpecSets.size(), 0, claSpecSets.size()));
+				DataSubsetInfo subInfo = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split)", dataSubInfo.size(), "identical subset", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
+				subInfo.totalCharacters = split->TotalNChar();
+				subInfo.uniqueCharacters = split->NChar();
+				dataSubInfo.push_back(subInfo);
+
 				//add the alignment regions that are comparable (bounded by identical regions or alignment ends), indicating that their likelihoods 
 				//should be summed
 				if(!strcmp(conf.alternateAlignmentMode.c_str(), "alternate")){
@@ -831,52 +845,58 @@ int main( int argc, char* argv[] )	{
 
 					int alternateColumns1, alternateColumns2;
 					alternateColumns1 = alternateColumns2 = 0;
-					outman.UserMessage("\nAlternative alignment regions found:");
+					int regionNum = 1;
+					outman.UserMessage("\n\nAlternative alignment regions found:");
 					outman.UserMessage("\t  Alignment1\t\t  Alignment2");
 					for(vector<IdenticalColumnRange>::const_iterator pit = alternateRanges.begin();pit != alternateRanges.end();pit++){
-						outman.UserMessage("\t%5d - %5d\t\t%5d - %5d", (*pit).first.first, (*pit).first.second, (*pit).second.first, (*pit).second.second);
+						outman.UserMessage("%d\t%5d - %5d\t\t%5d - %5d", regionNum++, (*pit).first.first, (*pit).first.second, (*pit).second.first, (*pit).second.second);
 						alternateColumns1 += (*pit).first.second - (*pit).first.first + 1;
 						alternateColumns2 += (*pit).second.second - (*pit).second.first + 1;
 						}
-					outman.UserMessage("\tBase totals: %d\t%d\n", alternateColumns1, alternateColumns2);
-					
-					for(vector<IdenticalColumnRange>::const_iterator pit = alternateRanges.begin();pit != alternateRanges.end();pit++){
-						NucleotideData *split1 = new NucleotideData();
-						split1->CreateMatrixFromOtherMatrix(*first, (*pit).first.first, (*pit).first.second);
+					outman.UserMessage("\t(%d and %d total alternative columns)\n", alternateColumns1, alternateColumns2);
 
+					outman.UserMessage("Creating subsets for each alternative alignment region\n");
+
+					regionNum = 1;
+					for(vector<IdenticalColumnRange>::const_iterator pit = alternateRanges.begin();pit != alternateRanges.end();pit++){
+						outman.UserMessage("Alternative region %d", regionNum++);
+						NucleotideData *split1 = new NucleotideData();
+						
+						vector<ColumnRange> ranges;
+						ranges.push_back((*pit).first);
+						split1->CreateMatrixFromOtherMatrix(*first, ranges);
 						split1->ProcessPatterns();
 						newMats.push_back(split1);
 						ClaSpecifierSet specSet(dataSubInfo.size(), 0, dataSubInfo.size());
 						DataSubsetInfo subInfo = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split1)", dataSubInfo.size(), "alt subset1", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
 						subInfo.totalCharacters = split1->TotalNChar();
 						subInfo.uniqueCharacters = split1->NChar();
-						subInfo.Report();
 						dataSubInfo.push_back(subInfo);
 
 						NucleotideData *split2 = new NucleotideData();
-						split2->CreateMatrixFromOtherMatrix(*sec, (*pit).second.first, (*pit).second.second);
 
+						ranges.clear();
+						ranges.push_back((*pit).second);
+						split2->CreateMatrixFromOtherMatrix(*sec, ranges);
 						split2->ProcessPatterns();
 						newMats.push_back(split2);
 						specSet.AddSpec(dataSubInfo.size(), 0, dataSubInfo.size());
 						DataSubsetInfo subInfo2 = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split2)", dataSubInfo.size(), "alt subset2", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
 						subInfo2.totalCharacters = split2->TotalNChar();
 						subInfo2.uniqueCharacters = split2->NChar();
-						subInfo2.Report();
 						dataSubInfo.push_back(subInfo2);
 
 						claSpecSets.push_back(specSet);
+
+						outman.UserMessage("");
 						}
-					assert(alternateColumns1+ identicalColumns == first->NChar());
-					assert(alternateColumns2+ identicalColumns == sec->NChar());
+					assert(alternateColumns1 + identicalColumns == first->NChar());
+					assert(alternateColumns2 + identicalColumns == sec->NChar());
 					}
 
 				dataPart.Delete();
 				for(vector<SequenceData *>::iterator sit = newMats.begin();sit != newMats.end();sit++)
 					dataPart.AddSubset(*sit);
-
-				//don't do this with these models
-				modSpecSet.SetInferSubsetRates(false);
 				}
 
 			outman.UserMessage("\n###################################################");
