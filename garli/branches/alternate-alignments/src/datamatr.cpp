@@ -439,13 +439,17 @@ void PatternManager::FillIntegerValues(int &_nMissing, int &_nConstant, int &_nV
 	_lastConst = lastConstant;
 	}
 
-vector<IdenticalColumnRange> PatternManager::FindIdenticalAlignmentColumns(const PatternManager &other) const{
-	vector<SitePattern> basePos1(patterns.size());
-	vector<SitePattern> basePos2(other.patterns.size());
+vector<IdenticalColumnRange> PatternManager::FindIdenticalAlignmentColumns(const PatternManager &other, bool strict/*=true*/) const{
+
+	//non-strict isn't tested yet
+	assert(strict);
+
+	vector< pair<int, SitePattern> > basePos1(patterns.size());
+	vector< pair<int, SitePattern> > basePos2(other.patterns.size());
 
 	//assuming nucleotide for now
 	unsigned char ambigState = 15;
-	//make dummy site patterns consisting of the base numbers allong each sequence, begining at 1.
+	//make dummy site patterns consisting of the base numbers along each sequence, begining at 1.
 	//gaps are the negative of the next base number i.e.
 	//-ACG-T = -1123-34
 	//GAGG-- = 1234-5-5
@@ -458,26 +462,48 @@ vector<IdenticalColumnRange> PatternManager::FindIdenticalAlignmentColumns(const
 	for(int tax = 0;tax < numTax;tax++){
 		baseNum = 1;
 		colNum = 0;
-		for(list<SitePattern>::const_iterator sit = patterns.begin();sit != patterns.end();sit++)
-			basePos1[colNum++].AddChar( (*sit).stateVec[tax] == ambigState ? -baseNum : baseNum++); 
+		if(strict){
+			for(list<SitePattern>::const_iterator sit = patterns.begin();sit != patterns.end();sit++)
+				basePos1[colNum++].second.AddChar( (*sit).stateVec[tax] == ambigState ? -baseNum : baseNum++); 
+			}
+		else{
+			for(list<SitePattern>::const_iterator sit = patterns.begin();sit != patterns.end();sit++)
+				basePos1[colNum++].second.AddChar( (*sit).stateVec[tax] == ambigState ? 0 : baseNum++); 
+			}
 			
 		baseNum = 1;
 		colNum = 0;
-		for(list<SitePattern>::const_iterator sit = other.patterns.begin();sit != other.patterns.end();sit++)
-			basePos2[colNum++].AddChar( (*sit).stateVec[tax] == ambigState ? -baseNum : baseNum++); 
+		if(strict){
+			for(list<SitePattern>::const_iterator sit = other.patterns.begin();sit != other.patterns.end();sit++)
+				basePos2[colNum++].second.AddChar( (*sit).stateVec[tax] == ambigState ? -baseNum : baseNum++);
+			}
+		else{
+			for(list<SitePattern>::const_iterator sit = other.patterns.begin();sit != other.patterns.end();sit++)
+				basePos2[colNum++].second.AddChar( (*sit).stateVec[tax] == ambigState ? 0 : baseNum++);
+			}
 		}
+
+	//store the sums of the column states - equality of the sums is necessary but not sufficient for columns to be
+	//identical, but much quicker to compare.
+	for(vector< pair<int, SitePattern> >::iterator pit = basePos1.begin();pit != basePos1.end();pit++)
+		(*pit).first = (*pit).second.StateSum();
+	for(vector< pair<int, SitePattern> >::iterator pit = basePos2.begin();pit != basePos2.end();pit++)
+		(*pit).first = (*pit).second.StateSum();
 
 	//Things get confusing below.  IdenticalColumnPair consists of one column index in one alignment and one in another. 
 	vector<IdenticalColumnPair> columnMatches;
 	int lastMatch, index1, index2;
 	lastMatch = index1 = index2 = 0;
-	for(vector<SitePattern>::iterator pat1 = basePos1.begin();pat1 != basePos1.end();pat1++){
+
+	for(vector< pair<int, SitePattern> >::iterator pat1 = basePos1.begin();pat1 != basePos1.end();pat1++){
 		index2 = lastMatch;
-		for(vector<SitePattern>::iterator pat2 = basePos2.begin() + lastMatch;pat2 != basePos2.end();pat2++){
-			if(*pat2 == *pat1){
-				columnMatches.push_back(IdenticalColumnPair(index1, index2));
-				lastMatch = index2;
-				break;
+		for(vector< pair<int, SitePattern> >::iterator pat2 = basePos2.begin() + lastMatch;pat2 != basePos2.end();pat2++){
+			if((*pat2).first == (*pat1).first){
+				if((*pat2).second == (*pat1).second){
+					columnMatches.push_back(IdenticalColumnPair(index1, index2));
+					lastMatch = index2;
+					break;
+					}
 				}
 			else
 				index2++;
@@ -505,25 +531,36 @@ vector<IdenticalColumnRange> PatternManager::FindIdenticalAlignmentColumns(const
 	return identicalRanges;
 	}
 
-void DataMatrix::CreateMatrixFromOtherMatrix(const DataMatrix &other, int startIndex, int endIndex){
+bool DataMatrix::ContainsAllMissingColumns(){
+	patman.CalcPatternTypesAndNumStates();
+    for(list<SitePattern>::const_iterator pit = patman.patterns.begin();pit != patman.patterns.end();pit++){
+		if((*pit).numStates == 0)
+			return true;
+		}
+    return false;
+	}
+
+void DataMatrix::CreateMatrixFromOtherMatrix(const DataMatrix &other, vector<ColumnRange> indexRanges){
 	NewMatrix(other.patman.numTax, other.patman.patterns.size());
 	patman.Initialize(other.patman.numTax, other.patman.maxNumStates);
 
-	list<SitePattern>::const_iterator fromStart = other.patman.patterns.begin();
-	list<SitePattern>::const_iterator fromEnd = fromStart;
-	advance(fromStart, startIndex);
-	advance(fromEnd, endIndex + 1);
-	for(list<SitePattern>::const_iterator copypat = fromStart;copypat != fromEnd;copypat++){
-		SitePattern thisPat(*copypat);
-		for(vector<int>::iterator sit = thisPat.siteNumbers.begin();sit != thisPat.siteNumbers.end();sit++)
-			(*sit) -= startIndex;
-		patman.AddPattern(thisPat);
+	for(vector<ColumnRange>::iterator cit = indexRanges.begin();cit != indexRanges.end();cit++){
+		int startIndex = (*cit).first;
+		int endIndex = (*cit).second;
+		list<SitePattern>::const_iterator fromStart = other.patman.patterns.begin();
+		list<SitePattern>::const_iterator fromEnd = fromStart;
+		advance(fromStart, startIndex);
+		advance(fromEnd, endIndex + 1);
+		for(list<SitePattern>::const_iterator copypat = fromStart;copypat != fromEnd;copypat++){
+			SitePattern thisPat(*copypat);
+			for(vector<int>::iterator sit = thisPat.siteNumbers.begin();sit != thisPat.siteNumbers.end();sit++)
+				(*sit) -= startIndex;
+			patman.AddPattern(thisPat);
+			}
 		}
 
 	for(int tax = 0;tax < other.nTax;tax++)
 		this->SetTaxonLabel(tax, other.TaxonLabel(tax));
-
-
 	}
 
 void DataMatrix::OutputDataSummary() const{

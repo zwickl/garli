@@ -107,6 +107,13 @@ public:
 		}
 	int CalcPatternTypeAndNumStates(vector<unsigned int> &stateCounts);
 	int MinScore(set<SitePatternState> patt, int bound, unsigned char bits=15, int prevSc=0) const;
+	int StateSum(){
+		int ret = 0;
+		for(StateVector::const_iterator sit = stateVec.begin();sit != stateVec.end();sit++)
+			ret += *sit;
+		return ret;
+		}
+
 	};
 
 //An alternate and several order of magnitude faster means of packing data.  The functionality is really the
@@ -183,7 +190,7 @@ public:
 	void FillConstStatesVector(vector<int> &cs) const;
 	void FillIntegerValues(int &numMissingChars, int &numConstantChars, int &numVariableUninformChars, int &numInformativeChars, int &lastConstant, int &numRealSitesInOrigMatrix, int &numNonMissingRealCountsInOrigMatrix, int &totNChar, int &NChar) const;
 
-	vector<IdenticalColumnRange> FindIdenticalAlignmentColumns(const PatternManager &other) const;
+	vector<IdenticalColumnRange> FindIdenticalAlignmentColumns(const PatternManager &other, bool strict=true) const;
 	};
 
 // Note: the class below has pure virtual member functions
@@ -526,7 +533,8 @@ protected:
 	  void MakeWeightSetString(NxsCharactersBlock &charblock, string &wtstring, string name);
       void MakeWeightSetString(std::string &wtstring, string name);
 
-	  void CreateMatrixFromOtherMatrix(const DataMatrix &other, int startIndex, int endIndex);
+	  void CreateMatrixFromOtherMatrix(const DataMatrix &other, vector<ColumnRange> indexRanges);
+	  bool ContainsAllMissingColumns();
 };
 
 #endif
