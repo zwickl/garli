@@ -791,7 +791,7 @@ int main( int argc, char* argv[] )	{
 					throw ErrorException("Alignment contains entirely missing columns (-, N or ?),\nwhich is not allowed in alignment splitting mode.");
 
 				//find the identical column ranges
-				vector<IdenticalColumnRange> identRanges = first->GetPatternManager().FindIdenticalAlignmentColumns(sec->GetPatternManager());
+				vector<IdenticalColumnRange> identRanges = first->GetPatternManager().FindIdenticalAlignmentColumnRanges(sec->GetPatternManager());
 
 				if(!strcmp(conf.alternateAlignmentMode.c_str(), "identical") && identRanges.size() == 0)
 					throw ErrorException("No identical alignment regions found!");
