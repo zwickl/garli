@@ -439,8 +439,7 @@ void PatternManager::FillIntegerValues(int &_nMissing, int &_nConstant, int &_nV
 	_lastConst = lastConstant;
 	}
 
-vector<IdenticalColumnRange> PatternManager::FindIdenticalAlignmentColumns(const PatternManager &other, bool strict/*=true*/) const{
-
+vector<IdenticalColumnPair> PatternManager::FindIdenticalAlignmentColumns(const PatternManager &other, bool strict/*=true*/) const{ 
 	//non-strict isn't tested yet
 	assert(strict);
 
@@ -510,6 +509,12 @@ vector<IdenticalColumnRange> PatternManager::FindIdenticalAlignmentColumns(const
 			}
 		index1++;
 		}
+	return columnMatches;
+	}
+
+vector<IdenticalColumnRange> PatternManager::FindIdenticalAlignmentColumnRanges(const PatternManager &other, bool strict/*=true*/) const{
+	//this returns pairs of columns that match, i.e. (columnInFirst, columnInSecond)
+	vector<IdenticalColumnPair> columnMatches = FindIdenticalAlignmentColumns(other);
 
 	//IdenticalColumnRange is a pair of ColumnRanges, with each pair being WITHIN one of the alignments, i.e.
 	//((firstStart, firstEnd), (secondStart, secondEnd))
