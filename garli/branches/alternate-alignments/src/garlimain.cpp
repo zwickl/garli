@@ -806,14 +806,14 @@ int main( int argc, char* argv[] )	{
 				//report on identical ranges
 				outman.UserMessage("\nIdentical alignment regions found:");
 
-				for(int i =0;i < identRanges.size();i++)
+				for(int i =0;i < alternateDataMatrices.size();i++)
 					outman.UserMessageNoCR("\tAlignment%d", i);
 				outman.UserMessage("");
 
 				int numIdenticalColumns = 0;
 				for(vector<IdenticalColumnRangeSet>::const_iterator it = identRanges.begin();it != identRanges.end();it++){
 					for(vector<ColumnRange>::const_iterator sit = (*it).begin();sit != (*it).end();sit++)
-						outman.UserMessageNoCR("\t%5d-%5d", (*sit).first, (*sit).second);
+						outman.UserMessageNoCR("\t%5d-%5d", (*sit).first + 1, (*sit).second + 1);
 					numIdenticalColumns += (*it)[0].second - (*it)[0].first + 1;
 					outman.UserMessage("");
 					}
@@ -867,12 +867,12 @@ int main( int argc, char* argv[] )	{
 					vector<int> alternateColumns(dataPart.NumSubsets(), 0);
 					int regionNum = 1;
 					outman.UserMessage("\n\nAlternative alignment regions found:");
-					for(int i =0;i < identRanges.size();i++)
+					for(int i =0;i < alternateDataMatrices.size();i++)
 						outman.UserMessageNoCR("\tAlignment%d", i);
 					outman.UserMessage("");
 					for(vector<IdenticalColumnRangeSet>::const_iterator it = alternateRanges.begin();it != alternateRanges.end();it++){
 						for(int aln = 0;aln < (*it).size();aln++){
-							outman.UserMessageNoCR("\t%5d-%5d", (*it)[aln].first, (*it)[aln].second);
+							outman.UserMessageNoCR("\t%5d-%5d", (*it)[aln].first + 1, (*it)[aln].second + 1);
 							alternateColumns[aln] += (*it)[aln].second - (*it)[aln].first + 1;
 							}
 						outman.UserMessage("");

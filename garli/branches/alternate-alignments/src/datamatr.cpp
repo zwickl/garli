@@ -585,11 +585,9 @@ vector<IdenticalColumnRangeSet> PatternManager::FindIdenticalAlignmentColumnRang
 		vector<IdenticalColumnSet>::iterator nextSet = startSet + 1;
 		//actually only need to check for adjacency of columns in first alignment - if adjacent in first must
 		//by definition be adjacent in others
-		while((*nextSet)[0] == (*currentSet)[0] + 1){
+		while(nextSet != columnMatches.end() && (*nextSet)[0] == (*currentSet)[0] + 1){
 			currentSet++;
 			nextSet++;
-			if(nextSet == columnMatches.end())
-				break;
 			}
 		vector<ColumnRange> thisRange;
 		for(int aln = 0;aln < numAlign;aln++)
