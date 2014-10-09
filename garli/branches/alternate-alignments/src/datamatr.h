@@ -46,8 +46,10 @@ typedef FLOAT_TYPE** DblPtrPtr;
 #endif
 
 typedef pair<int, int> IdenticalColumnPair;
+typedef vector<int> IdenticalColumnSet;
 typedef pair<int, int> ColumnRange;
-typedef pair<ColumnRange, ColumnRange> IdenticalColumnRange;
+typedef pair<ColumnRange, ColumnRange> IdenticalColumnRangePair;
+typedef vector<ColumnRange> IdenticalColumnRangeSet;
 
 //this needs to be int, not unsigned int, for identification of identical align columns
 typedef int SitePatternState;
@@ -142,6 +144,12 @@ class PatternManager{
 	list<SitePattern> uniquePatterns;
 	vector<int> constStates;
 
+	virtual void NewCollapse();
+	virtual void NewPack();
+	virtual void NewSort();
+	virtual void NewDetermineConstantSites();
+
+public:
 	PatternManager() {Reset();}
 	PatternManager(const PatternManager &other) {Reset();numTax = other.numTax;maxNumStates = other.maxNumStates;}
 
@@ -150,12 +158,6 @@ class PatternManager{
 		uniquePatterns.clear();
 		constStates.clear();
 		}
-	virtual void NewCollapse();
-	virtual void NewPack();
-	virtual void NewSort();
-	virtual void NewDetermineConstantSites();
-
-public:
 	void Initialize(int nt, int max){
 		Reset();
 		numTax = nt;
@@ -191,7 +193,9 @@ public:
 	void FillIntegerValues(int &numMissingChars, int &numConstantChars, int &numVariableUninformChars, int &numInformativeChars, int &lastConstant, int &numRealSitesInOrigMatrix, int &numNonMissingRealCountsInOrigMatrix, int &totNChar, int &NChar) const;
 
 	vector<IdenticalColumnPair> FindIdenticalAlignmentColumns(const PatternManager &other, bool strict=true) const;
-	vector<IdenticalColumnRange> FindIdenticalAlignmentColumnRanges(const PatternManager &other, bool strict=true) const;
+	vector<IdenticalColumnSet> FindIdenticalAlignmentColumns(vector<const PatternManager *> others, bool strict=true) const; 
+	vector<IdenticalColumnRangePair> FindIdenticalAlignmentColumnRanges(const PatternManager &other, bool strict=true) const;
+	vector<IdenticalColumnRangeSet> FindIdenticalAlignmentColumnRanges(vector<const PatternManager *> others, bool strict=true) const;
 	};
 
 // Note: the class below has pure virtual member functions

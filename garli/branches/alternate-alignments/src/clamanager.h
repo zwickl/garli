@@ -46,6 +46,8 @@ class ClaSpecifier{
 class ClaSpecifierSet{
 	public:
 	vector<ClaSpecifier> claSpecs;
+
+	ClaSpecifierSet(){};
 	ClaSpecifierSet(int c, int m, int d){
 		claSpecs.push_back(ClaSpecifier(c, m, d));
 		}
