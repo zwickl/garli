@@ -770,10 +770,11 @@ int main( int argc, char* argv[] )	{
 	
 			//Alignment comparison and splitting
 			if(strcmp(conf.alternateAlignmentMode.c_str(), "none")){
-				outman.UserMessage("\nDetecting identical alignment regions ...");
+				claSpecSets.clear();
+				dataSubInfo.clear();
+				vector<SequenceData *> newMats;
 
-				if(dataPart.NumSubsets() != 2)
-					throw ErrorException("Provide exactly 2 alignments for alignment splitting modes");
+				outman.UserMessage("\nDetecting identical alignment regions ...");
 
 				if(modSpecSet.NumSpecs() != 1)
 					throw ErrorException("Model linking must be used with alignment splitting modes (linkmodels = 1)");
@@ -781,43 +782,53 @@ int main( int argc, char* argv[] )	{
 				if(modSpecSet.InferSubsetRates())
 					throw ErrorException("Subset rates cannot be inferred in alignment splitting modes (subsetspecificrates = 0)");
 
-				SequenceData *first = dataPart.GetSubset(0);
-				SequenceData *sec = dataPart.GetSubset(1);
-				
-				if( !(first->IsNucleotide() && sec->IsNucleotide()) )
-					throw ErrorException("Only nucleotide models are implemented for alignment spliting modes");
+				vector<SequenceData *> alternateDataMatrices;
+				for(int subset = 0;subset < dataPart.NumSubsets();subset++){
+					SequenceData *thisAlign = dataPart.GetSubset(subset);
+					if(!thisAlign->IsNucleotide())
+						throw ErrorException("Only nucleotide models are implemented for alignment spliting modes");
+					if(thisAlign->ContainsAllMissingColumns())
+						throw ErrorException("Alignment contains entirely missing columns (-, N or ?),\nwhich is not allowed in alignment splitting mode.");
+					alternateDataMatrices.push_back(thisAlign);
+					}
 
-				if(first->ContainsAllMissingColumns() || sec->ContainsAllMissingColumns())
-					throw ErrorException("Alignment contains entirely missing columns (-, N or ?),\nwhich is not allowed in alignment splitting mode.");
+				//collect the pattern managers, EXCEPT for the first alignment
+				vector<const PatternManager *> otherPatternManagers;
+				for(vector<SequenceData *>::iterator it = alternateDataMatrices.begin() + 1;it != alternateDataMatrices.end();it++)
+					otherPatternManagers.push_back(&(*it)->GetPatternManager());
 
 				//find the identical column ranges
-				vector<IdenticalColumnRange> identRanges = first->GetPatternManager().FindIdenticalAlignmentColumnRanges(sec->GetPatternManager());
+				vector<IdenticalColumnRangeSet> identRanges = alternateDataMatrices[0]->GetPatternManager().FindIdenticalAlignmentColumnRanges(otherPatternManagers);
 
 				if(!strcmp(conf.alternateAlignmentMode.c_str(), "identical") && identRanges.size() == 0)
 					throw ErrorException("No identical alignment regions found!");
 
-				int identicalColumns = 0;
+				//report on identical ranges
 				outman.UserMessage("\nIdentical alignment regions found:");
-				outman.UserMessage("\t  Alignment1\t\t  Alignment2");
-				for(vector<IdenticalColumnRange>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++){
-					outman.UserMessage("\t%5d - %5d\t\t%5d - %5d", (*pit).first.first, (*pit).first.second, (*pit).second.first, (*pit).second.second);
-					identicalColumns += (*pit).first.second - (*pit).first.first + 1;
+
+				for(int i =0;i < identRanges.size();i++)
+					outman.UserMessageNoCR("\tAlignment%d", i);
+				outman.UserMessage("");
+
+				int numIdenticalColumns = 0;
+				for(vector<IdenticalColumnRangeSet>::const_iterator it = identRanges.begin();it != identRanges.end();it++){
+					for(vector<ColumnRange>::const_iterator sit = (*it).begin();sit != (*it).end();sit++)
+						outman.UserMessageNoCR("\t%5d-%5d", (*sit).first, (*sit).second);
+					numIdenticalColumns += (*it)[0].second - (*it)[0].first + 1;
+					outman.UserMessage("");
 					}
-				outman.UserMessage("\t(%d total identical columns)\n", identicalColumns);
 
+				outman.UserMessage("\t(%d total identical columns)\n", numIdenticalColumns);
 				outman.UserMessage("Creating subset containing all identical columns");
-
-				claSpecSets.clear();
-				dataSubInfo.clear();
-				vector<SequenceData *> newMats;
-
-				//add the shared identical regions once
-				vector<ColumnRange> ranges;
-				for(vector<IdenticalColumnRange>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++)
-					ranges.push_back((*pit).first);
+				
+				//add the shared identical regions once - since these regions are identical in all alignments, just work with the ranges
+				//and data from the first alignment
+				vector<ColumnRange> columnRanges;
+				for(vector<IdenticalColumnRangeSet>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++)
+					columnRanges.push_back((*pit)[0]);
 				
 				NucleotideData *split = new NucleotideData();
-				split->CreateMatrixFromOtherMatrix(*first, ranges);
+				split->CreateMatrixFromOtherMatrix(*alternateDataMatrices[0], columnRanges);
 				split->ProcessPatterns();
 				newMats.push_back(split);
 				claSpecSets.push_back(ClaSpecifierSet(claSpecSets.size(), 0, claSpecSets.size()));
@@ -829,71 +840,75 @@ int main( int argc, char* argv[] )	{
 				//add the alignment regions that are comparable (bounded by identical regions or alignment ends), indicating that their likelihoods 
 				//should be summed
 				if(!strcmp(conf.alternateAlignmentMode.c_str(), "alternate")){
-					vector<IdenticalColumnRange> alternateRanges;
-					int regionStart1 = 0;
-					int regionStart2 = 0;
-					for(vector<IdenticalColumnRange>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++){
-						if((*pit).first.first > 0){
-							alternateRanges.push_back(IdenticalColumnRange(ColumnRange(regionStart1, (*pit).first.first - 1), ColumnRange(regionStart2, (*pit).second.first - 1)));
-							}
-						regionStart1 = (*pit).first.second + 1;
-						regionStart2 = (*pit).second.second + 1;
-						}
-					//get the last alt segment, if the final base is not included in a matching section
-					if(regionStart1 != first->NChar())
-						alternateRanges.push_back(IdenticalColumnRange(ColumnRange(regionStart1, first->NChar() - 1), ColumnRange(regionStart2, sec->NChar() - 1)));
+					vector<IdenticalColumnRangeSet> alternateRanges;
+					vector<int> regionStarts(dataPart.NumSubsets(), 0);
 
-					int alternateColumns1, alternateColumns2;
-					alternateColumns1 = alternateColumns2 = 0;
+					//work out where the alternate regions are based on the location of the identical regions
+					for(vector<IdenticalColumnRangeSet>::const_iterator pit = identRanges.begin();pit != identRanges.end();pit++){
+						if((*pit)[0].first > 0){
+							vector<ColumnRange> thisRangeSet;
+							for(int aln = 0;aln < (*pit).size();aln++)
+								thisRangeSet.push_back(ColumnRange(regionStarts[aln], (*pit)[aln].first - 1));
+							alternateRanges.push_back(thisRangeSet);
+							}
+						for(int aln = 0;aln < (*pit).size();aln++)
+							regionStarts[aln] = (*pit)[aln].second + 1;
+						}
+
+					//get the last alt segment, if the final base is not included in a matching section
+					if(regionStarts[0] != alternateDataMatrices[0]->NChar()){
+						IdenticalColumnRangeSet thisRangeSet;
+						for(int aln = 0;aln < alternateDataMatrices.size();aln++)
+							thisRangeSet.push_back(ColumnRange(regionStarts[aln], alternateDataMatrices[aln]->NChar() - 1));
+						alternateRanges.push_back(thisRangeSet);
+						}
+
+					//report on the alternate regions
+					vector<int> alternateColumns(dataPart.NumSubsets(), 0);
 					int regionNum = 1;
 					outman.UserMessage("\n\nAlternative alignment regions found:");
-					outman.UserMessage("\t  Alignment1\t\t  Alignment2");
-					for(vector<IdenticalColumnRange>::const_iterator pit = alternateRanges.begin();pit != alternateRanges.end();pit++){
-						outman.UserMessage("%d\t%5d - %5d\t\t%5d - %5d", regionNum++, (*pit).first.first, (*pit).first.second, (*pit).second.first, (*pit).second.second);
-						alternateColumns1 += (*pit).first.second - (*pit).first.first + 1;
-						alternateColumns2 += (*pit).second.second - (*pit).second.first + 1;
-						}
-					outman.UserMessage("\t(%d and %d total alternative columns)\n", alternateColumns1, alternateColumns2);
-
-					outman.UserMessage("Creating subsets for each alternative alignment region\n");
-
-					regionNum = 1;
-					for(vector<IdenticalColumnRange>::const_iterator pit = alternateRanges.begin();pit != alternateRanges.end();pit++){
-						outman.UserMessage("Alternative region %d", regionNum++);
-						NucleotideData *split1 = new NucleotideData();
-						
-						vector<ColumnRange> ranges;
-						ranges.push_back((*pit).first);
-						split1->CreateMatrixFromOtherMatrix(*first, ranges);
-						split1->ProcessPatterns();
-						newMats.push_back(split1);
-						ClaSpecifierSet specSet(dataSubInfo.size(), 0, dataSubInfo.size());
-						DataSubsetInfo subInfo = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split1)", dataSubInfo.size(), "alt subset1", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
-						subInfo.totalCharacters = split1->TotalNChar();
-						subInfo.uniqueCharacters = split1->NChar();
-						dataSubInfo.push_back(subInfo);
-
-						NucleotideData *split2 = new NucleotideData();
-
-						ranges.clear();
-						ranges.push_back((*pit).second);
-						split2->CreateMatrixFromOtherMatrix(*sec, ranges);
-						split2->ProcessPatterns();
-						newMats.push_back(split2);
-						specSet.AddSpec(dataSubInfo.size(), 0, dataSubInfo.size());
-						DataSubsetInfo subInfo2 = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split2)", dataSubInfo.size(), "alt subset2", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
-						subInfo2.totalCharacters = split2->TotalNChar();
-						subInfo2.uniqueCharacters = split2->NChar();
-						dataSubInfo.push_back(subInfo2);
-
-						claSpecSets.push_back(specSet);
-
+					for(int i =0;i < identRanges.size();i++)
+						outman.UserMessageNoCR("\tAlignment%d", i);
+					outman.UserMessage("");
+					for(vector<IdenticalColumnRangeSet>::const_iterator it = alternateRanges.begin();it != alternateRanges.end();it++){
+						for(int aln = 0;aln < (*it).size();aln++){
+							outman.UserMessageNoCR("\t%5d-%5d", (*it)[aln].first, (*it)[aln].second);
+							alternateColumns[aln] += (*it)[aln].second - (*it)[aln].first + 1;
+							}
 						outman.UserMessage("");
 						}
-					assert(alternateColumns1 + identicalColumns == first->NChar());
-					assert(alternateColumns2 + identicalColumns == sec->NChar());
+
+					outman.UserMessage("\nCreating subsets for each alternative alignment region");
+					regionNum = 1;
+					for(vector<IdenticalColumnRangeSet>::const_iterator it = alternateRanges.begin();it != alternateRanges.end();it++){
+						outman.UserMessage("Alternative region %d", regionNum++);
+						ClaSpecifierSet specSet;
+
+						for(int aln = 0;aln < (*it).size();aln++){
+							NucleotideData *split = new NucleotideData();
+							vector<ColumnRange> columnRanges;
+							columnRanges.push_back((*it)[aln]);
+							split->CreateMatrixFromOtherMatrix(*alternateDataMatrices[aln], columnRanges);
+							split->ProcessPatterns();
+							newMats.push_back(split);
+
+							specSet.AddSpec(dataSubInfo.size(), 0, dataSubInfo.size());
+							DataSubsetInfo subInfo = DataSubsetInfo(dataSubInfo.size(), dataSubInfo.size(), "(split1)", dataSubInfo.size(), "alt subset1", DataSubsetInfo::NUCLEOTIDE, DataSubsetInfo::NUCLEOTIDE);
+							subInfo.totalCharacters = split->TotalNChar();
+							subInfo.uniqueCharacters = split->NChar();
+							dataSubInfo.push_back(subInfo);
+							}
+						outman.UserMessage("");
+
+						//the specSet is what keeps track of the fact that the likelihood of a given set of alternate alignments should be summed
+						claSpecSets.push_back(specSet);
+						}
+
+					for(int aln = 0;aln < alternateDataMatrices.size();aln++)
+						assert(alternateColumns[aln] + numIdenticalColumns == alternateDataMatrices[aln]->NChar());
 					}
 
+				//Nuke and replace the data partition with the new data subsets
 				dataPart.Delete();
 				for(vector<SequenceData *>::iterator sit = newMats.begin();sit != newMats.end();sit++)
 					dataPart.AddSubset(*sit);

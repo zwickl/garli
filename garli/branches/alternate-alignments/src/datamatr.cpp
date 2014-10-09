@@ -512,13 +512,50 @@ vector<IdenticalColumnPair> PatternManager::FindIdenticalAlignmentColumns(const 
 	return columnMatches;
 	}
 
-vector<IdenticalColumnRange> PatternManager::FindIdenticalAlignmentColumnRanges(const PatternManager &other, bool strict/*=true*/) const{
+vector<IdenticalColumnSet> PatternManager::FindIdenticalAlignmentColumns(vector<const PatternManager *> others, bool strict/*=true*/) const{
+	vector< vector<IdenticalColumnPair> > allPairs;
+
+	//get the matching columns between the first alignment and all of the others, pairwise 
+	for(vector<const PatternManager *>::iterator oit = others.begin();oit != others.end();oit++)
+		allPairs.push_back(FindIdenticalAlignmentColumns(*(*oit)));
+
+	//this will map between the index of a column in the first alignment and a vector containing the corresponding columns in all of the other
+	//alignments, if any.  Note that the index in the first alignment will also appear as the first element in the vector.  If the proper number
+	//of entries are in a vector after going through all pairs (i.e., one per comparison), then those vectors will be returned.
+	map<int, vector<int> > columnMap;
+
+	vector<IdenticalColumnPair> &firstPair = allPairs[0];
+
+	//go through the first comparison, populating the map
+	for(vector<IdenticalColumnPair>::iterator pit = firstPair.begin();pit != firstPair.end();pit++){
+		columnMap[(*pit).first].push_back((*pit).first);
+		columnMap[(*pit).first].push_back((*pit).second);
+		}
+
+	//now see if those columns that matched between the first two also match a column in each of the other alignments
+	for(vector< vector<IdenticalColumnPair> >::iterator vit = allPairs.begin() + 1;vit != allPairs.end();vit++){
+		for(vector<IdenticalColumnPair>::iterator pit = (*vit).begin();pit != (*vit).end();pit++){
+			if(columnMap.find((*pit).first) != columnMap.end()){
+				columnMap[(*pit).first].push_back((*pit).second);
+				}
+			}
+		}
+
+	vector<IdenticalColumnSet> ret;
+	for(map<int, vector<int> >::iterator mip = columnMap.begin();mip != columnMap.end();mip++)
+		if((*mip).second.size() == others.size() + 1)
+			ret.push_back((*mip).second);
+
+	return ret;	
+	}
+
+vector<IdenticalColumnRangePair> PatternManager::FindIdenticalAlignmentColumnRanges(const PatternManager &other, bool strict/*=true*/) const{
 	//this returns pairs of columns that match, i.e. (columnInFirst, columnInSecond)
 	vector<IdenticalColumnPair> columnMatches = FindIdenticalAlignmentColumns(other);
 
-	//IdenticalColumnRange is a pair of ColumnRanges, with each pair being WITHIN one of the alignments, i.e.
+	//IdenticalColumnRangePair is a pair of ColumnRanges, with each pair being WITHIN one of the alignments, i.e.
 	//((firstStart, firstEnd), (secondStart, secondEnd))
-	vector<IdenticalColumnRange> identicalRanges;
+	vector<IdenticalColumnRangePair> identicalRanges;
 	for(vector<IdenticalColumnPair>::iterator startPair = columnMatches.begin();startPair != columnMatches.end();){
 		vector<IdenticalColumnPair>::iterator currentPair = startPair;
 		vector<IdenticalColumnPair>::iterator nextPair = startPair + 1;
@@ -528,9 +565,38 @@ vector<IdenticalColumnRange> PatternManager::FindIdenticalAlignmentColumnRanges(
 			if(nextPair == columnMatches.end())
 				break;
 			}
-		//identicalRanges.push_back(IdenticalColumnRange(*startPair, *currentPair));
-		identicalRanges.push_back(IdenticalColumnRange(ColumnRange((*startPair).first, (*currentPair).first), ColumnRange((*startPair).second, (*currentPair).second)));
+		identicalRanges.push_back(IdenticalColumnRangePair(ColumnRange((*startPair).first, (*currentPair).first), ColumnRange((*startPair).second, (*currentPair).second)));
 		startPair = nextPair;
+		}
+
+	return identicalRanges;
+	}
+
+vector<IdenticalColumnRangeSet> PatternManager::FindIdenticalAlignmentColumnRanges(vector<const PatternManager *> others, bool strict/*=true*/) const{
+	//this returns pairs of columns that match, i.e. (columnInFirst, columnInSecond)
+	vector<IdenticalColumnSet> columnMatches = FindIdenticalAlignmentColumns(others);
+
+	int numAlign = others.size() + 1;
+	//IdenticalColumnRangePair is a pair of ColumnRanges, with each pair being WITHIN one of the alignments, i.e.
+	//((firstStart, firstEnd), (secondStart, secondEnd))
+	vector<IdenticalColumnRangeSet> identicalRanges;
+	for(vector<IdenticalColumnSet>::iterator startSet = columnMatches.begin();startSet != columnMatches.end();){
+		vector<IdenticalColumnSet>::iterator currentSet = startSet;
+		vector<IdenticalColumnSet>::iterator nextSet = startSet + 1;
+		//actually only need to check for adjacency of columns in first alignment - if adjacent in first must
+		//by definition be adjacent in others
+		while((*nextSet)[0] == (*currentSet)[0] + 1){
+			currentSet++;
+			nextSet++;
+			if(nextSet == columnMatches.end())
+				break;
+			}
+		vector<ColumnRange> thisRange;
+		for(int aln = 0;aln < numAlign;aln++)
+			thisRange.push_back(ColumnRange((*startSet)[aln], (*currentSet)[aln]));
+		identicalRanges.push_back(thisRange);
+
+		startSet = nextSet;
 		}
 
 	return identicalRanges;
