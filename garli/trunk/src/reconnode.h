@@ -50,7 +50,7 @@ class ReconNode{
 		deb << nodeNum << "\t" << reconDist << "\t" << pathlength << "\t" << weight << "\t" << chooseProb << "\t" << withinCutSubtree << "\n";
 		}
 
-	bool operator<(const ReconNode &rhs){
+	bool operator<(const ReconNode &rhs) const{
 		return reconDist < rhs.reconDist;
 		}
 	};
@@ -301,7 +301,7 @@ public:
 		return b.rep[block];	
 		}
 
-	bool operator<(const Swap &rhs){
+	bool operator<(const Swap &rhs) const{
 		//note that this is "less than" for sorting purposes, not in a subset sense
 		//it is a strict weak ordering, so it returns false in the case of possible equality
 		//ordering is based first on bip, then on reconDist
@@ -322,7 +322,7 @@ public:
 		return false;
 		}
 
-	bool operator==(const Swap &rhs){
+	bool operator==(const Swap &rhs) const{
 		assert(rhs.b.ContainsTaxon(1));
 		bool bipEqual = b.EqualsEquals(rhs.b);
 		if(bipEqual == false) return false;
