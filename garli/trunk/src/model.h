@@ -26,6 +26,7 @@
 #include <cassert>
 #include <math.h>
 #include <vector>
+#include <stdint.h>
 
 using namespace std;
 

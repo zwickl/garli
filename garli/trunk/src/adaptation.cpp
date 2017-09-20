@@ -18,6 +18,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstdio>
+#include <stdint.h>
 
 using namespace std;
 

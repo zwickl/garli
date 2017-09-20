@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <functional>
 #include "rng.h"
+#include <stdint.h>
 #ifdef UNIX
 #include "unistd.h"
 #endif

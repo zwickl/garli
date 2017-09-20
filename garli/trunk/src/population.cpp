@@ -28,6 +28,7 @@
 #include <iomanip>
 #include <fstream>
 #include <signal.h>
+#include <stdint.h>
 
 using namespace std;
 
