@@ -935,7 +935,6 @@ void Individual::SubtreeMutate(int subdomain, FLOAT_TYPE optPrecision, vector<in
 	   		else dirty=true;
 		  }
 		}
-/*  
   else{
     assert(TaxonSwapList.size>0);
     FLOAT_TYPE s2, s1 = params->rnd.uniform();
@@ -951,7 +950,6 @@ void Individual::SubtreeMutate(int subdomain, FLOAT_TYPE optPrecision, vector<in
     treeStruct->TaxonSwap(randint1, randint2, optPrecision);
     mutation_type |= taxonSwap;
   } 
-*//*
 	CalcFitness(subdomain);
 	treeStruct->calcs=calcCount;
 	calcCount=0;

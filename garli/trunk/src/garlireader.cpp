@@ -166,6 +166,7 @@ void GarliReader::Add(
 		curr->next = newBlock;
 		}
 	}
+*/
 
 /*----------------------------------------------------------------------------------------------------------------------
 |	Called by the NxsReader object when a block named `blockName' is entered. Allows program to notify user of 
@@ -219,6 +220,11 @@ void GarliReader::ExitingBlock(
 			case NxsCharactersBlock::continuous:
 				mess = " found continuous data...";
 				break;
+			case NxsCharactersBlock::mixed:
+                break;
+			case NxsCharactersBlock::codon:
+                break;
+            
 			}
 		}
 
@@ -1050,7 +1056,7 @@ void GarliReader::PreprocessNextCommand()
 	// Remove any whitespace characters from end of string entered by user
 	//
 	unsigned i = len;
-	while (i > 0 && next_command[i-1] == ' ' || next_command[i-1] == '\t' || next_command[i-1] == '\n')
+	while (i > 0 && (next_command[i-1] == ' ' || next_command[i-1] == '\t' || next_command[i-1] == '\n'))
 		i--;
 
 	// If character at position i - 1 is a semicolon, put '\0' terminator at position i;

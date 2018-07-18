@@ -1816,26 +1816,6 @@ void DataMatrix::WriteCollapsedData(){
 		}
 
 	}
-	
-void DataMatrix::ExplicitDestructor()	{
-	if( count ) MEM_DELETE_ARRAY(count); // count is of length numPatterns
-	if( numStates ) MEM_DELETE_ARRAY(numStates); // numStates is of length numPatterns
-	if( number ) MEM_DELETE_ARRAY(number); // number is of length numPatterns
-	if( taxonLabel ) {
-		int j;
-		for( j = 0; j < nTaxAllocated; j++ )
-			MEM_DELETE_ARRAY( taxonLabel[j] ); // taxonLabel[j] is of length strlen(taxonLabel[j])+1
-	    MEM_DELETE_ARRAY(taxonLabel); // taxonLabel is of length nTax
-		}
-	if( matrix ) {
-		int j;
-		for( j = 0; j < nTax; j++ )
-			MEM_DELETE_ARRAY(matrix[j]); // matrix[j] is of length numPatterns
-		MEM_DELETE_ARRAY(matrix); // matrix is of length nTax
-		}
-	memset(this, 0, sizeof(DataMatrix));
-}
-
 
 void DataMatrix::Reweight(FLOAT_TYPE prob){
 	for(int i=0;i<numPatterns;i++){

@@ -5528,7 +5528,7 @@ FLOAT_TYPE Tree::GetScorePartialTerminalNState(const CondLikeArray *partialCLA, 
 						if(underflow_mult[i] == 0)
 							conditioningLikeSum += siteL;
 						else{
-							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", (underflow_mult[i], exp((double)underflow_mult[i])));
+							outman.DebugMessage("SCALED MKV SCALER = %d (%f)", underflow_mult[i], exp((double)underflow_mult[i]));
 							double unscaler = exp((FLOAT_TYPE)underflow_mult[i]);
 							//Guard against this over or underflowing, which I think are very unlikely. If it does, just ignore this siteL
 							if(unscaler == unscaler){

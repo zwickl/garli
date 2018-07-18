@@ -1977,7 +1977,8 @@ void Tree::RecursivelyOptimizeBranches(TreeNode *nd, FLOAT_TYPE optPrecision, in
 		RecursivelyOptimizeBranches(nd->next, optPrecision, subtreeNode, radius, centerNode, false);
 		}
 	}
-
+*/
+/*
 void Tree::RecursivelyOptimizeBranchesDown(TreeNode *nd, TreeNode *calledFrom, FLOAT_TYPE optPrecision, int subtreeNode, int radius, int ){
 	FLOAT_TYPE prevScore=lnL;
 #ifdef BRENT	
@@ -2091,7 +2092,8 @@ inline FLOAT_TYPE CallBranchLikeRateHet(TreeNode *thisnode, Tree *thistree, FLOA
 	
 	return like;
 	}
-
+*/
+            /*
 FLOAT_TYPE Tree::BrentOptimizeBranchLength(FLOAT_TYPE accuracy_cutoff, TreeNode *here, bool firstPass){
 	//we pass the node whose branch length whose blen we want to optimize, but note that the
 	//calculations occur at the node below that
@@ -2208,7 +2210,7 @@ FLOAT_TYPE Tree::BrentOptimizeBranchLength(FLOAT_TYPE accuracy_cutoff, TreeNode 
 #endif
 	//	claMan->SetTempDirty(-1, true);
 
-/*		MakeAllNodesDirty();
+		MakeAllNodesDirty();
 		SetAllTempClasDirty();
 	if(minScore!=0.0){
 //		TraceDirtynessToRoot(here);

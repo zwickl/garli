@@ -465,7 +465,6 @@ protected:
 		DataMatrix& operator =(const DataMatrix&);
 
 		void Sort( int byCounts = 0 ){
-			byCounts;
 			QSort( 0, NChar()-1 );
 			}
 		virtual int PatternType( int , unsigned int *) const;	// returns PT_XXXX constant indicating type of pattern
@@ -480,7 +479,6 @@ protected:
 		void WriteCollapsedData();  //DZ
 		void SaveNexus(const char* filename, int iosFlags /* = 0 */); //DZ
 		virtual void DetermineConstantSites();
-		void ExplicitDestructor();  // cjb - totally clear the DataMatrix and revert it to its original state as if it was just constructed
 		void CheckForIdenticalTaxonNames();
 		bool DidUseDefaultWeightsets() const {return (wtsetName.length() > 0);}
 		string WeightsetName() const { return wtsetName;}

@@ -278,7 +278,7 @@ bool ReadData(const char* filename)	{
 		}
 	else if(1)
 		assert(0);
-/*	else if(FileIsFasta(filename)){
+	else if(FileIsFasta(filename)){
 		outman.UserMessage("Attempting to read data file in Fasta format: %s ...", filename);
 		data->ReadFasta(filename);
 		}
@@ -286,8 +286,8 @@ bool ReadData(const char* filename)	{
 		outman.UserMessage("Attempting to read data file in Phylip format: %s ...", filename);
 		data->ReadPhylip(filename);
 		}
-*/
-/*
+
+
 	if(modSpec.IsCodon()){
 		assert(0);
 		if(modSpec.IsVertMitoCode()){
@@ -303,8 +303,8 @@ bool ReadData(const char* filename)	{
 		static_cast<CodonData*>(data)->SetAminoAcid();
 		static_cast<CodonData*>(data)->FillCodonMatrix(true);
 		}
-*/
-/*
+
+
 	// report summary statistics about the data
 	data->Summarize();
 	outman.UserMessage("\nData summary:");
@@ -337,8 +337,8 @@ bool ReadData(const char* filename)	{
 //			static_cast<CodonData*>(data)->DetermineConstantAASites();
 			}
 		}
-*/	
-/*	return usedNCL;
+	
+	return usedNCL;
 	}
 */
 

@@ -4554,7 +4554,9 @@ if(rank > 0) return;
 		}
 #endif
 
-	if(gen==1 && ind==NULL || num==1){
+    //not sure what the original intended order of eval was here, but it caused warnings
+    //if(gen==1 && ind==NULL || num==1){
+	if(gen==1 && (ind==NULL || num==1)){
 		dataPart->BeginNexusTreesBlock(outf);
 		
 		paupf << "#nexus\n\n";
@@ -7784,7 +7786,7 @@ void Population::CheckPerturbParallel(){
 		}
 	else if(pertMan->pertAbandoned==false && (gen - pertMan->lastPertGeneration) >= pertMan->minPertInterval
 		&& (adap->improveOverStoredIntervals < pertMan->pertThresh)/* && (adap->branchOptPrecision == adap->minOptPrecision)*/ /*){
-/*		for(int i=1;i<=paraMan->nremotes;i++){
+		for(int i=1;i<=paraMan->nremotes;i++){
 			paraMan->needToSend[i]=true;
 			}
 		paraMan->perturbModeActive=true;

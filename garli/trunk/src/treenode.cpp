@@ -253,7 +253,6 @@ void TreeNode::Prune()
 			}
 		else
 			{
-			anc=anc;
 			assert(0);//internal polytomy
 			}
 		}

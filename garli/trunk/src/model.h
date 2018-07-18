@@ -970,9 +970,9 @@ public:
 		else if(_stricmp(str, "codon-aminoacid") == 0) SetCodonAminoAcid();
 		else if(_stricmp(str, "aminoacid") == 0) SetAminoAcid();
 		else if(_stricmp(str, "protein") == 0) SetAminoAcid();
-		else if(_stricmp(str, "dna") == 0) str;
+		else if(_stricmp(str, "dna") == 0) (void)0; //This is just a null op
 		else if(_stricmp(str, "rna") == 0) SetRna();
-		else if(_stricmp(str, "nucleotide") == 0) str;
+		else if(_stricmp(str, "nucleotide") == 0) (void)0;
 		else if(_stricmp(str, "nstate") == 0) SetNState();
 		else if(_stricmp(str, "standard") == 0) SetNState();
 		else if(_stricmp(str, "standardordered") == 0) SetOrderedNState();
