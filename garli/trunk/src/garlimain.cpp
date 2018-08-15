@@ -64,12 +64,6 @@ typedef pid_t pid_type;
 #import "MFEInterfaceClient.h"
 #endif
 
-#ifdef CUDA_GPU
-#include "cudaman.h"
-CudaManager *cudaman;
-int cuda_device_number=0;
-#endif
-
 OutputManager outman;
 bool interactive;
 bool is64bit = false;
@@ -160,9 +154,6 @@ void UsageMessage(char *execName){
 	outman.UserMessage                 ("  -t			run internal tests (requires dataset and config file)");
 	outman.UserMessage                 ("  -V			validate: load config file and data, validate config file, data, starting trees"); 
 	outman.UserMessage                 ("				and constraint files, print required memory and selected model, then exit");
-#ifdef CUDA_GPU
-	outman.UserMessage    ("  --device d_number	use specified CUDA device");
-#endif
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"\n");
 #endif
 	}
@@ -286,9 +277,6 @@ int main( int argc, char* argv[] )	{
 						//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
 						//which is essentially a stripped down version of pop::SeedPopWithStartingTree
 						validateMode = true;
-#ifdef CUDA_GPU
-					else if(!_stricmp(argv[curarg], "--device")) cuda_device_number = atoi(argv[++curarg]);
-#endif
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						UsageMessage(argv[0]);
@@ -414,9 +402,6 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("->Single precision floating point version<-\n");
 #endif
 
-#ifdef CUDA_GPU
-			outman.UserMessage("->CUDA GPU version<-\n");
-#endif
 			outman.UserMessage("##############################################################");
 			outman.UserMessage(" This is GARLI 2.1: maximum likelihood phylogenetic inference");
 			outman.UserMessage(" using nucleotide, amino acid, codon and morphology-like data,");

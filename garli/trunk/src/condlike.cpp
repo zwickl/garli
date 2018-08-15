@@ -22,8 +22,6 @@
 #include "clamanager.h"
 #include "utility.h"
 
-#undef ALIGN_CLAS
-#define CLA_ALIGNMENT 32
 
 CondLikeArray::~CondLikeArray(){
 	//with partitioning, the entire allocation is managed and deleted by the
@@ -31,11 +29,7 @@ CondLikeArray::~CondLikeArray(){
 	arr = NULL;
 	underflow_mult = NULL;
 /*	if( arr ){
-#ifndef ALIGN_CLAS
 		delete []arr;
-#else
-		DeleteAlignedArray(arr);
-#endif
 		arr=NULL;
 		 }
 	if(underflow_mult!=NULL) delete []underflow_mult;
@@ -44,21 +38,13 @@ CondLikeArray::~CondLikeArray(){
 
 void CondLikeArray::Allocate( int nk, int ns, int nr /* = 1 */ ){
 	if( arr ){
-#ifndef ALIGN_CLAS
 		delete []arr;
-#else
-		DeleteAlignedArray(arr);
-#endif
 		arr=NULL;
 		}
 	nrates = nr;
 	nsites = ns;
 	nstates = nk;
-#ifndef ALIGN_CLAS
 	arr=new FLOAT_TYPE[nk*nr*ns];
-#else
-	arr = NewAlignedArray<FLOAT_TYPE>(nk*nr*ns, CLA_ALIGNMENT);
-#endif
 	if(arr==NULL){
 		throw ErrorException("GARLI had a problem allocating memory!  Try reducing the availablememory setting.");
 		}
