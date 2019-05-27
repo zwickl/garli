@@ -33,6 +33,8 @@ extern int memLevel;
 
 #undef CLA_DEBUG
 
+class ClaOperation;
+
 class ClaSpecifier{
 	public:
 	int claIndex; //this is just the number of the corresponding cla - there is a 1 to 1 correspondence
@@ -49,6 +51,7 @@ class ClaManager{
 	int numClas;
 	int numHolders;
 	int maxUsed;
+	int curReclaimLevel;
 	CondLikeArraySet **allClas; //these are the actual sets of arrays to be used in calculations, but will assigned to 
 							 //nodes via a CondLikeArrayHolder.  There may be a limited number						 
 
@@ -57,8 +60,16 @@ class ClaManager{
 								  
 	vector<CondLikeArraySet *> claStack;
 	vector<int> holderStack;
-	
-	public:	
+
+	//Directly from BEAGLE branch
+	list<int> freeableHolderQueue; //these are holders that are assigned (or at least were when they were put in here),
+								   //have a valid cla in them and could be recycled.
+								   //they wiil be added as a queue, with lowest level dependencies appearing first, etc.
+								   //the curreclaim level indicates how far up the queue can be recycled.  If that isn't
+								   //enough then brute force iteration over holders will be necessary
+
+	public:
+	bool debug_clas;
 	//PARTITION	
 	//ClaManager(int nnod, int nClas, int nHolders, int nchar, int nrates) : numNodes(nnod), numClas(nClas), numHolders(nHolders), numRates(nrates){
 /*	ClaManager(int nnod, int numClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numHolders(nHolders){
@@ -82,12 +93,12 @@ class ClaManager{
 			holderStack.push_back(i);
 		}
 */
-	ClaManager(int nnod, int nClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numClas(nClas), numHolders(nHolders){
+	ClaManager(int nnod, int nClas, int nHolders, const ModelPartition *mods, const DataPartition *data) : numNodes(nnod), numClas(nClas), numHolders(nHolders), debug_clas(false){
 		maxUsed=0;
 		allClas=new CondLikeArraySet*[numClas];
 		claStack.reserve(numClas);
 		for(int i=numClas-1;i>=0;i--){
-				allClas[i]=new CondLikeArraySet;
+				allClas[i]=new CondLikeArraySet(i);
 				//for(vector<Model *>::iterator modit = mods->models.begin();modit != mods->models.end();modit++){
 				//for(int m = 0;m < mods->NumModels();m++){
 				for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
@@ -102,6 +113,15 @@ class ClaManager{
 		holderStack.reserve(numHolders);
 		for(int i=numHolders-1;i>=0;i--)
 			holderStack.push_back(i);
+
+//DEBUG
+#undef CLA_DEBUG
+
+#ifdef CLA_DEBUG
+		debug_clas = true;
+#else
+		debug_clas = false;
+#endif
 		}
 
 	~ClaManager(){
@@ -114,13 +134,23 @@ class ClaManager{
 		delete []holders;
 		}
 	
+private:
+	//Ported from BEAGLE Branch
+	//"primative" functions - the only ones that should be directly dealing with the stacks themselves
+	int _GetFreeH();
+	CondLikeArraySet* _GetFreeC();
+	void _ReclaimH(int index);
+	void _ReclaimC(int index);
+	void OutputClaReport();
+
+public:
 	int NumClas() {return numClas;}
 	int MaxUsedClas() {return maxUsed;}
 	int NumFreeClas() {return (int) claStack.size();}
 	int NumFreeHolders() {return (int) holderStack.size();}
 
 
-	int AssignClaHolder();
+	//int AssignClaHolder();
 	CondLikeArraySet* AssignFreeCla();
 	void FillHolder(int index, int dir); //sorry Mark
 
@@ -137,16 +167,58 @@ class ClaManager{
 	void RecycleClas();
 	int GetClaNumber(int index);
 	int CountClasInUse(int recLevel);
-	CondLikeArraySet *GetCla(int index);	
+	CondLikeArray *GetCla(int index, int modnum=0);
+	CondLikeArraySet *GetClaSet(int index);
 	const CondLikeArrayHolder *GetHolder(int index);	
 	bool IsDirty(int index);
 	int SetDirty(int index);
+	int SetHolderDirty(int index);
 	void IncrementCla(int index);
 	void DecrementCla(int index);
 	void CheckClaHolders();
 	void MakeAllHoldersDirty();
+
+
+	//Ported from BEAGLE Branch
+	CondLikeArrayHolder *GetMutableHolder(int index);
+	void SetHolderDependencies(int index, int depIndex1, int pDepIndex1, int depIndex2, int pDepIndex2);
+	void SetCurReclaimableLevel(int lvl) { curReclaimLevel = lvl; }
+	void SetDepLevel(int index, int lev);
+	void ClearFreeableQueue() { freeableHolderQueue.clear(); }
+	int AssignFreeClaHolder();
+	int TradeInClaHolder(int oldIndex);
+	void EmptyHolder(int index);
+	int DepLevel(int index) const { return holders[index].depLevel; }
+	int ReclaimLevel(int index) const;
+	bool IsHolderReserved(int index) const { return holders[index].reserved; }
+	bool IsHolderTempReserved(int index) const { return holders[index].tempReserved; };
+	void IncrementHolder(int index);
+	void DecrementHolder(int index);
+	void NewRecycleClas();
+
+	CondLikeArray *GetClaFillIfNecessary(int index, int modnum=0);
+	void ClaimClaFillIfNecessary(int index, int depLevel);
+	int GetClaIndexForBeagle(int index) const;
+	bool IsHolderDirty(int index) const;
+
+	void TempReserveCla(int index);
+
+	void RemoveNormalReservation(int index);
+	void RemoveTempReservation(int index);
+
+	void MarkOperationAsFreeable(ClaOperation &op);
+	void AddToFreeableQueue(int index) {
+		if (index > -1) {
+			RemoveTempReservation(index);
+			if (!IsHolderReserved(index))
+				freeableHolderQueue.push_back(index);
+		}
+	}
+	void ReportClaTotals(const char *mess, int index) const;
 	};
-	
+
+//Moving these to condlike.cpp
+#ifdef MOVED
 	inline int ClaManager::AssignClaHolder(){
 		assert(holderStack.size() > 0);
 		int index=holderStack[holderStack.size()-1];
@@ -227,6 +299,7 @@ class ClaManager{
 		}
 	
 	inline const CondLikeArrayHolder *ClaManager::GetHolder(int index){
+		assert(index > -1 && index < numHolders);
 		return &holders[index];
 		}
 	
@@ -235,6 +308,18 @@ class ClaManager{
 		assert(index > -1);
 		return (holders[index].theSet == NULL);	
 		}
+
+
+	//this marks this holder as one that should not have its cla reclaimed during recycling
+	//TEMP RESERVATIONS are nodes that are necessary for ongoing operations - destination arrays
+	//and immediate dependencies
+	void ClaManager::TempReserveCla(int index) {
+		assert(index > -1 && index < numHolders);
+		holders[index].tempReserved = true;
+		if (debug_clas) {
+			ReportClaTotals("tempreserved", index);
+		}
+	}
 
 	inline int ClaManager::SetDirty(int index){
 		//there are only two options here:
@@ -304,6 +389,93 @@ class ClaManager{
 				}
 			}
 		}
+
+//Ported from BEAGLE branch
+//This returns the cla number of the cla that this holder points to
+//it isn't changing anything, including indexes
+	int ClaManager::GetClaIndexForBeagle(int index) const {
+		assert(index > -1 && index < numHolders);
+		//BEAGLEMERGE
+		//assert(holders[index].theArray != NULL);
+		//return holders[index].theArray->Index();
+		assert(holders[index].theSet != NULL);
+		return holders[index].theSet->Index();
+	}
+
+	void ClaManager::SetHolderDependencies(int index, int depIndex1, int pDepIndex1, int depIndex2, int pDepIndex2) {
+		assert(index > -1 && index < numHolders);
+		assert(depIndex1 >= -(numNodes + 2) && depIndex1 < numHolders);
+		assert(depIndex2 >= -(numNodes + 2) && depIndex2 < numHolders);
+
+		holders[index].holderDep1 = depIndex1;
+		holders[index].transMatDep1 = pDepIndex1;
+		holders[index].holderDep2 = depIndex2;
+		holders[index].transMatDep2 = pDepIndex2;
+	}
+
+//This is essentially the same as GetCla, but doesn't return anything and also sets the tempReserved flag
+//FillHolder is only used if the holder is currently empty
+void ClaManager::ClaimClaFillIfNecessary(int index, int depLevel) {
+	assert(index > -1 && index < numHolders);
+	assert(holders[index].numAssigned > 0);
+	if (debug_clas) {
+		outman.DebugMessage("claim %d dep %d", index, depLevel);
+		CheckClaHolders();
+	}
+
+	if (IsHolderDirty(index)) {
+		FillHolder(index, depLevel);
+		if (debug_clas) {
+			ReportClaTotals("claimed-fill", index);
+		}
+	}
+	else {
+		//FillHolder will also set the dep level, but we need to set it even if FillHolder doesn't need to be called
+		SetDepLevel(index, depLevel);
+		if (debug_clas) {
+			ReportClaTotals("claimed-already-filled", index);
+		}
+	}
+	//mark this cla as one not to be reclaimed, since it has been "claimed"
+	TempReserveCla(index);
+}
+
+inline bool ClaManager::IsHolderDirty(int index) const {
+	//dirtyness is synonymous with a null cla pointer in the holder
+	assert(index > -1 && index < numHolders);
+	assert(holders[index].numAssigned > 0);
+	return (holders[index].theSet == NULL);
+}
+
+void ClaManager::ReportClaTotals(const char *mess, int index) const {
+	if (debug_clas) {
+		int clean, tempres, res, assigned;
+		clean = tempres = res = assigned = 0;
+		for (int i = 0; i<numHolders; i++) {
+			if (holders[i].theSet != NULL)
+				clean++;
+			if (IsHolderTempReserved(i))
+				tempres++;
+			if (IsHolderReserved(i))
+				res++;
+		}
+		assigned = numHolders - holderStack.size();
+		outman.DebugMessage("%s\t%d\tstacks:\t%d\t%d\tclean\t%d\ttempres\t%d\tres\t%d\tassigned\t%d\tfreeable\t%d", mess, index, claStack.size(), holderStack.size(), clean, tempres, res, assigned, freeableHolderQueue.size());
+		//the numbers can be a little out of whack because this is called mid-operation, so
+		//this will only check for serious problems
+		assert(abs(clean + (int)claStack.size() - numClas) <= 2);
+	}
+}
+
+inline void ClaManager::SetDepLevel(int index, int lvl) {
+	holders[index].depLevel = lvl;
+	if (debug_clas) {
+		char s[50];
+		sprintf(s, "setdep\tlvl\t%d", lvl);
+		ReportClaTotals(s, index);
+	}
+}
+#endif
 
 /*
 	void MarkReclaimable(int index, int val, bool observeCounts=true){

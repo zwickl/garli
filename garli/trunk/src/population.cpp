@@ -49,6 +49,7 @@ using namespace std;
 #include "tree.h"
 #include "funcs.h"
 #include "clamanager.h"
+#include "calculationmanager.h"
 #include "stopwatch.h"
 #include "bipartition.h"
 #include "adaptation.h"
@@ -581,8 +582,39 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	//setup the bipartition statics
 	Bipartition::SetBipartitionStatics(dataPart->NTax());
 
+	//BMERGE temporary hack to get beagle to work
+	SequenceData *firstData = dataPart->GetSubset(0);
+	ModelSpecification *firstmodSpec = modSpecSet.GetModSpec(0);
+
+	//new calc manager stuff
+	calcMan = new CalculationManager();
+	CalculationManager::SetClaManager(claMan);
+	//both the tips and internal branches need pmats, hence the x2
+	int idealPmats = total_size * (2 * (dataPart->NTax() - 1));
+	idealPmats *= 2;
+	//for now using as many pmats as pmat holders
+	//pmatMan = new PmatManager(numClas * 2, idealPmats, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)), modSpec.nstates);
+	pmatMan = new PmatManager(idealPmats, idealPmats, (firstmodSpec->numRateCats + (firstmodSpec->includeInvariantSites ? 1 : 0)), firstmodSpec->nstates);
+	CalculationManager::SetPmatManager(pmatMan);
+
+
+
+	CalculationManager::SetData(firstData);
+
+#ifdef USE_BEAGLE
+	//invariable class needs to be treated as extra rate for beagle
+	//calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
+	calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
+	//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, data->NStates(), sites, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)));
+	calcMan->InitializeBeagle(dataPart->NTax(), numClas, idealClas, firstData->NStates(), firstData->NChar(), (firstmodSpec->numRateCats + (firstmodSpec->includeInvariantSites ? 1 : 0)));
+#endif
+
+	NodeClaManager::SetClaManager(claMan);
+	NodeClaManager::SetPmatManager(pmatMan);
+
+
 	//set the tree statics
-	Tree::SetTreeStatics(claMan, dataPart, conf);
+	Tree::SetTreeStatics(claMan, pmatMan, calcMan, dataPart, conf);
 
 	//load any constraints
 	GetConstraints();
@@ -598,6 +630,7 @@ void Population::LoadNexusStartingConditions(){
 	GarliReader & reader = GarliReader::GetInstance();
 	NxsTaxaBlock *tax = NULL;
 	NxsTreesBlock *treesblock = NULL;
+
 
 	if(reader.GetNumTaxaBlocks() == 1)
 		tax = reader.GetTaxaBlock(0);
@@ -841,6 +874,9 @@ void Population::RunTests(){
 	tree1->MakeAllNodesDirty();
 
 	for(int i=0;i<100;i++){
+
+//BMERGE rerooting isn't working right with beagle currently
+#ifndef USE_BEAGLE
 		tree0->RerootHere(tree0->GetRandomInternalNode());
 		tree1->RerootHere(tree1->GetRandomInternalNode());
 
@@ -849,7 +885,7 @@ void Population::RunTests(){
 
 		//check rerooting and bipartition comparisons
 		assert(tree0->IdenticalTopologyAllowingRerooting(tree1->root));
-
+#endif
 		ind0->SetDirty();
 		ind1->SetDirty();
 
@@ -1294,8 +1330,11 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].treeStruct->root->CheckTreeFormation();
 	indiv[0].treeStruct->root->CheckforPolytomies();
 
+//BMERGE - rebalancing totally hoses things with beagle.  avoiding for now
+#ifndef USE_BEAGLE
 	if(!indiv[0].treeStruct->rootWithDummy)
 		indiv[0].treeStruct->CheckBalance();
+#endif
 	indiv[0].treeStruct->modPart=&indiv[0].modPart;
 	
 	try{
@@ -3555,9 +3594,13 @@ void Population::PerformSearch(){
 					else
 						theInd = storedTrees[best];
 					//InferAllInternalStateProbs will deal with assigning clas, since neither the tree in storedTrees nor the potentially temp tree have them
+#ifndef USE_BEAGLE
 					theInd->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
 					if(prematureTermination && best == storedTrees.size() - 1)
 						outman.UserMessage("WARNING: Internal states inferred on tree from prematurely terminated search\n");
+#else
+					outman.UserMessage("**Internal state inference must be updated for beagle");
+#endif
 					}
 				}
 			else if(prematureTermination){
@@ -4441,6 +4484,32 @@ void Population::PerformMutation(int indNum){
 
 void Population::NextGeneration(){
 
+	//BMERGE DEBUG
+/*
+	//outman.UserMessage("gen %d", gen);
+	for (int i = 0; i < total_size; i++) {
+		Tree *t = indiv[i].treeStruct;
+		//outman.UserMessage("ind %d", i);
+		//t->NodeManagerClaReport();
+		}
+	
+	for (int i = 0; i < total_size; i++) {
+		double before = indiv[i].Fitness();
+		//outman.UserMessage("before dirty rescore ind %d", i);
+		//indiv[i].treeStruct->NodeManagerClaReport();
+		//outman.UserMessageNoCR("%f\t", indiv[i].Fitness());
+		indiv[i].treeStruct->MakeAllNodesDirty();
+		//DEBUG
+		//outman.UserMessage("after dirty rescore ind %d", i);
+		//indiv[i].treeStruct->NodeManagerClaReport();
+		indiv[i].SetDirty();
+		indiv[i].CalcFitness(0);
+		double after = indiv[i].Fitness();
+		assert(FloatingPointEquals(before, after, 1e-8));
+		//outman.UserMessage("%f", indiv[i].Fitness());
+	}
+	*/
+
 	DetermineParentage();
 
 	FindTreeStructsForNextGeneration();
@@ -4912,8 +4981,11 @@ void Population::WriteStoredTrees( const char* treefname ){
 		const Individual *curInd;
 		if(Tree::outgroup != NULL || conf->collapseBranches){
 			tempInd.DuplicateIndivWithoutCLAs(storedTrees[r]);
+			//BMERGE TODO - still need to figure out rerooting
+#ifndef USE_BEAGLE
 			if(Tree::outgroup != NULL)
 				OutgroupRoot(&tempInd, -1);
+#endif
 			if(conf->collapseBranches){
 				int num = 0;
 				tempInd.treeStruct->root->CollapseMinLengthBranches(num);
@@ -7436,6 +7508,7 @@ void Population::FinalizeOutputStreams(){
 	}
 */
 
+/*BMERGE this needs to be updated
 void Population::FindLostClas(){
 	vector<CondLikeArraySet *> arr;
 	
@@ -7466,6 +7539,7 @@ void Population::FindLostClas(){
 		}
 	assert(arr.size() + claMan->NumFreeClas() == claMan->NumClas());
 	}
+*/
 
 void Population::LogNewBestFromRemote(FLOAT_TYPE scorediff, int ind){
 #ifdef MPI_VERSION

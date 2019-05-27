@@ -857,6 +857,7 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 			SetTaxonLabel(i, NxsString::GetEscaped(tlabel).c_str());
 			int j = 0;
 
+			bool foundAmbig = false;
 			for(NxsUnsignedSet::const_iterator cit = realCharSet->begin(); cit != realCharSet->end();cit++){	
 				if(i == 0)
 					SetOriginalDataNumber(j, *cit);
@@ -865,6 +866,8 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 				else if(charblock->IsMissingState(origTaxIndex, *cit) == true) datum = 15;
 				else{
 					int nstates = charblock->GetNumStates(origTaxIndex, *cit);
+					if (nstates > 1)
+						foundAmbig = true;
 					for(int s=0;s<nstates;s++){
 						datum += CharToBitwiseRepresentation(charblock->GetState(origTaxIndex, *cit, s));
 						}
@@ -874,6 +877,8 @@ void NucleotideData::CreateMatrixFromNCL(const NxsCharactersBlock *charblock, Nx
 				SetMatrix( i, j, datum );
 				j++;
 				}
+			if (foundAmbig)
+				taxaWithPartialAmbig.push_back(i);
 			i++;
 			}
 		}

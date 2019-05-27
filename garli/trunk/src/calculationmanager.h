@@ -18,9 +18,16 @@
 #ifndef CALCULATION_MANAGER
 #define CALCULATION_MANAGER
 
-#ifdef USE_BEAGLE
+//currently only using this for BEAGLE, although initially conceived more generally
+
+#ifndef USE_BEAGLE
+class NodeClaManager;
+class PmatManager;
+class CalculationManager;
+
+#else 
 #include "beagle.h"
-#endif
+
 
 //extern ClaManager claMan;
 //owned by each TreeNode
@@ -1089,4 +1096,7 @@ private:
 	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const;
 #endif 
 	};
+
+#endif //USE_BEAGLE
+
 #endif
