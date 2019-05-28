@@ -41,8 +41,13 @@ GeneralGamlConfig::GeneralGamlConfig(){
 	gpuBeagle = false;
 	rescaleBeagle = false;
 	preferredBeagleFlags = "SINGLE CPU RESCALE";
+#ifdef __FLT_EPSILON__
 	singlePrecEps = __FLT_EPSILON__ * 10.0;
 	doublePrecEps = __FLT_EPSILON__ * 10.0;
+#else
+	singlePrecEps = FLT_EPSILON * 10.0;
+	doublePrecEps = FLT_EPSILON * 10.0;
+#endif
 	deviceNumBeagle = -1;
 
 	//output related
