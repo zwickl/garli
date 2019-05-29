@@ -3424,6 +3424,13 @@ void Model::CreateModelFromSpecification(int modnum){
 			d = new FLOAT_TYPE;
 			*d = 1.0 / NRateCats();
 			omegaProbs.push_back(d);
+
+			//BMERGE - forgot to transfer this over
+			//changes for beagle, should have no side effects
+//The overall rate multipliers are all equal for different NS rate cats, even if omega varies
+			rateMults[i] = 1.0;
+			rateProbs[i] = *omegaProbs[i];
+
 			}
 
 /*		*omegas[0] = 0.0000;
