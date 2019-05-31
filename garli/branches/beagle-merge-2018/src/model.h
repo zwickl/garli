@@ -1199,7 +1199,8 @@ class Model{
 	void CalcDerivativesOrientedGap(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
 	void FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLOAT ***one, MODEL_FLOAT ***two);
 	void OutputPmats(ofstream &deb);
-	void OutputPmat(ofstream &deb, MODEL_FLOAT ***mat);
+	void OutputPmat(ofstream &deb, MODEL_FLOAT ***mat) const;
+	void OutputPmat(ofstream& deb, vector<MODEL_FLOAT> mat) const;
 	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pr);
 	void CalcOrientedGapPmat(FLOAT_TYPE blen, MODEL_FLOAT ***&mat);
 	void UpdateQMat();

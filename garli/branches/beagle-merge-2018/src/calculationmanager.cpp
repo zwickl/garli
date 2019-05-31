@@ -161,8 +161,8 @@ void CalculationManager::FillBeagleOptionsMaps(){
 	flagToName.insert(pair<long, string>(BEAGLE_FLAG_THREADING_OPENMP, "OPENMP"));
 	nameToFlag.insert(pair<string, long>("OPENMP", BEAGLE_FLAG_THREADING_OPENMP));
 
-	flagToName.insert(pair<long, string>(BEAGLE_FLAG_THREADING_OPENMP, "THREADING"));
-	//nameToFlag.insert(pair<string, long>("OPENMP", BEAGLE_FLAG_THREADING_CPP));
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_THREADING_CPP, "THREADING"));
+	nameToFlag.insert(pair<string, long>("THREADING", BEAGLE_FLAG_THREADING_CPP));
 
 #ifdef OUTPUT_OTHER_BEAGLE
 	//we don't usually care about these flags
@@ -294,7 +294,9 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	//num freqs = numEigens in beagle, so need at least one
 	int eigCount = 1;
 #else
-	int eigCount = nClas;
+	//BMERGE - don't know why this was nclas, at most should be # categories (nrates)
+	//int eigCount = nClas;
+	int eigCount = nrates;
 #endif
 	//this is a gross overestimate of how many matrices are needed, but haven't worked out recycling quite yet for mats
 	int matrixCount = (nHolders * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
@@ -392,47 +394,47 @@ void CalculationManager::SendTipDataToBeagle(){
     char convert[16]={-1, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4};
 	
 	int nstates = data->NStates();
-	for(int t = 0;t < data->NTax();t++){
+	for (int t = 0; t < data->NTax(); t++) {
 		bool partialAmbig = data->TaxonHasPartialAmbig(t);
 		outman.DebugMessageNoCR("t %d ", t);
 
-		const unsigned char *dataString = data->GetRow(t); 
-		if(partialAmbig){
+		const unsigned char* dataString = data->GetRow(t);
+		if (partialAmbig) {
 			//ambiguity if currently for nuc only (all versions, not just beagle)
 			assert(nstates == 4);
 			outman.DebugMessage("(some ambig)");
 			vector<double> tipPartial;
-			for(int c = 0;c < data->NChar();c++){
-				for(int s = 0;s < nstates;s++){
+			for (int c = 0; c < data->NChar(); c++) {
+				for (int s = 0; s < nstates; s++) {
 					((dataString[c] & (1 << s)) ? tipPartial.push_back(1.0) : tipPartial.push_back(0.0));
-					}
 				}
+			}
 			CheckBeagleReturnValue(
 				beagleSetTipPartials(beagleInst, t, &(tipPartial[0])),
 				"beagleSetTipStates");
-			}
-		else{
+		}
+		else {
 			outman.DebugMessage("(no ambig)");
 			vector<int> dat;
-			
-			for(int c = 0;c < data->NChar();c++){
-				if(nstates == 4){
+
+			for (int c = 0; c < data->NChar(); c++) {
+				if (nstates == 4) {
 					//nucleotide data needs to be converted from the bitwise format to 0, 1, 2, 3, 4
 					assert(dataString[c] < 16);
 					assert(convert[dataString[c]] < 5);
 					dat.push_back(convert[dataString[c]]);
-					}
-				else{
+				}
+				else {
 					//for non-nuc the data is already in the correct indexing scheme, but must be converted from
 					//chars to ints
 					dat.push_back(dataString[c]);
-					}
 				}
+			}
 			CheckBeagleReturnValue(
 				beagleSetTipStates(beagleInst, t, &(dat[0])),
 				"beagleSetTipStates");
-			}
 		}
+	}
 	outman.DebugMessage("DATA SENT");
 	}
 #endif
@@ -824,10 +826,12 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 
 #ifdef OUTPUT_PMATS
 
+	ofstream* deb = outman.GetDebugStream();
 	int nstates = data->NStates();
 	
-	int nrates = pmatMan->GetModelForTransMatHolder(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
-
+	const Model* localDebugModel = pmatMan->GetModelForTransMatHolder(theOps.begin()->destTransMatIndex);
+	//int nrates = pmatMan->GetModelForTransMatHolder(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
+	int nrates = localDebugModel->NumRateCatsForBeagle();
 //	if(calcDerivs){
 
 	/*wrong	*/
@@ -844,29 +848,67 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	double inmat[16] = {0.907060771,  0.02927234,  0.028687678,  0.034979238,  0.032138303,  0.904194759,  0.028687707,  0.034979216,  0.032138303,  0.029272277,  0.903610189,  0.034979216,  0.032138297,  0.029272304,  0.028687689,  0.909901709};
 
 	vector<double> outMat(nstates * nstates * nrates);
-	for(list<TransMatOperation>::const_iterator pit = theOps.begin();pit != theOps.end();pit++){				
-//		outman.UserMessage("MANUALLY SETTING PMATS");
-//		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), inmat);
+	for (list<TransMatOperation>::const_iterator pit = theOps.begin(); pit != theOps.end(); pit++) {
+		//		outman.UserMessage("MANUALLY SETTING PMATS");
+		//		beagleSetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), inmat);
 
 		outMat.clear();
-		for(int p=0;p<nstates*nstates*nrates;p++) 
+		for (int p = 0; p < nstates * nstates * nrates; p++)
 			outMat.push_back(p);
 		beagleGetTransitionMatrix(beagleInst, PmatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
 		//beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
 		vector<double>::iterator it = outMat.begin();
-		outman.DebugMessage("%d", (*pit).destTransMatIndex);
-		for(int r = 0;r < nrates;r++){
-			for(int i = 0;i < nstates;i++){
-				for(int j=0;j < nstates;j++){
-					outman.DebugMessageNoCR("%.10f\t", *it++);
-					}
-				outman.DebugMessage("");
+		outman.DebugMessage("Pmat: transmatIndex %d", (*pit).destTransMatIndex);
+
+		localDebugModel->OutputPmat(*deb, outMat);
+		/*
+		for (int r = 0; r < nrates; r++) {
+			outman.DebugMessage("rate %d", r);
+			for (int i = 0; i < nstates; i++) {
+				for (int j = 0; j < nstates; j++) {
+					//outman.DebugMessageNoCR("%.1f\t", *it++);
+					outman.DebugMessageNoCR("%.6f\t", *it++);
 				}
+				outman.DebugMessage("");
 			}
 		}
+		*/
+		beagleGetTransitionMatrix(beagleInst, D1MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
+		outman.DebugMessage("D1: transmatIndex %d", (*pit).destTransMatIndex);
+		localDebugModel->OutputPmat(*deb, outMat);
+		/*
+		for (int r = 0; r < nrates; r++) {
+			outman.DebugMessage("rate %d", r);
+			for (int i = 0; i < nstates; i++) {
+				for (int j = 0; j < nstates; j++) {
+					//outman.DebugMessageNoCR("%.1f\t", *it++);
+					outman.DebugMessageNoCR("%.6f\t", *it++);
+				}
+				outman.DebugMessage("");
+			}
+		}
+		*/
+
+		beagleGetTransitionMatrix(beagleInst, D2MatIndexForBeagle((*pit).destTransMatIndex), &(outMat[0]));
+		outman.DebugMessage("D2: transmatIndex %d", (*pit).destTransMatIndex);
+		localDebugModel->OutputPmat(*deb, outMat);
+		/*
+		for (int r = 0; r < nrates; r++) {
+			outman.DebugMessage("rate %d", r);
+			for (int i = 0; i < nstates; i++) {
+				for (int j = 0; j < nstates; j++) {
+					//outman.DebugMessageNoCR("%.1f\t", *it++);
+					outman.DebugMessageNoCR("%.6f\t", *it++);
+				}
+				outman.DebugMessage("");
+			}
+		}
+		*/
+	}
+
 //		}
 #endif
-	}
+}
 
 void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &theOps){
 #if ! (defined(BATCHED_CALLS) && ! defined(DONT_SEND_TRANSMATS))

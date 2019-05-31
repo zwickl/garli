@@ -1231,13 +1231,29 @@ void Model::OutputPmats(ofstream &deb){
 
 	}
 
-void Model::OutputPmat(ofstream &deb, MODEL_FLOAT ***mat) {
+void Model::OutputPmat(ofstream &deb, MODEL_FLOAT ***mat) const {
 	for (int r = 0; r<NRateCats(); r++) {
 		if (NRateCats() > 1)
 			deb << "r" << r << "\n";
 		for (int f = 0; f<nstates; f++) {
 			for (int t = 0; t<nstates; t++) {
 				deb << mat[r][f][t] << "\t";
+			}
+			deb << "\n";
+		}
+		//	deb << "\n";
+	}
+	//deb << "\n";
+}
+
+void Model::OutputPmat(ofstream& deb, vector<MODEL_FLOAT> mat) const {
+	vector<MODEL_FLOAT>::iterator  it = mat.begin();
+	for (int r = 0; r < NRateCats(); r++) {
+		if (NRateCats() > 1)
+			deb << "r" << r << "\n";
+		for (int f = 0; f < nstates; f++) {
+			for (int t = 0; t < nstates; t++) {
+				deb << *it++ << "\t";
 			}
 			deb << "\n";
 		}
