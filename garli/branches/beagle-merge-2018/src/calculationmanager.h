@@ -632,6 +632,12 @@ public:
 		pmatMan->SetEdgelen(transMatIndex, e);
 	}
 
+	void SetTransMat(ModelPartition* m, int modnum, FLOAT_TYPE e) {
+		//outman.DebugMessage("up pdeps %d", transMatIndex);
+		pmatMan->SetModel(transMatIndex, m->GetModel(modnum));
+		pmatMan->SetEdgelen(transMatIndex, e);
+	}
+
 	inline CondLikeArray *GetClaDown(int modnum /*=0*/){
 		bool calc = true;
 		if(claMan->IsDirty(downHolderIndex)){
@@ -779,7 +785,11 @@ class CalculationManager{
 	//with the global manager, as everything did previously
 	static ClaManager *claMan;
 	static PmatManager *pmatMan;
+#ifdef BEAGLEPART
+	static const DataPartition* dataPart;
+#else
 	static const SequenceData *data;
+#endif
 	list<BlockingOperationsSet> operationSetQueue;
 	list<BlockingOperationsSet> freeableOpSets;
 	list<ScoringOperation> scoreOps;
@@ -805,7 +815,12 @@ public:
 	//bool rescaleBeagle;
 //	bool singlePrecBeagle;
 //	bool gpuBeagle;
+#ifdef BEAGLEPART
+	vector<int> beagleInstances
+#else
 	int beagleInst;
+#endif
+
 	string ofprefix;
 
 	CalculationManager(){
@@ -857,7 +872,7 @@ public:
 	//this is also only known AFTER initialization
 	bool IsGPU() {return (bool) (actual_flags & BEAGLE_FLAG_PROCESSOR_GPU);}
 
-	void InitializeBeagle(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
+	void InitializeBeagleInstance(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
 
 	void Finalize(){
 #ifdef USE_BEAGLE
@@ -874,9 +889,15 @@ public:
 		CalculationManager::pmatMan = pMan;
 		}
 
-	static void SetData(SequenceData *dat){
+#ifdef BEAGLEPART
+	static void SetData(DataPartition *dat){
 		CalculationManager::data = dat;
 		}
+#else
+	static void SetData(SequenceData* dat) {
+		CalculationManager::data = dat;
+	}
+#endif
 	
 	void SetOfprefix(string &prefix){
 		ofprefix = prefix;

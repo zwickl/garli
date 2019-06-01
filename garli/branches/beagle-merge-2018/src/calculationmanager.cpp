@@ -156,7 +156,7 @@ void CalculationManager::FillBeagleOptionsMaps(){
 	nameToFlag.insert(pair<string, long>("SSE", BEAGLE_FLAG_VECTOR_SSE));
 
 	flagToName.insert(pair<long, string>(BEAGLE_FLAG_VECTOR_SSE, "AVX"));
-	nameToFlag.insert(pair<string, long>("SSE", BEAGLE_FLAG_VECTOR_AVX));
+	nameToFlag.insert(pair<string, long>("AVX", BEAGLE_FLAG_VECTOR_AVX));
 
 	flagToName.insert(pair<long, string>(BEAGLE_FLAG_THREADING_OPENMP, "OPENMP"));
 	nameToFlag.insert(pair<string, long>("OPENMP", BEAGLE_FLAG_THREADING_OPENMP));
@@ -256,7 +256,7 @@ void CalculationManager::InterpretBeagleResourceFlags(long flags, string &list, 
 		}while(bit <= (1 << 18));
 	}
 
-void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, int nstates, int nchar, int nrates){
+void CalculationManager::InitializeBeagleInstance(int nTips, int nClas, int nHolders, int nstates, int nchar, int nrates){
 	assert(useBeagle);
 
 	termOnBeagleError = true;
@@ -323,7 +323,7 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 	BeagleInstanceDetails det;
 
 	//this returns either the instance number or a beagle error, which is somewhat annoying
-   	beagleInst = beagleCreateInstance(tipCount, 
+   	int beagleInstNum = beagleCreateInstance(tipCount, 
 		partialsCount, 
 		compactCount, 
 		nstates, 
@@ -337,6 +337,12 @@ void CalculationManager::InitializeBeagle(int nTips, int nClas, int nHolders, in
 		pref_flags, 
 		req_flags,
 		&det);
+
+#ifdef BEAGLEPART
+	beagleInst.push_back(beagleInstNum);
+#else
+	beagleInst = beagleInstNum;
+#endif
 
 	CheckBeagleReturnValue(
 		beagleInst, 
@@ -765,18 +771,37 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	//currently it will always be resent (sol.changed will always be true) because
 	//it is non-trivial to figure out when it has changed since it was last sent to beagle
 	ModelEigenSolution sol;
+	
 	pmatMan->GetEigenSolution(theOps.begin()->destTransMatIndex, sol);
 
-	if(sol.changed){
+	int nstates = pmatMan->GetNumStates();
+
+	//omega cats
+	if (nstates > 60 && pmatMan->GetNumRates() > 1) {
+		if (sol.changed) {
+			for (int cat = 0; cat < pmatMan->GetNumRates(); cat++) {
+				CheckBeagleReturnValue(
+					beagleSetEigenDecomposition(
+						beagleInst,
+						cat,
+						&sol.eigenVecs[cat * nstates * nstates],
+						&sol.invEigenVecs[cat * nstates * nstates],
+						&sol.eigenVals[cat * nstates]),
+					"beagleSetEigenDecomposition");
+			}
+		}
+
+	}
+	else {
 		CheckBeagleReturnValue(
 			beagleSetEigenDecomposition(
 				beagleInst,
-				eigenIndex,
+				0,
 				sol.eigenVecs,
 				sol.invEigenVecs,
 				sol.eigenVals),
 			"beagleSetEigenDecomposition");
-		}
+	}
 
 	vector<FLOAT_TYPE> categRates;
 	pmatMan->GetCategoryRatesForBeagle(theOps.begin()->destTransMatIndex, categRates);
@@ -812,16 +837,36 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	outman.DebugMessageNoCR("UPDATING TRANS MAT ");
 //	outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOp->destTransMatIndex), theOp->destTransMatIndex, eigenIndex, edgeLens[0]);
 #endif
-	CheckBeagleReturnValue(
-		beagleUpdateTransitionMatrices(
-			beagleInst,
-			eigenIndex,
-            &pmatInd[0],
-			(calcDerivs ? &d1MatInd[0] : NULL),
-			(calcDerivs ? &d2MatInd[0] : NULL),
-			&edgeLens[0],
-            count),
-		"beagleUpdateTransitionMatrices");
+
+	int nrates = pmatMan->GetNumRates();
+	if (pmatMan->GetNumStates() > 60 && nrates > 1) {
+
+		vector<int> eigenIndeces(nrates);
+		for (int r = 0; r < nrates; r++) eigenIndeces.push_back(r);
+		//eigenIndeces = { 0, 1 };
+		CheckBeagleReturnValue(
+			beagleUpdateTransitionMatricesWithModelCategories(
+				beagleInst,
+				&eigenIndeces[0],
+				&pmatInd[0],
+				(calcDerivs ? &d1MatInd[0] : NULL),
+				(calcDerivs ? &d2MatInd[0] : NULL),
+				&edgeLens[0],
+				count),
+			"beagleUpdateTransitionMatricesWithModelCategories");
+	}
+	else {
+		CheckBeagleReturnValue(
+			beagleUpdateTransitionMatrices(
+				beagleInst,
+				eigenIndex,
+				&pmatInd[0],
+				(calcDerivs ? &d1MatInd[0] : NULL),
+				(calcDerivs ? &d2MatInd[0] : NULL),
+				&edgeLens[0],
+				count),
+			"beagleUpdateTransitionMatrices");
+	}
 #endif
 
 #ifdef OUTPUT_PMATS

@@ -598,16 +598,19 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	pmatMan = new PmatManager(idealPmats, idealPmats, (firstmodSpec->numRateCats + (firstmodSpec->includeInvariantSites ? 1 : 0)), firstmodSpec->nstates);
 	CalculationManager::SetPmatManager(pmatMan);
 
-
-
+#ifdef BEAGLEPART 
+	CalculationManager::SetData(dataPart);
+#else
 	CalculationManager::SetData(firstData);
+#endif
 
 #ifdef USE_BEAGLE
 	//invariable class needs to be treated as extra rate for beagle
 	//calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
 	calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
 	//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, data->NStates(), sites, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)));
-	calcMan->InitializeBeagle(dataPart->NTax(), numClas, idealClas, firstData->NStates(), firstData->NChar(), (firstmodSpec->numRateCats + (firstmodSpec->includeInvariantSites ? 1 : 0)));
+	calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, firstData->NStates(), firstData->NChar(), (firstmodSpec->numRateCats + (firstmodSpec->includeInvariantSites ? 1 : 0)));
+
 #endif
 
 	NodeClaManager::SetClaManager(claMan);
