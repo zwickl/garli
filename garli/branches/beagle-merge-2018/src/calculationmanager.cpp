@@ -49,6 +49,8 @@ const char *AdvanceDataPointer(const char *arr, int num);
 
 #ifdef USE_BEAGLE
 
+//#define DONT_SEND_TRANSMATS
+
 // print possible beagle resources
 void CalculationManager::OutputBeagleResources() const{
     BeagleResourceList* rList;
@@ -790,7 +792,6 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 					"beagleSetEigenDecomposition");
 			}
 		}
-
 	}
 	else {
 		CheckBeagleReturnValue(
@@ -841,7 +842,7 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 	int nrates = pmatMan->GetNumRates();
 	if (pmatMan->GetNumStates() > 60 && nrates > 1) {
 
-		vector<int> eigenIndeces(nrates);
+		vector<int> eigenIndeces;
 		for (int r = 0; r < nrates; r++) eigenIndeces.push_back(r);
 		//eigenIndeces = { 0, 1 };
 		CheckBeagleReturnValue(
@@ -872,11 +873,10 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 #ifdef OUTPUT_PMATS
 
 	ofstream* deb = outman.GetDebugStream();
-	int nstates = data->NStates();
+	//int nstates = data->NStates();
 	
 	const Model* localDebugModel = pmatMan->GetModelForTransMatHolder(theOps.begin()->destTransMatIndex);
 	//int nrates = pmatMan->GetModelForTransMatHolder(theOps.begin()->destTransMatIndex)->NumRateCatsForBeagle();
-	int nrates = localDebugModel->NumRateCatsForBeagle();
 //	if(calcDerivs){
 
 	/*wrong	*/
