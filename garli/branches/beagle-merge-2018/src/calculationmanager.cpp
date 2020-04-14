@@ -758,14 +758,8 @@ void CalculationManager::UpdateAllConditionals(){
 	}
 
 void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperation> &theOps){
-#ifndef USE_BEAGLE
-	//mod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
-	//this is a bit ridiculous, but these funcs won't really be getting used except with beagle
-	pmatMan->GetMutableHolder(theOp->destTransMatIndex)->myMod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
-#else 
 
 	//for now assuming that all transmat ops in a set have same eigen solution and rate multipliers
-	
 	//currently just using a single eigen index and sending it every time
 	int eigenIndex = 0;
 	
@@ -868,7 +862,6 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 				count),
 			"beagleUpdateTransitionMatrices");
 	}
-#endif
 
 #ifdef OUTPUT_PMATS
 
@@ -950,9 +943,8 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 		}
 		*/
 	}
-
-//		}
 #endif
+//		}
 }
 
 void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &theOps){
@@ -1277,121 +1269,58 @@ void CalculationManager::ResetDepLevelsAndReservations(){
 
 void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 
-#ifdef USE_BEAGLE
-	//DEBUG
-	useBeagle = true;
-#endif
 //	outman.DebugMessage("**ENTERING PERFORM CLA");	
 
-	if(! useBeagle){
-		int term1 = 0;
-		int term2 = 0;
-		if(theOp->childClaIndex1 < 0)
-			term1 = -theOp->childClaIndex1;
-	
-		if(theOp->childClaIndex2 < 0)
-			term2 = -theOp->childClaIndex2;
-
-		if( term1 && term2 ){
-			CalcFullCLATerminalTerminal(
-				claMan->GetClaFillIfNecessary(theOp->destClaIndex),
-				//DEBUG - should probably figure some way not to do these static cassts
-				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term1-1),
-				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term2-1),
-				pmatMan->GetPmatArray(theOp->transMatIndex1),
-				pmatMan->GetPmatArray(theOp->transMatIndex2), 
-				pmatMan->GetModelForTransMatHolder(theOp->transMatIndex1));
-			}
-		else if( ! (term1 || term2)){
-			CalcFullClaInternalInternal(
-				claMan->GetClaFillIfNecessary(theOp->destClaIndex),
-				claMan->GetClaFillIfNecessary(theOp->childClaIndex1),
-				claMan->GetClaFillIfNecessary(theOp->childClaIndex2),
-				pmatMan->GetPmatArray(theOp->transMatIndex1),
-				pmatMan->GetPmatArray(theOp->transMatIndex2),
-				pmatMan->GetModelForTransMatHolder(theOp->transMatIndex1));
-			}
-		else if( term1 ){
-			this->CalcFullCLAInternalTerminal(
-				claMan->GetClaFillIfNecessary(theOp->destClaIndex),
-				claMan->GetClaFillIfNecessary(theOp->childClaIndex2),
-				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term1-1),
-				pmatMan->GetPmatArray(theOp->transMatIndex2),
-				pmatMan->GetPmatArray(theOp->transMatIndex1),
-				pmatMan->GetModelForTransMatHolder(theOp->transMatIndex1), 
-				NULL);
-			}
-		else{
-			this->CalcFullCLAInternalTerminal(
-				claMan->GetClaFillIfNecessary(theOp->destClaIndex),
-				claMan->GetClaFillIfNecessary(theOp->childClaIndex1),
-				(char*) static_cast<const NucleotideData *>(data)->GetAmbigString(term2-1),
-				pmatMan->GetPmatArray(theOp->transMatIndex1),
-				pmatMan->GetPmatArray(theOp->transMatIndex2),
-				pmatMan->GetModelForTransMatHolder(theOp->transMatIndex1),
-				NULL);
-			}
-		}
-	else{
-#ifdef USE_BEAGLE
 
 		//this is deprecated in favor of batched calls
 #ifdef BATCHED_CALLS
 	assert(0);
 #endif	
-		//not sure if this is right - will always use a single scale array for destWrite (essentially
-		//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
-		int destinationScaleWrite = (IsRescaling() ? claMan->NumClas() : BEAGLE_OP_NONE);
-		int	destinationScaleRead = BEAGLE_OP_NONE;
+	//not sure if this is right - will always use a single scale array for destWrite (essentially
+	//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
+	int destinationScaleWrite = (IsRescaling() ? claMan->NumClas() : BEAGLE_OP_NONE);
+	int	destinationScaleRead = BEAGLE_OP_NONE;
 
-		int operationTuple[7] = {PartialIndexForBeagle(theOp->destClaIndex),
-                                destinationScaleWrite,
-                                destinationScaleRead,
-								PartialIndexForBeagle(theOp->childClaIndex1),
- 								PmatIndexForBeagle(theOp->transMatIndex1),
- 								PartialIndexForBeagle(theOp->childClaIndex2),
-								PmatIndexForBeagle(theOp->transMatIndex2)};
+	int operationTuple[7] = {PartialIndexForBeagle(theOp->destClaIndex),
+                            destinationScaleWrite,
+                            destinationScaleRead,
+							PartialIndexForBeagle(theOp->childClaIndex1),
+ 							PmatIndexForBeagle(theOp->transMatIndex1),
+ 							PartialIndexForBeagle(theOp->childClaIndex2),
+							PmatIndexForBeagle(theOp->transMatIndex2)};
 
-		outman.DebugMessageNoCR("PARTS\t");
-		outman.DebugMessageNoCR("\tD\t%d (%d)", PartialIndexForBeagle(theOp->destClaIndex), theOp->destClaIndex);
-		outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", PartialIndexForBeagle(theOp->childClaIndex1), theOp->childClaIndex1, PartialIndexForBeagle(theOp->childClaIndex2), theOp->childClaIndex2);
-		outman.DebugMessage("\tP\t%d (%d)\t%d (%d)", PmatIndexForBeagle(theOp->transMatIndex1), theOp->transMatIndex1, PmatIndexForBeagle(theOp->transMatIndex2), theOp->transMatIndex2);
+	outman.DebugMessageNoCR("PARTS\t");
+	outman.DebugMessageNoCR("\tD\t%d (%d)", PartialIndexForBeagle(theOp->destClaIndex), theOp->destClaIndex);
+	outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", PartialIndexForBeagle(theOp->childClaIndex1), theOp->childClaIndex1, PartialIndexForBeagle(theOp->childClaIndex2), theOp->childClaIndex2);
+	outman.DebugMessage("\tP\t%d (%d)\t%d (%d)", PmatIndexForBeagle(theOp->transMatIndex1), theOp->transMatIndex1, PmatIndexForBeagle(theOp->transMatIndex2), theOp->transMatIndex2);
 		
-		int instanceCount = 1;
-		int operationCount = 1;
+	int instanceCount = 1;
+	int operationCount = 1;
 
-		//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
-		//and my negative (tip) corresponds to a NULL in beagle
-		int cumulativeScaleIndex = BEAGLE_OP_NONE;
-		if(IsRescaling()){
-			cumulativeScaleIndex = theOp->destClaIndex;
-			AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
-			}
-
-		CheckBeagleReturnValue(
-			beagleUpdatePartials(
-				beagleInst,
-				(BeagleOperation*)operationTuple,
-				operationCount,
-				cumulativeScaleIndex),
-			"beagleUpdatePartials");
-
-		//to indicate that the partial is now clean, fill the holder that represents it, despite the fact that the memory there is never being used
-		//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
-		claMan->FillHolder(theOp->destClaIndex, 0);
-#endif
+	//accumulate rescaling factors - For scale arrays my indexing scheme and Beagle's happen to be the same, 
+	//and my negative (tip) corresponds to a NULL in beagle
+	int cumulativeScaleIndex = BEAGLE_OP_NONE;
+	if(IsRescaling()){
+		cumulativeScaleIndex = theOp->destClaIndex;
+		AccumulateRescalers(cumulativeScaleIndex, theOp->childClaIndex1, theOp->childClaIndex2);
 		}
-	}
 
+	CheckBeagleReturnValue(
+		beagleUpdatePartials(
+			beagleInst,
+			(BeagleOperation*)operationTuple,
+			operationCount,
+			cumulativeScaleIndex),
+		"beagleUpdatePartials");
+
+	//to indicate that the partial is now clean, fill the holder that represents it, despite the fact that the memory there is never being used
+	//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
+	claMan->FillHolder(theOp->destClaIndex, 0);
+}
 
 
 //deprecated in favor of PerformTransMatOperationBatch
 void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp){
-#ifndef USE_BEAGLE
-	//mod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
-	//this is a bit ridiculous, but these funcs won't really be getting used except with beagle
-	pmatMan->GetMutableHolder(theOp->destTransMatIndex)->myMod->AltCalcPmat(theOp->edgeLength, pmatMan->GetPmat(theOp->destTransMatIndex)->theMat);
-#else 
 
 #ifdef BATCHED_CALLS
 	assert(0);
@@ -1455,7 +1384,6 @@ void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp
 			edgeLens,
             count),
 		"beagleUpdateTransitionMatrices");
-#endif
 
 #ifdef OUTPUT_PMATS
 if(theOp->calcDerivs){
@@ -1500,144 +1428,134 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 #ifdef OUTPUT_OTHER_BEAGLE
 //	outman.DebugMessage("ENTER PERF SCR");
 #endif
-
-	if(!useBeagle){
-		results.lnL = GetScorePartialInternalRateHet(claMan->GetClaFillIfNecessary(theOp->childClaIndex1), 
-			claMan->GetClaFillIfNecessary(theOp->childClaIndex2), 
-			pmatMan->GetPmatArray(theOp->transMatIndex),
-			pmatMan->GetModelForTransMatHolder(theOp->transMatIndex));
-		}
-
-	else{
 #ifdef USE_BEAGLE
-		//state freqs - these are always being sent and stored in the same slot
-		vector<FLOAT_TYPE> freqs(pmatMan->GetNumStates());
-		//BEAGLE MERGE
-		pmatMan->GetModelForTransMatHolder(theOp->transMatIndex)->GetStateFreqs(&(freqs[0]));
-		//pmatMan->GetModelForTransMatHolder(theOp->transMatIndex)->stateFreqs;
+	//state freqs - these are always being sent and stored in the same slot
+	vector<FLOAT_TYPE> freqs(pmatMan->GetNumStates());
+	//BEAGLE MERGE
+	pmatMan->GetModelForTransMatHolder(theOp->transMatIndex)->GetStateFreqs(&(freqs[0]));
+	//pmatMan->GetModelForTransMatHolder(theOp->transMatIndex)->stateFreqs;
 
 #ifdef OUTPUT_OTHER_BEAGLE
 /*		outman.DebugMessageNoCR("freqs sent\t");
-		for(int i = 0; i < 4;i++)
-			outman.DebugMessageNoCR("%.6f\t", freqs[i]);
+	for(int i = 0; i < 4;i++)
+		outman.DebugMessageNoCR("%.6f\t", freqs[i]);
+	outman.DebugMessage("");
+	*/
+#endif
+	int freqIndex = 0;
+	CheckBeagleReturnValue(
+		beagleSetStateFrequencies(
+			beagleInst,
+			freqIndex,
+			&(freqs[0])),
+		"beagleSetStateFrequencies");
+
+	//category weights (or probs) - these are also always being sent.  annoying to figure out when they need to be updated
+	vector<FLOAT_TYPE> inWeights;
+	pmatMan->GetCategoryWeightsForBeagle(theOp->transMatIndex, inWeights);
+#ifdef OUTPUT_OTHER_BEAGLE
+	if(inWeights.size() > 1){
+		outman.DebugMessageNoCR("rate props sent\t");
+		for(int i = 0; i < inWeights.size();i++)
+			outman.DebugMessageNoCR("%.6f\t", inWeights[i]);
 		outman.DebugMessage("");
-		*/
+		}
 #endif
-		int freqIndex = 0;
+	int weightIndex = 0;
+	if(inWeights.size() > 0){
 		CheckBeagleReturnValue(
-			beagleSetStateFrequencies(
+			beagleSetCategoryWeights(
 				beagleInst,
-				freqIndex,
-				&(freqs[0])),
-			"beagleSetStateFrequencies");
+				weightIndex,
+				&(inWeights[0])),
+			"beagleSetCategoryWeights");
+		}
 
-		//category weights (or probs) - these are also always being sent.  annoying to figure out when they need to be updated
-		vector<FLOAT_TYPE> inWeights;
-		pmatMan->GetCategoryWeightsForBeagle(theOp->transMatIndex, inWeights);
-#ifdef OUTPUT_OTHER_BEAGLE
-		if(inWeights.size() > 1){
-			outman.DebugMessageNoCR("rate props sent\t");
-			for(int i = 0; i < inWeights.size();i++)
-				outman.DebugMessageNoCR("%.6f\t", inWeights[i]);
-			outman.DebugMessage("");
-			}
-#endif
-		int weightIndex = 0;
-		if(inWeights.size() > 0){
-			CheckBeagleReturnValue(
-				beagleSetCategoryWeights(
-					beagleInst,
-					weightIndex,
-					&(inWeights[0])),
-				"beagleSetCategoryWeights");
-			}
+	//the two children to be included- they should have been calculated and reserved
+	//earlier in UpdateClas
+	int buffer1[1] = {PartialIndexForBeagle(theOp->childClaIndex1)};
+	int buffer2[1] = {PartialIndexForBeagle(theOp->childClaIndex2)};
+	int numInput = 2;
 
-		//the two children to be included- they should have been calculated and reserved
-		//earlier in UpdateClas
-		int buffer1[1] = {PartialIndexForBeagle(theOp->childClaIndex1)};
-		int buffer2[1] = {PartialIndexForBeagle(theOp->childClaIndex2)};
-		int numInput = 2;
+	//arrays to hold site lnLs and derivs returned from Beagle
+	//note that later beagle versions don't return the array anymore, just the sum
+	vector<double> siteLikesOut(data->NChar());
+	vector<double> siteD1Out(data->NChar());
+	vector<double> siteD2Out(data->NChar());
 
-		//arrays to hold site lnLs and derivs returned from Beagle
-		//note that later beagle versions don't return the array anymore, just the sum
-		vector<double> siteLikesOut(data->NChar());
-		vector<double> siteD1Out(data->NChar());
-		vector<double> siteD2Out(data->NChar());
-
-		int pmatIndeces[1] = {PmatIndexForBeagle(theOp->transMatIndex)};
-		int	d1MatIndeces[1] = {D1MatIndexForBeagle(theOp->transMatIndex)};
-		int	d2MatIndeces[1] = {D2MatIndexForBeagle(theOp->transMatIndex)};
+	int pmatIndeces[1] = {PmatIndexForBeagle(theOp->transMatIndex)};
+	int	d1MatIndeces[1] = {D1MatIndexForBeagle(theOp->transMatIndex)};
+	int	d2MatIndeces[1] = {D2MatIndexForBeagle(theOp->transMatIndex)};
 
 #ifdef OUTPUT_OTHER_BEAGLE
-		outman.DebugMessageNoCR("Scr:\t");
-		outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", buffer2[0], theOp->childClaIndex2, buffer1[0], theOp->childClaIndex1);
-		outman.DebugMessage("\tP\t%d (%d)", pmatIndeces[0], theOp->transMatIndex);
+	outman.DebugMessageNoCR("Scr:\t");
+	outman.DebugMessageNoCR("\tC\t%d (%d)\t%d (%d)", buffer2[0], theOp->childClaIndex2, buffer1[0], theOp->childClaIndex1);
+	outman.DebugMessage("\tP\t%d (%d)", pmatIndeces[0], theOp->transMatIndex);
 #endif
 
-		int count = 1;
+	int count = 1;
 
-		//accumulate rescaling factors of the two clas that are being combined (one might be a tip)
-		//For scale arrays my indexing scheme and Beagle's happen to be the same, and my negative (tip) corresponds to a NULL in beagle
-		//use this scratch index to hold the final accumulated scalers 
-		int cumulativeBeagleScaleIndex = BEAGLE_OP_NONE;
-		if(IsRescaling()){
-			cumulativeBeagleScaleIndex = ScalerIndexForBeagle(GARLI_FINAL_SCALER_INDEX);
-			beagleResetScaleFactors(beagleInst, cumulativeBeagleScaleIndex);
-			//add all of the rescaling up to the two involved children.  This will be passed to
-			//calcEdgeLike, which will give the final scores
-			AccumulateRescalers(GARLI_FINAL_SCALER_INDEX, theOp->childClaIndex1, theOp->childClaIndex2);
-			}
+	//accumulate rescaling factors of the two clas that are being combined (one might be a tip)
+	//For scale arrays my indexing scheme and Beagle's happen to be the same, and my negative (tip) corresponds to a NULL in beagle
+	//use this scratch index to hold the final accumulated scalers 
+	int cumulativeBeagleScaleIndex = BEAGLE_OP_NONE;
+	if(IsRescaling()){
+		cumulativeBeagleScaleIndex = ScalerIndexForBeagle(GARLI_FINAL_SCALER_INDEX);
+		beagleResetScaleFactors(beagleInst, cumulativeBeagleScaleIndex);
+		//add all of the rescaling up to the two involved children.  This will be passed to
+		//calcEdgeLike, which will give the final scores
+		AccumulateRescalers(GARLI_FINAL_SCALER_INDEX, theOp->childClaIndex1, theOp->childClaIndex2);
+		}
 
-		CheckBeagleReturnValue(
-			beagleCalculateEdgeLogLikelihoods(
-				beagleInst,
-				buffer2,
-				buffer1,
-				pmatIndeces,
-				(theOp->derivatives ? d1MatIndeces : NULL),
-				(theOp->derivatives ? d2MatIndeces : NULL),
-				&weightIndex,
-				&freqIndex,
-				&cumulativeBeagleScaleIndex,
-				count,
-				&siteLikesOut[0],
-				(theOp->derivatives ? &siteD1Out[0] : NULL),
-				(theOp->derivatives ? &siteD2Out[0] : NULL)),
-			"beagleCalculateEdgeLogLikelihoods");
+	CheckBeagleReturnValue(
+		beagleCalculateEdgeLogLikelihoods(
+			beagleInst,
+			buffer2,
+			buffer1,
+			pmatIndeces,
+			(theOp->derivatives ? d1MatIndeces : NULL),
+			(theOp->derivatives ? d2MatIndeces : NULL),
+			&weightIndex,
+			&freqIndex,
+			&cumulativeBeagleScaleIndex,
+			count,
+			&siteLikesOut[0],
+			(theOp->derivatives ? &siteD1Out[0] : NULL),
+			(theOp->derivatives ? &siteD2Out[0] : NULL)),
+		"beagleCalculateEdgeLogLikelihoods");
 
-		bool beagleReturnsSums = true;
+	bool beagleReturnsSums = true;
 
-		if(beagleReturnsSums){
-			results.lnL = siteLikesOut[0];
-			results.d1 = siteD1Out[0];
-			results.d2 = siteD2Out[0];
+	if(beagleReturnsSums){
+		results.lnL = siteLikesOut[0];
+		results.d1 = siteD1Out[0];
+		results.d2 = siteD2Out[0];
 
 #ifdef OUTPUT_BEAGLE_SITELIKES
-			string name = ofprefix + ".Bsitelikes.log";
-			ofstream file(name.c_str(), ios::app);	
-			file.precision(10);
-			OutputBeagleSiteValues(file, theOp->derivatives);
-			file.close();
-			//mySummation = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
-			//outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
+		string name = ofprefix + ".Bsitelikes.log";
+		ofstream file(name.c_str(), ios::app);	
+		file.precision(10);
+		OutputBeagleSiteValues(file, theOp->derivatives);
+		file.close();
+		//mySummation = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
+		//outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
 #endif
-			}
-		else
-			results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
-		assert(results.lnL < 0.0 && results.lnL > -10.0e10);
-		assert(results.d1 < 10.0e15 && results.d1 > -10.0e15);
-		assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
+		}
+	else
+		results = SumSiteValues(&siteLikesOut[0], (theOp->derivatives ? &siteD1Out[0] : NULL), (theOp->derivatives ? &siteD2Out[0] : NULL));
+	assert(results.lnL < 0.0 && results.lnL > -10.0e10);
+	assert(results.d1 < 10.0e15 && results.d1 > -10.0e15);
+	assert(results.d2 < 10.0e25 && results.d2 > -10.0e25);
 #ifdef OUTPUT_OTHER_BEAGLE
-		outman.DebugMessage("L\t%f\tD1\t%f\tD2\t%f", results.lnL, results.d1, results.d2);
+	outman.DebugMessage("L\t%f\tD1\t%f\tD2\t%f", results.lnL, results.d1, results.d2);
 #endif
 #ifdef TERMINATE_AFTER_SCORE
-		throw ErrorException("TERMINATING AFTER ONE SCORE");
+	throw ErrorException("TERMINATING AFTER ONE SCORE");
 #endif
 
 #endif
-		}
 	return results;
-	}
+}
 
 ScoreSet CalculationManager::SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const{
 	FLOAT_TYPE lnL = 0.0, D1 = 0.0, D2 = 0.0;
@@ -1731,792 +1649,3 @@ void CalculationManager::OutputBeagleSiteValues(ofstream &out, bool derivs) cons
 		}
 	}
 
-//these are my old functions, not used when in beagle mode
-void CalculationManager::CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA, MODEL_FLOAT ***Lpmat,  MODEL_FLOAT ***Rpmat, const Model *mod){
-
-	FLOAT_TYPE *Lpr = **Lpmat;
-	FLOAT_TYPE *Rpr = **Rpmat;
-
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	FLOAT_TYPE *dest=destCLA->arr;
-	const FLOAT_TYPE *LCL=LCLA->arr;
-	const FLOAT_TYPE *RCL=RCLA->arr;
-	FLOAT_TYPE L1, L2, L3, L4, R1, R2, R3, R4;
-
-	const int nRateCats = mod->NRateCats();
-	const int nchar = data->NChar();
-	const int *counts = data->GetCounts();
-
-#ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)LCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void *)RCL, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-	if(nRateCats == 4){//the unrolled 4 rate version
-#ifdef OMP_INTINTCLA
-		#pragma omp parallel for private(dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
-		for(int i=0;i<nchar;i++){
-			int index=4*4*i;
-			dest = &(destCLA->arr[index]);
-			LCL = &(LCLA->arr[index]);
-			RCL= &(RCLA->arr[index]);
-#else
-		for(int i=0;i<nchar;i++){
-#endif
-#ifdef USE_COUNTS_IN_BOOT
-			if(counts[i]> 0){
-#else
-			if(1){
-#endif
-				L1=((Lpr[0]*LCL[0])+(Lpr[1]*LCL[1]))+((Lpr[2]*LCL[2])+(Lpr[3]*LCL[3]));
-				L2=((Lpr[4]*LCL[0])+(Lpr[5]*LCL[1]))+((Lpr[6]*LCL[2])+(Lpr[7]*LCL[3]));
-				L3=((Lpr[8]*LCL[0])+(Lpr[9]*LCL[1]))+((Lpr[10]*LCL[2])+(Lpr[11]*LCL[3]));
-				L4=((Lpr[12]*LCL[0])+(Lpr[13]*LCL[1]))+((Lpr[14]*LCL[2])+(Lpr[15]*LCL[3]));
-
-				R1=((Rpr[0]*RCL[0])+(Rpr[1]*RCL[1]))+((Rpr[2]*RCL[2])+(Rpr[3]*RCL[3]));
-				R2=((Rpr[4]*RCL[0])+(Rpr[5]*RCL[1]))+((Rpr[6]*RCL[2])+(Rpr[7]*RCL[3]));
-				R3=((Rpr[8]*RCL[0])+(Rpr[9]*RCL[1]))+((Rpr[10]*RCL[2])+(Rpr[11]*RCL[3]));
-				R4=((Rpr[12]*RCL[0])+(Rpr[13]*RCL[1]))+((Rpr[14]*RCL[2])+(Rpr[15]*RCL[3]));
-
-				dest[0] = L1 * R1;
-				dest[1] = L2 * R2;
-				dest[2] = L3 * R3;
-				dest[3] = L4 * R4;
-
-				dest+=4;
-				LCL+=4;
-				RCL+=4;
-
-				L1=(Lpr[16+0]*LCL[0]+Lpr[16+1]*LCL[1])+(Lpr[16+2]*LCL[2]+Lpr[16+3]*LCL[3]);
-				L2=(Lpr[16+4]*LCL[0]+Lpr[16+5]*LCL[1])+(Lpr[16+6]*LCL[2]+Lpr[16+7]*LCL[3]);
-				L3=(Lpr[16+8]*LCL[0]+Lpr[16+9]*LCL[1])+(Lpr[16+10]*LCL[2]+Lpr[16+11]*LCL[3]);
-				L4=(Lpr[16+12]*LCL[0]+Lpr[16+13]*LCL[1])+(Lpr[16+14]*LCL[2]+Lpr[16+15]*LCL[3]);
-
-				R1=(Rpr[16+0]*RCL[0]+Rpr[16+1]*RCL[1])+(Rpr[16+2]*RCL[2]+Rpr[16+3]*RCL[3]);
-				R2=(Rpr[16+4]*RCL[0]+Rpr[16+5]*RCL[1])+(Rpr[16+6]*RCL[2]+Rpr[16+7]*RCL[3]);
-				R3=(Rpr[16+8]*RCL[0]+Rpr[16+9]*RCL[1])+(Rpr[16+10]*RCL[2]+Rpr[16+11]*RCL[3]);
-				R4=(Rpr[16+12]*RCL[0]+Rpr[16+13]*RCL[1])+(Rpr[16+14]*RCL[2]+Rpr[16+15]*RCL[3]);
-
-				dest[0] = L1 * R1;
-				dest[1] = L2 * R2;
-				dest[2] = L3 * R3;
-				dest[3] = L4 * R4;
-
-				dest+=4;
-				LCL+=4;
-				RCL+=4;
-
-				L1=(Lpr[32+0]*LCL[0]+Lpr[32+1]*LCL[1])+(Lpr[32+2]*LCL[2]+Lpr[32+3]*LCL[3]);
-				L2=(Lpr[32+4]*LCL[0]+Lpr[32+5]*LCL[1])+(Lpr[32+6]*LCL[2]+Lpr[32+7]*LCL[3]);
-				L3=(Lpr[32+8]*LCL[0]+Lpr[32+9]*LCL[1])+(Lpr[32+10]*LCL[2]+Lpr[32+11]*LCL[3]);
-				L4=(Lpr[32+12]*LCL[0]+Lpr[32+13]*LCL[1])+(Lpr[32+14]*LCL[2]+Lpr[32+15]*LCL[3]);
-
-				R1=(Rpr[32+0]*RCL[0]+Rpr[32+1]*RCL[1])+(Rpr[32+2]*RCL[2]+Rpr[32+3]*RCL[3]);
-				R2=(Rpr[32+4]*RCL[0]+Rpr[32+5]*RCL[1])+(Rpr[32+6]*RCL[2]+Rpr[32+7]*RCL[3]);
-				R3=(Rpr[32+8]*RCL[0]+Rpr[32+9]*RCL[1])+(Rpr[32+10]*RCL[2]+Rpr[32+11]*RCL[3]);
-				R4=(Rpr[32+12]*RCL[0]+Rpr[32+13]*RCL[1])+(Rpr[32+14]*RCL[2]+Rpr[32+15]*RCL[3]);
-
-				dest[0] = L1 * R1;
-				dest[1] = L2 * R2;
-				dest[2] = L3 * R3;
-				dest[3] = L4 * R4;
-
-				dest+=4;
-				LCL+=4;
-				RCL+=4;
-
-				L1=(Lpr[48+0]*LCL[0]+Lpr[48+1]*LCL[1])+(Lpr[48+2]*LCL[2]+Lpr[48+3]*LCL[3]);
-				L2=(Lpr[48+4]*LCL[0]+Lpr[48+5]*LCL[1])+(Lpr[48+6]*LCL[2]+Lpr[48+7]*LCL[3]);
-				L3=(Lpr[48+8]*LCL[0]+Lpr[48+9]*LCL[1])+(Lpr[48+10]*LCL[2]+Lpr[48+11]*LCL[3]);
-				L4=(Lpr[48+12]*LCL[0]+Lpr[48+13]*LCL[1])+(Lpr[48+14]*LCL[2]+Lpr[48+15]*LCL[3]);
-
-				R1=(Rpr[48+0]*RCL[0]+Rpr[48+1]*RCL[1])+(Rpr[48+2]*RCL[2]+Rpr[48+3]*RCL[3]);
-				R2=(Rpr[48+4]*RCL[0]+Rpr[48+5]*RCL[1])+(Rpr[48+6]*RCL[2]+Rpr[48+7]*RCL[3]);
-				R3=(Rpr[48+8]*RCL[0]+Rpr[48+9]*RCL[1])+(Rpr[48+10]*RCL[2]+Rpr[48+11]*RCL[3]);
-				R4=(Rpr[48+12]*RCL[0]+Rpr[48+13]*RCL[1])+(Rpr[48+14]*RCL[2]+Rpr[48+15]*RCL[3]);
-
-				dest[0] = L1 * R1;
-				dest[1] = L2 * R2;
-				dest[2] = L3 * R3;
-				dest[3] = L4 * R4;
-
-				dest+=4;
-				LCL+=4;
-				RCL+=4;
-
-#ifdef ALLOW_SINGLE_SITE
-				if(siteToScore > -1) break;
-#endif
-				}
-			}
-		}
-
-	else{//the general N rate version
-		int r;
-#ifdef OMP_INTINTCLA
-		int index;
-		#pragma omp parallel for private(r, index, dest, LCL, RCL, L1, L2, L3, L4, R1, R2, R3, R4)
-		for(int i=0;i<nchar;i++) {
-			index=4*nRateCats*i;
-			dest = &(destCLA->arr[index]);
-			LCL = &(LCLA->arr[index]);
-			RCL= &(RCLA->arr[index]);
-#else
-		for(int i=0;i<nchar;i++) {
-#endif
-#ifdef USE_COUNTS_IN_BOOT
-			if(counts[i] > 0){
-#else
-			if(1){
-#endif
-				for(r=0;r<nRateCats;r++){
-					L1=( Lpr[16*r+0]*LCL[0]+Lpr[16*r+1]*LCL[1]+Lpr[16*r+2]*LCL[2]+Lpr[16*r+3]*LCL[3]);
-					L2=( Lpr[16*r+4]*LCL[0]+Lpr[16*r+5]*LCL[1]+Lpr[16*r+6]*LCL[2]+Lpr[16*r+7]*LCL[3]);
-					L3=( Lpr[16*r+8]*LCL[0]+Lpr[16*r+9]*LCL[1]+Lpr[16*r+10]*LCL[2]+Lpr[16*r+11]*LCL[3]);
-					L4=( Lpr[16*r+12]*LCL[0]+Lpr[16*r+13]*LCL[1]+Lpr[16*r+14]*LCL[2]+Lpr[16*r+15]*LCL[3]);
-
-					R1=(Rpr[16*r+0]*RCL[0]+Rpr[16*r+1]*RCL[1]+Rpr[16*r+2]*RCL[2]+Rpr[16*r+3]*RCL[3]);
-					R2=(Rpr[16*r+4]*RCL[0]+Rpr[16*r+5]*RCL[1]+Rpr[16*r+6]*RCL[2]+Rpr[16*r+7]*RCL[3]);
-					R3=(Rpr[16*r+8]*RCL[0]+Rpr[16*r+9]*RCL[1]+Rpr[16*r+10]*RCL[2]+Rpr[16*r+11]*RCL[3]);
-					R4=(Rpr[16*r+12]*RCL[0]+Rpr[16*r+13]*RCL[1]+Rpr[16*r+14]*RCL[2]+Rpr[16*r+15]*RCL[3]);
-
-					dest[0] = L1 * R1;
-					dest[1] = L2 * R2;
-					dest[2] = L3 * R3;
-					dest[3] = L4 * R4;
-
-					dest+=4;
-					LCL+=4;
-					RCL+=4;
-					}
-#ifdef ALLOW_SINGLE_SITE
-				if(siteToScore > -1) break;
-#endif
-				}
-			}
-		}
-
-	const int *left_mult=LCLA->underflow_mult;
-	const int *right_mult=RCLA->underflow_mult;
-	int *undermult=destCLA->underflow_mult;
-
-	for(int i=0;i<nchar;i++){
-		undermult[i] = left_mult[i] + right_mult[i];
-		}
-	destCLA->rescaleRank = 2 + LCLA->rescaleRank + RCLA->rescaleRank;
-	}
-
-void CalculationManager::CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata, MODEL_FLOAT ***Lpmat, MODEL_FLOAT ***Rpmat, const Model *mod){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-
-	FLOAT_TYPE *Lpr = **Lpmat;
-	FLOAT_TYPE *Rpr = **Rpmat;
-
-	FLOAT_TYPE *dest=destCLA->arr;
-
-	const int nRateCats = mod->NRateCats();
-	const int nchar = data->NChar();
-	const int *counts = data->GetCounts();
-
-#ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-#ifdef ALLOW_SINGLE_SITE
-	if(siteToScore > 0){
-		Ldata = AdvanceDataPointer(Ldata, siteToScore);
-		Rdata = AdvanceDataPointer(Rdata, siteToScore);
-		}
-#endif
-
-	for(int i=0;i<nchar;i++){
-#ifdef USE_COUNTS_IN_BOOT
-		if(counts[i] > 0){
-#else
-		if(1){
-#endif
-			if(*Ldata > -1 && *Rdata > -1){
-				for(int r=0;r<nRateCats;r++){
-					*(dest++) = Lpr[(*Ldata)+16*r] * Rpr[(*Rdata)+16*r];
-					*(dest++) = Lpr[(*Ldata+4)+16*r] * Rpr[(*Rdata+4)+16*r];
-					*(dest++) = Lpr[(*Ldata+8)+16*r] * Rpr[(*Rdata+8)+16*r];
-					*(dest++) = Lpr[(*Ldata+12)+16*r] * Rpr[(*Rdata+12)+16*r];
-					}
-				Ldata++;
-				Rdata++;
-				}
-
-			else if((*Ldata == -4 && *Rdata == -4) || (*Ldata == -4 && *Rdata > -1) || (*Rdata == -4 && *Ldata > -1)){//total ambiguity of left, right or both
-
-				if(*Ldata == -4 && *Rdata == -4) //total ambiguity of both
-					for(int i=0;i< (4*nRateCats);i++) *(dest++) = ONE_POINT_ZERO;
-
-				else if(*Ldata == -4){//total ambiguity of left
-					for(int i=0;i<nRateCats;i++){
-						*(dest++) = Rpr[(*Rdata)+16*i];
-						*(dest++) = Rpr[(*Rdata+4)+16*i];
-						*(dest++) = Rpr[(*Rdata+8)+16*i];
-						*(dest++) = Rpr[(*Rdata+12)+16*i];
-						assert(*(dest-4)>=ZERO_POINT_ZERO);
-						}
-					}
-				else{//total ambiguity of right
-					for(int i=0;i<nRateCats;i++){
-						*(dest++) = Lpr[(*Ldata)+16*i];
-						*(dest++) = Lpr[(*Ldata+4)+16*i];
-						*(dest++) = Lpr[(*Ldata+8)+16*i];
-						*(dest++) = Lpr[(*Ldata+12)+16*i];
-						assert(*(dest-4)>=ZERO_POINT_ZERO);
-						}
-					}
-				Ldata++;
-				Rdata++;
-				}
-			else {//partial ambiguity of left, right or both
-				if(*Ldata>-1){//unambiguous left
-					for(int i=0;i<nRateCats;i++){
-						*(dest+(i*4)) = Lpr[(*Ldata)+16*i];
-						*(dest+(i*4)+1) = Lpr[(*Ldata+4)+16*i];
-						*(dest+(i*4)+2) = Lpr[(*Ldata+8)+16*i];
-						*(dest+(i*4)+3) = Lpr[(*Ldata+12)+16*i];
-						assert(*(dest)>=ZERO_POINT_ZERO);
-						}
-					Ldata++;
-					}
-				else{
-					if(*Ldata==-4){//fully ambiguous left
-						for(int i=0;i< (4*nRateCats);i++){
-							*(dest+i)=ONE_POINT_ZERO;
-							}
-						Ldata++;
-						}
-
-					else{//partially ambiguous left
-						int nstates=-*(Ldata++);
-						for(int q=0;q< (4*nRateCats);q++) dest[q]=0;
-						for(int i=0;i<nstates;i++){
-							for(int r=0;r<nRateCats;r++){
-								*(dest+(r*4)) += Lpr[(*Ldata)+16*r];
-								*(dest+(r*4)+1) += Lpr[(*Ldata+4)+16*r];
-								*(dest+(r*4)+2) += Lpr[(*Ldata+8)+16*r];
-								*(dest+(r*4)+3) += Lpr[(*Ldata+12)+16*r];
-								}
-							Ldata++;
-							}
-						}
-					}
-				if(*Rdata>-1){//unambiguous right
-					for(int i=0;i<nRateCats;i++){
-						*(dest++) *= Rpr[(*Rdata)+16*i];
-						*(dest++) *= Rpr[(*Rdata+4)+16*i];
-						*(dest++) *= Rpr[(*Rdata+8)+16*i];
-						*(dest++) *= Rpr[(*Rdata+12)+16*i];
-						}
-					Rdata++;
-					}
-				else if(*Rdata != -4){//partially ambiguous right
-					char nstates=-1 * *(Rdata++);
-					//create a temporary cla to hold the results from the ambiguity of the right,
-					//which need to be +'s
-					//FLOAT_TYPE *tempcla=new FLOAT_TYPE[4*nRateCats];
-					vector<FLOAT_TYPE> tempcla(4*nRateCats);
-					for(int i=0;i<nstates;i++){
-						for(int r=0;r<nRateCats;r++){
-							tempcla[(r*4)]   += Rpr[(*Rdata)+16*r];
-							tempcla[(r*4)+1] += Rpr[(*Rdata+4)+16*r];
-							tempcla[(r*4)+2] += Rpr[(*Rdata+8)+16*r];
-							tempcla[(r*4)+3] += Rpr[(*Rdata+12)+16*r];
-							}
-						Rdata++;
-						}
-					//Now multiply the temporary results against the already calced left
-					for(int i=0;i<nRateCats;i++){
-						*(dest++) *= tempcla[(i*4)];
-						*(dest++) *= tempcla[(i*4)+1];
-						*(dest++) *= tempcla[(i*4)+2];
-						*(dest++) *= tempcla[(i*4)+3];
-						}
-					}
-				else{//fully ambiguous right
-					dest+=(4*nRateCats);
-					Rdata++;
-					}
-				}
-#ifdef ALLOW_SINGLE_SITE
-			if(siteToScore > -1) break;
-#endif
-			}
-		else{//if the count for this site is 0
-#ifdef OPEN_MP
-			//this is a little strange, but dest only needs to be advanced in the case of OMP
-			//because sections of the CLAs corresponding to sites with count=0 are skipped
-			//over in OMP instead of being eliminated
-			dest += 4 * nRateCats;
-#endif
-			if(*Ldata > -1 || *Ldata == -4) Ldata++;
-			else{
-				int states = -1 * *Ldata;
-				do{
-					Ldata++;
-					}while (states-- > 0);
-				}
-			if(*Rdata > -1 || *Rdata == -4) Rdata++;
-			else{
-				int states = -1 * *Rdata;
-				do{
-					Rdata++;
-					}while (states-- > 0);
-				}
-			}
-		}
-
-		for(int site=0;site<nchar;site++){
-			destCLA->underflow_mult[site]=0;
-			}
-	destCLA->rescaleRank=2;
-	}
-
-void CalculationManager::CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *dat2, MODEL_FLOAT ***Lpmat, MODEL_FLOAT ***Rpmat, const Model *mod, const unsigned *ambigMap){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-
-	FLOAT_TYPE *pr1 = **Lpmat;
-	FLOAT_TYPE *pr2 = **Rpmat;
-
-	FLOAT_TYPE *des=destCLA->arr;
-	FLOAT_TYPE *dest=des;
-	const FLOAT_TYPE *CL=LCLA->arr;
-	const FLOAT_TYPE *CL1=CL;
-	const char *data2=dat2;
-
-	const int nchar = data->NChar();
-	const int nRateCats = mod->NRateCats();
-	const int *counts = data->GetCounts();
-
-#ifdef UNIX
-	madvise(dest, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-#ifdef ALLOW_SINGLE_SITE
-	if(siteToScore > 0) data2 = AdvanceDataPointer(data2, siteToScore);
-#endif
-
-	if(nRateCats==4){//unrolled 4 rate version
-#ifdef OMP_INTTERMCLA
-		#pragma omp parallel for private(dest, CL1, data2)
-		for(int i=0;i<nchar;i++){
-			dest=&des[4*4*i];
-			CL1=&CL[4*4*i];
-			data2=&dat2[ambigMap[i]];
-#else
-		for(int i=0;i<nchar;i++){
-#endif
-#ifdef USE_COUNTS_IN_BOOT
-			if(counts[i] > 0){
-#else
-			if(1){
-#endif
-				if(*data2 > -1){ //no ambiguity
-					dest[0] = ((pr1[0]*CL1[0]+pr1[1]*CL1[1])+(pr1[2]*CL1[2]+pr1[3]*CL1[3])) * pr2[*data2];
-					dest[1] = ((pr1[4]*CL1[0]+pr1[5]*CL1[1])+(pr1[6]*CL1[2]+pr1[7]*CL1[3])) * pr2[*data2+4];
-					dest[2] = ((pr1[8]*CL1[0]+pr1[9]*CL1[1])+(pr1[10]*CL1[2]+pr1[11]*CL1[3])) * pr2[*data2+8];
-					dest[3] = ((pr1[12]*CL1[0]+pr1[13]*CL1[1])+(pr1[14]*CL1[2]+pr1[15]*CL1[3])) * pr2[*data2+12];
-
-					dest[4] = ((pr1[16]*CL1[4]+pr1[17]*CL1[5])+(pr1[18]*CL1[6]+pr1[19]*CL1[7])) * pr2[*data2+16];
-					dest[5] = ((pr1[20]*CL1[4]+pr1[21]*CL1[5])+(pr1[22]*CL1[6]+pr1[23]*CL1[7])) * pr2[*data2+4+16];
-					dest[6] = ((pr1[24]*CL1[4]+pr1[25]*CL1[5])+(pr1[26]*CL1[6]+pr1[27]*CL1[7])) * pr2[*data2+8+16];
-					dest[7] = ((pr1[28]*CL1[4]+pr1[29]*CL1[5])+(pr1[30]*CL1[6]+pr1[31]*CL1[7])) * pr2[*data2+12+16];
-
-					dest[8] = ((pr1[32]*CL1[8]+pr1[33]*CL1[9])+(pr1[34]*CL1[10]+pr1[35]*CL1[11])) * pr2[*data2+32];
-					dest[9] = ((pr1[36]*CL1[8]+pr1[37]*CL1[9])+(pr1[38]*CL1[10]+pr1[39]*CL1[11])) * pr2[*data2+4+32];
-					dest[10] = ((pr1[40]*CL1[8]+pr1[41]*CL1[9])+(pr1[42]*CL1[10]+pr1[43]*CL1[11])) * pr2[*data2+8+32];
-					dest[11] = ((pr1[44]*CL1[8]+pr1[45]*CL1[9])+(pr1[46]*CL1[10]+pr1[47]*CL1[11])) * pr2[*data2+12+32];
-
-					dest[12] = ((pr1[48]*CL1[12]+pr1[49]*CL1[13])+(pr1[50]*CL1[14]+pr1[51]*CL1[15])) * pr2[*data2+48];
-					dest[13] = ((pr1[52]*CL1[12]+pr1[53]*CL1[13])+(pr1[54]*CL1[14]+pr1[55]*CL1[15])) * pr2[*data2+4+48];
-					dest[14] = ((pr1[56]*CL1[12]+pr1[57]*CL1[13])+(pr1[58]*CL1[14]+pr1[59]*CL1[15])) * pr2[*data2+8+48];
-					dest[15] = ((pr1[60]*CL1[12]+pr1[61]*CL1[13])+(pr1[62]*CL1[14]+pr1[63]*CL1[15])) * pr2[*data2+12+48];
-
-					dest+=16;
-					data2++;
-					}
-				else if(*data2 == -4){//total ambiguity
-					dest[0] = ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-					dest[1] = ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-					dest[2] = ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-					dest[3] = ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
-
-					dest[4] = ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
-					dest[5] = ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
-					dest[6] = ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
-					dest[7] = ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
-
-					dest[8] = ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
-					dest[9] = ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
-					dest[10] = ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
-					dest[11] = ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
-
-					dest[12] = ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
-					dest[13] = ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
-					dest[14] = ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
-					dest[15] = ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-
-					dest+=16;
-					data2++;
-					}
-				else {//partial ambiguity
-					//first figure in the ambiguous terminal
-					int nstates=-1 * *(data2++);
-					for(int j=0;j<16;j++) dest[j]=ZERO_POINT_ZERO;
-					for(int s=0;s<nstates;s++){
-						for(int r=0;r<4;r++){
-							*(dest+(r*4)) += pr2[(*data2)+16*r];
-							*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
-							*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
-							*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
-							}
-						data2++;
-						}
-
-					//now add the internal child
-					*(dest++) *= ( pr1[0]*CL1[0]+pr1[1]*CL1[1]+pr1[2]*CL1[2]+pr1[3]*CL1[3]);
-					*(dest++) *= ( pr1[4]*CL1[0]+pr1[5]*CL1[1]+pr1[6]*CL1[2]+pr1[7]*CL1[3]);
-					*(dest++) *= ( pr1[8]*CL1[0]+pr1[9]*CL1[1]+pr1[10]*CL1[2]+pr1[11]*CL1[3]);
-					*(dest++) *= ( pr1[12]*CL1[0]+pr1[13]*CL1[1]+pr1[14]*CL1[2]+pr1[15]*CL1[3]);
-
-					*(dest++) *= ( pr1[16]*CL1[4]+pr1[17]*CL1[5]+pr1[18]*CL1[6]+pr1[19]*CL1[7]);
-					*(dest++) *= ( pr1[20]*CL1[4]+pr1[21]*CL1[5]+pr1[22]*CL1[6]+pr1[23]*CL1[7]);
-					*(dest++) *= ( pr1[24]*CL1[4]+pr1[25]*CL1[5]+pr1[26]*CL1[6]+pr1[27]*CL1[7]);
-					*(dest++) *= ( pr1[28]*CL1[4]+pr1[29]*CL1[5]+pr1[30]*CL1[6]+pr1[31]*CL1[7]);
-
-					*(dest++) *= ( pr1[32]*CL1[8]+pr1[33]*CL1[9]+pr1[34]*CL1[10]+pr1[35]*CL1[11]);
-					*(dest++) *= ( pr1[36]*CL1[8]+pr1[37]*CL1[9]+pr1[38]*CL1[10]+pr1[39]*CL1[11]);
-					*(dest++) *= ( pr1[40]*CL1[8]+pr1[41]*CL1[9]+pr1[42]*CL1[10]+pr1[43]*CL1[11]);
-					*(dest++) *= ( pr1[44]*CL1[8]+pr1[45]*CL1[9]+pr1[46]*CL1[10]+pr1[47]*CL1[11]);
-
-					*(dest++) *= ( pr1[48]*CL1[12]+pr1[49]*CL1[13]+pr1[50]*CL1[14]+pr1[51]*CL1[15]);
-					*(dest++) *= ( pr1[52]*CL1[12]+pr1[53]*CL1[13]+pr1[54]*CL1[14]+pr1[55]*CL1[15]);
-					*(dest++) *= ( pr1[56]*CL1[12]+pr1[57]*CL1[13]+pr1[58]*CL1[14]+pr1[59]*CL1[15]);
-					*(dest++) *= ( pr1[60]*CL1[12]+pr1[61]*CL1[13]+pr1[62]*CL1[14]+pr1[63]*CL1[15]);
-					}
-				CL1+=16;
-#ifdef ALLOW_SINGLE_SITE
-				if(siteToScore > -1) break;
-#endif
-				}
-			else{
-				data2 = AdvanceDataPointer(data2, 1);
-				}
-			}
-		}
-	else{//general N rate version
-#ifdef OMP_INTTERMCLA
-		#pragma omp parallel for private(dest, CL1, data2)
-		for(int i=0;i<nchar;i++){
-			dest=&des[4*nRateCats*i];
-			CL1=&CL[4*nRateCats*i];
-			data2=&dat2[ambigMap[i]];
-#else
-		for(int i=0;i<nchar;i++){
-#endif
-#ifdef USE_COUNTS_IN_BOOT
-			if(counts[i] > 0){
-#else
-			if(1){
-#endif
-				if(*data2 > -1){ //no ambiguity
-					for(int r=0;r<nRateCats;r++){
-						dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]) * pr2[(*data2)+16*r];
-						dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]) * pr2[(*data2+4)+16*r];
-						dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]) * pr2[(*data2+8)+16*r];
-						dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]) * pr2[(*data2+12)+16*r];
-						dest+=4;
-						}
-					data2++;
-					}
-				else if(*data2 == -4){//total ambiguity
-					for(int r=0;r<nRateCats;r++){
-						dest[0] = ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
-						dest[1] = ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
-						dest[2] = ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
-						dest[3] = ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
-						dest+=4;
-						}
-					data2++;
-					}
-				else {//partial ambiguity
-					//first figure in the ambiguous terminal
-					int nstates=-1 * *(data2++);
-					for(int q=0;q<4*nRateCats;q++) dest[q]=0;
-					for(int s=0;s<nstates;s++){
-						for(int r=0;r<nRateCats;r++){
-							*(dest+(r*4)) += pr2[(*data2)+16*r];
-							*(dest+(r*4)+1) += pr2[(*data2+4)+16*r];
-							*(dest+(r*4)+2) += pr2[(*data2+8)+16*r];
-							*(dest+(r*4)+3) += pr2[(*data2+12)+16*r];
-							}
-						data2++;
-						}
-					//now add the internal child
-					for(int r=0;r<nRateCats;r++){
-						*(dest++) *= ( pr1[16*r+0]*CL1[4*r+0]+pr1[16*r+1]*CL1[4*r+1]+pr1[16*r+2]*CL1[4*r+2]+pr1[16*r+3]*CL1[4*r+3]);
-						*(dest++) *= ( pr1[16*r+4]*CL1[4*r+0]+pr1[16*r+5]*CL1[4*r+1]+pr1[16*r+6]*CL1[4*r+2]+pr1[16*r+7]*CL1[4*r+3]);
-						*(dest++) *= ( pr1[16*r+8]*CL1[4*r+0]+pr1[16*r+9]*CL1[4*r+1]+pr1[16*r+10]*CL1[4*r+2]+pr1[16*r+11]*CL1[4*r+3]);
-						*(dest++) *= ( pr1[16*r+12]*CL1[4*r+0]+pr1[16*r+13]*CL1[4*r+1]+pr1[16*r+14]*CL1[4*r+2]+pr1[16*r+15]*CL1[4*r+3]);
-						}
-					}
-				CL1 += 4*nRateCats;
-#ifdef ALLOW_SINGLE_SITE
-				if(siteToScore > -1) break;
-#endif
-				}
-			else{
-				data2 = AdvanceDataPointer(data2, 1);
-				}
-			}
-		}
-
-	for(int i=0;i<nchar;i++)
-		destCLA->underflow_mult[i]=LCLA->underflow_mult[i];
-
-	destCLA->rescaleRank=LCLA->rescaleRank+2;
-	}
-
-
-FLOAT_TYPE CalculationManager::GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA, MODEL_FLOAT ***pmat, const Model *mod){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-
-	const FLOAT_TYPE *prmat = **pmat;
-
-	const FLOAT_TYPE *CL1=childCLA->arr;
-	const FLOAT_TYPE *partial=partialCLA->arr;
-	const int *underflow_mult1=partialCLA->underflow_mult;
-	const int *underflow_mult2=childCLA->underflow_mult;
-
-	const int nchar=data->NChar();
-	const int nRateCats=mod->NRateCats();
-
-	const int *countit=data->GetCounts();
-
-	const FLOAT_TYPE *rateProb=const_cast<Model *> (mod)->GetRateProbs();
-	const FLOAT_TYPE prI=mod->PropInvar();
-	const int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstStates();
-
-	FLOAT_TYPE freqs[4];
-	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
-
-
-#ifdef UNIX
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-	madvise((void*)CL1, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-	//DEBUG
-	//FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
-	double siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
-	FLOAT_TYPE La, Lc, Lg, Lt;
-
-	vector<double> siteLikes(nchar);
-
-	for(int i=0;i<nchar;i++){
-#ifdef USE_COUNTS_IN_BOOT
-		if(countit[i] > 0){
-#else
-		if(1){
-#endif
-			La=Lc=Lg=Lt=ZERO_POINT_ZERO;
-			for(int r=0;r<nRateCats;r++){
-				int rOff=r*16;
-				La += ( prmat[rOff ]*CL1[0]+prmat[rOff + 1]*CL1[1]+prmat[rOff + 2]*CL1[2]+prmat[rOff + 3]*CL1[3]) * partial[0] * rateProb[r];
-				Lc += ( prmat[rOff + 4]*CL1[0]+prmat[rOff + 5]*CL1[1]+prmat[rOff + 6]*CL1[2]+prmat[rOff + 7]*CL1[3]) * partial[1] * rateProb[r];
-				Lg += ( prmat[rOff + 8]*CL1[0]+prmat[rOff + 9]*CL1[1]+prmat[rOff + 10]*CL1[2]+prmat[rOff + 11]*CL1[3]) * partial[2] * rateProb[r];
-				Lt += ( prmat[rOff + 12]*CL1[0]+prmat[rOff + 13]*CL1[1]+prmat[rOff + 14]*CL1[2]+prmat[rOff + 15]*CL1[3]) * partial[3] * rateProb[r];
-				partial+=4;
-				CL1+=4;
-				}
-			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
-				FLOAT_TYPE btot=ZERO_POINT_ZERO;
-				if(conBases[i]&1) btot+=freqs[0];
-				if(conBases[i]&2) btot+=freqs[1];
-				if(conBases[i]&4) btot+=freqs[2];
-				if(conBases[i]&8) btot+=freqs[3];
-				if(underflow_mult1[i] + underflow_mult2[i] == 0)
-					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + prI*btot);
-				else
-					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot*exp((FLOAT_TYPE)underflow_mult1[i]+underflow_mult2[i])));
-				}
-			else
-				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
-
-			unscaledlnL = (log(siteL) - underflow_mult1[i] - underflow_mult2[i]);
-			totallnL += (countit[i] * unscaledlnL);
-
-#ifdef ALLOW_SINGLE_SITE
-			if(siteToScore > -1) break;
-#endif
-			}
-		else{
-#ifdef OPEN_MP
-			//this is a little strange, but the arrays only needs to be advanced in the case of OMP
-			//because sections of the CLAs corresponding to sites with count=0 are skipped
-			//over in OMP instead of being eliminated
-			partial+=4*nRateCats;
-			CL1+=4*nRateCats;
-#endif
-			}
-#ifdef LUMP_LIKES
-		if((i + 1) % LUMP_FREQ == 0){
-			grandSumlnL += totallnL;
-			totallnL = ZERO_POINT_ZERO;
-			}
-#endif
-//DEBUG
-/*
-		if(sitelikeLevel != 0)
-			siteLikes[i] = unscaledlnL;
-*/		}
-
-#ifdef LUMP_LIKES
-	totallnL += grandSumlnL;
-#endif
-//DEBUG
-/*
-	if(sitelikeLevel != 0){
-		OutputSiteLikelihoods(siteLikes, underflow_mult1, underflow_mult2);
-		}
-*/
-	return totallnL;
-	}
-FLOAT_TYPE CalculationManager::GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA, MODEL_FLOAT ***pmat, const char *Ldata, const Model *mod){
-	//this function assumes that the pmat is arranged with the 16 entries for the
-	//first rate, followed by 16 for the second, etc.
-	const FLOAT_TYPE *prmat = **pmat;
-	const FLOAT_TYPE *partial=partialCLA->arr;
-	const int *underflow_mult=partialCLA->underflow_mult;
-	const int nRateCats=mod->NRateCats();
-	const int nchar=data->NChar();
-	const int *countit=data->GetCounts();
-	const FLOAT_TYPE *rateProb=const_cast<Model *> (mod)->GetRateProbs();
-	const int lastConst=data->LastConstant();
-	const int *conBases=data->GetConstStates();
-	const FLOAT_TYPE prI=mod->PropInvar();
-	FLOAT_TYPE freqs[4];
-	for(int i=0;i<4;i++) freqs[i]=mod->StateFreq(i);
-#ifdef UNIX
-	madvise((void*)partial, nchar*4*nRateCats*sizeof(FLOAT_TYPE), MADV_SEQUENTIAL);
-#endif
-
-#ifdef ALLOW_SINGLE_SITE
-	if(siteToScore > 0) Ldata = AdvanceDataPointer(Ldata, siteToScore);
-#endif
-
-	FLOAT_TYPE siteL, totallnL=ZERO_POINT_ZERO, grandSumlnL=ZERO_POINT_ZERO, unscaledlnL;
-	FLOAT_TYPE La, Lc, Lg, Lt;
-
-	vector<double> siteLikes(nchar);
-
-	for(int i=0;i<nchar;i++){
-#ifdef USE_COUNTS_IN_BOOT
-		if(countit[i] > 0){
-#else
-		if(1){
-#endif
-			La=Lc=Lg=Lt=ZERO_POINT_ZERO;
-			if(*Ldata > -1){ //no ambiguity
-				for(int i=0;i<nRateCats;i++){
-					La  += prmat[(*Ldata)+16*i] * partial[0] * rateProb[i];
-					Lc  += prmat[(*Ldata+4)+16*i] * partial[1] * rateProb[i];
-					Lg  += prmat[(*Ldata+8)+16*i] * partial[2] * rateProb[i];
-					Lt  += prmat[(*Ldata+12)+16*i] * partial[3] * rateProb[i];
-					partial += 4;
-					}
-				Ldata++;
-				}
-
-			else if(*Ldata == -4){ //total ambiguity
-				for(int i=0;i<nRateCats;i++){
-					La += partial[0] * rateProb[i];
-					Lc += partial[1] * rateProb[i];
-					Lg += partial[2] * rateProb[i];
-					Lt += partial[3] * rateProb[i];
-					partial += 4;
-					}
-				Ldata++;
-				}
-			else{ //partial ambiguity
-				char nstates=-1 * *(Ldata++);
-				for(int i=0;i<nstates;i++){
-					for(int i=0;i<nRateCats;i++){
-						La += prmat[(*Ldata)+16*i]  * partial[4*i] * rateProb[i];
-						Lc += prmat[(*Ldata+4)+16*i] * partial[1+4*i] * rateProb[i];
-						Lg += prmat[(*Ldata+8)+16*i]* partial[2+4*i] * rateProb[i];
-						Lt += prmat[(*Ldata+12)+16*i]* partial[3+4*i] * rateProb[i];
-						}
-					Ldata++;
-					}
-				partial+=4*nRateCats;
-				}
-			if((mod->NoPinvInModel() == false) && (i<=lastConst)){
-				FLOAT_TYPE btot=0.0;
-				if(conBases[i]&1) btot+=freqs[0];
-				if(conBases[i]&2) btot+=freqs[1];
-				if(conBases[i]&4) btot+=freqs[2];
-				if(conBases[i]&8) btot+=freqs[3];
-				if(underflow_mult[i]==0)
-					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + prI*btot);
-				else
-					siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]) + (prI*btot*exp((FLOAT_TYPE)underflow_mult[i])));
-				}
-			else
-				siteL  = ((La*freqs[0]+Lc*freqs[1]+Lg*freqs[2]+Lt*freqs[3]));
-			unscaledlnL = (log(siteL) - underflow_mult[i]);
-			totallnL += (countit[i] * unscaledlnL);
-
-#ifdef ALLOW_SINGLE_SITE
-			if(siteToScore > -1) break;
-#endif
-			}
-		else{
-#ifdef OPEN_MP
-			//this is a little strange, but partial only needs to be advanced in the case of OMP
-			//because sections of the CLAs corresponding to sites with count=0 are skipped
-			//over in OMP instead of being eliminated
-			partial += 4*nRateCats;
-#endif
-			if(*Ldata > -1 || *Ldata == -4) Ldata++;
-			else{
-				int states = -1 * *Ldata;
-				do{
-					Ldata++;
-					}while (states-- > 0);
-				}
-			}
-#ifdef LUMP_LIKES
-		if((i + 1) % LUMP_FREQ == 0){
-			grandSumlnL += totallnL;
-			totallnL = ZERO_POINT_ZERO;
-			}
-#endif
-//DEBUG
-/*
-			if(sitelikeLevel != 0)
-				siteLikes[i] = unscaledlnL;
-				*/
-		}
-#ifdef LUMP_LIKES
-	totallnL += grandSumlnL;
-#endif
-//DEBUG
-/*
-	if(sitelikeLevel != 0){
-		OutputSiteLikelihoods(siteLikes, underflow_mult, NULL);
-		}
-*/
-	return totallnL;
-	}

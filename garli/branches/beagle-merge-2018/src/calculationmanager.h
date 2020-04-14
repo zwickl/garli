@@ -28,8 +28,6 @@
 #include "model.h"
 class TreeNode;
 
-#include "managedresource.h"
-
 struct ScoreSet{
 	MODEL_FLOAT lnL;
 	MODEL_FLOAT d1;
@@ -37,7 +35,6 @@ struct ScoreSet{
 	};
 
 #define GARLI_FINAL_SCALER_INDEX -9999999
-
 
 class ClaOperation{
 	friend class CalculationManager;
@@ -50,9 +47,7 @@ public:
 	int opDepLevel;
 public:
 	ClaOperation(): destClaIndex(-1), childClaIndex1(-1), childClaIndex2(-1), transMatIndex1(-1), transMatIndex2(-1), opDepLevel(-1){};	
-	ClaOperation(int d, int cla1, int cla2, int pmat1, int pmat2, int dLevel): destClaIndex(d), childClaIndex1(cla1), childClaIndex2(cla2), transMatIndex1(pmat1), transMatIndex2(pmat2), opDepLevel(dLevel){
-		int poo = 2;	
-		}
+	ClaOperation(int d, int cla1, int cla2, int pmat1, int pmat2, int dLevel) : destClaIndex(d), childClaIndex1(cla1), childClaIndex2(cla2), transMatIndex1(pmat1), transMatIndex2(pmat2), opDepLevel(dLevel) {};
 	ClaOperation(int d, const CondLikeArrayHolder *h): destClaIndex(d), childClaIndex1(h->HolderDep1()), childClaIndex2(h->HolderDep2()), transMatIndex1(h->TransMatDep1()), transMatIndex2(h->TransMatDep2()), opDepLevel(h->DepLevel()){};	
 	};
 
@@ -264,8 +259,6 @@ public:
 		}
 
 	~PmatManager(){
-		//transMatSetStack.clear();
-		//holderStack.clear();
 		if(allMatSets != NULL){
 			for(int i = 0;i < nMats;i++){
 				delete allMatSets[i];
@@ -518,7 +511,6 @@ public:
 
 class NodeClaManager{
 	static ClaManager *claMan;
-	static ClaManager2 *claMan2;
 	static PmatManager *pmatMan;
 
 public:
@@ -534,10 +526,6 @@ public:
 
 	static void SetClaManager(ClaManager *cMan) {
 		NodeClaManager::claMan = cMan;
-		}
-
-	static void SetClaManager2(ClaManager2 *cMan) {
-		NodeClaManager::claMan2 = cMan;
 		}
 
 	static void SetPmatManager(PmatManager *pMan) {
@@ -742,17 +730,6 @@ public:
 	};
 
 /*
-class NewBlockingOperationsSet{
-public:
-	list<NodeOperation> nodeOps;
-	list<BranchOperation> brOps;
-	~NewBlockingOperationsSet(){
-		nodeOps.clear();
-		brOps.clear();
-		}
-	};
-*/
-/*
 bool MyOpLessThan(const BlockingOperationsSet &lhs, const BlockingOperationsSet &rhs){
 //	int d1 = lhs.claOps.size() == 0 ? -1 : lhs.claOps.begin()->depLevel;
 //	int d2 = rhs.claOps.size() == 0 ? -1 : rhs.claOps.begin()->depLevel;
@@ -794,8 +771,6 @@ class CalculationManager{
 	list<BlockingOperationsSet> freeableOpSets;
 	list<ScoringOperation> scoreOps;
 	
-//	list<NewBlockingOperationsSet> newOperationSetQueue;
-
 	map<long, string> flagToName;
 	map<string, long> nameToFlag;
 	vector<long> invalidFlags;
@@ -967,13 +942,6 @@ private:
 	//calculate a pmat, or a pmat, d1mat and d2mat
 	void PerformTransMatOperation(const TransMatOperation *theOp);
 	
-	//these are just duplicates of the functions originally in Tree.  They are not used with beagle
-	void CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA,  MODEL_FLOAT ***Lpr,  MODEL_FLOAT ***Rpr, const Model *mod);
-	void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata,  MODEL_FLOAT ***Lpr,  MODEL_FLOAT ***Rpr, const Model *mod);
-	void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *data2,  MODEL_FLOAT ***pr1,  MODEL_FLOAT ***pr2, const Model *mod, const unsigned *ambigMap);
-	FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,  MODEL_FLOAT ***prmat, const char *Ldata, const Model *mod);
-	FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA,  MODEL_FLOAT ***prmat, const Model *mod);
-
 #ifdef USE_BEAGLE
 	//BEAGLE SPECIFIC FUNCS
 
@@ -1028,7 +996,6 @@ private:
 	//return beagle partial index (might actually represent tip)
 	int PartialIndexForBeagle(int ind) const{
 
-//BEAGLEMERGE DEBUG
 //#define PASS_HOLDER_INDECES
 
 #ifdef PASS_HOLDER_INDECES
