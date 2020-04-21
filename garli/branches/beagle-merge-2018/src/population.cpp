@@ -35,6 +35,7 @@ using namespace std;
 #ifdef WIN32
 #include <conio.h>
 #include <windows.h>
+#include <winbase.h>
 #endif
 
 #ifdef MAC_FRONTEND
@@ -501,121 +502,127 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		
 	const int KB = 1024;
 
-	double claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
-	int numNodesPerIndiv = dataPart->NTax()-2;
-	int idealClas =  3 * total_size * numNodesPerIndiv;
-	int maxClas = (int)((memToUse*KB)/ claSizePerNodeKB);
-	int numClas;	
+	int numNodesPerIndiv = dataPart->NTax() - 2;
+	int idealClas = 3 * total_size * numNodesPerIndiv;
+	int maxClas = (int)((memToUse*KB) / claSizePerNodeKB);
+	int numClas;
 
-	int L0=(int) (numNodesPerIndiv * total_size * 2);//a downward and one upward set for each tree
-	int L1=(int) (numNodesPerIndiv * total_size + 2*total_size + numNodesPerIndiv); //at least a downward set and a full root set for every tree, plus one other set
-	int L2=(int) (numNodesPerIndiv * 2.0 + 2*total_size);//a downward set for the best, one other full set and enough for each root direction
+	int L0 = (int)(numNodesPerIndiv * total_size * 2);//a downward and one upward set for each tree
+	int L1 = (int)(numNodesPerIndiv * total_size + 2 * total_size + numNodesPerIndiv); //at least a downward set and a full root set for every tree, plus one other set
+	int L2 = (int)(numNodesPerIndiv * 2.0 + 2 * total_size);//a downward set for the best, one other full set and enough for each root direction
 	int L3;
-	if(conf->scoreOnly || conf->optimizeInputOnly){
-		L3=(int) (numNodesPerIndiv * 1.0 + 2);//one full set plus a few extra
-		}
-	else{
-		L3=(int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size);//one full set, enough to reserve at least all of the full internals of the 
+	if (conf->scoreOnly || conf->optimizeInputOnly) {
+		L3 = (int)(numNodesPerIndiv * 1.0 + 2);//one full set plus a few extra
+	}
+	else {
+		L3 = (int)(numNodesPerIndiv * 1.5 - 2 + 2 * total_size);//one full set, enough to reserve at least all of the full internals of the 
 															 //best indiv and enough for each root
-		}
+	}
 
-	if(maxClas >= L0){
-		numClas = min(maxClas, idealClas);
-		memLevel = 0;		
-		}
-	else{
-		numClas=maxClas;
-	 	if(maxClas >= L1) memLevel = 1;
-	 	else if(maxClas >= L2) memLevel = 2;
-	 	else if(maxClas >= L3) memLevel = 3;
-	 	else memLevel=-1;
-		}
 
-	outman.precision(4);
-	outman.UserMessage("\nFor this dataset:");
-	outman.UserMessage(" Mem level		availablememory setting");
-	outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNodeKB/(FLOAT_TYPE)KB)) * memUsageMult);
-	outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
-	outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
-	outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
-	outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult );
-
-	if(conf->scoreOnly || conf->optimizeInputOnly){
-		outman.UserMessage("\nNOTE: Less memory is required when scoring or optimizing fixed trees.\n\tminimum of %.0f availablememory would be required to search\n", ceil(((int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size)) * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
-		}
-
-	outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
-
-	outman.UserMessage("\nGarli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
-
-	if( ! (conf->scoreOnly || conf->optimizeInputOnly)){
-		if(memLevel == 0)
-			outman.UserMessage("**Your memory level is: great (you don't need to change anything)**");
-		else if(memLevel == 1)
-			outman.UserMessage("**Your memory level is: good (you don't need to change anything)**");
-		else if(memLevel == 2)
-			outman.UserMessage("**Your memory level is: low\n\t(you may want to increase the availablememory setting)**");
-		else if(memLevel == 3)
-			outman.UserMessage("**Your memory level is: very low\n\t(if possible, you should increase the availablememory setting)**");
-		else if(memLevel == -1)
-			outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
-		}
-	outman.UserMessage("\n#######################################################");
-/*
-	outman.precision(4);
-	outman.UserMessage("allocating memory...\nusing %.1f MB for conditional likelihood arrays.  Memlevel= %d", (FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB, memLevel);
-	outman.UserMessage("For this dataset:");
-	outman.UserMessage("level 0: >= %.0f megs", ceil(L0 * (claSizePerNode/(FLOAT_TYPE)MB)));
-	outman.UserMessage("level 1: %.0f megs to %.0f megs", ceil(L0 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)));
-	outman.UserMessage("level 2: %.0f megs to %.0f megs", ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)));
-	outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)));
-	outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB))-1);
-*/
-	if(memLevel==-1 && !validateMode) 
-		throw ErrorException("Not enough memory specified in config file (availablememory)!");
-
-	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
-	//if we do tons of recombination 
-	idealClas *= 2;
-	if(!validateMode)
-		claMan=new ClaManager(dataPart->NTax()-2, numClas, idealClas, &indiv[0].modPart, dataPart);
-
-	//setup the bipartition statics
-	Bipartition::SetBipartitionStatics(dataPart->NTax());
-
-	//temporary hack to get beagle to work
-	SequenceData *firstData = dataPart->GetSubset(0);
-	ModelSpecification *firstmodSpec = modSpecSet.GetModSpec(0);
-
-	//new calc manager stuff
 	calcMan = new CalculationManager();
-	CalculationManager::SetClaManager(claMan);
-	//both the tips and internal branches need pmats, hence the x2
-	int idealPmats = total_size * (2 * (dataPart->NTax() - 1));
-	idealPmats *= 2;
-	//for now using as many pmats as pmat holders
-	//pmatMan = new PmatManager(numClas * 2, idealPmats, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)), modSpec.nstates);
-	pmatMan = new PmatManager(idealPmats, idealPmats, (firstmodSpec->numRateCats + (firstmodSpec->includeInvariantSites ? 1 : 0)), firstmodSpec->nstates);
-	CalculationManager::SetPmatManager(pmatMan);
+	if (modSpecSet.NumSpecs() > 1)
+		throw ErrorException("still working on true partitioned beagle support. This version should work fine with a single subset");
+
+	//loop over subsets (for partitioned beagle)
+	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
+		SequenceData *subsetData = dataPart->GetSubset(subsetSpec->dataIndex);
+		ModelSpecification *subsetModSpec = modSpecSet.GetModSpec(subsetSpec->modelIndex);
+
+		double claSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart);
+				
+		if(maxClas >= L0){
+			numClas = min(maxClas, idealClas);
+			memLevel = 0;		
+			}
+		else{
+			numClas=maxClas;
+	 		if(maxClas >= L1) memLevel = 1;
+	 		else if(maxClas >= L2) memLevel = 2;
+	 		else if(maxClas >= L3) memLevel = 3;
+	 		else memLevel=-1;
+			}
+
+		outman.precision(4);
+		outman.UserMessage("\nFor this dataset:");
+		outman.UserMessage(" Mem level		availablememory setting");
+		outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNodeKB/(FLOAT_TYPE)KB)) * memUsageMult);
+		outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
+		outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
+		outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
+		outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult );
+
+		if(conf->scoreOnly || conf->optimizeInputOnly){
+			outman.UserMessage("\nNOTE: Less memory is required when scoring or optimizing fixed trees.\n\tminimum of %.0f availablememory would be required to search\n", ceil(((int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size)) * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
+			}
+
+		outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
+
+		outman.UserMessage("\nGarli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
+
+		if( ! (conf->scoreOnly || conf->optimizeInputOnly)){
+			if(memLevel == 0)
+				outman.UserMessage("**Your memory level is: great (you don't need to change anything)**");
+			else if(memLevel == 1)
+				outman.UserMessage("**Your memory level is: good (you don't need to change anything)**");
+			else if(memLevel == 2)
+				outman.UserMessage("**Your memory level is: low\n\t(you may want to increase the availablememory setting)**");
+			else if(memLevel == 3)
+				outman.UserMessage("**Your memory level is: very low\n\t(if possible, you should increase the availablememory setting)**");
+			else if(memLevel == -1)
+				outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
+			}
+		outman.UserMessage("\n#######################################################");
+	/*
+		outman.precision(4);
+		outman.UserMessage("allocating memory...\nusing %.1f MB for conditional likelihood arrays.  Memlevel= %d", (FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB, memLevel);
+		outman.UserMessage("For this dataset:");
+		outman.UserMessage("level 0: >= %.0f megs", ceil(L0 * (claSizePerNode/(FLOAT_TYPE)MB)));
+		outman.UserMessage("level 1: %.0f megs to %.0f megs", ceil(L0 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)));
+		outman.UserMessage("level 2: %.0f megs to %.0f megs", ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)));
+		outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)));
+		outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB))-1);
+	*/
+		if(memLevel==-1 && !validateMode) 
+			throw ErrorException("Not enough memory specified in config file (availablememory)!");
+
+		//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
+		//if we do tons of recombination 
+		idealClas *= 2;
+		if(!validateMode)
+			claMan=new ClaManager(dataPart->NTax()-2, numClas, idealClas, &indiv[0].modPart, dataPart);
+
+		CalculationManager::SetClaManager(claMan);
+		//both the tips and internal branches need pmats, hence the x2
+		int idealPmats = total_size * (2 * (dataPart->NTax() - 1));
+		idealPmats *= 2;
+		//for now using as many pmats as pmat holders
+		//pmatMan = new PmatManager(numClas * 2, idealPmats, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)), modSpec.nstates);
+		pmatMan = new PmatManager(idealPmats, idealPmats, (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)), subsetModSpec->nstates);
+		CalculationManager::SetPmatManager(pmatMan);
 
 #ifdef BEAGLEPART 
-	CalculationManager::SetData(dataPart);
+		CalculationManager::SetData(dataPart);
 #else
-	CalculationManager::SetData(firstData);
+		CalculationManager::SetData(subsetData);
 #endif
 
-#ifdef USE_BEAGLE
-	//invariable class needs to be treated as extra rate for beagle
-	//calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
-	calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
-	//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, data->NStates(), sites, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)));
-	calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, firstData->NStates(), firstData->NChar(), (firstmodSpec->numRateCats + (firstmodSpec->includeInvariantSites ? 1 : 0)));
+	#ifdef USE_BEAGLE
+		//invariable class needs to be treated as extra rate for beagle
+		//calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
+		calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
+		//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, data->NStates(), sites, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)));
+		calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)));
+	#endif
+	} // end loop over modelParts
 
-#endif
-
+	CalculationManager::SetClaManager(claMan);
+	//CalculationManager::SetData(dataPart);
 	NodeClaManager::SetClaManager(claMan);
 	NodeClaManager::SetPmatManager(pmatMan);
 
+	//setup the bipartition statics
+	Bipartition::SetBipartitionStatics(dataPart->NTax());
 
 	//set the tree statics
 	Tree::SetTreeStatics(claMan, pmatMan, calcMan, dataPart, conf);

@@ -2220,6 +2220,7 @@ public:
 	void CalcMutationProbsFromWeights();
 	unsigned CalcRequiredCLAsize(const DataPartition *dat); //this is the size in BYTES not elements
 	double CalcRequiredCLAsizeKB(const DataPartition *dat); //this is the size in KB not elements
+	double CalcRequiredSubsetCLAsizeKB(int subsetNum, const DataPartition *dat); //this is the size in KB not elements
 
 	ModelSet *GetModelSet(int ms) const{
 		if(ms < 0 || ms < modSets.size() == false) throw ErrorException("Attemped to access invalid ModelSet number");

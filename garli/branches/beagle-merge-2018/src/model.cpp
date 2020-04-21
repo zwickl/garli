@@ -4878,6 +4878,21 @@ double ModelPartition::CalcRequiredCLAsizeKB(const DataPartition *dat){
 	return size2;
 	}
 
+//This is the size in KB not elements. KB is used because the number of bytes can be larger than UNSIGNED_MAX on very large datasets
+double ModelPartition::CalcRequiredSubsetCLAsizeKB(int subsetNum, const DataPartition *dat) {
+	unsigned size = 0;
+	double size2 = 0;
+	double KB = 1024;
+	//for (vector<ClaSpecifier>::iterator specs = claSpecs.begin(); specs != claSpecs.end(); specs++) {
+	ClaSpecifier spec = claSpecs[subsetNum];
+	const Model *thisMod = GetModel(spec.modelIndex);
+	size2 += (dat->GetSubset(spec.dataIndex)->NChar() / KB) * (thisMod->NStates() * thisMod->NRateCats() * sizeof(FLOAT_TYPE) + sizeof(int));
+	size += (thisMod->NStates() * thisMod->NRateCats() * dat->GetSubset(spec.dataIndex)->NChar()) * sizeof(FLOAT_TYPE);
+	size += dat->GetSubset(spec.dataIndex)->NChar() * sizeof(int);
+	assert(size2 * 1024 == size);
+	return size2;
+}
+
 //this is the size in BYTES not elements
 unsigned ModelPartition::CalcRequiredCLAsize(const DataPartition *dat){
 	unsigned size = 0;
