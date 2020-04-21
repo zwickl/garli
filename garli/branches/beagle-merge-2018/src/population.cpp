@@ -504,7 +504,6 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 
 	int numNodesPerIndiv = dataPart->NTax() - 2;
 	int idealClas = 3 * total_size * numNodesPerIndiv;
-	int maxClas = (int)((memToUse*KB) / claSizePerNodeKB);
 	int numClas;
 
 	int L0 = (int)(numNodesPerIndiv * total_size * 2);//a downward and one upward set for each tree
@@ -530,7 +529,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		ModelSpecification *subsetModSpec = modSpecSet.GetModSpec(subsetSpec->modelIndex);
 
 		double claSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart);
-				
+		int maxClas = (int)((memToUse*KB) / claSizePerNodeKB);
 		if(maxClas >= L0){
 			numClas = min(maxClas, idealClas);
 			memLevel = 0;		
