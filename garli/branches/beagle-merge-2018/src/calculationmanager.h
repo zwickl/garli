@@ -35,6 +35,9 @@ struct ScoreSet{
 	};
 
 #define GARLI_FINAL_SCALER_INDEX -9999999
+#define DONT_SEND_TRANSMATS
+
+
 
 class ClaOperation{
 	friend class CalculationManager;
@@ -188,6 +191,7 @@ class TransMatHolder{
 
 	//these are the things that the holder must know to calculate valid transmats for itself
 	Model *myMod;
+	ModelPartition *myModPart;
 	MODEL_FLOAT edgeLen;
 
 	//will be NULL if dirty
@@ -196,10 +200,11 @@ class TransMatHolder{
 	TransMatHolder() : theMatSet(NULL), myMod(NULL), edgeLen(-1.0), numAssigned(0){};
 	~TransMatHolder() {
 		myMod = NULL;
+		myModPart = NULL;
 		theMatSet = NULL;
 		}
-	void Reset(){numAssigned = 0; theMatSet = NULL; myMod = NULL;}
-	
+	void Reset(){numAssigned = 0; theMatSet = NULL; myMod = NULL; myModPart = NULL;
+	}
 	MODEL_FLOAT ***GetPmatArray(){
 		assert(theMatSet);
 		assert(theMatSet->GetPmatArray()[0] && theMatSet->GetPmatArray()[0][0]);
@@ -284,6 +289,10 @@ public:
 		holders[index].myMod = mod;
 		}
 
+	void SetModelPartition(int index, ModelPartition *mod) {
+		holders[index].myModPart = mod;
+	}
+
 	void SetEdgelen(int index, FLOAT_TYPE e){
 		holders[index].edgeLen = e;
 		}
@@ -297,20 +306,39 @@ public:
 		holders[index].myMod->GetEigenSolution(sol);
 		}
 
+	void GetEigenSolution(int index, ModelEigenSolution &sol, int modelIndex) const {
+		assert(holders[index].myMod);
+		//holders[index].myMod->GetEigenSolution(sol);
+		holders[index].myModPart->GetModel(modelIndex)->GetEigenSolution(sol);
+	}
+
 //this includes pinv, which my scheme doesn't treat as a rate class per se
 	void GetCategoryRatesForBeagle(int index, vector<FLOAT_TYPE> &r)const{
 		holders[index].myMod->GetRateMultsForBeagle(r);
 		}
+
+	//this includes pinv, which my scheme doesn't treat as a rate class per se
+	void GetCategoryRatesForBeagle(int index, vector<FLOAT_TYPE> &r, int modelIndex)const {
+		holders[index].myModPart->GetModel(modelIndex)->GetRateMultsForBeagle(r);
+	}
 
 //this includes pinv
 	void GetCategoryWeightsForBeagle(int index, vector<FLOAT_TYPE> &p) const {
 		holders[index].myMod->GetRateProbsForBeagle(p);
 		}
 
+	void GetCategoryWeightsForBeagle(int index, vector<FLOAT_TYPE> &p, int modelIndex) const {
+		holders[index].myModPart->GetModel(modelIndex)->GetRateProbsForBeagle(p);
+	}
+
 	//need to include pinv, which is a separate rate as far as beagle is concerned, but not for Gar
 	int NumRateCatsForBeagle(int index) const { 
 		return holders[index].myMod->NumRateCatsForBeagle();
 		}
+
+	int NumRateCatsForBeagle(int index, int modelIndex) const {
+		return holders[index].myModPart->GetModel(modelIndex)->NumRateCatsForBeagle();
+	}
 
 	MODEL_FLOAT ***GetPmatArray(int index){
 		assert(holders[index].numAssigned > 0);
@@ -614,9 +642,7 @@ public:
 	//BMERGE HACK
 	void SetTransMat(ModelPartition *m, FLOAT_TYPE e) {
 		//outman.DebugMessage("up pdeps %d", transMatIndex);
-		int modnum = 0;
-		//BMERGE TODO 
-		pmatMan->SetModel(transMatIndex, m->GetModel(modnum));
+		pmatMan->SetModelPartition(transMatIndex, m);
 		pmatMan->SetEdgelen(transMatIndex, e);
 	}
 
