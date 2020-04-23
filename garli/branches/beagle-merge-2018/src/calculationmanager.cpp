@@ -1110,7 +1110,6 @@ void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theO
 */
 	}
 
-#ifdef USE_BEAGLE
 //For scale arrays my indexing scheme and Beagle's happen to be the same
 //further accumulate the cumulative rescalings from the two children.  In the batched case
 //the dest array will already have the rescaling done at this node included, so don't reset it
@@ -1143,7 +1142,6 @@ void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int
 			"beagleAccumulateScaleFactors");
 		}
 	}
-#endif
 
 void CalculationManager::OutputOperationsSummary() const{
 	//DEBUG

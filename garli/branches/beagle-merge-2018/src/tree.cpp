@@ -8945,7 +8945,9 @@ void Tree::UpdateNodeIndeces() {
 //are required for any cla operation
 void Tree::UpdatePmatDependencies() {
 	for (int i = 1; i < numNodesTotal; i++) {
-		allNodes[i]->myMan.SetTransMat(modPart, allNodes[i]->dlen);
+		//BPART todo - remove this hack 
+		int modNum = 0;
+		allNodes[i]->myMan.SetTransMat(modPart, modNum, allNodes[i]->dlen);
 	}
 }
 
