@@ -835,10 +835,14 @@ void Model::CalcEigenStuff(){
 		
 		//DEBUG - rescaling the eigenvals by blen_multiplier here _should_ give same result as using it later
 		//in transition matrix calculating function.  This will be easier for passing to beagle prescaled as well
+		//5/26/20 removed accounting for pinv here.  
+		//when using beagle the rate classes are normalized to account for it elsewhere so don't do it here as well.
+		//BMERGE TODO - will need to figure out how to do the right thing in all beagle/non-beagle cases
 		for (int ev = 0; ev < nstates; ev++)
-			eigvals[m][ev] *= (NoPinvInModel() ? blen_multiplier[m] : blen_multiplier[0] / (ONE_POINT_ZERO - *propInvar));
-		blen_multiplier[m] = 1.0;
-
+			eigvals[m][ev] *= (NoPinvInModel() ? blen_multiplier[m] : blen_multiplier[0]);
+			//eigvals[m][ev] *= (NoPinvInModel() ? blen_multiplier[m] : blen_multiplier[0] / (ONE_POINT_ZERO - *propInvar));
+		//blen_multiplier[m] = 1.0;
+		
 		//For codon models using this precalculation actually makes things things slower in CalcPmat (cache thrashing,
 		//I think) so don't bother doing it here.  In fact, don't even allocate it in the model
 		if(modSpec->IsCodon() == false)
