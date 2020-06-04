@@ -1282,8 +1282,10 @@ class Model{
 		//			return;
 
 		//codon NS rate variation will be taken care of here, and all of the rateMults will be 1.0
+		//normalize rates such that mean is 1.0
+		double rescaler = (ONE_POINT_ZERO - *propInvar);
 		for (int rate = 0; rate < NRateCats(); rate++) {
-			r.push_back(rateMults[rate] / (ONE_POINT_ZERO - *propInvar));
+			r.push_back(rateMults[rate] / rescaler);
 		}
 
 		//the only real trick here is that pinv will be include as a separate category of rate zero
