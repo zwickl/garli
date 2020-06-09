@@ -418,7 +418,7 @@ private:
 			treeString(NULL), adap(NULL), rep_fraction_done(ZERO_POINT_ZERO), tot_fraction_done(ZERO_POINT_ZERO),
 			userTermination(false), timeTermination(false), genTermination(false), workPhaseTermination(false), restartedAfterTermination(false),
 			currentBootstrapRep(0), finishedRep(false), lastBootstrapSeed(0), nextBootstrapSeed(0), dataPart(NULL), rawPart(NULL), swapTermThreshold(0),
-			finishedGenerations(false), initialRefinePass(0), finalRefinePass(0)
+			finishedGenerations(false), initialRefinePass(0), finalRefinePass(0), pmatMan(NULL)
 #ifdef INCLUDE_PERTURBATION			 
 			pertMan(NULL), allTimeBest(NULL), bestSinceRestart(NULL),
 #endif

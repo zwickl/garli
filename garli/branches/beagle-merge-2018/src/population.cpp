@@ -528,7 +528,10 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		SequenceData *subsetData = dataPart->GetSubset(subsetSpec->dataIndex);
 		ModelSpecification *subsetModSpec = modSpecSet.GetModSpec(subsetSpec->modelIndex);
 
-		double claSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart);
+		//for things to work we need the beagle subset instances to all have the same # of clas 
+		//(and there is only one claMan, so for now just using size needed for whole partitioned analysis  
+		double claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
+		//double claSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart);
 		int maxClas = (int)((memToUse*KB) / claSizePerNodeKB);
 		if(maxClas >= L0){
 			numClas = min(maxClas, idealClas);
@@ -588,8 +591,8 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 		//if we do tons of recombination 
 		idealClas *= 2;
-		if(!validateMode)
-			claMan=new ClaManager(dataPart->NTax()-2, numClas, idealClas, &indiv[0].modPart, dataPart);
+		if (!validateMode && !claMan)
+			claMan = new ClaManager(dataPart->NTax() - 2, numClas, idealClas, &indiv[0].modPart, dataPart);
 
 		CalculationManager::SetClaManager(claMan);
 		//both the tips and internal branches need pmats, hence the x2
@@ -597,7 +600,8 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		idealPmats *= 2;
 		//for now using as many pmats as pmat holders
 		//pmatMan = new PmatManager(numClas * 2, idealPmats, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)), modSpec.nstates);
-		pmatMan = new PmatManager(idealPmats, idealPmats, (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)), subsetModSpec->nstates);
+		if(!pmatMan)
+			pmatMan = new PmatManager(idealPmats, idealPmats, (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)), subsetModSpec->nstates);
 		CalculationManager::SetPmatManager(pmatMan);
 
 #ifdef BEAGLEPART 
@@ -610,9 +614,13 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		//invariable class needs to be treated as extra rate for beagle
 		//calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
 		calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
-		//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, data->NStates(), sites, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)));
+#ifndef BEAGLEPART
+		//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec.numRateCats + (subsetModSpec.includeInvariantSites ? 1 : 0)));
 		calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)));
-	#endif
+#else
+		calcMan->AddSubsetInstance(numClas, idealClas, subsetData, subsetModSpec, subsetSpec->modelIndex);
+#endif
+#endif
 	} // end loop over modelParts
 
 	CalculationManager::SetClaManager(claMan);
