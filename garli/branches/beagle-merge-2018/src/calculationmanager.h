@@ -22,8 +22,7 @@
 #include "beagle.h"
 #endif
 
-//extern ClaManager claMan;
-//owned by each TreeNode
+#include "clamanager.h"
 #include "utility.h"
 #include "model.h"
 class TreeNode;
@@ -93,6 +92,7 @@ public:
 
 class ScoringOperation{
 	friend class CalculationManager;
+	friend class SubsetCalculationManager;
 	friend class BranchOperation;
 
 	//my functions don't write the final cla, but Beagle allows for specifying one
@@ -224,9 +224,15 @@ class TransMatHolder{
 	const Model *GetConstModel() const{
 		return myMod;
 		}
+
+	const Model *GetConstModel(int modelIndex) const {
+		return myModPart->GetModel(modelIndex);
+	}
+
 	};
 
-class PmatManager{
+class PmatManager {
+	friend class CalculationManager;
 	int nRates;
 	int nStates;
 	int nMats;
@@ -301,13 +307,21 @@ public:
 		return holders[index].edgeLen;
 		}
 
+	const FLOAT_TYPE GetScaledEdgelen(int index, int modelIndex) const {
+		return holders[index].edgeLen * holders[index].myModPart->SubsetRate(modelIndex);
+	}
+
 	void GetEigenSolution(int index, ModelEigenSolution &sol) const{
 		assert(holders[index].myMod);
 		holders[index].myMod->GetEigenSolution(sol);
 		}
 
+	const FLOAT_TYPE GetSubsetRate(int index, int modelIndex) const {
+		return holders[index].myModPart->SubsetRate(modelIndex);
+	}
+
 	void GetEigenSolution(int index, ModelEigenSolution &sol, int modelIndex) const {
-		assert(holders[index].myMod);
+		assert(holders[index].myModPart);
 		//holders[index].myMod->GetEigenSolution(sol);
 		holders[index].myModPart->GetModel(modelIndex)->GetEigenSolution(sol);
 	}
@@ -401,6 +415,10 @@ public:
 	const Model *GetModelForTransMatHolder(int index)const{
 		return holders[index].GetConstModel();
 		}
+
+	const Model *GetModelForTransMatHolder(int index, int modelIndex)const {
+		return holders[index].GetConstModel(modelIndex);
+	}
 
 	Model *GetMutableModelForTransMatHolder(int index)const{
 		return holders[index].myMod;
@@ -786,7 +804,7 @@ of CLA holders and pmat holders, and constructs the sets of operations to be cal
 class CalculationManager{
 	//the claManager may eventually be owned by calcManager, but for now it can interact indirectly
 	//with the global manager, as everything did previously
-	static ClaManager *claMan;
+	//static ClaManager *claMan;
 	static PmatManager *pmatMan;
 #ifdef BEAGLEPART
 	static const DataPartition* dataPart;
@@ -809,6 +827,8 @@ class CalculationManager{
 	long pref_flags;
 	long actual_flags;
 
+	static ClaManager *claMan;
+
 public:
 	bool useBeagle;
 	bool termOnBeagleError;
@@ -817,7 +837,8 @@ public:
 //	bool singlePrecBeagle;
 //	bool gpuBeagle;
 #ifdef BEAGLEPART
-	vector<int> beagleInstances
+	//vector<int> beagleInstances;
+	vector<SubsetCalculationManager*>  subsetManagers;
 #else
 	int beagleInst;
 #endif
@@ -827,7 +848,9 @@ public:
 	CalculationManager(){
 		useBeagle = false; 
 //		gpuBeagle = false;
+#ifndef BEAGLEPART
 		beagleInst = -1; 
+#endif
 		termOnBeagleError = true;
 		//singlePrecBeagle = false;
 		//rescaleBeagle = false;
@@ -873,10 +896,22 @@ public:
 	//this is also only known AFTER initialization
 	bool IsGPU() {return (bool) (actual_flags & BEAGLE_FLAG_PROCESSOR_GPU);}
 
+	
 	void InitializeBeagleInstance(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
+	void InitializeBeagleInstance(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates, SequenceData *data);
+	void AddSubsetInstance(int nClas, int nHolders, SequenceData *subsetData, ModelSpecification *subsetModSpec, int modelIndex);
 
 	void Finalize(){
 #ifdef USE_BEAGLE
+#ifdef BEAGLEPART
+		//for(vector<int>::iterator inst = beagleInstances.begin(); inst != beagleInstances.end(); inst++)
+		//	beagleFinalizeInstance(*inst);
+		for (vector<SubsetCalculationManager *>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
+		//beagleFinalizeInstance((*subman).beagleInst);
+		(*subman)->Finalize();
+		delete *subman;
+		}
+#else
 		if(beagleInst > 0)
 			beagleFinalizeInstance(beagleInst);
 #endif
@@ -972,6 +1007,7 @@ private:
 	//BEAGLE SPECIFIC FUNCS
 
 	void SendTipDataToBeagle();
+	void SendTipDataToBeagle(int beagleInstNum, SequenceData *data);
 
 	//interpret beagle error codes, output a message and bail if termOnBeagleError == true
 	void CheckBeagleReturnValue(int err, const char *funcName) const;
@@ -1104,3 +1140,5 @@ private:
 #endif 
 	};
 #endif
+
+#endif //#ifndef CALCULATION_MANAGER
