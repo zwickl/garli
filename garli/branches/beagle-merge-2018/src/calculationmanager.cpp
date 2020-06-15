@@ -1632,39 +1632,40 @@ void CalculationManager::GetBeagleSiteLikelihoods(double *likes){
 	beagleGetSiteLogLikelihoods(beagleInst, likes);
 	}
 
-void CalculationManager::OutputBeagleSiteValues(ofstream &out, bool derivs) const{
+void CalculationManager::OutputBeagleSiteValues(ofstream& out, bool derivs) const {
 
-	/*TODO_BEAGLE_PART  need to have a CalculationManager level wrapper around 
+	/*TODO_BEAGLE_PART  need to have a CalculationManager level wrapper around
 	individual calls to subset manager*/
-/*
+	/*
 
-	//there is only one set of sitelikes stored by an instance, the most recent ones		
-	vector<double> siteLikesOut(data->NChar());
-	vector<double> siteD1Out(data->NChar());
-	vector<double> siteD2Out(data->NChar());
+		//there is only one set of sitelikes stored by an instance, the most recent ones
+		vector<double> siteLikesOut(data->NChar());
+		vector<double> siteD1Out(data->NChar());
+		vector<double> siteD2Out(data->NChar());
 
-	const int *counts = data->GetCounts();
+		const int *counts = data->GetCounts();
 
-	beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
-	if(derivs)
-		beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
+		beagleGetSiteLogLikelihoods(beagleInst, &(siteLikesOut[0]));
+		if(derivs)
+			beagleGetSiteDerivatives(beagleInst, &(siteD1Out[0]), &(siteD2Out[0]));
 
-	//ScoreSet mySummation = SumSiteValues(&siteLikesOut[0], (derivs ? &siteD1Out[0] : NULL), (derivs ? &siteD2Out[0] : NULL));
-	//out << "mine\t" << mySummation.lnL << "\t" << mySummation.d1 << "\t" << mySummation.d2 << "\n";
-	//outman.DebugMessage("myL\t%f\tD1\t%f\tD2\t%f", mySummation.lnL, mySummation.d1, mySummation.d2);
-	//outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
+		//ScoreSet mySummation = SumSiteValues(&siteLikesOut[0], (derivs ? &siteD1Out[0] : NULL), (derivs ? &siteD2Out[0] : NULL));
+		//out << "mine\t" << mySummation.lnL << "\t" << mySummation.d1 << "\t" << mySummation.d2 << "\n";
+		//outman.DebugMessage("myL\t%f\tD1\t%f\tD2\t%f", mySummation.lnL, mySummation.d1, mySummation.d2);
+		//outman.UserMessage("mine = %.4f beag = %.4f", mySummation.lnL, results.lnL);
 
-	for(int s = 0;s < data->GapsIncludedNChar();s++){
-		int packed = data->Number(s);
-		if(packed >= 0){
-			out << s << "\t" << packed << "\t" << counts[packed] << "\t" << siteLikesOut[packed];
-			if(derivs){
-				out << "\t" << siteD1Out[packed] << "\t" << siteD2Out[packed];
+		for(int s = 0;s < data->GapsIncludedNChar();s++){
+			int packed = data->Number(s);
+			if(packed >= 0){
+				out << s << "\t" << packed << "\t" << counts[packed] << "\t" << siteLikesOut[packed];
+				if(derivs){
+					out << "\t" << siteD1Out[packed] << "\t" << siteD2Out[packed];
+					}
 				}
+			else
+				out << s << "\t" << packed << "\t" << counts[packed] << "\tNA";
+			out << "\n";
 			}
-		else 
-			out << s << "\t" << packed << "\t" << counts[packed] << "\tNA";
-		out << "\n";
 		}
-	}
-
+	*/
+}
