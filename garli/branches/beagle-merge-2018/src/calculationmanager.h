@@ -228,7 +228,6 @@ class TransMatHolder{
 	const Model *GetConstModel(int modelIndex) const {
 		return myModPart->GetModel(modelIndex);
 	}
-
 	};
 
 class PmatManager {

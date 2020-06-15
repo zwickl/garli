@@ -2233,6 +2233,11 @@ public:
 			throw ErrorException("Attemped to access invalid Model number");
 		return models[m];
 		}
+	const Model *GetConstModel(int m) const {
+		if (m < 0 || (m < models.size()) == false)
+			throw ErrorException("Attemped to access invalid Model number");
+		return models[m];
+	}
 	bool IsModelPartitionEqual(const ModelPartition *other) const{
 		bool equal = true;
 		for(unsigned i=0;i<modSets.size();i++){
