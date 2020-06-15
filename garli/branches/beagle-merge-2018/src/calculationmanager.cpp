@@ -25,7 +25,11 @@
 
 ClaManager *CalculationManager::claMan = NULL;
 PmatManager *CalculationManager::pmatMan = NULL;
+#ifdef BEAGLEPART
+const DataPartition *CalculationManager::dataPart = NULL;
+#else
 const SequenceData *CalculationManager::data = NULL;
+#endif
 
 ClaManager *NodeClaManager::claMan = NULL;
 PmatManager *NodeClaManager::pmatMan = NULL;
@@ -645,7 +649,14 @@ int CalculationManager::AccumulateOpsOnPath(int holderInd, list<NodeOperation> &
 
 //this just performs all of the transmat and cla ops that were queued
 //will generally be followed by a call to PerformScoring to get lnL or derivs
-void CalculationManager::UpdateAllConditionals(){	
+void CalculationManager::UpdateAllConditionals(){
+	
+#ifdef BEAGLEPART
+	for (vector<SubsetCalculationManager*>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
+		(*subman)->UpdateAllConditionals(operationSetQueue);
+	}
+	return
+#endif	
 	//DEBUG
 #ifdef DEBUG_OPS
 	OutputOperationsSummary();
@@ -716,7 +727,7 @@ void CalculationManager::UpdateAllConditionals(){
 			//should have been reserved in AccumulateOps, otherwise when they were reserved when previous
 			//destinations
 			ReserveDestinationClas(*it);
-			PerformClaOperationBatch((*it).claOps);
+			PerformClaOperationBatch(beagleInst, (*it).claOps);
 			
 			//No need to do all this unreservation if the number of clas is large enough to simultaneously hold
 			//all clas of the tree. We'll still unreserve them all at the end
@@ -948,6 +959,11 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 }
 
 void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &theOps){
+
+	//BEAGLEPART
+	//would need to loop over subsets here
+
+
 #if ! (defined(BATCHED_CALLS) && ! defined(DONT_SEND_TRANSMATS))
 	assert(0);
 #endif
@@ -1023,7 +1039,7 @@ void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &th
 		}
 	}
 
-void CalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theOps){
+void CalculationManager::PerformClaOperationBatch(int beagleInst, const list<ClaOperation> &theOps) {
 	//not sure if this is right - will always use a single scale array for destWrite (essentially
 	//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
 	//int destinationScaleWrite = (rescaleBeagle ? claMan->NumClas() : BEAGLE_OP_NONE);
@@ -1617,6 +1633,11 @@ void CalculationManager::GetBeagleSiteLikelihoods(double *likes){
 	}
 
 void CalculationManager::OutputBeagleSiteValues(ofstream &out, bool derivs) const{
+
+	/*TODO_BEAGLE_PART  need to have a CalculationManager level wrapper around 
+	individual calls to subset manager*/
+/*
+
 	//there is only one set of sitelikes stored by an instance, the most recent ones		
 	vector<double> siteLikesOut(data->NChar());
 	vector<double> siteD1Out(data->NChar());

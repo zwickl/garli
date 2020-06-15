@@ -985,7 +985,8 @@ private:
 	void ResetDepLevelsAndReservations();
 
 	//Calculate a whole set of cla operations at once - each combines two clas and two transmats into one dest cla
-	void PerformClaOperationBatch(const list<ClaOperation> &theOps);
+	void PerformClaOperationBatch(int beagleInst, const list<ClaOperation>& theOps);
+	//void PerformClaOperationBatch(const list<ClaOperation> &theOps);
 
 	//Calculate a whole set of transmat operations at once. May include derivative matrix calcs too.
 	//Acutal calculation of the matrices may happen in Garli and then be sent to beagle
