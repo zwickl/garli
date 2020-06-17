@@ -518,10 +518,11 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 															 //best indiv and enough for each root
 	}
 
-
 	calcMan = new CalculationManager();
+#ifndef BEAGLEPART
 	if (modSpecSet.NumSpecs() > 1)
 		throw ErrorException("still working on true partitioned beagle support. This version should work fine with a single subset");
+#endif
 
 	//loop over subsets (for partitioned beagle)
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {

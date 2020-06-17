@@ -1161,12 +1161,14 @@ private:
 	//return beagle partial index (might actually represent tip)
 	int PartialIndexForBeagle(int ind) const{
 
-//#define PASS_HOLDER_INDECES
-
 #ifdef PASS_HOLDER_INDECES
 		return (ind < 0 ? ((-ind) - 1) : ind + data->NTax());
 #else
+#ifndef BEAGLEPART
 		return (ind < 0 ? ((-ind) - 1) : claMan->GetClaIndexForBeagle(ind) + data->NTax());
+#else
+		return (ind < 0 ? ((-ind) - 1) : claMan->GetClaIndexForBeagle(ind) + dataPart->NTax());
+#endif
 #endif
 		}
 	/*beagle rescaling indeces are in the same order as mine, and they match my partial indeces*/
@@ -1227,12 +1229,6 @@ private:
 				claMan->GetClaFillIfNecessary(num)->arr),
 			"beagleSetPartials");
 		*/
-		CheckBeagleReturnValue(
-			beagleSetPartials(
-				beagleInst,
-				PartialIndexForBeagle(num),
-				claMan->GetClaFillIfNecessary(num)->arr), 
-			"beagleSetPartials");
 		}
 
 	void OutputBeagleTransMat(int index);

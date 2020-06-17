@@ -69,13 +69,13 @@ do
 #	score=`tail -1 ${i%.conf}.sitelikes.log | awk '{print $2}'`
 	score=`tail -1 scr.$base.sitelikes.log | awk '{print $2}'`
 	expect=`head -n$line data/expected.scr | tail -n1`
-	diff=`echo \($score\) - \($expect\) | bc`
+	diff=`echo  \($score\) - \($expect\) | sed 's///g' | bc`
 	echo ***********TEST**************
 	echo ***Score is $score
 	echo ***Expected is $expect
 	echo ***SCORE DIFFERENCE IS $diff
 	echo ***ALLOWED ERROR IS $allowed
-	OK=`echo "$diff < $allowed && $diff > -$allowed" | bc`
+	OK=`echo  "$diff <= $allowed && $diff >= -$allowed" | sed 's///g' |  bc`
 
 	if (( $OK ))
 	then

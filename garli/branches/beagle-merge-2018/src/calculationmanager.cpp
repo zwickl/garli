@@ -51,8 +51,6 @@ const char *AdvanceDataPointer(const char *arr, int num);
 	#define OUTPUT_OTHER_BEAGLE
 #endif
 
-#ifdef USE_BEAGLE
-
 //#define DONT_SEND_TRANSMATS
 
 // print possible beagle resources
@@ -262,6 +260,26 @@ void CalculationManager::InterpretBeagleResourceFlags(long flags, string &list, 
 		}while(bit <= (1 << 18));
 	}
 
+#ifdef BEAGLEPART
+void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData *subsetData, ModelSpecification *subsetModSpec, int modelIndex) {
+	assert(useBeagle);
+
+	termOnBeagleError = true;
+	req_flags = ParseBeagleFlagString(requiredBeagleFlags);
+	//dealing with rescaling depending on other assigned flags gets annoying, so just always demand it
+	req_flags = req_flags | BEAGLE_FLAG_SCALERS_LOG;
+	pref_flags = ParseBeagleFlagString(preferredBeagleFlags, req_flags);
+
+	SubsetCalculationManager *subsetMan = new SubsetCalculationManager;
+	subsetMan->InitializeSubset(nClas, nHolders, pref_flags, req_flags, subsetData, subsetModSpec, modelIndex);
+	subsetMan->SetClaManager(claMan);
+	subsetMan->SetPmatManager(pmatMan);
+	subsetMan->SetOfprefix(ofprefix);
+	subsetManagers.push_back(subsetMan);
+}
+#endif
+
+#ifndef BEAGLEPART
 void CalculationManager::InitializeBeagleInstance(int nTips, int nClas, int nHolders, int nstates, int nchar, int nrates){
 	assert(useBeagle);
 
@@ -344,11 +362,7 @@ void CalculationManager::InitializeBeagleInstance(int nTips, int nClas, int nHol
 		req_flags,
 		&det);
 
-#ifdef BEAGLEPART
-	beagleInst.push_back(beagleInstNum);
-#else
 	beagleInst = beagleInstNum;
-#endif
 
 	CheckBeagleReturnValue(
 		beagleInst, 
@@ -449,7 +463,7 @@ void CalculationManager::SendTipDataToBeagle(){
 	}
 	outman.DebugMessage("DATA SENT");
 	}
-#endif
+#endif //ifndef BEAGLEPART
 
 ScoreSet CalculationManager::CalculateLikelihoodAndDerivatives(const TreeNode *effectiveRoot, bool calcDerivs){
 #ifdef DEBUG_OPS
@@ -655,8 +669,8 @@ void CalculationManager::UpdateAllConditionals(){
 	for (vector<SubsetCalculationManager*>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
 		(*subman)->UpdateAllConditionals(operationSetQueue);
 	}
-	return
-#endif	
+	return;
+#else
 	//DEBUG
 #ifdef DEBUG_OPS
 	OutputOperationsSummary();
@@ -765,9 +779,11 @@ void CalculationManager::UpdateAllConditionals(){
 		for(list<ClaOperation>::const_iterator cit = (*it).claOps.begin();cit != (*it).claOps.end();cit++)
 			PerformClaOperation(&(*cit));
 		}
-#endif
-	}
+#endif //#ifdef BATCHED_CALLS
+#endif //#ifdef BEAGLEPART
+}
 
+#ifndef BEAGLEPART
 void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperation> &theOps){
 
 	//for now assuming that all transmat ops in a set have same eigen solution and rate multipliers
@@ -957,7 +973,9 @@ void CalculationManager::PerformTransMatOperationBatch(const list<TransMatOperat
 #endif
 //		}
 }
+#endif //#ifndef BEAGLEPART
 
+#ifndef BEAGLEPART
 void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &theOps){
 
 	//BEAGLEPART
@@ -1038,7 +1056,8 @@ void CalculationManager::SendTransMatsToBeagle(const list<TransMatOperation> &th
 			}
 		}
 	}
-
+#endif //#ifndef BEAGLEPART
+#ifndef BEAGLEPART
 void CalculationManager::PerformClaOperationBatch(int beagleInst, const list<ClaOperation> &theOps) {
 	//not sure if this is right - will always use a single scale array for destWrite (essentially
 	//scratch space, I think) and then pass a cumulative scaler to actually keep track of the scaling
@@ -1158,6 +1177,7 @@ void CalculationManager::AccumulateRescalers(int destIndex, int childIndex1, int
 			"beagleAccumulateScaleFactors");
 		}
 	}
+#endif //#ifndef BEAGLEPART
 
 void CalculationManager::OutputOperationsSummary() const{
 	//DEBUG
@@ -1281,6 +1301,7 @@ void CalculationManager::ResetDepLevelsAndReservations(){
 		claMan->ReportClaTotals("reset all ", -1);
 	}
 
+#ifndef BEAGLEPART
 void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 
 //	outman.DebugMessage("**ENTERING PERFORM CLA");	
@@ -1331,7 +1352,6 @@ void CalculationManager::PerformClaOperation(const ClaOperation *theOp){
 	//DEBUG - need to figure out second argument here (direction) which I think determined how likely a holder is to be recycled.
 	claMan->FillHolder(theOp->destClaIndex, 0);
 }
-
 
 //deprecated in favor of PerformTransMatOperationBatch
 void CalculationManager::PerformTransMatOperation(const TransMatOperation *theOp){
@@ -1434,11 +1454,26 @@ void CalculationManager::OutputBeagleTransMat(int beagleIndex){
 			}
 		}
 	}
+#endif // ifndef BEAGLEPART
 
 //this does the last operation, beagleCalculateEdgeLogLikelihoods, and expects that the 
 //required partials have been calculated as well as the transmats necessary for this operation
 ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *theOp){
-	ScoreSet results = {0.0, 0.0, 0.0};
+	
+	ScoreSet results = { 0.0, 0.0, 0.0 };
+#ifdef BEAGLEPART
+	//loop over subset managers
+		//this needs to loop over subset managers
+	ScoreSet subsetResults = { 0.0, 0.0, 0.0 };
+	for (vector<SubsetCalculationManager*>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
+		ScoreSet subsetResults = (*subman)->PerformScoringOperation(theOp);
+		results.lnL += subsetResults.lnL;
+		results.d1 += subsetResults.d1;
+		results.d2 += subsetResults.d2;
+	}
+	return results;
+#else
+	
 #ifdef OUTPUT_OTHER_BEAGLE
 //	outman.DebugMessage("ENTER PERF SCR");
 #endif
@@ -1569,8 +1604,10 @@ ScoreSet CalculationManager::PerformScoringOperation(const ScoringOperation *the
 
 #endif
 	return results;
+#endif //#ifdef BEAGLEPART
 }
 
+#ifndef BEAGLEPART
 ScoreSet CalculationManager::SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const{
 	FLOAT_TYPE lnL = 0.0, D1 = 0.0, D2 = 0.0;
 	for(int i = 0;i < data->NChar();i++){
@@ -1627,10 +1664,16 @@ ScoreSet CalculationManager::SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOA
 	ScoreSet res = {lnL, D1, D2};
 	return res;
 	}
+#endif //#ifndef BEAGLEPART
 
 void CalculationManager::GetBeagleSiteLikelihoods(double *likes){
+#ifdef BEAGLEPART
+	//BEAGLEPART TODO generalize for partitioned 
+#else
 	beagleGetSiteLogLikelihoods(beagleInst, likes);
+#endif
 	}
+
 
 void CalculationManager::OutputBeagleSiteValues(ofstream& out, bool derivs) const {
 
