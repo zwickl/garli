@@ -57,6 +57,7 @@ Garli_SOURCES = \
 	rng.cpp \
 	sequencedata.cpp \
 	set.cpp \
+	subsetcalculationmanager.cpp \
 	translatetable.cpp \
 	tree.cpp \
 	treenode.cpp \
