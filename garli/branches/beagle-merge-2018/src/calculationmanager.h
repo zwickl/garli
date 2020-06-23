@@ -1105,9 +1105,6 @@ private:
 	void PerformClaOperation(const ClaOperation *theOp);
 	//calculate a pmat, or a pmat, d1mat and d2mat
 	void PerformTransMatOperation(const TransMatOperation *theOp);
-	
-#ifdef USE_BEAGLE
-	//BEAGLE SPECIFIC FUNCS
 
 	void SendTipDataToBeagle();
 	void SendTipDataToBeagle(int beagleInstNum, SequenceData *data);
@@ -1235,8 +1232,7 @@ private:
 	//this is just for debugging
 	void OutputOperationsSummary() const;
 	//Sum site likes/derivs. Beagle now sums on its own, so no longer necessary except for debugging
-	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const;
-#endif 
+	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const; 
 	};
 #endif
 

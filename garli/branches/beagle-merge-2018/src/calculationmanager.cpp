@@ -666,6 +666,8 @@ int CalculationManager::AccumulateOpsOnPath(int holderInd, list<NodeOperation> &
 void CalculationManager::UpdateAllConditionals(){
 	
 #ifdef BEAGLEPART
+	//for partitioned beagle usage, the original meat of this function has been implemented in SubsetCalcman::UpdateAllConditionals
+	//here we just call it for each subset
 	for (vector<SubsetCalculationManager*>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
 		(*subman)->UpdateAllConditionals(operationSetQueue);
 	}
@@ -720,9 +722,6 @@ void CalculationManager::UpdateAllConditionals(){
 		9. Unreserve anything remaining, clear freeable queue and op queue
 
 	*/
-
-	//BMERGE DEBUG
-//#define DONT_SEND_TRANSMATS
 
 	claMan->SetCurReclaimableLevel(0);
 	list<BlockingOperationsSet>::iterator toFree = operationSetQueue.begin();

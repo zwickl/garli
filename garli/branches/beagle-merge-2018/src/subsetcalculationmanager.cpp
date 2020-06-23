@@ -498,9 +498,6 @@ void SubsetCalculationManager::UpdateAllConditionals(list<BlockingOperationsSet>
 #ifdef DEBUG_OPS
 	OutputOperationsSummary();
 #endif
-
-
-#ifdef BATCHED_CALLS
 	
 	//this just yoinks the pmat ops from each BlockingOpSet into a new list
 	//note that PerformTransMatOperationBatch assumes that all the ops either
@@ -543,11 +540,6 @@ void SubsetCalculationManager::UpdateAllConditionals(list<BlockingOperationsSet>
 		9. Unreserve anything remaining, clear freeable queue and op queue
 
 	*/
-	//BPART
-	//for(loop over models/instances){
-	//for (vector<int>::iterator beagleInst = beagleInstances.begin(); beagleInst != beagleInstances.end(); beagleInst++) {
-		//BMERGE DEBUG
-	//#define DONT_SEND_TRANSMATS
 
 	claMan->SetCurReclaimableLevel(0);
 	list<BlockingOperationsSet>::iterator toFree = operationSetQueue.begin();
@@ -596,17 +588,7 @@ void SubsetCalculationManager::UpdateAllConditionals(list<BlockingOperationsSet>
 //TODO - what should happen with reclaim level after all the calcs?  
 //trying to allow freeing of first level dependencies in general
 claMan->SetCurReclaimableLevel(1);
-#else
-	//do the actual operations.  right now it is doing 2 pmat ops followed by the cla op that requires then and looping
-	//since there are enough pmats it would make more sense to put them into a single block to be done together
-	for (list<BlockingOperationsSet>::const_iterator it = operationSetQueue.begin(); it != operationSetQueue.end(); it++) {
-		for (list<TransMatOperation>::const_iterator pit = (*it).pmatOps.begin(); pit != (*it).pmatOps.end(); pit++)
-			PerformTransMatOperation(&(*pit));
-		for (list<ClaOperation>::const_iterator cit = (*it).claOps.begin(); cit != (*it).claOps.end(); cit++)
-			PerformClaOperation(&(*cit));
-	}
-#endif
-	}
+}
 
 	void SubsetCalculationManager::PerformClaOperationBatch(const list<ClaOperation> &theOps) {
 		//not sure if this is right - will always use a single scale array for destWrite (essentially

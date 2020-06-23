@@ -523,16 +523,23 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	if (modSpecSet.NumSpecs() > 1)
 		throw ErrorException("still working on true partitioned beagle support. This version should work fine with a single subset");
 #endif
+	//For partitioned beagle each subset must have the same number of conditionals allocated, 
+	//and the memory levels, etc will be the same.  In this mode the specified amount of memory 
+	//is per instance (= per subset), so determine how many clas the largest subset (in terms of required size) 
+	//could have within that restriction
+	double claSizePerNodeKB = 0.0;
+	double subsetClaSizePerNodeKB = 0.0;
+	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
+		subsetClaSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart);
+		outman.UserMessage("subset clasize = %f", subsetClaSizePerNodeKB);
+		claSizePerNodeKB = max(subsetClaSizePerNodeKB, claSizePerNodeKB);
+	}
 
 	//loop over subsets (for partitioned beagle)
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
 		SequenceData *subsetData = dataPart->GetSubset(subsetSpec->dataIndex);
 		ModelSpecification *subsetModSpec = modSpecSet.GetModSpec(subsetSpec->modelIndex);
-
-		//for things to work we need the beagle subset instances to all have the same # of clas 
-		//(and there is only one claMan, so for now just using size needed for whole partitioned analysis  
-		double claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
-		//double claSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart);
+		//double claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
 		int maxClas = (int)((memToUse*KB) / claSizePerNodeKB);
 		if(maxClas >= L0){
 			numClas = min(maxClas, idealClas);
