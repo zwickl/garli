@@ -85,7 +85,7 @@ public:
 		transOp1 = t1;
 		transOp2 = t2;
 		}
-	bool operator <(const NodeOperation &rhs){
+	bool operator <(const NodeOperation &rhs) const{
 		return claOp.opDepLevel < rhs.claOp.opDepLevel;
 		}
 	};
