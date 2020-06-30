@@ -840,6 +840,9 @@ class SubsetCalculationManager {
 	int ModelIndex() const { return modelIndex; }
 	int ScalerIndexForBeagle(int ind) const;
 	int PartialIndexForBeagle(int ind) const;
+	int NChar() { return nchar; }
+	int BeagleInst() { return beagleInst; }
+	void GetBeagleSiteLikelihoods(double* likes);
 	//simple report
 	void ParseInstanceDetails(const BeagleInstanceDetails *det);
 

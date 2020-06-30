@@ -912,3 +912,7 @@ ScoreSet SubsetCalculationManager::PerformScoringOperation(const ScoringOperatio
 #endif
 	return results;
 }
+
+void SubsetCalculationManager::GetBeagleSiteLikelihoods(double *likes) {
+	beagleGetSiteLogLikelihoods(beagleInst, &likes[0]);
+}

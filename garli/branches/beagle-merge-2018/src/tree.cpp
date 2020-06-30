@@ -3928,111 +3928,113 @@ void Tree::UpdateCLAs(CondLikeArraySet *destCLAset, CondLikeArraySet *firstCLAse
 		else if(firstCLAset==NULL && secCLAset==NULL){
 			//two terminal children
 			ProfTermTerm.Start();
-			if(isNucleotide)
-				CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-			else if(mod->IsOrientedGap())
-				CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, NULL, firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-			else
-				CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-			ProfTermTerm.Stop();
+if (isNucleotide)
+CalcFullCLATerminalTerminal(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+else if (mod->IsOrientedGap())
+CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, NULL, firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+else
+CalcFullCLATerminalTerminalNState(destCLA, &Lprmat[0], &Rprmat[0], firstChild->tipData[(*specs).dataIndex], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+ProfTermTerm.Stop();
 			}
 
-		else{
-			//one terminal, one internal
-			ProfIntTerm.Start();
+		else {
+		//one terminal, one internal
+		ProfIntTerm.Start();
 
-			if(isNucleotide == false){
-				if(mod->IsOrientedGap()){
-					if(firstCLAset==NULL)
-						CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, secCLA, firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
-					else
-						CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], firstCLA, NULL, NULL, secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					}
-				else{
-					if(firstCLAset==NULL)
-						CalcFullCLAInternalTerminalNState(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					else 
-						CalcFullCLAInternalTerminalNState(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					}
-				}
-			else{
-	#ifdef OPEN_MP
-				if(firstCLA==NULL){
-					assert(firstChild->ambigMap.size() > (*specs).dataIndex);
-					assert(firstChild->ambigMap[(*specs).dataIndex] != NULL);					
-					}
-				else{
-					assert(secChild->ambigMap.size() > (*specs).dataIndex);
-					assert(secChild->ambigMap[(*specs).dataIndex] != NULL);	
-					}
-
-				if(firstCLA==NULL)
-						CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], firstChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-					else
-						CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], secChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
-				}
-	#else
-				if(firstCLA==NULL)
-					CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
-				else 
-					CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
-				}
-	#endif
-			ProfIntTerm.Stop();
+		if (isNucleotide == false) {
+			if (mod->IsOrientedGap()) {
+				if (firstCLAset == NULL)
+					CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], NULL, secCLA, firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
+				else
+					CalcFullCLAOrientedGap(destCLA, &Lprmat[0], &Rprmat[0], firstCLA, NULL, NULL, secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
 			}
-		if(destCLA->rescaleRank >= rescaleEvery){
-			ProfRescale.Start();
-			if(isNucleotide)
-				RescaleRateHet(destCLA, (*specs).dataIndex);
-			else
-				RescaleRateHetNState(destCLA, (*specs).dataIndex);
+			else {
+				if (firstCLAset == NULL)
+					CalcFullCLAInternalTerminalNState(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+				else
+					CalcFullCLAInternalTerminalNState(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+			}
+		}
+		else {
+#ifdef OPEN_MP
+			if (firstCLA == NULL) {
+				assert(firstChild->ambigMap.size() > (*specs).dataIndex);
+				assert(firstChild->ambigMap[(*specs).dataIndex] != NULL);
+			}
+			else {
+				assert(secChild->ambigMap.size() > (*specs).dataIndex);
+				assert(secChild->ambigMap[(*specs).dataIndex] != NULL);
+			}
 
-			ProfRescale.Stop();
+			if (firstCLA == NULL)
+				CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], firstChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+			else
+				CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], secChild->ambigMap[(*specs).dataIndex], (*specs).modelIndex, (*specs).dataIndex);
+		}
+#else
+			if (firstCLA == NULL)
+				CalcFullCLAInternalTerminal(destCLA, secCLA, &Rprmat[0], &Lprmat[0], firstChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
+			else
+				CalcFullCLAInternalTerminal(destCLA, firstCLA, &Lprmat[0], &Rprmat[0], secChild->tipData[(*specs).dataIndex], NULL, (*specs).modelIndex, (*specs).dataIndex);
+		}
+#endif
+		ProfIntTerm.Stop();
+			}
+			if (destCLA->rescaleRank >= rescaleEvery) {
+				ProfRescale.Start();
+				if (isNucleotide)
+					RescaleRateHet(destCLA, (*specs).dataIndex);
+				else
+					RescaleRateHetNState(destCLA, (*specs).dataIndex);
+
+				ProfRescale.Stop();
 			}
 		}
 	}
 
-int Tree::Score(int rootNodeNum /*=0*/){
+	int Tree::Score(int rootNodeNum /*=0*/) {
 
-	TreeNode *rootNode=allNodes[rootNodeNum];
+		TreeNode* rootNode = allNodes[rootNodeNum];
 
 #ifdef EQUIV_CALCS
-	if(dirtyEQ){
-		ProfEQVectors.Start();
-		root->SetEquivalentConditionalVectors(data);
-		ProfEQVectors.Stop();
-		dirtyEQ=false;
+		if (dirtyEQ) {
+			ProfEQVectors.Start();
+			root->SetEquivalentConditionalVectors(data);
+			ProfEQVectors.Stop();
+			dirtyEQ = false;
 		}
 #endif
-	bool scoreOK=true;
-	do{
-		try{
-			scoreOK=true;
-		
-			if(rootWithDummy){
-				//BMERGE - think this is only for ogap
-				assert(0);
+		bool scoreOK = true;
+		do {
+			try {
+				scoreOK = true;
 
-				assert(rootNodeNum == 0);
-				ConditionalLikelihoodRateHet( ROOT, dummyRoot->anc);
+				if (rootWithDummy) {
+					//BMERGE - think this is only for ogap
+					assert(0);
+
+					assert(rootNodeNum == 0);
+					ConditionalLikelihoodRateHet(ROOT, dummyRoot->anc);
 				}
-			else {
+				else {
 #ifdef NEW_MANAGEMENT
-				//DEBUG
-				//UpdateNodeClaManagers();
+					//DEBUG
+					//UpdateNodeClaManagers();
 
-				//BMERGE - this is failing currently - check
-				//CheckClaIndeces();
-				//DEBUG - this shouldn't need to happen so often, but is playing it safe
-				UpdateDependencies();
-				lnL = calcMan->CalculateLikelihoodAndDerivatives(rootNode, false).lnL;
-				if (sitelikeLevel != 0) {
-					//BMERGE HACK
-					int subsetNum = 0;
-					vector<double> likes(dataPart->GetSubset(subsetNum)->NChar());
-					calcMan->GetBeagleSiteLikelihoods(&(likes[0]));
-					OutputSiteLikelihoods(subsetNum, likes, NULL, NULL);
-				}
+					//BMERGE - this is failing currently - check
+					//CheckClaIndeces();
+					//DEBUG - this shouldn't need to happen so often, but is playing it safe
+					UpdateDependencies();
+					lnL = calcMan->CalculateLikelihoodAndDerivatives(rootNode, false).lnL;
+					if (sitelikeLevel != 0) {
+						vector<double> likes;
+						for (int subsetNum = 0; subsetNum < dataPart->NumSubsets(); subsetNum++) {
+							likes.resize(dataPart->GetSubset(subsetNum)->NChar());
+							calcMan->subsetManagers[subsetNum]->GetBeagleSiteLikelihoods(&likes[0]);
+							OutputSiteLikelihoods(subsetNum, likes, NULL, NULL);
+							likes.clear();
+						}
+					}
 				//CheckClaIndeces();
 
 #ifdef TEST_ACCURACY

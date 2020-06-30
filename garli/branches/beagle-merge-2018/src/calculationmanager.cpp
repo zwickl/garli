@@ -1665,13 +1665,21 @@ ScoreSet CalculationManager::SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOA
 	}
 #endif //#ifndef BEAGLEPART
 
-void CalculationManager::GetBeagleSiteLikelihoods(double *likes){
+void CalculationManager::GetBeagleSiteLikelihoods(double* likes) {
 #ifdef BEAGLEPART
-	//BEAGLEPART TODO generalize for partitioned 
+	//in principle could do something like this, getting the sitelikes for each subset separately and combining.  
+	//however, sitelike output in the standard partitioned case already uses multiple calls to OutputSiteLikelihoods
+	//with the a sitelike array for a given subset passed in.  So, in Tree::Score, calling 
+	//SubsetCalculationManager::GetBeagleSiteLikelihoods for each subset followed by OutputSiteLikelihoods
+	for (vector<SubsetCalculationManager*>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
+		vector<double> subsetLikes((*subman)->NChar());
+		beagleGetSiteLogLikelihoods((*subman)->BeagleInst(), &subsetLikes[0]);
+	}
 #else
 	beagleGetSiteLogLikelihoods(beagleInst, likes);
 #endif
 	}
+}
 
 
 void CalculationManager::OutputBeagleSiteValues(ofstream& out, bool derivs) const {
