@@ -1671,14 +1671,13 @@ void CalculationManager::GetBeagleSiteLikelihoods(double* likes) {
 	//however, sitelike output in the standard partitioned case already uses multiple calls to OutputSiteLikelihoods
 	//with the a sitelike array for a given subset passed in.  So, in Tree::Score, calling 
 	//SubsetCalculationManager::GetBeagleSiteLikelihoods for each subset followed by OutputSiteLikelihoods
-	for (vector<SubsetCalculationManager*>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
+	for (vector<SubsetCalculationManager*>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++){
 		vector<double> subsetLikes((*subman)->NChar());
 		beagleGetSiteLogLikelihoods((*subman)->BeagleInst(), &subsetLikes[0]);
 	}
 #else
 	beagleGetSiteLogLikelihoods(beagleInst, likes);
 #endif
-	}
 }
 
 
