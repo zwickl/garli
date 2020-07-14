@@ -530,8 +530,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	double claSizePerNodeKB = 0.0;
 	double subsetClaSizePerNodeKB = 0.0;
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
-		subsetClaSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart);
-		outman.UserMessage("subset clasize = %f", subsetClaSizePerNodeKB);
+		subsetClaSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart, true);
 		claSizePerNodeKB = max(subsetClaSizePerNodeKB, claSizePerNodeKB);
 	}
 
