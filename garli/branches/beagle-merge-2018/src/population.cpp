@@ -523,65 +523,74 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	if (modSpecSet.NumSpecs() > 1)
 		throw ErrorException("still working on true partitioned beagle support. This version should work fine with a single subset");
 #endif
+
 	//For partitioned beagle each subset must have the same number of conditionals allocated, 
 	//and the memory levels, etc will be the same.  In this mode the specified amount of memory 
 	//is per instance (= per subset), so determine how many clas the largest subset (in terms of required size) 
 	//could have within that restriction
 	double claSizePerNodeKB = 0.0;
 	double subsetClaSizePerNodeKB = 0.0;
+	vector<int> subsetClaSizes;
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
 		subsetClaSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart, true);
+		subsetClaSizes.push_back(subsetClaSizePerNodeKB);
 		claSizePerNodeKB = max(subsetClaSizePerNodeKB, claSizePerNodeKB);
 	}
+	int maxClas = (int)((memToUse * KB) / claSizePerNodeKB);
+	if (maxClas >= L0) {
+		numClas = min(maxClas, idealClas);
+		memLevel = 0;
+	}
+	else {
+		numClas = maxClas;
+		if (maxClas >= L1) memLevel = 1;
+		else if (maxClas >= L2) memLevel = 2;
+		else if (maxClas >= L3) memLevel = 3;
+		else memLevel = -1;
+	}
+
+	outman.precision(4);
+	outman.UserMessage("\nFor this dataset:");
+	outman.UserMessage(" Mem level		availablememory setting");
+	outman.UserMessage("  great			    >= %.0f MB", ceil(L0* (claSizePerNodeKB / (FLOAT_TYPE)KB))* memUsageMult);
+	outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0* ((FLOAT_TYPE)claSizePerNodeKB / KB))* memUsageMult - 1, ceil(L1* ((FLOAT_TYPE)claSizePerNodeKB / KB))* memUsageMult);
+	outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1* ((FLOAT_TYPE)claSizePerNodeKB / KB))* memUsageMult - 1, ceil(L2* ((FLOAT_TYPE)claSizePerNodeKB / KB))* memUsageMult);
+	outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2* ((FLOAT_TYPE)claSizePerNodeKB / KB))* memUsageMult - 1, ceil(L3* ((FLOAT_TYPE)claSizePerNodeKB / KB))* memUsageMult);
+	outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3* ((FLOAT_TYPE)claSizePerNodeKB / KB))* memUsageMult);
+
+	if (conf->scoreOnly || conf->optimizeInputOnly) {
+		outman.UserMessage("\nNOTE: Less memory is required when scoring or optimizing fixed trees.\n\tminimum of %.0f availablememory would be required to search\n", ceil(((int)(numNodesPerIndiv * 1.5 - 2 + 2 * total_size)) * ((FLOAT_TYPE)claSizePerNodeKB / KB)) * 1.25);
+	}
+
+	outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
+	outman.UserMessage("\nwhen using the BEAGLE library, this is the maximum amount of memory per model partition (instance).");
+
+	if (!(conf->scoreOnly || conf->optimizeInputOnly)) {
+		if (memLevel == 0)
+			outman.UserMessage("**Your memory level is: great (you don't need to change anything)**");
+		else if (memLevel == 1)
+			outman.UserMessage("**Your memory level is: good (you don't need to change anything)**");
+		else if (memLevel == 2)
+			outman.UserMessage("**Your memory level is: low\n\t(you may want to increase the availablememory setting)**");
+		else if (memLevel == 3)
+			outman.UserMessage("**Your memory level is: very low\n\t(if possible, you should increase the availablememory setting)**");
+		else if (memLevel == -1)
+			outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
+	}
+	outman.UserMessage("\n#######################################################");
+	if (memLevel == -1 && !validateMode)
+		throw ErrorException("Not enough memory specified in config file (availablememory)!");
 
 	//loop over subsets (for partitioned beagle)
+	double totalMemAllocated = 0.0;
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
 		SequenceData *subsetData = dataPart->GetSubset(subsetSpec->dataIndex);
 		ModelSpecification *subsetModSpec = modSpecSet.GetModSpec(subsetSpec->modelIndex);
-		//double claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
-		int maxClas = (int)((memToUse*KB) / claSizePerNodeKB);
-		if(maxClas >= L0){
-			numClas = min(maxClas, idealClas);
-			memLevel = 0;		
-			}
-		else{
-			numClas=maxClas;
-	 		if(maxClas >= L1) memLevel = 1;
-	 		else if(maxClas >= L2) memLevel = 2;
-	 		else if(maxClas >= L3) memLevel = 3;
-	 		else memLevel=-1;
-			}
 
-		outman.precision(4);
-		outman.UserMessage("\nFor this dataset:");
-		outman.UserMessage(" Mem level		availablememory setting");
-		outman.UserMessage("  great			    >= %.0f MB", ceil(L0 * (claSizePerNodeKB/(FLOAT_TYPE)KB)) * memUsageMult);
-		outman.UserMessage("  good			approx %.0f MB to %.0f MB", ceil(L0 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
-		outman.UserMessage("  low			approx %.0f MB to %.0f MB", ceil(L1 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
-		outman.UserMessage("  very low		approx %.0f MB to %.0f MB", ceil(L2 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult - 1, ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult);
-		outman.UserMessage("the minimum required availablememory is %.0f MB", ceil(L3 * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * memUsageMult );
-
-		if(conf->scoreOnly || conf->optimizeInputOnly){
-			outman.UserMessage("\nNOTE: Less memory is required when scoring or optimizing fixed trees.\n\tminimum of %.0f availablememory would be required to search\n", ceil(((int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size)) * ((FLOAT_TYPE)claSizePerNodeKB/KB)) * 1.25);
-			}
-
-		outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
-
-		outman.UserMessage("\nGarli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
-
-		if( ! (conf->scoreOnly || conf->optimizeInputOnly)){
-			if(memLevel == 0)
-				outman.UserMessage("**Your memory level is: great (you don't need to change anything)**");
-			else if(memLevel == 1)
-				outman.UserMessage("**Your memory level is: good (you don't need to change anything)**");
-			else if(memLevel == 2)
-				outman.UserMessage("**Your memory level is: low\n\t(you may want to increase the availablememory setting)**");
-			else if(memLevel == 3)
-				outman.UserMessage("**Your memory level is: very low\n\t(if possible, you should increase the availablememory setting)**");
-			else if(memLevel == -1)
-				outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
-			}
-		outman.UserMessage("\n#######################################################");
+		//outman.UserMessage("\nfor this partition subset, Garli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
+		double subsetMemUsage = memUsageMult * (FLOAT_TYPE)numClas * (FLOAT_TYPE)subsetClaSizes[subsetSpec->claIndex] / (FLOAT_TYPE)KB;
+		outman.UserMessage("\nfor this partition subset, Garli will actually use approx. %.1f MB of memory", subsetMemUsage);
+		totalMemAllocated += subsetMemUsage;
 	/*
 		outman.precision(4);
 		outman.UserMessage("allocating memory...\nusing %.1f MB for conditional likelihood arrays.  Memlevel= %d", (FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB, memLevel);
@@ -592,8 +601,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)));
 		outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB))-1);
 	*/
-		if(memLevel==-1 && !validateMode) 
-			throw ErrorException("Not enough memory specified in config file (availablememory)!");
+
 
 		//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 		//if we do tons of recombination 
@@ -629,6 +637,9 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 #endif
 #endif
 	} // end loop over modelParts
+
+	outman.UserMessage("\nThe total memory allocated for likelihood calculations is approx %.1f MB", totalMemAllocated);
+
 
 	CalculationManager::SetClaManager(claMan);
 	//CalculationManager::SetData(dataPart);
