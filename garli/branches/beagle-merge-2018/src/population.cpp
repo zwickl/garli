@@ -589,7 +589,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 
 		//outman.UserMessage("\nfor this partition subset, Garli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
 		double subsetMemUsage = memUsageMult * (FLOAT_TYPE)numClas * (FLOAT_TYPE)subsetClaSizes[subsetSpec->claIndex] / (FLOAT_TYPE)KB;
-		outman.UserMessage("\nfor this partition subset, Garli will actually use approx. %.1f MB of memory", subsetMemUsage);
+		outman.UserMessage("\nFor this partition subset, Garli will actually use approx. %.1f MB of memory", subsetMemUsage);
 		totalMemAllocated += subsetMemUsage;
 	/*
 		outman.precision(4);
@@ -638,7 +638,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 #endif
 	} // end loop over modelParts
 
-	outman.UserMessage("\nThe total memory allocated for likelihood calculations is approx %.1f MB", totalMemAllocated);
+	outman.UserMessage("\n\nThe total memory allocated for likelihood calculations is approx %.1f MB", totalMemAllocated);
 
 
 	CalculationManager::SetClaManager(claMan);
