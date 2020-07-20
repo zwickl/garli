@@ -4886,19 +4886,17 @@ double ModelPartition::CalcRequiredCLAsizeKB(const DataPartition *dat){
 //in the beagle case, the invariable sites rate class has space allocated in the CLAs, so account for that
 double ModelPartition::CalcRequiredSubsetCLAsizeKB(int subsetNum, const DataPartition *dat, bool beagle /*=false*/) {
 	unsigned size = 0;
-	double size2 = 0;
 	double KB = 1024;
 	//for (vector<ClaSpecifier>::iterator specs = claSpecs.begin(); specs != claSpecs.end(); specs++) {
 	ClaSpecifier spec = claSpecs[subsetNum];
 	const Model *thisMod = GetModel(spec.modelIndex);
 	int nrates = thisMod->NRateCats();
-	if(beagle)
+	//the beagle rescalers are floats, core garli uses ints
+	int scalerSize = (beagle ? sizeof(FLOAT_TYPE) : sizeof(int));
+	if(beagle) 
 		nrates += (thisMod->includeInvariantSites ? 1 : 0);
-	size2 += (dat->GetSubset(spec.dataIndex)->NChar() / KB) * (thisMod->NStates() * nrates * sizeof(FLOAT_TYPE) + sizeof(int));
-	size += (thisMod->NStates() * nrates * dat->GetSubset(spec.dataIndex)->NChar()) * sizeof(FLOAT_TYPE);
-	size += dat->GetSubset(spec.dataIndex)->NChar() * sizeof(int);
-	assert(size2 * 1024 == size);
-	return size2;
+	size += (dat->GetSubset(spec.dataIndex)->NChar() / KB) * (thisMod->NStates() * nrates * sizeof(FLOAT_TYPE) + scalerSize);
+	return size;
 }
 
 //this is the size in BYTES not elements
