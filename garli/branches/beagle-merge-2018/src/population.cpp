@@ -519,6 +519,8 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	}
 
 	calcMan = new CalculationManager();
+	outman.UserMessage("");
+	calcMan->OutputBeagleResources();
 #ifndef BEAGLEPART
 	if (modSpecSet.NumSpecs() > 1)
 		throw ErrorException("still working on true partitioned beagle support. This version should work fine with a single subset");
