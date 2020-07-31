@@ -80,8 +80,8 @@ BeagleInstanceDetails SubsetCalculationManager::InitializeSubset(int nClas, int 
 	int eigCount = nrates;
 #endif
 	//this is a gross overestimate of how many matrices are needed, but haven't worked out recycling quite yet for mats
-	int matrixCount = (nHolders * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
-	//int matrixCount = (nClas * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
+	//int matrixCount = (nHolders * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
+	int matrixCount = (nClas * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
 
 	//try one scaler per cla, as in normal garli.  These are doubles rather than ints though, so larger.
 	//scaler for a given cla will share same index, and will be cumulative, as mine are now
@@ -493,7 +493,7 @@ void SubsetCalculationManager::AccumulateRescalers(int destIndex, int childIndex
 
 //this just performs all of the transmat and cla ops that were queued
 //will generally be followed by a call to PerformScoring to get lnL or derivs
-void SubsetCalculationManager::UpdateAllConditionals(list<BlockingOperationsSet> operationSetQueue) {
+void SubsetCalculationManager::UpdateAllConditionals(list<BlockingOperationsSet> operationSetQueue, bool freeClas) {
 	//DEBUG
 #ifdef DEBUG_OPS
 	OutputOperationsSummary();
@@ -564,7 +564,8 @@ void SubsetCalculationManager::UpdateAllConditionals(list<BlockingOperationsSet>
 			//all clas of the tree. We'll still unreserve them all at the end
 			//DEBUG
 			//if(memLevel > 0){
-			if (1) {
+			//if (1) {
+			if (freeClas){
 				//remove the temp reservations from the level 1 DEPENDENCIES (if they are clean clas and not tips)
 				//but DO NOT add them to the freeable queue (since they must have been clean in the first place)
 				if ((*it).opSetDepLevel == 1) {

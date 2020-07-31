@@ -668,8 +668,11 @@ void CalculationManager::UpdateAllConditionals(){
 #ifdef BEAGLEPART
 	//for partitioned beagle usage, the original meat of this function has been implemented in SubsetCalcman::UpdateAllConditionals
 	//here we just call it for each subset
-	for (vector<SubsetCalculationManager*>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
-		(*subman)->UpdateAllConditionals(operationSetQueue);
+	//for (vector<SubsetCalculationManager*>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
+	int numSubs = subsetManagers.size();
+	for (int subnum = 0; subnum < numSubs; subnum++){
+		bool freeClas = (subnum == numSubs - 1 ? true : false);
+		subsetManagers[subnum]->UpdateAllConditionals(operationSetQueue, freeClas);
 	}
 	return;
 #else

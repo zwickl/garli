@@ -827,7 +827,7 @@ class SubsetCalculationManager {
 	public:
 	BeagleInstanceDetails InitializeSubset(int nClas, int nHolders, int pref_flags, int req_flags, SequenceData *data, ModelSpecification *subsetModSpec, int modelInd);
 	void SendTipDataToBeagle();
-	void UpdateAllConditionals(list<BlockingOperationsSet> operationSetQueue);
+	void UpdateAllConditionals(list<BlockingOperationsSet> operationSetQueue, bool freeClas);
 	void PerformClaOperationBatch(const list<ClaOperation> &theOps);
 	void PerformTransMatOperationBatch(const list<TransMatOperation> &theOps);
 	void Finalize(){ beagleFinalizeInstance(beagleInst); }
