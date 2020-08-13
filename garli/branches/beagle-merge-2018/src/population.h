@@ -425,6 +425,7 @@ private:
 			{
 			lastTopoImprove = 0;
 			lastPrecisionReduction = 0;
+			calcMan = new CalculationManager();
 			}
 
 		~Population();

@@ -517,10 +517,11 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		L3 = (int)(numNodesPerIndiv * 1.5 - 2 + 2 * total_size);//one full set, enough to reserve at least all of the full internals of the 
 															 //best indiv and enough for each root
 	}
-
-	calcMan = new CalculationManager();
+	//moved this instantiation to Population Constructor, so it can be called earlier
+	//calcMan = new CalculationManager();
 	outman.UserMessage("");
 	calcMan->OutputBeagleResources();
+	
 #ifndef BEAGLEPART
 	if (modSpecSet.NumSpecs() > 1)
 		throw ErrorException("still working on true partitioned beagle support. This version should work fine with a single subset");

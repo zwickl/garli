@@ -158,6 +158,7 @@ void UsageMessage(char *execName){
 	outman.UserMessage                 ("				and constraint files, print required memory and selected model, then exit");
 #ifdef USE_BEAGLE
 	outman.UserMessage("                                 BEAGLE LIBRARY OPTIONS");
+	outman.UserMessage("  -r --resources    output list of potential beagle resources and their available flags and exit");
 	outman.UserMessage("  -f <FLAGS>        pass flags to beagle library to help it choose a specific resource. Options are");
 	outman.UserMessage("                    CPU GPU SINGLE DOUBLE SSE OPENMP.  They may not all work. Flags are interpreted");
 	outman.UserMessage("                    as beagle *preferences*, so can be ignored when not able to be met");
@@ -237,6 +238,8 @@ int main( int argc, char* argv[] )	{
 #else
 	interactive=true;
 #endif
+	//moved popukation creation much earlier
+	Population *pop = new Population;
 
 	bool runTests = false;
 	bool validateMode = false;
@@ -300,6 +303,10 @@ int main( int argc, char* argv[] )	{
 							cmdLineBeagleFlags += argv[curarg++];
 						}
 					}
+					else if (!_stricmp(argv[curarg], "-r") || !_stricmp(argv[curarg], "--resources")) {
+						pop->calcMan->OutputBeagleResources();
+						return 0;
+					}
 					else if (!strcmp(argv[curarg], "--device")) {
 						curarg++;
 						if (curarg == argc || !isdigit(argv[curarg][0])) {
@@ -326,9 +333,6 @@ int main( int argc, char* argv[] )	{
 #ifdef GANESH
 	if(Tree::random_p==false) Tree::ComputeRealCatalan();
 #endif
-
-		//population is defined here, but not allocated until much later
-		Population *pop = NULL;
 
 		DataPartition dataPart;
 		DataPartition rawPart;
@@ -812,7 +816,7 @@ int main( int argc, char* argv[] )	{
 			//could deallocate the storage in the NCL reader here, which saves a bit of memory but isn't critical
 			//reader.DeleteCharacterBlocksFromFactories();
 			
-			//allocate the population
+			//allocate the population - this was moved earlier
 			pop = new Population();
 			pop->usedNCL = usedNCL;
 			pop->Setup(&conf, &dataPart, &rawPart, 1, (validateMode == true ? -1 : 0));
