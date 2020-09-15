@@ -825,7 +825,7 @@ class SubsetCalculationManager {
 
 
 	public:
-	BeagleInstanceDetails InitializeSubset(int nClas, int nHolders, int pref_flags, int req_flags, SequenceData *data, ModelSpecification *subsetModSpec, int modelInd);
+	BeagleInstanceDetails InitializeSubset(int nClas, int nHolders, int pref_flags, int req_flags, SequenceData *data, ModelSpecification *subsetModSpec, int modelInd, int beagleDeviceNum=-1);
 	void SendTipDataToBeagle();
 	void UpdateAllConditionals(list<BlockingOperationsSet> operationSetQueue, bool freeClas);
 	void PerformClaOperationBatch(const list<ClaOperation> &theOps);
@@ -915,6 +915,7 @@ class CalculationManager{
 #else
 	static const SequenceData *data;
 #endif
+	BeagleResourceList* rList;
 	list<BlockingOperationsSet> operationSetQueue;
 	list<BlockingOperationsSet> freeableOpSets;
 	list<ScoringOperation> scoreOps;
@@ -937,6 +938,8 @@ public:
 	bool useBeagle;
 	bool termOnBeagleError;
 	int beagleDeviceNum;
+	vector<int> BeagleGPUDeviceNumbers;
+	int nextGPUIndex;
 	//bool rescaleBeagle;
 //	bool singlePrecBeagle;
 //	bool gpuBeagle;
@@ -960,6 +963,7 @@ public:
 		//rescaleBeagle = false;
 		FillBeagleOptionsMaps();
 		req_flags = pref_flags = actual_flags = 0;
+		FindBeagleResources();
 		}
 
 	void FillBeagleOptionsMaps();
@@ -991,6 +995,14 @@ public:
 	long ParseBeagleFlagString(string flagsString, long flagMask = 0) const;
 	void InterpretBeagleResourceFlags(long flags, string &list, long flagMask = 0) const;
 	void OutputBeagleResources() const;
+	void FindBeagleResources() {
+		rList = beagleGetResourceList();
+		for (int i = 0; i < rList->length; i++) {
+			if (rList->list[i].supportFlags & BEAGLE_FLAG_PROCESSOR_GPU)
+				BeagleGPUDeviceNumbers.push_back(i);
+		}
+		nextGPUIndex = 0;
+	}
 
 	//for now assuming that rescaling will always be available - this will need to be
 	//called BEFORE initializing an instance because how the initialization is called depends on it

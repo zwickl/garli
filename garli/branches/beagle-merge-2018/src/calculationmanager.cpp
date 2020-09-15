@@ -55,8 +55,6 @@ const char *AdvanceDataPointer(const char *arr, int num);
 
 // print possible beagle resources
 void CalculationManager::OutputBeagleResources() const{
-    BeagleResourceList* rList;
-    rList = beagleGetResourceList();
     outman.UserMessageNoCR("Available resources:\n");
     for (int i = 0; i < rList->length; i++) {
         outman.UserMessageNoCR("\tResource %i:\n\t\tName : %s\n", i, rList->list[i].name);
@@ -271,7 +269,13 @@ void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData
 	pref_flags = ParseBeagleFlagString(preferredBeagleFlags, req_flags);
 
 	SubsetCalculationManager *subsetMan = new SubsetCalculationManager;
-	subsetMan->InitializeSubset(nClas, nHolders, pref_flags, req_flags, subsetData, subsetModSpec, modelIndex);
+	//if a specific device hasn't been chosen and multiple GPUs exist, cycle through them
+	if (beagleDeviceNum == -1 &&  BeagleGPUDeviceNumbers.empty() == false) {
+		beagleDeviceNum = BeagleGPUDeviceNumbers[nextGPUIndex];
+		nextGPUIndex = (nextGPUIndex + 1 == BeagleGPUDeviceNumbers.size() ? 0 : nextGPUIndex + 1);
+	}
+
+	subsetMan->InitializeSubset(nClas, nHolders, pref_flags, req_flags, subsetData, subsetModSpec, modelIndex, beagleDeviceNum);
 	subsetMan->SetClaManager(claMan);
 	subsetMan->SetPmatManager(pmatMan);
 	subsetMan->SetOfprefix(ofprefix);
