@@ -77,8 +77,10 @@ class Tree{
 		static FLOAT_TYPE max_brlen;
 		static FLOAT_TYPE exp_starting_brlen;
 		static ClaManager *claMan;
+#ifdef USE_BEAGLE
 		static PmatManager *pmatMan;
 		static CalculationManager *calcMan;
+#endif
 		static const DataPartition *dataPart;
 		static FLOAT_TYPE treeRejectionThreshold;
 		static vector<Constraint> constraints;
@@ -412,8 +414,11 @@ class Tree{
 		void MoveDummyRootToBranchMidpoint();
 		void GetUsedHolderList(vector<int> &used);
 
-		//static void SetTreeStatics(ClaManager *, const DataPartition *, const GeneralGamlConfig *);
-		static void  SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationManager *calcMan, const DataPartition *data, const GeneralGamlConfig *conf);
+#ifdef USE_BEAGLE
+		static void SetTreeStatics(ClaManager* claMan, PmatManager* pmatMan, CalculationManager* calcMan, const DataPartition* data, const GeneralGamlConfig* conf);
+#else
+		static void SetTreeStatics(ClaManager* claMan, const DataPartition* data, const GeneralGamlConfig* conf);
+#endif
 
 		void C4(const FLOAT_TYPE *a);
 		};
@@ -458,8 +463,10 @@ inline void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len, bool dummyRootDo
 		if(otherNode)
 			SetBranchLength(otherNode, len, true);
 		}
+#ifdef USE_BEAGLE
 	//BMERGE added
 	nd->myMan.SetTransMatDirty();
+#endif
 
 	SweepDirtynessOverTree(nd);
 	}

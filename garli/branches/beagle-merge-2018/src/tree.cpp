@@ -83,8 +83,10 @@ FLOAT_TYPE Tree::min_brlen;	  // branch lengths never below this value
 FLOAT_TYPE Tree::max_brlen;	  
 FLOAT_TYPE Tree::exp_starting_brlen;    // expected starting branch length
 ClaManager *Tree::claMan;
-PmatManager *Tree::pmatMan;
+#ifdef USE_BEAGLE
+PmatManager* Tree::pmatMan;
 CalculationManager *Tree::calcMan;
+#endif
 list<TreeNode *> Tree::nodeOptVector;
 const DataPartition *Tree::dataPart;
 unsigned Tree::rescaleEvery;
@@ -133,11 +135,17 @@ const char *AdvanceDataPointer(const char *arr, int num){
 	return arr;
 	}
 
+#ifdef USE_BEAGLE
 void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationManager *calcMan, const DataPartition *data, const GeneralGamlConfig *conf) {
+#else
+void Tree::SetTreeStatics(ClaManager * claMan, const DataPartition* data, const GeneralGamlConfig* conf){
+#endif
 	Tree::claMan = claMan;
+#ifdef USE_BEAGLE
 	Tree::pmatMan = pmatMan;
-	Tree::dataPart = data;
 	Tree::calcMan = calcMan;
+#endif
+	Tree::dataPart = data;
 #ifdef SINGLE_PRECISION_FLOATS
 	Tree::rescaleEvery = 6;
 	Tree::rescaleBelow = exp(-1.0f); //this is 0.368
@@ -152,7 +160,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationM
 		
 	FLOAT_TYPE minVal = 1.0e-10f;
 	FLOAT_TYPE maxVal = 1.0e10f;
-#else
+#else //!SINGLE_PRECISION_FLOATS
 	Tree::rescaleEvery=16;
 	Tree::rescaleBelow = exp(-24.0); //this is 1.026e-10
 	Tree::reduceRescaleBelow = 1.0e-190; 
@@ -166,17 +174,17 @@ void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationM
 		
 	FLOAT_TYPE minVal = 1.0e-20;
 	FLOAT_TYPE maxVal = 1.0e20;
-#endif
+#endif //ifdef SINGLE_PRECISION_FLOATS
 	Tree::uniqueSwapBias = conf->uniqueSwapBias;
 	Tree::distanceSwapBias = conf->distanceSwapBias;
 	for(int i=0;i<500;i++){
-		Tree::uniqueSwapPrecalc[i] = (FLOAT_TYPE) pow(Tree::uniqueSwapBias, i);
+		Tree::uniqueSwapPrecalc[i] = (FLOAT_TYPE) pow(uniqueSwapBias, i);
 		//if(Tree::uniqueSwapPrecalc[i] != Tree::uniqueSwapPrecalc[i]) Tree::uniqueSwapPrecalc[i]=0.0f;
-		if(Tree::uniqueSwapPrecalc[i] < minVal) Tree::uniqueSwapPrecalc[i] = minVal;
-		if(Tree::uniqueSwapPrecalc[i] > maxVal) Tree::uniqueSwapPrecalc[i] = maxVal;
+		if(uniqueSwapPrecalc[i] < minVal) Tree::uniqueSwapPrecalc[i] = minVal;
+		if(uniqueSwapPrecalc[i] > maxVal) Tree::uniqueSwapPrecalc[i] = maxVal;
 		}
 	for(int i=0;i<1000;i++){
-		Tree::distanceSwapPrecalc[i] = (FLOAT_TYPE) pow(Tree::distanceSwapBias, i);
+		Tree::distanceSwapPrecalc[i] = (FLOAT_TYPE) pow(distanceSwapBias, i);
 		//if(Tree::distanceSwapPrecalc[i] != Tree::distanceSwapPrecalc[i]) Tree::distanceSwapPrecalc[i]=0.0f;	
 		if(Tree::distanceSwapPrecalc[i] < minVal) Tree::distanceSwapPrecalc[i] = minVal;	
 		if(Tree::distanceSwapPrecalc[i] > maxVal) Tree::distanceSwapPrecalc[i] = maxVal;	
@@ -198,7 +206,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationM
 
 	string outString = conf->outgroupString;
 
-	if(someOrientedGap){
+	if(Tree::someOrientedGap){
 		//Tree::rescaleEvery = 2;
 		Tree::rootWithDummy = true;
 		Tree::useOptBoundedForBlen = true;
@@ -224,8 +232,8 @@ void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationM
 
 	//deal with the outgroup specification, if there is one
 	if(outString.length() > 0){
-		if(outgroup) outgroup->ClearBipartition();
-		else outgroup = new Bipartition();
+		if(Tree::outgroup) Tree::outgroup->ClearBipartition();
+		else Tree::outgroup = new Bipartition();
 
 		GarliReader &reader = GarliReader::GetInstance();
 		if(reader.GetTaxaBlock(0)->GetNTax() > 0){
@@ -238,7 +246,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationM
 			NxsUnsignedSet iset;
 			try{
 				NxsSetReader::ReadSetDefinition(tok, *reader.GetTaxaBlock(0), "outgroup", "GARLI configuration", &iset);
-				if(!rootWithDummy)
+				if(!Tree::rootWithDummy)
 					outman.UserMessage("Found outgroup specification: %s", NxsSetReader::GetSetAsNexusString(iset).c_str());
 				}
 			catch (const NxsException & x){
@@ -250,7 +258,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationM
 			for(NxsUnsignedSet::const_iterator it = iset.begin();it != iset.end(); it++)
 				nset.insert(*it + 1);
 
-			outgroup->BipartFromNodenums(nset);
+			Tree::outgroup->BipartFromNodenums(nset);
 			}
 		else{//the old half-assed outgroup reader
 			vector<int> nums;
@@ -269,7 +277,7 @@ void Tree::SetTreeStatics(ClaManager *claMan, PmatManager *pmatMan, CalculationM
 			for(vector<int>::iterator it = nums.begin();it != nums.end();it++)
 				outman.UserMessageNoCR("%d ", *it);
 			outman.UserMessage("\n");
-			outgroup->BipartFromNodenums(nums);
+			Tree::outgroup->BipartFromNodenums(nums);
 			}
 		outman.UserMessage("\n#######################################################");
 		}
@@ -4063,8 +4071,8 @@ ProfTermTerm.Stop();
 					throw err;
 					//throw ErrorException("exiting after score accuracy check");
 				}
-#endif
-#else
+#endif //CHECK_ACCURACY
+#else //!NEW_MANAGEMENT
 				ConditionalLikelihoodRateHet(ROOT, rootNode);
 #endif //NEW_MANAGEMENT
 			//!rootwithDummy
@@ -4299,6 +4307,7 @@ void Tree::SweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 	//	UpdateDependencies();
 	}
 
+#ifdef USE_BEAGLE
 void Tree::NewSweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/) {
 	//this will never be called initially with nd = root
 	//	if(claMan->debug_clas)
@@ -4387,6 +4396,7 @@ void Tree::NewSweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/) {
 		}
 	}
 }
+#endif
 
 void Tree::TraceDirtynessToNode(TreeNode *nd, int tonode){
 	if(nd->nodeNum==0 || nd->nodeNum>numTipsTotal) nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
@@ -5385,7 +5395,8 @@ void Tree::ClaReport(ofstream &cla){
 	cla << "tots\t" << totDown << "\t" << totUL << "\t" << totUR << endl;
 //	cla.close();
 	}
-	
+
+#ifdef USE_BEAGLE
 void Tree::NodeManagerClaReport() {
 	for (int n = 0; n < numNodesTotal; n++) {
 		if (n == 0 || n > numTipsTotal) {
@@ -5398,6 +5409,7 @@ void Tree::NodeManagerClaReport() {
 		}
 	}
 }
+#endif
 
 FLOAT_TYPE Tree::CountClasInUse(){
 	FLOAT_TYPE inUse=0.0;
@@ -8807,6 +8819,7 @@ void Tree::MakeAllNodesDirty() {
 	UpdateDependencies();
 }
 
+#ifdef NEW_MANAGEMENT
 void Tree::NewMakeAllNodesDirty() {
 
 	if (claMan->debug_clas)
@@ -8833,6 +8846,7 @@ void Tree::MakeAllTransMatsDirty() {
 		allNodes[i]->myMan.SetTransMatDirty();
 	}
 }
+#endif //NEW_MANAGEMENT
 
 //DEBUG - TEMP
 void Tree::CheckClaIndeces() const {
@@ -8887,6 +8901,7 @@ void Tree::AssignCLAsFromMaster() {
 	UpdateDependencies();
 }
 
+#ifdef USE_BEAGLE
 void Tree::NewAssignCLAsFromMaster() {
 	//remember that the root's down cla is actually the one that goes up 
 	//the middle des
@@ -8915,6 +8930,7 @@ void Tree::NewAssignCLAsFromMaster() {
 	
 
 }
+#endif //USE_BEAGLE
 
 //I don't think that this will be used for anything but debugging.  Note that each manager is assigned its own transMatIndex back
 void Tree::UpdateNodeClaManagers() {
@@ -8943,6 +8959,7 @@ void Tree::UpdateNodeIndeces() {
 #endif
 }
 
+#ifdef USE_BEAGLE
 //this updates the blen and model used to calculate each pmat, but not which pmats
 //are required for any cla operation
 void Tree::UpdatePmatDependencies() {
@@ -8956,6 +8973,7 @@ void Tree::UpdatePmatDependencies() {
 #endif
 	}
 }
+#endif
 
 //this is, to say the least, inelegant
 void Tree::UpdateDependencies() {
@@ -9197,7 +9215,7 @@ void Tree::CopyClaIndeces(const Tree *from, bool remove) {
 	//DEBUG
 	UpdateNodeClaManagers();
 }
-
+#ifdef USE_BEAGLE
 void Tree::NewCopyClaIndeces(const Tree *from, bool remove) {
 	//the bool argument "remove" designates whether the tree currently has cla arrays
 	//assigned to it or not (if not, it must have come from the unused tree vector)
@@ -9217,6 +9235,7 @@ void Tree::NewCopyClaIndeces(const Tree *from, bool remove) {
 	//DEBUG
 	//this->UpdateNodeIndeces();
 }
+#endif
 
 void Tree::RemoveTreeFromAllClas() {
 
@@ -9257,6 +9276,7 @@ void Tree::RemoveTreeFromAllClas() {
 	//UpdateDependencies();
 }
 
+#ifdef NEW_MANAGEMENT
 void Tree::NewRemoveTreeFromAllClas() {
 	//CheckClaIndeces();
 
@@ -9271,6 +9291,7 @@ void Tree::NewRemoveTreeFromAllClas() {
 	//DEBUG
 	//UpdateNodeIndeces();
 }
+#endif //NEW_MANAGEMENT
 
 CondLikeArray *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/) {
 	if (claMan->IsHolderDirty(nd->claIndexDown)) {

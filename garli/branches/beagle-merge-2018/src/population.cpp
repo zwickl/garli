@@ -50,7 +50,9 @@ using namespace std;
 #include "tree.h"
 #include "funcs.h"
 #include "clamanager.h"
+#ifdef USE_BEAGLE
 #include "calculationmanager.h"
+#endif
 #include "stopwatch.h"
 #include "bipartition.h"
 #include "adaptation.h"
@@ -520,18 +522,20 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	//moved this instantiation to Population Constructor, so it can be called earlier
 	//calcMan = new CalculationManager();
 	outman.UserMessage("");
+#ifdef USE_BEAGLE
 	calcMan->OutputBeagleResources();
 	
 #ifndef BEAGLEPART
 	if (modSpecSet.NumSpecs() > 1)
 		throw ErrorException("still working on true partitioned beagle support. This version should work fine with a single subset");
 #endif
-
+#endif //USE_BEAGLE
 	//For partitioned beagle each subset must have the same number of conditionals allocated, 
 	//and the memory levels, etc will be the same.  In this mode the specified amount of memory 
 	//is per instance (= per subset), so determine how many clas the largest subset (in terms of required size) 
 	//could have within that restriction
 	double claSizePerNodeKB = 0.0;
+#ifdef USE_BEAGLE
 	double subsetClaSizePerNodeKB = 0.0;
 	vector<int> subsetClaSizes;
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
@@ -539,6 +543,10 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		subsetClaSizes.push_back(subsetClaSizePerNodeKB);
 		claSizePerNodeKB = max(subsetClaSizePerNodeKB, claSizePerNodeKB);
 	}
+#else
+	claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
+#endif
+
 	int maxClas = (int)((memToUse * KB) / claSizePerNodeKB);
 	if (maxClas >= L0) {
 		numClas = min(maxClas, idealClas);
@@ -584,6 +592,13 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	if (memLevel == -1 && !validateMode)
 		throw ErrorException("Not enough memory specified in config file (availablememory)!");
 
+#ifndef USE_BEAGLE
+	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
+//if we do tons of recombination 
+	idealClas *= 2;
+	if (!validateMode)
+		claMan = new ClaManager(dataPart->NTax() - 2, numClas, idealClas, &indiv[0].modPart, dataPart);
+#else //BEAGLE
 	//loop over subsets (for partitioned beagle)
 	double totalMemAllocated = 0.0;
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
@@ -604,7 +619,6 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)));
 		outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB))-1);
 	*/
-
 
 		//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 		//if we do tons of recombination 
@@ -628,7 +642,6 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		CalculationManager::SetData(subsetData);
 #endif
 
-	#ifdef USE_BEAGLE
 		//invariable class needs to be treated as extra rate for beagle
 		//calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
 		calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
@@ -638,22 +651,27 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 #else
 		calcMan->AddSubsetInstance(numClas, idealClas, subsetData, subsetModSpec, subsetSpec->modelIndex);
 #endif
-#endif
 	} // end loop over modelParts
 
 	outman.UserMessage("\n\nThe total memory allocated for likelihood calculations is approx %.1f MB", totalMemAllocated);
+
 
 
 	CalculationManager::SetClaManager(claMan);
 	//CalculationManager::SetData(dataPart);
 	NodeClaManager::SetClaManager(claMan);
 	NodeClaManager::SetPmatManager(pmatMan);
+#endif //!USE_BEAGLE
 
 	//setup the bipartition statics
 	Bipartition::SetBipartitionStatics(dataPart->NTax());
 
 	//set the tree statics
+#ifdef USE_BEAGLE
 	Tree::SetTreeStatics(claMan, pmatMan, calcMan, dataPart, conf);
+#else
+	Tree::SetTreeStatics(claMan, dataPart, conf);
+#endif
 
 	//load any constraints
 	GetConstraints();

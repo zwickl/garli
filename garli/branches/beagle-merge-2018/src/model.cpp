@@ -1274,15 +1274,19 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
 			MODEL_FLOAT scaledEigVal;
+			//11/5/20 the blen_multiplier is now only used in rescaling the eigvals in CalcEigenstuff, so no longer needs to be used here 
 			if(modSpec->IsNonsynonymousRateHet() == false){
-				if(NoPinvInModel()==true || modSpec->IsFlexRateHet())//if we're using flex rates, pinv should already be included
+				if (NoPinvInModel() == true || modSpec->IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
-					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+					//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];
+					scaledEigVal = eigvals[0][k] * rateMults[rate];
 				else
-					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+					//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+					scaledEigVal = eigvals[0][k] * rateMults[rate] / (ONE_POINT_ZERO - *propInvar);
 				}
 			else{
-				scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				//scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				scaledEigVal = eigvals[rate][k];
 				}
 			EigValexp[k+rateOffset] = exp(scaledEigVal * dlen);
 			EigValderiv[k+rateOffset] = scaledEigVal*EigValexp[k+rateOffset];
@@ -1468,15 +1472,19 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
 			MODEL_FLOAT scaledEigVal;
+			//11/5/20 the blen_multiplier is now only used in rescaling the eigvals in CalcEigenstuff, so no longer needs to be used here 
 			if(modSpec->IsNonsynonymousRateHet() == false){
 				if(NoPinvInModel()==true || modSpec->IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
-					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+					//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];
+					scaledEigVal = eigvals[0][k] * rateMults[rate];
 				else
-					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+					//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+					scaledEigVal = eigvals[0][k] * rateMults[rate] / (ONE_POINT_ZERO - *propInvar);
 				}
 			else{
-				scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				//scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				scaledEigVal = eigvals[rate][k];
 				}
 			EigValexp[k+rateOffset] = exp(scaledEigVal * dlen);
 			}
@@ -4885,7 +4893,7 @@ double ModelPartition::CalcRequiredCLAsizeKB(const DataPartition *dat){
 //This is the size in KB not elements. KB is used because the number of bytes can be larger than UNSIGNED_MAX on very large datasets
 //in the beagle case, the invariable sites rate class has space allocated in the CLAs, so account for that
 double ModelPartition::CalcRequiredSubsetCLAsizeKB(int subsetNum, const DataPartition *dat, bool beagle /*=false*/) {
-	unsigned size = 0;
+	double size = 0;
 	double KB = 1024;
 	//for (vector<ClaSpecifier>::iterator specs = claSpecs.begin(); specs != claSpecs.end(); specs++) {
 	ClaSpecifier spec = claSpecs[subsetNum];

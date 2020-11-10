@@ -238,7 +238,7 @@ int main( int argc, char* argv[] )	{
 #else
 	interactive=true;
 #endif
-	//moved popukation creation much earlier
+	//moved population creation much earlier
 	Population *pop = new Population;
 
 	bool runTests = false;
@@ -290,6 +290,7 @@ int main( int argc, char* argv[] )	{
 						//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
 						//which is essentially a stripped down version of pop::SeedPopWithStartingTree
 						validateMode = true;
+#ifdef USE_BEAGLE
 					else if (!strcmp(argv[curarg], "-f") || !strcmp(argv[curarg], "-F")) {
 						//beagle flags are being passed in.  Assuming that nothing comes after them
 						//allowed CPU GPU SINGLE DOUBLE SSE OPENMP
@@ -315,10 +316,12 @@ int main( int argc, char* argv[] )	{
 						}
 						else
 							beagleDeviceNum = atoi(argv[curarg]);
+
 #ifdef BOINC
 						beagleDeviceNum++; // with BOINC the first GPU is device 0
 #endif
 					}
+#endif //USE_BEAGLE
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						UsageMessage(argv[0]);
@@ -817,7 +820,7 @@ int main( int argc, char* argv[] )	{
 			//reader.DeleteCharacterBlocksFromFactories();
 			
 			//allocate the population - this was moved earlier
-			pop = new Population();
+			//pop = new Population();
 			pop->usedNCL = usedNCL;
 			pop->Setup(&conf, &dataPart, &rawPart, 1, (validateMode == true ? -1 : 0));
 			pop->SetOutputDetails();

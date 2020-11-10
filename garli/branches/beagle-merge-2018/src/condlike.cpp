@@ -339,9 +339,6 @@ void ClaManager::TempReserveCla(int index) {
 
 int ClaManager::SetDirty(int index) {
 
-	//BMERGE - think that SetHolderDirty is what should be getting used now
-	assert(0);
-
 	//there are only two options here:
 	//1. Cla is being made dirty, and only node node points to it 
 	//	->null the holder's cla pointer and return the same index
@@ -359,10 +356,10 @@ int ClaManager::SetDirty(int index) {
 	}
 	else {
 		//DecrementCla(index);
-		DecrementCla(index);
+		DecrementHolder(index);
 		index = holderStack[holderStack.size() - 1];
 		holderStack.pop_back();
-		IncrementCla(index);
+		IncrementHolder(index);
 	}
 	return index;
 }
@@ -638,7 +635,8 @@ int ClaManager::SetHolderDirty(int index) {
 	//	->null the holder's cla pointer and return the same index
 	//2. Cla is being made dirty, and multiple nodes point to it
 	//	->remove this node from the holder (decrement) and assign a new one	
-	assert(index > -1 && index < numHolders);
+	assert(index < numHolders);
+	if(index == -1) {return index;}
 	assert(holders[index].numAssigned > 0);
 	CheckClaHolders();
 
