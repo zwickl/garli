@@ -67,9 +67,7 @@ typedef pid_t pid_type;
 OutputManager outman;
 bool interactive;
 bool is64bit = false;
-string cmdLineBeagleFlags;
-int beagleDeviceNum = -1;
-
+ 
 vector<ClaSpecifier> claSpecs;
 vector<DataSubsetInfo> dataSubInfo;
 //This is annoying, but the substituted rev and date from svn are in crappy format.
@@ -156,14 +154,6 @@ void UsageMessage(char *execName){
 	outman.UserMessage                 ("  -t			run internal tests (requires dataset and config file)");
 	outman.UserMessage                 ("  -V			validate: load config file and data, validate config file, data, starting trees"); 
 	outman.UserMessage                 ("				and constraint files, print required memory and selected model, then exit");
-#ifdef USE_BEAGLE
-	outman.UserMessage("                                 BEAGLE LIBRARY OPTIONS");
-	outman.UserMessage("  -f <FLAGS>        pass flags to beagle library to help it choose a specific resource. Options are");
-	outman.UserMessage("                    CPU GPU SINGLE DOUBLE SSE OPENMP.  They may not all work. Flags are interpreted");
-	outman.UserMessage("                    as beagle *preferences*, so can be ignored when not able to be met");
-	outman.UserMessage("  -F <FLAGS>        same as -f, except interpret the flags as beagle *requirements*");
-	outman.UserMessage("  --device <device num>   use specified beagle device number");
-#endif
 	outman.UserMessage("NOTE: If no config filename is passed on the command line the program\n   will look in the current directory for a file named \"garli.conf\"\n");
 #endif
 	}
@@ -287,39 +277,14 @@ int main( int argc, char* argv[] )	{
 						//validate mode skips some allocation in pop::Setup, and then executes pop::ValidateInput,
 						//which is essentially a stripped down version of pop::SeedPopWithStartingTree
 						validateMode = true;
-					else if (!strcmp(argv[curarg], "-f") || !strcmp(argv[curarg], "-F")) {
-						//beagle flags are being passed in.  Assuming that nothing comes after them
-						//allowed CPU GPU SINGLE DOUBLE SSE OPENMP
-						//if a capital F was used, this will be interpreted as beagle requirements, otherwise prefs
-						if (!strcmp(argv[curarg], "-F"))
-							cmdLineBeagleFlags = "F ";
-						curarg++;
-						cmdLineBeagleFlags += argv[curarg++];
-						while (curarg < argc) {
-							cmdLineBeagleFlags += " ";
-							cmdLineBeagleFlags += argv[curarg++];
-						}
-					}
-					else if (!strcmp(argv[curarg], "--device")) {
-						curarg++;
-						if (curarg == argc || !isdigit(argv[curarg][0])) {
-							outman.UserMessage("--device flag must be followed by beagle device #");
-							exit(1);
-						}
-						else
-							beagleDeviceNum = atoi(argv[curarg]);
-#ifdef BOINC
-						beagleDeviceNum++; // with BOINC the first GPU is device 0
-#endif
-					}
 					else {
 						outman.UserMessage("Unknown command line option %s", argv[curarg]);
 						UsageMessage(argv[0]);
 						return 0;
 						}
 					}
-					//if anything else appears, we'll assume that it's a config file
-					else conf_name = argv[curarg];
+				//if anything else appears, we'll assume that it's a config file
+				else conf_name = argv[curarg];
 	        curarg++;
 			}
 		}
@@ -338,20 +303,6 @@ int main( int argc, char* argv[] )	{
 			MasterGamlConfig conf;
 			bool confOK;
 			confOK = ((conf.Read(conf_name.c_str()) < 0) == false);
-#ifdef USE_BEAGLE
-			//override default beagle settings or any found in config in favor of command line
-			if (cmdLineBeagleFlags.length() > 0) {
-				if (cmdLineBeagleFlags[0] == 'F') {
-					//
-					cmdLineBeagleFlags.erase(0, 1);
-					conf.requiredBeagleFlags = cmdLineBeagleFlags;
-		}
-				else
-					conf.preferredBeagleFlags = cmdLineBeagleFlags;
-				}
-			if (beagleDeviceNum > -1)
-				conf.deviceNumBeagle = beagleDeviceNum;
-#endif
 
 #ifdef SUBROUTINE_GARLI
 			//override the ofprefix here, tacking .runXX onto it 
@@ -432,12 +383,6 @@ int main( int argc, char* argv[] )	{
 
 #endif
 
-#ifdef DEBUG_MESSAGES
-			string str = conf.ofprefix;
-			str += ".deb.log";
-			outman.SetDebugFile(str.c_str(), false);
-#endif
-
 #ifdef SUBROUTINE_GARLI //MPI versions
 			outman.UserMessage("->MPI Parallel Version<-\nNote: this version divides a number of independent runs across processors.");
 			outman.UserMessage("It is not the multipopulation parallel Garli algorithm.\n(but is generally a better use of resources)"); 
@@ -487,9 +432,6 @@ int main( int argc, char* argv[] )	{
 			outman.UserMessage("Using %s", NCL_NAME_AND_VERSION);
 #endif
 
-#ifdef USE_BEAGLE
-			outman.UserMessage("->Using BEAGLE library<-\n");
-#endif
 			OutputImportantDefines();
 			outman.UserMessage("\n#######################################################");
 			outman.UserMessage("Reading config file %s", conf_name.c_str());

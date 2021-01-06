@@ -49,16 +49,6 @@ class ConfigModelSettings{
 
 class GeneralGamlConfig{
 	public:
-	//beagle
-	bool useBeagle;
-	bool singlePrecBeagle;
-	bool gpuBeagle;
-	bool rescaleBeagle;
-	string requiredBeagleFlags;
-	string preferredBeagleFlags;
-	double singlePrecEps;
-	double doublePrecEps;
-	int deviceNumBeagle;
 	//these options will be the same regardless of whether a population is master or remote
 
 	//output related

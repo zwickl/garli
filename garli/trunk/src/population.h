@@ -308,9 +308,6 @@ private:
 public:
 	GeneralGamlConfig *conf;
 	ClaManager *claMan;
-	ClaManager2 *claMan2;
-	PmatManager *pmatMan;
-	CalculationManager *calcMan;
 	Adaptation *adap;
 	Individual* indiv;
 

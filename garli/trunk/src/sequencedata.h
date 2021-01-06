@@ -45,7 +45,7 @@ protected:
 	virtual char	DatumToChar( unsigned char d ) const;
 	virtual unsigned char	FirstState() const { return 0; }
 	virtual unsigned char	LastState() const { return 3; }
-	//virtual int	NumStates(int) const { return 4; }
+	virtual int	NumStates(int) const { return 4; }
 
 public:
 	virtual void CreateMatrixFromNCL(const NxsCharactersBlock *, NxsUnsignedSet &charset) = 0;

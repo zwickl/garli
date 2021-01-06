@@ -1100,27 +1100,18 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 	//nd1 and nd2 are the nodes on either side of the branch of interest
 	//nd1 will always be the "lower" one, and will always be internal, while
 	//nd2 can be internal or terminal
-
-#ifdef USE_BEAGLE
-//DEBUG - this shouldn't need to happen so often, but is playing it safe
-	UpdateDependencies();
-	ScoreSet results = calcMan->CalculateLikelihoodAndDerivatives(nd2, true);
-	lnL = results.lnL;
-	return pair<FLOAT_TYPE, FLOAT_TYPE>(results.d1, results.d2);
-#endif
-
 	CondLikeArray *claOne=NULL, *claTwo=NULL;
 	CondLikeArraySet *setOne=NULL, *setTwo=NULL;
 	if(nd1->left == nd2)
-		setOne=GetClaSetUpLeft(nd1, true);
+		setOne=GetClaUpLeft(nd1, true);
 	else if(nd1->right == nd2)
-		setOne=GetClaSetUpRight(nd1, true);
+		setOne=GetClaUpRight(nd1, true);
 	else //nd1 must be the root, and nd2 it's middle des
-		setOne=GetClaSetDown(nd1, true);
+		setOne=GetClaDown(nd1, true);
 	
 	//this must happen BEFORE the derivs are calced, or the prmat won't be current for this branch!
 	if(nd2->left != NULL)
-		setTwo=GetClaSetDown(nd2, true);
+		setTwo=GetClaDown(nd2, true);
 
 	FLOAT_TYPE ***deriv1, ***deriv2, ***prmat;
 

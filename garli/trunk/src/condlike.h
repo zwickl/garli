@@ -59,7 +59,6 @@ class CondLikeArray{
 	friend class CondLikeArrayIterator;
 
 	unsigned nsites, nrates, nstates;
-	int index;
 	public:
 		FLOAT_TYPE* arr;
 		int* underflow_mult;
@@ -76,10 +75,8 @@ class CondLikeArray{
 		int NRateCats() const {return nrates;}
 		int RequiredSize() const {return nsites * nstates * nrates;}
 		void Assign(FLOAT_TYPE *alloc, int * under) {arr = alloc; underflow_mult = under;}
-		int Index() { return index;}
 
 		void Allocate( int nk, int ns, int nr = 1 );
-		void Allocate(int ind, int nk, int ns, int nr = 1);
 	};
 
 class CondLikeArraySet{
@@ -88,10 +85,8 @@ public:
 		vector<CondLikeArray *> theSets;
 		FLOAT_TYPE *rawAllocation;
 		int *rawUnder;
-		int index;
 
-		CondLikeArraySet() : rawAllocation(NULL), rawUnder(NULL), index(-1){};
-		CondLikeArraySet(int ind) : rawAllocation(NULL), rawUnder(NULL), index(ind) {};
+		CondLikeArraySet() : rawAllocation(NULL), rawUnder(NULL){};
 		~CondLikeArraySet() {
 			for(int i = 0;i < theSets.size();i++)
 				delete theSets[i];
@@ -107,14 +102,9 @@ public:
 		CondLikeArray *GetCLA(int index){
 			return theSets[index];
 			}
-		int Index() const{
-			//assert(index >= 0);
-			return index;
-			}
 	};
 
 class CondLikeArrayHolder{
-	friend class ClaManager;
 	public:
 	short numAssigned;
 	short reclaimLevel;
@@ -122,48 +112,11 @@ class CondLikeArrayHolder{
 	bool reserved;
 	//CondLikeArray *theArray;
 	CondLikeArraySet *theSet;
-	int holderDep1;
-	int holderDep2;
-	int transMatDep1;
-	int transMatDep2;
-	int depLevel;
-	
-	//BEAGLEMERGE2018
-	//These are mostly directly from the orig beagle branch, but replacing theArray with theSet//
-
-	//CondLikeArrayHolder() : theSet(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){}
-	//~CondLikeArrayHolder() {theSet = NULL;}
-	CondLikeArrayHolder() : depLevel(-1), theSet(NULL), numAssigned(0), reclaimLevel(0), reserved(false), tempReserved(false) {
-		holderDep1 = holderDep2 = transMatDep1 = transMatDep2 = -1;
-	}
-	//the arrays are actually allocated and deleted by the claManager, not the holders
-	~CondLikeArrayHolder() {
-		theSet = NULL;
-	};
-	int HolderDep1() const { return holderDep1; }
-	int HolderDep2() const { return holderDep2; }
-	int TransMatDep1() const { return transMatDep1; }
-	int TransMatDep2() const { return transMatDep2; }
-	bool IsDirty() const { return theSet == NULL; }
-	int DepLevel() const { return depLevel; }
-	////
-
+	CondLikeArrayHolder() : theSet(NULL), numAssigned(0), reclaimLevel(0), reserved(false) , tempReserved(false){}
+	~CondLikeArrayHolder() {theSet = NULL;}
 	int GetReclaimLevel() {return reclaimLevel;}
 	void SetReclaimLevel(int lvl) {reclaimLevel = lvl;}
-	void SetDepLevel(int lvl) { depLevel = lvl; }
-	
-	//BEAGLEMERGE2018
-	//void Reset(){reclaimLevel=0;numAssigned=0,tempReserved=false;reserved=false;theSet=NULL;}
-	void Reset() {
-		depLevel = -1;
-		theSet = NULL;
-		numAssigned = 0;
-		reclaimLevel = 0;
-		tempReserved = false;
-		reserved = false;
-		holderDep1 = holderDep2 = transMatDep1 = transMatDep2 = -1;
-	}
-	////
+	void Reset(){reclaimLevel=0;numAssigned=0,tempReserved=false;reserved=false;theSet=NULL;}
 	};
 #endif
 

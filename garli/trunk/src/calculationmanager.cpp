@@ -38,7 +38,8 @@ const char *AdvanceDataPointer(const char *arr, int num);
 //#define OUTPUT_OTHER_BEAGLE
 //#define OUTPUT_PMATS
 //#undef OUTPUT_PARTIALS
-//#define OUTPUT_BEAGLE_SITELIKES
+//BMERGE DEBUG
+#define OUTPUT_BEAGLE_SITELIKES
 
 #ifdef FULL_BEAGLE_DEBUG
 	#define	OUTPUT_PMATS

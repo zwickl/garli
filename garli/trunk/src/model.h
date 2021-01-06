@@ -79,16 +79,6 @@ extern bool FloatingPointEquals(const FLOAT_TYPE first, const FLOAT_TYPE sec, co
 		INSERTPROPORTION = 9
 		};
 
-	//The set of eigen variables that need to be sent to beagle.  Note the the arrays are just ALIASES
-	//to the proper arrays in the corresponding Model object.
-	struct ModelEigenSolution {
-		//if the model changed (same as eigenDirty), which means that it won't have to be sent to beagle again
-		bool changed;
-		MODEL_FLOAT *eigenVecs;
-		MODEL_FLOAT *eigenVals;
-		MODEL_FLOAT *invEigenVecs;
-	};
-
 class BaseParameter {
 protected:
 	NxsString name;
@@ -1115,9 +1105,6 @@ class Model{
 	vector<FLOAT_TYPE*> omegaProbs;
 
 	bool eigenDirty;
-	//ratesChanged and rateProbsChanged were added for beagle, so that we know when the rate mults need to be resent or not
-	bool ratesChanged;
-	bool rateProbsChanged;
 	FLOAT_TYPE *blen_multiplier; //this is the rescaling factor to make the mean rate in the qmat = 1
 
 	FLOAT_TYPE rateMults[20];
@@ -1197,9 +1184,7 @@ class Model{
 	void CalcPmatNState(FLOAT_TYPE blen, MODEL_FLOAT *metaPmat);
 	void CalcDerivatives(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
 	void CalcDerivativesOrientedGap(FLOAT_TYPE, FLOAT_TYPE ***&, FLOAT_TYPE ***&, FLOAT_TYPE ***&);
-	void FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLOAT ***one, MODEL_FLOAT ***two);
 	void OutputPmats(ofstream &deb);
-	void OutputPmat(ofstream &deb, MODEL_FLOAT ***mat);
 	void AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pr);
 	void CalcOrientedGapPmat(FLOAT_TYPE blen, MODEL_FLOAT ***&mat);
 	void UpdateQMat();
@@ -1271,62 +1256,6 @@ class Model{
 	bool IsBinaryNotAllZeros() const {return modSpec->IsBinaryNotAllZeros();}
 	const ModelSpecification *GetModSpec() const {return modSpec;}
 	
-	void GetRateMultsForBeagle(vector<FLOAT_TYPE> &r) {
-		//if ratesChanged isn't true, than the rate mults haven't changed since last time they were
-		//sent to beagle.  The calling function will be told this by having an empty vector of rates
-
-		//oops, no the rates need to be sent to beagle whenever they change in beagles mind, not 
-		//a given model's.  The last send could have been a diff indiv with diff values
-		//		if(!ratesChanged)
-		//			return;
-
-		//codon NS rate variation will be taken care of here, and all of the rateMults will be 1.0
-		for (int rate = 0; rate < NRateCats(); rate++) {
-			r.push_back(rateMults[rate] / (ONE_POINT_ZERO - *propInvar));
-		}
-
-		//the only real trick here is that pinv will be include as a separate category of rate zero
-		//making it AFTER the others, so having it won't screw up indexing in non-beagle mode
-		if (NoPinvInModel() == false) {
-			r.push_back(0.0);
-		}
-		ratesChanged = false;
-	}
-	void GetRateProbsForBeagle(vector<FLOAT_TYPE> &p) {
-		//if ratesChanged isn't true, then the rate mults haven't changed since last time they were
-		//sent to beagle.  The calling function will be told this by having an empty vector of rates
-
-		//oops, no the rates need to be sent to beagle whenever they change in beagles mind, not 
-		//a given model's.  The last send could have been a diff indiv with diff values
-		//		if(!rateProbsChanged)
-		//			return;
-
-		for (int rate = 0; rate < NRateCats(); rate++) {
-			if (modSpec->IsCodon())
-				p.push_back(*omegaProbs[rate]);
-			else
-				p.push_back(rateProbs[rate]);
-		}
-
-		//the only real trick here is that pinv will be include as a separate category of rate zero
-		//making it AFTER the others, so having it won't screw up indexing in non-beagle mode
-		if (NoPinvInModel() == false) {
-			p.push_back(*propInvar);
-		}
-#ifndef NDEBUG
-		FLOAT_TYPE sum = 0.0;
-		for (vector<FLOAT_TYPE>::iterator it = p.begin(); it != p.end(); it++)
-			sum += *it;
-		assert(FloatingPointEquals(sum, 1.0, 1e-6));
-#endif
-		rateProbsChanged = false;
-	}
-
-	//this just includes pinv as a separate rate class, which it is for beagle but not gar
-	int NumRateCatsForBeagle() const {
-		return (this->NRateCats() + (NoPinvInModel() ? 0 : 1));
-	}
-
 	FLOAT_TYPE InsertRate() const {return *insertRate;}
 	FLOAT_TYPE DeleteRate() const {return *deleteRate;}
 	//these are the old freqs, no longer used.  Came from TKF I think
@@ -1335,21 +1264,6 @@ class Model{
 	//these were from Rivas and Eddy, also not used currently
 	FLOAT_TYPE IndelPsi(FLOAT_TYPE blen)   const {return (InsertRate() / (InsertRate() + DeleteRate()) * (1.0 - exp(-(InsertRate() + DeleteRate()) * blen)));}
 	FLOAT_TYPE IndelGamma(FLOAT_TYPE blen) const {return (DeleteRate() / (InsertRate() + DeleteRate()) * (1.0 - exp(-(InsertRate() + DeleteRate()) * blen)));}
-
-	void GetEigenSolution(ModelEigenSolution &sol) {
-		if (eigenDirty)
-			CalcEigenStuff();
-
-		//had this wrong previously, and was only setting sol.changed if eigenDirty
-		//that isn't right though, single eigenDirty refers to this model, and sol.changed
-		//refers to the entirety of beagle.  It only matters if it is changed since the
-		//last time it was sent to beagle, which might have been a different indiv.  For
-		//now just always set sol.changed
-		sol.changed = true;
-		sol.eigenVecs = **eigvecs;
-		sol.eigenVals = *eigvals;
-		sol.invEigenVecs = **inveigvecs;
-	}
 
 	//Setting things
 	void SetDefaultModelParameters(SequenceData *data);
@@ -2061,11 +1975,6 @@ class Model{
 #endif		
 		return rateProbs;
 		}
-	
-	void GetStateFreqs(FLOAT_TYPE *outFreqs) const {
-		for (int i = 0; i < nstates; i++)
-			outFreqs[i] = *stateFreqs[i];
-	}
 	};
 
 class ModelSet{//this is a set of models that are applied to a _single_ set of sites

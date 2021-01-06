@@ -34,16 +34,13 @@ class OutputManager{
 	char message[BUFFER_LENGTH+1];
 	ostream *defaultOut;
 	ofstream logOut;
-	ofstream debugOut;
 	bool noOutput;
-	bool debugToStdOut;
 	bool log;
 
 	public:
 		OutputManager(){
 			noOutput=false;
 			log=false;
-			debugToStdOut = false;
 			defaultOut=&cout;
 			}
 			
@@ -68,16 +65,6 @@ class OutputManager{
 			logOut.open(logname);
 			}
 
-		void SetDebugFile(const char *debname, bool debStdOut = true) {
-			if (debugOut.is_open()) {
-				debugOut.close();
-				debugOut.clear();
-			}
-			bool ok = debugOut.good();
-			debugOut.open(debname);
-			debugToStdOut = debStdOut;
-		}
-
 		ofstream *GetLogStream(){
 			if(log == true) return &logOut;
 			else return NULL;
@@ -87,10 +74,6 @@ class OutputManager{
 			if(noOutput) return NULL;
 			else return defaultOut;
 			}
-		
-		ofstream *GetDebugStream() {
-			return &debugOut;
-		}
 
 		void SetLogFileForAppend(const char *logname){
 			log=true;

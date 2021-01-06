@@ -273,7 +273,6 @@ protected:
 	int 	lastConstant;
 	int 	*constStates;//the state (or states) that a constant site contains
 	unsigned char fullyAmbigChar;
-	vector<int> taxaWithPartialAmbig;
 
 	protected:
 		int*	numStates;
@@ -352,7 +351,6 @@ protected:
 		int NTax() const { return nTax; }
 		void SetNTax(int ntax) { nTax = ntax; }
 
-		int NStates() const { return maxNumStates; }
 		virtual int NChar() const { return numPatterns; }
 		int TotalNChar() const { return numNonMissingRealSitesInOrigMatrix; }
 		int GapsIncludedNChar() const { return numRealSitesInOrigMatrix; }
@@ -428,13 +426,6 @@ protected:
 			for(int t=0;t<nTax;t++) 
 				SetTaxonLabel(t, dat->TaxonLabel(t));
 			}
-		
-		unsigned NumTaxaWithPartialAmbig() const {
-			return (unsigned)taxaWithPartialAmbig.size();
-		}
-		bool TaxonHasPartialAmbig(int tax) const {
-			return (find(taxaWithPartialAmbig.begin(), taxaWithPartialAmbig.end(), tax) != taxaWithPartialAmbig.end());
-		}
 
 		void BeginNexusTreesBlock(ofstream &treeout) const;
 		void BeginNexusTreesBlock(string &trans) const;
