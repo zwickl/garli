@@ -3325,19 +3325,19 @@ void Tree::CopyClaIndecesInSubtree(const TreeNode *from, bool remove){
 	assert(from->anc);
 
 	//do the clas down
-	if(remove) claMan->DecrementCla(allNodes[from->nodeNum]->claIndexDown);
+	if(remove) claMan->DecrementHolder(allNodes[from->nodeNum]->claIndexDown);
 	allNodes[from->nodeNum]->claIndexDown=from->claIndexDown;
-	if(allNodes[from->nodeNum]->claIndexDown != -1) claMan->IncrementCla(allNodes[from->nodeNum]->claIndexDown);
+	if(allNodes[from->nodeNum]->claIndexDown != -1) claMan->IncrementHolder(allNodes[from->nodeNum]->claIndexDown);
 	
 	//do the clas up left
-	if(remove) claMan->DecrementCla(allNodes[from->nodeNum]->claIndexUL);
+	if(remove) claMan->DecrementHolder(allNodes[from->nodeNum]->claIndexUL);
 	allNodes[from->nodeNum]->claIndexUL=from->claIndexUL;
-	if(allNodes[from->nodeNum]->claIndexUL != -1) claMan->IncrementCla(allNodes[from->nodeNum]->claIndexUL);
+	if(allNodes[from->nodeNum]->claIndexUL != -1) claMan->IncrementHolder(allNodes[from->nodeNum]->claIndexUL);
 	
 	//do the clas up right
-	if(remove) claMan->DecrementCla(allNodes[from->nodeNum]->claIndexUR);
+	if(remove) claMan->DecrementHolder(allNodes[from->nodeNum]->claIndexUR);
 	allNodes[from->nodeNum]->claIndexUR=from->claIndexUR;
-	if(allNodes[from->nodeNum]->claIndexUR != -1) claMan->IncrementCla(allNodes[from->nodeNum]->claIndexUR);
+	if(allNodes[from->nodeNum]->claIndexUR != -1) claMan->IncrementHolder(allNodes[from->nodeNum]->claIndexUR);
 	
 	if(from->left->IsInternal()) CopyClaIndecesInSubtree(from->left, remove);
 	if(from->right->IsInternal()) CopyClaIndecesInSubtree(from->right, remove);
@@ -3857,10 +3857,10 @@ int Tree::FillStatewiseUnscaledPosteriors(CondLikeArraySet *partialCLAset, CondL
 	CondLikeArray *partialCLA=NULL, *childCLA=NULL, *destCLA=NULL;
 
 	//careful!  The cla will have to be returned manually by the caller
-	int posteriorClaIndex=claMan->AssignClaHolder();
+	int posteriorClaIndex=claMan->AssignFreeClaHolder();
 	claMan->FillHolder(posteriorClaIndex, ROOT);
 	claMan->ReserveCla(posteriorClaIndex);
-	CondLikeArraySet *destCLAset = claMan->GetCla(posteriorClaIndex);
+	CondLikeArraySet *destCLAset = claMan->GetClaSet(posteriorClaIndex);
 	//note that the NState functions are used here for both nuc and other datatypes
 
 	for(vector<ClaSpecifier>::iterator specs = claSpecs.begin();specs != claSpecs.end();specs++){
@@ -4996,7 +4996,7 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int mod
 	if(nd->IsInternal()){
 		if(claMan->IsDirty(nd->claIndexDown) == false){
 			deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
-			const CondLikeArray *cla = claMan->GetCla(nd->claIndexDown)->theSets[modIndex];
+			const CondLikeArray *cla = claMan->GetClaSet(nd->claIndexDown)->theSets[modIndex];
 			for(int i=0;i<nstates*rateCats;i++) 
 				deb << cla->arr[index+i] << "\t";
 			deb << cla->underflow_mult[site];
@@ -5009,7 +5009,7 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int mod
 	if(nd->IsInternal()){
 		if(claMan->IsDirty(nd->claIndexUL) == false){
 			deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
-			const CondLikeArray *cla = claMan->GetCla(nd->claIndexUL)->theSets[modIndex];
+			const CondLikeArray *cla = claMan->GetClaSet(nd->claIndexUL)->theSets[modIndex];
 			for(int i=0;i<nstates*rateCats;i++) 
 				deb << cla->arr[index+i] << "\t";
 			deb << cla->underflow_mult[site];
@@ -5022,7 +5022,7 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int mod
 	if(nd->IsInternal()){
 		if(claMan->IsDirty(nd->claIndexUR) == false){
 			deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
-			const CondLikeArray *cla = claMan->GetCla(nd->claIndexUR)->theSets[modIndex];
+			const CondLikeArray *cla = claMan->GetClaSet(nd->claIndexUR)->theSets[modIndex];
 			for(int i=0;i<nstates*rateCats;i++) 
 				deb << cla->arr[index+i] << "\t";
 			deb << cla->underflow_mult[site];
@@ -5147,7 +5147,7 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 		//thus, the state frqeuencies have already been figured in and nothing needs to be done in InferStatesFromCla besides divide each by the sum
 		//note that this clas then only uses the first nstates x nchar portion, instead of the usual nstates x nchar x nrates
 		int wholeTreeIndex = ConditionalLikelihoodRateHet(ROOT, nd, true);
-		CondLikeArraySet *CLAset = claMan->GetCla(wholeTreeIndex);
+		CondLikeArraySet *CLAset = claMan->GetClaSet(wholeTreeIndex);
 
 		//output newick strings with both names and numbers indicating which node this corresponds to
 		string subtreeString;
@@ -5192,7 +5192,7 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 			
 			//return the cla that we used temporarily
 			claMan->ClearTempReservation(wholeTreeIndex);
-			claMan->DecrementCla(wholeTreeIndex);
+			claMan->DecrementHolder(wholeTreeIndex);
 			delete states;
 			}
 			}

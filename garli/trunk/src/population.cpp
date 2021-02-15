@@ -7442,18 +7442,18 @@ void Population::FindLostClas(){
 	for(unsigned i=0;i<total_size;i++){
 		Tree *t=indiv[i].treeStruct;
 		if(! (claMan->IsDirty(t->allNodes[0]->claIndexDown)))
-			arr.push_back(claMan->GetCla(t->allNodes[0]->claIndexDown));
+			arr.push_back(claMan->GetClaSet(t->allNodes[0]->claIndexDown));
 		if(! (claMan->IsDirty(t->allNodes[0]->claIndexUL)))
-			arr.push_back(claMan->GetCla(t->allNodes[0]->claIndexUL));			
+			arr.push_back(claMan->GetClaSet(t->allNodes[0]->claIndexUL));			
 		if(! (claMan->IsDirty(t->allNodes[0]->claIndexUR)))
-			arr.push_back(claMan->GetCla(t->allNodes[0]->claIndexUR));
+			arr.push_back(claMan->GetClaSet(t->allNodes[0]->claIndexUR));
 		for(int n=t->getNumTipsTotal()+1;n<t->getNumNodesTotal();n++){
 			if(! (claMan->IsDirty(t->allNodes[n]->claIndexDown)))
-				arr.push_back(claMan->GetCla(t->allNodes[n]->claIndexDown));
+				arr.push_back(claMan->GetClaSet(t->allNodes[n]->claIndexDown));
 			if(! (claMan->IsDirty(t->allNodes[n]->claIndexUL)))
-				arr.push_back(claMan->GetCla(t->allNodes[n]->claIndexUL));			
+				arr.push_back(claMan->GetClaSet(t->allNodes[n]->claIndexUL));			
 			if(! (claMan->IsDirty(t->allNodes[n]->claIndexUR)))
-				arr.push_back(claMan->GetCla(t->allNodes[n]->claIndexUR));
+				arr.push_back(claMan->GetClaSet(t->allNodes[n]->claIndexUR));
 			}
 		}
 	sort(arr.begin(), arr.end());

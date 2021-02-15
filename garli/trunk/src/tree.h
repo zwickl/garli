@@ -427,14 +427,14 @@ inline void Tree::AssignCLAsFromMaster(){
 	if(claMan == NULL)
 		return;
 	assert(allNodes[0]->claIndexDown==-1);
-	allNodes[0]->claIndexDown=claMan->AssignClaHolder();
-	allNodes[0]->claIndexUL=claMan->AssignClaHolder();
-	allNodes[0]->claIndexUR=claMan->AssignClaHolder();
+	allNodes[0]->claIndexDown=claMan->AssignFreeClaHolder();
+	allNodes[0]->claIndexUL=claMan->AssignFreeClaHolder();
+	allNodes[0]->claIndexUR=claMan->AssignFreeClaHolder();
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		assert(allNodes[i]->claIndexDown==-1);
-		allNodes[i]->claIndexDown=claMan->AssignClaHolder();
-		allNodes[i]->claIndexUL=claMan->AssignClaHolder();
-		allNodes[i]->claIndexUR=claMan->AssignClaHolder();
+		allNodes[i]->claIndexDown=claMan->AssignFreeClaHolder();
+		allNodes[i]->claIndexUL=claMan->AssignFreeClaHolder();
+		allNodes[i]->claIndexUR=claMan->AssignFreeClaHolder();
 		}
 	}
 	
@@ -443,9 +443,9 @@ inline void Tree::CopyClaIndeces(const Tree *from, bool remove){
 	//assigned to it or not (if not, it must have come from the unused tree vector)
 
 	//do the clas down
-	if(remove) claMan->DecrementCla(allNodes[0]->claIndexDown);
+	if(remove) claMan->DecrementHolder(allNodes[0]->claIndexDown);
 	allNodes[0]->claIndexDown=from->allNodes[0]->claIndexDown;
-	if(allNodes[0]->claIndexDown != -1) claMan->IncrementCla(allNodes[0]->claIndexDown);
+	if(allNodes[0]->claIndexDown != -1) claMan->IncrementHolder(allNodes[0]->claIndexDown);
 	
 #ifdef EQUIV_CALCS
 	if(from->dirtyEQ == false){
@@ -458,58 +458,58 @@ inline void Tree::CopyClaIndeces(const Tree *from, bool remove){
 #endif
 
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(remove) claMan->DecrementCla(allNodes[i]->claIndexDown);
+		if(remove) claMan->DecrementHolder(allNodes[i]->claIndexDown);
 		allNodes[i]->claIndexDown=from->allNodes[i]->claIndexDown;
-		if(allNodes[i]->claIndexDown != -1) claMan->IncrementCla(allNodes[i]->claIndexDown);
+		if(allNodes[i]->claIndexDown != -1) claMan->IncrementHolder(allNodes[i]->claIndexDown);
 		}
 		
 	//do the clas up left
-	if(remove) claMan->DecrementCla(allNodes[0]->claIndexUL);
+	if(remove) claMan->DecrementHolder(allNodes[0]->claIndexUL);
 	allNodes[0]->claIndexUL=from->allNodes[0]->claIndexUL;
-	if(allNodes[0]->claIndexUL != -1) claMan->IncrementCla(allNodes[0]->claIndexUL);
+	if(allNodes[0]->claIndexUL != -1) claMan->IncrementHolder(allNodes[0]->claIndexUL);
 	
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(remove) claMan->DecrementCla(allNodes[i]->claIndexUL);
+		if(remove) claMan->DecrementHolder(allNodes[i]->claIndexUL);
 		allNodes[i]->claIndexUL=from->allNodes[i]->claIndexUL;
-		if(allNodes[i]->claIndexUL != -1) claMan->IncrementCla(allNodes[i]->claIndexUL);
+		if(allNodes[i]->claIndexUL != -1) claMan->IncrementHolder(allNodes[i]->claIndexUL);
 		}
 	
 	//do the clas up right
-	if(remove) claMan->DecrementCla(allNodes[0]->claIndexUR);
+	if(remove) claMan->DecrementHolder(allNodes[0]->claIndexUR);
 	allNodes[0]->claIndexUR=from->allNodes[0]->claIndexUR;
-	if(allNodes[0]->claIndexUR != -1) claMan->IncrementCla(allNodes[0]->claIndexUR);
+	if(allNodes[0]->claIndexUR != -1) claMan->IncrementHolder(allNodes[0]->claIndexUR);
 		
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		if(remove) claMan->DecrementCla(allNodes[i]->claIndexUR);
+		if(remove) claMan->DecrementHolder(allNodes[i]->claIndexUR);
 		allNodes[i]->claIndexUR=from->allNodes[i]->claIndexUR;
-		if(allNodes[i]->claIndexUR != -1) claMan->IncrementCla(allNodes[i]->claIndexUR);
+		if(allNodes[i]->claIndexUR != -1) claMan->IncrementHolder(allNodes[i]->claIndexUR);
 		}
 	}
 
 inline void Tree::RemoveTreeFromAllClas(){
 	if(root->claIndexDown != -1){
-		claMan->DecrementCla(root->claIndexDown);
+		claMan->DecrementHolder(root->claIndexDown);
 		root->claIndexDown=-1;
 		}
 	if(root->claIndexUL != -1){
-		claMan->DecrementCla(root->claIndexUL);
+		claMan->DecrementHolder(root->claIndexUL);
 		root->claIndexUL=-1;
 		}
 	if(root->claIndexUR != -1){	
-		claMan->DecrementCla(root->claIndexUR);
+		claMan->DecrementHolder(root->claIndexUR);
 		root->claIndexUR=-1;
 		}
 	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
 		if(allNodes[i]->claIndexDown != -1){
-			claMan->DecrementCla(allNodes[i]->claIndexDown);
+			claMan->DecrementHolder(allNodes[i]->claIndexDown);
 			allNodes[i]->claIndexDown=-1;
 			}
 		if(allNodes[i]->claIndexUL != -1){
-			claMan->DecrementCla(allNodes[i]->claIndexUL);
+			claMan->DecrementHolder(allNodes[i]->claIndexUL);
 			allNodes[i]->claIndexUL=-1;
 			}
 		if(allNodes[i]->claIndexUR != -1){
-			claMan->DecrementCla(allNodes[i]->claIndexUR);
+			claMan->DecrementHolder(allNodes[i]->claIndexUR);
 			allNodes[i]->claIndexUR=-1;
 			}
 		}
@@ -594,7 +594,7 @@ inline CondLikeArraySet *Tree::GetClaDown(TreeNode *nd, bool calc/*=true*/){
 		else claMan->FillHolder(nd->claIndexDown, 1);
 		}
 	if(memLevel > 1) claMan->ReserveCla(nd->claIndexDown);
-	return claMan->GetCla(nd->claIndexDown);
+	return claMan->GetClaSet(nd->claIndexDown);
 	}
 	
 inline CondLikeArraySet *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
@@ -605,7 +605,7 @@ inline CondLikeArraySet *Tree::GetClaUpLeft(TreeNode *nd, bool calc/*=true*/){
 		else claMan->FillHolder(nd->claIndexUL, 2);
 		}
 	if(memLevel > 0) claMan->ReserveCla(nd->claIndexUL);
-	return claMan->GetCla(nd->claIndexUL);
+	return claMan->GetClaSet(nd->claIndexUL);
 	}
 	
 inline CondLikeArraySet *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/){
@@ -616,7 +616,7 @@ inline CondLikeArraySet *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/){
 		else claMan->FillHolder(nd->claIndexUR, 2);
 		}
 	if(memLevel > 0) claMan->ReserveCla(nd->claIndexUR);
-	return claMan->GetCla(nd->claIndexUR);
+	return claMan->GetClaSet(nd->claIndexUR);
 	}
 
 inline void Tree::ProtectClas(){
