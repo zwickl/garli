@@ -28,6 +28,7 @@ using namespace std;
 #include "rng.h"
 
 #undef ALIGN_MODEL
+#define FAKE_PINV_MATS
 
 Profiler ProfCalcPmat("CalcPmat      ");
 Profiler ProfCalcEigen("CalcEigen     ");
@@ -131,28 +132,36 @@ Model::~Model(){
 
 void Model::AllocateEigenVariables(){
 #ifndef ALIGN_MODEL
+
+	//need extra for beagle if pinv.  should remove this allocation in non-beagle mode, but shouldn't cause problems
+#ifdef USE_BEAGLE
+	int realNumRates = NumRateCatsForBeagle();
+#else
+	int realNumRates = NRateCats();
+#endif
+
 	//a bunch of allocation here for all of the qmatrix->eigenvector->pmatrix related variables
 	eigvalsimag=new MODEL_FLOAT[nstates];
 	iwork=new int[nstates];
 	work=new MODEL_FLOAT[nstates];
 	col=new MODEL_FLOAT[nstates];
 	indx=new int[nstates];
-	EigValexp=new MODEL_FLOAT[nstates*NRateCats()];
-	EigValderiv=new MODEL_FLOAT[nstates*NRateCats()];
-	EigValderiv2=new MODEL_FLOAT[nstates*NRateCats()];
+	EigValexp = new MODEL_FLOAT[nstates*realNumRates];
+	EigValderiv = new MODEL_FLOAT[nstates*realNumRates];
+	EigValderiv2 = new MODEL_FLOAT[nstates*realNumRates];
 
 	//create the matrix for the eigenvectors
-	eigvecs=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
+	eigvecs = New3DArray<MODEL_FLOAT>(realNumRates, nstates, nstates);
 
 	//create a temporary matrix to hold the eigenvectors that will be destroyed during the invertization
 	teigvecs=New2DArray<MODEL_FLOAT>(nstates,nstates);
 
 	//create the matrix for the inverse eigenvectors
-	inveigvecs=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);	
+	inveigvecs = New3DArray<MODEL_FLOAT>(realNumRates, nstates, nstates);
 
 	//allocate the pmats
-	pmat1=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
-	pmat2=New3DArray<MODEL_FLOAT>(NRateCats(), nstates, nstates);
+	pmat1 = New3DArray<MODEL_FLOAT>(realNumRates, nstates, nstates);
+	pmat2 = New3DArray<MODEL_FLOAT>(realNumRates, nstates, nstates);
 	
 #ifdef SINGLE_PRECISION_FLOATS
 	//allocate single precision versions of the matrices
@@ -829,6 +838,16 @@ void Model::CalcEigenStuff(){
 		memcpy(*teigvecs, *eigvecs[m], nstates*nstates*sizeof(MODEL_FLOAT));
 		InvertMatrix(teigvecs, nstates, col, indx, inveigvecs[m]);
 		
+		//DEBUG - rescaling the eigenvals by blen_multiplier here _should_ give same result as using it later
+		//in transition matrix calculating function.  This will be easier for passing to beagle prescaled as well
+		//5/26/20 removed accounting for pinv here.  
+		//when using beagle the rate classes are normalized to account for it elsewhere so don't do it here as well.
+		//BMERGE TODO - will need to figure out how to do the right thing in all beagle/non-beagle cases
+		for (int ev = 0; ev < nstates; ev++)
+			eigvals[m][ev] *= (NoPinvInModel() ? blen_multiplier[m] : blen_multiplier[0]);
+			//eigvals[m][ev] *= (NoPinvInModel() ? blen_multiplier[m] : blen_multiplier[0] / (ONE_POINT_ZERO - *propInvar));
+		//blen_multiplier[m] = 1.0;
+		
 		//For codon models using this precalculation actually makes things things slower in CalcPmat (cache thrashing,
 		//I think) so don't bother doing it here.  In fact, don't even allocate it in the model
 		if(modSpec->IsCodon() == false)
@@ -1221,6 +1240,37 @@ void Model::OutputPmats(ofstream &deb){
 
 	}
 
+void Model::OutputPmat(ofstream &deb, MODEL_FLOAT ***mat) const {
+	for (int r = 0; r<NRateCats(); r++) {
+		if (NRateCats() > 1)
+			deb << "r" << r << "\n";
+		for (int f = 0; f<nstates; f++) {
+			for (int t = 0; t<nstates; t++) {
+				deb << mat[r][f][t] << "\t";
+			}
+			deb << "\n";
+		}
+		//	deb << "\n";
+	}
+	//deb << "\n";
+}
+
+void Model::OutputPmat(ofstream& deb, vector<MODEL_FLOAT> mat) const {
+	vector<MODEL_FLOAT>::iterator  it = mat.begin();
+	for (int r = 0; r < NRateCats(); r++) {
+		if (NRateCats() > 1)
+			deb << "r" << r << "\n";
+		for (int f = 0; f < nstates; f++) {
+			for (int t = 0; t < nstates; t++) {
+				deb << *it++ << "\t";
+			}
+			deb << "\n";
+		}
+		//	deb << "\n";
+	}
+	//deb << "\n";
+}
+
 void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&one, FLOAT_TYPE ***&two){
 	if(eigenDirty==true)
 		CalcEigenStuff();
@@ -1229,15 +1279,19 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
 			MODEL_FLOAT scaledEigVal;
+			//11/5/20 the blen_multiplier is now only used in rescaling the eigvals in CalcEigenstuff, so no longer needs to be used here 
 			if(modSpec->IsNonsynonymousRateHet() == false){
 				if(NoPinvInModel()==true || modSpec->IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
-					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+					//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];
+					scaledEigVal = eigvals[0][k] * rateMults[rate];
 				else
-					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+					//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+					scaledEigVal = eigvals[0][k] * rateMults[rate] / (ONE_POINT_ZERO - *propInvar);
 				}
 			else{
-				scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				//scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				scaledEigVal = eigvals[rate][k];
 				}
 			EigValexp[k+rateOffset] = exp(scaledEigVal * dlen);
 			EigValderiv[k+rateOffset] = scaledEigVal*EigValexp[k+rateOffset];
@@ -1306,6 +1360,112 @@ void Model::CalcDerivatives(FLOAT_TYPE dlen, FLOAT_TYPE ***&pr, FLOAT_TYPE ***&o
 #endif
 	}
 
+//this version will assume that the arrays passed in are allocated and to be filled with the matrices
+//these might be the actual matrices that are part of the model, or if beagle they might be from elsewhere
+//regardless, the model will use its own data members to calculate and hold the eigen solution 
+void Model::FillDerivativeMatrices(FLOAT_TYPE dlen, MODEL_FLOAT ***pr, MODEL_FLOAT ***one, MODEL_FLOAT ***two) {
+
+	if (eigenDirty == true)
+		CalcEigenStuff();
+
+	assert(FloatingPointEquals(blen_multiplier[0], 1.0, 1e-4));
+
+	//this gets tricky, because to do +I and pass pmats/dmats we need to create mats for the 0 rate class,
+	//which Garli does not usually do.
+
+	vector<double> realMults;
+	int realNumRates = NRateCats();
+	for (int rate = 0; rate<NRateCats(); rate++)
+		realMults.push_back(rateMults[rate]);
+	//put the pinv class after the others will make this easier on the GARLI side
+#ifdef FAKE_PINV_MATS
+	if (NoPinvInModel() == false) {
+		realNumRates += 1;
+		realMults.push_back(0.0);
+		for (int rate = 0; rate<NRateCats(); rate++)
+			realMults[rate] /= (1.0 - *propInvar);
+	}
+#endif
+
+	//DEBUG
+	//for(int rate=0;rate<NRateCats();rate++){
+	for (int rate = 0; rate<realNumRates; rate++) {
+		//DEBUG
+		assert(rate < realMults.size());
+		const unsigned rateOffset = nstates*rate;
+		for (int k = 0; k<nstates; k++) {
+			MODEL_FLOAT scaledEigVal;
+			if (modSpec->IsNonsynonymousRateHet() == false) {
+				//The blen multiplier should be taken care of in CalcEigenStuff, including the effect of pinv
+				//Then blen_multiplier should have been set to 1.0.  This was added for beagle, where prescaling
+				//everything made more sense.
+				//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+				scaledEigVal = eigvals[0][k] * realMults[rate] * blen_multiplier[0];
+
+				/*				if(NoPinvInModel()==true || modSpec.IsFlexRateHet())//if we're using flex rates, pinv should already be included
+				//in the rate normalization, and doesn't need to be figured in here
+				scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];
+				else
+				scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+				*/
+			}
+			else {
+				assert(NoPinvInModel());
+				scaledEigVal = eigvals[rate][k] * blen_multiplier[rate];
+			}
+			EigValexp[k + rateOffset] = exp(scaledEigVal * dlen);
+			EigValderiv[k + rateOffset] = scaledEigVal*EigValexp[k + rateOffset];
+			EigValderiv2[k + rateOffset] = scaledEigVal*EigValderiv[k + rateOffset];
+		}
+	}
+
+	if (NStates() > 59) {//using precalced eigvecs X inveigvecs (c_ijk) is less efficient for codon models, and I
+						 //don't want a conditional in the inner loop
+		for (int rate = 0; rate<realNumRates; rate++) {
+			int model = 0;
+			if (modSpec->IsNonsynonymousRateHet())
+				model = rate;
+			const unsigned rateOffset = nstates*rate;
+			for (int i = 0; i < nstates; i++) {
+				for (int j = 0; j < nstates; j++) {
+					MODEL_FLOAT sum_p = ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d1p = ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d2p = ZERO_POINT_ZERO;
+					for (int k = 0; k < nstates; k++) {
+						const MODEL_FLOAT x = eigvecs[model][i][k] * inveigvecs[model][k][j];
+						sum_p += x*EigValexp[k + rateOffset];
+						sum_d1p += x*EigValderiv[k + rateOffset];
+						sum_d2p += x*EigValderiv2[k + rateOffset];
+					}
+					pr[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					one[rate][i][j] = sum_d1p;
+					two[rate][i][j] = sum_d2p;
+				}
+			}
+		}
+	}
+	else { // aminoacids or nucleotides
+		for (int rate = 0; rate<realNumRates; rate++) {
+			const unsigned rateOffset = nstates*rate;
+			for (int i = 0; i < nstates; i++) {
+				for (int j = 0; j < nstates; j++) {
+					MODEL_FLOAT sum_p = ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d1p = ZERO_POINT_ZERO;
+					MODEL_FLOAT sum_d2p = ZERO_POINT_ZERO;
+					for (int k = 0; k < nstates; k++) {
+						MODEL_FLOAT x = c_ijk[0][i*nstates*nstates + j*nstates + k];
+						sum_p += x*EigValexp[k + rateOffset];
+						sum_d1p += x*EigValderiv[k + rateOffset];
+						sum_d2p += x*EigValderiv2[k + rateOffset];
+					}
+					pr[rate][i][j] = (sum_p > ZERO_POINT_ZERO ? sum_p : ZERO_POINT_ZERO);
+					one[rate][i][j] = sum_d1p;
+					two[rate][i][j] = sum_d2p;
+				}
+			}
+		}
+	}
+}
 
 bool DoubleAbsLessThan(double &first, double &sec){return fabs(first) <= fabs(sec);}
 
@@ -1317,15 +1477,19 @@ void Model::AltCalcPmat(FLOAT_TYPE dlen, MODEL_FLOAT ***&pmat){
 		const unsigned rateOffset = nstates*rate; 
 		for(int k=0; k<nstates; k++){
 			MODEL_FLOAT scaledEigVal;
+			//11/5/20 the blen_multiplier is now only used in rescaling the eigvals in CalcEigenstuff, so no longer needs to be used here 
 			if(modSpec->IsNonsynonymousRateHet() == false){
 				if(NoPinvInModel()==true || modSpec->IsFlexRateHet())//if we're using flex rates, pinv should already be included
 					//in the rate normalization, and doesn't need to be figured in here
-					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];	
+					//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0];
+					scaledEigVal = eigvals[0][k] * rateMults[rate];
 				else
-					scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+					//scaledEigVal = eigvals[0][k]*rateMults[rate]*blen_multiplier[0]/(ONE_POINT_ZERO-*propInvar);
+					scaledEigVal = eigvals[0][k] * rateMults[rate] / (ONE_POINT_ZERO - *propInvar);
 				}
 			else{
-				scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				//scaledEigVal = eigvals[rate][k]*blen_multiplier[rate];
+				scaledEigVal = eigvals[rate][k];
 				}
 			EigValexp[k+rateOffset] = exp(scaledEigVal * dlen);
 			}
@@ -3293,6 +3457,13 @@ void Model::CreateModelFromSpecification(int modnum){
 			d = new FLOAT_TYPE;
 			*d = 1.0 / NRateCats();
 			omegaProbs.push_back(d);
+
+			//BMERGE - forgot to transfer this over
+			//changes for beagle, should have no side effects
+//The overall rate multipliers are all equal for different NS rate cats, even if omega varies
+			rateMults[i] = 1.0;
+			rateProbs[i] = *omegaProbs[i];
+
 			}
 
 /*		*omegas[0] = 0.0000;
