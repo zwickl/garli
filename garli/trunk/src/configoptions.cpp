@@ -35,6 +35,21 @@ using namespace std;
 GeneralGamlConfig::GeneralGamlConfig(){
 	//Default values for everything
 
+	//beagle
+	useBeagle = false;
+	singlePrecBeagle = false;
+	gpuBeagle = false;
+	rescaleBeagle = false;
+	preferredBeagleFlags = "DOUBLE CPU RESCALE";
+#ifdef __FLT_EPSILON__
+	singlePrecEps = __FLT_EPSILON__ * 10.0;
+	doublePrecEps = __FLT_EPSILON__ * 10.0;
+#else
+	singlePrecEps = FLT_EPSILON * 10.0;
+	doublePrecEps = FLT_EPSILON * 10.0;
+#endif
+	deviceNumBeagle = -1;
+
 	//output related
 	ofprefix = "ofprefix";
 	logevery = 10;
@@ -162,6 +177,18 @@ int GeneralGamlConfig::Read(const char* fname, bool isMaster /*=false*/)	{
 	found += cr.GetPositiveNonZeroDoubleOption("availablememory", availableMemory, true);
 	if(found == -2) throw ErrorException("Either \"megsclamemory\" or \"availablememory\" must be specified in conf!");
 	
+	//beagle
+	cr.GetBoolOption("usebeagle", useBeagle, true);
+	cr.GetBoolOption("singleprecbeagle", singlePrecBeagle, true);
+	cr.GetBoolOption("gpubeagle", gpuBeagle, true);
+	cr.GetBoolOption("rescalebeagle", rescaleBeagle, true);
+	cr.GetStringOption("preferredbeagleflags", preferredBeagleFlags, true);
+	cr.GetStringOption("requiredbeagleflags", requiredBeagleFlags, true);
+	cr.GetIntOption("devicenumbeagle", deviceNumBeagle, true);
+
+	cr.GetPositiveNonZeroDoubleOption("singlepreceps", singlePrecEps, true);
+	cr.GetPositiveNonZeroDoubleOption("doublepreceps", doublePrecEps, true);
+
 	errors += cr.GetStringOption("datafname", datafname);
 	errors += cr.GetStringOption("ofprefix", ofprefix);
 	errors += cr.GetStringOption("streefname", streefname);
