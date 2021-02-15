@@ -35,6 +35,7 @@ using namespace std;
 #ifdef WIN32
 #include <conio.h>
 #include <windows.h>
+#include <winbase.h>
 #endif
 
 #ifdef MAC_FRONTEND
@@ -49,6 +50,9 @@ using namespace std;
 #include "tree.h"
 #include "funcs.h"
 #include "clamanager.h"
+#ifdef USE_BEAGLE
+#include "calculationmanager.h"
+#endif
 #include "stopwatch.h"
 #include "bipartition.h"
 #include "adaptation.h"
@@ -499,10 +503,9 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		}
 		
 	const int KB = 1024;
-	double claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
+
 	int numNodesPerIndiv = dataPart->NTax()-2;
 	int idealClas =  3 * total_size * numNodesPerIndiv;
-	int maxClas = (int)((memToUse*KB)/ claSizePerNodeKB);
 	int numClas;	
 
 	int L0=(int) (numNodesPerIndiv * total_size * 2);//a downward and one upward set for each tree
@@ -516,7 +519,35 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		L3=(int) (numNodesPerIndiv * 1.5 - 2 + 2*total_size);//one full set, enough to reserve at least all of the full internals of the 
 															 //best indiv and enough for each root
 		}
+	//moved this instantiation to Population Constructor, so it can be called earlier
+	//calcMan = new CalculationManager();
+	outman.UserMessage("");
+#ifdef USE_BEAGLE
+	calcMan->OutputBeagleResources();
 
+#ifndef BEAGLEPART
+	if (modSpecSet.NumSpecs() > 1)
+		throw ErrorException("still working on true partitioned beagle support. This version should work fine with a single subset");
+#endif
+#endif //USE_BEAGLE
+	//For partitioned beagle each subset must have the same number of conditionals allocated, 
+	//and the memory levels, etc will be the same.  In this mode the specified amount of memory 
+	//is per instance (= per subset), so determine how many clas the largest subset (in terms of required size) 
+	//could have within that restriction
+	double claSizePerNodeKB = 0.0;
+#ifdef USE_BEAGLE
+	double subsetClaSizePerNodeKB = 0.0;
+	vector<int> subsetClaSizes;
+	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
+		subsetClaSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart, true);
+		subsetClaSizes.push_back(subsetClaSizePerNodeKB);
+		claSizePerNodeKB = max(subsetClaSizePerNodeKB, claSizePerNodeKB);
+	}
+#else
+	claSizePerNodeKB = indiv[0].modPart.CalcRequiredCLAsizeKB(dataPart);
+#endif
+
+	int maxClas = (int)((memToUse * KB) / claSizePerNodeKB);
 	if(maxClas >= L0){
 		numClas = min(maxClas, idealClas);
 		memLevel = 0;		
@@ -543,8 +574,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		}
 
 	outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
-
-	outman.UserMessage("\nGarli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
+	outman.UserMessage("\nwhen using the BEAGLE library, this is the maximum amount of memory per model partition (instance).");
 
 	if( ! (conf->scoreOnly || conf->optimizeInputOnly)){
 		if(memLevel == 0)
@@ -559,6 +589,26 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 			outman.UserMessage("**NOT ENOUGH MEMORY\n\t(you must increase the availablememory setting)**");
 		}
 	outman.UserMessage("\n#######################################################");
+	if (memLevel == -1 && !validateMode)
+		throw ErrorException("Not enough memory specified in config file (availablememory)!");
+
+#ifndef USE_BEAGLE
+	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
+//if we do tons of recombination 
+	idealClas *= 2;
+	if (!validateMode)
+		claMan = new ClaManager(dataPart->NTax() - 2, numClas, idealClas, &indiv[0].modPart, dataPart);
+#else //BEAGLE
+	//loop over subsets (for partitioned beagle)
+	double totalMemAllocated = 0.0;
+	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
+		SequenceData *subsetData = dataPart->GetSubset(subsetSpec->dataIndex);
+		ModelSpecification *subsetModSpec = modSpecSet.GetModSpec(subsetSpec->modelIndex);
+
+		//outman.UserMessage("\nfor this partition subset, Garli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
+		double subsetMemUsage = memUsageMult * (FLOAT_TYPE)numClas * (FLOAT_TYPE)subsetClaSizes[subsetSpec->claIndex] / (FLOAT_TYPE)KB;
+		outman.UserMessage("\nFor this partition subset, Garli will actually use approx. %.1f MB of memory", subsetMemUsage);
+		totalMemAllocated += subsetMemUsage;
 /*
 	outman.precision(4);
 	outman.UserMessage("allocating memory...\nusing %.1f MB for conditional likelihood arrays.  Memlevel= %d", (FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB, memLevel);
@@ -569,20 +619,59 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)));
 	outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB))-1);
 */
-	if(memLevel==-1 && !validateMode) 
-		throw ErrorException("Not enough memory specified in config file (availablememory)!");
 
 	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 	//if we do tons of recombination 
 	idealClas *= 2;
-	if(!validateMode)
+		if (!validateMode && !claMan)
 		claMan=new ClaManager(dataPart->NTax()-2, numClas, idealClas, &indiv[0].modPart, dataPart);
+
+		CalculationManager::SetClaManager(claMan);
+		//both the tips and internal branches need pmats, hence the x2
+		int idealPmats = total_size * (2 * (dataPart->NTax() - 1));
+		idealPmats *= 2;
+		//for now using as many pmats as pmat holders
+		//pmatMan = new PmatManager(numClas * 2, idealPmats, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)), modSpec.nstates);
+		if(!pmatMan)
+			pmatMan = new PmatManager(idealPmats, idealPmats, (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)), subsetModSpec->nstates);
+		CalculationManager::SetPmatManager(pmatMan);
+
+#ifdef BEAGLEPART 
+		CalculationManager::SetData(dataPart);
+#else
+		CalculationManager::SetData(subsetData);
+#endif
+
+		//invariable class needs to be treated as extra rate for beagle
+		//calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
+		calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
+#ifndef BEAGLEPART
+		//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec.numRateCats + (subsetModSpec.includeInvariantSites ? 1 : 0)));
+		calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)));
+#else
+		calcMan->AddSubsetInstance(numClas, idealClas, subsetData, subsetModSpec, subsetSpec->modelIndex);
+#endif
+	} // end loop over modelParts
+
+	outman.UserMessage("\n\nThe total memory allocated for likelihood calculations is approx %.1f MB", totalMemAllocated);
+
+
+
+	CalculationManager::SetClaManager(claMan);
+	//CalculationManager::SetData(dataPart);
+	NodeClaManager::SetClaManager(claMan);
+	NodeClaManager::SetPmatManager(pmatMan);
+#endif //!USE_BEAGLE
 
 	//setup the bipartition statics
 	Bipartition::SetBipartitionStatics(dataPart->NTax());
 
 	//set the tree statics
+#ifdef USE_BEAGLE
+	Tree::SetTreeStatics(claMan, pmatMan, calcMan, dataPart, conf);
+#else
 	Tree::SetTreeStatics(claMan, dataPart, conf);
+#endif
 
 	//load any constraints
 	GetConstraints();
@@ -841,6 +930,9 @@ void Population::RunTests(){
 	tree1->MakeAllNodesDirty();
 
 	for(int i=0;i<100;i++){
+
+//BMERGE rerooting isn't working right with beagle currently
+#ifndef USE_BEAGLE
 		tree0->RerootHere(tree0->GetRandomInternalNode());
 		tree1->RerootHere(tree1->GetRandomInternalNode());
 
@@ -849,7 +941,7 @@ void Population::RunTests(){
 
 		//check rerooting and bipartition comparisons
 		assert(tree0->IdenticalTopologyAllowingRerooting(tree1->root));
-
+#endif
 		ind0->SetDirty();
 		ind1->SetDirty();
 
@@ -1294,8 +1386,11 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].treeStruct->root->CheckTreeFormation();
 	indiv[0].treeStruct->root->CheckforPolytomies();
 
+//BMERGE - rebalancing totally hoses things with beagle.  avoiding for now
+#ifndef USE_BEAGLE
 	if(!indiv[0].treeStruct->rootWithDummy)
 		indiv[0].treeStruct->CheckBalance();
+#endif
 	indiv[0].treeStruct->modPart=&indiv[0].modPart;
 	
 	try{
@@ -3555,9 +3650,13 @@ void Population::PerformSearch(){
 					else
 						theInd = storedTrees[best];
 					//InferAllInternalStateProbs will deal with assigning clas, since neither the tree in storedTrees nor the potentially temp tree have them
+#ifndef USE_BEAGLE
 					theInd->treeStruct->InferAllInternalStateProbs(conf->ofprefix.c_str());
 					if(prematureTermination && best == storedTrees.size() - 1)
 						outman.UserMessage("WARNING: Internal states inferred on tree from prematurely terminated search\n");
+#else
+					outman.UserMessage("**Internal state inference must be updated for beagle");
+#endif
 					}
 				}
 			else if(prematureTermination){
@@ -4912,8 +5011,11 @@ void Population::WriteStoredTrees( const char* treefname ){
 		const Individual *curInd;
 		if(Tree::outgroup != NULL || conf->collapseBranches){
 			tempInd.DuplicateIndivWithoutCLAs(storedTrees[r]);
+			//BMERGE TODO - still need to figure out rerooting
+#ifndef USE_BEAGLE
 			if(Tree::outgroup != NULL)
 				OutgroupRoot(&tempInd, -1);
+#endif
 			if(conf->collapseBranches){
 				int num = 0;
 				tempInd.treeStruct->root->CollapseMinLengthBranches(num);
@@ -7436,6 +7538,7 @@ void Population::FinalizeOutputStreams(){
 	}
 */
 
+/*BMERGE this needs to be updated
 void Population::FindLostClas(){
 	vector<CondLikeArraySet *> arr;
 	
@@ -7466,6 +7569,7 @@ void Population::FindLostClas(){
 		}
 	assert(arr.size() + claMan->NumFreeClas() == claMan->NumClas());
 	}
+*/
 
 void Population::LogNewBestFromRemote(FLOAT_TYPE scorediff, int ind){
 #ifdef MPI_VERSION
