@@ -22,13 +22,10 @@
 #include "beagle.h"
 #endif
 
-//extern ClaManager claMan;
-//owned by each TreeNode
+#include "clamanager.h"
 #include "utility.h"
 #include "model.h"
 class TreeNode;
-
-#include "managedresource.h"
 
 struct ScoreSet{
 	MODEL_FLOAT lnL;
@@ -37,6 +34,8 @@ struct ScoreSet{
 	};
 
 #define GARLI_FINAL_SCALER_INDEX -9999999
+#define DONT_SEND_TRANSMATS
+
 
 
 class ClaOperation{
@@ -50,9 +49,7 @@ public:
 	int opDepLevel;
 public:
 	ClaOperation(): destClaIndex(-1), childClaIndex1(-1), childClaIndex2(-1), transMatIndex1(-1), transMatIndex2(-1), opDepLevel(-1){};	
-	ClaOperation(int d, int cla1, int cla2, int pmat1, int pmat2, int dLevel): destClaIndex(d), childClaIndex1(cla1), childClaIndex2(cla2), transMatIndex1(pmat1), transMatIndex2(pmat2), opDepLevel(dLevel){
-		int poo = 2;	
-		}
+	ClaOperation(int d, int cla1, int cla2, int pmat1, int pmat2, int dLevel) : destClaIndex(d), childClaIndex1(cla1), childClaIndex2(cla2), transMatIndex1(pmat1), transMatIndex2(pmat2), opDepLevel(dLevel) {};
 	ClaOperation(int d, const CondLikeArrayHolder *h): destClaIndex(d), childClaIndex1(h->HolderDep1()), childClaIndex2(h->HolderDep2()), transMatIndex1(h->TransMatDep1()), transMatIndex2(h->TransMatDep2()), opDepLevel(h->DepLevel()){};	
 	};
 
@@ -88,13 +85,14 @@ public:
 		transOp1 = t1;
 		transOp2 = t2;
 		}
-	bool operator <(const NodeOperation &rhs){
+	bool operator <(const NodeOperation &rhs) const{
 		return claOp.opDepLevel < rhs.claOp.opDepLevel;
 		}
 	};
 
 class ScoringOperation{
 	friend class CalculationManager;
+	friend class SubsetCalculationManager;
 	friend class BranchOperation;
 
 	//my functions don't write the final cla, but Beagle allows for specifying one
@@ -193,6 +191,7 @@ class TransMatHolder{
 
 	//these are the things that the holder must know to calculate valid transmats for itself
 	Model *myMod;
+	ModelPartition *myModPart;
 	MODEL_FLOAT edgeLen;
 
 	//will be NULL if dirty
@@ -201,10 +200,11 @@ class TransMatHolder{
 	TransMatHolder() : theMatSet(NULL), myMod(NULL), edgeLen(-1.0), numAssigned(0){};
 	~TransMatHolder() {
 		myMod = NULL;
+		myModPart = NULL;
 		theMatSet = NULL;
 		}
-	void Reset(){numAssigned = 0; theMatSet = NULL; myMod = NULL;}
-	
+	void Reset(){numAssigned = 0; theMatSet = NULL; myMod = NULL; myModPart = NULL;
+	}
 	MODEL_FLOAT ***GetPmatArray(){
 		assert(theMatSet);
 		assert(theMatSet->GetPmatArray()[0] && theMatSet->GetPmatArray()[0][0]);
@@ -224,9 +224,14 @@ class TransMatHolder{
 	const Model *GetConstModel() const{
 		return myMod;
 		}
+
+	const Model *GetConstModel(int modelIndex) const {
+		return myModPart->GetModel(modelIndex);
+	}
 	};
 
 class PmatManager{
+	friend class CalculationManager;
 	int nRates;
 	int nStates;
 	int nMats;
@@ -264,8 +269,6 @@ public:
 		}
 
 	~PmatManager(){
-		//transMatSetStack.clear();
-		//holderStack.clear();
 		if(allMatSets != NULL){
 			for(int i = 0;i < nMats;i++){
 				delete allMatSets[i];
@@ -291,6 +294,10 @@ public:
 		holders[index].myMod = mod;
 		}
 
+	void SetModelPartition(int index, ModelPartition *mod) {
+		holders[index].myModPart = mod;
+	}
+
 	void SetEdgelen(int index, FLOAT_TYPE e){
 		holders[index].edgeLen = e;
 		}
@@ -299,25 +306,52 @@ public:
 		return holders[index].edgeLen;
 		}
 
+	const FLOAT_TYPE GetScaledEdgelen(int index, int modelIndex) const {
+		return holders[index].edgeLen * holders[index].myModPart->SubsetRate(modelIndex);
+	}
+
 	void GetEigenSolution(int index, ModelEigenSolution &sol) const{
 		assert(holders[index].myMod);
 		holders[index].myMod->GetEigenSolution(sol);
 		}
+
+	const FLOAT_TYPE GetSubsetRate(int index, int modelIndex) const {
+		return holders[index].myModPart->SubsetRate(modelIndex);
+	}
+
+	void GetEigenSolution(int index, ModelEigenSolution &sol, int modelIndex) const {
+		assert(holders[index].myModPart);
+		//holders[index].myMod->GetEigenSolution(sol);
+		holders[index].myModPart->GetModel(modelIndex)->GetEigenSolution(sol);
+	}
 
 //this includes pinv, which my scheme doesn't treat as a rate class per se
 	void GetCategoryRatesForBeagle(int index, vector<FLOAT_TYPE> &r)const{
 		holders[index].myMod->GetRateMultsForBeagle(r);
 		}
 
+	//this includes pinv, which my scheme doesn't treat as a rate class per se
+	void GetCategoryRatesForBeagle(int index, vector<FLOAT_TYPE> &r, int modelIndex)const {
+		holders[index].myModPart->GetModel(modelIndex)->GetRateMultsForBeagle(r);
+	}
+
 //this includes pinv
 	void GetCategoryWeightsForBeagle(int index, vector<FLOAT_TYPE> &p) const {
 		holders[index].myMod->GetRateProbsForBeagle(p);
 		}
 
+	void GetCategoryWeightsForBeagle(int index, vector<FLOAT_TYPE> &p, int modelIndex) const {
+		holders[index].myModPart->GetModel(modelIndex)->GetRateProbsForBeagle(p);
+	}
+
 	//need to include pinv, which is a separate rate as far as beagle is concerned, but not for Gar
 	int NumRateCatsForBeagle(int index) const { 
 		return holders[index].myMod->NumRateCatsForBeagle();
 		}
+
+	int NumRateCatsForBeagle(int index, int modelIndex) const {
+		return holders[index].myModPart->GetModel(modelIndex)->NumRateCatsForBeagle();
+	}
 
 	MODEL_FLOAT ***GetPmatArray(int index){
 		assert(holders[index].numAssigned > 0);
@@ -380,6 +414,10 @@ public:
 	const Model *GetModelForTransMatHolder(int index)const{
 		return holders[index].GetConstModel();
 		}
+
+	const Model *GetModelForTransMatHolder(int index, int modelIndex)const {
+		return holders[index].GetConstModel(modelIndex);
+	}
 
 	Model *GetMutableModelForTransMatHolder(int index)const{
 		return holders[index].myMod;
@@ -518,7 +556,6 @@ public:
 
 class NodeClaManager{
 	static ClaManager *claMan;
-	static ClaManager2 *claMan2;
 	static PmatManager *pmatMan;
 
 public:
@@ -534,10 +571,6 @@ public:
 
 	static void SetClaManager(ClaManager *cMan) {
 		NodeClaManager::claMan = cMan;
-		}
-
-	static void SetClaManager2(ClaManager2 *cMan) {
-		NodeClaManager::claMan2 = cMan;
 		}
 
 	static void SetPmatManager(PmatManager *pMan) {
@@ -626,8 +659,12 @@ public:
 	//BMERGE HACK
 	void SetTransMat(ModelPartition *m, FLOAT_TYPE e) {
 		//outman.DebugMessage("up pdeps %d", transMatIndex);
-		int modnum = 0;
-		//BMERGE TODO 
+		pmatMan->SetModelPartition(transMatIndex, m);
+		pmatMan->SetEdgelen(transMatIndex, e);
+	}
+
+	void SetTransMat(ModelPartition* m, int modnum, FLOAT_TYPE e) {
+		//outman.DebugMessage("up pdeps %d", transMatIndex);
 		pmatMan->SetModel(transMatIndex, m->GetModel(modnum));
 		pmatMan->SetEdgelen(transMatIndex, e);
 	}
@@ -736,17 +773,6 @@ public:
 	};
 
 /*
-class NewBlockingOperationsSet{
-public:
-	list<NodeOperation> nodeOps;
-	list<BranchOperation> brOps;
-	~NewBlockingOperationsSet(){
-		nodeOps.clear();
-		brOps.clear();
-		}
-	};
-*/
-/*
 bool MyOpLessThan(const BlockingOperationsSet &lhs, const BlockingOperationsSet &rhs){
 //	int d1 = lhs.claOps.size() == 0 ? -1 : lhs.claOps.begin()->depLevel;
 //	int d2 = rhs.claOps.size() == 0 ? -1 : rhs.claOps.begin()->depLevel;
@@ -774,18 +800,126 @@ of CLA holders and pmat holders, and constructs the sets of operations to be cal
    operations by indecies to Beagle.
 */
 
+
+class SubsetCalculationManager {
+	int beagleInst;
+	int ambigTips;
+	int normalTips;
+	int partialsCount;
+	int compactCount;
+	int nstates;
+	int nchar;
+	int nrates;
+	int ntax;
+
+	SequenceData *subsetData;
+	ModelSpecification *subsetModSpec;
+	int modelIndex;
+
+	long beagle_instance_flags;
+
+	static ClaManager *claMan;
+	static PmatManager *pmatMan;
+
+	string ofprefix;
+
+
+	public:
+	BeagleInstanceDetails InitializeSubset(int nClas, int nHolders, int pref_flags, int req_flags, SequenceData *data, ModelSpecification *subsetModSpec, int modelInd, int beagleDeviceNum=-1);
+	void SendTipDataToBeagle();
+	void UpdateAllConditionals(list<BlockingOperationsSet> operationSetQueue, bool freeClas);
+	void PerformClaOperationBatch(const list<ClaOperation> &theOps);
+	void PerformTransMatOperationBatch(const list<TransMatOperation> &theOps);
+	void Finalize(){ beagleFinalizeInstance(beagleInst); }
+	void OutputBeagleSiteValues(ofstream &out, bool derivs) const;
+	void AccumulateRescalers(int destIndex, int childIndex1, int childIndex2);
+	//void PerformClaOperation(const ClaOperation *theOp);
+	ScoreSet PerformScoringOperation(const ScoringOperation *theOp);
+	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2);
+	int BeagleInstance() const{ return beagleInst; }
+	int ModelIndex() const { return modelIndex; }
+	int ScalerIndexForBeagle(int ind) const;
+	int PartialIndexForBeagle(int ind) const;
+	int NChar() { return nchar; }
+	int BeagleInst() { return beagleInst; }
+	void GetBeagleSiteLikelihoods(double* likes);
+	//simple report
+	void ParseInstanceDetails(const BeagleInstanceDetails *det);
+
+	static void SetClaManager(ClaManager *cMan) {
+		SubsetCalculationManager::claMan = cMan;
+	}
+
+	static void SetPmatManager(PmatManager *pMan) {
+		SubsetCalculationManager::pmatMan = pMan;
+	}
+
+	bool IsRescaling() { return (bool)(beagle_instance_flags & BEAGLE_FLAG_SCALERS_LOG); }
+	bool IsSinglePrecision() { return (bool)(beagle_instance_flags & BEAGLE_FLAG_PRECISION_SINGLE); }
+	bool IsGPU() { return (bool)(beagle_instance_flags & BEAGLE_FLAG_PROCESSOR_GPU); }
+
+	void SetOfprefix(string& prefix) {
+		ofprefix = prefix;
+	}
+
+	/*beagle doesn't know anything about pmat vs deriv mats in terms of storage.  So, I keep track of TransMatSets, which contain one of each
+these will be transformed into beagle indeces such that the pmat, d1 and d2 mats use three consecutive beagle mat indeces
+thus, for my TransMatSet 0, the beagle pmat index is 0, d1 index is 1, d2 is 2.  TransMatSet 1 is 3, 4, 5, etc. */
+	int PmatIndexForBeagle(int ind) {
+#ifdef PASS_PMAT_HOLDER_INDECES
+		return (ind * 3);
+#else
+		return pmatMan->GetPmatIndexForBeagle(ind);
+#endif
+	}
+	int D1MatIndexForBeagle(int ind) {
+#ifdef PASS_PMAT_HOLDER_INDECES
+		return (ind * 3) + 1;
+#else
+		return pmatMan->GetD1MatIndexForBeagle(ind);
+#endif
+	}
+	int D2MatIndexForBeagle(int ind) {
+#ifdef PASS_PMAT_HOLDER_INDECES
+		return (ind * 3) + 2;
+#else
+		return pmatMan->GetD2MatIndexForBeagle(ind);
+#endif
+	}
+
+	//As a hack, duplicating these in SubsetCalcMan and CalcMan to get all ported functions working
+
+	/*Called from UpdateAllConditionals, claims the destination clas for the current dep level.  Those
+clas then remain reserved as they are the deps of the next level, then they are unreserved either
+just before the call to CalcLikeAndDerives returns or as the dep pass continue, if mem is limited*/
+	void ReserveDestinationClas(BlockingOperationsSet &set);
+
+	/*Mark clas as recycleable after they are no longer directly needed.  The dep levels remain the same,
+	so lower dep level clas will still be reclaimed before higher ones*/
+	void UnreserveDependencyClas(const BlockingOperationsSet &set);
+
+	void QueueDependencyClasForFreeing(const BlockingOperationsSet &set);
+	void QueueDestinationClasForFreeing(const BlockingOperationsSet &set);
+
+	//interpret beagle error codes, output a message and bail if termOnBeagleError == true
+	void CheckBeagleReturnValue(int err, const char *funcName) const;
+};
+
 class CalculationManager{
 	//the claManager may eventually be owned by calcManager, but for now it can interact indirectly
 	//with the global manager, as everything did previously
-	static ClaManager *claMan;
+	//static ClaManager *claMan;
 	static PmatManager *pmatMan;
+#ifdef BEAGLEPART
+	static const DataPartition* dataPart;
+#else
 	static const SequenceData *data;
+#endif
+	BeagleResourceList* rList;
 	list<BlockingOperationsSet> operationSetQueue;
 	list<BlockingOperationsSet> freeableOpSets;
 	list<ScoringOperation> scoreOps;
 	
-//	list<NewBlockingOperationsSet> newOperationSetQueue;
-
 	map<long, string> flagToName;
 	map<string, long> nameToFlag;
 	vector<long> invalidFlags;
@@ -798,25 +932,38 @@ class CalculationManager{
 	long pref_flags;
 	long actual_flags;
 
+	static ClaManager *claMan;
+
 public:
 	bool useBeagle;
 	bool termOnBeagleError;
 	int beagleDeviceNum;
+	vector<int> BeagleGPUDeviceNumbers;
+	int nextGPUIndex;
 	//bool rescaleBeagle;
 //	bool singlePrecBeagle;
 //	bool gpuBeagle;
+#ifdef BEAGLEPART
+	//vector<int> beagleInstances;
+	vector<SubsetCalculationManager*>  subsetManagers;
+#else
 	int beagleInst;
+#endif
+
 	string ofprefix;
 
 	CalculationManager(){
 		useBeagle = false; 
 //		gpuBeagle = false;
+#ifndef BEAGLEPART
 		beagleInst = -1; 
+#endif
 		termOnBeagleError = true;
 		//singlePrecBeagle = false;
 		//rescaleBeagle = false;
 		FillBeagleOptionsMaps();
 		req_flags = pref_flags = actual_flags = 0;
+		FindBeagleResources();
 		}
 
 	void FillBeagleOptionsMaps();
@@ -848,6 +995,14 @@ public:
 	long ParseBeagleFlagString(string flagsString, long flagMask = 0) const;
 	void InterpretBeagleResourceFlags(long flags, string &list, long flagMask = 0) const;
 	void OutputBeagleResources() const;
+	void FindBeagleResources() {
+		rList = beagleGetResourceList();
+		for (int i = 0; i < rList->length; i++) {
+			if (rList->list[i].supportFlags & BEAGLE_FLAG_PROCESSOR_GPU)
+				BeagleGPUDeviceNumbers.push_back(i);
+		}
+		nextGPUIndex = 0;
+	}
 
 	//for now assuming that rescaling will always be available - this will need to be
 	//called BEFORE initializing an instance because how the initialization is called depends on it
@@ -857,10 +1012,22 @@ public:
 	//this is also only known AFTER initialization
 	bool IsGPU() {return (bool) (actual_flags & BEAGLE_FLAG_PROCESSOR_GPU);}
 
-	void InitializeBeagle(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
+	
+	void InitializeBeagleInstance(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
+	void InitializeBeagleInstance(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates, SequenceData *data);
+	void AddSubsetInstance(int nClas, int nHolders, SequenceData *subsetData, ModelSpecification *subsetModSpec, int modelIndex);
 
 	void Finalize(){
 #ifdef USE_BEAGLE
+#ifdef BEAGLEPART
+		//for(vector<int>::iterator inst = beagleInstances.begin(); inst != beagleInstances.end(); inst++)
+		//	beagleFinalizeInstance(*inst);
+		for (vector<SubsetCalculationManager *>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
+		//beagleFinalizeInstance((*subman).beagleInst);
+		(*subman)->Finalize();
+		delete *subman;
+		}
+#else
 		if(beagleInst > 0)
 			beagleFinalizeInstance(beagleInst);
 #endif
@@ -874,9 +1041,15 @@ public:
 		CalculationManager::pmatMan = pMan;
 		}
 
+#ifdef BEAGLEPART
+	static void SetData(DataPartition *dat){
+		CalculationManager::dataPart = dat;
+		}
+#else
 	static void SetData(SequenceData *dat){
 		CalculationManager::data = dat;
 		}
+#endif
 	
 	void SetOfprefix(string &prefix){
 		ofprefix = prefix;
@@ -929,11 +1102,13 @@ private:
 	void ResetDepLevelsAndReservations();
 
 	//Calculate a whole set of cla operations at once - each combines two clas and two transmats into one dest cla
-	void PerformClaOperationBatch(const list<ClaOperation> &theOps);
+	void PerformClaOperationBatch(int beagleInst, const list<ClaOperation>& theOps);
+	//void PerformClaOperationBatch(const list<ClaOperation> &theOps);
 
 	//Calculate a whole set of transmat operations at once. May include derivative matrix calcs too.
 	//Acutal calculation of the matrices may happen in Garli and then be sent to beagle
 	void PerformTransMatOperationBatch(const list<TransMatOperation> &theOps);
+	void PerformTransMatOperationBatch(int beagleInst, const list<TransMatOperation> &theOps);
 	//call back to the underlying models to calculate the pmats, then send them to beagle
 	void SendTransMatsToBeagle(const list<TransMatOperation> &theOps);
 
@@ -946,17 +1121,8 @@ private:
 	//calculate a pmat, or a pmat, d1mat and d2mat
 	void PerformTransMatOperation(const TransMatOperation *theOp);
 	
-	//these are just duplicates of the functions originally in Tree.  They are not used with beagle
-	void CalcFullClaInternalInternal(CondLikeArray *destCLA, const CondLikeArray *LCLA, const CondLikeArray *RCLA,  MODEL_FLOAT ***Lpr,  MODEL_FLOAT ***Rpr, const Model *mod);
-	void CalcFullCLATerminalTerminal(CondLikeArray *destCLA, const char *Ldata, const char *Rdata,  MODEL_FLOAT ***Lpr,  MODEL_FLOAT ***Rpr, const Model *mod);
-	void CalcFullCLAInternalTerminal(CondLikeArray *destCLA, const CondLikeArray *LCLA, char *data2,  MODEL_FLOAT ***pr1,  MODEL_FLOAT ***pr2, const Model *mod, const unsigned *ambigMap);
-	FLOAT_TYPE GetScorePartialTerminalRateHet(const CondLikeArray *partialCLA,  MODEL_FLOAT ***prmat, const char *Ldata, const Model *mod);
-	FLOAT_TYPE GetScorePartialInternalRateHet(const CondLikeArray *partialCLA, const CondLikeArray *childCLA,  MODEL_FLOAT ***prmat, const Model *mod);
-
-#ifdef USE_BEAGLE
-	//BEAGLE SPECIFIC FUNCS
-
 	void SendTipDataToBeagle();
+	void SendTipDataToBeagle(int beagleInstNum, SequenceData *data);
 
 	//interpret beagle error codes, output a message and bail if termOnBeagleError == true
 	void CheckBeagleReturnValue(int err, const char *funcName) const;
@@ -1007,13 +1173,14 @@ private:
 	//return beagle partial index (might actually represent tip)
 	int PartialIndexForBeagle(int ind) const{
 
-//BEAGLEMERGE DEBUG
-//#define PASS_HOLDER_INDECES
-
 #ifdef PASS_HOLDER_INDECES
 		return (ind < 0 ? ((-ind) - 1) : ind + data->NTax());
 #else
+#ifndef BEAGLEPART
 		return (ind < 0 ? ((-ind) - 1) : claMan->GetClaIndexForBeagle(ind) + data->NTax());
+#else
+		return (ind < 0 ? ((-ind) - 1) : claMan->GetClaIndexForBeagle(ind) + dataPart->NTax());
+#endif
 #endif
 		}
 	/*beagle rescaling indeces are in the same order as mine, and they match my partial indeces*/
@@ -1074,12 +1241,6 @@ private:
 				claMan->GetClaFillIfNecessary(num)->arr),
 			"beagleSetPartials");
 		*/
-		CheckBeagleReturnValue(
-			beagleSetPartials(
-				beagleInst,
-				PartialIndexForBeagle(num),
-				claMan->GetClaFillIfNecessary(num)->arr), 
-			"beagleSetPartials");
 		}
 
 	void OutputBeagleTransMat(int index);
@@ -1087,6 +1248,7 @@ private:
 	void OutputOperationsSummary() const;
 	//Sum site likes/derivs. Beagle now sums on its own, so no longer necessary except for debugging
 	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const;
-#endif 
 	};
 #endif
+
+#endif //#ifndef CALCULATION_MANAGER
