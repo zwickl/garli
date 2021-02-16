@@ -120,6 +120,9 @@ do
     fi
 done
 
+#don't do output or checkpoint tests yet
+exit
+
 echo "**************************"
 echo "Running output tests ..."
 echo "**************************"
