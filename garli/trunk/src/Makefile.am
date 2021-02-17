@@ -13,6 +13,7 @@ noinst_HEADERS = \
 	condlike.h \
 	configoptions.h \
 	configreader.h \
+	calculationmanager.h \
 	datamatr.h \
 	defs.h \
 	errorexception.h \
@@ -43,6 +44,7 @@ Garli_SOURCES = \
 	condlike.cpp \
 	configoptions.cpp \
 	configreader.cpp \
+	calculationmanager.cpp \
 	datamatr.cpp \
 	funcs.cpp \
 	garlimain.cpp \
@@ -55,6 +57,7 @@ Garli_SOURCES = \
 	rng.cpp \
 	sequencedata.cpp \
 	set.cpp \
+	subsetcalculationmanager.cpp \
 	translatetable.cpp \
 	tree.cpp \
 	treenode.cpp \
