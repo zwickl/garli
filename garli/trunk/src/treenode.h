@@ -28,6 +28,9 @@ using namespace std;
 #include "condlike.h"
 #include "clamanager.h"
 #include "bipartition.h"
+#ifdef USE_BEAGLE
+#include "calculationmanager.h"
+#endif
 
 class NucleotideData;
 class MFILE;
@@ -36,6 +39,9 @@ class TreeNode{
 	public:
 		TreeNode* left,* right,* next,* prev,* anc;
  		int nodeNum;
+#ifdef USE_BEAGLE
+		NodeClaManager myMan;
+#endif
  		int claIndexDown;
  		int claIndexUL;
  		int claIndexUR;
