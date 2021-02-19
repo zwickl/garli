@@ -4018,9 +4018,10 @@ int Tree::Score(int rootNodeNum /*=0*/){
 			scoreOK=true;
 		
 			if(rootWithDummy){
+#ifdef USE_BEAGLE
 					//BMERGE - think this is only for ogap
 					assert(0);
-
+#endif
 				assert(rootNodeNum == 0);
 				ConditionalLikelihoodRateHet( ROOT, dummyRoot->anc);
 				}
@@ -5366,13 +5367,13 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 					out << "Entirely uninformative character (gaps,N's or ?'s)\n";
 				}
 			
-			//return the cla that we used temporarily
-			claMan->ClearTempReservation(wholeTreeIndex);
-			claMan->DecrementHolder(wholeTreeIndex);
 			delete states;
 			}
-			}
+		//return the cla that we used temporarily
+		claMan->ClearTempReservation(wholeTreeIndex);
+		claMan->DecrementHolder(wholeTreeIndex);
 		}
+	}
 
 void Tree::ClaReport(ofstream &cla){
 	int totDown=0;
