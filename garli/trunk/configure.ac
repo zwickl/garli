@@ -143,6 +143,7 @@ if test "$enable_beagle" = yes; then
            *** NOTE: compiling version using hmsbeagle calculation library
            ])
 fi
+AM_CONDITIONAL([BEAGLE], [test "x$enable_beagle" = xyes] )
 
 # single precision version (still being tested)
 AC_ARG_ENABLE(single-prec,

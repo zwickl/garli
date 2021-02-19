@@ -38,13 +38,14 @@ noinst_HEADERS = \
 	treenode.h \
 	utility.h 
 
+if BEAGLE 
 Garli_SOURCES = \
 	adaptation.cpp \
 	bipartition.cpp \
+	calculationmanager.cpp \
 	condlike.cpp \
 	configoptions.cpp \
 	configreader.cpp \
-	calculationmanager.cpp \
 	datamatr.cpp \
 	funcs.cpp \
 	garlimain.cpp \
@@ -62,7 +63,31 @@ Garli_SOURCES = \
 	tree.cpp \
 	treenode.cpp \
 	mpitrick.cpp
+else
 
+Garli_SOURCES = \
+	adaptation.cpp \
+	bipartition.cpp \
+	condlike.cpp \
+	configoptions.cpp \
+	configreader.cpp \
+	datamatr.cpp \
+	funcs.cpp \
+	garlimain.cpp \
+	garlireader.cpp \
+	individual.cpp \
+	linalg.cpp \
+	model.cpp \
+	optimization.cpp \
+	population.cpp \
+	rng.cpp \
+	sequencedata.cpp \
+	set.cpp \
+	translatetable.cpp \
+	tree.cpp \
+	treenode.cpp \
+	mpitrick.cpp
+endif
 
 Garli_LDADD =  $(LDADD) @GARLI_LIBS@
 
