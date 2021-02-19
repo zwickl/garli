@@ -4895,6 +4895,23 @@ double ModelPartition::CalcRequiredCLAsizeKB(const DataPartition *dat){
 	return size2;
 	}
 
+//This is the size in KB not elements. KB is used because the number of bytes can be larger than UNSIGNED_MAX on very large datasets
+//in the beagle case, the invariable sites rate class has space allocated in the CLAs, so account for that
+double ModelPartition::CalcRequiredSubsetCLAsizeKB(int subsetNum, const DataPartition *dat, bool beagle /*=false*/) {
+	double size = 0;
+	double KB = 1024;
+	//for (vector<ClaSpecifier>::iterator specs = claSpecs.begin(); specs != claSpecs.end(); specs++) {
+	ClaSpecifier spec = claSpecs[subsetNum];
+	const Model *thisMod = GetModel(spec.modelIndex);
+	int nrates = thisMod->NRateCats();
+	//the beagle rescalers are floats, core garli uses ints
+	int scalerSize = (beagle ? sizeof(FLOAT_TYPE) : sizeof(int));
+	if(beagle) 
+		nrates += (thisMod->includeInvariantSites ? 1 : 0);
+	size += (dat->GetSubset(spec.dataIndex)->NChar() / KB) * (thisMod->NStates() * nrates * sizeof(FLOAT_TYPE) + scalerSize);
+	return size;
+}
+
 //this is the size in BYTES not elements
 unsigned ModelPartition::CalcRequiredCLAsize(const DataPartition *dat){
 	unsigned size = 0;
