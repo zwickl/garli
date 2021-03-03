@@ -910,11 +910,7 @@ class CalculationManager{
 	//with the global manager, as everything did previously
 	//static ClaManager *claMan;
 	static PmatManager *pmatMan;
-#ifdef BEAGLEPART
 	static const DataPartition* dataPart;
-#else
-	static const SequenceData *data;
-#endif
 	BeagleResourceList* rList;
 	list<BlockingOperationsSet> operationSetQueue;
 	list<BlockingOperationsSet> freeableOpSets;
@@ -943,21 +939,13 @@ public:
 	//bool rescaleBeagle;
 //	bool singlePrecBeagle;
 //	bool gpuBeagle;
-#ifdef BEAGLEPART
-	//vector<int> beagleInstances;
 	vector<SubsetCalculationManager*>  subsetManagers;
-#else
-	int beagleInst;
-#endif
 
 	string ofprefix;
 
 	CalculationManager(){
 		useBeagle = false; 
 //		gpuBeagle = false;
-#ifndef BEAGLEPART
-		beagleInst = -1; 
-#endif
 		termOnBeagleError = true;
 		//singlePrecBeagle = false;
 		//rescaleBeagle = false;
@@ -1019,7 +1007,6 @@ public:
 
 	void Finalize(){
 #ifdef USE_BEAGLE
-#ifdef BEAGLEPART
 		//for(vector<int>::iterator inst = beagleInstances.begin(); inst != beagleInstances.end(); inst++)
 		//	beagleFinalizeInstance(*inst);
 		for (vector<SubsetCalculationManager *>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
@@ -1027,11 +1014,7 @@ public:
 		(*subman)->Finalize();
 		delete *subman;
 		}
-#else
-		if(beagleInst > 0)
-			beagleFinalizeInstance(beagleInst);
-#endif
-		}
+	}
 
 	static void SetClaManager(ClaManager *cMan) {
 		CalculationManager::claMan = cMan;
@@ -1041,15 +1024,9 @@ public:
 		CalculationManager::pmatMan = pMan;
 		}
 
-#ifdef BEAGLEPART
 	static void SetData(DataPartition *dat){
 		CalculationManager::dataPart = dat;
 		}
-#else
-	static void SetData(SequenceData *dat){
-		CalculationManager::data = dat;
-		}
-#endif
 	
 	void SetOfprefix(string &prefix){
 		ofprefix = prefix;
@@ -1176,11 +1153,7 @@ private:
 #ifdef PASS_HOLDER_INDECES
 		return (ind < 0 ? ((-ind) - 1) : ind + data->NTax());
 #else
-#ifndef BEAGLEPART
-		return (ind < 0 ? ((-ind) - 1) : claMan->GetClaIndexForBeagle(ind) + data->NTax());
-#else
 		return (ind < 0 ? ((-ind) - 1) : claMan->GetClaIndexForBeagle(ind) + dataPart->NTax());
-#endif
 #endif
 		}
 	/*beagle rescaling indeces are in the same order as mine, and they match my partial indeces*/

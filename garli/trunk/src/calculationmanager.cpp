@@ -25,11 +25,9 @@
 
 ClaManager *CalculationManager::claMan = NULL;
 PmatManager *CalculationManager::pmatMan = NULL;
-#ifdef BEAGLEPART
+
 const DataPartition *CalculationManager::dataPart = NULL;
-#else
-const SequenceData *CalculationManager::data = NULL;
-#endif
+
 
 ClaManager *NodeClaManager::claMan = NULL;
 PmatManager *NodeClaManager::pmatMan = NULL;
