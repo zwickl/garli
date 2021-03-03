@@ -604,6 +604,8 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
 		SequenceData *subsetData = dataPart->GetSubset(subsetSpec->dataIndex);
 		ModelSpecification *subsetModSpec = modSpecSet.GetModSpec(subsetSpec->modelIndex);
+		if (subsetModSpec->IsMkTypeModel() || subsetModSpec->IsOrientedGap())
+			throw ErrorException("Invalid datatype!\nSorry, only sequence datatypes (DNA, amino acid and codon) are supported by the BEAGLE-enabled version of GARLI");
 
 		//outman.UserMessage("\nfor this partition subset, Garli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
 		double subsetMemUsage = memUsageMult * (FLOAT_TYPE)numClas * (FLOAT_TYPE)subsetClaSizes[subsetSpec->claIndex] / (FLOAT_TYPE)KB;
