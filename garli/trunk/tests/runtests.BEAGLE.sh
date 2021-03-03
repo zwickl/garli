@@ -30,42 +30,48 @@ else
 fi
 
 function shouldfail(){
-	#the return value obtained via $? after calling this func will be 1 if "mk" or gap models are being used
-	#as inferred from the config filename
-	for PATT in "mk" "^g."
+	#the return value obtained via $? after calling this func will be 1 if "mk" or gap models 
+    #are being used, as inferred from the config filename
+    #the grep call returns zero if the PATT regex matches the string
+	for PATT in "mk" "\/g[.]"
 	do
-		grep -q "$1" <<< $PATT
-		if [ $? ]; then
-			return $?
+		echo $1 | grep -q "$PATT"
+		if [ $? -eq 0 ]; then
+			return 1
 		fi
 	done
-	
+    return 0
 }
-
 
 echo "**************************"
 echo "Running internal tests ..."
 echo "**************************"
 
 if [ -d $TESTS_DIR/internal ];then
-	#for i in $TESTS_DIR/internal/*.conf
-	for i in $TESTS_DIR/internal/*mk*.conf
+	for i in $TESTS_DIR/internal/*.conf
 	do
     		base=${i/*\/}
     		base=${base/.conf/}
     		echo "Running internal test $i"
 		echo "Running internal test $i" >&2
 
+        shouldfail $i
+        SHOULDFAIL=$?
 	 	$GARLI_BIN -t $i $GARLI_ARGS
 		if [ ! $? -eq 0 ];then
-			shouldfail $i
-			if [ $? ]
+			if [ $SHOULDFAIL -eq 1 ]
 			then
 				echo "error expected"
 				continue
 			elif [[ ! -n "$NO_EXIT_ON_ERR" ]];then
 				exit 1
 			fi
+        else
+            if [ $SHOULDFAIL -eq 1 ]
+            then
+                echo "ERROR, config should have failed to run"
+                exit 1
+            fi
 		fi
 	done
 else
@@ -85,16 +91,25 @@ if [ -d $TESTS_DIR/scoring ];then
 	
 			echo "Running scoring test $i"
 			echo "Running scoring test $i" >&2
+            shouldfail $i
+            SHOULDFAIL=$?
 			$GARLI_BIN $i $GARLI_ARGS
 			if [ ! $? -eq 0 ];then
-				shouldfail $i
-				if [ $? ]
+                echo RETURNED ERROR
+                echo shouldfail = $SHOULDFAIL
+                if [ $SHOULDFAIL -eq 1 ]
 				then
 					echo "OK, ERROR EXPECTED"
 					continue
 				elif [[ ! -n "$NO_EXIT_ON_ERR" ]];then
 					exit 1
 				fi
+            else
+                if [ $SHOULDFAIL -eq 1 ]
+                then
+                    echo "ERROR, config should have failed to run"
+                    exit 1
+                fi
 			fi
 	
 			#figure out what precision we can expect
@@ -153,18 +168,25 @@ if [ -d $TESTS_DIR/const ];then
 		base=${i/*\/}
 	        base=${base/.conf/}
 	        echo "Running constraint test $base"
-		echo "Running constraint test $base" >&2
+            echo "Running constraint test $base" >&2
 
+            shouldfail $i
+            SHOULDFAIL=$?
 	        $GARLI_BIN $i $GARLI_ARGS
 		if [ ! $? -eq 0 ];then
-			shouldfail $i
-			if [ $? ]
+            if [ $SHOULDFAIL -eq 1 ]
 			then
 				echo "OK, ERROR EXPECTED"
 				continue
 			elif [[ ! -n "$NO_EXIT_ON_ERR" ]];then
 				exit 1
 			fi
+        else
+            if [ $SHOULDFAIL -eq 1 ]
+            then
+                echo "ERROR, config should have failed to run"
+                exit 1
+            fi
 		fi
 
 		#NEXUSvalidator gives a warning every time it reads a tree file
@@ -198,16 +220,24 @@ if [ -d $TESTS_DIR/output ];then
 		echo "Running output test $base"
 		echo "Running output test $base" >&2
 
+        shouldfail $i
+        SHOULDFAIL=$?
 		$GARLI_BIN $i $GARLI_ARGS
 		if [ ! $? -eq 0 ];then
-			shouldfail $i
-			if [ $? ]
+            if [ $SHOULDFAIL -eq 1 ]
 			then
 				echo "OK, ERROR EXPECTED"
 				continue
 			elif [[ ! -n "$NO_EXIT_ON_ERR" ]];then
 				exit 1
 			fi
+
+        else
+            if [ $SHOULDFAIL -eq 1 ]
+            then
+                echo "ERROR, config should have failed to run"
+                exit 1
+            fi
 		fi
 
 
@@ -250,28 +280,42 @@ if [ -d $TESTS_DIR/check ];then
 		echo "Running checkpoint test $i"
 		echo "Running checkpoint test $i" >&2
 		
+        shouldfail $i
+        SHOULDFAIL=$?
 		$GARLI_BIN $i $GARLI_ARGS
 		if [ ! $? -eq 0 ];then
-			shouldfail $i
-			if [ $? ]
+            if [ $SHOULDFAIL -eq 1 ]
 			then
 				echo "OK, ERROR EXPECTED"
 				continue
 			elif [[ ! -n "$NO_EXIT_ON_ERR" ]];then
 				exit 1
 			fi
+        else
+            if [ $SHOULDFAIL -eq 1 ]
+            then
+                echo "ERROR, config should have failed to run"
+                exit 1
+            fi
 		fi
 
 
+        shouldfail $i
+        SHOULDFAIL=$?
 		$GARLI_BIN $TESTS_DIR/restart/$base.conf $GARLI_ARGS
 		if [ ! $? -eq 0 ];then
-			shouldfail $i
-			if [ $? ]
+            if [ $SHOULDFAIL -eq 1 ]
 			then
 				echo "OK, ERROR EXPECTED"
 				continue
 			elif [[ ! -n "$NO_EXIT_ON_ERR" ]];then
 				exit 1
+            fi
+        else
+            if [ $SHOULDFAIL -eq 1 ]
+            then
+                echo "ERROR, config should have failed to run"
+                exit 1
             fi
 		fi
 
