@@ -272,8 +272,8 @@ if [ -d $TESTS_DIR/check ];then
 				continue
 			elif [[ ! -n "$NO_EXIT_ON_ERR" ]];then
 				exit 1
+            fi
 		fi
-
 
 		#NEXUSvalidator gives a warning every time it reads a tree file
 		#without a taxa block.  So, shut it up initially and then if it
