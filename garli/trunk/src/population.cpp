@@ -4770,6 +4770,7 @@ void Population::AppendTreeToTreeLog(int mutType, int indNum /*=-1*/){
 	const Individual *theInd;
 	if(Tree::outgroup != NULL || conf->collapseBranches){
 		tempInd.DuplicateIndivWithoutCLAs(ind);
+		tempInd.treeStruct->noCalcs = true;
 		if(Tree::outgroup != NULL)
 			OutgroupRoot(&tempInd, -1);
 /*		//Can't decide if these should be collapsed or not here.  Thinking no.
