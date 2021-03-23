@@ -4029,7 +4029,6 @@ int Tree::Score(int rootNodeNum /*=0*/){
 #ifdef NEW_MANAGEMENT
 					//DEBUG
 					//UpdateNodeClaManagers();
-
 					//BMERGE - this is failing currently - check
 					//CheckClaIndeces();
 					//DEBUG - this shouldn't need to happen so often, but is playing it safe
@@ -5046,6 +5045,11 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 
 	
 void Tree::MakeNodeDirty(TreeNode *nd){
+#ifdef USE_BEAGLE
+	NewMakeNodeDirty(nd);
+	return;
+#endif
+
 	if(nd->claIndexDown != -1)
 		nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
 	if(nd->claIndexUL != -1)
@@ -5053,6 +5057,14 @@ void Tree::MakeNodeDirty(TreeNode *nd){
 	if(nd->claIndexUR != -1)
 		nd->claIndexUR=claMan->SetDirty(nd->claIndexUR);
 	}
+
+void Tree::NewMakeNodeDirty(TreeNode* nd) {
+#ifdef USE_BEAGLE
+	nd->myMan.SetDirtyAll();
+#else
+	assert(0);
+#endif
+}
 	
 void Tree::RemoveTempClaReservations(){
 	if(memLevel > 1){
@@ -5215,6 +5227,75 @@ void Tree::OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int mod
 		OutputNthClaAcrossTree(deb, nd->next, site, modIndex);
 	}
 
+void Tree::OutpuClaIndecesAcrossTree(ofstream& deb, TreeNode* nd) {
+
+#ifdef USE_BEAGLE
+	int down = nd->myMan.downHolderIndex;
+	int UL = nd->myMan.ULHolderIndex;
+	int UR = nd->myMan.URHolderIndex;
+#else
+	int down = nd->claIndexDown;
+	int UL = nd->claIndexUL;
+	int UR = nd->claIndexUR;
+#endif
+	if (nd->IsInternal()) {
+		const CondLikeArrayHolder *hold = claMan->GetHolder(down);
+		deb << "\t" << nd->nodeNum << "\tdown\t" << down << "\t" << hold->numAssigned << "\t" << hold->IsDirty() << "\t" << hold->reserved << "\t" << hold->tempReserved << endl;
+		/*
+		if (claMan->IsDirty(nd->claIndexDown) == false) {
+			deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\t";
+			const CondLikeArray* cla = claMan->GetClaSet(nd->claIndexDown)->theSets[modIndex];
+			for (int i = 0; i < nstates * rateCats; i++)
+				deb << cla->arr[index + i] << "\t";
+			deb << cla->underflow_mult[site];
+			deb << "\n";
+		}
+		else if (outputDirtyClas) {
+			deb << nd->nodeNum << "\t0\t" << nd->claIndexDown << "\n";
+		}
+		*/
+	}
+	if (nd->IsInternal()) {
+		const CondLikeArrayHolder* hold = claMan->GetHolder(UL);
+		deb << "\t" << nd->nodeNum << "\tUL\t" << UL << "\t" << hold->numAssigned << "\t" << hold->IsDirty() << "\t" << hold->reserved << "\t" << hold->tempReserved << endl;
+
+		/*
+		if (claMan->IsDirty(nd->claIndexUL) == false) {
+			deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\t";
+			const CondLikeArray* cla = claMan->GetClaSet(nd->claIndexUL)->theSets[modIndex];
+			for (int i = 0; i < nstates * rateCats; i++)
+				deb << cla->arr[index + i] << "\t";
+			deb << cla->underflow_mult[site];
+			deb << "\n";
+		}
+		else if (outputDirtyClas) {
+			deb << nd->nodeNum << "\t1\t" << nd->claIndexUL << "\n";
+		}
+		*/
+	}
+	if (nd->IsInternal()) {
+		const CondLikeArrayHolder* hold = claMan->GetHolder(UR);
+		deb << "\t" << nd->nodeNum << "\tUR\t" << UR << "\t" << hold->numAssigned << "\t" << hold->IsDirty() << "\t" << hold->reserved << "\t" << hold->tempReserved << endl;
+		/*
+		if (claMan->IsDirty(nd->claIndexUR) == false) {
+			deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\t";
+			const CondLikeArray* cla = claMan->GetClaSet(nd->claIndexUR)->theSets[modIndex];
+			for (int i = 0; i < nstates * rateCats; i++)
+				deb << cla->arr[index + i] << "\t";
+			deb << cla->underflow_mult[site];
+			deb << "\n";
+		}
+		else if (outputDirtyClas) {
+			deb << nd->nodeNum << "\t2\t" << nd->claIndexUR << "\n";
+		}
+		*/
+	}
+	if (nd->IsInternal())
+		OutpuClaIndecesAcrossTree(deb, nd->left);
+	if (nd->next != NULL)
+		OutpuClaIndecesAcrossTree(deb, nd->next);
+}
+
 void Tree::CountNumReservedClas(int &clean, int &tempRes, int&res){
 	clean=0;
 	tempRes=0;
@@ -5374,29 +5455,30 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 		claMan->DecrementHolder(wholeTreeIndex);
 		}
 	}
-
+/*
 void Tree::ClaReport(ofstream &cla){
 	int totDown=0;
 	int totUL=0;
 	int totUR=0;
-	
-	cla << "root\t" << claMan->GetReclaimLevel(root->claIndexDown) << "\t" << claMan->GetNumAssigned(root->claIndexDown)<< "\t" << claMan->GetClaNumber(root->claIndexDown);
+
+	cla << "root\t" << claMan->GetReclaimLevel(root->claIndexDown) << "\t" << claMan->GetNumAssigned(root->claIndexDown) << "\t" << claMan->GetClaNumber(root->claIndexDown);
 	cla << "\n\t" << claMan->GetReclaimLevel(root->claIndexUL) << "\t" << claMan->GetNumAssigned(root->claIndexUL) << "\t" << claMan->GetClaNumber(root->claIndexUL);
-	cla << "\n\t" << claMan->GetReclaimLevel(root->claIndexUR)  << "\t" << claMan->GetNumAssigned(root->claIndexUR)  << "\t" << claMan->GetClaNumber(root->claIndexUR) << "\n";
-//	cla << "\t" << claMan->GetNumAssigned(root->claIndexDown) << "\t" << claMan->GetNumAssigned(root->claIndexUL) << "\t" << claMan->GetNumAssigned(root->claIndexUR)  << "\n";
-	for(int i=numTipsTotal+1;i<numNodesTotal;i++){
-		TreeNode *n=allNodes[i];
-	cla << i << "\t" << claMan->GetReclaimLevel(n->claIndexDown) << "\t" << claMan->GetNumAssigned(n->claIndexDown) << "\t" << claMan->GetClaNumber(n->claIndexDown);
-	cla << "\n\t" << claMan->GetReclaimLevel(n->claIndexUL) << "\t" << claMan->GetNumAssigned(n->claIndexUL) << "\t" << claMan->GetClaNumber(n->claIndexUL);
-	cla << "\n\t" << claMan->GetReclaimLevel(n->claIndexUR)  << "\t" << claMan->GetNumAssigned(n->claIndexUR)  << "\t" << claMan->GetClaNumber(n->claIndexUR) << "\n";
+	cla << "\n\t" << claMan->GetReclaimLevel(root->claIndexUR) << "\t" << claMan->GetNumAssigned(root->claIndexUR) << "\t" << claMan->GetClaNumber(root->claIndexUR) << "\n";
+	//	cla << "\t" << claMan->GetNumAssigned(root->claIndexDown) << "\t" << claMan->GetNumAssigned(root->claIndexUL) << "\t" << claMan->GetNumAssigned(root->claIndexUR)  << "\n";
+	for (int i = numTipsTotal + 1; i < numNodesTotal; i++) {
+		TreeNode* n = allNodes[i];
+		cla << i << "\t" << claMan->GetReclaimLevel(n->claIndexDown) << "\t" << claMan->GetNumAssigned(n->claIndexDown) << "\t" << claMan->GetClaNumber(n->claIndexDown);
+		cla << "\n\t" << claMan->GetReclaimLevel(n->claIndexUL) << "\t" << claMan->GetNumAssigned(n->claIndexUL) << "\t" << claMan->GetClaNumber(n->claIndexUL);
+		cla << "\n\t" << claMan->GetReclaimLevel(n->claIndexUR) << "\t" << claMan->GetNumAssigned(n->claIndexUR) << "\t" << claMan->GetClaNumber(n->claIndexUR) << "\n";
 		totDown += claMan->GetReclaimLevel(n->claIndexDown);
 		totUL += claMan->GetReclaimLevel(n->claIndexUL);
 		totUR += claMan->GetReclaimLevel(n->claIndexUR);
-		}
+	}
 	cla << "tots\t" << totDown << "\t" << totUL << "\t" << totUR << endl;
+
 //	cla.close();
 	}
-	
+*/
 #ifdef USE_BEAGLE
 void Tree::NodeManagerClaReport() {
 	for (int n = 0; n < numNodesTotal; n++) {
