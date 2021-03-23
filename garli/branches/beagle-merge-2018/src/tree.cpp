@@ -5045,6 +5045,11 @@ void Tree::SwapNodeDataForReroot(TreeNode *nroot){
 
 	
 void Tree::MakeNodeDirty(TreeNode *nd){
+#ifdef USE_BEAGLE
+	NewMakeNodeDirty(nd);
+	return;
+#endif
+
 	if(nd->claIndexDown != -1)
 		nd->claIndexDown=claMan->SetDirty(nd->claIndexDown);
 	if(nd->claIndexUL != -1)
@@ -5052,6 +5057,14 @@ void Tree::MakeNodeDirty(TreeNode *nd){
 	if(nd->claIndexUR != -1)
 		nd->claIndexUR=claMan->SetDirty(nd->claIndexUR);
 	}
+	
+void Tree::NewMakeNodeDirty(TreeNode* nd) {
+#ifdef USE_BEAGLE
+	nd->myMan.SetDirtyAll();
+#else
+	assert(0);
+#endif
+}
 	
 void Tree::RemoveTempClaReservations(){
 	if(memLevel > 1){
@@ -5372,8 +5385,8 @@ void Tree::RecursivelyCalculateInternalStateProbs(TreeNode *nd, ofstream &out){
 			delete states;
 			}
 			}
-		}
-
+			}
+/*
 void Tree::ClaReport(ofstream &cla){
 	int totDown=0;
 	int totUL=0;
@@ -5395,7 +5408,7 @@ void Tree::ClaReport(ofstream &cla){
 	cla << "tots\t" << totDown << "\t" << totUL << "\t" << totUR << endl;
 //	cla.close();
 	}
-
+*/
 #ifdef USE_BEAGLE
 void Tree::NodeManagerClaReport() {
 	for (int n = 0; n < numNodesTotal; n++) {
