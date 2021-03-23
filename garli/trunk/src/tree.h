@@ -352,6 +352,7 @@ class Tree{
 		CondLikeArraySet *GetClaSetUpRight(TreeNode *nd, bool calc = true);
 		void OutputValidClaIndeces();
 		void OutputNthClaAcrossTree(ofstream &deb, TreeNode *nd, int site, int modIndex);
+		void OutpuClaIndecesAcrossTree(ofstream& deb, TreeNode* nd);
 		void ClaReport(ofstream &cla);
 		void NodeManagerClaReport();
 		FLOAT_TYPE CountClasInUse();
