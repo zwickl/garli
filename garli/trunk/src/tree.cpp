@@ -9421,7 +9421,7 @@ CondLikeArray *Tree::GetClaUpRight(TreeNode *nd, bool calc/*=true*/) {
 	return claMan->GetClaFillIfNecessary(nd->claIndexUR);
 }
 
-inline CondLikeArraySet *Tree::GetClaSetDown(TreeNode *nd, bool calc/*=true*/) {
+CondLikeArraySet *Tree::GetClaSetDown(TreeNode *nd, bool calc/*=true*/) {
 	if (claMan->IsDirty(nd->claIndexDown)) {
 		if (calc == true) {
 			ConditionalLikelihoodRateHet(DOWN, nd);
@@ -9432,7 +9432,7 @@ inline CondLikeArraySet *Tree::GetClaSetDown(TreeNode *nd, bool calc/*=true*/) {
 	return claMan->GetClaSet(nd->claIndexDown);
 }
 
-inline CondLikeArraySet *Tree::GetClaSetUpLeft(TreeNode *nd, bool calc/*=true*/) {
+CondLikeArraySet *Tree::GetClaSetUpLeft(TreeNode *nd, bool calc/*=true*/) {
 	if (claMan->IsDirty(nd->claIndexUL)) {
 		if (calc == true) {
 			ConditionalLikelihoodRateHet(UPLEFT, nd);
@@ -9443,7 +9443,7 @@ inline CondLikeArraySet *Tree::GetClaSetUpLeft(TreeNode *nd, bool calc/*=true*/)
 	return claMan->GetClaSet(nd->claIndexUL);
 }
 
-inline CondLikeArraySet *Tree::GetClaSetUpRight(TreeNode *nd, bool calc/*=true*/) {
+CondLikeArraySet *Tree::GetClaSetUpRight(TreeNode *nd, bool calc/*=true*/) {
 	if (claMan->IsDirty(nd->claIndexUR)) {
 		if (calc == true) {
 			ConditionalLikelihoodRateHet(UPRIGHT, nd);
