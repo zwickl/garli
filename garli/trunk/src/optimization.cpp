@@ -1102,7 +1102,7 @@ pair<FLOAT_TYPE, FLOAT_TYPE> Tree::CalcDerivativesRateHet(TreeNode *nd1, TreeNod
 	//nd2 can be internal or terminal
 
 #ifdef USE_BEAGLE
-//DEBUG - this shouldn't need to happen so often, but is playing it safe
+	//DEBUG - this shouldn't need to happen so often, but is playing it safe
 	UpdateDependencies();
 	ScoreSet results = calcMan->CalculateLikelihoodAndDerivatives(nd2, true);
 	lnL = results.lnL;

@@ -924,9 +924,9 @@ class CalculationManager{
 	string preferredBeagleFlags;
 	string actualBeagleFlags;
 
-	long req_flags;
-	long pref_flags;
-	long actual_flags;
+	long req_flag_bits;
+	long pref_flag_bits;
+	long actual_flag_bits;
 
 	static ClaManager *claMan;
 
@@ -950,7 +950,7 @@ public:
 		//singlePrecBeagle = false;
 		//rescaleBeagle = false;
 		FillBeagleOptionsMaps();
-		req_flags = pref_flags = actual_flags = 0;
+		req_flag_bits = pref_flag_bits = actual_flag_bits = 0;
 		FindBeagleResources();
 		}
 
@@ -978,6 +978,10 @@ public:
 		requiredBeagleFlags = reqFlags;
 		ofprefix = prefix;
 		beagleDeviceNum = dnum;
+		req_flag_bits = ParseBeagleFlagString(requiredBeagleFlags);
+		//dealing with rescaling depending on other assigned flags gets annoying, so just always demand it
+		req_flag_bits = req_flag_bits | BEAGLE_FLAG_SCALERS_LOG;
+		pref_flag_bits = ParseBeagleFlagString(preferredBeagleFlags, req_flag_bits);
 		}
 
 	long ParseBeagleFlagString(string flagsString, long flagMask = 0) const;
@@ -994,11 +998,11 @@ public:
 
 	//for now assuming that rescaling will always be available - this will need to be
 	//called BEFORE initializing an instance because how the initialization is called depends on it
-	bool IsRescaling() {return (bool) ((pref_flags | req_flags) & BEAGLE_FLAG_SCALERS_LOG);}
+	bool IsRescaling() {return (bool) ((pref_flag_bits | req_flag_bits) & BEAGLE_FLAG_SCALERS_LOG);}
 	//this will only know if it ended up being SP AFTER initialization
-	bool IsSinglePrecision() {return (bool) (actual_flags & BEAGLE_FLAG_PRECISION_SINGLE);}
+	bool IsSinglePrecision() {return (bool) (actual_flag_bits & BEAGLE_FLAG_PRECISION_SINGLE);}
 	//this is also only known AFTER initialization
-	bool IsGPU() {return (bool) (actual_flags & BEAGLE_FLAG_PROCESSOR_GPU);}
+	bool IsGPU() {return (bool) (actual_flag_bits & BEAGLE_FLAG_PROCESSOR_GPU);}
 
 	
 	void InitializeBeagleInstance(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);

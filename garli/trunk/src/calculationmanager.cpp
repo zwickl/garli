@@ -61,11 +61,11 @@ void CalculationManager::OutputBeagleResources() const{
 		string flagList;
 		InterpretBeagleResourceFlags(rList->list[i].supportFlags, flagList);
 		outman.UserMessage("%s", flagList.c_str());
-		if((rList->list[i].supportFlags & req_flags) == req_flags)
+		if((rList->list[i].supportFlags & req_flag_bits) == req_flag_bits)
 			outman.UserMessage("\t\t(Meets beagle instance requirements)");
 		else
 			outman.UserMessage("\t\t(Does not meet beagle instance requirements)");
-		if((rList->list[i].supportFlags & pref_flags) == pref_flags)
+		if((rList->list[i].supportFlags & pref_flag_bits) == pref_flag_bits)
 			outman.UserMessage("\t\t(Meets beagle instance preferences)");
 		else
 			outman.UserMessage("\t\t(Does not meet beagle instance preferences)");
@@ -81,8 +81,8 @@ void CalculationManager::ParseInstanceDetails(const BeagleInstanceDetails *det){
 	outman.UserMessageNoCR("\t\timplementation name: %s\n", det->implName);
 	outman.UserMessageNoCR("\t\tFlags: ");
 	
-	actual_flags = det->flags;
-	InterpretBeagleResourceFlags(actual_flags, actualBeagleFlags);
+	actual_flag_bits = det->flags;
+	InterpretBeagleResourceFlags(actual_flag_bits, actualBeagleFlags);
 	outman.UserMessage("%s", actualBeagleFlags.c_str());
 	}
 
@@ -261,10 +261,7 @@ void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData
 	assert(useBeagle);
 
 	termOnBeagleError = true;
-	req_flags = ParseBeagleFlagString(requiredBeagleFlags);
-	//dealing with rescaling depending on other assigned flags gets annoying, so just always demand it
-	req_flags = req_flags | BEAGLE_FLAG_SCALERS_LOG;
-	pref_flags = ParseBeagleFlagString(preferredBeagleFlags, req_flags);
+
 
 	SubsetCalculationManager *subsetMan = new SubsetCalculationManager;
 	//if a specific device hasn't been chosen and multiple GPUs exist, cycle through them
@@ -273,7 +270,7 @@ void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData
 		nextGPUIndex = (nextGPUIndex + 1 == BeagleGPUDeviceNumbers.size() ? 0 : nextGPUIndex + 1);
 	}
 
-	subsetMan->InitializeSubset(nClas, nHolders, pref_flags, req_flags, subsetData, subsetModSpec, modelIndex, beagleDeviceNum);
+	subsetMan->InitializeSubset(nClas, nHolders, pref_flag_bits, req_flag_bits, subsetData, subsetModSpec, modelIndex, beagleDeviceNum);
 	subsetMan->SetClaManager(claMan);
 	subsetMan->SetPmatManager(pmatMan);
 	subsetMan->SetOfprefix(ofprefix);
@@ -360,8 +357,8 @@ void CalculationManager::InitializeBeagleInstance(int nTips, int nClas, int nHol
 		scalerCount, 
 		resourceList, 
 		resourceListCount, 
-		pref_flags, 
-		req_flags,
+		pref_flag_bits, 
+		req_flag_bits,
 		&det);
 
 	beagleInst = beagleInstNum;
@@ -1668,7 +1665,8 @@ ScoreSet CalculationManager::SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOA
 	ScoreSet res = {lnL, D1, D2};
 	return res;
 	}
-#endif //#ifndef BEAGLEPART
+#endif //#ifndef lsl
+
 
 void CalculationManager::GetBeagleSiteLikelihoods(double *likes){
 #ifdef BEAGLEPART

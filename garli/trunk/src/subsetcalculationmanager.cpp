@@ -56,7 +56,7 @@ void SubsetCalculationManager::CheckBeagleReturnValue(int err, const char *funcN
 
 
 //this could be improved by calculating some of these arguments in this function 
-BeagleInstanceDetails SubsetCalculationManager::InitializeSubset(int nClas, int nHolders, int pref_flags, int req_flags, SequenceData *data, ModelSpecification *modSpec, int modelInd, int beagleDeviceNum /*=-1*/) {
+BeagleInstanceDetails SubsetCalculationManager::InitializeSubset(int nClas, int nHolders, int pref_flag_bits, int req_flag_bits, SequenceData *data, ModelSpecification *modSpec, int modelInd, int beagleDeviceNum /*=-1*/) {
 	//set these class members
 	modelIndex = modelInd;
 	subsetModSpec = modSpec;
@@ -115,8 +115,8 @@ BeagleInstanceDetails SubsetCalculationManager::InitializeSubset(int nClas, int 
 		scalerCount,
 		resourceList,
 		resourceListCount,
-		pref_flags,
-		req_flags,
+		pref_flag_bits,
+		req_flag_bits,
 		&det);
 
 	beagleInst = beagleInstNum;

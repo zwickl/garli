@@ -4565,7 +4565,7 @@ void Population::NextGeneration(){
 	//this loop is only for mutation and recom, so start from holdover
 	for(unsigned indnum = conf->holdover; indnum < conf->nindivs; indnum++ ){
 		PerformMutation(indnum);
-		}
+	}
 
 	UpdateTreeModels();
 

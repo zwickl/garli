@@ -493,7 +493,7 @@ int main( int argc, char* argv[] )	{
 #endif
 
 #ifdef USE_BEAGLE
-			outman.UserMessage("->Using BEAGLE library<-\n");
+			outman.UserMessage("->Using BEAGLE computation library, version %s<-\n", beagleGetVersion());
 #endif
 			OutputImportantDefines();
 			outman.UserMessage("\n#######################################################");
