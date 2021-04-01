@@ -263,13 +263,19 @@ void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData
 
 	termOnBeagleError = true;
 
-
 	SubsetCalculationManager *subsetMan = new SubsetCalculationManager;
 	//if a specific device hasn't been chosen and multiple GPUs exist, cycle through them
 	if (beagleDeviceNum == -1 &&  BeagleGPUDeviceNumbers.empty() == false) {
 		beagleDeviceNum = BeagleGPUDeviceNumbers[nextGPUIndex];
 		nextGPUIndex = (nextGPUIndex + 1 == BeagleGPUDeviceNumbers.size() ? 0 : nextGPUIndex + 1);
 	}
+
+	string prefFlagNames;
+	InterpretBeagleResourceFlags(pref_flag_bits, prefFlagNames);
+	outman.UserMessage("preferred Beagle flags: %s", prefFlagNames.c_str());
+	string reqFlagNames;
+	InterpretBeagleResourceFlags(req_flag_bits, reqFlagNames);
+	outman.UserMessage("required Beagle flags: %s", reqFlagNames.c_str());
 
 	const BeagleInstanceDetails details = subsetMan->InitializeSubset(nClas, nHolders, pref_flag_bits, req_flag_bits, subsetData, subsetModSpec, modelIndex, beagleDeviceNum);
 	OutputInstanceReport(&details);
