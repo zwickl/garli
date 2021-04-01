@@ -36,8 +36,6 @@ struct ScoreSet{
 #define GARLI_FINAL_SCALER_INDEX -9999999
 #define DONT_SEND_TRANSMATS
 
-
-
 class ClaOperation{
 	friend class CalculationManager;
 public:
@@ -817,6 +815,7 @@ class SubsetCalculationManager {
 	int modelIndex;
 
 	long beagle_instance_flags;
+	BeagleInstanceDetails beagle_instance_details;
 
 	static ClaManager *claMan;
 	static PmatManager *pmatMan;
@@ -844,7 +843,6 @@ class SubsetCalculationManager {
 	int BeagleInst() { return beagleInst; }
 	void GetBeagleSiteLikelihoods(double* likes);
 	//simple report
-	void ParseInstanceDetails(const BeagleInstanceDetails *det);
 
 	static void SetClaManager(ClaManager *cMan) {
 		SubsetCalculationManager::claMan = cMan;
@@ -1109,7 +1107,7 @@ private:
 	void CheckBeagleReturnValue(int err, const char *funcName) const;
 
 	//simple report
-	void ParseInstanceDetails(const BeagleInstanceDetails *det);
+	void OutputInstanceReport(const BeagleInstanceDetails *det);
 
 	//These functions can be altered to get indeces from different schemes without actually altering the
 	//functions that talk to beagle

@@ -120,12 +120,11 @@ BeagleInstanceDetails SubsetCalculationManager::InitializeSubset(int nClas, int 
 		&det);
 
 	beagleInst = beagleInstNum;
-
+	beagle_instance_flags = det.flags;
+	beagle_instance_details = det;
 	CheckBeagleReturnValue(
 		beagleInstNum,
 		"beagleCreateInstance");
-
-	ParseInstanceDetails(&det);
 
 	/*
 	int fpSize = (IsSinglePrecision() ? 4 : 8);
@@ -756,21 +755,6 @@ void SubsetCalculationManager::QueueDestinationClasForFreeing(const BlockingOper
 	}
 }
 */
-
-//print actual beagle resources used by specific instance
-void SubsetCalculationManager::ParseInstanceDetails(const BeagleInstanceDetails *det) {
-	outman.UserMessageNoCR("Instance details:\n");
-	outman.UserMessageNoCR("\t\tnumber: %d\n", det->resourceNumber);
-	outman.UserMessageNoCR("\t\tresource name: %s\n", det->resourceName);
-	outman.UserMessageNoCR("\t\timplementation name: %s\n", det->implName);
-	outman.UserMessageNoCR("\t\tFlags: ");
-
-	beagle_instance_flags = det->flags;
-	//BPART todo - figure out what to do with these at SubMan level
-	//string flag_string;
-	//InterpretBeagleResourceFlags(beagle_instance_flags, flag_string);
-	//outman.UserMessage("%s", flag_string.c_str());
-}
 
 //this does the last operation, beagleCalculateEdgeLogLikelihoods, and expects that the 
 //required partials have been calculated as well as the transmats necessary for this operation

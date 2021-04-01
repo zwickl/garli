@@ -51,6 +51,7 @@ const char *AdvanceDataPointer(const char *arr, int num);
 
 //#define DONT_SEND_TRANSMATS
 
+
 // print possible beagle resources
 void CalculationManager::OutputBeagleResources() const{
     outman.UserMessageNoCR("Available resources:\n");
@@ -71,19 +72,6 @@ void CalculationManager::OutputBeagleResources() const{
 			outman.UserMessage("\t\t(Does not meet beagle instance preferences)");
 		}
     outman.UserMessageNoCR("\n");
-	}
-
-//print actual beagle resources used by specific instance
-void CalculationManager::ParseInstanceDetails(const BeagleInstanceDetails *det){
-    outman.UserMessageNoCR("Instance details:\n");
-	outman.UserMessageNoCR("\t\tnumber: %d\n", det->resourceNumber);
-	outman.UserMessageNoCR("\t\tresource name: %s\n", det->resourceName);
-	outman.UserMessageNoCR("\t\timplementation name: %s\n", det->implName);
-	outman.UserMessageNoCR("\t\tFlags: ");
-	
-	actual_flag_bits = det->flags;
-	InterpretBeagleResourceFlags(actual_flag_bits, actualBeagleFlags);
-	outman.UserMessage("%s", actualBeagleFlags.c_str());
 	}
 
 void CalculationManager::CheckBeagleReturnValue(int err, const char *funcName) const{
@@ -201,6 +189,19 @@ void CalculationManager::FillBeagleOptionsMaps(){
 	invalidFlags.push_back(BEAGLE_FLAG_PROCESSOR_CPU | BEAGLE_FLAG_PROCESSOR_GPU);
 	}
 
+//print actual beagle resources used by specific instance
+void CalculationManager::OutputInstanceReport(const BeagleInstanceDetails* det) {
+	outman.UserMessageNoCR("Instance details:\n");
+	outman.UserMessageNoCR("\t\tnumber: %d\n", det->resourceNumber);
+	outman.UserMessageNoCR("\t\tresource name: %s\n", det->resourceName);
+	outman.UserMessageNoCR("\t\timplementation name: %s\n", det->implName);
+	outman.UserMessageNoCR("\t\tFlags: ");
+
+	string flag_string;
+	CalculationManager::InterpretBeagleResourceFlags(det->flags, flag_string);
+	outman.UserMessage("%s", flag_string.c_str());
+}
+
 //flag mask allows for ignoring bits that have already be interpreted, for example req_flags trump pref_flags, and thus
 //redundant pref_flags don't need to be dealt with 
 long CalculationManager::ParseBeagleFlagString(string flagsString, long flagMask /*=0*/) const{
@@ -270,7 +271,8 @@ void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData
 		nextGPUIndex = (nextGPUIndex + 1 == BeagleGPUDeviceNumbers.size() ? 0 : nextGPUIndex + 1);
 	}
 
-	subsetMan->InitializeSubset(nClas, nHolders, pref_flag_bits, req_flag_bits, subsetData, subsetModSpec, modelIndex, beagleDeviceNum);
+	const BeagleInstanceDetails details = subsetMan->InitializeSubset(nClas, nHolders, pref_flag_bits, req_flag_bits, subsetData, subsetModSpec, modelIndex, beagleDeviceNum);
+	OutputInstanceReport(&details);
 	subsetMan->SetClaManager(claMan);
 	subsetMan->SetPmatManager(pmatMan);
 	subsetMan->SetOfprefix(ofprefix);
@@ -367,7 +369,7 @@ void CalculationManager::InitializeBeagleInstance(int nTips, int nClas, int nHol
 		beagleInst, 
 		"beagleCreateInstance");
 
-	ParseInstanceDetails(&det);
+	OutputInstanceReport(&det);
 
 	int fpSize = (IsSinglePrecision() ? 4 : 8);
 

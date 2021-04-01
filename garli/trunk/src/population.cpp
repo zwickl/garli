@@ -523,6 +523,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	//calcMan = new CalculationManager();
 	outman.UserMessage("");
 #ifdef USE_BEAGLE
+	calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
 	calcMan->OutputBeagleResources();
 
 #ifndef BEAGLEPART
@@ -645,8 +646,6 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 #endif
 
 		//invariable class needs to be treated as extra rate for beagle
-		//calcMan->SetBeagleDetails(conf->gpuBeagle, conf->singlePrecBeagle, conf->rescaleBeagle, conf->ofprefix);
-		calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
 #ifndef BEAGLEPART
 		//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec.numRateCats + (subsetModSpec.includeInvariantSites ? 1 : 0)));
 		calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)));
