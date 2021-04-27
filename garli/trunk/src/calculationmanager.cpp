@@ -125,11 +125,11 @@ void CalculationManager::FillBeagleOptionsMaps(){
 	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PROCESSOR_GPU, "GPU"));
 	nameToFlag.insert(pair<string, long>("GPU", BEAGLE_FLAG_PROCESSOR_GPU));
 
-	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PROCESSOR_GPU, "CUDA"));
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_FRAMEWORK_CUDA, "CUDA"));
 	nameToFlag.insert(pair<string, long>("CUDA", BEAGLE_FLAG_FRAMEWORK_CUDA));
 
-	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PROCESSOR_GPU, "OPENCL"));
-	nameToFlag.insert(pair<string, long>("GPU", BEAGLE_FLAG_FRAMEWORK_OPENCL));
+	flagToName.insert(pair<long, string>(BEAGLE_FLAG_FRAMEWORK_OPENCL, "OPENCL"));
+	nameToFlag.insert(pair<string, long>("OPENCL", BEAGLE_FLAG_FRAMEWORK_OPENCL));
 
 	flagToName.insert(pair<long, string>(BEAGLE_FLAG_PRECISION_DOUBLE, "DOUBLE"));
 	nameToFlag.insert(pair<string, long>("DOUBLE", BEAGLE_FLAG_PRECISION_DOUBLE));
