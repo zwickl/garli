@@ -249,7 +249,7 @@ if test  "$enable_beagle" = yes; then
    BEAGLE_INCLUDES="-I$BEAGLE_INSTALL_PATH/include/libhmsbeagle-1 -I$BEAGLE_INSTALL_PATH/include/libhmsbeagle-1/libhmsbeagle"
    LDFLAGS="$LDFLAGS $BEAGLE_LDFLAGS"
    LIBS="$LIBS $BEAGLE_LIB"
-   CXXFLAGS="$CXXFLAGS $BEAGLE_INCLUDES -DNEW_MANAGEMENT -DUSE_BEAGLE"
+   CXXFLAGS="$CXXFLAGS $BEAGLE_INCLUDES -DNEW_MANAGEMENT -DUSE_BEAGLE -DBEAGLEPART"
 fi
 
 ####################################################################
