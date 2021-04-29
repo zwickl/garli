@@ -262,13 +262,15 @@ void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData
 	assert(useBeagle);
 
 	termOnBeagleError = true;
-
+	int deviceNumToUse = beagleDeviceNum;
 	SubsetCalculationManager *subsetMan = new SubsetCalculationManager;
-	//if we prefer or require GPU and if a specific device hasn't been chosen, and if multiple GPUs exist, cycle through them
-	bool wantGPU = (req_flag_bits | pref_flag_bits) & BEAGLE_FLAG_PROCESSOR_GPU != 0;
+	//if CPU wasn't specified as required and we prefer or require GPU 
+	//and if a specific device wasn't specified, and if multiple GPUs exist, cycle through them
+	bool wantGPU = (((req_flag_bits & BEAGLE_FLAG_PROCESSOR_CPU) == 0) &&
+				   (((req_flag_bits | pref_flag_bits) & (BEAGLE_FLAG_PROCESSOR_GPU | BEAGLE_FLAG_FRAMEWORK_CUDA)) != 0));
 	if (wantGPU && beagleDeviceNum == -1 && BeagleGPUDeviceNumbers.empty() == false) {
-		beagleDeviceNum = BeagleGPUDeviceNumbers[nextGPUIndex];
-		nextGPUIndex = (nextGPUIndex + 1 == BeagleGPUDeviceNumbers.size() ? 0 : nextGPUIndex + 1);
+		deviceNumToUse = BeagleGPUDeviceNumbers[nextGPUIndex % BeagleGPUDeviceNumbers.size()];
+		nextGPUIndex++;
 	}
 
 	string prefFlagNames;
@@ -278,7 +280,7 @@ void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData
 	InterpretBeagleResourceFlags(req_flag_bits, reqFlagNames);
 	outman.UserMessage("required Beagle flags: %s", reqFlagNames.c_str());
 
-	const BeagleInstanceDetails details = subsetMan->InitializeSubset(nClas, nHolders, pref_flag_bits, req_flag_bits, subsetData, subsetModSpec, modelIndex, beagleDeviceNum);
+	const BeagleInstanceDetails details = subsetMan->InitializeSubset(nClas, nHolders, pref_flag_bits, req_flag_bits, subsetData, subsetModSpec, modelIndex, deviceNumToUse);
 	OutputInstanceReport(&details);
 	subsetMan->SetClaManager(claMan);
 	subsetMan->SetPmatManager(pmatMan);
