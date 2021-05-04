@@ -254,7 +254,7 @@ void CalculationManager::InterpretBeagleResourceFlags(long flags, string &list, 
 				list += (*itToName).second + " ";
 			}
 		bit = bit << 1;
-		}while(bit <= (1 << 18));
+		}while(bit <= (1 << 29));
 	}
 
 #ifdef BEAGLEPART
