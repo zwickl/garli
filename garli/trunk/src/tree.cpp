@@ -4019,7 +4019,7 @@ int Tree::Score(int rootNodeNum /*=0*/){
 		
 			if(rootWithDummy){
 #ifdef USE_BEAGLE
-					//BMERGE - think this is only for ogap
+					//think this is only for ogap
 					assert(0);
 #endif
 				assert(rootNodeNum == 0);
@@ -4027,10 +4027,6 @@ int Tree::Score(int rootNodeNum /*=0*/){
 				}
 				else {
 #ifdef NEW_MANAGEMENT
-					//DEBUG
-					//UpdateNodeClaManagers();
-					//BMERGE - this is failing currently - check
-					//CheckClaIndeces();
 					//DEBUG - this shouldn't need to happen so often, but is playing it safe
 					UpdateDependencies();
 					lnL = calcMan->CalculateLikelihoodAndDerivatives(rootNode, false).lnL;
@@ -9065,8 +9061,6 @@ void Tree::UpdateDependencies() {
 
 	assert(nd->myMan.IsAllocated());
 
-	//DEBUG
-	//CheckClaIndeces();
 
 	UpdatePmatDependencies();
 

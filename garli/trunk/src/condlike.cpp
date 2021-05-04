@@ -170,16 +170,12 @@ void ClaManager::DecrementHolder(int index) {
 		if (debug_clas) {
 			assert(find(holderStack.begin(), holderStack.end(), index) == holderStack.end());
 		}
-		//BMERGE 
-		//holderStack.push_back(index);
 
 		_ReclaimH(index);
 		
 		if (debug_clas) {
 			ReportClaTotals("reclaimH", index);
 		}
-		//EmptyHolder(index);
-		//holders[index].Reset();
 	}
 	else {
 		assert(holders[index].numAssigned != 0);
@@ -192,16 +188,6 @@ void ClaManager::DecrementHolder(int index) {
 		RemoveTempReservation(index);
 	}
 }
-
-/*BMERGE
-int ClaManager::AssignClaHolder() {
-	assert(holderStack.size() > 0);
-	int index = holderStack[holderStack.size() - 1];
-	IncrementCla(index);
-	holderStack.pop_back();
-	return index;
-}
-*/
 
 //this will assign an unused holder index to a node that did not previously have one (no argument)
 int ClaManager::AssignFreeClaHolder() {
@@ -356,7 +342,7 @@ void ClaManager::IncrementCla(int index) {
 }
 
 void ClaManager::DecrementCla(int index) {
-	//BMERGE - DecrementHolder should be used now
+	//Deprecated - DecrementHolder should be used now
 	assert(0);
 
 	assert(index != -1);

@@ -842,11 +842,8 @@ void Model::CalcEigenStuff(){
 		//in transition matrix calculating function.  This will be easier for passing to beagle prescaled as well
 		//5/26/20 removed accounting for pinv here.  
 		//when using beagle the rate classes are normalized to account for it elsewhere so don't do it here as well.
-		//BMERGE TODO - will need to figure out how to do the right thing in all beagle/non-beagle cases
 		for (int ev = 0; ev < nstates; ev++)
 			eigvals[m][ev] *= (NoPinvInModel() ? blen_multiplier[m] : blen_multiplier[0]);
-			//eigvals[m][ev] *= (NoPinvInModel() ? blen_multiplier[m] : blen_multiplier[0] / (ONE_POINT_ZERO - *propInvar));
-		//blen_multiplier[m] = 1.0;
 		
 		//For codon models using this precalculation actually makes things things slower in CalcPmat (cache thrashing,
 		//I think) so don't bother doing it here.  In fact, don't even allocate it in the model
@@ -3458,9 +3455,8 @@ void Model::CreateModelFromSpecification(int modnum){
 			*d = 1.0 / NRateCats();
 			omegaProbs.push_back(d);
 
-			//BMERGE - forgot to transfer this over
 			//changes for beagle, should have no side effects
-//The overall rate multipliers are all equal for different NS rate cats, even if omega varies
+			//The overall rate multipliers are all equal for different NS rate cats, even if omega varies
 			rateMults[i] = 1.0;
 			rateProbs[i] = *omegaProbs[i];
 

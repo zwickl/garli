@@ -433,6 +433,7 @@ public:
 		TransMatHolder *hold = &holders[pit.destTransMatIndex];
 		thePMat = GetPmatArray(pit.destTransMatIndex);
 		//BMERGE DEBUG - AltCalcPmat doesn't deal with Pinv properly in the beagle context, so just always use FillDerivativeMatrices, which does
+		//this is only used when sending precalculated pmats to beagle, so only debugging, really
 		//if(pit.calcDerivs){
 		if(1){
 			theD1Mat = GetD1MatArray(pit.destTransMatIndex);
@@ -654,7 +655,6 @@ public:
 		pmatMan->SetEdgelen(transMatIndex, e);
 		}
 
-	//BMERGE HACK
 	void SetTransMat(ModelPartition *m, FLOAT_TYPE e) {
 		//outman.DebugMessage("up pdeps %d", transMatIndex);
 		pmatMan->SetModelPartition(transMatIndex, m);

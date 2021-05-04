@@ -933,7 +933,6 @@ void Population::RunTests(){
 	for(int i=0;i<100;i++){
 
 //BMERGE rerooting isn't working right with beagle currently
-#ifndef USE_BEAGLE
 		tree0->RerootHere(tree0->GetRandomInternalNode());
 		tree1->RerootHere(tree1->GetRandomInternalNode());
 
@@ -942,7 +941,7 @@ void Population::RunTests(){
 
 		//check rerooting and bipartition comparisons
 		assert(tree0->IdenticalTopologyAllowingRerooting(tree1->root));
-#endif
+
 		ind0->SetDirty();
 		ind1->SetDirty();
 
@@ -1387,11 +1386,8 @@ void Population::SeedPopulationWithStartingTree(int rep){
 	indiv[0].treeStruct->root->CheckTreeFormation();
 	indiv[0].treeStruct->root->CheckforPolytomies();
 
-//BMERGE - rebalancing totally hoses things with beagle.  avoiding for now
-#ifndef USE_BEAGLE
 	if(!indiv[0].treeStruct->rootWithDummy)
 		indiv[0].treeStruct->CheckBalance();
-#endif
 	indiv[0].treeStruct->modPart=&indiv[0].modPart;
 	
 	try{
