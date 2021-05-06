@@ -1388,6 +1388,10 @@ void Population::SeedPopulationWithStartingTree(int rep){
 
 	if(!indiv[0].treeStruct->rootWithDummy)
 		indiv[0].treeStruct->CheckBalance();
+#ifdef USE_BEAGLE
+	//the adjustment of conditionals in CheckBalance needs to be updated to work in the beagle context, but it doesn't help much anyway
+	indiv[0].treeStruct->MakeAllNodesDirty();
+#endif
 	indiv[0].treeStruct->modPart=&indiv[0].modPart;
 	
 	try{
