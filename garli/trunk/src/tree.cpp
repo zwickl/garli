@@ -8947,7 +8947,6 @@ void Tree::AssignCLAsFromMaster() {
 	if (noCalcs)
 		return;
 	NewAssignCLAsFromMaster();
-	UpdateDependencies();
 	return;
 #endif
 
@@ -9298,7 +9297,6 @@ void Tree::RemoveTreeFromAllClas() {
 
 #ifdef NEW_MANAGEMENT
 	NewRemoveTreeFromAllClas();
-	UpdateDependencies();
 	return;
 #endif
 
