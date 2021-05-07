@@ -4250,10 +4250,7 @@ void Tree::SweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 	if (noCalcs)
 		return;
 #ifdef NEW_MANAGEMENT
-	//this->CheckClaIndeces();
 	NewSweepDirtynessOverTree(nd, from);
-	//DEBUG
-	//UpdateNodeIndeces();
 	UpdateDependencies();
 	return;
 #endif
@@ -4297,10 +4294,6 @@ void Tree::SweepDirtynessOverTree(TreeNode *nd, TreeNode *from/*=NULL*/){
 			else if(nd->left->next->IsInternal()) SweepDirtynessOverTree(nd->left->next, nd);
 			}
 		}
-	//BMERGE - the following 3 are verbatim from only beagle, not sure what was up
-	//DEBUG - this is silly
-	UpdateNodeClaManagers();
-	//	UpdateDependencies();
 	}
 
 #ifdef USE_BEAGLE
@@ -8880,6 +8873,7 @@ void Tree::MakeAllNodesDirty() {
 		return;
 #ifdef NEW_MANAGEMENT
 	NewMakeAllNodesDirty();
+	UpdateDependencies();
 	return;
 #endif
 
@@ -8892,10 +8886,6 @@ void Tree::MakeAllNodesDirty() {
 		allNodes[i]->claIndexUR = claMan->SetHolderDirty(allNodes[i]->claIndexUR);
 	}
 	lnL = -ONE_POINT_ZERO;
-
-	//DEBUG
-	UpdateNodeClaManagers();
-	UpdateDependencies();
 }
 
 #ifdef NEW_MANAGEMENT
@@ -8915,9 +8905,6 @@ void Tree::NewMakeAllNodesDirty() {
 		allNodes[i]->myMan.SetDirtyAll();
 	}
 
-	//DEBUG
-	//UpdateNodeIndeces();
-	UpdateDependencies();
 }
 
 void Tree::MakeAllTransMatsDirty() {
@@ -8960,6 +8947,7 @@ void Tree::AssignCLAsFromMaster() {
 	if (noCalcs)
 		return;
 	NewAssignCLAsFromMaster();
+	UpdateDependencies();
 	return;
 #endif
 
@@ -8975,9 +8963,6 @@ void Tree::AssignCLAsFromMaster() {
 		allNodes[i]->claIndexUL = claMan->AssignFreeClaHolder();
 		allNodes[i]->claIndexUR = claMan->AssignFreeClaHolder();
 	}
-	//DEBUG
-	UpdateNodeClaManagers();
-	UpdateDependencies();
 }
 
 #ifdef USE_BEAGLE
@@ -9003,11 +8988,6 @@ void Tree::NewAssignCLAsFromMaster() {
 	for (int i = numTipsTotal + 1; i<numNodesTotal; i++) {
 		allNodes[i]->myMan.ObtainClaAndTransMatHolders();
 	}
-	
-	//DEBUG
-	//UpdateNodeIndeces();
-	
-
 }
 #endif //USE_BEAGLE
 
@@ -9318,6 +9298,7 @@ void Tree::RemoveTreeFromAllClas() {
 
 #ifdef NEW_MANAGEMENT
 	NewRemoveTreeFromAllClas();
+	UpdateDependencies();
 	return;
 #endif
 
@@ -9348,14 +9329,10 @@ void Tree::RemoveTreeFromAllClas() {
 			allNodes[i]->claIndexUR = -1;
 		}
 	}
-	//DEBUG
-	UpdateNodeClaManagers();
-	//UpdateDependencies();
 }
 
 #ifdef NEW_MANAGEMENT
 void Tree::NewRemoveTreeFromAllClas() {
-	//CheckClaIndeces();
 
 	if (claMan->debug_clas)
 		outman.DebugMessage("Remove tree from all");
@@ -9365,8 +9342,6 @@ void Tree::NewRemoveTreeFromAllClas() {
 		allNodes[i]->myMan.StripHolders();
 	}
 
-	//DEBUG
-	//UpdateNodeIndeces();
 }
 #endif //NEW_MANAGEMENT
 
