@@ -328,8 +328,6 @@ void CalculationManager::InitializeBeagleInstance(int nTips, int nClas, int nHol
 	//num freqs = numEigens in beagle, so need at least one
 	int eigCount = 1;
 #else
-	//BMERGE - don't know why this was nclas, at most should be # categories (nrates)
-	//int eigCount = nClas;
 	int eigCount = nrates;
 #endif
 	//this is a gross overestimate of how many matrices are needed, but haven't worked out recycling quite yet for mats

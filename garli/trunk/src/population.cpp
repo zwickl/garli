@@ -932,7 +932,6 @@ void Population::RunTests(){
 
 	for(int i=0;i<100;i++){
 
-//BMERGE rerooting isn't working right with beagle currently
 		tree0->RerootHere(tree0->GetRandomInternalNode());
 		tree1->RerootHere(tree1->GetRandomInternalNode());
 
@@ -5013,11 +5012,8 @@ void Population::WriteStoredTrees( const char* treefname ){
 		const Individual *curInd;
 		if(Tree::outgroup != NULL || conf->collapseBranches){
 			tempInd.DuplicateIndivWithoutCLAs(storedTrees[r]);
-			//BMERGE TODO - still need to figure out rerooting
-#ifndef USE_BEAGLE
 			if(Tree::outgroup != NULL)
 				OutgroupRoot(&tempInd, -1);
-#endif
 			if(conf->collapseBranches){
 				int num = 0;
 				tempInd.treeStruct->root->CollapseMinLengthBranches(num);

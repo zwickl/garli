@@ -432,7 +432,7 @@ public:
 	void ObtainAppropriateTransmats(const TransMatOperation &pit, double ***&thePMat, double ***&theD1Mat, double ***&theD2Mat){
 		TransMatHolder *hold = &holders[pit.destTransMatIndex];
 		thePMat = GetPmatArray(pit.destTransMatIndex);
-		//BMERGE DEBUG - AltCalcPmat doesn't deal with Pinv properly in the beagle context, so just always use FillDerivativeMatrices, which does
+		//AltCalcPmat doesn't deal with Pinv properly in the beagle context, so just always use FillDerivativeMatrices, which does
 		//this is only used when sending precalculated pmats to beagle, so only debugging, really
 		//if(pit.calcDerivs){
 		if(1){

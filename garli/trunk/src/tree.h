@@ -382,8 +382,6 @@ class Tree{
 		void NewMakeAllNodesDirty();
 		void MakeAllTransMatsDirty();
 		void NewMakeNodeDirty(TreeNode *nd);
-		//BMERGE - the temporary designation here is from old beagle
-		//TEMPORARY
 		void UpdateNodeClaManagers();
 		void UpdateNodeIndeces();
 		void NewCopyClaIndeces(const Tree *source, bool remove);
@@ -465,10 +463,8 @@ inline void Tree::SetBranchLength(TreeNode *nd, FLOAT_TYPE len, bool dummyRootDo
 			SetBranchLength(otherNode, len, true);
 		}
 #ifdef USE_BEAGLE
-	//BMERGE added
 	nd->myMan.SetTransMatDirty();
 #endif
-
 	SweepDirtynessOverTree(nd);
 	}
 

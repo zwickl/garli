@@ -9210,15 +9210,8 @@ void Tree::CopyClaIndeces(const Tree *from, bool remove) {
 	//the bool argument "remove" designates whether the tree currently has cla arrays
 	//assigned to it or not (if not, it must have come from the unused tree vector)
 
-	//DEBUG
 #ifdef NEW_MANAGEMENT
 
-	//BMERGE
-	/*
-	from->CheckClaIndeces();
-	if (remove)
-		CheckClaIndeces();
-	*/
 	if (noCalcs)
 		return;
 	NewCopyClaIndeces(from, remove);
@@ -9267,10 +9260,8 @@ void Tree::CopyClaIndeces(const Tree *from, bool remove) {
 		allNodes[i]->claIndexUR = from->allNodes[i]->claIndexUR;
 		if (allNodes[i]->claIndexUR > -1) claMan->IncrementHolder(allNodes[i]->claIndexUR);
 	}
-
-	//DEBUG
-	UpdateNodeClaManagers();
 }
+
 #ifdef USE_BEAGLE
 void Tree::NewCopyClaIndeces(const Tree *from, bool remove) {
 	//the bool argument "remove" designates whether the tree currently has cla arrays
@@ -9287,9 +9278,6 @@ void Tree::NewCopyClaIndeces(const Tree *from, bool remove) {
 	for (int i = numTipsTotal + 1; i < numNodesTotal; i++) {
 		allNodes[i]->myMan.CopyHolderIndecesInternal(&from->allNodes[i]->myMan, remove);
 	}
-
-	//DEBUG
-	//this->UpdateNodeIndeces();
 }
 #endif
 
@@ -9300,7 +9288,6 @@ void Tree::RemoveTreeFromAllClas() {
 	return;
 #endif
 
-	CheckClaIndeces();
 	if (root->claIndexDown > -1) {
 		claMan->DecrementHolder(root->claIndexDown);
 		root->claIndexDown = -1;
