@@ -5012,6 +5012,7 @@ void Population::WriteStoredTrees( const char* treefname ){
 		const Individual *curInd;
 		if(Tree::outgroup != NULL || conf->collapseBranches){
 			tempInd.DuplicateIndivWithoutCLAs(storedTrees[r]);
+            tempInd.treeStruct->noCalcs = true;
 			if(Tree::outgroup != NULL)
 				OutgroupRoot(&tempInd, -1);
 			if(conf->collapseBranches){
