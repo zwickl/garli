@@ -176,8 +176,6 @@ BeagleInstanceDetails SubsetCalculationManager::InitializeSubset(int nClas, int 
 #endif
 	beagleSetPatternWeights(beagleInstNum, &(counts[0]));
 	SendTipDataToBeagle();
-
-	outman.UserMessage("#######################################################");
 	
 	return det;
 }

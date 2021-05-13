@@ -638,6 +638,10 @@ int main( int argc, char* argv[] )	{
 				if(conf.linkModels && (modSpec->IsMkTypeModel() || modSpec->IsOrientedGap()))
 					throw ErrorException("Model linkage cannot be used with Mk/Mkv models (nor does it\n\tneed to be, since there are no estimated parameters).\n\tSet linkmodels = 0");
 
+#ifdef USE_BEAGLE
+				if (modSpec->IsMkTypeModel() || modSpec->IsOrientedGap())
+					throw ErrorException("Invalid datatype!\nSorry, only sequence datatypes (DNA, amino acid and codon) are supported by the BEAGLE-enabled version of GARLI");
+#endif
 				//defaults here are NUCLEOTIDE, so make changes as necessary
 				if(modSpec->IsCodon()) 
 					dataSubInfo[dataChunk].usedAs = DataSubsetInfo::CODON;
@@ -899,10 +903,12 @@ int main( int argc, char* argv[] )	{
 					}
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
 				if(pop != NULL){
+				if (pop->conf != NULL) {
 					pop->FinalizeOutputStreams(0);
 					pop->FinalizeOutputStreams(1);
 					pop->FinalizeOutputStreams(2);
 					}
+			}
 
 #ifdef MAC_FRONTEND
 				NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];

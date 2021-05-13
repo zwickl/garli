@@ -524,7 +524,6 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	outman.UserMessage("");
 #ifdef USE_BEAGLE
 	calcMan->SetBeagleDetails(conf->preferredBeagleFlags, conf->requiredBeagleFlags, conf->deviceNumBeagle, conf->ofprefix);
-	calcMan->OutputBeagleResources();
 
 #ifndef BEAGLEPART
 	if (modSpecSet.NumSpecs() > 1)
@@ -575,8 +574,12 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		}
 
 	outman.UserMessage("\nYou specified that Garli should use at most %.1f MB of memory.", conf->availableMemory);
-	outman.UserMessage("\nwhen using the BEAGLE library, this is the maximum amount of memory per model partition (instance).");
+#ifdef USE_BEAGLE
+	outman.UserMessage("\nwhen using the BEAGLE library, this is the maximum amount of memory per model partition subset (beagle instance).\n");
 
+	calcMan->OutputBeagleResources();
+#endif
+#ifndef USE_BEAGLE
 	if( ! (conf->scoreOnly || conf->optimizeInputOnly)){
 		if(memLevel == 0)
 			outman.UserMessage("**Your memory level is: great (you don't need to change anything)**");
@@ -592,74 +595,54 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	outman.UserMessage("\n#######################################################");
 	if (memLevel == -1 && !validateMode)
 		throw ErrorException("Not enough memory specified in config file (availablememory)!");
-
-#ifndef USE_BEAGLE
+#endif
 	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
 //if we do tons of recombination 
 	idealClas *= 2;
-	if (!validateMode)
+	if (!validateMode) {
 		claMan = new ClaManager(dataPart->NTax() - 2, numClas, idealClas, &indiv[0].modPart, dataPart);
-#else //BEAGLE
+	}
+
+#ifdef USE_BEAGLE
+	CalculationManager::SetClaManager(claMan);
 	//loop over subsets (for partitioned beagle)
 	double totalMemAllocated = 0.0;
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
+		outman.UserMessage("Partition subset %d:", (*subsetSpec).modelIndex);
 		SequenceData *subsetData = dataPart->GetSubset(subsetSpec->dataIndex);
 		ModelSpecification *subsetModSpec = modSpecSet.GetModSpec(subsetSpec->modelIndex);
-		if (subsetModSpec->IsMkTypeModel() || subsetModSpec->IsOrientedGap())
-			throw ErrorException("Invalid datatype!\nSorry, only sequence datatypes (DNA, amino acid and codon) are supported by the BEAGLE-enabled version of GARLI");
 
-		//outman.UserMessage("\nfor this partition subset, Garli will actually use approx. %.1f MB of memory", memUsageMult*(FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNodeKB/(FLOAT_TYPE)KB);
 		double subsetMemUsage = memUsageMult * (FLOAT_TYPE)numClas * (FLOAT_TYPE)subsetClaSizes[subsetSpec->claIndex] / (FLOAT_TYPE)KB;
-		outman.UserMessage("\nFor this partition subset, Garli will actually use approx. %.1f MB of memory", subsetMemUsage);
+		outman.UserMessage("For this partition subset, Garli will actually use approx. %.1f MB of memory", subsetMemUsage);
 		totalMemAllocated += subsetMemUsage;
-/*
-	outman.precision(4);
-	outman.UserMessage("allocating memory...\nusing %.1f MB for conditional likelihood arrays.  Memlevel= %d", (FLOAT_TYPE)numClas*(FLOAT_TYPE)claSizePerNode/(FLOAT_TYPE)MB, memLevel);
-	outman.UserMessage("For this dataset:");
-	outman.UserMessage("level 0: >= %.0f megs", ceil(L0 * (claSizePerNode/(FLOAT_TYPE)MB)));
-	outman.UserMessage("level 1: %.0f megs to %.0f megs", ceil(L0 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB)));
-	outman.UserMessage("level 2: %.0f megs to %.0f megs", ceil(L1 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB)));
-	outman.UserMessage("level 3: %.0f megs to %.0f megs", ceil(L2 * ((FLOAT_TYPE)claSizePerNode/MB))-1, ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB)));
-	outman.UserMessage("not enough mem: <= %.0f megs\n", ceil(L3 * ((FLOAT_TYPE)claSizePerNode/MB))-1);
-*/
 
-	//increasing this more to allow for the possiblility of needing a set for all nodes for both the indiv and newindiv arrays
-	//if we do tons of recombination 
-	idealClas *= 2;
-		if (!validateMode && !claMan)
-		claMan=new ClaManager(dataPart->NTax()-2, numClas, idealClas, &indiv[0].modPart, dataPart);
-
-		CalculationManager::SetClaManager(claMan);
 		//both the tips and internal branches need pmats, hence the x2
 		int idealPmats = total_size * (2 * (dataPart->NTax() - 1));
 		idealPmats *= 2;
 		//for now using as many pmats as pmat holders
-		//pmatMan = new PmatManager(numClas * 2, idealPmats, (modSpec.numRateCats + (modSpec.includeInvariantSites ? 1 : 0)), modSpec.nstates);
-		if(!pmatMan)
+		//for beagle pmat manager only being used to manage pmat indeces, so no actual allocation and nstates/nrates don't actually matter
+		if (!pmatMan) {
 			pmatMan = new PmatManager(idealPmats, idealPmats, (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)), subsetModSpec->nstates);
 		CalculationManager::SetPmatManager(pmatMan);
-
-#ifdef BEAGLEPART 
-		CalculationManager::SetData(dataPart);
-#else
-		CalculationManager::SetData(subsetData);
-#endif
-
-		//invariable class needs to be treated as extra rate for beagle
+		}
 #ifndef BEAGLEPART
+		//invariable class needs to be treated as extra rate for beagleF
 		//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec.numRateCats + (subsetModSpec.includeInvariantSites ? 1 : 0)));
 		calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)));
 #else
 		calcMan->AddSubsetInstance(numClas, idealClas, subsetData, subsetModSpec, subsetSpec->modelIndex);
+		outman.UserMessage("\n#######################################################");
 #endif
 	} // end loop over modelParts
 
 	outman.UserMessage("\n\nThe total memory allocated for likelihood calculations is approx %.1f MB", totalMemAllocated);
 
+#ifdef BEAGLEPART 
+	CalculationManager::SetData(dataPart);
+#else
+	CalculationManager::SetData(subsetData);
+#endif
 
-
-	CalculationManager::SetClaManager(claMan);
-	//CalculationManager::SetData(dataPart);
 	NodeClaManager::SetClaManager(claMan);
 	NodeClaManager::SetPmatManager(pmatMan);
 #endif //!USE_BEAGLE
@@ -5008,10 +4991,12 @@ void Population::WriteStoredTrees( const char* treefname ){
 	int bestRep = EvaluateStoredTrees(false);
 	
 	Individual tempInd;
+	tempInd.treeStruct->noCalcs = true;
 	for(unsigned r=0;r<storedTrees.size();r++){
 		const Individual *curInd;
 		if(Tree::outgroup != NULL || conf->collapseBranches){
 			tempInd.DuplicateIndivWithoutCLAs(storedTrees[r]);
+			tempInd.treeStruct->noCalcs = true;
 			if(Tree::outgroup != NULL)
 				OutgroupRoot(&tempInd, -1);
 			if(conf->collapseBranches){
