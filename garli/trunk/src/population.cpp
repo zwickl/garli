@@ -4991,7 +4991,6 @@ void Population::WriteStoredTrees( const char* treefname ){
 	int bestRep = EvaluateStoredTrees(false);
 	
 	Individual tempInd;
-	tempInd.treeStruct->noCalcs = true;
 	for(unsigned r=0;r<storedTrees.size();r++){
 		const Individual *curInd;
 		if(Tree::outgroup != NULL || conf->collapseBranches){
