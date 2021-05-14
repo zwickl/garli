@@ -54,7 +54,14 @@ const char *AdvanceDataPointer(const char *arr, int num);
 
 // print possible beagle resources
 void CalculationManager::OutputBeagleResources() const{
-    outman.UserMessageNoCR("Available resources:\n");
+	string prefFlagNames;
+	InterpretBeagleResourceFlags(pref_flag_bits, prefFlagNames);
+	outman.UserMessage("Preferred Beagle flags: %s", prefFlagNames.c_str());
+	string reqFlagNames;
+	InterpretBeagleResourceFlags(req_flag_bits, reqFlagNames);
+	outman.UserMessage("Required Beagle flags: %s", reqFlagNames.c_str());
+
+    outman.UserMessageNoCR("Available Beagle resources:\n");
     for (int i = 0; i < rList->length; i++) {
         outman.UserMessageNoCR("\tResource %i:\n\t\tName : %s\n", i, rList->list[i].name);
         outman.UserMessageNoCR("\t\tDesc : %s\n", rList->list[i].description);
@@ -192,7 +199,7 @@ void CalculationManager::FillBeagleOptionsMaps(){
 //print actual beagle resources used by specific instance
 void CalculationManager::OutputInstanceReport(const BeagleInstanceDetails* det) {
 	outman.UserMessageNoCR("Instance details:\n");
-	outman.UserMessageNoCR("\t\tnumber: %d\n", det->resourceNumber);
+	outman.UserMessageNoCR("\t\tdevice number: %d\n", det->resourceNumber);
 	outman.UserMessageNoCR("\t\tresource name: %s\n", det->resourceName);
 	outman.UserMessageNoCR("\t\timplementation name: %s\n", det->implName);
 	outman.UserMessageNoCR("\t\tFlags: ");
@@ -272,13 +279,6 @@ void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData
 		deviceNumToUse = BeagleGPUDeviceNumbers[nextGPUIndex % BeagleGPUDeviceNumbers.size()];
 		nextGPUIndex++;
 	}
-
-	string prefFlagNames;
-	InterpretBeagleResourceFlags(pref_flag_bits, prefFlagNames);
-	outman.UserMessage("preferred Beagle flags: %s", prefFlagNames.c_str());
-	string reqFlagNames;
-	InterpretBeagleResourceFlags(req_flag_bits, reqFlagNames);
-	outman.UserMessage("required Beagle flags: %s", reqFlagNames.c_str());
 
 	const BeagleInstanceDetails details = subsetMan->InitializeSubset(nClas, nHolders, pref_flag_bits, req_flag_bits, subsetData, subsetModSpec, modelIndex, deviceNumToUse);
 	OutputInstanceReport(&details);

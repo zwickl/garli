@@ -160,7 +160,7 @@ void UsageMessage(char *execName){
 	outman.UserMessage("                                 BEAGLE LIBRARY OPTIONS");
 	outman.UserMessage("  -r --resources    output list of potential beagle resources and their available flags and exit");
 	outman.UserMessage("  -f <FLAGS>        pass flags to beagle library to help it choose a specific resource. Options are");
-	outman.UserMessage("                    CPU GPU SINGLE DOUBLE SSE OPENMP.  They may not all work. Flags are interpreted");
+	outman.UserMessage("                    CPU GPU CUDA OPENCL SINGLE DOUBLE SSE OPENMP.  They may not all work. Flags are interpreted");
 	outman.UserMessage("                    as beagle *preferences*, so can be ignored when not able to be met");
 	outman.UserMessage("  -F <FLAGS>        same as -f, except interpret the flags as beagle *requirements*");
 	outman.UserMessage("  --device <device num>   use specified beagle device number");
@@ -891,6 +891,11 @@ int main( int argc, char* argv[] )	{
 						pop->Bootstrap();
 					pop->FinalizeOutputStreams(2);
 					}
+#ifdef USE_BEAGLE
+				if (pop != NULL)
+					if(pop->calcMan != NULL )
+						pop->calcMan->Finalize();
+#endif
 				dataPart.Delete();
 				if(pop != NULL){
 					delete pop;
@@ -903,6 +908,10 @@ int main( int argc, char* argv[] )	{
 					}
 				outman.UserMessage("\nERROR: %s\n\n", err.message);
 				if(pop != NULL){
+#ifdef USE_BEAGLE
+				if (pop->calcMan != NULL)
+					pop->calcMan->Finalize();
+#endif
 				if (pop->conf != NULL) {
 					pop->FinalizeOutputStreams(0);
 					pop->FinalizeOutputStreams(1);

@@ -1008,11 +1008,8 @@ public:
 	void AddSubsetInstance(int nClas, int nHolders, SequenceData *subsetData, ModelSpecification *subsetModSpec, int modelIndex);
 
 	void Finalize(){
-#ifdef USE_BEAGLE
 		//for(vector<int>::iterator inst = beagleInstances.begin(); inst != beagleInstances.end(); inst++)
-		//	beagleFinalizeInstance(*inst);
 		for (vector<SubsetCalculationManager *>::iterator subman = subsetManagers.begin(); subman != subsetManagers.end(); subman++) {
-		//beagleFinalizeInstance((*subman).beagleInst);
 		(*subman)->Finalize();
 		delete *subman;
 		}
@@ -1224,6 +1221,5 @@ private:
 	//Sum site likes/derivs. Beagle now sums on its own, so no longer necessary except for debugging
 	ScoreSet SumSiteValues(const FLOAT_TYPE *sitelnL, const FLOAT_TYPE *siteD1, const FLOAT_TYPE *siteD2) const;
 	};
-#endif
 
 #endif //#ifndef CALCULATION_MANAGER
