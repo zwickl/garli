@@ -9428,6 +9428,10 @@ void Tree::ProtectClas() {
 }
 
 void Tree::UnprotectClas() {
+#ifdef NEW_MANAGEMENT
+	//this shouldn't be happening with beagle cla management
+	return;
+#endif
 	//DEBUG adding protection of all root clas
 	outman.DebugMessage("Unprotecting");
 	claMan->RemoveNormalReservation(root->claIndexDown);
