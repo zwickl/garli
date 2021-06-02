@@ -59,7 +59,7 @@ class TransMatOperation{
 public:
 	int destTransMatIndex;
 	FLOAT_TYPE edgeLength;
-	int modelIndex; // ~eigen solution
+	int modelIndex; // ~eigen solution - this isn't being used when each partition subset has it's own instance
 	bool calcDerivs;
 
 	TransMatOperation() : destTransMatIndex(-1), modelIndex(-1), edgeLength(-1.0), calcDerivs(false){};
@@ -282,6 +282,7 @@ public:
 	bool IsHolderDirty(int index) const { return holders[index].theMatSet == NULL; }
 
 	TransMatSet *GetTransMatSet(int index){
+		assert(index > -1 && index < nHolders);
 		if(holders[index].theMatSet == NULL)
 			FillTransMatHolder(index);
 		assert(holders[index].theMatSet != NULL);
@@ -289,35 +290,43 @@ public:
 		}
 
 	void SetModel(int index, Model *mod){
+		assert(index > -1 && index < nHolders);
 		holders[index].myMod = mod;
 		}
 
 	void SetModelPartition(int index, ModelPartition *mod) {
+		assert(index > -1 && index < nHolders);
 		holders[index].myModPart = mod;
 	}
 
 	void SetEdgelen(int index, FLOAT_TYPE e){
+		assert(index > -1 && index < nHolders);
 		holders[index].edgeLen = e;
 		}
 
 	const FLOAT_TYPE GetEdgelen(int index) const{
+		assert(index > -1 && index < nHolders);
 		return holders[index].edgeLen;
 		}
 
 	const FLOAT_TYPE GetScaledEdgelen(int index, int modelIndex) const {
+		assert(index < nHolders);
 		return holders[index].edgeLen * holders[index].myModPart->SubsetRate(modelIndex);
 	}
 
 	void GetEigenSolution(int index, ModelEigenSolution &sol) const{
+		assert(index > -1 && index < nHolders);
 		assert(holders[index].myMod);
 		holders[index].myMod->GetEigenSolution(sol);
 		}
 
 	const FLOAT_TYPE GetSubsetRate(int index, int modelIndex) const {
+		assert(index > -1 && index < nHolders);
 		return holders[index].myModPart->SubsetRate(modelIndex);
 	}
 
 	void GetEigenSolution(int index, ModelEigenSolution &sol, int modelIndex) const {
+		assert(index > -1 && index < nHolders);
 		assert(holders[index].myModPart);
 		//holders[index].myMod->GetEigenSolution(sol);
 		holders[index].myModPart->GetModel(modelIndex)->GetEigenSolution(sol);
@@ -325,33 +334,40 @@ public:
 
 //this includes pinv, which my scheme doesn't treat as a rate class per se
 	void GetCategoryRatesForBeagle(int index, vector<FLOAT_TYPE> &r)const{
+		assert(index > -1 && index < nHolders);
 		holders[index].myMod->GetRateMultsForBeagle(r);
 		}
 
 	//this includes pinv, which my scheme doesn't treat as a rate class per se
 	void GetCategoryRatesForBeagle(int index, vector<FLOAT_TYPE> &r, int modelIndex)const {
+		assert(index > -1 && index < nHolders);
 		holders[index].myModPart->GetModel(modelIndex)->GetRateMultsForBeagle(r);
 	}
 
 //this includes pinv
 	void GetCategoryWeightsForBeagle(int index, vector<FLOAT_TYPE> &p) const {
+		assert(index > -1 && index < nHolders);
 		holders[index].myMod->GetRateProbsForBeagle(p);
 		}
 
 	void GetCategoryWeightsForBeagle(int index, vector<FLOAT_TYPE> &p, int modelIndex) const {
+		assert(index > -1 && index < nHolders);
 		holders[index].myModPart->GetModel(modelIndex)->GetRateProbsForBeagle(p);
 	}
 
 	//need to include pinv, which is a separate rate as far as beagle is concerned, but not for Gar
-	int NumRateCatsForBeagle(int index) const { 
+	int NumRateCatsForBeagle(int index) const {
+		assert(index > -1 && index < nHolders);
 		return holders[index].myMod->NumRateCatsForBeagle();
 		}
 
 	int NumRateCatsForBeagle(int index, int modelIndex) const {
+		assert(index > -1 && index < nHolders);
 		return holders[index].myModPart->GetModel(modelIndex)->NumRateCatsForBeagle();
 	}
 
 	MODEL_FLOAT ***GetPmatArray(int index){
+		assert(index > -1 && index < nHolders);
 		assert(holders[index].numAssigned > 0);
 		if(holders[index].theMatSet == NULL){
 			FillTransMatHolder(index);
@@ -364,6 +380,7 @@ public:
 		}
  
 	MODEL_FLOAT ***GetD1MatArray(int index){
+		assert(index > -1 && index < nHolders);
 		assert(holders[index].numAssigned > 0);
 		if(holders[index].theMatSet == NULL)
 			FillTransMatHolder(index);
@@ -371,6 +388,7 @@ public:
 		}
 
 	MODEL_FLOAT ***GetD2MatArray(int index){
+		assert(index > -1 && index < nHolders);
 		assert(holders[index].numAssigned > 0);
 		if(holders[index].theMatSet == NULL)
 			FillTransMatHolder(index);
@@ -378,6 +396,7 @@ public:
 		}
 
 	void FillTransMatHolder(int index){
+		assert(index > -1 && index < nHolders);
 		//outman.DebugMessage("assign %d", index);
 		assert(holders[index].theMatSet == NULL);
 		holders[index].theMatSet = AssignFreeTransMatSet();
@@ -386,6 +405,7 @@ public:
 	//This is essentially the same as GetTransmat, but doesn't return anything and also sets the tempReserved flag
 	//FillHolder is only used if the holder is currently empty
 	void ClaimTransmatsetFillIfNecessary(int index){
+		assert(index > -1 && index < nHolders);
 		//this is all that needs to happen here until transmat recycling is worked out
 		if(IsHolderDirty(index)){
 			FillTransMatHolder(index);
@@ -400,28 +420,34 @@ public:
 		}
 
 	const TransMatHolder *GetTransMatHolder(int index) const{
+		assert(index > -1 && index < nHolders);
 		//outman.DebugMessage("get %d", index);
 		return &holders[index];
 		}
 
 	TransMatHolder *GetMutableTransMatHolder(int index){
+		assert(index > -1 && index < nHolders);
 		//outman.DebugMessage("get mut %d", index);
 		return &holders[index];
 		}
 
 	const Model *GetModelForTransMatHolder(int index)const{
+		assert(index > -1 && index < nHolders);
 		return holders[index].GetConstModel();
 		}
 
 	const Model *GetModelForTransMatHolder(int index, int modelIndex)const {
+		assert(index > -1 && index < nHolders);
 		return holders[index].GetConstModel(modelIndex);
 	}
 
 	Model *GetMutableModelForTransMatHolder(int index)const{
+		assert(index < nHolders);
 		return holders[index].myMod;
 		}
 
 	void FillDerivativeMatrices(int index, double ***thePMat, double ***theD1Mat, double ***theD2Mat){
+		assert(index > -1 && index < nHolders);
 		TransMatHolder *hold = &holders[index];
 		thePMat = hold->GetPmatArray();
 		theD1Mat = hold->GetD1Array();
@@ -452,6 +478,7 @@ public:
 		assert(holders[index].numAssigned == 0);
 		IncrementTransMatHolder(index);
 		holderStack.pop_back();
+		assert(index > -1 && index < nHolders);
 		return index;
 		}
 
@@ -470,14 +497,16 @@ public:
 		}
 
 	void IncrementTransMatHolder(int index){
+		assert(index > -1 && index < nHolders);
 		//outman.DebugMessage("inc %d to %d", index, holders[index].numAssigned + 1);
 		holders[index].numAssigned++;
 		}
 
 	void DecrementTransMatHolder(int index){
+		assert(index != -1 && index < nHolders);
+
 		TransMatHolder *thisHold = &holders[index];
 
-		assert(index != -1);
 		assert(thisHold->numAssigned != 0);
 		//outman.DebugMessage("dec %d to %d", index, holders[index].numAssigned - 1);
 		if(thisHold->numAssigned == 1){
@@ -507,7 +536,7 @@ public:
 		//	->null the holder's transmatSet pointer and return the same index
 		//2. transmatSet is being made dirty, and multiple nodes point to it
 		//	->remove this transmatSet from the holder (decrement) and assign a new one	
-		assert(index != -1);
+		assert(index > -1 && index < nHolders);
 
 		TransMatHolder *thisHold = &holders[index];
 		//outman.DebugMessage("dirty %d", index);
@@ -528,6 +557,7 @@ public:
 			holderStack.pop_back();
 			IncrementTransMatHolder(index);
 			}
+		assert(index > -1 && index < nHolders);
 		return index;
 		}
 
@@ -824,7 +854,7 @@ class SubsetCalculationManager {
 
 
 	public:
-	BeagleInstanceDetails InitializeSubset(int nClas, int nHolders, int pref_flags, int req_flags, SequenceData *data, ModelSpecification *subsetModSpec, int modelInd, int beagleDeviceNum=-1);
+	BeagleInstanceDetails InitializeSubset(int nClas, int nHolders, int nMatrices, int pref_flags, int req_flags, SequenceData *data, ModelSpecification *subsetModSpec, int modelInd, int beagleDeviceNum=-1);
 	void SendTipDataToBeagle();
 	void UpdateAllConditionals(list<BlockingOperationsSet> operationSetQueue, bool freeClas);
 	void PerformClaOperationBatch(const list<ClaOperation> &theOps);
@@ -1005,7 +1035,7 @@ public:
 	
 	void InitializeBeagleInstance(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates);
 	void InitializeBeagleInstance(int nnod, int nClas, int nHolders, int nstates, int nchar, int nrates, SequenceData *data);
-	void AddSubsetInstance(int nClas, int nHolders, SequenceData *subsetData, ModelSpecification *subsetModSpec, int modelIndex);
+	void AddSubsetInstance(int nClas, int nHolders, int nMatrices, SequenceData *subsetData, ModelSpecification *subsetModSpec, int modelIndex);
 
 	void Finalize(){
 		//for(vector<int>::iterator inst = beagleInstances.begin(); inst != beagleInstances.end(); inst++)

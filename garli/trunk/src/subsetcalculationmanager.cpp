@@ -56,7 +56,7 @@ void SubsetCalculationManager::CheckBeagleReturnValue(int err, const char *funcN
 
 
 //this could be improved by calculating some of these arguments in this function 
-BeagleInstanceDetails SubsetCalculationManager::InitializeSubset(int nClas, int nHolders, int pref_flag_bits, int req_flag_bits, SequenceData *data, ModelSpecification *modSpec, int modelInd, int beagleDeviceNum /*=-1*/) {
+BeagleInstanceDetails SubsetCalculationManager::InitializeSubset(int nClas, int nHolders, int nMatrices, int pref_flag_bits, int req_flag_bits, SequenceData *data, ModelSpecification *modSpec, int modelInd, int beagleDeviceNum /*=-1*/) {
 	//set these class members
 	modelIndex = modelInd;
 	subsetModSpec = modSpec;
@@ -78,8 +78,8 @@ BeagleInstanceDetails SubsetCalculationManager::InitializeSubset(int nClas, int 
 	int eigCount = nrates;
 #endif
 	//this is a gross overestimate of how many matrices are needed, but haven't worked out recycling quite yet for mats
-	//int matrixCount = (nHolders * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
-	int matrixCount = (nClas * 3) * 2;//x3 for the pmats, d1mats and d2mats, x2 for both internals and terms
+	//nMatrices is calculated up in pop->setup as total_size * (2 * (dataPart->NTax() - 1)) * 3;
+	int matrixCount = nMatrices;
 
 	//try one scaler per cla, as in normal garli.  These are doubles rather than ints though, so larger.
 	//scaler for a given cla will share same index, and will be cumulative, as mine are now

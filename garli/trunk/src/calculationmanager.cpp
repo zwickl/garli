@@ -265,7 +265,7 @@ void CalculationManager::InterpretBeagleResourceFlags(long flags, string &list, 
 	}
 
 #ifdef BEAGLEPART
-void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData *subsetData, ModelSpecification *subsetModSpec, int modelIndex) {
+void CalculationManager::AddSubsetInstance(int nClas, int nHolders, int nMatrices, SequenceData *subsetData, ModelSpecification *subsetModSpec, int modelIndex) {
 	assert(useBeagle);
 
 	termOnBeagleError = true;
@@ -280,7 +280,7 @@ void CalculationManager::AddSubsetInstance(int nClas, int nHolders, SequenceData
 		nextGPUIndex++;
 	}
 
-	const BeagleInstanceDetails details = subsetMan->InitializeSubset(nClas, nHolders, pref_flag_bits, req_flag_bits, subsetData, subsetModSpec, modelIndex, deviceNumToUse);
+	const BeagleInstanceDetails details = subsetMan->InitializeSubset(nClas, nHolders, nMatrices, pref_flag_bits, req_flag_bits, subsetData, subsetModSpec, modelIndex, deviceNumToUse);
 	OutputInstanceReport(&details);
 	subsetMan->SetClaManager(claMan);
 	subsetMan->SetPmatManager(pmatMan);

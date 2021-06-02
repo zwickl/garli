@@ -604,6 +604,15 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	}
 
 #ifdef USE_BEAGLE
+	//both the tips and internal branches need pmats, hence the x2, and eage edge needs prob, D1 and D2 matrices, hence x3
+	int idealPmats = total_size * (2 * (dataPart->NTax() - 1)) * 3;
+	//for now using as many pmats as pmat holders
+	//for beagle pmat manager only being used to manage pmat indeces, so no actual allocation and nstates/nrates don't actually matter
+	if (!pmatMan) {
+		pmatMan = new PmatManager(idealPmats, idealPmats, 4, 4);
+		CalculationManager::SetPmatManager(pmatMan);
+	}
+
 	CalculationManager::SetClaManager(claMan);
 	//loop over subsets (for partitioned beagle)
 	double totalMemAllocated = 0.0;
@@ -616,21 +625,12 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		outman.UserMessage("For this partition subset, Garli will actually use approx. %.1f MB of memory", subsetMemUsage);
 		totalMemAllocated += subsetMemUsage;
 
-		//both the tips and internal branches need pmats, hence the x2
-		int idealPmats = total_size * (2 * (dataPart->NTax() - 1));
-		idealPmats *= 2;
-		//for now using as many pmats as pmat holders
-		//for beagle pmat manager only being used to manage pmat indeces, so no actual allocation and nstates/nrates don't actually matter
-		if (!pmatMan) {
-			pmatMan = new PmatManager(idealPmats, idealPmats, (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)), subsetModSpec->nstates);
-		CalculationManager::SetPmatManager(pmatMan);
-		}
 #ifndef BEAGLEPART
 		//invariable class needs to be treated as extra rate for beagleF
 		//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec.numRateCats + (subsetModSpec.includeInvariantSites ? 1 : 0)));
 		calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)));
 #else
-		calcMan->AddSubsetInstance(numClas, idealClas, subsetData, subsetModSpec, subsetSpec->modelIndex);
+		calcMan->AddSubsetInstance(numClas, idealClas, idealPmats, subsetData, subsetModSpec, subsetSpec->modelIndex);
 		outman.UserMessage("\n#######################################################");
 #endif
 	} // end loop over modelParts
