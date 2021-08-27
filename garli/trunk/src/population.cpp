@@ -489,6 +489,7 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	FLOAT_TYPE memToUse;
 	//this gives a bit of leeway in normal runs, when total mem usage may get significantly higher than the actual CLA usage
 	//but not much is used when just scoring/optimizing one tree
+	//this will be ignored for beagle runs, where the pmat mem usage is explicitly included
 	FLOAT_TYPE memUsageMult = ((conf->scoreOnly || conf->optimizeInputOnly) ? 1.05 : 1.25);
 	outman.UserMessage("NOTE: Unlike many programs, the amount of system memory that Garli will\nuse can be controlled by the user.");
 	if(conf->availableMemory > 0){
@@ -537,10 +538,10 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	double claSizePerNodeKB = 0.0;
 #ifdef USE_BEAGLE
 	double subsetClaSizePerNodeKB = 0.0;
-	vector<int> subsetClaSizes;
+	vector<int> subsetClaSizesKB;
 	for (vector<ClaSpecifier>::iterator subsetSpec = claSpecs.begin(); subsetSpec != claSpecs.end(); subsetSpec++) {
 		subsetClaSizePerNodeKB = indiv[0].modPart.CalcRequiredSubsetCLAsizeKB(subsetSpec->claIndex, dataPart, true);
-		subsetClaSizes.push_back(subsetClaSizePerNodeKB);
+		subsetClaSizesKB.push_back(subsetClaSizePerNodeKB);
 		claSizePerNodeKB = max(subsetClaSizePerNodeKB, claSizePerNodeKB);
 	}
 #else
@@ -604,12 +605,17 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 	}
 
 #ifdef USE_BEAGLE
-	//both the tips and internal branches need pmats, hence the x2, and eage edge needs prob, D1 and D2 matrices, hence x3
-	int idealPmats = total_size * (2 * (dataPart->NTax() - 1)) * 3;
+	//both the tips and internal branches need pmats
+    //the second x2 is so that there are some extra mats for indiv and newIndiv arrays and for scoring final trees stored after each replicate  
+    //each edge needs prob, D1 and D2 matrices, but the pmatMan will only be managing PmatSets, 
+    //so the 3 matrices per node will be taken care of when the number of mats to allocate is passed to beagle, then later when indeces are passed to beagle 
+    //for operations the the internal pmatMan indeces will be converted to beagle indeces 
+    int edgesPerTree = (2 * (dataPart->NTax() - 1));
+	int idealPmatSets = total_size * edgesPerTree * 2;
 	//for now using as many pmats as pmat holders
-	//for beagle pmat manager only being used to manage pmat indeces, so no actual allocation and nstates/nrates don't actually matter
+	//for beagle mode, pmat manager only being used to manage pmat indeces, so no actual allocation and nstates/nrates don't actually matter
 	if (!pmatMan) {
-		pmatMan = new PmatManager(idealPmats, idealPmats, 4, 4);
+		pmatMan = new PmatManager(idealPmatSets, idealPmatSets, 4, 4);
 		CalculationManager::SetPmatManager(pmatMan);
 	}
 
@@ -620,17 +626,19 @@ void Population::Setup(GeneralGamlConfig *c, DataPartition *d, DataPartition *ra
 		outman.UserMessage("Partition subset %d:", (*subsetSpec).modelIndex);
 		SequenceData *subsetData = dataPart->GetSubset(subsetSpec->dataIndex);
 		ModelSpecification *subsetModSpec = modSpecSet.GetModSpec(subsetSpec->modelIndex);
+        int effectiveNumRates = subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0);
 
-		double subsetMemUsage = memUsageMult * (FLOAT_TYPE)numClas * (FLOAT_TYPE)subsetClaSizes[subsetSpec->claIndex] / (FLOAT_TYPE)KB;
-		outman.UserMessage("For this partition subset, Garli will actually use approx. %.1f MB of memory", subsetMemUsage);
-		totalMemAllocated += subsetMemUsage;
+        int totalPmatMemSizeKB = (idealPmatSets * 3 * subsetData->NStates() * subsetData->NStates() * effectiveNumRates * sizeof(FLOAT_TYPE)) / (FLOAT_TYPE)KB;
+		double subsetMemUsageMB = ((  (FLOAT_TYPE)numClas * (FLOAT_TYPE)subsetClaSizesKB[subsetSpec->claIndex]) +  (FLOAT_TYPE)totalPmatMemSizeKB) / (FLOAT_TYPE)KB;
+
+		outman.UserMessage("For this partition subset, Garli will actually use approx. %.1f MB of memory", subsetMemUsageMB);
+		totalMemAllocated += subsetMemUsageMB;
 
 #ifndef BEAGLEPART
-		//invariable class needs to be treated as extra rate for beagleF
 		//calcMan->InitializeBeagle(data->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec.numRateCats + (subsetModSpec.includeInvariantSites ? 1 : 0)));
-		calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), (subsetModSpec->numRateCats + (subsetModSpec->includeInvariantSites ? 1 : 0)));
+		calcMan->InitializeBeagleInstance(dataPart->NTax(), numClas, idealClas, subsetData->NStates(), subsetData->NChar(), effectiveNumRates);
 #else
-		calcMan->AddSubsetInstance(numClas, idealClas, idealPmats, subsetData, subsetModSpec, subsetSpec->modelIndex);
+		calcMan->AddSubsetInstance(numClas, idealClas, idealPmatSets*3, subsetData, subsetModSpec, subsetSpec->modelIndex);
 		outman.UserMessage("\n#######################################################");
 #endif
 	} // end loop over modelParts

@@ -284,6 +284,9 @@ void SubsetCalculationManager::PerformTransMatOperationBatch(const list<TransMat
 	vector<int> d2MatInd;
 	vector<double> edgeLens;
 
+#ifdef OUTPUT_OTHER_BEAGLE
+	outman.DebugMessageNoCR("UPDATING TRANS MATS");
+#endif
 	for (list<TransMatOperation>::const_iterator it = theOps.begin(); it != theOps.end(); it++) {
 		//DEBUG
 		//outman.DebugMessage("transmat %d mod %d modadr %d edge %.4f", (*it).destTransMatIndex, (*it).modelIndex, pmatMan->GetCorrespondingModel((*it).destTransMatIndex), (*it).edgeLength);
@@ -293,15 +296,20 @@ void SubsetCalculationManager::PerformTransMatOperationBatch(const list<TransMat
 		d1MatInd.push_back(D1MatIndexForBeagle((*it).destTransMatIndex));
 		d2MatInd.push_back(D2MatIndexForBeagle((*it).destTransMatIndex));
 		edgeLens.push_back(pmatMan->GetScaledEdgelen((*it).destTransMatIndex, modelIndex));
+#ifdef OUTPUT_OTHER_BEAGLE
+	outman.DebugMessage("HI %d PI %d BI %d, eigen %d, blen %f", (*it).destTransMatIndex, pmatMan->GetTransMatSet((*it).destTransMatIndex)->Index(), PmatIndexForBeagle((*it).destTransMatIndex), eigenIndex, edgeLens[0]);
+#endif
 	}
 
 	int count = pmatInd.size();
 	bool calcDerivs = theOps.begin()->calcDerivs;
 
+    /*
 #ifdef OUTPUT_OTHER_BEAGLE
 	outman.DebugMessageNoCR("UPDATING TRANS MAT ");
 	outman.DebugMessage("%d (%d), eigen %d, blen %f", PmatIndexForBeagle(theOps.front().destTransMatIndex), theOps.front().destTransMatIndex, eigenIndex, edgeLens[0]);
 #endif
+*/
 
 	if (nstates > 60 && nrates > 1) {
 		vector<int> eigenIndeces;
