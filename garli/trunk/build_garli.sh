@@ -24,6 +24,22 @@ then
             cd ${nclv} || exit
             sh bootstrap.sh || exit
             cd ..
+        elif [ "$1" = "--ncl-git" ]
+        then    
+            TARG="ncl-git"
+            if [ -d $TARG ] 
+            then
+                echo "***NCL LIBRARY SOURCE FROM GIT ALREADY EXISTS***"
+                echo "***CURRENT COPY WILL BE USED AS-IS.  UPDATE IT MANUALLY OR***"
+                echo "***DELETE THE $TARG  DIRECTORY TO GET THE LATEST NCL SOURCE***"
+            else
+                echo "***CHECKING OUT NCL LIBRARY SOURCE VIA GIT***"
+                    git clone https://github.com/mtholder/ncl.git $TARG|| exit
+            fi
+            shift # this shifts the first cmd line argument out so that the rest can be passed to GARLI configure
+            cd ${TARG} || exit
+            sh bootstrap.sh || exit
+            cd ..
         elif [ "$1" = "-h" ] || [ "$1" = "--help" ]
         then
                 echo "Usage ./$0 [--svn-ncl] [-h] [arguments to GALRI configure script]"
@@ -41,7 +57,7 @@ then
 fi
 
 #if NCL wasn't checked out above
-if [ -z "${nclv}" ]
+if [ -z "${TARG}" ]
 then
 	if [ "$1" = "--ncl-dist" ]
 	then
