@@ -1,6 +1,6 @@
-// GARLI version 1.00 source code
-// Copyright 2005-2010 Derrick J. Zwickl
-// email: zwickl@nescent.org
+// GARLI version 2.2 source code
+// Copyright 2005-2022 Derrick J. Zwickl
+// email: garli.support@gmail.com
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -278,6 +278,8 @@ public:
 
 	const int GetNumStates() const { return nStates; }
 	const int GetNumRates() const { return nRates; }
+	const int GetNumHolders() const { return nHolders; }
+	const int GetNumMatrices() const { return nMats; }
 	bool TransMatIsAssigned(int index) const { return holders[index].theMatSet != NULL; }
 	bool IsHolderDirty(int index) const { return holders[index].theMatSet == NULL; }
 
@@ -567,19 +569,25 @@ public:
 	int GetPmatIndexForBeagle(int index) const{
 		assert(index > -1 && index < nHolders);
 		assert(holders[index].theMatSet != NULL);
-		return holders[index].theMatSet->Index() * 3;
+		int bindex = holders[index].theMatSet->Index() * 3;
+		assert(bindex < this->GetNumMatrices());
+		return bindex;
 		}
 	
 	int GetD1MatIndexForBeagle(int index) const{
 		assert(index > -1 && index < nHolders);
 		assert(holders[index].theMatSet != NULL);
-		return holders[index].theMatSet->Index() * 3 + 1;
+		int bindex = holders[index].theMatSet->Index() * 3 + 1;
+		assert(bindex < this->GetNumMatrices());
+		return bindex;
 		}
 
 	int GetD2MatIndexForBeagle(int index) const{
 		assert(index > -1 && index < nHolders);
 		assert(holders[index].theMatSet != NULL);
-		return holders[index].theMatSet->Index() * 3 + 2;
+		int bindex = holders[index].theMatSet->Index() * 3 + 2;
+		assert(bindex < this->GetNumMatrices());
+		return bindex;
 		}
 	};
 

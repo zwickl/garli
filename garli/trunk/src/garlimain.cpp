@@ -1,5 +1,5 @@
-// GARLI version 2.1 source code
-// Copyright 2005-2014 Derrick J. Zwickl
+// GARLI version 2.2 source code
+// Copyright 2005-2022 Derrick J. Zwickl
 // email: garli.support@gmail.com
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -14,12 +14,10 @@
 //
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-//	NOTE: Portions of this source adapted from GAML source, written by Paul O. Lewis
 
 #define PROGRAM_NAME "GARLI"
 #define MAJOR_VERSION "2"
-#define MINOR_VERSION "1"
+#define MINOR_VERSION "2"
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
 #define SVN_REV "$Rev$"
 #define SVN_DATE "$Date$"
@@ -276,8 +274,8 @@ int main( int argc, char* argv[] )	{
 						outman.UserMessage("Single precision floating point version");
 #endif
 						outman.UserMessage("(DNA, AA, codon, morphology and partitioned models)");
-						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2011");
-						outman.UserMessage("http://www.nescent.org/wg/garli/");
+						outman.UserMessage("Copyright Derrick J. Zwickl 2005-2022");
+						outman.UserMessage("https://github.com/zwickl/garli");
 						outman.UserMessage("garli.support@gmail.com");
 						return 0;
 						}
@@ -463,15 +461,15 @@ int main( int argc, char* argv[] )	{
 #endif
 
 			outman.UserMessage("##############################################################");
-			outman.UserMessage(" This is GARLI 2.1: maximum likelihood phylogenetic inference");
+			outman.UserMessage(" This is GARLI 2.2: maximum likelihood phylogenetic inference");
 			outman.UserMessage(" using nucleotide, amino acid, codon and morphology-like data,");
 			outman.UserMessage("             as well as partitioned models.");
 			outman.UserMessage("   General program usage is extensively documented here:");
-			outman.UserMessage("            http://www.nescent.org/wg/garli/");
+			outman.UserMessage("            https://github.com/zwickl/garli/wiki");
 			outman.UserMessage("   See this page for details on partitioned model usage:");
-			outman.UserMessage("  http://www.nescent.org/wg_garli/Using_partitioned_models");
+			outman.UserMessage("  https://github.com/zwickl/garli/wiki/Garli_using_partitioned_models");
 			outman.UserMessage("   and this page for details on Mkv mophology model usage:");
-			outman.UserMessage("    http://www.nescent.org/wg_garli/Mkv_morphology_model");
+			outman.UserMessage("    https://github.com/zwickl/garli/wiki/Garli_Mkv_morphology_model");
 			outman.UserMessage("         PLEASE LET ME KNOW OF ANY PROBLEMS AT:");
 			outman.UserMessage("                garli.support@gmail.com");
 			outman.UserMessage("##############################################################");
