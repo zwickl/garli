@@ -1,5 +1,5 @@
-// GARLI Version 2.1 (September 2014)
-// Copyright 2005-2014 Derrick J. Zwickl
+// GARLI Version 2.2
+// Copyright 2005-2022 Derrick J. Zwickl
 // email: garli.support@gmail.com
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,6 @@
 
 Please let me know of any problems, concerns or feedback (garli.support@gmail.com)
 
-GARLI version 2.1 is a minor update to version 2.0.
 Versions >= 2.0 include models for nucleotides, amino acids,
 odons, and morphology-like characters, any of which can be 
 mixed together and applied to different subsets of data.
@@ -31,7 +30,13 @@ using the program.  For very basic usage see QuickStart.txt.
 ->Example datasets and template configuration files files can be found in the example folder
 
 ->For compilation help see the INSTALL file.  Versions >= 2.0 comes with an extremely easy build
-script, build_garli.sh, which should make compalation trivial on linux or OS X machines.
+script, build_garli.sh, which should make compalation trivial for many versions on linux or OS X machines.
+
+***New in version 2.2***
+1. Use  of the BEAGLE-LIB computation library.  
+Beagle-lib (https://github.com/beagle-dev/beagle-lib)  allows the use of GPU accelerators, which 
+allows  Garli to run several times faster, with the exact amount depending on the dataset and model used.  
+Codon models benefit the most. 
 
 ***New in version 2.1***
 1. MUCH faster parsing of very long alignments.  e.g., alignments millions of nucleotides in 

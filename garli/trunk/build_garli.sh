@@ -27,6 +27,7 @@ then
         elif [ "$1" = "--ncl-git" ]
         then    
             TARG="ncl-git"
+            nclv=$TARG
             if [ -d $TARG ] 
             then
                 echo "***NCL LIBRARY SOURCE FROM GIT ALREADY EXISTS***"

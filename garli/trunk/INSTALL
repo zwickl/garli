@@ -8,6 +8,7 @@ download one of the pre-compiled binaries.
 problems, please email garli.support@gmail.com)
 ------
 
+FOR STANDARD SINGLE PROCESSOR VERSION:
 EXTRA EASY COMPILATION INSTRUCTIONS (USE OF THIS IS RECOMMENDED!):
 If this is a version with the NCL source code bundled (there
 will be an ncl-2.1.xx.tar.gz file in the same directory as this
@@ -15,7 +16,10 @@ file), then you should be able to very easily do a default
 compilation and static linking to NCL by typing this in the
 same directory as this file:
 
-./build_garli.sh
+If no ncl-2.1.xx.tar.gz file appears in this directory,
+you may have NCL automatically downloaded and built
+
+./build_garli.sh --ncl-git
 
 This will do all of the necessary building of the NCL library, 
 and you should eventually end up with a working Garli-#.#
@@ -33,7 +37,7 @@ build_garli script will find and use it.
 ->If you want to check out the newest version of NCL (which could
 have bug fixes) from Sourceforge and build GARLI with it, do this:
 
-./build_garli.sh --ncl-svn
+./build_garli.sh --ncl-git
 
 ->If you know what you are doing and want to use a different compiler
 (such as the intel icc compiler) instead of gcc you can invoke the 
@@ -127,6 +131,16 @@ You can similarly pass extra CXXFLAGS or LDFLAGS:
 env CXXFLAGS=<your flags> LDFLAGS=<your flags> ./configure ... etc
 ------
 
+####BUILDING GARLI WITH BEAGLE-LIB SUPPORT####
+Adding BEAGLE-LIB  support to GARLI  will allow the use of faster ilikelihood computation 
+methods such as GPU accelerators and SSE.  
+
+First insatall beagle-lib (https://github.com/beagle-dev/beagle-lib)
+Then configure GARLI with these configure flags:
+--enable-beagle
+--with-beagle=<beagle-lib install directory>
+
+------
 Making an OS X Universal binary (this may not work with newer versions of OS X):
 To do this you first need to build the NCL static library with multiple architectures.
 Configure NCL like this (all on one line):

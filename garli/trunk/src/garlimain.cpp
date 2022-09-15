@@ -15,7 +15,11 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#ifndef USE_BEAGLE
 #define PROGRAM_NAME "GARLI"
+#else
+#define PROGRAM_NAME "GARLI-BEAGLE"
+#endif
 #define MAJOR_VERSION "2"
 #define MINOR_VERSION "2"
 //DON'T mess with the following 2 lines!.  They are auto substituted by svn.
@@ -116,8 +120,8 @@ int CheckRestartNumber(const string str){
 	}
 
 void UsageMessage(char *execName){
-#ifdef SUBROUTINE_GARLI
 	OutputVersion();
+#ifdef SUBROUTINE_GARLI
 	outman.UserMessage("This MPI version is for doing a large number of search replicates or bootstrap");
 	outman.UserMessage("replicates, each using the SAME config file.  The results will be exactly");
  	outman.UserMessage("identical to those obtained by executing the config file a comparable number");
@@ -129,7 +133,6 @@ void UsageMessage(char *execName){
 	outman.UserMessage("This version will expect a config file named \"garli.conf\".");
 	outman.UserMessage("Consult your cluster documentation for details on running MPI jobs\n");
 #elif defined (OLD_SUBROUTINE_GARLI)
-	OutputVersion();
 	outman.UserMessage("This MPI version is for doing a large number of independent jobs in batch, each");
 	outman.UserMessage("using a DIFFERENT config file.  This might be useful for analyzing a large");
 	outman.UserMessage("number of simulated datasets or for analyzing a single dataset under a variety");

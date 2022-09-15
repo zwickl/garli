@@ -2,7 +2,7 @@
 # This file was written by hand (by mth using PAUP's configure.ac and http://autotoolset.sourceforge.net/tutorial.html as guides).
 
 AC_PREREQ(2.59)
-AC_INIT([Garli], [2.1], [garli.support@gmail.com])
+AC_INIT([Garli], [2.2], [garli.support@gmail.com])
 
 AC_CONFIG_SRCDIR([src/garlimain.cpp])
 AC_CONFIG_HEADER([config.h])
@@ -251,61 +251,6 @@ if test  "$enable_beagle" = yes; then
    LIBS="$LIBS $BEAGLE_LIB"
    CXXFLAGS="$CXXFLAGS $BEAGLE_INCLUDES -DNEW_MANAGEMENT -DUSE_BEAGLE -DBEAGLEPART"
 fi
-
-####################################################################
-# DLA cuda toolkit (required for original cuda version) 
-CUDA_INSTALL_PATH="/usr/local/cuda"
-
-AC_ARG_WITH(
-	[cuda],
-	AC_HELP_STRING(
-		[--with-cuda=DIR],
-		[Specify the root directory for CUDA toolkit. Omit this flag to build using the default location ("/usr/local/cuda"). Used with --enable-beagle-cuda and --enable-cuda-gpu flags.]
-		),
-	[
-	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
-		CUDA_INSTALL_PATH="$withval"
-	fi
-	])
-
-# DLA original cuda gpu version
-CUDA_SDK_INSTALL_PATH="/Developer/CUDA"
-
-AC_ARG_WITH(
-	[cuda-sdk],
-	AC_HELP_STRING(
-		[--with-cuda-sdk=DIR],
-		[Specify the root directory for CUDA SDK. Omit this flag to build using the default location ("/Developer/CUDA"). Used with --enable-cuda-gpu flag.]
-		),
-	[
-	if ! test "$withval" = "yes" -o "$withval" = "no" ; then
-		CUDA_SDK_INSTALL_PATH="$withval"
-	fi
-	])
-
-if test  "$enable_cuda_gpu" = yes; then
-	NVCCFLAGS="$NVCCFLAGS --ptxas-options=-v -DUNIX --compiler-options -fno-strict-aliasing"
-	CUDA_CFLAGS="-DCUDA_GPU -I$CUDA_INSTALL_PATH/include -I$CUDA_SDK_INSTALL_PATH/C/common/inc"
-	if test  "$enable_cuda_memory" = yes; then
-		CUDA_CFLAGS="$CUDA_CFLAGS -DCUDA_MEMORY_PINNED"
-	fi
-	if test  "$enable_single_prec" = yes; then
-		NVCCFLAGS="$NVCCFLAGS -DSINGLE_PRECISION_FLOATS"
-	fi
-   CUDA_LDFLAGS="-L$CUDA_INSTALL_PATH/lib64 -L$CUDA_INSTALL_PATH/lib -L$CUDA_SDK_INSTALL_PATH/C/lib/"
-   CUDA_LIBS="-lcuda -lcudart -lcutil"
-   LDFLAGS="$LDFLAGS $CUDA_LDFLAGS"
-   LIBS="$LIBS $CUDA_LIBS"
-   CXXFLAGS="$CXXFLAGS $CUDA_CFLAGS"
-   NVCCFLAGS="$NVCCFLAGS $CUDA_CFLAGS"
-   NVCC="nvcc"
-   AC_SUBST(NVCC)
-   AC_SUBST(NVCCFLAGS)
-fi
-
-AM_CONDITIONAL(CUDASOURCE, test "$enable_cuda_gpu" = yes)
-                                                                   #
-####################################################################
 
 AC_LANG(C++)
 ACX_MPI
